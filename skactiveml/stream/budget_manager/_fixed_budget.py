@@ -14,7 +14,7 @@ class FixedBudget(BudgetManager):
     def is_budget_left(self):
         return self.seen_samples * self.budget - self.sampled_samples >= 1
     
-    def sample(self, utilities, return_budget_left=False, adapt_budget_manager=True, **kwargs):
+    def sample(self, utilities, return_budget_left=False, simulate=False, **kwargs):
         sampled = np.full(len(utilities), False)
         budget_left = np.full(len(utilities), False)
         
@@ -27,7 +27,7 @@ class FixedBudget(BudgetManager):
             sampled[i] = budget_left[i] and (utility >= 1 - self.budget)
             self.sampled_samples += sampled[i]
         
-        if not adapt_budget_manager:
+        if simulate:
             self.seen_samples = init_seen_samples
             self.sampled_samples = init_sampled_samples
         

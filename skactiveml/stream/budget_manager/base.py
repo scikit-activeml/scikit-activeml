@@ -14,5 +14,5 @@ class BudgetManager(ABC, BaseEstimator):
     def is_budget_left(self):
         return NotImplemented
     
-    def sample(self, utilities, return_budget_left=False, adapt_budget_manager=True, **kwargs):
+    def sample(self, utilities, return_budget_left=False, simulate=False, **kwargs):
         return NotImplemented
