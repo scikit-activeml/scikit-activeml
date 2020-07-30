@@ -23,3 +23,14 @@ class PoolBasedQueryStrategy(QueryStrategy):
     @abstractmethod
     def query(self, X_cand, *args, return_utilities=False, **kwargs):
         return NotImplemented
+
+
+class StreamBasedQueryStrategy(QueryStrategy):
+
+    def __init__(self,budget_manager, random_state=None):
+        super().__init__(random_state=random_state)
+        self.budget_manager = budget_manager
+
+    @abstractmethod
+    def query(self, X_cand, *args, return_utilities=False, adapt_query_strategy=True, **kwargs):
+        return NotImplemented

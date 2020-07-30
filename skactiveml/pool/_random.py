@@ -13,7 +13,7 @@ class RandomSampler(PoolBasedQueryStrategy):
     def query(self, X_cand, return_utilities=False, **kwargs):
         X_cand = check_array(X_cand, force_all_finite=False)
 
-        utilities = self.random_state.rand(len(X_cand))
+        utilities = self.random_state.random_sample(len(X_cand))
 
         best_indices = utilities.argsort()[-self.batch_size:][::-1]
 
