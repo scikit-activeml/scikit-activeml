@@ -1,8 +1,8 @@
 """
-The :mod:`skactiveml.pool` module implements query strategies for pool-based active learning.
+The :mod:`skactiveml.classifier` module # TODO.
 """
 
-from ._meta import IgnUnlabeledClassifier
+from skactiveml.semi_supervised._wrapper import IgnUnlabeledWrapper
 from ._pwc import PWC
 
-__all__ = ['IgnUnlabeledClassifier', 'PWC']
+__all__ = ['IgnUnlabeledWrapper', 'PWC']
