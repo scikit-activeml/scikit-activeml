@@ -32,5 +32,5 @@ class StreamBasedQueryStrategy(QueryStrategy):
         self.budget_manager = budget_manager
 
     @abstractmethod
-    def query(self, X_cand, *args, return_utilities=False, adapt_query_strategy=True, **kwargs):
+    def query(self, X_cand, *args, return_utilities=False, simulate=False, **kwargs):
         return NotImplemented
