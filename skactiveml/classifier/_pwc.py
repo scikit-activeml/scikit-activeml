@@ -1,7 +1,7 @@
 import numpy as np
 
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.metrics.pairwise import pairwise_kernels
+from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_random_state, check_array
 
 
@@ -46,28 +46,13 @@ class PWC(BaseEstimator, ClassifierMixin):
     Proceedings of the Tenth International Workshop Artificial Intelligence and Statistics, 2005.
     """
 
-    # see https://scikit-learn.org/stable/modules/generated/sklearn.metrics.pairwise.pairwise_kernels.html for
-    # more information
-    KERNEL_PARAMS = {
-        "additive_chi2": (),
-        "chi2": frozenset(["gamma"]),
-        "cosine": (),
-        "linear": (),
-        "poly": frozenset(["gamma", "degree", "coef0"]),
-        "polynomial": frozenset(["gamma", "degree", "coef0"]),
-        "rbf": frozenset(["gamma"]),
-        "laplacian": frozenset(["gamma"]),
-        "sigmoid": frozenset(["gamma", "coef0"]),
-        "precomputed": frozenset([])
-    }
-
     def __init__(self, n_classes, metric='rbf', n_neighbors=None, random_state=None, **kwargs):
         self.n_classes_ = int(n_classes)
         if self.n_classes_ <= 0:
             raise ValueError("The parameter 'n_classes' must be a positive integer.")
         self.metric_ = str(metric)
-        if self.metric_ not in self.KERNEL_PARAMS.keys():
-            raise ValueError("The parameter 'metric' must be a in {}".format(self.KERNEL_PARAMS.keys()))
+        if self.metric_ not in KERNEL_PARAMS.keys():
+            raise ValueError("The parameter 'metric' must be a in {}".format(KERNEL_PARAMS.keys()))
         self.n_neighbors_ = int(n_neighbors) if n_neighbors is not None else n_neighbors
         if self.n_neighbors_ is not None and self.n_neighbors_ <= 0:
             raise ValueError("The parameter 'n_neighbors' must be a positive integer.")
