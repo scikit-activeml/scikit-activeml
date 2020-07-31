@@ -136,6 +136,9 @@ class XPAL(PoolBasedQueryStrategy):
             Unlabeled evaluation samples
         """
 
+        X = X[self.clf.is_labeled(y)]
+        y = y[self.clf.is_labeled(y)]
+
         if self.mode == 'sequential':
 
             if hasattr(self.perf_est, 'predict_freq_seqal'):
