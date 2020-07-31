@@ -86,8 +86,10 @@ class XPAL(PoolBasedQueryStrategy):
         # TODO perf_est needs to implement predict_freq
         self.clf = clf
         self.perf_est = perf_est
-        self.classes = classes
         self.mode = mode
+
+        # TODO remove self.classes
+        self.classes = classes
 
         if risk == 'error' or risk == 'accuracy':
             self.risk = 'misclassification-loss'
