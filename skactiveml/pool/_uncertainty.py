@@ -8,7 +8,7 @@ import warnings
 
 class UncertaintySampling(PoolBasedQueryStrategy):
     # TODO: @PM: add comments and doc_string (incl paper reference) as in sklearn @PM: if you copy functions
-    # from modAL, please make clear where they come from (check with licence, if this is okay)
+    # from modAL, please make clear where they come from (check with licence, if this is okay) hallos
 
     def __init__(self, clf, method='entropy', random_state=None):
         super().__init__(random_state=random_state)
