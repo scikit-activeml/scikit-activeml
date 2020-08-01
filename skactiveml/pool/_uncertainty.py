@@ -13,7 +13,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     def __init__(self, clf, method='entropy', random_state=None):
         super().__init__(random_state=random_state)
 
-        if method is not 'entropy' or method is not 'least_confident' or method is not 'margin_sampling':
+        if (method is not 'entropy') and (method is not 'least_confident') and (method is not 'margin_sampling'):
             warnings.warn('The method \'' + method + '\' does not exist, \'entropy\' will be used.')
             method = 'entropy'
 
@@ -37,9 +37,9 @@ class UncertaintySampling(PoolBasedQueryStrategy):
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand)
-        best_indices = np.ndarray(np.argmax(utilities))
+        best_indices = np.array([np.argmax(utilities)]) # TODO: @PM: choose randomly amount equals
         if return_utilities:
-            return best_indices, utilities
+            return best_indices, np.array([utilities])
         else:
             return best_indices
 
