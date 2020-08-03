@@ -32,7 +32,7 @@ class McPAL(PoolBasedQueryStrategy):
 
 class XPAL(PoolBasedQueryStrategy):
 
-    def __init__(self, clf, perf_est, classes, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
+    def __init__(self, clf, classes, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
         # TODO @DK: clean up
         """ XPAL
         The cost-sensitive expected probabilistic active learning (CsXPAL) strategy is a generalization of the
@@ -141,7 +141,7 @@ class XPAL(PoolBasedQueryStrategy):
 
         if self.mode == 'sequential':
 
-            if hasattr(self.perf_est, 'predict_freq_seqal'):
+            if False: # hasattr(self.perf_est, 'predict_freq_seqal'):
                 # freq_cand          (n_cand, n_classes)
                 # pred_eval          (n_eval)
                 # freq_eval_new_mat  (n_cand, n_classes, n_eval, n_classes),
@@ -149,30 +149,50 @@ class XPAL(PoolBasedQueryStrategy):
 
                 freq_cand, freq_eval, freq_eval_new_mat = self.perf_est.predict_freq_seqal(X, y, X_cand, self.classes, X_eval)
             else:
-                self.perf_est.fit(X, y)
-                freq_cand = self.perf_est.predict_freq(X_cand)
-                freq_eval = self.perf_est.predict_freq(X_eval)
+                self.clf.fit(X, y)
+                pred_eval = self.clf.predict(X_eval).astype(int)
+                if self.perf_est is None:
+                    freq_cand = self.clf.predict_freq(X_cand)
+                    freq_eval = self.clf.predict_freq(X_eval)
+                else:
+                    self.perf_est.fit(X, y)
+                    freq_cand = self.perf_est.predict_freq(X_cand)
+                    freq_eval = self.perf_est.predict_freq(X_eval)
 
                 freq_eval_new_mat = np.full([len(X_cand), len(self.classes), len(X_eval), len(self.classes)], np.nan)
+                pred_eval_new_mat = np.full([len(X_cand), len(self.classes), len(X_eval)], np.nan, dtype=int)
                 for i_x_c, x_c in enumerate(X_cand):
                     for i_y_c, y_c in enumerate(self.classes):
                         X_new = np.vstack([X, [x_c]])
                         y_new = np.hstack([y, [y_c]])
 
-                        self.perf_est.fit(X_new, y_new)
-                        freq_eval_new_mat[i_x_c, i_y_c, :, :] = self.perf_est.predict_freq(X_eval)
+                        self.clf.fit(X_new, y_new)
+                        pred_eval_new_mat[i_x_c, i_y_c, :] = self.clf.predict(X_eval).astype(int)
+                        if self.perf_est is None:
+                            freq_eval_new_mat[i_x_c, i_y_c, :, :] = self.clf.predict_freq(X_eval)
+                        else:
+                            self.perf_est.fit(X_new, y_new)
+                            freq_eval_new_mat[i_x_c, i_y_c, :, :] = self.perf_est.predict_freq(X_eval)
 
-            # TODO: np.broadcast_to (differnet old predictions for pred_eval => pred_eval_mat)
+            # TODO: np.broadcast_to (different old predictions for pred_eval => pred_eval_mat)
             freq_eval_mat = np.tile(freq_eval, [len(X_cand), 1, 1])
+            pred_eval_mat = np.tile(pred_eval, [len(X_cand), 1]).astype(int)
 
             # freq_cand          (n_cand, n_classes)
             # freq_eval_mat      (n_cand, n_eval, n_classes)
             # freq_eval_new_mat  (n_cand, n_classes, n_eval, n_classes)
 
-            return compute_scores_sequential(freq_cand, freq_eval_mat, freq_eval_new_mat, classes=self.classes,
-                                             alpha_cand=self.alpha_cand, alpha_eval=self.alpha_eval,
-                                             risk=self.risk, cost_matrix=self.cost_matrix)
+            utilities = compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat,
+                                                  freq_eval_new_mat, pred_eval_new_mat,
+                                                  classes=self.classes,
+                                                  alpha_cand=self.alpha_cand, alpha_eval=self.alpha_eval,
+                                                  risk=self.risk, cost_matrix=self.cost_matrix)
 
+            best_indices = np.array([np.argmax(utilities)])  # TODO: choose randomly amount equals
+            if return_utilities:
+                return best_indices, np.array([utilities])
+            else:
+                return best_indices
 
 def cost_vector_to_cost_matrix(cost_vector):
     cost_matrix = np.array(cost_vector).reshape(-1, 1) @ np.ones((1, len(cost_vector)))
@@ -180,7 +200,7 @@ def cost_vector_to_cost_matrix(cost_vector):
     return cost_matrix
 
 
-def compute_scores_sequential(freq_cand, freq_eval_mat, freq_eval_new_mat, classes, alpha_cand,
+def compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat, freq_eval_new_mat, pred_eval_new_mat, classes, alpha_cand,
                               alpha_eval, risk, **kwargs):
     prob_cand = get_prior_prob(freq_cand, alpha_cand)
     prob_eval_new_mat = get_prior_prob(freq_eval_new_mat, alpha_eval)
@@ -188,46 +208,48 @@ def compute_scores_sequential(freq_cand, freq_eval_mat, freq_eval_new_mat, class
     risk_diff_mat = np.full(prob_cand.shape, np.nan)
     for i_x_c in range(prob_cand.shape[0]):
         for i_y_c in range(prob_cand.shape[1]):
+            # risk difference for one data model (trained with new label) - only predictions should vary
             risk_diff_mat[i_x_c, i_y_c] = risk_difference(prob_eval_new_mat[i_x_c, i_y_c, :, :],
-                                                          freq_eval_mat[i_x_c], freq_eval_new_mat[i_x_c, i_y_c],
+                                                          freq_eval_mat[i_x_c], pred_eval_mat[i_x_c],
+                                                          freq_eval_new_mat[i_x_c, i_y_c], pred_eval_new_mat[i_x_c, i_y_c],
                                                           risk=risk, classes=classes, **kwargs)
 
     return -np.sum(risk_diff_mat * prob_cand, axis=1)
 
 
-def risk_difference(prob_eval_new, freq_eval, freq_eval_new, risk, classes, **kwargs):
+def risk_difference(prob_eval_new, freq_eval, pred_eval, freq_eval_new, pred_eval_new, risk, classes, **kwargs):
     # prob_eval_new (n_eval, n_classes)
     # freq_eval     (n_eval, n_classes)
     # freq_eval_new  (n_eval, n_classes)
     if risk == 'error':
-        pred_eval = np.argmax(freq_eval, axis=1)
-        pred_eval_new = np.argmax(freq_eval_new, axis=1)
+        #pred_eval = np.argmax(freq_eval, axis=1)
+        #pred_eval_new = np.argmax(freq_eval_new, axis=1)
         loss_diffs = np.array([np.array(y != pred_eval_new, int) - np.array(y != pred_eval, int) for y in classes]).T
         return np.mean(np.sum(prob_eval_new * loss_diffs, axis=-1))
     elif risk == 'misclassification-loss':
         cost_matrix = kwargs.pop('cost_matrix', None)
-        pred_eval = np.argmin(freq_eval @ cost_matrix, axis=1)
-        pred_eval_new = np.argmin(freq_eval_new @ cost_matrix, axis=1)
+        #pred_eval = np.argmin(freq_eval @ cost_matrix, axis=1)
+        #pred_eval_new = np.argmin(freq_eval_new @ cost_matrix, axis=1)
         loss_diffs = np.array([cost_matrix[y, pred_eval_new] - cost_matrix[y, pred_eval] for y in classes]).T
         return np.mean(np.sum(prob_eval_new * loss_diffs, axis=-1))
     elif risk == 'f1-score':
         C = cost_vector_to_cost_matrix(1 / np.sum(prob_eval_new, axis=0))
-        pred_eval = np.argmin(freq_eval @ C, axis=1)
-        pred_eval_new = np.argmin(freq_eval_new @ C, axis=1)
+        #pred_eval = np.argmin(freq_eval @ C, axis=1)
+        #pred_eval_new = np.argmin(freq_eval_new @ C, axis=1)
         conf_matrix, conf_matrix_new = get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes)
         return score_f1(conf_matrix) - score_f1(conf_matrix_new)
     elif risk == 'macro-accuracy':
         C = cost_vector_to_cost_matrix(1 / np.sum(prob_eval_new, axis=0))
-        pred_eval = np.argmin(freq_eval @ C, axis=1)
-        pred_eval_new = np.argmin(freq_eval_new @ C, axis=1)
+        #pred_eval = np.argmin(freq_eval @ C, axis=1)
+        #pred_eval_new = np.argmin(freq_eval_new @ C, axis=1)
         conf_matrix, conf_matrix_new = get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes)
         # if score_macro_accuracy(conf_matrix) - score_macro_accuracy(conf_matrix_new) > 0:
         # print(conf_matrix)
         # print(conf_matrix_new)
         return score_macro_accuracy(conf_matrix) - score_macro_accuracy(conf_matrix_new)
     elif risk == 'accuracy':
-        pred_eval = np.argmax(freq_eval, axis=1)
-        pred_eval_new = np.argmax(freq_eval_new, axis=1)
+        #pred_eval = np.argmax(freq_eval, axis=1)
+        #pred_eval_new = np.argmax(freq_eval_new, axis=1)
         conf_matrix, conf_matrix_new = get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes)
         return score_accuracy(conf_matrix) - score_accuracy(conf_matrix_new)
 

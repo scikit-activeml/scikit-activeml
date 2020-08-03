@@ -111,8 +111,11 @@ class PWC(BaseEstimator, ClassifierMixin):
         K_X_cand = K[len(X):, :]
 
         # freq_eval          (n_eval, n_classes)
-        one_hot_y = np.eye(len(classes))[y]
-        freq_eval = K_X.T @ one_hot_y
+        if len(y) == 0:
+            freq_eval = np.zeros([len(K_X), len(classes)])
+        else:
+            one_hot_y = np.eye(len(classes))[y]
+            freq_eval = K_X.T @ one_hot_y
 
         # pred_eval          (n_eval)
         # freq_eval_new_mat  (n_cand, n_classes, n_eval, n_classes),

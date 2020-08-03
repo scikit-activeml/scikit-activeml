@@ -65,7 +65,7 @@ class IgnUnlabeledWrapper(BaseEstimator):
         else:
             warnings.warn("Classifier '{}' not fitted: Return default predictions".format(self.estimator.__str__()),
                           UserWarning)
-            return np.random.choice(self.classes_, len(X), replace=False)
+            return np.random.choice(self.classes_, len(X), replace=True)
             #TODO: randomstate?
 
     def predict_proba(self, X, **predict_proba_kwargs):
