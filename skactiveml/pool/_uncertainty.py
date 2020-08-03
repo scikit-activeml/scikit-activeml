@@ -9,7 +9,6 @@ import warnings
 class UncertaintySampling(PoolBasedQueryStrategy):
     """
     Uncertainty Sampling query stratagy.
-    The implementation is based on http://www.burrsettles.com/pub/settles.activelearning.pdf
 
     Parameters
     ----------
@@ -31,6 +30,11 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     -------
     query(X_cand, X, y, return_utilities=False, **kwargs)
         Represent the photo in the given colorspace.
+
+    Refereces
+    ---------
+    The implementation is based on http://www.burrsettles.com/pub/settles.activelearning.pdf
+    Settles, Burr. Active learning literature survey. University of Wisconsin-Madison Department of Computer Sciences, 2009.
     """
     def __init__(self, clf, method='entropy', random_state=None):
         super().__init__(random_state=random_state)
@@ -84,7 +88,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand)
-        best_indices = np.array([np.argmax(utilities)]) # TODO: @PM: choose randomly amount equals
+        best_indices = np.array([np.random.choice(np.argwhere(utilities==np.max(utilities)).flatten())])
         if return_utilities:
             return best_indices, np.array([utilities])
         else:
