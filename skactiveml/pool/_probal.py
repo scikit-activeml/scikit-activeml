@@ -5,6 +5,7 @@ from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
 
 from ..base import PoolBasedQueryStrategy
+from ..utils.selection import rand_argmax
 
 class McPAL(PoolBasedQueryStrategy):
     """ PAL
@@ -85,7 +86,7 @@ class McPAL(PoolBasedQueryStrategy):
         self.clf.fit(X_labeled, y_labeled)
         k_vec = self.clf.predict_freq(X_cand)
         utilities = densities * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
-        best_indices = np.argmax(utilities) # TODO: multiple instances
+        best_indices = rand_argmax(utilities, axis=1, random_state=self.random_state)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand)
@@ -253,7 +254,7 @@ class XPAL(PoolBasedQueryStrategy):
                                                   alpha_cand=self.alpha_cand, alpha_eval=self.alpha_eval,
                                                   risk=self.risk, cost_matrix=self.cost_matrix)
 
-            best_indices = np.array([np.argmax(utilities)])  # TODO: choose randomly amount equals
+            best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
             if return_utilities:
                 return best_indices, np.array([utilities])
             else:

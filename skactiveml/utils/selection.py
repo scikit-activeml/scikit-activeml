@@ -25,7 +25,7 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
-    return np.argmax(random_state.random(a.shape) * (a == a.min(**argmin_kwargs, keepdims=True)),
+    return np.argmin(random_state.random(a.shape) * (a == a.min(**argmin_kwargs, keepdims=True)),
                      **argmin_kwargs)
 
 
@@ -40,7 +40,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
         Determines random number generation for shuffling the data. Pass an int for reproducible results across multiple
         function calls.
     argmin_kwargs: dict-like
-        Keyword argument passed to numpy function argmin.
+        Keyword argument passed to numpy function argmax.
 
     Returns
     -------
