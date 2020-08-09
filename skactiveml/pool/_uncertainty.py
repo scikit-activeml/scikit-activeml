@@ -1,7 +1,7 @@
 from sklearn.utils import check_array
 
 from ..base import PoolBasedQueryStrategy
-from ..utils.selection import rand_argmax
+from ..utils import rand_argmax
 
 import numpy as np
 import warnings

@@ -5,7 +5,8 @@ from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
 
 from ..base import PoolBasedQueryStrategy
-from ..utils.selection import rand_argmax
+from ..utils import rand_argmax
+
 
 class McPAL(PoolBasedQueryStrategy):
     """ PAL

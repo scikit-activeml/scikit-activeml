@@ -5,7 +5,7 @@ from ..base import PoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier
 from sklearn.utils import check_random_state
-from ..utils.selection import rand_argmax
+from ..utils import rand_argmax
 
 
 class QBC(PoolBasedQueryStrategy):
