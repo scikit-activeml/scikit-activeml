@@ -5,6 +5,8 @@ from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
 
 from ..base import PoolBasedQueryStrategy
+from ..utils import rand_argmax
+
 
 class McPAL(PoolBasedQueryStrategy):
     """ PAL
@@ -55,37 +57,34 @@ class McPAL(PoolBasedQueryStrategy):
         self.density_estimator = density_estimator
         self.prior = prior
         self.m_max = m_max
-        self.random_state = random_state # TODO: use random state
+        self.random_state = random_state
 
-    def query(self, X_cand, X, y, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, weights, return_utilities=False, **kwargs):
         """
 
         Attributes
         ----------
         X: array-like (n_training_samples, n_features)
-            Labeled samples
+            Complete data set
         y: array-like (n_training_samples)
-            Labels of labeled samples
+            Labels of the data set
         X_cand: array-like (n_candidates, n_features)
             Unlabeled candidate samples
+        weights: array-like (n_training_samples)
+            Densities for each instance in X
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
         """
 
         X_cand = check_array(X_cand, force_all_finite=False)
-        X_labeled = X
-        y_labeled = y
-        X_all = np.concatenate((X_cand, X_labeled))
-
-        # Calculate similarities
-        self.density_estimator.fit(X_all)
-        densities = np.exp(self.density_estimator.score_samples(X_cand))
+        X_labeled = X[self.clf.is_labeled(y)]
+        y_labeled = y[self.clf.is_labeled(y)]
 
         # Calculate gains
         self.clf.fit(X_labeled, y_labeled)
         k_vec = self.clf.predict_freq(X_cand)
-        utilities = densities * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
-        best_indices = np.argmax(utilities) # TODO: multiple instances
+        utilities = weights * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
+        best_indices = rand_argmax(utilities, axis=1, random_state=self.random_state)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand)
@@ -253,7 +252,7 @@ class XPAL(PoolBasedQueryStrategy):
                                                   alpha_cand=self.alpha_cand, alpha_eval=self.alpha_eval,
                                                   risk=self.risk, cost_matrix=self.cost_matrix)
 
-            best_indices = np.array([np.argmax(utilities)])  # TODO: choose randomly amount equals
+            best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
             if return_utilities:
                 return best_indices, np.array([utilities])
             else:

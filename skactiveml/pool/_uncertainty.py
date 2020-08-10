@@ -1,6 +1,7 @@
 from sklearn.utils import check_array
 
 from ..base import PoolBasedQueryStrategy
+from ..utils import rand_argmax
 
 import numpy as np
 import warnings
@@ -14,15 +15,17 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     ----------
     clf : sklearn classifier
         A probabilistic sklearn classifier.
-    method : string
+    method : string (default='entropy')
         The method to calculate the uncertainty, entropy, least confident and margin_sampling are possible.
-    random_state : int
-        The random seed to use.
+    random_state : numeric | np.random.RandomState
+        The random state to use.
 
     Attributes
     ----------
+    random_state: numeric | np.random.RandomState
+        Random state to use.
     method : string
-        The method to calculate the uncertainty, entropy, least confident and margin_sampling are possible.
+        The method to calculate the uncertainty. entropy, least confident and margin_sampling are possible.
     clf : sklearn classifier
         A probabilistic sklearn classifier.
 
@@ -33,8 +36,9 @@ class UncertaintySampling(PoolBasedQueryStrategy):
 
     Refereces
     ---------
-    The implementation is based on http://www.burrsettles.com/pub/settles.activelearning.pdf
-    Settles, Burr. Active learning literature survey. University of Wisconsin-Madison Department of Computer Sciences, 2009.
+    [1] Settles, Burr. Active learning literature survey.
+        University of Wisconsin-Madison Department of Computer Sciences, 2009.
+        http://www.burrsettles.com/pub/settles.activelearning.pdf
     """
     def __init__(self, clf, method='entropy', random_state=None):
         super().__init__(random_state=random_state)
@@ -58,7 +62,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
             The labeled pool used to fit the classifier.
         y : np.array
             The labels of the labeled pool X.
-        return_utilities : bool
+        return_utilities : bool (default=False
             If True, the utilities are returned.
 
         Returns
@@ -87,8 +91,8 @@ class UncertaintySampling(PoolBasedQueryStrategy):
                 utilities = -np.sum(probas * np.log(probas), axis=1)
 
         # best_indices is a np.array (batch_size=1)
-        # utilities is a np.array (batch_size=1 x len(X_cand)
-        best_indices = np.array([np.random.choice(np.argwhere(utilities==np.max(utilities)).flatten())])
+        # utilities is a np.array (batch_size=1 x len(X_cand))
+        best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
         if return_utilities:
             return best_indices, np.array([utilities])
         else:
