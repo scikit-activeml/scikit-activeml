@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils import column_or_1d
+from sklearn.utils.validation import column_or_1d, check_is_fitted
 from sklearn.preprocessing import LabelEncoder
 
 
@@ -45,6 +45,7 @@ def is_labeled(y, unlabeled_class=np.nan):
     """
     return ~is_unlabeled(y, unlabeled_class)
 
+
 class ExtLabelEncoder(BaseEstimator, TransformerMixin):
     """Encode class labels with value between 0 and classes-1.
     This transformer should be used to encode class labels, *i.e.* `y`, and
@@ -63,12 +64,16 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         Holds the label for each class.
     unlabeled_class: scalar|string|np.nan|None, default=np.nan
         Value to represent a missing label.
+    le_: sklearn.preprocessing.LabelEncoder
+        LabelEncoder created through fitting.
+    dtype_: numpy data type
+        Inferred from classes or y through fitting.
+
     """
 
     def __init__(self, classes=None, unlabeled_class=np.nan):
         self.classes = column_or_1d(classes, warn=True) if classes is not None else None
         self.unlabeled_class = unlabeled_class
-        self.le = LabelEncoder()
 
     def fit(self, y):
         """Fit label encoder.
@@ -85,11 +90,12 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         is_lbld = is_labeled(y, unlabeled_class=self.unlabeled_class)
         y = np.asarray(y)
         self.dtype_ = y.dtype
+        self.le_ = LabelEncoder()
         if self.classes is None:
-            self.le.fit(y[is_lbld])
+            self.le_.fit(y[is_lbld])
         else:
-            self.le.fit(self.classes)
-        self.classes = self.le.classes_
+            self.le_.fit(self.classes)
+        self.classes = self.le_.classes_
 
         return self
 
@@ -110,35 +116,41 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
 
     def transform(self, y):
         """Transform labels to normalized encoding.
+
         Parameters
         ----------
         y : array-like of shape [n_samples]
             Target values.
+
         Returns
         -------
         y_enc : array-like of shape [n_samples]
         """
+        check_is_fitted(self.le_)
         is_lbld = is_labeled(y, unlabeled_class=self.unlabeled_class)
         y = np.asarray(y)
         y_enc = np.empty_like(y, dtype=float)
-        y_enc[is_lbld] = self.le.transform(y[is_lbld].ravel())
+        y_enc[is_lbld] = self.le_.transform(y[is_lbld].ravel())
         y_enc[~is_lbld] = np.nan
         return y_enc
 
     def inverse_transform(self, y):
         """Transform labels back to original encoding.
+
         Parameters
         ----------
         y : numpy array of shape [n_samples]
             Target values.
+
         Returns
         -------
         y_dec : numpy array of shape [n_samples]
         """
+        check_is_fitted(self.le_)
         is_lbld = is_labeled(y, unlabeled_class=np.nan)
         y = np.asarray(y)
         y_dec = np.empty_like(y, dtype=self.dtype_)
-        y_dec[is_lbld] = self.le.inverse_transform(np.array(y[is_lbld].ravel(), dtype=int))
+        y_dec[is_lbld] = self.le_.inverse_transform(np.array(y[is_lbld].ravel(), dtype=int))
         y_dec[~is_lbld] = self.unlabeled_class
         return y_dec
 
