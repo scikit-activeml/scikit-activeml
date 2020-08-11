@@ -15,7 +15,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     ----------
     clf : sklearn classifier
         A probabilistic sklearn classifier.
-    method : string (default='entropy')
+    method : string (default='margin_sampling')
         The method to calculate the uncertainty, entropy, least confident and margin_sampling are possible.
     random_state : numeric | np.random.RandomState
         The random state to use.
@@ -28,6 +28,8 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         The method to calculate the uncertainty. entropy, least confident and margin_sampling are possible.
     clf : sklearn classifier
         A probabilistic sklearn classifier.
+    classes : array-like, shape=(n_classes)
+        Holds the label for each class.
 
     Methods
     -------
@@ -40,14 +42,18 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
         http://www.burrsettles.com/pub/settles.activelearning.pdf
     """
-    def __init__(self, clf, method='entropy', random_state=None):
+    def __init__(self, clf, classes=None, method='margin_sampling', random_state=None):
         super().__init__(random_state=random_state)
 
-        if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling':
-            warnings.warn('The method \'' + method + '\' does not exist, \'entropy\' will be used.')
-            method = 'entropy'
+        if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling' and method != 'expected_average_precision':
+            warnings.warn('The method \'' + method + '\' does not exist, \'margin_sampling\' will be used.')
+            method = 'margin_sampling'
+
+        if method == 'expected_average_precision' and classes is None:
+            raise ValueError('\'classes\' has to be specified')
 
         self.method = method
+        self.classes = classes
         self.clf = clf
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
@@ -89,6 +95,8 @@ class UncertaintySampling(PoolBasedQueryStrategy):
                 utilities = sort_probas[:,-2] - sort_probas[:,-1]
             elif self.method == 'entropy':
                 utilities = -np.sum(probas * np.log(probas), axis=1)
+            elif self.method == 'expected_average_precision':
+                utilities = expected_average_precision(X_cand, self.classes, probas)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand))
@@ -99,3 +107,38 @@ class UncertaintySampling(PoolBasedQueryStrategy):
             return best_indices
 
 
+def expected_average_precision(X_cand, classes, proba):
+    score = np.zeros(len(X_cand))
+    for i, c in enumerate(classes):
+        for j, x in enumerate(X_cand):
+            # The i-th column of p without p[j,i]
+            p = proba[:,i]
+            p = np.delete(p,[j])
+            # Sort p in descending order
+            p = np.flipud(np.sort(p, axis=0))
+
+            g_arr = np.zeros((len(p),len(p)))
+            for n in range(len(p)):
+                for t in range(n):
+                    g_arr[n,t] = g(n,t,p)
+                    print(n,t)
+            print(g_arr)
+            for t in range(n):
+                print(t)
+                score[j] += f(len(p),t+1,p,g_arr)/(t+1)
+
+
+def g(n,t,p):
+    if t>n or (t==0 and n>0):
+        return 0
+    if t==0 and n==0:
+        return 1
+    return p[n]*g(n-1,t-1,p) + (1-p[n])*g(n-1,t,p)
+
+
+def f(n,t,p,g_arr):
+    if t>n or (t==0 and n>0):
+        return 0
+    if t==0 and n==0:
+        return 1
+    return p[n]*f(n-1,t-1,p) + p[n]*t*g_arr[n-1,t-1]/n + (1-p[n])*f(n-1,t,p)
