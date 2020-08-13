@@ -109,36 +109,44 @@ class UncertaintySampling(PoolBasedQueryStrategy):
 
 def expected_average_precision(X_cand, classes, proba):
     score = np.zeros(len(X_cand))
-    for i, c in enumerate(classes):
+    for i in range(len(classes)):
         for j, x in enumerate(X_cand):
             # The i-th column of p without p[j,i]
             p = proba[:,i]
             p = np.delete(p,[j])
             # Sort p in descending order
             p = np.flipud(np.sort(p, axis=0))
-
+            
+            # calculate g_arr
             g_arr = np.zeros((len(p),len(p)))
             for n in range(len(p)):
-                for t in range(n):
-                    g_arr[n,t] = g(n,t,p)
-                    print(n,t)
-            print(g_arr)
-            for t in range(n):
-                print(t)
-                score[j] += f(len(p),t+1,p,g_arr)/(t+1)
+                for h in range(n+1):
+                    g_arr[n,h] = g(n, h, p, g_arr)
+            
+            # calculate f_arr
+            f_arr = np.zeros((len(p)+1,len(p)+1))
+            for a in range(len(p)+1):
+                for b in range(a+1):
+                    f_arr[a,b] = f(a, b, p, f_arr, g_arr)
+            
+            # calculate score
+            for t in range(len(p)):
+                score[j] += f_arr[len(p),t+1]/(t+1)
+                
+    return score
 
 
-def g(n,t,p):
+def g(n,t,p,g_arr):
     if t>n or (t==0 and n>0):
         return 0
     if t==0 and n==0:
         return 1
-    return p[n]*g(n-1,t-1,p) + (1-p[n])*g(n-1,t,p)
+    return p[n]*g_arr[n-1,t-1] + (1-p[n])*g_arr[n-1,t]
 
 
-def f(n,t,p,g_arr):
+def f(n,t,p,f_arr,g_arr):
     if t>n or (t==0 and n>0):
         return 0
     if t==0 and n==0:
         return 1
-    return p[n]*f(n-1,t-1,p) + p[n]*t*g_arr[n-1,t-1]/n + (1-p[n])*f(n-1,t,p)
+    return p[n-1]*f_arr[n-1,t-1] + p[n-1]*t*g_arr[n-1,t-1]/n + (1-p[n-1])*f_arr[n-1,t]
