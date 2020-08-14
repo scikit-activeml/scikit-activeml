@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 
-from sklearn.utils.validation import NotFittedError
+from sklearn.utils.validation import NotFittedError, check_is_fitted
 from .._new_pwc import PWC
 
 
@@ -17,15 +17,12 @@ class TestPWC(unittest.TestCase):
         self.assertRaises(ValueError, PWC, n_neighbors=-1)
         self.assertRaises(TypeError, PWC, n_neighbors=1.0)
         pwc = PWC()
-        self.assertIsNotNone(pwc.le)
-        self.assertIs(pwc.le.unlabeled_class, np.nan)
-        self.assertIsNone(pwc.le.classes)
-        self.assertIsNone(pwc.cost_matrix)
+        self.assertRaises(NotFittedError, check_is_fitted, estimator=pwc)
         cost_matrix = 1-np.eye(2)
         pwc = PWC(classes=['tokyo', 'paris'], cost_matrix=cost_matrix, unlabeled_class='nan')
-        self.assertIsNotNone(pwc.le)
+        self.assertIsNotNone(pwc._le)
         np.testing.assert_array_equal(cost_matrix, pwc.cost_matrix)
-        self.assertEqual('nan', pwc.le.unlabeled_class)
+        self.assertEqual('nan', pwc._le.missing_label)
 
     def test_fit(self):
         pwc = PWC()
@@ -41,8 +38,6 @@ class TestPWC(unittest.TestCase):
 
     def test_predict_freq(self):
         pwc = PWC(classes=['tokyo', 'paris', 'new york'], unlabeled_class='nan', n_neighbors=10)
-        self.assertRaises(NotFittedError, pwc.predict_freq, X=self.X)
-        pwc.fit(X=[], y=[])
         F = pwc.predict_freq(X=self.X)
         np.testing.assert_array_equal(np.zeros((len(self.X), 3)), F)
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
@@ -61,8 +56,6 @@ class TestPWC(unittest.TestCase):
 
     def test_predict_proba(self):
         pwc = PWC(classes=['tokyo', 'paris'], unlabeled_class='nan')
-        self.assertRaises(NotFittedError, pwc.predict_proba, X=self.X)
-        pwc.fit(X=[], y=[])
         P = pwc.predict_proba(X=self.X)
         np.testing.assert_array_equal(np.ones((len(self.X), 2))*0.5, P)
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
@@ -71,8 +64,6 @@ class TestPWC(unittest.TestCase):
 
     def test_predict(self):
         pwc = PWC(classes=['tokyo', 'paris'], unlabeled_class='nan', random_state=0)
-        self.assertRaises(NotFittedError, pwc.predict_proba, X=self.X)
-        pwc.fit(X=[], y=[])
         y = pwc.predict(self.X)
         np.testing.assert_array_equal(['tokyo', 'paris'], y)
         pwc = PWC(classes=['tokyo', 'paris'], unlabeled_class='nan', random_state=1).fit(X=[], y=[])

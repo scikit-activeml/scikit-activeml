@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_random_state, check_array
 from sklearn.utils.validation import check_is_fitted, check_scalar
 
-from ..utils import rand_argmin, compute_vote_vectors, ExtLabelEncoder
+from ..utils import MISSING_LABEL, rand_argmin, compute_vote_vectors, check_cost_matrix, ExtLabelEncoder
 
 
 class PWC(BaseEstimator, ClassifierMixin):
@@ -54,21 +54,25 @@ class PWC(BaseEstimator, ClassifierMixin):
     """
     METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
-    def __init__(self, classes=None, unlabeled_class=np.nan, metric='rbf', n_neighbors=None, cost_matrix=None,
+    def __init__(self, classes=None, unlabeled_class=MISSING_LABEL, metric='rbf', n_neighbors=None, cost_matrix=None,
                  random_state=None, **metric_kwargs):
-        self.le = ExtLabelEncoder(classes=classes, unlabeled_class=unlabeled_class)
+        self._le = ExtLabelEncoder(classes=classes, missing_label=unlabeled_class)
+        self.missing_label = self._le.missing_label
         self.metric = str(metric)
         if self.metric not in PWC.METRICS:
             raise ValueError("The parameter 'metric' must be a in {}".format(KERNEL_PARAMS.keys()))
         self.n_neighbors = n_neighbors
         if n_neighbors is not None:
             check_scalar(self.n_neighbors, name='n_neighbors', min_val=1, target_type=int)
-        self.cost_matrix = check_array(cost_matrix) if cost_matrix is not None else None
         self.random_state = check_random_state(random_state)
         self.metric_kwargs = metric_kwargs
-        self.X_ = None
-        self.y_ = None
-        self.V_ = None
+        self.cost_matrix = check_array(cost_matrix) if cost_matrix is not None else None
+        if classes is not None:
+            self.classes_ = self._le.classes_
+            self.V_ = np.array([])
+            if self.cost_matrix is None:
+                self.cost_matrix = 1 - np.eye(len(self.classes_))
+            self.cost_matrix = check_cost_matrix(self.cost_matrix, len(self.classes_))
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -91,20 +95,20 @@ class PWC(BaseEstimator, ClassifierMixin):
         """
         if np.size(X) > 0:
             self.X_ = check_array(X)
-            self.y_ = self.le.fit_transform(y)
+            self.y_ = self._le.fit_transform(y)
             if sample_weight is not None:
                 sample_weight = check_array(sample_weight, force_all_finite=False, ensure_2d=False)
 
             # convert labels to count vectors
-            self.V_ = compute_vote_vectors(y=self.y_, w=sample_weight, classes=np.arange(len(self.le.classes)))
+            self.V_ = compute_vote_vectors(y=self.y_, w=sample_weight, classes=np.arange(len(self.classes_)))
         else:
-            if self.le.classes is None:
+            if not hasattr(self, 'classes_'):
                 raise ValueError(
                     "You cannot fit a classifier on empty data, if parameter 'classes' has not been specified.")
-            self.le.fit(self.le.classes)
             self.V_ = np.array([])
-
-        self.cost_matrix = 1 - np.eye(len(self.le.classes)) if self.cost_matrix is None else self.cost_matrix
+        self.classes_ = self._le.classes_
+        self.cost_matrix = 1 - np.eye(len(self._le.classes_)) if self.cost_matrix is None else self.cost_matrix
+        self.cost_matrix = check_cost_matrix(self.cost_matrix, len(self.classes_))
 
         return self
 
@@ -121,9 +125,9 @@ class PWC(BaseEstimator, ClassifierMixin):
         F: array-like, shape (n_samples, classes)
             The class frequency estimates of the input samples. Classes are ordered by lexicographic order.
         """
-        check_is_fitted(self.le)
-        if np.size(self.V_, 0) == 0:
-            return np.zeros((np.size(X, 0), len(self.le.classes)))
+        check_is_fitted(self, ['V_', 'classes_'])
+        if self.V_ is None or np.size(self.V_, 0) == 0:
+            return np.zeros((np.size(X, 0), len(self.classes_)))
 
         # calculating metric matrix
         if self.metric == 'precomputed':
@@ -138,7 +142,7 @@ class PWC(BaseEstimator, ClassifierMixin):
             F = K @ self.V_
         else:
             indices = np.argpartition(K, -self.n_neighbors, axis=1)[:, -self.n_neighbors:]
-            F = np.empty((np.size(X, 0), len(self.le.classes)))
+            F = np.empty((np.size(X, 0), len(self.classes_)))
             for i in range(np.size(X, 0)):
                 F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
         return F
@@ -185,7 +189,7 @@ class PWC(BaseEstimator, ClassifierMixin):
         P = self.predict_freq(X)
         normalizer = np.sum(P, axis=1)
         P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
-        P[normalizer == 0, :] = [1 / len(self.le.classes)] * len(self.le.classes)
+        P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
     def predict(self, X):
@@ -203,4 +207,4 @@ class PWC(BaseEstimator, ClassifierMixin):
         """
         P = self.predict_proba(X)
         costs = np.dot(P, self.cost_matrix)
-        return self.le.inverse_transform(rand_argmin(costs, random_state=self.random_state, axis=1))
+        return self._le.inverse_transform(rand_argmin(costs, random_state=self.random_state, axis=1))
