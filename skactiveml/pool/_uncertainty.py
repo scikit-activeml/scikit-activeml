@@ -1,7 +1,7 @@
 from sklearn.utils import check_array
 
 from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax
+from ..utils import rand_argmax, is_labeled
 
 import numpy as np
 import warnings
@@ -16,7 +16,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     clf : sklearn classifier
         A probabilistic sklearn classifier.
     method : string (default='margin_sampling')
-        The method to calculate the uncertainty, entropy, least confident and margin_sampling are possible.
+        The method to calculate the uncertainty, entropy, least_confident, margin_sampling and expected_average_precision are possible.
     random_state : numeric | np.random.RandomState
         The random state to use.
 
@@ -25,7 +25,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     random_state: numeric | np.random.RandomState
         Random state to use.
     method : string
-        The method to calculate the uncertainty. entropy, least confident and margin_sampling are possible.
+        The method to calculate the uncertainty. entropy, least_confident, margin_sampling and expected_average_precisionare possible.
     clf : sklearn classifier
         A probabilistic sklearn classifier.
     classes : array-like, shape=(n_classes)
@@ -34,15 +34,18 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     Methods
     -------
     query(X_cand, X, y, return_utilities=False, **kwargs)
-        Represent the photo in the given colorspace.
+        Queries the next instance to be labeled.
 
     Refereces
     ---------
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
         http://www.burrsettles.com/pub/settles.activelearning.pdf
+    [2] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
+        via maximizing expected average precision."
+        IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
-    def __init__(self, clf, classes=None, method='margin_sampling', random_state=None):
+    def __init__(self, clf, classes=None, method='margin_sampling', unlabeled_class=np.nan, random_state=None):
         super().__init__(random_state=random_state)
 
         if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling' and method != 'expected_average_precision':
@@ -52,6 +55,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         if method == 'expected_average_precision' and classes is None:
             raise ValueError('\'classes\' has to be specified')
 
+        self.unlabeled_class = unlabeled_class
         self.method = method
         self.classes = classes
         self.clf = clf
@@ -83,7 +87,8 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
 
         # fit the classifier and get the probabilities
-        self.clf.fit(X,y)
+        mask_labeled = is_labeled(y)
+        self.clf.fit(X[mask_labeled], y[mask_labeled])
         probas = self.clf.predict_proba(X_cand)
 
         # caculate the utilities
@@ -108,6 +113,23 @@ class UncertaintySampling(PoolBasedQueryStrategy):
 
 
 def expected_average_precision(X_cand, classes, proba):
+    """
+    Calculate the expected average precision.
+
+    Parameters
+    ----------
+    X_cand : np.ndarray
+        The unlabeled pool from which to choose.
+    classes : array-like, shape=(n_classes)
+        Holds the label for each class.
+    proba : np.ndarray, shape=(n_X_cand, n_classes)
+        The probabilities for each classes and all instance in X_cand.
+
+    Returns
+    -------
+    score : np.ndarray, shape=(n_X_cand)
+        The expected average precision score of all instances in X_cand.
+    """
     score = np.zeros(len(X_cand))
     for i in range(len(classes)):
         for j, x in enumerate(X_cand):
@@ -137,6 +159,7 @@ def expected_average_precision(X_cand, classes, proba):
 
 
 def g(n,t,p,g_arr):
+
     if t>n or (t==0 and n>0):
         return 0
     if t==0 and n==0:
