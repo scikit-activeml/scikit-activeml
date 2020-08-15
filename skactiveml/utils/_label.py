@@ -39,7 +39,9 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
         y = np.asarray(y)
     target_type = np.append(y.ravel(), missing_label).dtype
     missing_label = check_missing_label(missing_label, target_type=target_type, name='y')
-    if missing_label is np.nan:
+    if len(y) == 0:
+        return np.array([], dtype=bool)
+    elif missing_label is np.nan:
         return np.isnan(y)
     else:
         return y == missing_label
@@ -95,6 +97,7 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
             self._le = LabelEncoder().fit(self.classes_)
             self._dtype = np.append(self.classes_, self.missing_label).dtype
             self.missing_label = check_missing_label(missing_label, target_type=self._dtype, name='classes')
+        self._no_init_classes = classes is None
 
     def fit(self, y):
         """Fit label encoder.
@@ -108,7 +111,7 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         -------
         self: returns an instance of self.
         """
-        if self._le is None:
+        if self._no_init_classes:
             y = np.asarray(y)
             is_lbld = is_labeled(y, missing_label=self.missing_label)
             self._dtype = y.dtype
