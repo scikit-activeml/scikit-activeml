@@ -4,7 +4,7 @@ from ._label import ExtLabelEncoder
 from sklearn.utils import check_array, check_consistent_length
 
 
-def compute_vote_vectors(y, w=None, classes=None, unlabeled_class=np.nan):
+def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     """Counts number of votes per class label for each sample.
 
     Parameters
@@ -15,7 +15,7 @@ def compute_vote_vectors(y, w=None, classes=None, unlabeled_class=np.nan):
         Class label weights.
     classes : array-like, shape (n_classes), default=None
         Holds the label for each class.
-    unlabeled_class : scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar|string|np.nan|None, default=np.nan
         Value to represent a missing label.
 
     Returns
@@ -24,9 +24,9 @@ def compute_vote_vectors(y, w=None, classes=None, unlabeled_class=np.nan):
         V[i,j] counts number of votes per class j for sample i.
     """
     # check input parameters
-    le = ExtLabelEncoder(classes=classes, unlabeled_class=unlabeled_class)
+    le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     y = le.fit_transform(y)
-    n_classes = len(le.classes)
+    n_classes = len(le.classes_)
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     is_unlabeled_y = np.isnan(y)
     y[is_unlabeled_y] = 0

@@ -5,7 +5,7 @@ from ..base import PoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier
 from sklearn.utils import check_random_state
-from ..utils import rand_argmax
+from ..utils import rand_argmax, is_labeled
 
 
 class QBC(PoolBasedQueryStrategy):
@@ -18,24 +18,32 @@ class QBC(PoolBasedQueryStrategy):
 
     Parameters
     ----------
-    model: model used for committee construction
-        Model implementing the methods 'fit' and and 'predict_proba'.
-    method: string (default='KL_divergence')
+    classes : array-like, shape=(n_classes)
+        Holds the label for each class.
+    clf : Classifier, default=None
+        Classifier used for ensemble construction, if ensemble is None.
+        Implementing the methods 'fit', 'predict'(for vote entropy) and 'predict_proba'(for KL divergence).
+    ensemble : sklearn.ensemble, default=None
+        sklear.ensemble used as committee. If None, baggingClassifier is used.
+    method : string, default='KL_divergence'
         The method to calculate the disagreement. 'vote_entropy' or 'KL_divergence' are possible.
-    n_classes : int
-        Number of possible classes.
-    random_state: numeric | np.random.RandomState
+    unlabeled_class : scalar | str | None | np.nan, default=np.nan
+        Symbol to represent a missing label. Important: We do not differ between None and np.nan.
+    random_state : numeric | np.random.RandomState
         Random state to use.
 
     Attributes
     ----------
-    model: model used for committee construction
-        Model implementing the methods 'fit' and and 'predict_proba'.
-    method: string (default='KL_divergence')
+    ensemble : sklearn.ensemble
+        Ensemble used as committee.
+        Implementing the methods 'fit', 'predict'(for vote entropy) and 'predict_proba'(for KL divergence).
+    method : string, default='KL_divergence'
         The method to calculate the disagreement. 'vote_entropy' or 'KL_divergence' are possible.
-    n_classes : int
-        Number of possible classes.
-    random_state: numeric | np.random.RandomState
+    classes : array-like, shape=(n_classes)
+        Holds the label for each class.
+    unlabeled_class : scalar | str | None | np.nan, default=np.nan
+        Symbol to represent a missing label. Important: We do not differ between None and np.nan.
+    random_state : numeric | np.random.RandomState
         Random state to use.
 
     References
@@ -48,23 +56,26 @@ class QBC(PoolBasedQueryStrategy):
         pages 1-9. Morgan Kaufmann, 1998.
     """
 
-    def __init__(self, model, method='KL_divergence', n_classes=0, random_state=None):
+    def __init__(self, classes, clf=None, ensemble=None, method='KL_divergence', unlabeled_class=np.nan, random_state=None):
         super().__init__(random_state=random_state)
 
         if method != 'KL_divergence' and method != 'vote_entropy':
             warnings.warn('The method \'' + method + '\' does not exist, \'KL_divergence\' will be used.')
             method = 'KL_divergence'
 
-        if method == 'vote_entropy' and n_classes < 1:
-            raise TypeError('n_classes is not specified.')
-        if method == 'vote_entropy' and (getattr(model, 'fit', None) is None or getattr(model, 'predict', None) is None):
-            raise TypeError("'model' must implement the methods 'fit' and 'predict'")
-        elif (getattr(model, 'fit', None) is None or getattr(model, 'predict_proba', None) is None):
-            raise TypeError("'model' must implement the methods 'fit' and 'predict_proba'")
+        if ensemble is None:
+            ensemble = BaggingClassifier(base_estimator=clf)
 
+        if method == 'vote_entropy' and (getattr(ensemble.base_estimator_, 'fit', None) is None or getattr(ensemble.base_estimator_, 'predict', None) is None):
+            raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
+        elif (getattr(ensemble.base_estimator_, 'fit', None) is None or getattr(ensemble.base_estimator_, 'predict_proba', None) is None):
+            raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
+
+
+        self.unlabeled_class = unlabeled_class
+        self.classes = classes
         self.method = method
-        self.model = model
-        self.n_classes = n_classes
+        self.ensemble = ensemble
 
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
@@ -89,24 +100,15 @@ class QBC(PoolBasedQueryStrategy):
         np.ndarray  (shape=(1xlen(X_cnad))
             The utilities of all instances of X_cand(if return_utilities=True).
         """
-        n_detected_classes = len(np.unique(y))
-        if n_detected_classes < 2:
-            warnings.warn('The number of detected classes is less than 2.')
-            utilities = np.zeros((len(X_cand)))
-        else:
-            # create and train the models
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                n_features = X.shape[1]
-                max_features = self.random_state.choice(np.arange(np.ceil(n_features / 2), n_features))
-                max_features = int(max_features)
-                bagging = BaggingClassifier(base_estimator=self.model, n_estimators=25,
-                                            max_features=1.0, random_state=self.random_state).fit(X=X, y=y)
-            # choose the disagreement method and calculate the utilities
-            if self.method == 'KL_divergence':
-                utilities = calc_avg_KL_divergence(bagging=bagging, X=X, y=y, X_cand=X_cand, random_state=self.random_state)
-            elif self.method == 'vote_entropy':
-                utilities = vote_entropy(bagging, X_cand, X, y, n_classes=self.n_classes)
+
+        mask_labeled = is_labeled(y,self.unlabeled_class)
+        self.ensemble.fit(X[mask_labeled],y[mask_labeled])
+
+        # choose the disagreement method and calculate the utilities
+        if self.method == 'KL_divergence':
+            utilities = calc_avg_KL_divergence(ensemble=self.ensemble, X_cand=X_cand)
+        elif self.method == 'vote_entropy':
+            utilities = vote_entropy(self.ensemble, X_cand, classes=self.classes)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand))
@@ -117,22 +119,16 @@ class QBC(PoolBasedQueryStrategy):
             return best_indices
 
 
-def calc_avg_KL_divergence(bagging:BaggingClassifier, X_cand, X, y, random_state):
+def calc_avg_KL_divergence(ensemble, X_cand):
     """
     Calculate the average Kullback-Leibler (KL) divergence for measuring the level of disagreement in QBC.
 
     Parameters
     ----------
-    bagging: sklearn BaggingClassifier
-         fited sklearn BaggingClassifier used as committee.
+    ensemble: sklearn.ensemble
+         fited sklearn.ensemble used as committee.
     X_cand : np.ndarray
         The unlabeled pool from which to choose.
-    X : np.ndarray
-        The labeled pool used to fit the classifier.
-    y : np.array
-        The labels of the labeled pool X.
-    random_state: numeric | np.random.RandomState
-        Random state to use.
 
     Returns
     -------
@@ -145,12 +141,11 @@ def calc_avg_KL_divergence(bagging:BaggingClassifier, X_cand, X, y, random_state
         text classification. In Proceedings of the International Conference on Machine
         Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
     """
-    random_state = check_random_state(random_state)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
-        est_arr = bagging.estimators_
-        est_features = bagging.estimators_features_
+        est_arr = ensemble.estimators_
+        est_features = ensemble.estimators_features_
         P = [est_arr[e_idx].predict_proba(X_cand[:, est_features[e_idx]]) for e_idx in range(len(est_arr))]
         P = np.array(P)
         P_com = np.mean(P, axis=0)
@@ -159,22 +154,18 @@ def calc_avg_KL_divergence(bagging:BaggingClassifier, X_cand, X, y, random_state
     return scores
 
 
-def vote_entropy(bagging, X_cand, X, y, n_classes):
+def vote_entropy(ensemble, X_cand, classes):
     """
-    Calculate the average Kullback-Leibler (KL) divergence for measuring the level of disagreement in QBC.
+    Calculate the vote entropy for measuring the level of disagreement in QBC.
 
     Parameters
     ----------
-    bagging: sklearn BaggingClassifier
+    ensemble: sklearn.ensemble
          fited sklearn BaggingClassifier used as committee.
     X_cand : np.ndarray
         The unlabeled pool from which to choose.
-    X : np.ndarray
-        The labeled pool used to fit the classifier.
-    y : np.array
-        The labels of the labeled pool X.
-    n_classes : int
-        Number of possible classes.
+    classes : list
+        All possible classes.
 
     Returns
     -------
@@ -187,27 +178,27 @@ def vote_entropy(bagging, X_cand, X, y, n_classes):
         "Minimizing manual annotation cost in supervised training from corpora."
         arXiv preprint cmp-lg/9606030 (1996).
     """
-    models = bagging.estimators_
+    estimators = ensemble.estimators_
     # Let the models vote for unlabeled data
-    votes = np.zeros((len(X_cand), len(models)))
-    for i, model in enumerate(models):
+    votes = np.zeros((len(X_cand), len(estimators)))
+    for i, model in enumerate(estimators):
         votes[:, i] = model.predict(X_cand)
  
     # count the votes
-    vote_count = np.zeros((len(X_cand), n_classes))
+    vote_count = np.zeros((len(X_cand), len(classes)))
     for i in range(len(X_cand)):
-        for c in range(n_classes):
-            for m in range(len(models)):
+        for c in range(len(classes)):
+            for m in range(len(estimators)):
                 vote_count[i,c] += (votes[i,m] == c)
         
     # cumpute vote entropy
     vote_entropy = np.zeros(len(X_cand))
     for i in range(len(X_cand)):
-        for c in range(n_classes):
+        for c in range(len(classes)):
             if vote_count[i,c]!=0:
                 #definition gap at vote_count[i,c]==0:
-                a = vote_count[i,c]/len(models)
+                a = vote_count[i,c]/len(estimators)
                 vote_entropy[i] += a*np.log(a)
-    vote_entropy *= -1/np.log(len(models))
+    vote_entropy *= -1/np.log(len(estimators))
         
     return vote_entropy

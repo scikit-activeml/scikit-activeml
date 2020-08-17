@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 
-from ...utils import rand_argmin, rand_argmax
+from skactiveml.utils import rand_argmin, rand_argmax
 
 
 class TestSelection(unittest.TestCase):
