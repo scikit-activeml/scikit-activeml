@@ -54,7 +54,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
     CSL = 'csl'
     LOG_LOSS = 'log_loss'
 
-    def __init__(self, clf, n_classes=2, method=EMR, C=None, random_state=None, **kwargs):
+    def __init__(self, clf, classes, method=EMR, C=None, random_state=None, **kwargs):
         super().__init__(random_state=random_state, **kwargs)
 
         self.clf = clf
@@ -79,7 +79,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
                     ExpectedErrorReduction.LOG_LOSS, self.method_)
             )
 
-        self.n_classes_ = n_classes
+        self.classes_ = classes
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
         """
@@ -100,7 +100,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         X_unlabeled = X_cand
 
         utilities = expected_error_reduction(clf=self.clf, X_labeled=X_labeled, y_labeled=y_labeled,
-                                        X_unlabeled=X_unlabeled, n_classes=self.n_classes_, C=self.C_,
+                                        X_unlabeled=X_unlabeled, classes=self.classes_, C=self.C_,
                                         method=self.method_)
 
         best_indices = np.array([np.argmax(utilities)])  # TODO: choose randomly amount equals
@@ -110,7 +110,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
             return best_indices
 
 
-def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, n_classes, C=None, method='emr'):
+def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=None, method='emr'):
     """
     Computes least confidence as uncertainty scores. In case of a given cost matrix C,
     maximum expected cost is implemented as score.
@@ -125,8 +125,8 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, n_classes, 
         Class labels of labeled samples.
     X_unlabeled: array-like, shape (n_unlabeled_samples)
         Unlabeled samples.
-    n_classes: int
-        Number of classes.
+    classes: array-like, shape (n_classes)
+        List of classes.
     C: array-like, shape (n_classes, n_classes)
         Cost matrix with C[i,j] defining the cost of predicting class j for a sample with the actual class i.
         Only supported for least confident variant.
@@ -136,6 +136,9 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, n_classes, 
     """
     clf = copy.deepcopy(clf)
     clf.fit(X_labeled, y_labeled)
+    if clf.classes_ != classes:
+        raise ValueError("The given classes are not the same as in the classifier")
+    n_classes = len(classes)
     P = clf.predict_proba(X_unlabeled)
     C = 1 - np.eye(np.size(P, axis=1)) if C is None else C
     errors = np.zeros(len(X_unlabeled))
