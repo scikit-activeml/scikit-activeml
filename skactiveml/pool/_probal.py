@@ -46,11 +46,9 @@ class McPAL(PoolBasedQueryStrategy):
         vol. 285 of Frontiers in Artificial Intelligence and Applications, pages 586-594. IOS Press, 2016
     """
 
-    def __init__(self, clf, density_estimator, prior=1, m_max=1, random_state=None):
+    def __init__(self, clf, prior=1, m_max=1, random_state=None):
         super().__init__(random_state=random_state)
 
-        if not hasattr(density_estimator, 'score_samples'):
-            raise Exception("Density estimator must implement score_samples()")
         if not hasattr(clf, 'predict_freq'):
             raise("Classifier must implement predict_freq()")
         self.clf = clf
