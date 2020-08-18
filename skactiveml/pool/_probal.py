@@ -52,7 +52,6 @@ class McPAL(PoolBasedQueryStrategy):
         if not hasattr(clf, 'predict_freq'):
             raise("Classifier must implement predict_freq()")
         self.clf = clf
-        self.density_estimator = density_estimator
         self.prior = prior
         self.m_max = m_max
         self.random_state = random_state
