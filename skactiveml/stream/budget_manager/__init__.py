@@ -1,5 +1,7 @@
 """
-The :mod:`skactiveml.stream.budget_manager` module implements budget managers for stream-based active learning.
+The :mod:`skactiveml.stream.budget_manager` module implements budget managers,
+which are capable of modeling the budget constraints in stream-based active
+learning settings.
 """
 
 from .base import BudgetManager

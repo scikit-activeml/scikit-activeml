@@ -1,5 +1,6 @@
 """
-The :mod:`skactiveml.pool` module implements query strategies for stream-based active learning.
+The :mod:`skactiveml.pool` module implements query strategies for stream-based
+active learning.
 """
 
 from ._random import RandomSampler, PeriodicSampler
