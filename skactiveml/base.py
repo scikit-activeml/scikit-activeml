@@ -34,6 +34,7 @@ class StreamBasedQueryStrategy(QueryStrategy):
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting.
+
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
@@ -71,5 +72,9 @@ class StreamBasedQueryStrategy(QueryStrategy):
         sampled_indices : ndarray of shape (n_sampled_instances,)
             The indices of instances in X_cand which should be sampled, with
             0 <= n_sampled_instances <= n_samples.
+
+        utilities: ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy. Only provided if
+            return_utilities is True.
         """
         return NotImplemented

@@ -22,7 +22,7 @@ class BudgetManager(ABC, BaseEstimator):
 
     @abstractmethod
     def is_budget_left(self):
-        """check whether there is any utility given to sample(...), which may
+        """Check whether there is any utility given to sample(...), which may
         lead to sampling the corresponding instance, i.e., check if sampling
         another instance is currently possible under the specified budgeting
         constraint. This function is useful to determine, whether a provided
@@ -38,7 +38,8 @@ class BudgetManager(ABC, BaseEstimator):
         return NotImplemented
 
     @abstractmethod
-    def sample(self, utilities, simulate=False, **kwargs):
+    def sample(self, utilities, return_budget_left=True, simulate=False,
+               **kwargs):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
 
@@ -48,6 +49,10 @@ class BudgetManager(ABC, BaseEstimator):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
+
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
 
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
@@ -59,5 +64,9 @@ class BudgetManager(ABC, BaseEstimator):
         sampled_indices : ndarray of shape (n_sampled_instances,)
             The indices of instances represented by utilities which should be
             sampled, with 0 <= n_sampled_instances <= n_samples.
+
+        budget_left: ndarray of shape (n_samples,), optional
+            Shows whether there was budget left for each assessed utility. Only
+            provided if return_utilities is True.
         """
         return NotImplemented
