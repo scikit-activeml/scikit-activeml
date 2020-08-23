@@ -5,14 +5,68 @@ import numpy as np
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_scalar
 
+
 class BudgetManager(ABC, BaseEstimator):
-    
+    """Base class for all budget managers for stream-based active learning
+       in scikit-activeml to model budgeting constraints.
+
+    Parameters
+    ----------
+    budget : float
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1.
+    """
     def __init__(self, budget):
         check_scalar(budget, 'budget', np.float, min_val=0.0, max_val=1.0)
         self.budget = budget
-    
+
+    @abstractmethod
     def is_budget_left(self):
+        """Check whether there is any utility given to sample(...), which may
+        lead to sampling the corresponding instance, i.e., check if sampling
+        another instance is currently possible under the specified budgeting
+        constraint. This function is useful to determine, whether a provided
+        utility is not sufficient, or the budgeting constraint was simply
+        exhausted.
+
+        Returns
+        -------
+        budget_left : bool
+            True, if there is a utility which leads to sampling another
+            instance.
+        """
         return NotImplemented
-    
-    def sample(self, utilities, return_budget_left=False, simulate=False, **kwargs):
+
+    @abstractmethod
+    def sample(self, utilities, return_budget_left=True, simulate=False,
+               **kwargs):
+        """Ask the budget manager which utilities are sufficient to sample the
+        corresponding instance.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy, which are used to determine whether sampling an instance
+            is worth it given the budgeting constraint.
+
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
+
+        simulate : bool, optional
+            If True, the internal state of the budget manager before and after
+            the query is the same. This should only be used to prevent the
+            budget manager from adapting itself. The default is False.
+
+        Returns
+        -------
+        sampled_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances represented by utilities which should be
+            sampled, with 0 <= n_sampled_instances <= n_samples.
+
+        budget_left: ndarray of shape (n_samples,), optional
+            Shows whether there was budget left for each assessed utility. Only
+            provided if return_utilities is True.
+        """
         return NotImplemented
