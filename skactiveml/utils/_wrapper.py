@@ -68,7 +68,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin):
         y : array-like, shape (n_samples)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where missing labels are
-            represented the attribute 'missing_value'.
+            represented the attribute 'missing_label'.
         fit_kwargs : dict-like
             Further parameters as input to the 'fit' method of the 'estimator'.
 

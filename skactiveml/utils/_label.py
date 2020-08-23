@@ -114,7 +114,7 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         if self._no_init_classes:
             y = np.asarray(y)
             is_lbld = is_labeled(y, missing_label=self.missing_label)
-            self._dtype = y.dtype
+            self._dtype = np.append(y, self.missing_label).dtype
             self._le = LabelEncoder()
             self._le.fit(y[is_lbld])
             self.classes_ = self._le.classes_
