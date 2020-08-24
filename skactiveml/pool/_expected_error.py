@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.utils import check_array
 
 from ..base import PoolBasedQueryStrategy
+from ..utils import rand_argmax, is_labeled
 
 
 class ExpectedErrorReduction(PoolBasedQueryStrategy):
@@ -83,27 +84,40 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
         """
-        TODO
+        Queries the next instance to be labeled.
 
         Parameters
         ----------
-        unlabeled_indices: array-like, shape (n_unlabeled_samples)
+        X_cand: array-like (n_candidates, n_features)
+            Unlabeled candidate samples
+        X: array-like (n_training_samples, n_features)
+            Complete data set
+        y: array-like (n_training_samples)
+            Labels of the data set
+        return_utilities: bool (default=False)
+            If True, the utilities are additionally returned.
 
         Returns
         -------
-        scores: array-like, shape (n_unlabeled_samples)
-            Score of each unlabeled sample.
+        selection: np.ndarray, shape (1)
+            The index of the queried instance.
+        utilities: np.ndarray shape (1, n_candidates)
+            The utilities of all instances in X_cand (only if return_utilities=True).
         """
-        labeled_indices = self.clf.is_labeled(y)
+
+        X_cand = check_array(X_cand, force_all_finite=False)
+        X = np.array(X)
+        y = np.array(y)
+        labeled_indices = is_labeled(y)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]
-        X_unlabeled = X_cand
 
+        # caculate the utilities
         utilities = expected_error_reduction(clf=self.clf, X_labeled=X_labeled, y_labeled=y_labeled,
-                                        X_unlabeled=X_unlabeled, classes=self.classes_, C=self.C_,
+                                        X_unlabeled=X_cand, classes=self.classes_, C=self.C_,
                                         method=self.method_)
 
-        best_indices = np.array([np.argmax(utilities)])  # TODO: choose randomly amount equals
+        best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
         if return_utilities:
             return best_indices, np.array([utilities])
         else:
@@ -134,10 +148,14 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=
         Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
         cost-sensitive variants.
     """
+
+    if not X_labeled.shape[1] == X_unlabeled.shape[1]:
+        raise ValueError("X_labeled and X_unlabeled must have the same number of features.")
     clf = copy.deepcopy(clf)
     clf.fit(X_labeled, y_labeled)
-    if clf.classes_ != classes:
-        raise ValueError("The given classes are not the same as in the classifier")
+    if not np.array_equal(clf.classes_, classes):
+        raise ValueError("The given classes are not the same as in the classifier.")
+
     n_classes = len(classes)
     P = clf.predict_proba(X_unlabeled)
     C = 1 - np.eye(np.size(P, axis=1)) if C is None else C
