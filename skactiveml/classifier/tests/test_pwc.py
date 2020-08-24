@@ -3,7 +3,7 @@ import unittest
 
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.datasets import load_breast_cancer
-from .._new_pwc import PWC
+from skactiveml.classifier._new_pwc import PWC
 
 
 class TestPWC(unittest.TestCase):
