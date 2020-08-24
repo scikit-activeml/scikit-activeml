@@ -98,16 +98,15 @@ class PWC(BaseEstimator, ClassifierMixin):
             self.y_ = self._le.fit_transform(y)
             if sample_weight is not None:
                 sample_weight = check_array(sample_weight, force_all_finite=False, ensure_2d=False)
-
             # convert labels to count vectors
-            self.V_ = compute_vote_vectors(y=self.y_, w=sample_weight, classes=np.arange(len(self.classes_)))
+            self.V_ = compute_vote_vectors(y=self.y_, w=sample_weight, classes=np.arange(len(self._le.classes_)))
         else:
             if not hasattr(self, 'classes_'):
                 raise ValueError(
                     "You cannot fit a classifier on empty data, if parameter 'classes' has not been specified.")
             self.V_ = np.array([])
         self.classes_ = self._le.classes_
-        self.cost_matrix = 1 - np.eye(len(self._le.classes_)) if self.cost_matrix is None else self.cost_matrix
+        self.cost_matrix = 1 - np.eye(len(self.classes_)) if self.cost_matrix is None else self.cost_matrix
         self.cost_matrix = check_cost_matrix(self.cost_matrix, len(self.classes_))
 
         return self

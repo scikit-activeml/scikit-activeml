@@ -2,6 +2,7 @@ import numpy as np
 import unittest
 
 from sklearn.utils.validation import NotFittedError, check_is_fitted
+from sklearn.datasets import load_breast_cancer
 from .._new_pwc import PWC
 
 
@@ -76,9 +77,13 @@ class TestPWC(unittest.TestCase):
         pwc.fit(X=[], y=[])
         y = pwc.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
+        pwc = PWC(unlabeled_class='nan', cost_matrix=[[0, 10], [1, 0]])
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
         y = pwc.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
+        X, y = load_breast_cancer(return_X_y=True)
+        pwc = PWC(random_state=0).fit(X, y)
+        self.assertTrue(pwc.score(X, y) > 0.5)
 
 
 if __name__ == '__main__':
