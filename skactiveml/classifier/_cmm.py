@@ -2,7 +2,7 @@ import numpy as np
 
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
-from sklearn.utils.validation import check_random_state, check_array, check_is_fitted
+from sklearn.utils.validation import check_random_state, check_array, check_is_fitted, NotFittedError
 from ..utils import check_cost_matrix, ExtLabelEncoder, MISSING_LABEL, compute_vote_vectors, rand_argmin
 
 
@@ -12,8 +12,9 @@ class CMM(BaseEstimator, ClassifierMixin):
 
     Parameters
     ----------
-    mixture_model: object of type {GaussianMixture, BayesianGaussianMixture}
+    mixture_model: GaussianMixture or BayesianGaussianMixture or None, default=BayesianMixtureModel(n_components=10)
         Bayesian Gaussian Mixture model that is trained with unsupervised algorithm on train data.
+        If the initial mixture model is not fitted, it will be refitted in each call of the 'fit' method.
     classes: array-like, shape (n_classes), default=None
         Holds the label for each class.
     missing_label: scalar|string|np.nan|None, default=np.nan
@@ -24,8 +25,9 @@ class CMM(BaseEstimator, ClassifierMixin):
 
     Attributes
     ----------
-    mixture_model: object of type {GaussianMixture, BayesianGaussianMixture}
+    mixture_model: GaussianMixture or BayesianGaussianMixture or None, default=BayesianMixtureModel(n_components=10)
         Bayesian Gaussian Mixture model that is trained with unsupervised algorithm on train data.
+        If the initial mixture model is not fitted, it will be refitted in each call of the 'fit' method.
     classes_: array-like, shape (n_classes), default=None
         Holds the label for each class.
     missing_label: scalar|string|np.nan|None, default=np.nan
@@ -39,15 +41,21 @@ class CMM(BaseEstimator, ClassifierMixin):
         Encoder for class labels.
     """
 
-    def __init__(self, mixture_model, classes=None, cost_matrix=None, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(self, mixture_model=None, classes=None, cost_matrix=None, missing_label=MISSING_LABEL, random_state=None):
         # Check mixture model.
-        self.mixture_model = mixture_model
+        self.mixture_model = BayesianGaussianMixture(n_components=10) if mixture_model is None else mixture_model
+        self._provided_mixture = mixture_model is not None
         if not isinstance(self.mixture_model, (GaussianMixture, BayesianGaussianMixture)):
             raise TypeError(
                 "'mixture_model' is of the type '{}' but must be of the type 'sklearn.mixture.GaussianMixture' or "
                 "'sklearn.mixture.BayesianGaussianMixture'.".format(
                     type(self.mixture_model)))
-        check_is_fitted(self.mixture_model)
+        self._refit = False
+        try:
+            check_is_fitted(self.mixture_model)
+        except NotFittedError:
+            self._refit = True
+
 
         # Setup label encoder.
         self._le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
@@ -92,6 +100,10 @@ class CMM(BaseEstimator, ClassifierMixin):
             y = self._le.fit_transform(y)
             if sample_weight is not None:
                 sample_weight = check_array(sample_weight, force_all_finite=False, ensure_2d=False)
+
+            # Refit model if desired.
+            if self._refit:
+                self.mixture_model.fit(X)
 
             # Counts number of votes per class label for each sample.
             V = compute_vote_vectors(y=y, w=sample_weight, classes=np.arange(len(self._le.classes_)))
