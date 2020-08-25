@@ -4,7 +4,7 @@ import unittest
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.datasets import load_breast_cancer
-from skactiveml.classifier._cmm import CMM
+from skactiveml.classifier import CMM
 
 
 class TestCMM(unittest.TestCase):
