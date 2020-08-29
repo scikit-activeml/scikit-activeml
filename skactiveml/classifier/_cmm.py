@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 from sklearn.utils.validation import check_random_state, check_array, check_is_fitted, NotFittedError
+from scipy.spatial.distance import cdist
 from ..utils import check_cost_matrix, ExtLabelEncoder, MISSING_LABEL, compute_vote_vectors, rand_argmin
 
 
@@ -41,7 +42,8 @@ class CMM(BaseEstimator, ClassifierMixin):
         Encoder for class labels.
     """
 
-    def __init__(self, mixture_model=None, classes=None, cost_matrix=None, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(self, mixture_model=None, classes=None, cost_matrix=None, missing_label=MISSING_LABEL,
+                 random_state=None):
         # Check mixture model.
         self.mixture_model = BayesianGaussianMixture(n_components=10) if mixture_model is None else mixture_model
         self._provided_mixture = mixture_model is not None
@@ -55,7 +57,6 @@ class CMM(BaseEstimator, ClassifierMixin):
             check_is_fitted(self.mixture_model)
         except NotFittedError:
             self._refit = True
-
 
         # Setup label encoder.
         self._le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
@@ -138,8 +139,12 @@ class CMM(BaseEstimator, ClassifierMixin):
             The class frequency estimates of the input samples. Classes are ordered by lexicographic order.
         """
         check_is_fitted(self, ['F_components_', 'classes_'])
-        R = self.mixture_model.predict_proba(X)
-        F = R @ self.F_components_
+        D = np.exp(-np.array(
+            [cdist(X, [self.mixture_model.means_[j]], metric='mahalanobis',
+                   VI=self.mixture_model.precisions_[j]).ravel()
+             for j in range(self.mixture_model.n_components)])).T
+        F = D @ self.F_components_
+        D /= np.sum(D, axis=1, keepdims=True)
         return F
 
     def predict_proba(self, X):
@@ -178,4 +183,3 @@ class CMM(BaseEstimator, ClassifierMixin):
         P = self.predict_proba(X)
         costs = np.dot(P, self.cost_matrix)
         return self._le.inverse_transform(rand_argmin(costs, random_state=self.random_state, axis=1))
-

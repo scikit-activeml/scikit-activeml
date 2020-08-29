@@ -4,6 +4,7 @@ import unittest
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.datasets import load_breast_cancer
+from sklearn.preprocessing import StandardScaler
 from skactiveml.classifier import CMM
 
 
@@ -79,9 +80,15 @@ class TestCMM(unittest.TestCase):
         y = cmm.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
         X, y = load_breast_cancer(return_X_y=True)
+        X = StandardScaler().fit_transform(X)
         cmm = CMM(random_state=0).fit(X, y)
+        P = cmm.predict_freq(X)
         self.assertEqual(cmm.mixture_model.n_components, 10)
         self.assertTrue(cmm._refit)
+        self.assertTrue(cmm.score(X, y) > 0.5)
+        mixture = BayesianGaussianMixture(n_components=5).fit(X)
+        cmm = CMM(mixture_model=mixture, random_state=0).fit(X[:50], y[:50])
+        self.assertEqual(cmm.mixture_model.n_components, 5)
         self.assertTrue(cmm.score(X, y) > 0.5)
 
 
