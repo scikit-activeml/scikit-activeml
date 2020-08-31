@@ -6,7 +6,7 @@ import warnings
 
 from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin, is_classifier
 from sklearn.utils.validation import check_random_state, check_is_fitted
-from ..utils import MISSING_LABEL, ExtLabelEncoder
+from skactiveml.utils import MISSING_LABEL, ExtLabelEncoder
 
 
 class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):

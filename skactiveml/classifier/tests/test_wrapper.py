@@ -3,7 +3,7 @@ import unittest
 
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
-from skactiveml.utils._wrapper import SklearnClassifier
+from skactiveml.classifier import SklearnClassifier
 
 
 class TestClassifierWrapper(unittest.TestCase):
