@@ -1,8 +1,8 @@
 import numpy as np
 import unittest
 
-from .._expected_error import ExpectedErrorReduction as EER
-from ...classifier._new_pwc import PWC
+from skactiveml.pool import ExpectedErrorReduction as EER
+from skactiveml.classifier import PWC
 
 
 class TestPWC(unittest.TestCase):
