@@ -1,7 +1,7 @@
 from sklearn.utils import check_array
 
 from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled
+from ..utils import rand_argmax, is_labeled, MISSING_LABEL
 
 import numpy as np
 import warnings
@@ -45,7 +45,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
-    def __init__(self, clf, classes=None, method='margin_sampling', unlabeled_class=np.nan, random_state=None):
+    def __init__(self, clf, classes=None, method='margin_sampling', missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
 
         if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling' and method != 'expected_average_precision':
@@ -55,7 +55,10 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         if method == 'expected_average_precision' and classes is None:
             raise ValueError('\'classes\' has to be specified')
 
-        self.unlabeled_class = unlabeled_class
+        if getattr(clf, 'predict_proba', None) is None:
+            raise TypeError("'clf' must implement the method 'predict_proba'")
+
+        self.missing_label = missing_label
         self.method = method
         self.classes = classes
         self.clf = clf
@@ -87,8 +90,9 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
 
         # fit the classifier and get the probabilities
-        mask_labeled = is_labeled(y)
+        mask_labeled = is_labeled(y, self.missing_label)
         self.clf.fit(X[mask_labeled], y[mask_labeled])
+        #self.clf.fit(X, y)
         probas = self.clf.predict_proba(X_cand)
 
         # caculate the utilities
@@ -112,7 +116,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
             return best_indices
 
 
-def expected_average_precision(X_cand, classes, proba):
+def expected_average_precision(X_cand, classes, probas):
     """
     Calculate the expected average precision.
 
@@ -134,7 +138,7 @@ def expected_average_precision(X_cand, classes, proba):
     for i in range(len(classes)):
         for j, x in enumerate(X_cand):
             # The i-th column of p without p[j,i]
-            p = proba[:,i]
+            p = probas[:,i]
             p = np.delete(p,[j])
             # Sort p in descending order
             p = np.flipud(np.sort(p, axis=0))
@@ -164,7 +168,7 @@ def g(n,t,p,g_arr):
         return 0
     if t==0 and n==0:
         return 1
-    return p[n]*g_arr[n-1,t-1] + (1-p[n])*g_arr[n-1,t]
+    return p[n-1]*g_arr[n-1,t-1] + (1-p[n-1])*g_arr[n-1,t]
 
 
 def f(n,t,p,f_arr,g_arr):
@@ -173,3 +177,5 @@ def f(n,t,p,f_arr,g_arr):
     if t==0 and n==0:
         return 1
     return p[n-1]*f_arr[n-1,t-1] + p[n-1]*t*g_arr[n-1,t-1]/n + (1-p[n-1])*f_arr[n-1,t]
+
+
