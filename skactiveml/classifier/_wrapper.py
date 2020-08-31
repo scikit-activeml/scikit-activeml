@@ -5,15 +5,16 @@ import numpy as np
 import warnings
 
 from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin, is_classifier
-from sklearn.utils.validation import check_random_state, check_is_fitted
+from sklearn.utils.validation import check_random_state, check_is_fitted, check_array, check_consistent_length
 from skactiveml.utils import MISSING_LABEL, ExtLabelEncoder
 
 
 class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
     """SklearnClassifier
 
-    Implementation of a wrapper class for scikit-learning classifiers such that missing labels can be handled.
-    Enables access to all attributes of estimator object.
+    Implementation of a wrapper class for scikit-learn classifiers such that missing labels can be handled and
+    multiple labels per sample. Therefor, samples with missing labels are filtered and samples with n assigned labels
+    are duplicated n times, i.e., one duplicate for each label.
 
     Parameters
     ----------
@@ -66,10 +67,10 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         ----------
         X : matrix-like, shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples)
+        y : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where missing labels are
-            represented the attribute 'missing_label'.
+            Missing labels are represented the attribute 'missing_label'.
+            In case of multiple labels per sample (i.e., n_outputs > 1), the samples are duplicated.
         fit_kwargs : dict-like
             Further parameters as input to the 'fit' method of the 'estimator'.
 
@@ -78,7 +79,12 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         self: SklearnClassifier,
             The SklearnClassifier is fitted on the training data.
         """
+        X = check_array(X, ensure_min_samples=0, ensure_2d=False, ensure_min_features=0)
         y_enc = self._le.fit_transform(y)
+        check_consistent_length(X, y_enc)
+        if y_enc.ndim == 2:
+            X = np.repeat(X, np.size(y_enc, axis=1), axis=0)
+            y_enc = y_enc.ravel()
         is_lbld = ~np.isnan(y_enc)
         try:
             self.estimator.fit(X[is_lbld], y_enc[is_lbld], **fit_kwargs)

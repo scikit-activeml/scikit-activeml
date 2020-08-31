@@ -139,12 +139,15 @@ class CMM(BaseEstimator, ClassifierMixin):
             The class frequency estimates of the input samples. Classes are ordered by lexicographic order.
         """
         check_is_fitted(self, ['F_components_', 'classes_'])
-        D = np.exp(-np.array(
-            [cdist(X, [self.mixture_model.means_[j]], metric='mahalanobis',
-                   VI=self.mixture_model.precisions_[j]).ravel()
-             for j in range(self.mixture_model.n_components)])).T
-        F = D @ self.F_components_
-        D /= np.sum(D, axis=1, keepdims=True)
+        if np.sum(self.F_components_) > 0:
+            D = np.exp(-np.array(
+                [cdist(X, [self.mixture_model.means_[j]], metric='mahalanobis',
+                       VI=self.mixture_model.precisions_[j]).ravel()
+                 for j in range(self.mixture_model.n_components)])).T
+            F = D @ self.F_components_
+            D /= np.sum(D, axis=1, keepdims=True)
+        else:
+            F = np.zeros((len(X), len(self.classes_)))
         return F
 
     def predict_proba(self, X):

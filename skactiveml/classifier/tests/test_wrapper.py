@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
 
+from sklearn.datasets import load_breast_cancer
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
 from skactiveml.classifier import SklearnClassifier
@@ -84,6 +85,18 @@ class TestClassifierWrapper(unittest.TestCase):
         y = clf.predict(X=[[0]] * 1000)
         self.assertTrue(len(np.unique(y)) == len(clf.classes_))
         clf.fit(X=self.X, y=self.y1)
+
+    def test_multi_annotator_scenario(self):
+        X, y_true = load_breast_cancer(return_X_y=True)
+        y = np.repeat(y_true.reshape(-1, 1), 2, axis=1)
+        y[:100, 0] = -1
+        y[200:, 0] = -1
+        clf = SklearnClassifier(estimator=GaussianProcessClassifier(), missing_label=-1).fit(X[:250], y[:250])
+        self.assertTrue(clf.score(X[250:], y_true[250:]) > 0.5)
+
+
+
+
 
 
 if __name__ == '__main__':
