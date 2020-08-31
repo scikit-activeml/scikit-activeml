@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.utils import check_array
 
 from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled
+from ..utils import rand_argmax, is_labeled, MISSING_LABEL
 
 
 class ExpectedErrorReduction(PoolBasedQueryStrategy):
@@ -55,7 +55,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
     CSL = 'csl'
     LOG_LOSS = 'log_loss'
 
-    def __init__(self, clf, classes, method=EMR, C=None, random_state=None, **kwargs):
+    def __init__(self, clf, classes, method=EMR, C=None, random_state=None, missing_label=MISSING_LABEL, **kwargs):
         super().__init__(random_state=random_state, **kwargs)
 
         self.clf = clf
@@ -81,6 +81,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
             )
 
         self.classes_ = classes
+        self.missing_label = missing_label
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
         """
@@ -108,11 +109,11 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
         X = np.array(X)
         y = np.array(y)
-        labeled_indices = is_labeled(y)
+        labeled_indices = is_labeled(y, missing_label=self.missing_label)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]
 
-        # caculate the utilities
+        # calculate the utilities
         utilities = expected_error_reduction(clf=self.clf, X_labeled=X_labeled, y_labeled=y_labeled,
                                         X_unlabeled=X_cand, classes=self.classes_, C=self.C_,
                                         method=self.method_)
