@@ -4,15 +4,16 @@ Wrapper to deal with missing labels and labels from multiple annotators.
 import numpy as np
 import warnings
 
-from sklearn.base import BaseEstimator, ClassifierMixin, is_classifier
+from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin, is_classifier
 from sklearn.utils.validation import check_random_state, check_is_fitted
 from ..utils import MISSING_LABEL, ExtLabelEncoder
 
 
-class SklearnClassifier(BaseEstimator, ClassifierMixin):
+class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
     """SklearnClassifier
 
     Implementation of a wrapper class for scikit-learning classifiers such that missing labels can be handled.
+    Enables access to all attributes of estimator object.
 
     Parameters
     ----------
@@ -144,3 +145,8 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin):
                 return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
             else:
                 return np.tile(self._label_counts / np.sum(self._label_counts), [len(X), 1])
+
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return getattr(self, attr)
+        return getattr(self.estimator, attr)

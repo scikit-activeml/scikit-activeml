@@ -7,5 +7,6 @@ from ._random import RandomSampler
 from ._uncertainty import UncertaintySampling
 from ._qbc import QBC
 from ._expected_error import ExpectedErrorReduction
+from ._four_ds import FourDS
 
-__all__ = ['RandomSampler', 'McPAL', 'XPAL', 'UncertaintySampling', 'ExpectedErrorReduction', 'QBC']
+__all__ = ['RandomSampler', 'McPAL', 'XPAL', 'UncertaintySampling', 'ExpectedErrorReduction', 'QBC', 'FourDS']

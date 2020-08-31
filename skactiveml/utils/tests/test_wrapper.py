@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 
-from sklearn.utils.validation import NotFittedError
+from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
 from skactiveml.utils._wrapper import SklearnClassifier
 
@@ -19,21 +19,28 @@ class TestClassifierWrapper(unittest.TestCase):
         self.assertRaises(TypeError, SklearnClassifier, estimator=GaussianProcessClassifier(), missing_label=[2])
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(), random_state=0)
         self.assertFalse(hasattr(clf, 'classes_'))
+        self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(), missing_label='nan', classes=['tokyo', 'paris'],
                                 random_state=0)
         np.testing.assert_array_equal(['paris', 'tokyo'], clf.classes_)
         np.testing.assert_array_equal(['paris', 'tokyo'], clf._le._le.classes_)
+        self.assertEqual(clf.kernel, clf.estimator.kernel)
+        self.assertFalse(hasattr(clf, 'kernel_'))
 
     def test_fit(self):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier())
+        self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         self.assertRaises(ValueError, clf.fit, X=[], y=[])
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(), classes=['tokyo', 'paris', 'new york'],
                                 missing_label='nan').fit(X=[], y=[])
+        check_is_fitted(estimator=clf)
         self.assertFalse(clf.is_fitted_)
         clf.fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
+        self.assertTrue(hasattr(clf, 'kernel_'))
         clf.fit(self.X, self.y2)
         self.assertFalse(clf.is_fitted_)
+        self.assertFalse(hasattr(clf, 'kernel_'))
 
     def test_predict_proba(self):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(), missing_label='nan')

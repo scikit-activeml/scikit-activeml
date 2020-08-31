@@ -4,7 +4,8 @@ import unittest
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.datasets import load_breast_cancer
-from .._cmm import CMM
+from sklearn.preprocessing import StandardScaler
+from skactiveml.classifier import CMM
 
 
 class TestCMM(unittest.TestCase):
@@ -17,7 +18,8 @@ class TestCMM(unittest.TestCase):
     def test_init(self):
         self.assertRaises(TypeError, CMM, mixture_model="Test")
         mixture = GaussianMixture()
-        self.assertRaises(NotFittedError, CMM, GaussianMixture())
+        cmm = CMM(mixture_model=GaussianMixture())
+        self.assertTrue(cmm._refit)
         mixture.fit(X=self.X)
         self.assertRaises(ValueError, CMM, mixture_model=mixture, classes=[1, 2], cost_matrix=1-np.eye(3))
         cmm = CMM(mixture_model=mixture)
@@ -27,6 +29,7 @@ class TestCMM(unittest.TestCase):
         self.assertIsNotNone(cmm._le)
         np.testing.assert_array_equal(cost_matrix, cmm.cost_matrix)
         self.assertEqual('nan', cmm._le.missing_label)
+        self.assertFalse(cmm._refit)
 
     def test_fit(self):
         mixture = BayesianGaussianMixture(n_components=1).fit(X=self.X)
@@ -77,8 +80,15 @@ class TestCMM(unittest.TestCase):
         y = cmm.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
         X, y = load_breast_cancer(return_X_y=True)
-        mixture = BayesianGaussianMixture(n_components=20, random_state=0).fit(X)
-        cmm = CMM(mixture_model=mixture, random_state=0).fit(X, y)
+        X = StandardScaler().fit_transform(X)
+        cmm = CMM(random_state=0).fit(X, y)
+        P = cmm.predict_freq(X)
+        self.assertEqual(cmm.mixture_model.n_components, 10)
+        self.assertTrue(cmm._refit)
+        self.assertTrue(cmm.score(X, y) > 0.5)
+        mixture = BayesianGaussianMixture(n_components=5).fit(X)
+        cmm = CMM(mixture_model=mixture, random_state=0).fit(X[:50], y[:50])
+        self.assertEqual(cmm.mixture_model.n_components, 5)
         self.assertTrue(cmm.score(X, y) > 0.5)
 
 
