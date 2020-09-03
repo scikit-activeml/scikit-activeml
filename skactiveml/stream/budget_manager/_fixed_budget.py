@@ -105,3 +105,20 @@ class FixedBudget(BudgetManager):
             return sampled_indices, budget_left
         else:
             return sampled_indices
+
+    def update(self, sampled, **kwargs):
+        """Updates the budget manager.
+
+        Parameters
+        ----------
+        sampled : array-like
+            Indicates which instances from X_cand have been sampled.
+
+        Returns
+        -------
+        self : FixedBudget
+            The FixedBudget returns itself, after it is updated.
+        """
+        self.seen_instances += sampled.shape[0]
+        self.sampled_instances += np.sum(sampled)
+        return self

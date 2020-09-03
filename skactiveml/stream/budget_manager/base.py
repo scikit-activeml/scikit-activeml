@@ -70,3 +70,19 @@ class BudgetManager(ABC, BaseEstimator):
             provided if return_utilities is True.
         """
         return NotImplemented
+
+    @abstractmethod
+    def update(self, sampled, **kwargs):
+        """Updates the BudgetManager.
+
+        Parameters
+        ----------
+        sampled : array-like
+            Indicates which instances from X_cand have been sampled.
+
+        Returns
+        -------
+        self : BudgetManager
+            The BudgetManager returns itself, after it is updated.
+        """
+        return NotImplemented
