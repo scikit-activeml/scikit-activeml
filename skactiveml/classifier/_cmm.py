@@ -167,7 +167,7 @@ class CMM(BaseEstimator, ClassifierMixin):
         check_is_fitted(self, ['F_components_', 'classes_'])
         if np.sum(self.F_components_) > 0:
             X = check_array(X)
-            self._check_n_features(X)
+            self._check_n_features(X, reset=False)
             D = np.exp(-np.array(
                 [cdist(X, [self.mixture_model.means_[j]], metric='mahalanobis',
                        VI=self.mixture_model.precisions_[j]).ravel()
