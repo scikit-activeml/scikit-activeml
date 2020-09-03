@@ -45,11 +45,16 @@ class StreamBasedQueryStrategy(QueryStrategy):
     @abstractmethod
     def query(self, X_cand, *args, return_utilities=False, simulate=False,
               **kwargs):
-        """Ask the query strategy which instance in X_cand to acquire.
+        """Ask the query strategy which instances in X_cand to acquire.
 
         The query startegy determines the most useful instances in X_cand,
         which can be acquired within the budgeting constraint specified by the
         budget_manager.
+        Please note that, when the decisions from this function
+        may differ from the final sampling, simulate=True can set, so that the
+        query strategy can be updated later with update(...) with the final
+        sampling. This is especially helpful, when developing wrapper query
+        strategies.
 
         Parameters
         ----------
@@ -76,5 +81,31 @@ class StreamBasedQueryStrategy(QueryStrategy):
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
+        """
+        return NotImplemented
+
+    @abstractmethod
+    def update(self, X_cand, sampled, *args, **kwargs):
+        """Update the query strategy with the decisions taken.
+
+        This function should be used in conjunction with the query function,
+        when the instances sampled from query(...) may differ from the
+        instances sampled in the end. In this case use query(...) with
+        simulate=true and provide the final decisions via update(...).
+        This is especially helpful, when developing wrapper query strategies.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        sampled : array-like
+            Indicates which instances from X_cand have been sampled.
+
+        Returns
+        -------
+        self : StreamBasedQueryStrategy
+            The StreamBasedQueryStrategy returns itself, after it is updated.
         """
         return NotImplemented
