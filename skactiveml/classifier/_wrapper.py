@@ -1,19 +1,23 @@
 """
-Wrapper to deal with missing labels and labels from multiple annotators.
+Wrapper for scikit-learn classifiers to deal with missing labels and labels
+from multiple annotators.
 """
 import numpy as np
 import warnings
 
-from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin, is_classifier
-from sklearn.utils.validation import check_random_state, check_is_fitted, check_array, check_consistent_length
+from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin, \
+    is_classifier
+from sklearn.utils.validation import check_random_state, check_is_fitted, \
+    check_array, check_consistent_length
 from skactiveml.utils import MISSING_LABEL, ExtLabelEncoder
 
 
 class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
     """SklearnClassifier
 
-    Implementation of a wrapper class for scikit-learn classifiers such that missing labels can be handled and
-    multiple labels per sample. Therefor, samples with missing labels are filtered and samples with n assigned labels
+    Implementation of a wrapper class for scikit-learn classifiers such that
+    missing labels can be handled and multiple labels per sample. Therefor,
+    samples with missing labels are filtered and samples with n assigned labels
     are duplicated n times, i.e., one duplicate for each label.
 
     Parameters
@@ -25,8 +29,8 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
     missing_label: scalar|string|np.nan|None, default=np.nan
         Value to represent a missing label.
     random_state: int, RandomState instance or None, optional (default=None)
-        Determines random number for 'predict' method. Pass an int for reproducible results across multiple
-        method calls.
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
 
     Attributes
     ----------
@@ -39,7 +43,8 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
     is_fitted_: boolean
         Determines whether the estimator has been fitted or not.
     random_state: int, RandomState instance or None, optional (default=None)
-        Determines random number for 'predict' method. Pass an int for reproducible results across multiple
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple
         method calls.
     _le : skactiveml.utils.ExtLabelEncoder
         Encoder for class labels.
@@ -47,11 +52,14 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         Number of observed labels per class.
     """
 
-    def __init__(self, estimator, classes=None, missing_label=MISSING_LABEL, random_state=None):
-        if not is_classifier(estimator=estimator) or not hasattr(estimator, 'predict_proba'):
-            raise TypeError("'{}' must be a classifier implementing 'predict_proba'".format(estimator))
+    def __init__(self, estimator, classes=None, missing_label=MISSING_LABEL,
+                 random_state=None):
+        if not is_classifier(estimator=estimator):
+            raise TypeError(
+                "'{}' must be a scikit-learn classifier".format(estimator))
         self.estimator = estimator
-        self._le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
+        self._le = ExtLabelEncoder(classes=classes,
+                                   missing_label=missing_label)
         self.missing_label = self._le.missing_label
         if classes is not None:
             self.classes_ = self._le.classes_
@@ -59,7 +67,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
             self._label_counts = np.zeros(len(self.classes_))
         self.random_state = check_random_state(random_state)
 
-    def fit(self, X, y, **fit_kwargs):
+    def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """
         Fit the model using X as training data and y as class labels.
 
@@ -70,7 +78,11 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         y : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
             Missing labels are represented the attribute 'missing_label'.
-            In case of multiple labels per sample (i.e., n_outputs > 1), the samples are duplicated.
+            In case of multiple labels per sample (i.e., n_outputs > 1), the
+            samples are duplicated.
+        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the weights of the training samples' class labels. It
+            must have the same shape as y.
         fit_kwargs : dict-like
             Further parameters as input to the 'fit' method of the 'estimator'.
 
@@ -79,23 +91,37 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         self: SklearnClassifier,
             The SklearnClassifier is fitted on the training data.
         """
-        X = check_array(X, ensure_min_samples=0, ensure_2d=False, ensure_min_features=0)
+        X = check_array(X, ensure_min_samples=0, ensure_2d=False,
+                        ensure_min_features=0)
         y_enc = self._le.fit_transform(y)
         check_consistent_length(X, y_enc)
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight,
+                                        force_all_finite=False,
+                                        ensure_2d=False)
+        check_consistent_length(y_enc, sample_weight)
         if y_enc.ndim == 2:
             X = np.repeat(X, np.size(y_enc, axis=1), axis=0)
             y_enc = y_enc.ravel()
+            if sample_weight is not None:
+                sample_weight = sample_weight.ravel()
         is_lbld = ~np.isnan(y_enc)
         try:
-            self.estimator.fit(X[is_lbld], y_enc[is_lbld], **fit_kwargs)
+            self._check_n_features(X, reset=True)
+            if sample_weight is None:
+                self.estimator.fit(X=X[is_lbld], y=y_enc[is_lbld],
+                                   **fit_kwargs)
+            else:
+                self.estimator.fit(X=X[is_lbld], y=y_enc[is_lbld],
+                                   sample_weight=sample_weight[is_lbld],
+                                   **fit_kwargs)
             self.is_fitted_ = True
         except Exception as err:
-            warnings.warn("'{}' could not be fitted due to: {}".format(self.estimator.__str__(), err), UserWarning)
-            if len(self._le.classes_) == 0:
-                raise ValueError(
-                    "You cannot fit a classifier on empty data, if parameter 'classes' has not been specified.")
+            warnings.warn("'{}' could not be fitted due to: {}".format(
+                self.estimator.__str__(), err), UserWarning)
             self.is_fitted_ = False
-            self._label_counts = [np.sum(y_enc[is_lbld] == c) for c in range(len(self._le.classes_))]
+            self._label_counts = [np.sum(y_enc[is_lbld] == c) for c in
+                                  range(len(self._le.classes_))]
         self.classes_ = self._le.classes_
         return self
 
@@ -107,7 +133,8 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         X :  array-like, shape (n_samples, n_features)
             Input samples.
         predict_kwargs : dict-like
-            Further parameters as input to the 'predict' method of the 'estimator'.
+            Further parameters as input to the 'predict' method of the
+            'estimator'.
 
         Returns
         -------
@@ -116,11 +143,15 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         """
         check_is_fitted(self, attributes=['is_fitted_'])
         if self.is_fitted_:
-            return self._le.inverse_transform(self.estimator.predict(X, **predict_kwargs))
+            self._check_n_features(X, reset=False)
+            return self._le.inverse_transform(
+                self.estimator.predict(X, **predict_kwargs))
         else:
-            warnings.warn("'{}' not fitted: Return default predictions".format(self.estimator.__str__()), UserWarning)
+            warnings.warn("'{}' not fitted: Return default predictions".format(
+                self.estimator.__str__()), UserWarning)
             p = self.predict_proba([X[0]]).ravel()
-            return self.random_state.choice(self.classes_, len(X), replace=True, p=p)
+            return self.random_state.choice(self.classes_, len(X),
+                                            replace=True, p=p)
 
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
@@ -130,15 +161,22 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         X : array-like, shape (n_samples, n_features)
             Input samples.
         predict_proba_kwargs : dict-like
-            Further parameters as input to the 'predict_proba' method of the 'estimator'.
+            Further parameters as input to the 'predict_proba' method of the
+            'estimator'.
 
         Returns
         -------
         P : array-like, shape (n_samples, classes)
-            The class probabilities of the input samples. Classes are ordered by lexicographic order.
+            The class probabilities of the input samples. Classes are ordered
+            by lexicographic order.
         """
+        if not hasattr(self.estimator, 'predict_proba'):
+            raise AttributeError("'{}' does not implement "
+                                 "'predict_proba'.".format(self.estimator))
         check_is_fitted(self, attributes=['is_fitted_'])
+        X = check_array(X)
         if self.is_fitted_:
+            self._check_n_features(X, reset=False)
             P = self.estimator.predict_proba(X, **predict_proba_kwargs)
             if len(self.estimator.classes_) != len(self.classes_):
                 P_ext = np.zeros((len(X), len(self.classes_)))
@@ -148,9 +186,11 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
             return P
         else:
             if sum(self._label_counts) == 0:
-                return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
+                return np.ones([len(X), len(self.classes_)]) / len(
+                    self.classes_)
             else:
-                return np.tile(self._label_counts / np.sum(self._label_counts), [len(X), 1])
+                return np.tile(self._label_counts / np.sum(self._label_counts),
+                               [len(X), 1])
 
     def __getattr__(self, attr):
         if attr in self.__dict__:

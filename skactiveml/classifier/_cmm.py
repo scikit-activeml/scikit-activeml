@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 from sklearn.utils.validation import check_random_state, check_array, \
-    check_is_fitted, NotFittedError
+    check_is_fitted, NotFittedError, check_consistent_length
 from scipy.spatial.distance import cdist
 from ..utils import check_cost_matrix, ExtLabelEncoder, MISSING_LABEL, \
     compute_vote_vectors, rand_argmin
@@ -102,7 +102,7 @@ class CMM(BaseEstimator, ClassifierMixin):
         y : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'unlabeled'.
+            missing labels are represented the attribute 'missing_label'.
         sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the weights of the training samples' class labels. It
             must have the same shape as y.
@@ -112,37 +112,32 @@ class CMM(BaseEstimator, ClassifierMixin):
         self: CMM,
             The CMM is fitted on the training data.
         """
-        if np.size(X) > 0:
-            # Check input parameters.
-            X = check_array(X)
-            self._check_n_features(X, reset=True)
-            y = self._le.fit_transform(y)
-            if sample_weight is not None:
-                sample_weight = check_array(sample_weight,
-                                            force_all_finite=False,
-                                            ensure_2d=False)
+        # Check input parameters.
+        X = check_array(X)
+        self._check_n_features(X, reset=True)
+        y = self._le.fit_transform(y)
+        check_consistent_length(X, y)
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight,
+                                        force_all_finite=False,
+                                        ensure_2d=False)
 
-            # Refit model if desired.
-            if self._refit:
-                self.mixture_model.fit(X)
+        # Refit model if desired.
+        if self._refit:
+            self.mixture_model.fit(X)
 
-            # Counts number of votes per class label for each sample.
-            V = compute_vote_vectors(y=y, w=sample_weight,
-                                     classes=np.arange(len(self._le.classes_)))
-
-            # Stores responsibility for every given sample of training set.
-            R = self.mixture_model.predict_proba(X)
-
-            # Stores class frequency estimates per component.
-            self.F_components_ = R.T @ V
-        else:
-            if not hasattr(self, 'classes_'):
-                raise ValueError(
-                    "You cannot fit a classifier on empty data, if parameter "
-                    "'classes' has not been specified.")
-            self.F_components_ = np.zeros(
-                (self.mixture_model.n_components, len(self.classes_)))
+        # Counts number of votes per class label for each sample.
         self.classes_ = self._le.classes_
+        V = compute_vote_vectors(y=y, w=sample_weight,
+                                 classes=np.arange(len(self.classes_)))
+
+        # Stores responsibility for every given sample of training set.
+        R = self.mixture_model.predict_proba(X)
+
+        # Stores class frequency estimates per component.
+        self.F_components_ = R.T @ V
+
+        # Update cost matrix.
         self.cost_matrix = 1 - np.eye(len(
             self.classes_)) if self.cost_matrix is None else self.cost_matrix
         self.cost_matrix = check_cost_matrix(self.cost_matrix,
@@ -165,8 +160,8 @@ class CMM(BaseEstimator, ClassifierMixin):
             ordered by lexicographic order.
         """
         check_is_fitted(self, ['F_components_', 'classes_'])
+        X = check_array(X)
         if np.sum(self.F_components_) > 0:
-            X = check_array(X)
             self._check_n_features(X, reset=False)
             D = np.exp(-np.array(
                 [cdist(X, [self.mixture_model.means_[j]], metric='mahalanobis',

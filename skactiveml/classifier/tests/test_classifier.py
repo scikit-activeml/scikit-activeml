@@ -33,8 +33,12 @@ class TestClassifier(unittest.TestCase):
         # test predictions of classifiers
         for clf in classifiers:
             print(clf)
-            clf_mdl = initialize_class(classifiers[clf], estimator=GaussianProcessClassifier(), classes=classes,
-                                       missing_label=missing_label, random_state=1)
+            clf_mdl = initialize_class(classifiers[clf],
+                                       estimator=GaussianProcessClassifier(),
+                                       classes=classes,
+                                       missing_label=missing_label,
+                                       random_state=1)
+            self.assertRaises(ValueError, clf_mdl.fit, X=[], y=[])
             self.assertTrue(clf_mdl.score(X, y_true) > 0)
             if hasattr(clf_mdl, 'predict_proba'):
                 P_exp = np.ones((len(X), len(classes))) / len(classes)
