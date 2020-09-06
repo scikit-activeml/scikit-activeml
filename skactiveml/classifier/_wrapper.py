@@ -22,33 +22,33 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
 
     Parameters
     ----------
-    estimator: sklearn.base.ClassifierMixin with 'predict_proba' method
+    estimator : sklearn.base.ClassifierMixin with 'predict_proba' method
         A scikit-learn classifier that is to deal with missing labels.
-    classes: array-like, shape (n_classes), default=None
+    classes : array-like, shape (n_classes), default=None
         Holds the label for each class.
-    missing_label: scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar|string|np.nan|None, default=np.nan
         Value to represent a missing label.
-    random_state: int, RandomState instance or None, optional (default=None)
+    random_state : int, RandomState instance or None, optional (default=None)
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_: array-like, shape (n_classes), default=None
-        Holds the label for each class.
-    missing_label: scalar|string|np.nan|None, default=np.nan
-        Value to represent a missing label.
-    estimator: sklearn.base.ClassifierMixin with 'predict_proba' method
+    estimator : sklearn.base.ClassifierMixin with 'predict_proba' method
         A scikit-learn classifier that is to deal with missing labels.
-    is_fitted_: boolean
+    classes_ : array-like, shape (n_classes), default=None
+        Holds the label for each class.
+    missing_label : scalar|string|np.nan|None, default=np.nan
+        Value to represent a missing label.
+    is_fitted_ : boolean
         Determines whether the estimator has been fitted or not.
-    random_state: int, RandomState instance or None, optional (default=None)
+    random_state : int, RandomState instance or None, optional (default=None)
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple
         method calls.
     _le : skactiveml.utils.ExtLabelEncoder
         Encoder for class labels.
-    _label_counts: array-like, shape (n_classes)
+    _label_counts : array-like, shape (n_classes)
         Number of observed labels per class.
     """
 
@@ -56,7 +56,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
                  random_state=None):
         if not is_classifier(estimator=estimator):
             raise TypeError(
-                "'{}' must be a scikit-learn classifier".format(estimator))
+                "'{}' must be a scikit-learn classifier.".format(estimator))
         self.estimator = estimator
         self._le = ExtLabelEncoder(classes=classes,
                                    missing_label=missing_label)
@@ -68,8 +68,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         self.random_state = check_random_state(random_state)
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
-        """
-        Fit the model using X as training data and y as class labels.
+        """Fit the model using X as training data and y as class labels.
 
         Parameters
         ----------
@@ -91,39 +90,35 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         self: SklearnClassifier,
             The SklearnClassifier is fitted on the training data.
         """
-        X = check_array(X, ensure_min_samples=0, ensure_2d=False,
-                        ensure_min_features=0)
-        y_enc = self._le.fit_transform(y)
-        check_consistent_length(X, y_enc)
-        if sample_weight is not None:
-            sample_weight = check_array(sample_weight,
-                                        force_all_finite=False,
-                                        ensure_2d=False)
-        check_consistent_length(y_enc, sample_weight)
-        if y_enc.ndim == 2:
-            X = np.repeat(X, np.size(y_enc, axis=1), axis=0)
-            y_enc = y_enc.ravel()
-            if sample_weight is not None:
-                sample_weight = sample_weight.ravel()
-        is_lbld = ~np.isnan(y_enc)
-        try:
-            self._check_n_features(X, reset=True)
-            if sample_weight is None:
-                self.estimator.fit(X=X[is_lbld], y=y_enc[is_lbld],
-                                   **fit_kwargs)
-            else:
-                self.estimator.fit(X=X[is_lbld], y=y_enc[is_lbld],
-                                   sample_weight=sample_weight[is_lbld],
-                                   **fit_kwargs)
-            self.is_fitted_ = True
-        except Exception as err:
-            warnings.warn("'{}' could not be fitted due to: {}".format(
-                self.estimator.__str__(), err), UserWarning)
-            self.is_fitted_ = False
-            self._label_counts = [np.sum(y_enc[is_lbld] == c) for c in
-                                  range(len(self._le.classes_))]
-        self.classes_ = self._le.classes_
-        return self
+        return self._fit(fit_function='fit', X=X, y=y,
+                         sample_weight=sample_weight, **fit_kwargs)
+
+    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+        """Partially fitting the model using X as training data and y as class
+        labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the class labels of the training samples.
+            Missing labels are represented the attribute 'missing_label'.
+            In case of multiple labels per sample (i.e., n_outputs > 1), the
+            samples are duplicated.
+        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the weights of the training samples' class labels. It
+            must have the same shape as y.
+        fit_kwargs : dict-like
+            Further parameters as input to the 'fit' method of the 'estimator'.
+
+        Returns
+        -------
+        self: SklearnClassifier,
+            The SklearnClassifier is fitted on the training data.
+        """
+        return self._fit(fit_function='partial_fit', X=X, y=y,
+                         sample_weight=sample_weight, **fit_kwargs)
 
     def predict(self, X, **predict_kwargs):
         """Return class label predictions for the input data X.
@@ -170,9 +165,6 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
             The class probabilities of the input samples. Classes are ordered
             by lexicographic order.
         """
-        if not hasattr(self.estimator, 'predict_proba'):
-            raise AttributeError("'{}' does not implement "
-                                 "'predict_proba'.".format(self.estimator))
         check_is_fitted(self, attributes=['is_fitted_'])
         X = check_array(X)
         if self.is_fitted_:
@@ -192,7 +184,62 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
                 return np.tile(self._label_counts / np.sum(self._label_counts),
                                [len(X), 1])
 
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return getattr(self, attr)
-        return getattr(self.estimator, attr)
+    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        # Extends fit functions to missing label setting.
+        X = check_array(X, ensure_min_samples=0, ensure_2d=False,
+                        ensure_min_features=0)
+        y_enc = self._le.fit_transform(y)
+        check_consistent_length(X, y_enc)
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight,
+                                        force_all_finite=False,
+                                        ensure_2d=False)
+        check_consistent_length(y_enc, sample_weight)
+        if y_enc.ndim == 2:
+            X = np.repeat(X, np.size(y_enc, axis=1), axis=0)
+            y_enc = y_enc.ravel()
+            if sample_weight is not None:
+                sample_weight = sample_weight.ravel()
+        is_lbld = ~np.isnan(y_enc)
+        try:
+            self._check_n_features(X, reset=True)
+            if sample_weight is None:
+                if fit_function == 'partial_fit':
+                    classes = self._le.transform(self.classes_)
+                    self.estimator.partial_fit(X=X[is_lbld], y=y_enc[is_lbld],
+                                               classes=classes,
+                                               **fit_kwargs)
+                elif fit_function == 'fit':
+                    self.estimator.fit(X=X[is_lbld], y=y_enc[is_lbld],
+                                       **fit_kwargs)
+            else:
+                if fit_function == 'partial_fit':
+                    classes = self._le.transform(self.classes_)
+                    self.estimator.partial_fit(X=X[is_lbld], y=y_enc[is_lbld],
+                                               classes=classes,
+                                               sample_weight=sample_weight[
+                                                   is_lbld],
+                                               **fit_kwargs)
+                elif fit_function == 'fit':
+                    self.estimator.fit(X=X[is_lbld], y=y_enc[is_lbld],
+                                       sample_weight=sample_weight[is_lbld],
+                                       **fit_kwargs)
+            self.is_fitted_ = True
+        except Exception as err:
+            warnings.warn("'{}' could not be fitted due to: {}".format(
+                self.estimator.__str__(), err), UserWarning)
+            self.is_fitted_ = False
+            self._label_counts = [np.sum(y_enc[is_lbld] == c) for c in
+                                  range(len(self._le.classes_))]
+        self.classes_ = self._le.classes_
+        return self
+
+    def __getattribute__(self, attr):
+        try:
+            if attr in ['predict_proba', 'partial_fit'] and \
+                    not getattr(object.__getattribute__(self, 'estimator'),
+                                attr):
+                raise AttributeError
+            return object.__getattribute__(self, attr)
+        except AttributeError:
+            return getattr(object.__getattribute__(self, 'estimator'), attr)

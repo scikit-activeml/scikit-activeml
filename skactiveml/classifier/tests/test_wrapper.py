@@ -49,10 +49,30 @@ class TestClassifierWrapper(unittest.TestCase):
         self.assertTrue(hasattr(clf, 'kernel_'))
         np.testing.assert_array_equal(clf.classes_, ['new york', 'paris',
                                                      'tokyo'])
-        self.assertEqual(clf.__getattr__('missing_label'), 'nan')
+        self.assertEqual(clf.missing_label, 'nan')
         clf.fit(self.X, self.y2)
         self.assertFalse(clf.is_fitted_)
-        self.assertFalse(hasattr(clf, 'kernel_'))
+        self.assertFalse(hasattr(clf, "kernel_"))
+        self.assertFalse(hasattr(clf, 'partial_fit'))
+
+    def test_partial_fit(self):
+        clf = SklearnClassifier(estimator=GaussianNB())
+        self.assertRaises(ValueError, clf.partial_fit, X=[], y=[])
+        clf = SklearnClassifier(estimator=GaussianNB(),
+                                classes=['tokyo', 'paris', 'new york'],
+                                missing_label='nan')
+        check_is_fitted(estimator=clf)
+        self.assertFalse(clf.is_fitted_)
+        clf.partial_fit(self.X, self.y1)
+        self.assertTrue(clf.is_fitted_)
+        self.assertTrue(hasattr(clf, 'class_count_'))
+        np.testing.assert_array_equal(clf.classes_, ['new york', 'paris',
+                                                     'tokyo'])
+        self.assertEqual(clf.missing_label, 'nan')
+        clf.partial_fit(self.X, self.y2)
+        self.assertTrue(clf.is_fitted_)
+        self.assertFalse(hasattr(clf, "kernel_"))
+        self.assertTrue(hasattr(clf, 'partial_fit'))
 
     def test_predict_proba(self):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
@@ -108,9 +128,9 @@ class TestClassifierWrapper(unittest.TestCase):
         y = np.repeat(y_true.reshape(-1, 1), 2, axis=1)
         y[:100, 0] = -1
         y[200:, 0] = -1
-        sample_weights = np.ones_like(y) * 0.5
+        sample_weights = np.ones_like(y) * 0.9
         clf = SklearnClassifier(estimator=GaussianNB(),
-                                missing_label=-1)
+                                missing_label=-1, random_state=0)
         clf.fit(X[:250], y[:250], sample_weight=sample_weights[:250])
         self.assertTrue(clf.score(X[250:], y_true[250:]) > 0.5)
 
