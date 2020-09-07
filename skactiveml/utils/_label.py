@@ -2,7 +2,7 @@ import numpy as np
 
 from iteration_utilities import deepflatten
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import check_is_fitted, check_array
 from sklearn.preprocessing import LabelEncoder
 from ..utils._validation import check_missing_label, check_classes
 
@@ -26,19 +26,24 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     """
     missing_label = check_missing_label(missing_label)
     if not isinstance(y, np.ndarray):
-        types = set(t.__qualname__ for t in set(type(v) for v in deepflatten(y)))
+        types = set(
+            t.__qualname__ for t in set(type(v) for v in deepflatten(y)))
         types.add(type(missing_label).__qualname__)
         is_number = False
         is_character = False
         for t in types:
             t = np.object if t == 'NoneType' else t
-            is_character = True if np.issubdtype(t, np.character) else is_character
+            is_character = True \
+                if np.issubdtype(t, np.character) else is_character
             is_number = True if np.issubdtype(t, np.number) else is_number
             if is_character and is_number:
-                raise TypeError("'y' must be uniformly strings or numbers. 'NoneType' is allowed. Got {}".format(types))
+                raise TypeError(
+                    "'y' must be uniformly strings or numbers. "
+                    "'NoneType' is allowed. Got {}".format(types))
         y = np.asarray(y)
     target_type = np.append(y.ravel(), missing_label).dtype
-    missing_label = check_missing_label(missing_label, target_type=target_type, name='y')
+    missing_label = check_missing_label(missing_label, target_type=target_type,
+                                        name='y')
     if len(y) == 0:
         return np.array([], dtype=bool)
     elif missing_label is np.nan:
@@ -96,7 +101,9 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
             self.classes_ = np.array(check_classes(classes))
             self._le = LabelEncoder().fit(self.classes_)
             self._dtype = np.append(self.classes_, self.missing_label).dtype
-            self.missing_label = check_missing_label(missing_label, target_type=self._dtype, name='classes')
+            self.missing_label = check_missing_label(missing_label,
+                                                     target_type=self._dtype,
+                                                     name='classes')
         self._no_init_classes = classes is None
 
     def fit(self, y):
@@ -111,6 +118,7 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         -------
         self: returns an instance of self.
         """
+        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
         if self._no_init_classes:
             y = np.asarray(y)
             is_lbld = is_labeled(y, missing_label=self.missing_label)
@@ -141,14 +149,15 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
 
         Parameters
         ----------
-        y : array-like of shape [n_samples]
+        y : array-like of shape (n_samples)
             Target values.
 
         Returns
         -------
-        y_enc : array-like of shape [n_samples]
+        y_enc : array-like of shape (n_samples
         """
         check_is_fitted(self, attributes=['classes_'])
+        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         y = np.asarray(y)
         y_enc = np.empty_like(y, dtype=float)
@@ -169,9 +178,11 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         y_dec : numpy array of shape [n_samples]
         """
         check_is_fitted(self, attributes=['classes_'])
+        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
         is_lbld = is_labeled(y, missing_label=np.nan)
         y = np.asarray(y)
         y_dec = np.empty_like(y, dtype=self._dtype)
-        y_dec[is_lbld] = self._le.inverse_transform(np.array(y[is_lbld].ravel(), dtype=int))
+        y_dec[is_lbld] = self._le.inverse_transform(
+            np.array(y[is_lbld].ravel(), dtype=int))
         y_dec[~is_lbld] = self.missing_label
         return y_dec
