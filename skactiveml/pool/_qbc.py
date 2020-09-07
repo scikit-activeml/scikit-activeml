@@ -108,7 +108,7 @@ class QBC(PoolBasedQueryStrategy):
             The utilities of all instances of X_cand(if return_utilities=True).
         """
 
-        mask_labeled = is_labeled(y,self.missing_label)
+        mask_labeled = is_labeled(y, self.missing_label)
         self.ensemble.fit(X[mask_labeled],y[mask_labeled])
         # choose the disagreement method and calculate the utilities
         if self.method == 'KL_divergence':

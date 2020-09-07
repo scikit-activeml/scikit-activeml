@@ -1,16 +1,12 @@
-import numpy as np
 import unittest
 
+import numpy as np
 from sklearn.datasets import load_breast_cancer
-from sklearn.preprocessing import StandardScaler
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.preprocessing import StandardScaler
+
 from skactiveml import classifier
-
-
-def initialize_class(class_obj, **kwargs):
-    parameters = class_obj.__init__.__code__.co_varnames
-    kwargs = dict(filter(lambda e: e[0] in parameters, kwargs.items()))
-    return class_obj(**kwargs)
+from skactiveml.utils import initialize_class_with_kwargs
 
 
 class TestClassifier(unittest.TestCase):
@@ -33,11 +29,11 @@ class TestClassifier(unittest.TestCase):
         # test predictions of classifiers
         for clf in classifiers:
             print(clf)
-            clf_mdl = initialize_class(classifiers[clf],
-                                       estimator=GaussianProcessClassifier(),
-                                       classes=classes,
-                                       missing_label=missing_label,
-                                       random_state=1)
+            clf_mdl = initialize_class_with_kwargs(classifiers[clf],
+                                                   estimator=GaussianProcessClassifier(),
+                                                   classes=classes,
+                                                   missing_label=missing_label,
+                                                   random_state=1)
             self.assertRaises(ValueError, clf_mdl.fit, X=[], y=[])
             self.assertTrue(clf_mdl.score(X, y_true) > 0)
             if hasattr(clf_mdl, 'predict_proba'):
