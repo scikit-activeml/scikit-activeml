@@ -5,7 +5,7 @@ from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
 
 from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled
+from ..utils import rand_argmax, is_labeled, MISSING_LABEL
 
 
 class McPAL(PoolBasedQueryStrategy):
@@ -94,7 +94,7 @@ class McPAL(PoolBasedQueryStrategy):
 
 class XPAL(PoolBasedQueryStrategy):
 
-    def __init__(self, clf, classes, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
+    def __init__(self, clf, classes, missing_label=MISSING_LABEL, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
         # TODO @DK: clean up
         """ XPAL
         The cost-sensitive expected probabilistic active learning (CsXPAL) strategy is a generalization of the
@@ -149,6 +149,7 @@ class XPAL(PoolBasedQueryStrategy):
         self.clf = clf
         self.perf_est = perf_est
         self.mode = mode
+        self.missing_label = missing_label
 
         # TODO remove self.classes
         self.classes = classes
@@ -197,9 +198,9 @@ class XPAL(PoolBasedQueryStrategy):
         X_eval: array-like (n_samples, n_features)
             Unlabeled evaluation samples
         """
-        labeled_idx = is_labeled(y)
-        X = X[labeled_idx]
-        y = y[labeled_idx]
+        #labeled_idx = is_labeled(y, missing_label=self.missing_label)
+        #X = X[labeled_idx]
+        #y = y[labeled_idx]
 
         if self.mode == 'sequential':
 
