@@ -15,7 +15,7 @@ class TestFourDS(unittest.TestCase):
         self.random_state = 1
         self.X, self.y = load_breast_cancer(return_X_y=True)
         self.X = StandardScaler().fit_transform(self.X)
-        mixture_model = BayesianGaussianMixture(n_components=2, weight_concentration_prior_type='dirichlet_distribution')
+        mixture_model = BayesianGaussianMixture(n_components=2)
         mixture_model.fit(self.X)
         self.CMM = CMM(mixture_model=mixture_model)
 
@@ -32,23 +32,30 @@ class TestFourDS(unittest.TestCase):
         self.assertTrue(isinstance(al4ds.random_state, np.random.RandomState))
 
     def test_query(self):
-        al4ds = FourDS(clf=self.CMM, batch_size=1, random_state=self.random_state)
+        al4ds = FourDS(clf=self.CMM, batch_size=1,
+                       random_state=self.random_state)
         query_indices = al4ds.query(X_cand=self.X, X=self.X, y=self.y)
         self.assertEqual((1,), query_indices.shape)
-        query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X, y=self.y, return_utilities=True)
+        query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X,
+                                               y=self.y, return_utilities=True)
         self.assertEqual((1,), query_indices.shape)
         self.assertEqual((len(self.X),), utilities.shape)
         self.assertEqual(0, np.sum(utilities < 0))
-        al4ds = FourDS(clf=self.CMM, batch_size=3, random_state=self.random_state)
-        query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X, y=self.y, return_utilities=True)
+        al4ds = FourDS(clf=self.CMM, batch_size=3,
+                       random_state=self.random_state)
+        query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X,
+                                               y=self.y, return_utilities=True)
         self.assertEqual((3,), query_indices.shape)
         self.assertEqual((len(self.X), 3), utilities.shape)
         self.assertEqual(3, np.sum(np.equal(utilities, -np.inf)))
-        al4ds = FourDS(clf=self.CMM, batch_size=len(self.X) + 1, random_state=self.random_state)
-        query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X, y=self.y, return_utilities=True)
+        al4ds = FourDS(clf=self.CMM, batch_size=len(self.X) + 1,
+                       random_state=self.random_state)
+        query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X,
+                                               y=self.y, return_utilities=True)
         self.assertEqual((len(self.X),), query_indices.shape)
         self.assertEqual((len(self.X), len(self.X)), utilities.shape)
-        self.assertEqual(np.sum(np.arange(0, len(self.X))), np.sum(np.equal(utilities, -np.inf)))
+        self.assertEqual(np.sum(np.arange(0, len(self.X))),
+                         np.sum(np.equal(utilities, -np.inf)))
 
 
 if __name__ == '__main__':

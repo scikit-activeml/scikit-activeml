@@ -17,46 +17,83 @@ class TestLabel(unittest.TestCase):
         self.y7 = ['paris', 'france', 'tokyo', -1]
 
     def test_is_unlabeled(self):
-        self.assertRaises(TypeError, is_unlabeled, y=self.y1, missing_label='2')
-        self.assertRaises(TypeError, is_unlabeled, y=self.y2, missing_label=np.nan)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y2, missing_label='2')
-        self.assertRaises(TypeError, is_unlabeled, y=self.y2, missing_label=None)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y3, missing_label='2')
-        self.assertRaises(TypeError, is_unlabeled, y=self.y3, missing_label=np.nan)
+        self.assertRaises(TypeError, is_unlabeled, y=self.y1,
+                          missing_label='2')
+        self.assertRaises(TypeError, is_unlabeled, y=self.y2,
+                          missing_label=np.nan)
+        self.assertRaises(TypeError, is_unlabeled, y=self.y2,
+                          missing_label='2')
+        self.assertRaises(TypeError, is_unlabeled, y=self.y2,
+                          missing_label=None)
+        self.assertRaises(TypeError, is_unlabeled, y=self.y3,
+                          missing_label='2')
+        self.assertRaises(TypeError, is_unlabeled, y=self.y3,
+                          missing_label=np.nan)
         self.assertRaises(TypeError, is_unlabeled, y=self.y4, missing_label=2)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y4, missing_label='2')
-        self.assertRaises(TypeError, is_unlabeled, y=self.y5, missing_label='2')
+        self.assertRaises(TypeError, is_unlabeled, y=self.y4,
+                          missing_label='2')
+        self.assertRaises(TypeError, is_unlabeled, y=self.y5,
+                          missing_label='2')
         self.assertRaises(TypeError, is_unlabeled, y=self.y6, missing_label=2)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y6, missing_label=np.nan)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=np.nan)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=None)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label='2')
+        self.assertRaises(TypeError, is_unlabeled, y=self.y6,
+                          missing_label=np.nan)
+        self.assertRaises(TypeError, is_unlabeled, y=self.y7,
+                          missing_label=np.nan)
+        self.assertRaises(TypeError, is_unlabeled, y=self.y7,
+                          missing_label=None)
+        self.assertRaises(TypeError, is_unlabeled, y=self.y7,
+                          missing_label='2')
         self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=-1)
-        np.testing.assert_array_equal(np.array([1, 0, 0, 0, 1], dtype=bool), is_unlabeled(self.y1))
-        np.testing.assert_array_equal(np.array([1, 0, 0, 0, 1], dtype=bool), is_unlabeled(self.y3, missing_label=None))
-        np.testing.assert_array_equal(np.array([1, 0, 0, 0, 1], dtype=bool), is_unlabeled(self.y4, missing_label=None))
-        np.testing.assert_array_equal(np.array([0, 0, 0, 0, 0], dtype=bool), is_unlabeled(self.y5, missing_label=None))
+        np.testing.assert_array_equal(np.array([1, 0, 0, 0, 1], dtype=bool),
+                                      is_unlabeled(self.y1))
+        np.testing.assert_array_equal(np.array([1, 0, 0, 0, 1], dtype=bool),
+                                      is_unlabeled(self.y3,
+                                                   missing_label=None))
+        np.testing.assert_array_equal(np.array([1, 0, 0, 0, 1], dtype=bool),
+                                      is_unlabeled(self.y4,
+                                                   missing_label=None))
         np.testing.assert_array_equal(np.array([0, 0, 0, 0, 0], dtype=bool),
-                                      is_unlabeled(self.y5, missing_label=np.nan))
-        np.testing.assert_array_equal(np.array([0, 1, 0, 0, 0], dtype=bool), is_unlabeled(self.y5, missing_label=-1))
-        np.testing.assert_array_equal(np.array([0, 0, 0, 0], dtype=bool), is_unlabeled(self.y6, missing_label=None))
-        np.testing.assert_array_equal(np.array([0, 0, 0, 1], dtype=bool), is_unlabeled(self.y6, missing_label='nan'))
+                                      is_unlabeled(self.y5,
+                                                   missing_label=None))
+        np.testing.assert_array_equal(np.array([0, 0, 0, 0, 0], dtype=bool),
+                                      is_unlabeled(self.y5,
+                                                   missing_label=np.nan))
+        np.testing.assert_array_equal(np.array([0, 1, 0, 0, 0], dtype=bool),
+                                      is_unlabeled(self.y5, missing_label=-1))
+        np.testing.assert_array_equal(np.array([0, 0, 0, 0], dtype=bool),
+                                      is_unlabeled(self.y6,
+                                                   missing_label=None))
+        np.testing.assert_array_equal(np.array([0, 0, 0, 1], dtype=bool),
+                                      is_unlabeled(self.y6,
+                                                   missing_label='nan'))
 
     def test_is_labeled(self):
-        np.testing.assert_array_equal(~np.array([1, 0, 0, 0, 1], dtype=bool), is_labeled(self.y1))
-        np.testing.assert_array_equal(~np.array([1, 0, 0, 0, 1], dtype=bool), is_labeled(self.y3, missing_label=None))
-        np.testing.assert_array_equal(~np.array([1, 0, 0, 0, 1], dtype=bool), is_labeled(self.y4, missing_label=None))
-        np.testing.assert_array_equal(~np.array([0, 0, 0, 0, 0], dtype=bool), is_labeled(self.y5, missing_label=None))
-        np.testing.assert_array_equal(~np.array([0, 0, 0, 0, 0], dtype=bool), is_labeled(self.y5, missing_label=np.nan))
-        np.testing.assert_array_equal(~np.array([0, 1, 0, 0, 0], dtype=bool), is_labeled(self.y5, missing_label=-1))
-        np.testing.assert_array_equal(~np.array([0, 0, 0, 0], dtype=bool), is_labeled(self.y6, missing_label=None))
-        np.testing.assert_array_equal(~np.array([0, 0, 0, 1], dtype=bool), is_labeled(self.y6, missing_label='nan'))
+        np.testing.assert_array_equal(~np.array([1, 0, 0, 0, 1], dtype=bool),
+                                      is_labeled(self.y1))
+        np.testing.assert_array_equal(~np.array([1, 0, 0, 0, 1], dtype=bool),
+                                      is_labeled(self.y3, missing_label=None))
+        np.testing.assert_array_equal(~np.array([1, 0, 0, 0, 1], dtype=bool),
+                                      is_labeled(self.y4, missing_label=None))
+        np.testing.assert_array_equal(~np.array([0, 0, 0, 0, 0], dtype=bool),
+                                      is_labeled(self.y5, missing_label=None))
+        np.testing.assert_array_equal(~np.array([0, 0, 0, 0, 0], dtype=bool),
+                                      is_labeled(self.y5,
+                                                 missing_label=np.nan))
+        np.testing.assert_array_equal(~np.array([0, 1, 0, 0, 0], dtype=bool),
+                                      is_labeled(self.y5, missing_label=-1))
+        np.testing.assert_array_equal(~np.array([0, 0, 0, 0], dtype=bool),
+                                      is_labeled(self.y6, missing_label=None))
+        np.testing.assert_array_equal(~np.array([0, 0, 0, 1], dtype=bool),
+                                      is_labeled(self.y6, missing_label='nan'))
 
     def test_ExtLabelEncoder(self):
         self.assertRaises(TypeError, ExtLabelEncoder, classes=[2, '2'])
-        self.assertRaises(TypeError, ExtLabelEncoder, classes=['1', '2'], missing_label=np.nan)
-        self.assertRaises(TypeError, ExtLabelEncoder, classes=['1', '2'], missing_label=np.nan)
-        self.assertRaises(NotFittedError, ExtLabelEncoder().transform, y=['1', '2'])
+        self.assertRaises(TypeError, ExtLabelEncoder, classes=['1', '2'],
+                          missing_label=np.nan)
+        self.assertRaises(TypeError, ExtLabelEncoder, classes=['1', '2'],
+                          missing_label=np.nan)
+        self.assertRaises(NotFittedError, ExtLabelEncoder().transform,
+                          y=['1', '2'])
 
         # missing_label=np.nan
         ext_le = ExtLabelEncoder().fit(self.y1)
@@ -93,7 +130,9 @@ class TestLabel(unittest.TestCase):
 
         # classes=[0, 2, 5, 10], missing_label=np.nan
         cls = [0, 2, 5, 10]
-        np.testing.assert_array_equal([np.nan, 1, 2, 3, np.nan], ExtLabelEncoder(classes=cls).fit_transform(self.y1))
+        np.testing.assert_array_equal([np.nan, 1, 2, 3, np.nan],
+                                      ExtLabelEncoder(
+                                          classes=cls).fit_transform(self.y1))
 
 
 if __name__ == '__main__':

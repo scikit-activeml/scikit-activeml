@@ -5,7 +5,7 @@ from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
 
 from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax
+from ..utils import rand_argmax, is_labeled
 
 
 class McPAL(PoolBasedQueryStrategy):
@@ -74,14 +74,15 @@ class McPAL(PoolBasedQueryStrategy):
         """
 
         X_cand = check_array(X_cand, force_all_finite=False)
-        X_labeled = X[self.clf.is_labeled(y)]
-        y_labeled = y[self.clf.is_labeled(y)]
+        labeled_idx = is_labeled(y)
+        X_labeled = X[labeled_idx]
+        y_labeled = y[labeled_idx]
 
         # Calculate gains
         self.clf.fit(X_labeled, y_labeled)
         k_vec = self.clf.predict_freq(X_cand)
         utilities = weights * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
-        best_indices = rand_argmax(utilities, axis=1, random_state=self.random_state)
+        best_indices = rand_argmax(utilities, random_state=self.random_state)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand)
@@ -196,9 +197,9 @@ class XPAL(PoolBasedQueryStrategy):
         X_eval: array-like (n_samples, n_features)
             Unlabeled evaluation samples
         """
-
-        X = X[self.clf.is_labeled(y)]
-        y = y[self.clf.is_labeled(y)]
+        labeled_idx = is_labeled(y)
+        X = X[labeled_idx]
+        y = y[labeled_idx]
 
         if self.mode == 'sequential':
 

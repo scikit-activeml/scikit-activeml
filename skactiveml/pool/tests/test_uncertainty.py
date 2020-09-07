@@ -2,8 +2,9 @@ import numpy as np
 import unittest
 
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
-from skactiveml.utils import rand_argmax
 
+from skactiveml.utils import rand_argmax
+from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import UncertaintySampling
 
 class TestUncertainty(unittest.TestCase):
@@ -17,12 +18,14 @@ class TestUncertainty(unittest.TestCase):
         pass
 
     def test_init(self):
-        self.assertRaises(ValueError, UncertaintySampling, clf=GaussianProcessClassifier(), classes=None, method ='expected_average_precision')
-        self.assertRaises(TypeError, UncertaintySampling, clf=GaussianProcessRegressor())
+        clf = SklearnClassifier(estimator=GaussianProcessClassifier(), random_state=self.random_state)
+        self.assertRaises(ValueError, UncertaintySampling, clf=clf, classes=None, method ='expected_average_precision')
+        clf = GaussianProcessRegressor()
+        self.assertRaises(TypeError, UncertaintySampling, clf=clf)
 
     def test_query(self):
         compare_list = []
-        clf = GaussianProcessClassifier()
+        clf = SklearnClassifier(estimator=GaussianProcessClassifier(), random_state=self.random_state)
         # entropy
         uncertainty = UncertaintySampling(clf=clf, method='entropy')
         best_indices, utilities = uncertainty.query(self.X_cand, self.X, self.y, return_utilities=True, random_state=self.random_state)
