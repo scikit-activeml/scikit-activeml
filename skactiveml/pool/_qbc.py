@@ -56,7 +56,7 @@ class QBC(PoolBasedQueryStrategy):
         pages 1-9. Morgan Kaufmann, 1998.
     """
 
-    def __init__(self, classes, clf=None, ensemble=None, method='KL_divergence', unlabeled_class=np.nan, random_state=None):
+    def __init__(self, classes, clf, ensemble=None, method='KL_divergence', unlabeled_class=np.nan, random_state=None):
         super().__init__(random_state=random_state)
 
         if method != 'KL_divergence' and method != 'vote_entropy':
@@ -66,9 +66,9 @@ class QBC(PoolBasedQueryStrategy):
         if ensemble is None:
             ensemble = BaggingClassifier(base_estimator=clf)
 
-        if method == 'vote_entropy' and (getattr(ensemble.base_estimator_, 'fit', None) is None or getattr(ensemble.base_estimator_, 'predict', None) is None):
+        if method == 'vote_entropy' and (getattr(ensemble.base_estimator, 'fit', None) is None or getattr(ensemble.base_estimator, 'predict', None) is None):
             raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
-        elif (getattr(ensemble.base_estimator_, 'fit', None) is None or getattr(ensemble.base_estimator_, 'predict_proba', None) is None):
+        elif (getattr(ensemble.base_estimator, 'fit', None) is None or getattr(ensemble.base_estimator, 'predict_proba', None) is None):
             raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
 
 
