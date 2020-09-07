@@ -3,8 +3,8 @@ import numpy as np
 
 from sklearn.utils import check_array
 
-from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL
+from skactiveml.base import PoolBasedQueryStrategy
+from skactiveml.utils import rand_argmax, is_labeled, MISSING_LABEL
 
 
 class ExpectedErrorReduction(PoolBasedQueryStrategy):
@@ -16,33 +16,38 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
 
     Parameters
     ----------
-    model: model to be trained
+    clf: model to be trained
         Model implementing the methods 'fit' and and 'predict_proba'.
-    method_: {'log_loss', 'emr', 'csl'}, optional (default='emr')
+    classes: array-like, shape (n_classes)
+        List of all possible classes. Must correspond to the classes of clf.
+    method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
         cost-sensitive variants.
-    data_set: base.DataSet
-        Data set containing samples, class labels, and optionally confidences of annotator(s).
-    C: array-like, shape (n_classes, n_classes)
+    C: array-like, shape (n_classes, n_classes), optional (default=None)
         Cost matrix with C[i,j] defining the cost of predicting class j for a sample with the actual class i.
         Only supported for least confident variant.
-    random_state: numeric | np.random.RandomState
+    random_state: numeric | np.random.RandomState, optional (defatult=None)
         Random state for annotator selection.
+    missing_label: str | numeric, optional (default=MISSING_LABEL)
+        Specifies the symbol that represents a missing label
+
 
     Attributes
     ----------
-    model_: model to be trained
+    clf: model to be trained
         Model implementing the methods 'fit' and and 'predict_proba'.
+    classes_: array-like, shape (n_classes)
+        List of all possible classes. Must correspond to the classes of clf.
     method_: {'log_loss', 'emr', 'csl'}
         Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
         cost-sensitive variants.
-    data_set_: base.DataSet
-        Data set containing samples, class labels, and optionally confidences of annotator(s).
     C_: array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a sample which actually belongs
-        to class i.
+        Cost matrix with C[i,j] defining the cost of predicting class j for a sample with the actual class i.
+        Only supported for least confident variant.
     random_state_: numeric | np.random.RandomState
         Random state for annotator selection.
+    missing_label: str | numeric
+        Specifies the symbol that represents a missing label
 
     References
     ----------
@@ -64,13 +69,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
                 "'model' must implement the methods 'fit' and 'predict_proba'"
             )
 
-        self.C_ = C
-        if self.C_ is not None:
-            self.C_ = check_array(self.C_)
-            if np.size(self.C_, axis=0) != np.size(self.C_, axis=1):
-                raise ValueError(
-                    "C must be a square matrix"
-                )
+        self.classes_ = classes
 
         self.method_ = method
         if self.method_ not in [ExpectedErrorReduction.EMR, ExpectedErrorReduction.CSL]:
@@ -79,8 +78,21 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
                     ExpectedErrorReduction.EMR, ExpectedErrorReduction.CSL,
                     ExpectedErrorReduction.LOG_LOSS, self.method_)
             )
+        
+        self.C_ = C
+        if self.C_ is not None:
+            self.C_ = check_array(self.C_)
+            if np.size(self.C_, axis=0) != np.size(self.C_, axis=1):
+                raise ValueError(
+                    "C must be a square matrix"
+                )
+            if np.size(self.C_, axis=0) != np.size(classes):
+                raise ValueError(
+                    "C must be a (n_classes, n_classes) matrix"
+                )
 
-        self.classes_ = classes
+        self.random_sate_ = random_state
+
         self.missing_label = missing_label
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
@@ -91,9 +103,9 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         ----------
         X_cand: array-like (n_candidates, n_features)
             Unlabeled candidate samples
-        X: array-like (n_training_samples, n_features)
+        X: array-like (n_samples, n_features)
             Complete data set
-        y: array-like (n_training_samples)
+        y: array-like (n_samples)
             Labels of the data set
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
@@ -103,7 +115,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         selection: np.ndarray, shape (1)
             The index of the queried instance.
         utilities: np.ndarray shape (1, n_candidates)
-            The utilities of all instances in X_cand (only if return_utilities=True).
+            The utilities of all instances in X_cand (only returned if return_utilities is True).
         """
 
         X_cand = check_array(X_cand, force_all_finite=False)
@@ -148,6 +160,11 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
         cost-sensitive variants.
+
+    Returns
+    -------
+    utilities: np.ndarray, shape (n_unlabeled_samples)
+        The utilities of all unlabeled instances.
     """
 
     if not X_labeled.shape[1] == X_unlabeled.shape[1]:
