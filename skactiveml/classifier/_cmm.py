@@ -72,6 +72,7 @@ class CMM(BaseEstimator, ClassifierMixin):
             self._refit = True
 
         # Setup label encoder.
+        self.classes = classes
         self._le = ExtLabelEncoder(classes=classes,
                                    missing_label=missing_label)
         self.missing_label = self._le.missing_label

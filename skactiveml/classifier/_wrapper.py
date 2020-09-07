@@ -58,6 +58,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
             raise TypeError(
                 "'{}' must be a scikit-learn classifier.".format(estimator))
         self.estimator = estimator
+        self.classes = classes
         self._le = ExtLabelEncoder(classes=classes,
                                    missing_label=missing_label)
         self.missing_label = self._le.missing_label
