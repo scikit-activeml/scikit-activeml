@@ -22,8 +22,9 @@ class TestClassifier(unittest.TestCase):
         self.y[:100, 0] = self.missing_label
         self.y[200:, 0] = self.missing_label
         self.estimator = BaggingClassifier(random_state=1,
-            base_estimator=GaussianProcessClassifier(random_state=1))
-        #self.estimator = GaussianProcessClassifier(random_state=1)
+                                           base_estimator=
+                                           GaussianProcessClassifier(
+                                               random_state=1))
 
         # Build dictionary of attributes.
         self.classifiers = {}
@@ -71,7 +72,8 @@ class TestClassifier(unittest.TestCase):
         clf_mdl = initialize_class_with_kwargs(self.classifiers[clf],
                                                estimator=self.estimator,
                                                classes=self.classes,
-                                               missing_label=self.missing_label,
+                                               missing_label=
+                                               self.missing_label,
                                                random_state=1)
         clf_mdl.fit(X=self.X, y=np.ones_like(self.y) * -1)
         self.assertEqual(clf_mdl.score(self.X, self.y_true), score)

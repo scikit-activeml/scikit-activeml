@@ -7,6 +7,7 @@ import warnings
 
 from sklearn.base import BaseEstimator, ClassifierMixin, MetaEstimatorMixin, \
     is_classifier
+from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import check_random_state, check_is_fitted, \
     check_array, check_consistent_length
 from skactiveml.utils import MISSING_LABEL, ExtLabelEncoder
@@ -94,6 +95,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         return self._fit(fit_function='fit', X=X, y=y,
                          sample_weight=sample_weight, **fit_kwargs)
 
+    @if_delegate_has_method(delegate='estimator')
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -149,6 +151,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
             return self.random_state.choice(self.classes_, len(X),
                                             replace=True, p=p)
 
+    @if_delegate_has_method(delegate='estimator')
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
@@ -235,12 +238,7 @@ class SklearnClassifier(BaseEstimator, ClassifierMixin, MetaEstimatorMixin):
         self.classes_ = self._le.classes_
         return self
 
-    def __getattribute__(self, attr):
-        try:
-            if attr in ['predict_proba', 'partial_fit'] and \
-                    not getattr(object.__getattribute__(self, 'estimator'),
-                                attr):
-                raise AttributeError
-            return object.__getattribute__(self, attr)
-        except AttributeError:
-            return getattr(object.__getattribute__(self, 'estimator'), attr)
+    def __getattr__(self, item):
+        if item in self.__dict__:
+            return getattr(self, item)
+        return getattr(self.estimator, item)
