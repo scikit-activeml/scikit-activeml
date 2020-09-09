@@ -21,8 +21,8 @@ class TestQBC(unittest.TestCase):
 
     def test_init(self):
         self.assertRaises(ValueError, QBC, clf=GaussianProcessClassifier(), method ='this_method_does_not_exist')
-        self.assertRaises(TypeError, QBC, clf=GaussianProcessRegressor(), method='vote_entropy')
-        self.assertRaises(TypeError, QBC, clf=GaussianProcessRegressor(),method='KL_divergence')
+        self.assertRaises(TypeError, QBC, clf=None, method='vote_entropy')
+        self.assertRaises(TypeError, QBC, clf=None, method='KL_divergence')
 
     def test_query(self):
         clf = PWC(random_state=self.random_state)

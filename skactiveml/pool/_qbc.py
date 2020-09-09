@@ -61,19 +61,19 @@ class QBC(PoolBasedQueryStrategy):
     def __init__(self, clf, ensemble=None, method='KL_divergence', missing_label=MISSING_LABEL, random_state=None, **kwargs):
         super().__init__(random_state=random_state)
 
+        if method != 'KL_divergence' and method != 'vote_entropy':
+            raise ValueError('The method \'' + method + '\' does not exist.')
+
+        if method == 'vote_entropy' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict', None) is None)):
+            raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
+        elif method == 'KL_divergence' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict_proba', None) is None)):
+            raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
+
         if not isinstance(clf, BaseEnsemble):
             if ensemble is None:
                 warnings.warn('\'ensemble\' is not specified, \'BaggingClassifier\' will be used.')
                 ensemble = BaggingClassifier
             ensemble = ensemble(base_estimator=clf, random_state=self.random_state, **kwargs)
-
-        if method != 'KL_divergence' and method != 'vote_entropy':
-            raise ValueError('The method \'' + method + '\' does not exist.')
-
-        if method == 'vote_entropy' and (getattr(clf, 'fit', None) is None or getattr(clf, 'predict', None) is None):
-            raise TypeError("'clf' or 'ensemble.base_estimator_' must implement the methods 'fit' and 'predict'")
-        elif (getattr(clf, 'fit', None) is None or getattr(clf, 'predict_proba', None) is None):
-            raise TypeError("'clf' or 'ensemble.base_estimator_' must implement the methods 'fit' and 'predict_proba'")
 
 
         self.missing_label = missing_label
