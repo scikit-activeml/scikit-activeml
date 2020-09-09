@@ -70,6 +70,7 @@ class PWC(BaseEstimator, ClassifierMixin):
     def __init__(self, classes=None, missing_label=MISSING_LABEL, metric='rbf',
                  n_neighbors=None, cost_matrix=None, random_state=None,
                  **metric_kwargs):
+        self.classes = classes
         self._le = ExtLabelEncoder(classes=classes,
                                    missing_label=missing_label)
         self.missing_label = self._le.missing_label

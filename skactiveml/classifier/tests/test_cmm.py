@@ -93,7 +93,6 @@ class TestCMM(unittest.TestCase):
         X, y = load_breast_cancer(return_X_y=True)
         X = StandardScaler().fit_transform(X)
         cmm = CMM(random_state=0).fit(X, y)
-        P = cmm.predict_freq(X)
         self.assertEqual(cmm.mixture_model.n_components, 10)
         self.assertTrue(cmm._refit)
         self.assertTrue(cmm.score(X, y) > 0.5)

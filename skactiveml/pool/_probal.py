@@ -5,7 +5,7 @@ from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
 
 from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax
+from ..utils import rand_argmax, is_labeled, MISSING_LABEL
 
 
 class McPAL(PoolBasedQueryStrategy):
@@ -74,14 +74,15 @@ class McPAL(PoolBasedQueryStrategy):
         """
 
         X_cand = check_array(X_cand, force_all_finite=False)
-        X_labeled = X[self.clf.is_labeled(y)]
-        y_labeled = y[self.clf.is_labeled(y)]
+        labeled_idx = is_labeled(y)
+        X_labeled = X[labeled_idx]
+        y_labeled = y[labeled_idx]
 
         # Calculate gains
         self.clf.fit(X_labeled, y_labeled)
         k_vec = self.clf.predict_freq(X_cand)
         utilities = weights * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
-        best_indices = rand_argmax(utilities, axis=1, random_state=self.random_state)
+        best_indices = rand_argmax(utilities, random_state=self.random_state)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand)
@@ -93,7 +94,7 @@ class McPAL(PoolBasedQueryStrategy):
 
 class XPAL(PoolBasedQueryStrategy):
 
-    def __init__(self, clf, classes, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
+    def __init__(self, clf, classes, missing_label=MISSING_LABEL, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
         # TODO @DK: clean up
         """ XPAL
         The cost-sensitive expected probabilistic active learning (CsXPAL) strategy is a generalization of the
@@ -148,6 +149,7 @@ class XPAL(PoolBasedQueryStrategy):
         self.clf = clf
         self.perf_est = perf_est
         self.mode = mode
+        self.missing_label = missing_label
 
         # TODO remove self.classes
         self.classes = classes
@@ -196,9 +198,9 @@ class XPAL(PoolBasedQueryStrategy):
         X_eval: array-like (n_samples, n_features)
             Unlabeled evaluation samples
         """
-
-        X = X[self.clf.is_labeled(y)]
-        y = y[self.clf.is_labeled(y)]
+        #labeled_idx = is_labeled(y, missing_label=self.missing_label)
+        #X = X[labeled_idx]
+        #y = y[labeled_idx]
 
         if self.mode == 'sequential':
 

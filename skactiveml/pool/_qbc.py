@@ -63,6 +63,11 @@ class QBC(PoolBasedQueryStrategy):
 
         if method != 'KL_divergence' and method != 'vote_entropy':
             raise ValueError('The method \'' + method + '\' does not exist.')
+        
+        # if method == 'vote_entropy' and (getattr(ensemble.base_estimator, 'fit', None) is None or getattr(ensemble.base_estimator, 'predict', None) is None):
+        #     raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
+        # elif (getattr(ensemble.base_estimator, 'fit', None) is None or getattr(ensemble.base_estimator, 'predict_proba', None) is None):
+        #     raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
 
         if method == 'vote_entropy' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict', None) is None)):
             raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
@@ -104,7 +109,7 @@ class QBC(PoolBasedQueryStrategy):
             The utilities of all instances of X_cand(if return_utilities=True).
         """
 
-        mask_labeled = is_labeled(y,self.missing_label)
+        mask_labeled = is_labeled(y, self.missing_label)
         self.ensemble.fit(X[mask_labeled],y[mask_labeled])
         # choose the disagreement method and calculate the utilities
         if self.method == 'KL_divergence':
