@@ -104,9 +104,9 @@ class FourDS(PoolBasedQueryStrategy):
         # Fit the classifier and get the probabilities.
         self.clf.fit(X, y)
         P_cand = self.clf.predict_proba(X_cand)
-        R_cand = self.clf.mixture_model.predict_proba(X_cand)
+        R_cand = self.clf.mixture_model_.predict_proba(X_cand)
         is_lbld = is_labeled(y, missing_label=self.clf.missing_label)
-        R_lbld = self.clf.mixture_model.predict_proba(X[is_lbld])
+        R_lbld = self.clf.mixture_model_.predict_proba(X[is_lbld])
 
         # Compute distance according to Eq. 9 in [1].
         P_cand_sorted = np.sort(P_cand, axis=1)
@@ -116,7 +116,7 @@ class FourDS(PoolBasedQueryStrategy):
                 np.max(distance_cand) - np.min(distance_cand))
 
         # Compute densities according to Eq. 10 in [1].
-        density_cand = self.clf.mixture_model.score_samples(X_cand)
+        density_cand = self.clf.mixture_model_.score_samples(X_cand)
         density_cand = (density_cand - np.min(density_cand)) / (
                 np.max(density_cand) - np.min(density_cand))
 
@@ -124,14 +124,14 @@ class FourDS(PoolBasedQueryStrategy):
         R_lbld_sum = np.sum(R_lbld, axis=0, keepdims=True)
         R_sum = R_cand + R_lbld_sum
         R_mean = R_sum / (len(R_lbld) + 1)
-        distribution_cand = self.clf.mixture_model.weights_ - R_mean
+        distribution_cand = self.clf.mixture_model_.weights_ - R_mean
         distribution_cand = np.maximum(np.zeros_like(distribution_cand),
                                        distribution_cand)
         distribution_cand = 1 - np.sum(distribution_cand, axis=1)
 
         # Compute rho according to Eq. 15  in [1].
         diff = np.sum(
-            np.abs(self.clf.mixture_model.weights_ - np.mean(R_lbld, axis=0)))
+            np.abs(self.clf.mixture_model_.weights_ - np.mean(R_lbld, axis=0)))
         rho = min(1, diff)
 
         # Compute e_dwus according to Eq. 13  in [1].
@@ -166,7 +166,7 @@ class FourDS(PoolBasedQueryStrategy):
                 R_sum = R_cand + np.sum(R_cand[is_selected], axis=0,
                                         keepdims=True) + R_lbld_sum
                 R_mean = R_sum / (len(R_lbld) + len(query_indices) + 1)
-                distribution_cand = self.clf.mixture_model.weights_ - R_mean
+                distribution_cand = self.clf.mixture_model_.weights_ - R_mean
                 distribution_cand = np.maximum(
                     np.zeros_like(distribution_cand), distribution_cand)
                 distribution_cand = 1 - np.sum(distribution_cand, axis=1)
