@@ -112,13 +112,13 @@ class FourDS(PoolBasedQueryStrategy):
         P_cand_sorted = np.sort(P_cand, axis=1)
         distance_cand = np.log(
             (P_cand_sorted[:, -1] + 1.e-5) / (P_cand_sorted[:, -2] + 1.e-5))
-        distance_cand = (distance_cand - np.min(distance_cand)) / (
-                np.max(distance_cand) - np.min(distance_cand))
+        distance_cand = (distance_cand - np.min(distance_cand) + 1.e-5) / (
+                np.max(distance_cand) - np.min(distance_cand) + 1.e-5)
 
         # Compute densities according to Eq. 10 in [1].
         density_cand = self.clf.mixture_model_.score_samples(X_cand)
-        density_cand = (density_cand - np.min(density_cand)) / (
-                np.max(density_cand) - np.min(density_cand))
+        density_cand = (density_cand - np.min(density_cand) + 1.e-5) / (
+                np.max(density_cand) - np.min(density_cand) + 1.e-5)
 
         # Compute distributions according to Eq. 11 in [1].
         R_lbld_sum = np.sum(R_lbld, axis=0, keepdims=True)

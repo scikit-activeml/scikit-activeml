@@ -210,8 +210,8 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         # Update cost matrix.
         self.cost_matrix_ = 1 - np.eye(len(self.classes_)) \
             if self.cost_matrix is None else self.cost_matrix
-        self.cost_matrix_ = check_cost_matrix(self.cost_matrix_,
-                                              len(self.classes_))
+        self.cost_matrix_ = np.array(check_cost_matrix(self.cost_matrix_,
+                                                       len(self.classes_)))
         if self.classes is not None:
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
