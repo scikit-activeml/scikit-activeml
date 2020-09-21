@@ -23,8 +23,8 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=['2', 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
-        np.testing.assert_array_equal([1, 2, 3], check_classes([2, 3, 1]))
-        np.testing.assert_array_equal(['1', '2', '3'],
+        np.testing.assert_array_equal([2, 3, 1], check_classes([2, 3, 1]))
+        np.testing.assert_array_equal(['2', '3', '1'],
                                       check_classes(['2', '3', '1']))
 
     def test_check_missing_label(self):

@@ -4,7 +4,7 @@ from iteration_utilities import deepflatten
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted, check_array
 from sklearn.preprocessing import LabelEncoder
-from ..utils._validation import check_missing_label, check_classes
+from ..utils._validation import check_classifier_params, check_missing_label
 
 MISSING_LABEL = np.nan
 
@@ -86,25 +86,10 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
     ----------
     classes_: array-like, shape (n_classes)
         Holds the label for each class.
-    missing_label: scalar|string|np.nan|None, default=np.nan
-        Value to represent a missing label.
-    _dtype: numpy data type
-        Inferred from classes or y through fitting.
-    _le: sklearn.preprocessing.LabelEncoder
-        LabelEncoder created through fitting.
     """
-
     def __init__(self, classes=None, missing_label=MISSING_LABEL):
-        self.missing_label = check_missing_label(missing_label)
-        self._le = None
-        if classes is not None:
-            self.classes_ = np.array(check_classes(classes))
-            self._le = LabelEncoder().fit(self.classes_)
-            self._dtype = np.append(self.classes_, self.missing_label).dtype
-            self.missing_label = check_missing_label(missing_label,
-                                                     target_type=self._dtype,
-                                                     name='classes')
-        self._no_init_classes = classes is None
+        self.classes, self.missing_label, _ = check_classifier_params(
+            classes=classes, missing_label=missing_label)
 
     def fit(self, y):
         """Fit label encoder.
@@ -119,13 +104,17 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         self: returns an instance of self.
         """
         y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
-        if self._no_init_classes:
+        self._le = LabelEncoder()
+        if self.classes is None:
             y = np.asarray(y)
             is_lbld = is_labeled(y, missing_label=self.missing_label)
             self._dtype = np.append(y, self.missing_label).dtype
-            self._le = LabelEncoder()
             self._le.fit(y[is_lbld])
+        else:
+            self._dtype = np.append(self.classes, self.missing_label).dtype
+            self._le.fit(self.classes)
             self.classes_ = self._le.classes_
+        self.classes_ = self._le.classes_
 
         return self
 
