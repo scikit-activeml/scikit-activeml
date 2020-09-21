@@ -106,7 +106,6 @@ def check_classes(classes, return_indices=False):
             "'classes' is not iterable. Got {}".format(type(classes)))
     try:
         classes_sorted = np.array(sorted(set(classes)))
-        classes = np.array(classes)
         if len(classes) != len(classes_sorted):
             raise ValueError("Duplicate entries in 'classes'.")
         return classes
@@ -133,10 +132,9 @@ def check_cost_matrix(cost_matrix, n_classes):
         Cost matrix.
     """
     check_scalar(n_classes, target_type=int, name='n_classes', min_val=1)
-    cost_matrix = check_array(np.array(cost_matrix, dtype=float),
-                              ensure_2d=True)
-    if cost_matrix.shape != (n_classes, n_classes):
+    cost_matrix_cpy = check_array(np.array(cost_matrix, dtype=float), ensure_2d=True)
+    if cost_matrix_cpy.shape != (n_classes, n_classes):
         raise ValueError(
             "'cost_matrix' must have shape ({}, {}). "
-            "Got {}.".format(n_classes, n_classes, cost_matrix.shape))
+            "Got {}.".format(n_classes, n_classes, cost_matrix_cpy.shape))
     return cost_matrix
