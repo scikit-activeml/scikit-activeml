@@ -119,6 +119,6 @@ class FixedBudget(BudgetManager):
         self : FixedBudget
             The FixedBudget returns itself, after it is updated.
         """
-        self.seen_instances += sampled.shape[0]
+        self.observed_instances += sampled.shape[0]
         self.sampled_instances += np.sum(sampled)
         return self

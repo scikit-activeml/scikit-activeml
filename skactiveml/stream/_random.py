@@ -7,9 +7,9 @@ from ..base import StreamBasedQueryStrategy
 
 class RandomSampler(StreamBasedQueryStrategy):
     """The RandomSampler samples instances completely randomly. The probability
-    to sample an instance is depnedent on the budget specified in the
-    budget_manager. Given a budget of 10%, the utility of exceeds 0.1 with a
-    probability of 10%. Instances are sampled regardless of their position in
+    to sample an instance is dependent on the budget specified in the
+    budget_manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1) with 
+    a probability of 10%. Instances are sampled regardless of their position in
     the feature space. As this query strategy disregards any information about
     the instance. Thus, it should only be used as a baseline strategy.
 
@@ -18,8 +18,8 @@ class RandomSampler(StreamBasedQueryStrategy):
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the interval between
-        sampling instnces
+        the budget_manager will be used to determine the probability to sample
+        instances
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -64,10 +64,15 @@ class RandomSampler(StreamBasedQueryStrategy):
         """
         X_cand = check_array(X_cand, force_all_finite=False)
 
+        prior_random_state_state = self.random_state.get_state()
+
         utilities = self.random_state.random_sample(len(X_cand))
 
         sampled_indices = self.budget_manager.sample(utilities,
                                                      simulate=simulate)
+
+        if simulate:
+            self.random_state.set_state(prior_random_state_state)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -92,6 +97,9 @@ class RandomSampler(StreamBasedQueryStrategy):
         self : RandomSampler
             The RandomSampler returns itself, after it is updated.
         """
+        # update the random state assuming, that query(..., simulate=True) was
+        # used
+        self.random_state.random_sample(len(sampled))
         self.budget_manager.update(sampled)
         return self
 
