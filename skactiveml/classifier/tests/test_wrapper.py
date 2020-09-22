@@ -6,6 +6,7 @@ from sklearn.utils.validation import NotFittedError, check_is_fitted
 from sklearn.gaussian_process import GaussianProcessClassifier, \
     GaussianProcessRegressor
 from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import Perceptron
 from skactiveml.classifier import SklearnClassifier
 
 
@@ -14,7 +15,9 @@ class TestClassifierWrapper(unittest.TestCase):
     def setUp(self):
         self.X = np.zeros((4, 1))
         self.y1 = ['tokyo', 'paris', 'nan', 'tokyo']
-        self.y2 = ['tokyo', 'nan', 'nan', 'nan']
+        self.y2 = ['tokyo', 'nan', 'nan', 'tokyo']
+        self.y_nan = [['nan', 'nan'], ['nan', 'nan'], ['nan', 'nan'],
+                      ['nan', 'nan']]
 
     def test_init(self):
         self.assertRaises(TypeError, SklearnClassifier, estimator=None)
@@ -30,10 +33,13 @@ class TestClassifierWrapper(unittest.TestCase):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 missing_label='nan',
                                 classes=['tokyo', 'paris'], random_state=0)
-        np.testing.assert_array_equal(['paris', 'tokyo'], clf.classes_)
-        np.testing.assert_array_equal(['paris', 'tokyo'], clf._le._le.classes_)
+        np.testing.assert_array_equal(['tokyo', 'paris'], clf.classes)
         self.assertEqual(clf.kernel, clf.estimator.kernel)
         self.assertFalse(hasattr(clf, 'kernel_'))
+        self.assertRaises(ValueError, SklearnClassifier,
+                          estimator=Perceptron(), missing_label='nan',
+                          classes=['tokyo', 'paris'], random_state=0,
+                          cost_matrix=1-np.eye(2))
 
     def test_fit(self):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier())
@@ -42,8 +48,7 @@ class TestClassifierWrapper(unittest.TestCase):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 classes=['tokyo', 'paris', 'new york'],
                                 missing_label='nan')
-        check_is_fitted(estimator=clf)
-        self.assertFalse(clf.is_fitted_)
+        self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf.fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, 'kernel_'))
@@ -61,15 +66,14 @@ class TestClassifierWrapper(unittest.TestCase):
         clf = SklearnClassifier(estimator=GaussianNB(),
                                 classes=['tokyo', 'paris', 'new york'],
                                 missing_label='nan')
-        check_is_fitted(estimator=clf)
-        self.assertFalse(clf.is_fitted_)
+        self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf.partial_fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, 'class_count_'))
         np.testing.assert_array_equal(clf.classes_, ['new york', 'paris',
                                                      'tokyo'])
         self.assertEqual(clf.missing_label, 'nan')
-        clf.partial_fit(self.X, self.y2)
+        clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertTrue(hasattr(clf, 'partial_fit'))
@@ -92,6 +96,7 @@ class TestClassifierWrapper(unittest.TestCase):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 classes=['ny', 'paris', 'tokyo'],
                                 missing_label='nan')
+        clf.fit(X=self.X, y=self.y_nan)
         P = clf.predict_proba(X=self.X)
         P_exp = np.ones((len(self.X), 3)) / 3
         np.testing.assert_array_equal(P_exp, P)
@@ -116,12 +121,6 @@ class TestClassifierWrapper(unittest.TestCase):
         y = clf.predict(X=self.X)
         y_exp = ['tokyo'] * len(self.X)
         np.testing.assert_array_equal(y_exp, y)
-        clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
-                                classes=['ny', 'paris', 'tokyo'],
-                                missing_label='nan', random_state=0)
-        y = clf.predict(X=[[0]] * 1000)
-        self.assertTrue(len(np.unique(y)) == len(clf.classes_))
-        clf.fit(X=self.X, y=self.y1)
 
     def test_multi_annotator_scenario(self):
         X, y_true = load_breast_cancer(return_X_y=True)

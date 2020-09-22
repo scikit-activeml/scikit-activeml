@@ -16,15 +16,13 @@ class TestValidation(unittest.TestCase):
                           cost_matrix=[[2, 1], [2, 2]], n_classes=-1)
         self.assertRaises(TypeError, check_cost_matrix,
                           cost_matrix=[[2, 1], [2, 2]], n_classes=2.5)
-        np.testing.assert_array_equal([[2, 0], [3, 1]], check_cost_matrix(
-            [['2', '0'], ['3', '1']], n_classes=2))
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=['2', 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
-        np.testing.assert_array_equal([1, 2, 3], check_classes([2, 3, 1]))
-        np.testing.assert_array_equal(['1', '2', '3'],
+        np.testing.assert_array_equal([2, 3, 1], check_classes([2, 3, 1]))
+        np.testing.assert_array_equal(['2', '3', '1'],
                                       check_classes(['2', '3', '1']))
 
     def test_check_missing_label(self):

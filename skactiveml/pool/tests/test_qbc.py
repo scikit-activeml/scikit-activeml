@@ -25,7 +25,7 @@ class TestQBC(unittest.TestCase):
         self.assertRaises(TypeError, QBC, clf=None, method='KL_divergence')
 
     def test_query(self):
-        clf = PWC(random_state=self.random_state)
+        clf = PWC(random_state=self.random_state, classes=self.classes)
         ensemble = BaggingClassifier(base_estimator=clf,random_state=self.random_state)
         # KL_divergence
         qbc = QBC(clf=clf, method='KL_divergence', random_state=self.random_state)
