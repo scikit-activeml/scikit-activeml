@@ -143,12 +143,12 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf, budget_manager, theta_init=1.0, s=0.01,
+    def __init__(self, clf, budget_manager, theta=1.0, s=0.01,
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
-        self.theta_init = theta_init
+        self.theta = theta
         self.s = s
 
     def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
@@ -200,11 +200,11 @@ class VariableUncertainty(StreamBasedQueryStrategy):
             sampled, budget_left = self.budget_manager.sample(
                 utilities,
                 simulate=True,
-                return_budget_left=False
+                return_budget_left=True
             )
             sampled_indices.append(sampled)
             if budget_left[-1]:
-                if sampled[-1]:
+                if len(sampled):
                     tmp_theta = tmp_theta * (1-self.s)
                 else:
                     tmp_theta = tmp_theta * (1+self.s)
@@ -274,11 +274,12 @@ class Split(StreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf, budget_manager, v=0.1, theta_init=1.0, s=0.01,
+    def __init__(self, clf, budget_manager, v=0.1, theta=1.0, s=0.01,
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
+        self.s = s
         self.random_sampler = RandomSampler(
             self.budget_manager,
             random_state=self.random_state.tomaxint()
@@ -286,7 +287,7 @@ class Split(StreamBasedQueryStrategy):
         self.variable_uncertainty = VariableUncertainty(
             clf,
             self.budget_manager,
-            theta_init=theta_init,
+            theta=theta,
             s=s,
             random_state=self.random_state.tomaxint()
         )
@@ -336,7 +337,7 @@ class Split(StreamBasedQueryStrategy):
         tmp_budget_manager = copy.copy(self.budget_manager)
         tmp_random_sampler = copy.copy(self.random_sampler)
         tmp_random_sampler.budget_manager = tmp_budget_manager
-        tmp_var_uncertainty = copy.copy(self.random_sampler)
+        tmp_var_uncertainty = copy.copy(self.variable_uncertainty)
         tmp_var_uncertainty.budget_manager = tmp_budget_manager
 
         merged_sampled_indices = []
