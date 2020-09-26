@@ -14,15 +14,17 @@ class CMM(ClassFrequencyEstimator):
     """CMM
 
     Classifier mixture model (CMM) is a generative classifier based on a
-    Gaussian mixture model (GMM).
+    (Bayesian) Gaussian mixture model (GMM).
 
     Parameters
     ----------
-    mixture_model : {GaussianMixture, BayesianGaussianMixture}, default=None
+    mixture_model : {GaussianMixture, BayesianGaussianMixture, None},
+    default=None
         (Bayesian) Gaussian Mixture model that is trained with unsupervised
         algorithm on train data. If the initial mixture model is not fitted, it
         will be refitted in each call of the 'fit' method. If None,
-        mixture_model=BayesianMixtureModel(n_components=10) will be used.
+        mixture_model=BayesianMixtureModel(n_components=n_classes) will be
+        used.
     classes : array-like, shape (n_classes), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -46,28 +48,16 @@ class CMM(ClassFrequencyEstimator):
     F_components_ : numpy.ndarray, shape (n_components, n_classes)
         F[j,c] is a proxy for the number of sample of class c belonging to
         component j.
+    mixture_model_ : {GaussianMixture, BayesianGaussianMixture}
+        (Bayesian) Gaussian Mixture model that is trained with unsupervised
+        algorithm on train data.
     """
-
     def __init__(self, mixture_model=None, classes=None,
                  missing_label=MISSING_LABEL, cost_matrix=None,
                  random_state=None):
         super().__init__(classes=classes, missing_label=missing_label,
                          cost_matrix=cost_matrix, random_state=random_state)
-
-        # Check mixture model.
-        if mixture_model is None:
-            self.mixture_model = BayesianGaussianMixture(n_components=10,
-                                                         random_state=
-                                                         self.random_state)
-        else:
-            if not isinstance(mixture_model,
-                              (GaussianMixture, BayesianGaussianMixture)):
-                raise TypeError(
-                    "'mixture_model' is of the type '{}' but must be of the "
-                    "type 'sklearn.mixture.GaussianMixture' or "
-                    "'sklearn.mixture.BayesianGaussianMixture'.".format(
-                        type(mixture_model)))
-            self.mixture_model = mixture_model
+        self.mixture_model = mixture_model
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -91,13 +81,26 @@ class CMM(ClassFrequencyEstimator):
         """
         # Check input parameters.
         X, y, sample_weight = self._validate_input(X, y, sample_weight)
-        self._check_n_features(X, reset=True)
 
-        self.mixture_model_ = deepcopy(self.mixture_model)
+        # Check mixture model.
+        if self.mixture_model is None:
+            bgm = BayesianGaussianMixture(n_components=len(self.classes_),
+                                          random_state=self._random_state)
+            self.mixture_model_ = bgm
+        else:
+            if not isinstance(self.mixture_model,
+                              (GaussianMixture, BayesianGaussianMixture)):
+                raise TypeError(
+                    "'mixture_model' is of the type '{}' but must be of the "
+                    "type 'sklearn.mixture.GaussianMixture' or "
+                    "'sklearn.mixture.BayesianGaussianMixture'.".format(
+                        type(self.mixture_model)))
+            self.mixture_model_ = deepcopy(self.mixture_model)
+        self._check_n_features(X, reset=True)
 
         # Refit model if desired.
         try:
-            check_is_fitted(self.mixture_model)
+            check_is_fitted(self.mixture_model_)
         except NotFittedError:
             self.mixture_model_ = self.mixture_model_.fit(X)
 
@@ -127,8 +130,7 @@ class CMM(ClassFrequencyEstimator):
             The class frequency estimates of the input samples. Classes are
             ordered according to classes_.
         """
-        check_is_fitted(self, ['F_components_', 'classes_', '_le',
-                               'cost_matrix_', 'mixture_model_'])
+        check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)
         if np.sum(self.F_components_) > 0:

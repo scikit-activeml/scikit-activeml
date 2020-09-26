@@ -20,12 +20,22 @@ class TestClassifierWrapper(unittest.TestCase):
                       ['nan', 'nan']]
 
     def test_init(self):
-        self.assertRaises(TypeError, SklearnClassifier, estimator=None)
-        self.assertRaises(TypeError, SklearnClassifier,
-                          estimator=GaussianProcessRegressor())
-        self.assertRaises(TypeError, SklearnClassifier,
-                          estimator=GaussianProcessClassifier(),
-                          missing_label=[2])
+        clf = SklearnClassifier(estimator=None, missing_label=-1)
+        self.assertEqual(clf.missing_label, -1)
+        self.assertEqual(clf.classes, None)
+        self.assertEqual(clf.estimator, None)
+        self.assertEqual(clf.random_state, None)
+        self.assertEqual(clf.cost_matrix, None)
+
+    def test_fit(self):
+        clf = SklearnClassifier(missing_label='nan', estimator=None)
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+        clf = SklearnClassifier(missing_label='nan',
+                                estimator=GaussianProcessRegressor())
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+        clf = SklearnClassifier(missing_label=[2],
+                                estimator=GaussianProcessClassifier())
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 random_state=0)
         self.assertFalse(hasattr(clf, 'classes_'))
@@ -36,12 +46,10 @@ class TestClassifierWrapper(unittest.TestCase):
         np.testing.assert_array_equal(['tokyo', 'paris'], clf.classes)
         self.assertEqual(clf.kernel, clf.estimator.kernel)
         self.assertFalse(hasattr(clf, 'kernel_'))
-        self.assertRaises(ValueError, SklearnClassifier,
-                          estimator=Perceptron(), missing_label='nan',
-                          classes=['tokyo', 'paris'], random_state=0,
-                          cost_matrix=1-np.eye(2))
-
-    def test_fit(self):
+        clf = SklearnClassifier(estimator=Perceptron(),
+                               missing_label='nan', cost_matrix=1 - np.eye(2),
+                               classes=['tokyo', 'paris'], random_state=0)
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
         clf = SklearnClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         self.assertRaises(ValueError, clf.fit, X=[], y=[])
@@ -128,8 +136,9 @@ class TestClassifierWrapper(unittest.TestCase):
         y[:100, 0] = -1
         y[200:, 0] = -1
         sample_weights = np.ones_like(y) * 0.9
-        clf = SklearnClassifier(estimator=GaussianNB(),
-                                missing_label=-1, random_state=0)
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1,
+                                classes=[0, 1], cost_matrix=1-np.eye(2),
+                                random_state=0)
         clf.fit(X[:250], y[:250], sample_weight=sample_weights[:250])
         self.assertTrue(clf.score(X[250:], y_true[250:]) > 0.5)
 

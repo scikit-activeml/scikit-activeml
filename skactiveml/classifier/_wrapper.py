@@ -40,6 +40,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     Attributes
     ----------
+    classes_ : array-like, shape (n_classes)
+        Holds the label for each class after fitting.
+    cost_matrix_ : array-like, shape (classes, classes)
+        Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
+        for a sample of class classes_[i].
     estimator_ : sklearn.base.ClassifierMixin with 'predict_proba' method
         The scikit-learn classifier after calling the fit method.
     """
@@ -48,18 +53,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                  cost_matrix=None, random_state=None):
         super().__init__(classes=classes, missing_label=missing_label,
                          cost_matrix=cost_matrix, random_state=random_state)
-
-        # Check whether estimator is a valid classifier.
-        if not is_classifier(estimator=estimator):
-            raise TypeError(
-                "'{}' must be a scikit-learn classifier.".format(estimator))
         self.estimator = estimator
-
-        # Check whether estimator can deal with cost matrix.
-        if self.cost_matrix is not None and not hasattr(self.estimator,
-                                                        'predict_proba'):
-            raise ValueError("'cost_matrix' can be only set, if 'estimator'"
-                             "implements 'predict_proba'.")
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -131,7 +125,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y :  array-like, shape (n_samples)
             Predicted class labels of the input samples.
         """
-        check_is_fitted(self, attributes=['estimator_'])
+        check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)
         try:
@@ -140,11 +134,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             else:
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
-                y_pred = rand_argmin(costs, random_state=self.random_state,
+                y_pred = rand_argmin(costs, random_state=self._random_state,
                                      axis=1)
         except Exception:
             p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state.choice(np.arange(len(self.classes_)),
+            y_pred = self._random_state.choice(np.arange(len(self.classes_)),
                                               len(X),
                                               replace=True, p=p)
         y_pred = self._le.inverse_transform(y_pred)
@@ -169,7 +163,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             The class probabilities of the input samples. Classes are ordered
             by lexicographic order.
         """
-        check_is_fitted(self, attributes=['estimator_'])
+        check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)
         try:
@@ -180,7 +174,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 P_ext[:, class_indices] = P
                 P = P_ext
             return P
-        except Exception as err:
+        except Exception:
             if sum(self._label_counts) == 0:
                 return np.ones([len(X), len(self.classes_)]) / len(
                     self.classes_)
@@ -191,6 +185,17 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
         X, y, sample_weight = self._validate_input(X, y, sample_weight)
+
+        # Check whether estimator is a valid classifier.
+        if not is_classifier(estimator=self.estimator):
+            raise TypeError( "'{}' must be a scikit-learn "
+                             "classifier.".format(self.estimator))
+
+        # Check whether estimator can deal with cost matrix.
+        if self.cost_matrix is not None and not hasattr(self.estimator,
+                                                        'predict_proba'):
+            raise ValueError("'cost_matrix' can be only set, if 'estimator'"
+                             "implements 'predict_proba'.")
         if fit_function == 'fit' or not hasattr(self, 'n_features_in_'):
             self._check_n_features(X, reset=True)
         elif fit_function == 'partial_fit':

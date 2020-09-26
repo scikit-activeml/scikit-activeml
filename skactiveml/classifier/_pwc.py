@@ -57,28 +57,14 @@ class PWC(ClassFrequencyEstimator):
     """
     METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
-    def __init__(self, classes=None, missing_label=MISSING_LABEL, metric='rbf',
-                 n_neighbors=None, cost_matrix=None, metric_dict=None,
+    def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
+                 classes=None, missing_label=MISSING_LABEL,  cost_matrix=None,
                  random_state=None):
         super().__init__(classes=classes, missing_label=missing_label,
                          cost_matrix=cost_matrix, random_state=random_state)
-
-        # Check whether metric is available.
-        self.metric = str(metric)
-        if self.metric not in PWC.METRICS:
-            raise ValueError("The parameter 'metric' must be "
-                             "in {}".format(KERNEL_PARAMS.keys()))
-
-        # Check number of neighbors which must be a positive integer.
+        self.metric = metric
         self.n_neighbors = n_neighbors
-        if n_neighbors is not None:
-            check_scalar(self.n_neighbors, name='n_neighbors', min_val=1,
-                         target_type=int)
-
-        # Ensure that metric_dict is a Python dictionary.
         self.metric_dict = metric_dict if metric_dict is not None else {}
-        if not isinstance(self.metric_dict, dict):
-            raise TypeError("'metric_dict' must be a Python dictionary.")
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -102,6 +88,21 @@ class PWC(ClassFrequencyEstimator):
         """
         # Check input parameters.
         X, y, sample_weight = self._validate_input(X, y, sample_weight)
+
+        # Check whether metric is available.
+        if self.metric not in PWC.METRICS:
+            raise ValueError("The parameter 'metric' must be "
+                             "in {}".format(KERNEL_PARAMS.keys()))
+
+        # Check number of neighbors which must be a positive integer.
+        if self.n_neighbors is not None:
+            check_scalar(self.n_neighbors, name='n_neighbors', min_val=1,
+                         target_type=int)
+
+        # Ensure that metric_dict is a Python dictionary.
+        if not isinstance(self.metric_dict, dict):
+            raise TypeError("'metric_dict' must be a Python dictionary.")
+
         self._check_n_features(X, reset=True)
 
         # Store train samples.
@@ -114,7 +115,7 @@ class PWC(ClassFrequencyEstimator):
         return self
 
     def predict_freq(self, X):
-        """Return class frequency estimates for the input data X.
+        """Return class frequency estimates for the input samples 'X'.
 
         Parameters
         ----------
@@ -128,8 +129,7 @@ class PWC(ClassFrequencyEstimator):
             The class frequency estimates of the input samples. Classes are
             ordered according to classes_.
         """
-        check_is_fitted(self, ['V_', 'classes_', 'cost_matrix_', 'X_',
-                               'n_features_in_'])
+        check_is_fitted(self)
         X = check_array(X)
 
         # Compute kernel (metric) matrix.
