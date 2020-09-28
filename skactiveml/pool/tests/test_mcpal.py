@@ -5,7 +5,7 @@ from skactiveml.pool import McPAL
 from skactiveml.classifier import PWC
 
 
-class TestPWC(unittest.TestCase):
+class TestMCPAL(unittest.TestCase):
 
     def setUp(self):
         self.X = np.zeros((6, 2))
