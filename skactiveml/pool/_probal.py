@@ -1,17 +1,19 @@
-import numpy as np
 import itertools
 
-from sklearn.utils import check_array
+import numpy as np
 from scipy.special import factorial, gammaln
+from sklearn.base import clone
+from sklearn.utils import check_array
 
-from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled
+from skactiveml.base import PoolBasedQueryStrategy
+from skactiveml.utils import rand_argmax, is_labeled, MISSING_LABEL
 
 
 class McPAL(PoolBasedQueryStrategy):
     """ PAL
 
-    This class implements multi-class probabilistic active learning (McPAL) [1] strategy.
+    This class implements multi-class probabilistic active learning (McPAL) [1]
+    strategy.
 
     Parameters
     ----------
@@ -41,47 +43,70 @@ class McPAL(PoolBasedQueryStrategy):
 
     References
     ----------
-    [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra Spiliopoulou.
-        Multi-Class Probabilistic Active Learning,
-        vol. 285 of Frontiers in Artificial Intelligence and Applications, pages 586-594. IOS Press, 2016
+    [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra
+    Spiliopoulou. Multi-Class Probabilistic Active Learning, vol. 285 of
+    Frontiers in Artificial Intelligence and Applications,
+    pages 586-594. IOS Press, 2016
     """
 
-    def __init__(self, clf, prior=1, m_max=1, random_state=None):
+    def __init__(self, clf, prior=1, m_max=1, random_state=None,
+                 missing_label=MISSING_LABEL, **kwargs):
         super().__init__(random_state=random_state)
 
-        if not hasattr(clf, 'predict_freq'):
-            raise("Classifier must implement predict_freq()")
         self.clf = clf
+        if not hasattr(self.clf, 'predict_freq'):
+            raise TypeError("Classifier must implement predict_freq()")
+
         self.prior = prior
+        if self.prior <= 0:
+            raise ValueError("The prior must be greater than zero.")
+
         self.m_max = m_max
+        if self.m_max < 1 or not float(self.m_max).is_integer():
+            raise ValueError("m_max must be a positive integer.")
+
         self.random_state = random_state
+
+        self.missing_label = missing_label
 
     def query(self, X_cand, X, y, weights, return_utilities=False, **kwargs):
         """
 
         Attributes
         ----------
-        X: array-like (n_training_samples, n_features)
-            Complete data set
-        y: array-like (n_training_samples)
-            Labels of the data set
         X_cand: array-like (n_candidates, n_features)
             Unlabeled candidate samples
-        weights: array-like (n_training_samples)
+        X: array-like (n_samples, n_features)
+            Complete data set
+        y: array-like (n_samples)
+            Labels of the data set
+        weights: array-like (n_samples)
             Densities for each instance in X
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
+
+        Returns
+        -------
+        selection: np.ndarray, shape (1)
+            The index of the queried instance.
+        utilities: np.ndarray shape (1, n_candidates)
+            The utilities of all instances in X_cand
+            (only returned if return_utilities is True).
         """
 
         X_cand = check_array(X_cand, force_all_finite=False)
-        labeled_idx = is_labeled(y)
-        X_labeled = X[labeled_idx]
-        y_labeled = y[labeled_idx]
+        X = np.array(X)
+        y = np.array(y)
+        labeled_indices = is_labeled(y, missing_label=self.missing_label)
+        X_labeled = X[labeled_indices]
+        y_labeled = y[labeled_indices]
 
         # Calculate gains
-        self.clf.fit(X_labeled, y_labeled)
-        k_vec = self.clf.predict_freq(X_cand)
-        utilities = weights * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
+        clf = clone(self.clf)
+        clf.fit(X_labeled, y_labeled)
+        k_vec = clf.predict_freq(X_cand)
+        utilities = weights * cost_reduction(k_vec, prior=self.prior,
+                                             m_max=self.m_max)
         best_indices = rand_argmax(utilities, random_state=self.random_state)
 
         # best_indices is a np.array (batch_size=1)
@@ -379,6 +404,7 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     expected_cost_reduction: array-like, shape [n_samples]
         Expected cost reduction for given parameters.
     """
+
     n_classes = len(k_vec_list[0])
     n_samples = len(k_vec_list)
 
