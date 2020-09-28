@@ -1,6 +1,5 @@
-import copy
 import numpy as np
-
+from sklearn.base import clone
 from sklearn.utils import check_array
 
 from skactiveml.base import PoolBasedQueryStrategy
@@ -42,8 +41,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         List of all possible classes. Must correspond to the classes of clf.
     method: {'log_loss', 'emr', 'csl'}
         Variant of expected error reduction to be used: 'log_loss' is
-        cost-insensitive, while 'emr' and 'csl' are
-        cost-sensitive variants.
+        cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
     C: array-like, shape (n_classes, n_classes)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i.
@@ -72,14 +70,18 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         self.clf = clf
         if getattr(self.clf, 'fit', None) is None or\
                 getattr(self.clf, 'predict_proba', None) is None:
-            raise TypeError("'clf' must implement the methods 'fit' and"
-                            " 'predict_proba'")
+            raise TypeError("'clf' must implement the methods 'fit' and "
+                            "'predict_proba'")
 
         self.classes = classes
+        if not np.array_equal(clf.classes, self.classes):
+            raise ValueError("The given classes are not the same as in the "
+                             "classifier.")
 
         self.method = method
         if self.method not in [ExpectedErrorReduction.EMR,
-                               ExpectedErrorReduction.CSL]:
+                               ExpectedErrorReduction.CSL,
+                               ExpectedErrorReduction.LOG_LOSS]:
             raise ValueError(
                 f"supported methods are [{ExpectedErrorReduction.EMR}, "
                 f"{ExpectedErrorReduction.CSL}, "
@@ -150,7 +152,7 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
                              C, method='emr'):
     """
     Computes least confidence as uncertainty scores. In case of a given cost
-     matrix C, maximum expected cost is implemented as score.
+    matrix C, maximum expected cost is implemented as score.
 
     Parameters
     ----------
@@ -178,14 +180,15 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
         The utilities of all unlabeled instances.
     """
 
-    if not X_labeled.shape[1] == X_unlabeled.shape[1]:
+    if X_labeled.shape[0] > 0 and X_unlabeled.shape[0] > 0 and \
+            not X_labeled.shape[1] == X_unlabeled.shape[1]:
         raise ValueError("X_labeled and X_unlabeled must have the same number "
                          "of features.")
-    clf = copy.deepcopy(clf)
+    clf = clone(clf)
     clf.fit(X_labeled, y_labeled)
-    if not np.array_equal(clf.classes_, classes):
-        raise ValueError("The given classes are not the same as in the "
-                         "classifier.")
+    # if not np.array_equal(clf.classes_, classes):
+    #     raise ValueError("The given classes are not the same as in the "
+    #                      "classifier.")
 
     n_classes = len(classes)
     P = clf.predict_proba(X_unlabeled)
@@ -211,5 +214,5 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
                                  f"given one " "is: {method}")
             errors_per_class[yi] = P[i, yi] * costs
         errors[i] = errors_per_class.sum()
-    print(P)
+    # print(P)
     return -errors
