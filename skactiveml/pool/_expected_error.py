@@ -9,7 +9,8 @@ from skactiveml.utils import rand_argmax, is_labeled, MISSING_LABEL
 
 class ExpectedErrorReduction(PoolBasedQueryStrategy):
     """ExpectedErrorReduction
-    This class implements the expected error reduction algorithm with different loss functions:
+    This class implements the expected error reduction algorithm with different
+    loss functions:
      - log loss (log_loss) [1],
      - expected misclassification risk (emr) [2],
      - and cost-sensitive learning (csl) [2].
@@ -21,11 +22,12 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
     classes: array-like, shape (n_classes)
         List of all possible classes. Must correspond to the classes of clf.
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
-        Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
-        cost-sensitive variants.
+        Variant of expected error reduction to be used: 'log_loss' is
+        cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
     C: array-like, shape (n_classes, n_classes), optional (default=None)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a sample with the actual class i.
-        Only supported for least confident variant.
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i. Only supported for least confident
+        variant.
     random_state: numeric | np.random.RandomState, optional (defatult=None)
         Random state for annotator selection.
     missing_label: str | numeric, optional (default=MISSING_LABEL)
@@ -36,15 +38,17 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
     ----------
     clf: model to be trained
         Model implementing the methods 'fit' and and 'predict_proba'.
-    classes_: array-like, shape (n_classes)
+    classes: array-like, shape (n_classes)
         List of all possible classes. Must correspond to the classes of clf.
-    method_: {'log_loss', 'emr', 'csl'}
-        Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
+    method: {'log_loss', 'emr', 'csl'}
+        Variant of expected error reduction to be used: 'log_loss' is
+        cost-insensitive, while 'emr' and 'csl' are
         cost-sensitive variants.
-    C_: array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a sample with the actual class i.
+    C: array-like, shape (n_classes, n_classes)
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i.
         Only supported for least confident variant.
-    random_state_: numeric | np.random.RandomState
+    random_state: numeric | np.random.RandomState
         Random state for annotator selection.
     missing_label: str | numeric
         Specifies the symbol that represents a missing label
@@ -53,45 +57,46 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
     ----------
     [1] Settles, Burr. "Active learning literature survey." University of
         Wisconsin, Madison 52.55-66 (2010): 11.
-    [2] Margineantu, D. D. (2005, July). Active cost-sensitive learning. In IJCAI (Vol. 5, pp. 1622-1623).
+    [2] Margineantu, D. D. (2005, July). Active cost-sensitive learning.
+        In IJCAI (Vol. 5, pp. 1622-1623).
     """
 
     EMR = 'emr'
     CSL = 'csl'
     LOG_LOSS = 'log_loss'
 
-    def __init__(self, clf, classes, method=EMR, C=None, random_state=None, missing_label=MISSING_LABEL, **kwargs):
-        super().__init__(random_state=random_state, **kwargs)
+    def __init__(self, clf, classes, method=EMR, C=None, random_state=None,
+                 missing_label=MISSING_LABEL, **kwargs):
+        super().__init__(random_state=random_state)
 
         self.clf = clf
-        if getattr(self.clf, 'fit', None) is None or getattr(self.clf, 'predict_proba', None) is None:
-            raise TypeError(
-                "'model' must implement the methods 'fit' and 'predict_proba'"
-            )
+        if getattr(self.clf, 'fit', None) is None or\
+                getattr(self.clf, 'predict_proba', None) is None:
+            raise TypeError("'clf' must implement the methods 'fit' and"
+                            " 'predict_proba'")
 
-        self.classes_ = classes
+        self.classes = classes
 
-        self.method_ = method
-        if self.method_ not in [ExpectedErrorReduction.EMR, ExpectedErrorReduction.CSL]:
+        self.method = method
+        if self.method not in [ExpectedErrorReduction.EMR,
+                               ExpectedErrorReduction.CSL]:
             raise ValueError(
-                "supported methods are [{}, {}, {}], the given one " "is: {}".format(
-                    ExpectedErrorReduction.EMR, ExpectedErrorReduction.CSL,
-                    ExpectedErrorReduction.LOG_LOSS, self.method_)
+                f"supported methods are [{ExpectedErrorReduction.EMR}, "
+                f"{ExpectedErrorReduction.CSL}, "
+                f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
+                f"{self.method}"
             )
-        
-        self.C_ = C
-        if self.C_ is not None:
-            self.C_ = check_array(self.C_)
-            if np.size(self.C_, axis=0) != np.size(self.C_, axis=1):
-                raise ValueError(
-                    "C must be a square matrix"
-                )
-            if np.size(self.C_, axis=0) != np.size(classes):
-                raise ValueError(
-                    "C must be a (n_classes, n_classes) matrix"
-                )
 
-        self.random_sate_ = random_state
+        if C is None:
+            self.C = 1 - np.eye(len(self.classes))
+        else:
+            self.C = check_array(C)
+        if np.size(self.C, axis=0) != np.size(self.C, axis=1):
+            raise ValueError("C must be a square matrix")
+        if np.size(self.C, axis=0) != np.size(classes):
+            raise ValueError("C must be a (n_classes, n_classes) matrix")
+
+        self.random_sate = random_state
 
         self.missing_label = missing_label
 
@@ -115,7 +120,8 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         selection: np.ndarray, shape (1)
             The index of the queried instance.
         utilities: np.ndarray shape (1, n_candidates)
-            The utilities of all instances in X_cand (only returned if return_utilities is True).
+            The utilities of all instances in X_cand
+            (only returned if return_utilities is True).
         """
 
         X_cand = check_array(X_cand, force_all_finite=False)
@@ -126,21 +132,25 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         y_labeled = y[labeled_indices]
 
         # calculate the utilities
-        utilities = expected_error_reduction(clf=self.clf, X_labeled=X_labeled, y_labeled=y_labeled,
-                                        X_unlabeled=X_cand, classes=self.classes_, C=self.C_,
-                                        method=self.method_)
+        utilities = expected_error_reduction(clf=self.clf, X_labeled=X_labeled,
+                                             y_labeled=y_labeled,
+                                             X_unlabeled=X_cand,
+                                             classes=self.classes,
+                                             C=self.C, method=self.method)
 
-        best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
+        query_indices = rand_argmax([utilities], axis=1,
+                                    random_state=self.random_state)
         if return_utilities:
-            return best_indices, np.array([utilities])
+            return query_indices, np.array([utilities])
         else:
-            return best_indices
+            return query_indices
 
 
-def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=None, method='emr'):
+def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
+                             C, method='emr'):
     """
-    Computes least confidence as uncertainty scores. In case of a given cost matrix C,
-    maximum expected cost is implemented as score.
+    Computes least confidence as uncertainty scores. In case of a given cost
+     matrix C, maximum expected cost is implemented as score.
 
     Parameters
     ----------
@@ -155,11 +165,12 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=
     classes: array-like, shape (n_classes)
         List of classes.
     C: array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a sample with the actual class i.
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i.
         Only supported for least confident variant.
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
-        Variant of expected error reduction to be used: 'log_loss' is cost-insensitive, while 'emr' and 'csl' are
-        cost-sensitive variants.
+        Variant of expected error reduction to be used: 'log_loss' is
+        cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
 
     Returns
     -------
@@ -168,11 +179,13 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=
     """
 
     if not X_labeled.shape[1] == X_unlabeled.shape[1]:
-        raise ValueError("X_labeled and X_unlabeled must have the same number of features.")
+        raise ValueError("X_labeled and X_unlabeled must have the same number "
+                         "of features.")
     clf = copy.deepcopy(clf)
     clf.fit(X_labeled, y_labeled)
     if not np.array_equal(clf.classes_, classes):
-        raise ValueError("The given classes are not the same as in the classifier.")
+        raise ValueError("The given classes are not the same as in the "
+                         "classifier.")
 
     n_classes = len(classes)
     P = clf.predict_proba(X_unlabeled)
@@ -194,9 +207,9 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes, C=
                 P_new = clf.predict_proba(X_unlabeled)
                 costs = -np.sum(P_new * np.log(P_new))
             else:
-                raise ValueError(
-                    "supported methods are ['emr', 'csl'], the given one " "is: {}".format(method)
-                )
+                raise ValueError(f"supported methods are ['emr', 'csl'], the "
+                                 f"given one " "is: {method}")
             errors_per_class[yi] = P[i, yi] * costs
         errors[i] = errors_per_class.sum()
+    print(P)
     return -errors
