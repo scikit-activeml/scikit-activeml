@@ -82,7 +82,12 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         y_hat = np.max(predict_proba, axis=1)
         num_classes = predict_proba.shape[1]
         theta = 1/num_classes + self.budget_manager.budget*(1-1/num_classes)
-        utilities = y_hat <= theta
+        # the original inequation is:
+        # sample_instance: True if y < theta_t
+        # to scale this inequation to the desired range, i.e., utilities
+        # higher than 1-budget should lead to sampling the instance, we use
+        # sample_instance: True if 1-budget < theta_t + (1-budget) - y
+        utilities = theta + (1 - self.budget_manager.budget) - y_hat
 
         sampled_indices = self.budget_manager.sample(utilities,
                                                      simulate=simulate)
@@ -196,7 +201,12 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         sampled_indices = []
 
         for y in y_hat:
-            utilities.append(y < tmp_theta)
+            # the original inequation is:
+            # sample_instance: True if y < theta_t
+            # to scale this inequation to the desired range, i.e., utilities
+            # higher than 1-budget should lead to sampling the instance, we use
+            # sample_instance: True if 1-budget < theta_t + (1-budget) - y
+            utilities.append(tmp_theta + (1 - self.budget_manager.budget) - y)
             sampled, budget_left = self.budget_manager.sample(
                 utilities,
                 simulate=True,
@@ -282,14 +292,14 @@ class Split(StreamBasedQueryStrategy):
         self.s = s
         self.random_sampler = RandomSampler(
             self.budget_manager,
-            random_state=self.random_state.tomaxint()
+            random_state=self.random_state.randint(2**32-1)
         )
         self.variable_uncertainty = VariableUncertainty(
             clf,
             self.budget_manager,
             theta=theta,
             s=s,
-            random_state=self.random_state.tomaxint()
+            random_state=self.random_state.randint(2**32-1)
         )
 
     def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
