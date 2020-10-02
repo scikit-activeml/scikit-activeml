@@ -1,6 +1,6 @@
 import numpy as np
 
-from .base import BudgetManager
+from .base import BudgetManager, get_default_budget
 
 
 class FixedBudget(BudgetManager):
@@ -20,10 +20,8 @@ class FixedBudget(BudgetManager):
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
     """
-    def __init__(self, budget):
+    def __init__(self, budget=None):
         super().__init__(budget)
-        self.observed_instances = 0
-        self.sampled_instances = 0
 
     def is_budget_left(self):
         """Check whether there is any utility given to sample(...), which may
@@ -40,8 +38,8 @@ class FixedBudget(BudgetManager):
             True, if there is a utility which leads to sampling another
             instance.
         """
-        available_budget = (self.observed_instances * self.budget
-                            - self.sampled_instances)
+        available_budget = (self.observed_instances_ * self.budget_
+                            - self.queried_instances_)
         return available_budget >= 1
 
     def sample(self, utilities, simulate=False, return_budget_left=False,
@@ -75,27 +73,33 @@ class FixedBudget(BudgetManager):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
+        # check if budget has been set
+        self._validate_budget(get_default_budget())
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
         # keep record if the instance is sampled and if there was budget left,
         # when assessing the corresponding utilities
         sampled = np.full(len(utilities), False)
         budget_left = np.full(len(utilities), False)
 
         # keep the internal state to reset it later if simulate is true
-        init_observed_instances = self.observed_instances
-        init_sampled_instances = self.sampled_instances
-
+        tmp_observed_instances = self.observed_instances_
+        tmp_queried_instances = self.queried_instances_
         # check for each sample separately if budget is left and the utility is
         # high enough
         for i, utility in enumerate(utilities):
-            self.observed_instances += 1
+            tmp_observed_instances += 1
             budget_left[i] = self.is_budget_left()
-            sampled[i] = budget_left[i] and (utility >= 1 - self.budget)
-            self.sampled_instances += sampled[i]
+            sampled[i] = budget_left[i] and (utility >= 1 - self.budget_)
+            tmp_queried_instances += sampled[i]
 
         # set the internal state to the previous values
-        if simulate:
-            self.observed_instances = init_observed_instances
-            self.sampled_instances = init_sampled_instances
+        if not simulate:
+            self.observed_instances_ = tmp_observed_instances
+            self.sampled_instances_ = tmp_queried_instances
 
         # get the indices instances that should be sampled
         sampled_indices = np.where(sampled)[0]
@@ -119,6 +123,13 @@ class FixedBudget(BudgetManager):
         self : FixedBudget
             The FixedBudget returns itself, after it is updated.
         """
-        self.observed_instances += sampled.shape[0]
-        self.sampled_instances += np.sum(sampled)
+        # check if budget has been set
+        self._validate_budget(get_default_budget())
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
+        self.observed_instances_ += sampled.shape[0]
+        self.sampled_instances_ += np.sum(sampled)
         return self

@@ -4,11 +4,13 @@ from sklearn.utils import check_array
 
 from ..base import StreamBasedQueryStrategy
 
+from .budget_manager import FixedBudget
+
 
 class RandomSampler(StreamBasedQueryStrategy):
     """The RandomSampler samples instances completely randomly. The probability
     to sample an instance is dependent on the budget specified in the
-    budget_manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1) with 
+    budget_manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1) with
     a probability of 10%. Instances are sampled regardless of their position in
     the feature space. As this query strategy disregards any information about
     the instance. Thus, it should only be used as a baseline strategy.
@@ -24,7 +26,7 @@ class RandomSampler(StreamBasedQueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
-    def __init__(self, budget_manager, random_state=None):
+    def __init__(self, budget_manager=FixedBudget(), random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
 
@@ -49,8 +51,11 @@ class RandomSampler(StreamBasedQueryStrategy):
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
+            query strategy from adapting itself. Member variabled created
+            during the query call may not be deleted, however, their state is
+            reset in such a way, as the query call never happened. Note, that
+            this parameter is propagated to the budget_manager, as well.
+            The default is False.
 
         Returns
         -------
@@ -62,17 +67,22 @@ class RandomSampler(StreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
-
-        prior_random_state_state = self.random_state.get_state()
+        # check if a random state is set
+        self._validate_random_state()
+        # copy random state in case of simulating the query
+        prior_random_state_state = self.random_state_.get_state()
+        # check if a budget_manager is set
+        self._validate_budget_manager()
 
         utilities = self.random_state.random_sample(len(X_cand))
 
-        sampled_indices = self.budget_manager.sample(utilities,
-                                                     simulate=simulate)
+        sampled_indices = self.budget_manager_.sample(utilities,
+                                                      simulate=simulate)
 
         if simulate:
-            self.random_state.set_state(prior_random_state_state)
+            self.random_state_.set_state(prior_random_state_state)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -97,9 +107,13 @@ class RandomSampler(StreamBasedQueryStrategy):
         self : RandomSampler
             The RandomSampler returns itself, after it is updated.
         """
+        # check if a random state is set
+        self._validate_random_state()
+        # check if a budget_manager is set
+        self._validate_budget_manager()
         # update the random state assuming, that query(..., simulate=True) was
         # used
-        self.random_state.random_sample(len(sampled))
+        self.random_state_.random_sample(len(sampled))
         self.budget_manager.update(sampled)
         return self
 
@@ -125,11 +139,9 @@ class PeriodicSampler(StreamBasedQueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
-    def __init__(self, budget_manager, random_state=None):
+    def __init__(self, budget_manager=FixedBudget(), random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
-        self.seen_instances = 0
-        self.sampled_instances = 0
 
     def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -168,26 +180,35 @@ class PeriodicSampler(StreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
 
-        instances_to_sample = 0
+        instances_to_query = 0
         utilities = np.zeros(X_cand.shape[0])
+        budget = getattr(self.budget_manager_, 'budget_', 0)
         for i, x in enumerate(X_cand):
-            seen_instances = (self.seen_instances + i + 1)
-            sampled_instances = (self.sampled_instances + instances_to_sample)
-            remaining_budget = (seen_instances * self.budget_manager.budget
-                                - sampled_instances)
+            observed_instances = (self.observed_instances_ + i + 1)
+            queried_instances = (self.queried_instances_ + instances_to_query)
+            remaining_budget = (observed_instances * budget -
+                                queried_instances)
             if remaining_budget >= 1:
                 utilities[i] = 1
-                instances_to_sample += 1
+                instances_to_query += 1
             else:
                 utilities[i] = 0
 
         if not simulate:
-            self.seen_instances += X_cand.shape[0]
-            self.sampled_instances += instances_to_sample
-        sampled_indices = self.budget_manager.sample(utilities,
-                                                     simulate=simulate)
+            self.observed_instances_ = observed_instances
+            self.queried_instances_ = queried_instances
+        sampled_indices = self.budget_manager_.sample(utilities,
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -212,6 +233,14 @@ class PeriodicSampler(StreamBasedQueryStrategy):
         self : PeriodicSampler
             The PeriodicSampler returns itself, after it is updated.
         """
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
+
         self.budget_manager.update(sampled)
         self.seen_instances += X_cand.shape[0]
         self.sampled_instances += np.sum(sampled)

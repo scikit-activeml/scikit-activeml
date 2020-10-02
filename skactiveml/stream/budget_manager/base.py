@@ -17,7 +17,6 @@ class BudgetManager(ABC, BaseEstimator):
         0 <= budget <= 1.
     """
     def __init__(self, budget):
-        check_scalar(budget, 'budget', np.float, min_val=0.0, max_val=1.0)
         self.budget = budget
 
     @abstractmethod
@@ -86,3 +85,23 @@ class BudgetManager(ABC, BaseEstimator):
             The BudgetManager returns itself, after it is updated.
         """
         return NotImplemented
+
+    def _validate_budget(self, default=None):
+        """check the assigned budget and set a default value, when none is set
+        prior.
+
+        Parameters
+        ----------
+        default : float, optional
+            the budget which should be assigned, when none is set.
+        """
+        if self.budget is not None:
+            self.budget_ = self.budget
+        else:
+            self.budget_ = default
+        check_scalar(self.budget_, 'budget',
+                     np.float, min_val=0.0, max_val=1.0)
+
+
+def get_default_budget():
+    return 0.1

@@ -1,7 +1,7 @@
 import numpy as np
 
 from abc import ABC, abstractmethod
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state, check_array, \
     check_consistent_length
 from sklearn.utils.multiclass import type_of_target
@@ -116,6 +116,15 @@ class StreamBasedQueryStrategy(QueryStrategy):
             The StreamBasedQueryStrategy returns itself, after it is updated.
         """
         return NotImplemented
+
+    def _validate_random_state(self):
+        if not hasattr(self, 'random_state_'):
+            self.random_state_ = self.random_state
+        self.random_state_ = check_random_state(self.random_state_)
+
+    def _validate_budget_manager(self):
+        if not hasattr(self, 'budget_manager_'):
+            self.budget_manager_ = clone(self.budget_manager)
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):

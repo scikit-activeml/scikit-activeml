@@ -2,11 +2,15 @@ import numpy as np
 
 from sklearn.utils import check_array
 
+from sklearn.base import is_classifier
+
 from ..base import StreamBasedQueryStrategy
 
 from ._random import RandomSampler
 
 import copy
+
+from .budget_manager import FixedBudget
 
 
 class FixedUncertainty(StreamBasedQueryStrategy):
@@ -37,7 +41,8 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf, budget_manager, random_state=None):
+    def __init__(self, clf=None, budget_manager=FixedBudget(),
+                 random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
@@ -76,21 +81,28 @@ class FixedUncertainty(StreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
-
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        # check if clf is a classifier
+        if not is_classifier(self.clf):
+            raise ValueError("clf is not a classifier. Please refer to "
+                             "sklearn.base.is_classifier")
         predict_proba = self.clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
         num_classes = predict_proba.shape[1]
-        theta = 1/num_classes + self.budget_manager.budget*(1-1/num_classes)
+        budget = getattr(self.budget_manager_, "budget_", 0)
+        theta = 1/num_classes + budget*(1-1/num_classes)
         # the original inequation is:
         # sample_instance: True if y < theta_t
         # to scale this inequation to the desired range, i.e., utilities
         # higher than 1-budget should lead to sampling the instance, we use
         # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-        utilities = theta + (1 - self.budget_manager.budget) - y_hat
+        utilities = theta + (1 - budget) - y_hat
 
-        sampled_indices = self.budget_manager.sample(utilities,
-                                                     simulate=simulate)
+        sampled_indices = self.budget_manager_.sample(utilities,
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -115,7 +127,9 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         self : FixedUncertainty
             The FixedUncertainty returns itself, after it is updated.
         """
-        self.budget_manager.update(sampled)
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        self.budget_manager_.update(sampled)
         return self
 
 
@@ -148,8 +162,8 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf, budget_manager, theta=1.0, s=0.01,
-                 random_state=None):
+    def __init__(self, clf=None, budget_manager=FixedBudget(),
+                 theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
@@ -190,12 +204,18 @@ class VariableUncertainty(StreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        if not hasattr(self, "theta_"):
+            self.theta_ = self.theta
 
         predict_proba = self.clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
+        budget = getattr(self.budget_manager_, "budget_", 0)
 
-        tmp_theta = self.theta
+        tmp_theta = self.theta_
 
         utilities = []
         sampled_indices = []
@@ -206,8 +226,8 @@ class VariableUncertainty(StreamBasedQueryStrategy):
             # to scale this inequation to the desired range, i.e., utilities
             # higher than 1-budget should lead to sampling the instance, we use
             # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-            utilities.append(tmp_theta + (1 - self.budget_manager.budget) - y)
-            sampled, budget_left = self.budget_manager.sample(
+            utilities.append(tmp_theta + (1 - budget) - y)
+            sampled, budget_left = self.budget_manager_.sample(
                 utilities,
                 simulate=True,
                 return_budget_left=True
@@ -220,10 +240,10 @@ class VariableUncertainty(StreamBasedQueryStrategy):
                     tmp_theta = tmp_theta * (1+self.s)
 
         if not simulate:
-            self.theta = tmp_theta
+            self.theta_ = tmp_theta
 
-        sampled_indices = self.budget_manager.sample(utilities,
-                                                     simulate=simulate)
+        sampled_indices = self.budget_manager_.sample(utilities,
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -248,14 +268,16 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         self : VariableUncertainty
             The VariableUncertainty returns itself, after it is updated.
         """
-        self.budget_manager.update(sampled)
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        self.budget_manager_.update(sampled)
         budget_left = kwargs.get('budget_left', None)
         for i, s in enumerate(sampled):
             if budget_left is None:
                 if sampled[-1]:
-                    self.theta = self.theta * (1-self.s)
+                    self.theta_ *= (1-self.s)
                 else:
-                    self.theta = self.theta * (1+self.s)
+                    self.theta_ *= (1+self.s)
         return self
 
 
