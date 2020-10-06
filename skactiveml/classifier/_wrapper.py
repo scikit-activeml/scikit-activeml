@@ -2,6 +2,9 @@
 Wrapper for scikit-learn classifiers to deal with missing labels and labels
 from multiple annotators.
 """
+
+# Author: Marek Herde <marek.herde@uni-kassel.de>
+
 import numpy as np
 
 from copy import deepcopy

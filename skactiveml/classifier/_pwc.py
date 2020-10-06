@@ -1,3 +1,9 @@
+"""
+Parzen Window Classifier
+"""
+
+# Author: Marek Herde <marek.herde@uni-kassel.de>
+
 import numpy as np
 
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS

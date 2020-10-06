@@ -1,3 +1,10 @@
+"""
+Logistic Regression for Multiple Annotators
+"""
+
+# Author: Marek Herde <marek.herde@uni-kassel.de>
+#         Timo Sturm
+
 import numpy as np
 import warnings
 
