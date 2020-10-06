@@ -201,7 +201,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
                 prior_array = np.ones(n_annotators) * prior
             else:
                 prior_array = column_or_1d(prior)
-            if name is 'annot_prior_full':
+            if name == 'annot_prior_full':
                 is_invalid_prior = np.sum(prior_array <= 0)
             else:
                 is_invalid_prior = np.sum(prior_array < 0)
