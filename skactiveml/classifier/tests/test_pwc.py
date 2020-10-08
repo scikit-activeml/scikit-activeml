@@ -15,19 +15,30 @@ class TestPWC(unittest.TestCase):
         self.w = [[2, np.nan, 1], [1, 1, 1]]
 
     def test_init(self):
-        self.assertRaises(ValueError, PWC, metric="Test")
-        self.assertRaises(ValueError, PWC, n_neighbors=-1)
-        self.assertRaises(TypeError, PWC, n_neighbors=1.0)
-        self.assertRaises(TypeError, PWC, metric_dict=['gamma'])
-        self.assertRaises(ValueError, PWC, cost_matrix=1 - np.eye(3))
+        pwc = PWC(missing_label=-1)
+        self.assertEqual(pwc.missing_label, -1)
+        self.assertEqual(pwc.classes, None)
+        self.assertEqual(pwc.metric_dict, {})
+        self.assertEqual(pwc.random_state, None)
+        self.assertEqual(pwc.cost_matrix, None)
+
+    def test_fit(self):
+        pwc = PWC(missing_label='nan', metric="Test")
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', n_neighbors=-1)
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', n_neighbors=1.0)
+        self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', metric_dict=['gamma'])
+        self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', cost_matrix=1 - np.eye(3))
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
         pwc = PWC(missing_label=None)
         self.assertRaises(NotFittedError, check_is_fitted, estimator=pwc)
         cost_matrix = 1 - np.eye(2)
         pwc = PWC(classes=['tokyo', 'paris'], cost_matrix=cost_matrix,
                   missing_label='nan')
         np.testing.assert_array_equal(cost_matrix, pwc.cost_matrix)
-
-    def test_fit(self):
         pwc = PWC(missing_label='nan')
         self.assertRaises(ValueError, pwc.fit, X=[], y=[])
         self.assertRaises(ValueError,  pwc.fit, X=self.X, y=self.y_nan)

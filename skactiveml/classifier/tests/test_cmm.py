@@ -16,23 +16,34 @@ class TestCMM(unittest.TestCase):
         self.w = [[2, np.nan, 1], [1, 1, 1]]
 
     def test_init(self):
-        self.assertRaises(TypeError, CMM, mixture_model="Test")
+        cmm = CMM(missing_label=-1)
+        self.assertEqual(cmm.missing_label, -1)
+        self.assertEqual(cmm.classes, None)
+        self.assertEqual(cmm.mixture_model, None)
+        self.assertEqual(cmm.random_state, None)
+        self.assertEqual(cmm.cost_matrix, None)
+
+    def test_fit(self):
+        cmm = CMM(missing_label='nan', mixture_model="Test")
+        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label='nan', weight_mode="Test")
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
         mixture = GaussianMixture(random_state=0, n_components=4)
-        self.assertRaises(ValueError, CMM, mixture_model=mixture,
-                          classes=[1, 2], cost_matrix=1 - np.eye(3))
-        self.assertRaises(ValueError, CMM, mixture_model=mixture,
-                          cost_matrix=1 - np.eye(3))
-        cmm = CMM(mixture_model=mixture, missing_label=None, random_state=0)
+        cmm = CMM(missing_label='nan', mixture_model=mixture, classes=[1, 2],
+                  cost_matrix=1 - np.eye(3))
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label='nan', mixture_model=mixture,
+                  cost_matrix=1 - np.eye(3))
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label=None, random_state=0)
         self.assertRaises(NotFittedError, check_is_fitted, estimator=cmm)
         cost_matrix = 1 - np.eye(2)
         cmm = CMM(classes=['tokyo', 'paris'],
                   cost_matrix=cost_matrix, missing_label='nan')
         np.testing.assert_array_equal(cost_matrix, cmm.cost_matrix)
         self.assertEqual('nan', cmm.missing_label)
-        self.assertEqual(cmm.mixture_model.n_components, 10)
+        self.assertEqual(cmm.mixture_model, None)
         np.testing.assert_array_equal(['tokyo', 'paris'], cmm.classes)
-
-    def test_fit(self):
         mixture = BayesianGaussianMixture(n_components=1).fit(X=self.X)
         cmm = CMM(mixture_model=mixture)
         self.assertRaises(ValueError, cmm.fit, X=[], y=[])
@@ -105,8 +116,7 @@ class TestCMM(unittest.TestCase):
 
     def test_on_data_set(self):
         X, y = make_blobs(n_samples=300, random_state=0)
-        mixture_model = BayesianGaussianMixture(n_components=10)
-        pwc = CMM(mixture_model=mixture_model, random_state=0).fit(X, y)
+        pwc = CMM(weight_mode='similarities', random_state=0).fit(X, y)
         self.assertTrue(pwc.score(X, y) > 0.5)
 
 

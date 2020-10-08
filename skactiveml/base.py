@@ -128,16 +128,41 @@ class StreamBasedQueryStrategy(QueryStrategy):
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
+    """SkactivemlClassifier
 
-    @abstractmethod
+    Base class for scikit-activeml classifiers such that missing labels,
+    user-defined classes, cost-sensitive classification (i.e., cost matrix),
+    and multiple labels per sample can be handled.
+
+    Parameters
+    ----------
+    classes : array-like, shape (n_classes), default=None
+        Holds the label for each class. If none, the classes are determined
+        during the fit.
+    missing_label : {scalar, string, np.nan, None}, default=np.nan
+        Value to represent a missing label.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with cost_matrix[i,j] indicating cost of predicting class
+        classes[j]  for a sample of class classes[i]. Can be only set, if
+        classes is not none.
+    random_state : int, RandomState instance or None, optional (default=None)
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+
+    Attributes
+    ----------
+    classes_ : array-like, shape (n_classes)
+        Holds the label for each class after fitting.
+    cost_matrix_ : array-like, shape (classes, classes)
+        Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
+        for a sample of class classes_[i].
+    """
     def __init__(self, classes, missing_label=MISSING_LABEL, cost_matrix=None,
                  random_state=None):
-        # Check common classifier parameters.
-        self.classes, self.missing_label, self.cost_matrix = \
-            check_classifier_params(classes, missing_label, cost_matrix)
-
-        # Store and check random state.
-        self.random_state = check_random_state(random_state)
+        self.classes = classes
+        self.missing_label = missing_label
+        self.cost_matrix = cost_matrix
+        self.random_state = random_state
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -162,9 +187,46 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         """
         return NotImplemented
 
-    def score(self, X, y, sample_weight=None):
+    def predict_proba(self, X):
+        """Return probability estimates for the test data X.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            Test samples.
+
+        Returns
+        -------
+        P : numpy.ndarray, shape (n_samples, classes)
+            The class probabilities of the test samples. Classes are ordered
+            according to 'classes_'.
         """
-        Return the mean accuracy on the given test data and labels.
+        return NotImplemented
+
+    def predict(self, X):
+        """Return class label predictions for the test samples X.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features) or
+        shape (n_samples, m_samples) if metric == 'precomputed'
+            Input samples.
+
+        Returns
+        -------
+        y : numpy.ndarray, shape (n_samples)
+            Predicted class labels of the test samples 'X'. Classes are ordered
+            according to 'classes_'.
+        """
+        P = self.predict_proba(X)
+        costs = np.dot(P, self.cost_matrix_)
+        y_pred = rand_argmin(costs, random_state=self._random_state, axis=1)
+        y_pred = self._le.inverse_transform(y_pred)
+        y_pred = np.asarray(y_pred, dtype=self.classes_.dtype)
+        return y_pred
+
+    def score(self, X, y, sample_weight=None):
+        """Return the mean accuracy on the given test data and labels.
 
         Parameters
         ----------
@@ -187,6 +249,12 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
     def _validate_input(self, X, y, sample_weight):
+        # Check common classifier parameters.
+        check_classifier_params(self.classes, self.missing_label,
+                                    self.cost_matrix)
+        # Store and check random state.
+        self._random_state = check_random_state(self.random_state)
+
         # Check input parameters.
         X = check_array(X)
         y = np.array(y)
@@ -232,27 +300,54 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
 
 class ClassFrequencyEstimator(SkactivemlClassifier):
+    """ClassFrequencyEstimator
+
+    Extends scikit-activeml classifiers to estimators that are able to estimate
+    class frequencies for given samples (by calling 'predict_freq').
+
+    Parameters
+    ----------
+    classes : array-like, shape (n_classes), default=None
+        Holds the label for each class. If none, the classes are determined
+        during the fit.
+    missing_label : {scalar, string, np.nan, None}, default=np.nan
+        Value to represent a missing label.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with cost_matrix[i,j] indicating cost of predicting class
+        classes[j]  for a sample of class classes[i]. Can be only set, if
+        classes is not none.
+    random_state : int, RandomState instance or None, optional (default=None)
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+
+    Attributes
+    ----------
+    classes_ : array-like, shape (n_classes)
+        Holds the label for each class after fitting.
+    cost_matrix_ : array-like, shape (classes, classes)
+        Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
+        for a sample of class classes_[i].
+    """
 
     @abstractmethod
     def predict_freq(self, X):
-        """Return class frequency estimates for the input data X.
+        """Return class frequency estimates for the test samples X.
 
         Parameters
         ----------
-        X: array-like, shape (n_samples, n_features) or shape
-        (n_samples, m_samples) if metric == 'precomputed'
-            Input samples.
+        X: array-like, shape (n_samples, n_features)
+            Test samples whose class frequencies are to be estimated.
 
         Returns
         -------
         F: array-like, shape (n_samples, classes)
-            The class frequency estimates of the input samples. Classes are
-            ordered according to classes_.
+            The class frequency estimates of the test samples 'X'. Classes are
+            ordered according to attribute 'classes_'.
         """
         return NotImplemented
 
     def predict_proba(self, X):
-        """Return probability estimates for the input data X.
+        """Return probability estimates for the test data X.
 
         Parameters
         ----------
@@ -263,7 +358,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Returns
         -------
         P : array-like, shape (n_samples, classes)
-            The class probabilities of the input samples. Classes are ordered
+            The class probabilities of the test samples. Classes are ordered
             according to classes_.
         """
         # Normalize probabilities of each sample.
@@ -273,23 +368,27 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
-    def predict(self, X):
-        """Return class label predictions for the input data X.
+
+class AnnotatorModel(BaseEstimator, ABC):
+    """AnnotatorModel
+
+    Base class of all annotator models estimating the performances of
+    annotators for given samples.
+    """
+    @abstractmethod
+    def predict_annot_proba(self, X):
+        """Calculates the probability that an annotator provides the true label
+        for a given sample.
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features) or
-        shape (n_samples, m_samples) if metric == 'precomputed'
-            Input samples.
+        X : array-like, shape (n_samples, n_features)
+            Test samples.
 
         Returns
         -------
-        y :  array-like, shape (n_samples)
-            Predicted class labels of the input samples.
+        P_annot : numpy.ndarray, shape (n_samples, classes)
+            P_annot[i,l] is the probability, that annotator l provides the
+            correct class label for sample X[i].
         """
-        P = self.predict_proba(X)
-        costs = np.dot(P, self.cost_matrix_)
-        y_pred = rand_argmin(costs, random_state=self.random_state, axis=1)
-        y_pred = self._le.inverse_transform(y_pred)
-        y_pred = np.asarray(y_pred, dtype=self.classes_.dtype)
-        return y_pred
+        return NotImplemented
