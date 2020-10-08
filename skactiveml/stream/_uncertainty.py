@@ -2,9 +2,11 @@ import numpy as np
 
 from sklearn.utils import check_array
 
-from sklearn.base import is_classifier
+from sklearn.base import is_classifier, clone
 
 from ..base import StreamBasedQueryStrategy
+
+from ..classifier import PWC
 
 from ._random import RandomSampler
 
@@ -47,7 +49,8 @@ class FixedUncertainty(StreamBasedQueryStrategy):
                          random_state=random_state)
         self.clf = clf
 
-    def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
+    def query(self, X_cand, X, y, return_utilities=False, simulate=False,
+              **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -85,11 +88,22 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
         self._validate_budget_manager()
+        # check if a random state is set
+        self._validate_random_state()
         # check if clf is a classifier
-        if not is_classifier(self.clf):
-            raise ValueError("clf is not a classifier. Please refer to "
-                             "sklearn.base.is_classifier")
-        predict_proba = self.clf.predict_proba(X_cand)
+        if X is not None and y is not None:
+            if self.clf is None:
+                clf = PWC(
+                    random_state=self.random_state_.randint(2**32-1))
+            elif is_classifier(self.clf):
+                clf = clone(self.clf)
+            else:
+                raise ValueError("clf is not a classifier. Please refer to " +
+                                 "sklearn.base.is_classifier")
+            clf.fit(X, y)
+        else:
+            clf = self.clf
+        predict_proba = clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
         num_classes = predict_proba.shape[1]
         budget = getattr(self.budget_manager_, "budget_", 0)
@@ -109,7 +123,7 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, sampled, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -170,7 +184,8 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         self.theta = theta
         self.s = s
 
-    def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
+    def query(self, X_cand, X, y, return_utilities=False, simulate=False,
+              **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -208,10 +223,25 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
         self._validate_budget_manager()
+        # check if a random state is set
+        self._validate_random_state()
+        # check if clf is a classifier
+        if X is not None and y is not None:
+            if self.clf is None:
+                clf = PWC(
+                    random_state=self.random_state_.randint(2**32-1))
+            elif is_classifier(self.clf):
+                clf = clone(self.clf)
+            else:
+                raise ValueError("clf is not a classifier. Please refer to " +
+                                 "sklearn.base.is_classifier")
+            clf.fit(X, y)
+        else:
+            clf = self.clf
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
 
-        predict_proba = self.clf.predict_proba(X_cand)
+        predict_proba = clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
         budget = getattr(self.budget_manager_, "budget_", 0)
 
@@ -220,13 +250,13 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         utilities = []
         sampled_indices = []
 
-        for y in y_hat:
+        for y_ in y_hat:
             # the original inequation is:
             # sample_instance: True if y < theta_t
             # to scale this inequation to the desired range, i.e., utilities
             # higher than 1-budget should lead to sampling the instance, we use
             # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-            utilities.append(tmp_theta + (1 - budget) - y)
+            utilities.append(tmp_theta + (1 - budget) - y_)
             sampled, budget_left = self.budget_manager_.sample(
                 utilities,
                 simulate=True,
@@ -250,7 +280,7 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, sampled, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -270,6 +300,8 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
+        if not hasattr(self, "theta_"):
+            self.theta_ = self.theta
         self.budget_manager_.update(sampled)
         budget_left = kwargs.get('budget_left', None)
         for i, s in enumerate(sampled):
@@ -306,25 +338,17 @@ class Split(StreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf, budget_manager, v=0.1, theta=1.0, s=0.01,
-                 random_state=None):
+    def __init__(self, clf=None, budget_manager=FixedBudget(), v=0.1,
+                 theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
         self.s = s
-        self.random_sampler = RandomSampler(
-            self.budget_manager,
-            random_state=self.random_state.randint(2**32-1)
-        )
-        self.variable_uncertainty = VariableUncertainty(
-            clf,
-            self.budget_manager,
-            theta=theta,
-            s=s,
-            random_state=self.random_state.randint(2**32-1)
-        )
+        self.v = v
+        self.theta = theta
 
-    def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
+    def query(self, X_cand, X, y, return_utilities=False, simulate=False,
+              **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -358,19 +382,53 @@ class Split(StreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        # check if a random state is set
+        self._validate_random_state()
+        # check if clf is a classifier
+        if X is not None and y is not None:
+            if self.clf is None:
+                clf = PWC(
+                    random_state=self.random_state_.randint(2**32-1))
+            elif is_classifier(self.clf):
+                clf = clone(self.clf)
+            else:
+                raise ValueError("clf is not a classifier. Please refer to " +
+                                 "sklearn.base.is_classifier")
+            clf.fit(X, y)
+        else:
+            clf = self.clf
+
+        if not hasattr(self, 'random_sampler_'):
+            self.random_sampler_ = RandomSampler(
+                self.budget_manager_,
+                random_state=self.random_state_.randint(2**32-1))
+        if not hasattr(self, 'variable_uncertainty_'):
+            self.variable_uncertainty_ = VariableUncertainty(
+                clf,
+                self.budget_manager_,
+                theta=self.theta,
+                s=self.s,
+                random_state=self.random_state_.randint(2**32-1))
+        # copy random state in case of simulating the query
+        prior_random_state_state = self.random_state_.get_state()
 
         utilities = []
         sampled_indices = []
 
-        use_random_sampler = self.random_state.choice([0, 1], X_cand.shape[0],
-                                                      p=[(1-self.s), self.s])
+        use_random_sampler = self.random_state_.choice([0, 1], X_cand.shape[0],
+                                                       p=[(1-self.v), self.v])
 
-        tmp_budget_manager = copy.copy(self.budget_manager)
-        tmp_random_sampler = copy.copy(self.random_sampler)
-        tmp_random_sampler.budget_manager = tmp_budget_manager
-        tmp_var_uncertainty = copy.copy(self.variable_uncertainty)
-        tmp_var_uncertainty.budget_manager = tmp_budget_manager
+        tmp_budget_manager = copy.deepcopy(self.budget_manager_)
+        tmp_random_sampler = copy.deepcopy(self.random_sampler_)
+        tmp_random_sampler.budget_manager_ = tmp_budget_manager
+        tmp_random_sampler.clf = self.clf
+        tmp_var_uncertainty = copy.deepcopy(self.variable_uncertainty_)
+        tmp_var_uncertainty.budget_manager_ = tmp_budget_manager
+        tmp_var_uncertainty.clf = self.clf
 
         merged_sampled_indices = []
         merged_utilities = []
@@ -379,29 +437,33 @@ class Split(StreamBasedQueryStrategy):
             if use_rand:
                 sampled_indices, utilities = tmp_random_sampler.query(
                     x.reshape([1, -1]),
+                    X=X,
+                    y=y,
                     return_utilities=True,
-                    simulate=False
-                )
+                    simulate=False)
             else:
                 sampled_indices, utilities = tmp_var_uncertainty.query(
                     x.reshape([1, -1]),
+                    X=X,
+                    y=y,
                     return_utilities=True,
-                    simulate=False
-                )
+                    simulate=False)
             merged_sampled_indices.extend(sampled_indices)
             merged_utilities.extend(utilities)
 
         if not simulate:
-            self.budget_manager = tmp_budget_manager
-            self.random_sampler = tmp_random_sampler
-            self.variable_uncertainty = tmp_var_uncertainty
+            self.budget_manager_ = tmp_budget_manager
+            self.random_sampler_ = tmp_random_sampler
+            self.variable_uncertainty_ = tmp_var_uncertainty
+        else:
+            self.random_state_.set_state(prior_random_state_state)
 
         if return_utilities:
             return sampled_indices, utilities
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, sampled, X, y, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -419,19 +481,24 @@ class Split(StreamBasedQueryStrategy):
         self : VariableUncertainty
             The VariableUncertainty returns itself, after it is updated.
         """
-        use_random_sampler = self.random_state.choice([0, 1], X_cand.shape[0],
-                                                      p=[(1-self.s), self.s])
+        # check the shape of data
+        X_cand = check_array(X_cand, force_all_finite=False)
+        # check if a budget_manager is set
+        self._validate_budget_manager()
+        # check if a random state is set
+        self._validate_random_state()
+
+        use_random_sampler = self.random_state_.choice([0, 1], X_cand.shape[0],
+                                                       p=[(1-self.v), self.v])
 
         for x, s, use_rand in zip(X_cand, sampled, use_random_sampler):
             if use_rand:
-                sampled_indices, utilities = self.random_sampler.update(
+                self.random_sampler_.update(
                     x.reshape([1, -1]),
-                    [s]
-                )
+                    np.array([s]))
             else:
-                sampled_indices, utilities = self.variable_uncertainty.update(
+                self.variable_uncertainty_.update(
                     x.reshape([1, -1]),
-                    [s]
-                )
-
+                    np.array([s]))
+        self.budget_manager_.update(sampled)
         return self

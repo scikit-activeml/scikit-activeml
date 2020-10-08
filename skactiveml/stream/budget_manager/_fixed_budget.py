@@ -92,14 +92,15 @@ class FixedBudget(BudgetManager):
         # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_instances += 1
-            budget_left[i] = self.is_budget_left()
+            budget_left[i] = (tmp_observed_instances * self.budget_
+                              - tmp_queried_instances)
             sampled[i] = budget_left[i] and (utility >= 1 - self.budget_)
             tmp_queried_instances += sampled[i]
 
         # set the internal state to the previous values
         if not simulate:
             self.observed_instances_ = tmp_observed_instances
-            self.sampled_instances_ = tmp_queried_instances
+            self.queried_instances_ = tmp_queried_instances
 
         # get the indices instances that should be sampled
         sampled_indices = np.where(sampled)[0]
@@ -131,5 +132,5 @@ class FixedBudget(BudgetManager):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
         self.observed_instances_ += sampled.shape[0]
-        self.sampled_instances_ += np.sum(sampled)
+        self.queried_instances_ += np.sum(sampled)
         return self

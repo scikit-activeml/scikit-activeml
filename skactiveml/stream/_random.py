@@ -76,7 +76,7 @@ class RandomSampler(StreamBasedQueryStrategy):
         # check if a budget_manager is set
         self._validate_budget_manager()
 
-        utilities = self.random_state.random_sample(len(X_cand))
+        utilities = self.random_state_.random_sample(len(X_cand))
 
         sampled_indices = self.budget_manager_.sample(utilities,
                                                       simulate=simulate)
@@ -89,7 +89,7 @@ class RandomSampler(StreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, sampled, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -114,7 +114,7 @@ class RandomSampler(StreamBasedQueryStrategy):
         # update the random state assuming, that query(..., simulate=True) was
         # used
         self.random_state_.random_sample(len(sampled))
-        self.budget_manager.update(sampled)
+        self.budget_manager_.update(sampled)
         return self
 
 
@@ -190,32 +190,40 @@ class PeriodicSampler(StreamBasedQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        instances_to_query = 0
         utilities = np.zeros(X_cand.shape[0])
         budget = getattr(self.budget_manager_, 'budget_', 0)
+
+        tmp_observed_instances = self.observed_instances_
+        tmp_queried_instances = self.queried_instances_
         for i, x in enumerate(X_cand):
-            observed_instances = (self.observed_instances_ + i + 1)
-            queried_instances = (self.queried_instances_ + instances_to_query)
-            remaining_budget = (observed_instances * budget -
-                                queried_instances)
+            tmp_observed_instances += 1
+            remaining_budget = (tmp_observed_instances * budget -
+                                tmp_queried_instances)
+            # print(remaining_budget >= 1)
             if remaining_budget >= 1:
                 utilities[i] = 1
-                instances_to_query += 1
+                tmp_queried_instances += 1
             else:
                 utilities[i] = 0
 
+            # print("observed_instances", observed_instances)
+            # print("queried_instances", queried_instances)
+            # print("budget", budget)
+            # print("remaining_budget", remaining_budget)
+
         if not simulate:
-            self.observed_instances_ = observed_instances
-            self.queried_instances_ = queried_instances
+            self.observed_instances_ = tmp_observed_instances
+            self.queried_instances_ = tmp_queried_instances
         sampled_indices = self.budget_manager_.sample(utilities,
                                                       simulate=simulate)
+        # print("sampled_indices", sampled_indices)
 
         if return_utilities:
             return sampled_indices, utilities
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, sampled, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -241,7 +249,8 @@ class PeriodicSampler(StreamBasedQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        self.budget_manager.update(sampled)
-        self.seen_instances += X_cand.shape[0]
-        self.sampled_instances += np.sum(sampled)
+        self.budget_manager_.update(sampled)
+        self.observed_instances_ += X_cand.shape[0]
+        self.queried_instances_ += np.sum(sampled > 0)
+        # print("queried_instances_", self.queried_instances_)
         return self
