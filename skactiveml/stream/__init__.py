@@ -4,5 +4,9 @@ active learning.
 """
 
 from ._random import RandomSampler, PeriodicSampler
+from ._uncertainty import FixedUncertainty, VariableUncertainty, Split
 
-__all__ = ['RandomSampler', 'PeriodicSampler']
+__all__ = [
+    'RandomSampler', 'PeriodicSampler', 'FixedUncertainty',
+    'VariableUncertainty', 'Split'
+]

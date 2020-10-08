@@ -1,7 +1,7 @@
 import numpy as np
 
 from abc import ABC, abstractmethod
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state, check_array, \
     check_consistent_length
 from sklearn.utils.multiclass import type_of_target
@@ -117,6 +117,15 @@ class StreamBasedQueryStrategy(QueryStrategy):
         """
         return NotImplemented
 
+    def _validate_random_state(self):
+        if not hasattr(self, 'random_state_'):
+            self.random_state_ = self.random_state
+        self.random_state_ = check_random_state(self.random_state_)
+
+    def _validate_budget_manager(self):
+        if not hasattr(self, 'budget_manager_'):
+            self.budget_manager_ = clone(self.budget_manager)
+
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
     """SkactivemlClassifier
@@ -183,15 +192,14 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features) or
-        shape (n_samples, m_samples) if metric == 'precomputed'
+        X : array-like, shape (n_samples, n_features)
             Test samples.
 
         Returns
         -------
-        P : array-like, shape (n_samples, classes)
+        P : numpy.ndarray, shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to classes_.
+            according to 'classes_'.
         """
         return NotImplemented
 
@@ -206,9 +214,9 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         Returns
         -------
-        y :  array-like, shape (n_samples)
+        y : numpy.ndarray, shape (n_samples)
             Predicted class labels of the test samples 'X'. Classes are ordered
-            according to classes_.
+            according to 'classes_'.
         """
         P = self.predict_proba(X)
         costs = np.dot(P, self.cost_matrix_)
@@ -359,3 +367,28 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
+
+
+class AnnotatorModel(BaseEstimator, ABC):
+    """AnnotatorModel
+
+    Base class of all annotator models estimating the performances of
+    annotators for given samples.
+    """
+    @abstractmethod
+    def predict_annot_proba(self, X):
+        """Calculates the probability that an annotator provides the true label
+        for a given sample.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            Test samples.
+
+        Returns
+        -------
+        P_annot : numpy.ndarray, shape (n_samples, classes)
+            P_annot[i,l] is the probability, that annotator l provides the
+            correct class label for sample X[i].
+        """
+        return NotImplemented

@@ -26,6 +26,8 @@ class TestCMM(unittest.TestCase):
     def test_fit(self):
         cmm = CMM(missing_label='nan', mixture_model="Test")
         self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label='nan', weight_mode="Test")
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
         mixture = GaussianMixture(random_state=0, n_components=4)
         cmm = CMM(missing_label='nan', mixture_model=mixture, classes=[1, 2],
                   cost_matrix=1 - np.eye(3))
@@ -114,7 +116,7 @@ class TestCMM(unittest.TestCase):
 
     def test_on_data_set(self):
         X, y = make_blobs(n_samples=300, random_state=0)
-        pwc = CMM(random_state=0).fit(X, y)
+        pwc = CMM(weight_mode='similarities', random_state=0).fit(X, y)
         self.assertTrue(pwc.score(X, y) > 0.5)
 
 

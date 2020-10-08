@@ -1,3 +1,9 @@
+"""
+Classifier Ensemble for Multiple Annotators
+"""
+
+# Author: Marek Herde <marek.herde@uni-kassel.de>
+
 import numpy as np
 
 from copy import deepcopy

@@ -2,6 +2,9 @@
 Wrapper for scikit-learn classifiers to deal with missing labels and labels
 from multiple annotators.
 """
+
+# Author: Marek Herde <marek.herde@uni-kassel.de>
+
 import numpy as np
 
 from copy import deepcopy
@@ -24,7 +27,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     Parameters
     ----------
     estimator : sklearn.base.ClassifierMixin with 'predict_proba' method
-        A scikit-learn classifier that is to deal with missing labels.
+        annot_prior scikit-learn classifier that is to deal with missing
+        labels.
     classes : array-like, shape (n_classes), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
