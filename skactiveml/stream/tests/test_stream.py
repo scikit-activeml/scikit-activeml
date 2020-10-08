@@ -97,7 +97,6 @@ class TestStream(unittest.TestCase):
 
     def _test_query_update(self, rand_seed, query_strategy_class,
                            X_init, y_init, X_stream, y_stream, training_size):
-        print("query_strat: ", query_strategy_class)
         rand = check_random_state(rand_seed)
         qs_rand_seed = rand.randint(2**32-1)
         query_strategy_1 = query_strategy_class(
