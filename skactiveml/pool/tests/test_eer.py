@@ -53,10 +53,6 @@ class TestEER(unittest.TestCase):
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
         self.assertRaises(ValueError, eer.query, X_cand=np.zeros((2, 3)),
                           X=self.X, y=self.y)
-        # eer = EER(self.clf, self.classes, method='csl')
-        # eer.query(X_cand=np.array([[0], [1], [2], [3]]),
-        #           X=np.array([[0], [1], [2], [3]]),
-        #           y=np.array([np.nan, np.nan, np.nan, np.nan]))
 
     def test_scenario(self):
         clf = PWC(classes=[0, 1])
