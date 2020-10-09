@@ -17,14 +17,27 @@ class TestEER(unittest.TestCase):
 
     def test_init(self):
         self.assertRaises(TypeError, EER)
-        self.assertRaises(TypeError, EER, clf=3, classes=self.classes)
-        self.assertRaises(ValueError, EER, clf=self.clf, classes=self.classes,
-                          method='wrong_method')
-        self.assertRaises(ValueError, EER, clf=self.clf, classes=self.classes,
-                          C=np.ones((2, 3)))
-        self.assertRaises(ValueError, EER, clf=self.clf, classes=self.classes,
-                          C=np.ones((2, 2)))
-        self.assertRaises(ValueError, EER, clf=self.clf, classes=[0, 1])
+        eer = EER(clf=3, classes=self.classes)
+        self.assertRaises(TypeError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=self.clf)
+        self.assertRaises(TypeError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=self.classes, method='wrong_method')
+        self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=self.classes, C=np.ones((2, 3)))
+        self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=self.classes, C=np.ones((3, 2)))
+        self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=self.classes, C='wrong_string')
+        self.assertRaises(TypeError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=self.classes, C=np.ones((2, 2)))
+        self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
+        eer = EER(clf=self.clf, classes=[0, 1, 2, 3])
+        self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
+        self.assertRaises(ValueError, EER, self.clf, self.classes,
+                          random_state='string')
+        eer = EER(clf=self.clf, classes=self.classes, missing_label=[1, 2, 3])
+        self.assertRaises(TypeError, eer.query, self.X_cand, self.X, self.y)
+
         eer = EER(clf=self.clf, classes=self.classes)
         self.assertIsNotNone(eer.classes)
         for method in ['emr', 'csl', 'log_loss']:
@@ -40,6 +53,10 @@ class TestEER(unittest.TestCase):
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
         self.assertRaises(ValueError, eer.query, X_cand=np.zeros((2, 3)),
                           X=self.X, y=self.y)
+        # eer = EER(self.clf, self.classes, method='csl')
+        # eer.query(X_cand=np.array([[0], [1], [2], [3]]),
+        #           X=np.array([[0], [1], [2], [3]]),
+        #           y=np.array([np.nan, np.nan, np.nan, np.nan]))
 
     def test_scenario(self):
         clf = PWC(classes=[0, 1])
@@ -51,17 +68,14 @@ class TestEER(unittest.TestCase):
             self.assertEqual(utilities.shape, (1, len(X_cand)))
 
         X_cand = [[0], [1], [2], [5]]
-        eer = EER(clf=PWC(classes=[0, 1]), classes=[0, 1], C=1-np.eye(2))
+        eer = EER(clf=PWC(classes=[0, 1]), classes=[0, 1])
 
         utilities = eer.query(X_cand, [[1]], [0], return_utilities=True)[1]
         np.testing.assert_array_equal(utilities, np.zeros((1, len(X_cand))))
 
-        utilities = eer.query(X_cand=[[0], [100], [200]], X=[[0], [200]],
-                              y=[0, 1], return_utilities=True)[1]
-        print(utilities)
-        query_indices = eer.query(X_cand=[[0], [1], [2]],
-                                  X=[[0], [2]], y=[0, 1])
-        # np.testing.assert_array_equal(query_indices, [1])
+        query_indices = eer.query(X_cand=[[0], [100], [200]],
+                                  X=[[0], [200]], y=[0, 1])
+        np.testing.assert_array_equal(query_indices, [1])
 
 
 if __name__ == '__main__':

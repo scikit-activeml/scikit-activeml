@@ -1,13 +1,16 @@
+from numbers import Number
+
 import numpy as np
 from sklearn.base import clone
-from sklearn.utils import check_array
+from sklearn.utils import check_array, check_random_state
 
-from skactiveml.base import PoolBasedQueryStrategy
+from skactiveml.base import PoolBasedQueryStrategy, ClassFrequencyEstimator
 from skactiveml.utils import rand_argmax, is_labeled, MISSING_LABEL
 
 
 class ExpectedErrorReduction(PoolBasedQueryStrategy):
-    """ExpectedErrorReduction
+    """Expected Error Reduction.
+
     This class implements the expected error reduction algorithm with different
     loss functions:
      - log loss (log_loss) [1],
@@ -31,7 +34,6 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         Random state for annotator selection.
     missing_label: str | numeric, optional (default=MISSING_LABEL)
         Specifies the symbol that represents a missing label
-
 
     Attributes
     ----------
@@ -66,45 +68,15 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
     def __init__(self, clf, classes, method=EMR, C=None, random_state=None,
                  missing_label=MISSING_LABEL, **kwargs):
         super().__init__(random_state=random_state)
-
         self.clf = clf
-        if getattr(self.clf, 'fit', None) is None or\
-                getattr(self.clf, 'predict_proba', None) is None:
-            raise TypeError("'clf' must implement the methods 'fit' and "
-                            "'predict_proba'")
-
         self.classes = classes
-        if not np.array_equal(clf.classes, self.classes):
-            raise ValueError("The given classes are not the same as in the "
-                             "classifier.")
-
         self.method = method
-        if self.method not in [ExpectedErrorReduction.EMR,
-                               ExpectedErrorReduction.CSL,
-                               ExpectedErrorReduction.LOG_LOSS]:
-            raise ValueError(
-                f"supported methods are [{ExpectedErrorReduction.EMR}, "
-                f"{ExpectedErrorReduction.CSL}, "
-                f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
-                f"{self.method}"
-            )
-
-        if C is None:
-            self.C = 1 - np.eye(len(self.classes))
-        else:
-            self.C = check_array(C)
-        if np.size(self.C, axis=0) != np.size(self.C, axis=1):
-            raise ValueError("C must be a square matrix")
-        if np.size(self.C, axis=0) != np.size(classes):
-            raise ValueError("C must be a (n_classes, n_classes) matrix")
-
-        self.random_sate = random_state
-
+        self.C = C
+        self.random_state = random_state
         self.missing_label = missing_label
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
-        """
-        Queries the next instance to be labeled.
+        """Query the next instance to be labeled.
 
         Parameters
         ----------
@@ -119,26 +91,56 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
 
         Returns
         -------
-        selection: np.ndarray, shape (1)
+        query_indices: np.ndarray, shape (1)
             The index of the queried instance.
-        utilities: np.ndarray shape (1, n_candidates)
+        utilities: np.ndarray, shape (1, n_candidates)
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
+        # Check class attributes
+        if not isinstance(self.clf, ClassFrequencyEstimator):
+            raise TypeError("'clf' must implement methods according to "
+                            "'ClassFrequencyEstimator'.")
+        if not isinstance(self.classes, (list, np.ndarray)):
+            raise TypeError("'classes' must be a list or np.ndarray")
+        if not np.array_equal(self.clf.classes, self.classes):
+            raise ValueError("The given classes are not the same as in the "
+                             "classifier.")
+        if self.method not in [ExpectedErrorReduction.EMR,
+                               ExpectedErrorReduction.CSL,
+                               ExpectedErrorReduction.LOG_LOSS]:
+            raise ValueError(
+                f"supported methods are [{ExpectedErrorReduction.EMR}, "
+                f"{ExpectedErrorReduction.CSL}, "
+                f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
+                f"{self.method}"
+            )
+        if self.C is None:
+            self.C = 1 - np.eye(len(self.classes))
+        if not isinstance(self.C, np.ndarray):
+            raise TypeError("'C' must be a np.ndarray")
+        if np.size(self.C, axis=0) != np.size(self.classes):
+            raise ValueError("C must be a (n_classes, n_classes) matrix")
+        if np.size(self.C, axis=1) != np.size(self.classes):
+            raise ValueError("C must be a (n_classes, n_classes) matrix")
+        self.random_state = check_random_state(self.random_state)
+        if not isinstance(self.missing_label, (str, Number)):
+            raise TypeError("'missing_value' must be a string or numeric")
 
         X_cand = check_array(X_cand, force_all_finite=False)
+        labeled_indices = is_labeled(y, missing_label=self.missing_label)
         X = np.array(X)
         y = np.array(y)
-        labeled_indices = is_labeled(y, missing_label=self.missing_label)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]
 
-        # calculate the utilities
-        utilities = expected_error_reduction(clf=self.clf, X_labeled=X_labeled,
+        utilities = expected_error_reduction(clf=self.clf,
+                                             X_labeled=X_labeled,
                                              y_labeled=y_labeled,
                                              X_unlabeled=X_cand,
                                              classes=self.classes,
-                                             C=self.C, method=self.method)
+                                             C=self.C,
+                                             method=self.method)
 
         query_indices = rand_argmax([utilities], axis=1,
                                     random_state=self.random_state)
@@ -150,9 +152,10 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
 
 def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
                              C, method='emr'):
-    """
-    Computes least confidence as uncertainty scores. In case of a given cost
-    matrix C, maximum expected cost is implemented as score.
+    """Compute least confidence as uncertainty scores.
+
+    In case of a given cost matrix C, maximum expected cost is implemented as
+    score.
 
     Parameters
     ----------
@@ -179,16 +182,12 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
     utilities: np.ndarray, shape (n_unlabeled_samples)
         The utilities of all unlabeled instances.
     """
-
     if X_labeled.shape[0] > 0 and X_unlabeled.shape[0] > 0 and \
             not X_labeled.shape[1] == X_unlabeled.shape[1]:
         raise ValueError("X_labeled and X_unlabeled must have the same number "
                          "of features.")
     clf = clone(clf)
     clf.fit(X_labeled, y_labeled)
-    # if not np.array_equal(clf.classes_, classes):
-    #     raise ValueError("The given classes are not the same as in the "
-    #                      "classifier.")
 
     n_classes = len(classes)
     P = clf.predict_proba(X_unlabeled)
@@ -208,11 +207,10 @@ def expected_error_reduction(clf, X_labeled, y_labeled, X_unlabeled, classes,
                     costs = 0
             elif method == 'log_loss':
                 P_new = clf.predict_proba(X_unlabeled)
-                costs = -np.sum(P_new * np.log(P_new))
+                costs = -np.sum(P_new * np.log(P_new + np.finfo(float).eps))
             else:
                 raise ValueError(f"supported methods are ['emr', 'csl'], the "
                                  f"given one " "is: {method}")
             errors_per_class[yi] = P[i, yi] * costs
         errors[i] = errors_per_class.sum()
-    # print(P)
     return -errors
