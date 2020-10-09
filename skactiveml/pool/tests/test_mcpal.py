@@ -18,10 +18,23 @@ class TestMCPAL(unittest.TestCase):
 
     def test_init(self):
         self.assertRaises(TypeError, McPAL)
-        self.assertRaises(TypeError, McPAL, clf=3)
-        self.assertRaises(ValueError, McPAL, clf=self.clf, m_max=-2)
-        self.assertRaises(ValueError, McPAL, clf=self.clf, m_max=1.5)
-        self.assertRaises(ValueError, McPAL, clf=self.clf, prior=0)
+        pal = McPAL(clf=3)
+        self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
+                          self.weights)
+        self.assertRaises(ValueError, McPAL, self.clf, self.classes,
+                          random_state='string')
+        pal = McPAL(self.clf, prior=0)
+        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
+                          self.weights)
+        pal = McPAL(self.clf, prior='wrong_value')
+        self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
+                          self.weights)
+        pal = McPAL(self.clf, m_max=-2)
+        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
+                          self.weights)
+        pal = McPAL(self.clf, m_max=1.5)
+        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
+                          self.weights)
 
     def test_query(self):
         mcpal = McPAL(clf=self.clf)
@@ -34,7 +47,7 @@ class TestMCPAL(unittest.TestCase):
 
     def test_scenario(self):
         X_cand = [[0], [1], [2], [5]]
-        mcpal = McPAL(clf=PWC(classes=[0, 1]), classes=[0, 1], C=np.eye(2))
+        mcpal = McPAL(clf=PWC(classes=[0, 1]))
 
         best_indices = mcpal.query(X_cand, X=[[1]], y=[0],
                                    weights=[1, 1, 1, 1])
