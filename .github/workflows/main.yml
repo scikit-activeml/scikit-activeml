@@ -34,6 +34,6 @@ jobs:
         pip install pytest
         pytest
     - name: Create documentation with sphinx
-    	run: |
+      run: |
         cd docs
         make html
