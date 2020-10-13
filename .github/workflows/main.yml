@@ -35,5 +35,5 @@ jobs:
         pytest
     - name: Create documentation with sphinx
     	run: |
-    		cd docs
-    		make html
+        cd docs
+        make html
