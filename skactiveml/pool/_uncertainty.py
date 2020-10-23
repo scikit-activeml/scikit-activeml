@@ -1,8 +1,10 @@
 from sklearn.utils import check_array
-
-from ..base import PoolBasedQueryStrategy
+from sklearn.base import clone
+from ..classifier import PWC
+from ..base import PoolBasedQueryStrategy, ClassFrequencyEstimator
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL
-
+from scipy.optimize import minimize_scalar
+from scipy.interpolate import griddata
 import numpy as np
 import warnings
 
@@ -16,7 +18,8 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     clf : sklearn classifier
         A probabilistic sklearn classifier.
     method : string (default='margin_sampling')
-        The method to calculate the uncertainty, entropy, least_confident, margin_sampling and expected_average_precision are possible.
+        The method to calculate the uncertainty, entropy, least_confident, margin_sampling, expected_average_precision and epistemic are possible.
+        Epistemic only works with Parzen Window Classifier or Logistic Regression.
     random_state : numeric | np.random.RandomState
         The random state to use.
 
@@ -25,7 +28,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     random_state: numeric | np.random.RandomState
         Random state to use.
     method : string
-        The method to calculate the uncertainty. entropy, least_confident, margin_sampling and expected_average_precisionare possible.
+        The method to calculate the uncertainty. Only entropy, least_confident, margin_sampling, expected_average_precisionare and epistemic.
     clf : sklearn classifier
         A probabilistic sklearn classifier.
     classes : array-like, shape=(n_classes)
@@ -41,19 +44,28 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
         http://www.burrsettles.com/pub/settles.activelearning.pdf
+
     [2] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
+
+    [3] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
+        "Epistemic uncertainty sampling." International Conference on
+        Discovery Science. Springer, Cham, 2019.
     """
-    def __init__(self, clf, classes=None, method='margin_sampling', missing_label=MISSING_LABEL, random_state=None):
+    def __init__(self, clf, classes=None, method='margin_sampling', precompute=False, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
 
-        if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling' and method != 'expected_average_precision':
+        if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling' and method != 'expected_average_precision'and method != 'epistemic':
             warnings.warn('The method \'' + method + '\' does not exist, \'margin_sampling\' will be used.')
             method = 'margin_sampling'
 
         if method == 'expected_average_precision' and classes is None:
             raise ValueError('\'classes\' has to be specified')
+
+        # for pwc:
+        if method == 'epistemic' and not isinstance(clf, ClassFrequencyEstimator):
+            raise TypeError("'clf' must be a subclass of ClassFrequencyEstimator")
 
         if getattr(clf, 'predict_proba', None) is None:
             raise TypeError("'clf' must implement the method 'predict_proba'")
@@ -61,7 +73,13 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         self.missing_label = missing_label
         self.method = method
         self.classes = classes
-        self.clf = clf
+        self.clf = clone(clf)
+        self.precompute = precompute
+        if precompute:
+            self.precomp = np.full((2,2), np.nan)
+        else:
+            self.precomp = None
+
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
         """
@@ -92,7 +110,6 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         # fit the classifier and get the probabilities
         mask_labeled = is_labeled(y, self.missing_label)
         self.clf.fit(X[mask_labeled], y[mask_labeled])
-        #self.clf.fit(X, y)
         probas = self.clf.predict_proba(X_cand)
 
         # caculate the utilities
@@ -106,6 +123,9 @@ class UncertaintySampling(PoolBasedQueryStrategy):
                 utilities = -np.sum(probas * np.log(probas), axis=1)
             elif self.method == 'expected_average_precision':
                 utilities = expected_average_precision(X_cand, self.classes, probas)
+            elif self.method == 'epistemic':
+                utilities = epistemic_uncertainty_logreg
+                utilities, self.precomp = epistemic_uncertainty_pwc(self.clf, X_cand, self.precomp)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand))
@@ -116,6 +136,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
             return best_indices
 
 
+# expected average precision:
 def expected_average_precision(X_cand, classes, probas):
     """
     Calculate the expected average precision.
@@ -179,3 +200,85 @@ def f(n,t,p,f_arr,g_arr):
     return p[n-1]*f_arr[n-1,t-1] + p[n-1]*t*g_arr[n-1,t-1]/n + (1-p[n-1])*f_arr[n-1,t]
 
 
+# epistemic uncertainty:
+def epistemic_uncertainty_pwc(clf, X_cand, precomp):
+    freq = clf.predict_freq(X_cand)
+    n = freq[:,0]
+    p = freq[:,1]
+    res = np.full((len(freq)), np.nan)
+    if precomp is not None:
+        # enlarges the precomp array if necessary:
+        if precomp.shape[0] <= np.max(n)+1:
+            new_shape = (int(np.max(n))-precomp.shape[0]+2, precomp.shape[1])
+            precomp = np.append(precomp, np.full(new_shape, np.nan), axis=0)
+        if precomp.shape[1] <= np.max(p)+1:
+            new_shape = (precomp.shape[0], int(np.max(p))-precomp.shape[1]+2)
+            precomp = np.append(precomp, np.full(new_shape, np.nan), axis=1)        
+
+        for f in freq:
+            # compute the epistemic uncertainty:
+            for N in range(precomp.shape[0]):
+                for P in range(precomp.shape[1]):
+                    if np.isnan(precomp[N,P]):
+                        pi1 = -epistemic_pwc_sup_1(minimize_scalar(epistemic_pwc_sup_1,method='Bounded',bounds=(0.0,1.0), args=(N,P)).x, N, P)
+                        pi0 = -epistemic_pwc_sup_0(minimize_scalar(epistemic_pwc_sup_0,method='Bounded',bounds=(0.0,1.0), args=(N,P)).x, N, P)
+                        pi = np.array([pi1,pi0])
+                        precomp[N,P] = np.min(pi, axis=0)
+        res = interpolate(precomp,freq)
+    else:
+        for i, f in enumerate(freq):
+            pi1 = -epistemic_pwc_sup_1(minimize_scalar(epistemic_pwc_sup_1,method='Bounded',bounds=(0.0,1.0), args=(f[0],f[1])).x, f[0], f[1])
+            pi0 = -epistemic_pwc_sup_0(minimize_scalar(epistemic_pwc_sup_0,method='Bounded',bounds=(0.0,1.0), args=(f[0],f[1])).x, f[0], f[1])
+            pi = np.array([pi1,pi0])
+            if ((f[0]==0) & (f[1]==0)):
+                print(pi)
+            res[i] = np.min(pi, axis=0)
+    return res, precomp
+
+
+def interpolate(precomp, freq):
+    # bilinear interpolation:
+    points = np.zeros((precomp.shape[0]*precomp.shape[1],2))
+    for n in range(precomp.shape[0]):
+        for p in range(precomp.shape[1]):
+            points[n*precomp.shape[1]+p] = n,p
+    return griddata(points, precomp.flatten(), freq, method='linear')
+    
+
+def epistemic_pwc_sup_1(t, n, p):
+    if ((n == 0.0) and (p == 0.0)):
+        return -1.0
+    piH = ((t**p)*((1-t)**n))/(((p/(n+p))**p)*((n/(n+p))**n))
+    return -np.minimum(piH,2*t-1)
+
+
+def epistemic_pwc_sup_0(t, n, p):
+    if ((n == 0.0) and (p == 0.0)):
+        return -1.0
+    piH = ((t**p)*((1-t)**n))/(((p/(n+p))**p)*((n/(n+p))**n))
+    return -np.minimum(piH,1-2*t)
+
+
+#logistic regressionepistemic_uncertainty_logreg
+#alg 3
+def epistemic_uncertainty_logreg(X_cand, X, y, probas):
+    # compute pi_0, pi_1 for every x in X_cand:
+    pi0, pi1 = np.empty((len(probas))), np.empty((len(probas)))
+    for i, x in enumerate(X_cand):
+        Qn, Qp = np.array(probas), np.array(probas)
+        pi1[i], pi0[i] = np.maximum(2*probas[i]-1,0), np.maximum(1-2*probas[i],0)
+        for q in X_cand:
+            idx_an, idx_ap = np.argmax(Qn), np.argmax(Qp)
+            an, ap = Qn[idx_an], Qp[idx_ap]
+            if 2*ap-1 > pi1[i]:
+                #solve 22 -> theta
+                pi1[i] = np.maximum(pi1[i],np.min(pi_h(theta),2*ap-1))
+            if 1-2*an > pi0[i]:
+                #solve 22 -> theta
+                pi0[i] = np.maximum(pi0[i],np.min(pi_h(theta),1-2*an))
+
+            Qn, Qp = np.delete(Qn, idx_an), np.delete(Qp, idx_ap)
+
+    #
+    utilities = np.min(np.array([pi1,pi0]), axis=1)
+    return utilities
