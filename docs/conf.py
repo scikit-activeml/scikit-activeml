@@ -98,7 +98,7 @@ pygments_style = 'sphinx'
 #
 html_theme = "sphinx_rtd_theme"
 
-html_logo = 'ies-logo.png'
+# html_logo = 'ies-logo.png'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -128,69 +128,6 @@ html_static_path = []
 htmlhelp_basename = 'scikit-activeml-guide'
 
 
-# -- Options for LaTeX output ------------------------------------------------
-
-latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
-    #
-    # 'papersize': 'letterpaper',
-
-    # The font size ('10pt', '11pt' or '12pt').
-    #
-    # 'pointsize': '10pt',
-
-    # Additional stuff for the LaTeX preamble.
-    #
-    # 'preamble': '',
-
-    # Latex figure (float) alignment
-    #
-    # 'figure_align': 'htbp',
-
-    'preamble': r"""\usepackage{amsmath}\usepackage{amsfonts}\usepackage{bm}
-                    \usepackage{morefloats}\usepackage{enumitem} \setlistdepth{10}
-                    \usepackage{letltxmacro}
-                    
-                    \LetLtxMacro\oldshpinx\sphinxincludegraphics
-                    \renewcommand{\sphinxincludegraphics}[2][]{\begin{center} \oldshpinx[#1]{#2} \end{center}}
-                    
-                    \renewcommand{\maketitle}{ 
-                    \begin{titlepage} 
-                           \begin{center}
-    
-                                \begin{figure}
-                                        \includegraphics[width=0.35\textwidth]{../../uni-logo}
-                                        \hfill
-                                        \includegraphics[width=0.35\textwidth]{../../ies-logo}
-                                \end{figure}
-                                \vspace*{0.5cm}
-                                \large{Faculty Electrical Engineering / Computer Science}\\
-                                \vspace*{0.5cm} \large{Department Intelligent Embedded Systems\\ Prof.
-                                Dr. Bernhard Sick}
-                                \vspace*{2cm}
-                                \large {Project Report (6 Credits)}\\
-                                \vspace*{1cm} \Huge {\textbf{scikit-activeml: User~Guide} }\\
-                                \vspace*{1cm} \Huge {\textbf{Release 1.0}}\\
-    
-                            \end{center}
-                    \end{titlepage} 
-                   }
-                 """,
-    'classoptions': ',openany,oneside'
-}
-
-
-# Grouping the document tree into LaTeX files. List of tuples
-# (source start file, target name, title,
-#  author, documentclass [howto, manual, or own class]).
-latex_documents = [
-    (master_doc, 'scikit-activeml.tex', 'scikit-activeml -- User Guide',
-     'Marek Herde', 'manual'),
-]
-
-latex_logo = "ies-logo.pdf"
-
-
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
@@ -199,22 +136,6 @@ man_pages = [
     (master_doc, 'scikit-activeml', 'scikit-activeml -- User Guide',
      [author], 1)
 ]
-
-
-# -- Options for Texinfo output ----------------------------------------------
-
-# Grouping the document tree into Texinfo files. List of tuples
-# (source start file, target name, title, author,
-#  dir menu entry, description, category)
-texinfo_documents = [
-    (master_doc, 'scikit-activeml', 'scikit-activeml -- User Guide',
-     author, 'scikit-activeml', 'scikit-activeml',
-     'Miscellaneous'),
-]
-
-numfig = True
-
-
 
 # -- Extension configuration -------------------------------------------------
 
