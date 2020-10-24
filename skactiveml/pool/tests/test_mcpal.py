@@ -3,6 +3,7 @@ import unittest
 
 from skactiveml.pool import McPAL
 from skactiveml.classifier import PWC
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestMCPAL(unittest.TestCase):
@@ -44,6 +45,20 @@ class TestMCPAL(unittest.TestCase):
                           y=self.y, weights=self.weights)
         self.assertRaises(ValueError, mcpal.query, X_cand=self.X_cand,
                           X=self.X, y=[0, 1, 4, 0, 2, 1], weights=self.weights)
+
+    def test_missing_label(self):
+        X_cand = [[0], [1], [2]]
+        mcpal = McPAL(clf=PWC(classes=[0, 1]))
+        _, utilities = mcpal.query(X_cand, [[1]], [MISSING_LABEL],
+                                   return_utilities=True, weights=[1])
+        self.assertEqual(utilities.shape, (1, len(X_cand)))
+        self.assertEqual(len(np.unique(utilities)), 1)
+
+        _, utilities = mcpal.query(X_cand, X=[[0], [1], [2]],
+                                   y=[0, 1, MISSING_LABEL], weights=[1, 1, 1],
+                                   return_utilities=True)
+        self.assertGreater(utilities[0, 2], utilities[0, 1])
+        self.assertGreater(utilities[0, 2], utilities[0, 0])
 
     def test_scenario(self):
         X_cand = [[0], [1], [2], [5]]
