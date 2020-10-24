@@ -2,10 +2,12 @@ import itertools
 import numpy as np
 
 from scipy.special import factorial, gammaln
+from sklearn import clone
 from sklearn.utils import check_array, check_random_state
 
 from skactiveml.base import PoolBasedQueryStrategy, ClassFrequencyEstimator
-from skactiveml.utils import rand_argmax, is_labeled, MISSING_LABEL
+from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.utils import check_classifier_params
 
 
 class McPAL(PoolBasedQueryStrategy):
@@ -15,17 +17,6 @@ class McPAL(PoolBasedQueryStrategy):
     strategy.
 
     Parameters
-    ----------
-    clf: BaseEstimator
-        Probabilistic classifier for gain calculation.
-    prior: float, optional (default=1)
-        Prior probabilities for the Dirichlet distribution of the samples.
-    m_max: int, optional (default=1)
-        Maximum number of hypothetically acquired labels.
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
-
-    Attributes
     ----------
     clf: BaseEstimator
         Probabilistic classifier for gain calculation.
@@ -87,16 +78,16 @@ class McPAL(PoolBasedQueryStrategy):
         if self.m_max < 1 or not float(self.m_max).is_integer():
             raise ValueError("'m_max' must be a positive integer.")
         check_random_state(self.random_state)
+        self.clf = clone(self.clf)
+        self.clf.classes, self.clf.missing_label, _ = \
+            check_classifier_params(self.clf.classes, self.clf.missing_label)
 
         X_cand = check_array(X_cand, force_all_finite=False)
-        labeled_idx = is_labeled(y, missing_label=self.clf.missing_label)
-        X = np.array(X)
-        y = np.array(y)
-        X_labeled = X[labeled_idx]
-        y_labeled = y[labeled_idx]
+        X = check_array(X, force_all_finite=False)
+        y = check_array(y, force_all_finite=False, ensure_2d=False)
 
         # Calculate gains
-        self.clf.fit(X_labeled, y_labeled)
+        self.clf.fit(X, y)
         k_vec = self.clf.predict_freq(X_cand)
         utilities = weights * cost_reduction(k_vec, prior=self.prior,
                                              m_max=self.m_max)
