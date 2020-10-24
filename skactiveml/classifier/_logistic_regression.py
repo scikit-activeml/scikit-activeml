@@ -3,7 +3,7 @@ Logistic Regression for Multiple Annotators
 """
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
-#         Timo Sturm
+#         Timo Sturm <timo.sturm@student.uni-kassel.de>
 
 import numpy as np
 import warnings
@@ -271,9 +271,21 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
             # M-Step:
             self._Alpha = self._calc_Alpha(y, Mu, A)
 
-            def error(W):
-                # evaluate error of weight vectors for scipy.minimize
-                W = W.reshape(n_features, n_classes)
+            def error(w):
+                """
+                Evaluate cross-entropy error of weights for scipy.minimize.
+
+                Parameters
+                ----------
+                w : ndarray, shape (n_features * n_classes)
+                    Weights for which cross-entropy error is to be computed.
+
+                Returns
+                -------
+                G : flaot
+                    Computed cross-entropy error.
+                """
+                W = w.reshape(n_features, n_classes)
                 P_W = softmax(X @ W, axis=1)
                 prior_W = 0
                 for c_idx in range(n_classes):
@@ -284,26 +296,52 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
                 log += prior_W
                 return -log / n_samples
 
-            def grad(W):
-                # compute gradient of error function for scipy.minimize
-                W = W.reshape(n_features, n_classes)
-                P_W = softmax(X @ W, axis=1)
-                grad = ((Mu - P_W).T @ X - (Gamma @ W).T).T.ravel()
-                return -grad / n_samples
+            def grad(w):
+                """
+                Compute gradient of error function for scipy.minimize.
 
-            def hessian(W):
-                # compute hessian matrix of error function for scipy.minimize
-                W = W.reshape(n_features, n_classes)
+                Parameters
+                ----------
+                w : ndarray, shape (n_features * n_classes)
+                    Weights whose gradient is to be computed.
+
+                Returns
+                -------
+                G : narray, shape (n_features * n_classes)
+                    Computed gradient of weights.
+                """
+                W = w.reshape(n_features, n_classes)
+                P_W = softmax(X @ W, axis=1)
+                G = (X.T @ (P_W - Mu) + Gamma @ W).ravel()
+                return G / n_samples
+
+            def hessian(w):
+                """
+                Compute Hessian matrix of error function for scipy.minimize.
+
+                Parameters
+                ----------
+                w : numpy.ndarray, shape (n_features * n_classes)
+                    Weights whose Hessian matrix is to be computed.
+
+                Returns
+                -------
+                H : numpy.narray, shape (n_features * n_classes,
+                n_features * n_classes)
+                    Computed Hessian matrix of weights.
+                """
+                W = w.reshape(n_features, n_classes)
                 H = np.empty((n_classes * n_features, n_classes * n_features))
                 P_W = softmax(X @ W, axis=1)
                 for k in range(n_classes):
                     for j in range(n_classes):
-                        H_kj = (P_W[:, k] * (I[k, j] - P_W[:, j]))
-                        H_kj = (H_kj.reshape(-1, 1) * X).T @ X + Gamma
+                        diagonal = P_W[:, j] * (I[k, j] - P_W[:, k])
+                        D = np.diag(diagonal)
+                        H_kj = X.T @ D @ X + Gamma
                         H[k * n_features:(k + 1) * n_features,
                         j * n_features:(j + 1) * n_features] \
                             = H_kj
-                return - H / n_samples
+                return H / n_samples
 
             with warnings.catch_warnings():
                 warning_msg = ".*Method .* does not use Hessian information.*"
@@ -383,9 +421,9 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
             The class labels provided by the annotators for all samples.
 
         Alpha: numpy.ndarray, shape (n_annotators, n_classes, n_classes)
-            annot_prior vector (n_annotators, n_classes, n_classes) containing the new
-            estimates for Alpha. This is effectively a confusion matrix for
-            each annotator, where each row is normalized.
+            annot_prior vector (n_annotators, n_classes, n_classes) containing
+            the new estimates for Alpha. This is effectively a confusion matrix
+            for each annotator, where each row is normalized.
 
         Returns
         -------
