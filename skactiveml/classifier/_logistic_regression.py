@@ -182,6 +182,12 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         if y.ndim <= 1:
             y = y.copy().reshape(-1, 1)
 
+        # Ensure sample weights to form a 2d array.
+        if sample_weight is None:
+            sample_weight = np.ones_like(y)
+        if sample_weight.ndim <= 1:
+            sample_weight = sample_weight.copy().reshape(-1, 1)
+
         # Set auxiliary variables.
         n_samples = X.shape[0]
         n_features = X.shape[1]
@@ -269,7 +275,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
             current_expectation = new_expectation
 
             # M-Step:
-            self._Alpha = self._calc_Alpha(y, Mu, A)
+            self._Alpha = self._calc_Alpha(y, Mu, A, sample_weight)
 
             def error(w):
                 """
@@ -419,7 +425,6 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         ----------
         y: numpy.ndarray, shape (n_samples, n_annotators)
             The class labels provided by the annotators for all samples.
-
         Alpha: numpy.ndarray, shape (n_annotators, n_classes, n_classes)
             annot_prior vector (n_annotators, n_classes, n_classes) containing
             the new estimates for Alpha. This is effectively a confusion matrix
@@ -427,7 +432,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
 
         Returns
         -------
-        out: ndarray
+        out: numpy.ndarray
             Vector of shape (n_samples, n_classes).
         """
         n_samples, n_annotators, n_classes = y.shape[0], y.shape[1], \
@@ -442,7 +447,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         return V
 
     @staticmethod
-    def _calc_Alpha(y, Mu, A):
+    def _calc_Alpha(y, Mu, A, sample_weight):
         """Calculates the class-dependent performance estimates of the
         annotators.
 
@@ -456,10 +461,13 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         A : numpy.ndarray, shape (n_annotators, n_classes, n_classes)
             A[l,i,j] is the estimated number of times.
             annotator l has provided label j for an instance of true label i.
+        sample_weight : numpy.ndarray, shape (n_samples, n_annotators)
+            It contains the weights of the training samples' class labels.
+            It must have the same shape as y.
 
         Returns
         ----------
-        new_Alpha : np.ndarray, shape (n_annotators, n_classes, n_classes)
+        new_Alpha : numpy..ndarray, shape (n_annotators, n_classes, n_classes)
             This is a confusion matrix for each annotator, where each
             row is normalized. `new_Alpha[l,k,c]` describes the probability
             that annotator l provides the class label c for a sample belonging
@@ -472,7 +480,8 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         for j in range(n_annotators):
             # Only take those rows from Y, where Y is not NaN:
             y_j = np.eye(n_classes)[y[not_nan_y[:, j], j].astype(int)]
-            new_Alpha[j] = (Mu[not_nan_y[:, j]].T @ y_j) + A[j] - 1
+            w_j = sample_weight[not_nan_y[:, j], j].reshape(-1, 1)
+            new_Alpha[j] = (Mu[not_nan_y[:, j]].T @ (w_j * y_j)) + A[j] - 1
 
         # Lazy normalization: (The real normalization factor
         # (sum_i=1^N mu_i,c + sum_k=0^K-1 A_j,c,k - K) is omitted here)
@@ -497,7 +506,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
 
         Returns
         -------
-        new_Mu : ndarray
+        new_Mu : numpy.ndarray
             new_Mu[i,k] contains the probability of a sample X[i] to be of
             class classes_[k] estimated according to the EM-algorithm.
         """
