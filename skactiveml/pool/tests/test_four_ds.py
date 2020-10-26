@@ -20,18 +20,28 @@ class TestFourDS(unittest.TestCase):
         self.CMM = CMM(mixture_model=mixture_model)
 
     def test_fit(self):
-        self.assertRaises(TypeError, FourDS, clf=GaussianProcessClassifier())
-        self.assertRaises(TypeError, FourDS, clf=CMM(), batch_size=1.2)
-        self.assertRaises(ValueError, FourDS, clf=CMM(), batch_size=0)
-        self.assertRaises(TypeError, FourDS, clf=CMM(), lmbda=True)
-        self.assertRaises(ValueError, FourDS, clf=CMM(), lmbda=1.1)
         al4ds = FourDS(clf=CMM(), batch_size=3, random_state=self.random_state)
         self.assertTrue(isinstance(al4ds.clf, CMM))
         self.assertEqual(al4ds.batch_size, 3)
-        self.assertEqual(al4ds.lmbda, 0.1)
-        self.assertTrue(isinstance(al4ds.random_state, np.random.RandomState))
+        self.assertEqual(al4ds.lmbda, None)
+        self.assertEqual(al4ds.random_state, self.random_state)
 
     def test_query(self):
+        al4ds = FourDS(clf=GaussianProcessClassifier())
+        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y)
+        al4ds = FourDS(clf=CMM(), batch_size=1.2)
+        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y)
+        al4ds = FourDS(clf=CMM(), batch_size=0)
+        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y)
+        al4ds = FourDS(clf=CMM(), lmbda=True)
+        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y)
+        al4ds = FourDS(clf=CMM(), lmbda=1.1)
+        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y)
         al4ds = FourDS(clf=self.CMM, batch_size=1,
                        random_state=self.random_state)
         query_indices = al4ds.query(X_cand=self.X, X=self.X, y=self.y)

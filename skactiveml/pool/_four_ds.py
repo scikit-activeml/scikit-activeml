@@ -52,18 +52,10 @@ class FourDS(PoolBasedQueryStrategy):
 
     def __init__(self, clf, batch_size=1, lmbda=None, random_state=None):
         super().__init__(random_state=random_state)
-        if not isinstance(clf, CMM):
-            raise TypeError(
-                "'clf' must be a 'CMM' but got {}".format(type(clf)))
         self.clf = clf
-        check_scalar(batch_size, target_type=int, name='batch_size', min_val=1)
         self.batch_size = batch_size
-        if lmbda is None:
-            lmbda = np.min(((self.batch_size - 1) * 0.05, 0.5))
-        check_scalar(lmbda, target_type=float, name='lmbda', min_val=0,
-                     max_val=1)
         self.lmbda = lmbda
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
         """Ask the query strategy which sample in 'X_cand' to query.
@@ -93,6 +85,14 @@ class FourDS(PoolBasedQueryStrategy):
         # Check X_cand to be a non-empty 2D array.
         X_cand = check_array(X_cand)
 
+        # Check classifier type.
+        if not isinstance(self.clf, CMM):
+            raise TypeError(
+                "'clf' must be a 'CMM' but got {}".format(type(self.clf)))
+
+        # Check batch size.
+        check_scalar(self.batch_size, target_type=int, name='batch_size',
+                     min_val=1)
         batch_size = self.batch_size
         if len(X_cand) < self.batch_size:
             warnings.warn(
@@ -100,6 +100,17 @@ class FourDS(PoolBasedQueryStrategy):
                 "in 'X_cand'. Set 'batch_size={}'".format(
                     self.batch_size, len(X_cand)))
             batch_size = len(X_cand)
+        query_indices = np.full(batch_size, fill_value=-1, dtype=int)
+
+        # Check lmbda.
+        lmbda = self.lmbda
+        if lmbda is None:
+            lmbda = np.min(((self.batch_size - 1) * 0.05, 0.5))
+        check_scalar(lmbda, target_type=float, name='lmbda', min_val=0,
+                     max_val=1)
+
+        # Set and check random state.
+        random_state = check_random_state(self.random_state)
 
         # Fit the classifier and get the probabilities.
         self.clf.fit(X, y)
@@ -146,9 +157,9 @@ class FourDS(PoolBasedQueryStrategy):
         utilities[:, 0] = alpha * (
                 1 - distance_cand) + beta * density_cand + \
                           rho * distribution_cand
-        query_indices = rand_argmax(utilities[:, 0])
+        query_indices[0] = rand_argmax(utilities[:, 0], random_state)
         is_selected = np.zeros(len(X_cand), dtype=bool)
-        is_selected[query_indices] = True
+        is_selected[query_indices[0]] = True
 
         if batch_size > 1:
             # Compute e_us according to Eq. 14  in [1].
@@ -157,9 +168,9 @@ class FourDS(PoolBasedQueryStrategy):
             # Normalization of the coefficients alpha, beta, and rho such
             # that these coefficients plus
             # lmbda sum up to one.
-            rho = min(rho, 1 - self.lmbda)
-            alpha = (1 - (rho + self.lmbda)) * (1 - e_us)
-            beta = 1 - (rho + self.lmbda) - alpha
+            rho = min(rho, 1 - lmbda)
+            alpha = (1 - (rho + lmbda)) * (1 - e_us)
+            beta = 1 - (rho + lmbda) - alpha
 
             for i in range(1, batch_size):
                 # Update distributions according to Eq. 11 in [1].
@@ -181,12 +192,11 @@ class FourDS(PoolBasedQueryStrategy):
                 # Compute utilities to select sample.
                 utilities[:, i] = alpha * (
                         1 - distance_cand) + beta * density_cand + \
-                                  self.lmbda * diversity_cand \
+                                  lmbda * diversity_cand \
                                   + rho * distribution_cand
                 utilities[is_selected, i] = - np.inf
-                query_indices = np.append(query_indices,
-                                          rand_argmax(utilities[:, i]))
-                is_selected[query_indices] = True
+                query_indices[i] = rand_argmax(utilities[:, i], random_state)
+                is_selected[query_indices[i]] = True
 
         # Check whether utilities are to be returned.
         if return_utilities:
