@@ -82,8 +82,7 @@ class ExpectedErrorReduction(PoolBasedQueryStrategy):
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
-        self.classes, self.missing_label, self.C = \
-            check_classifier_params(self.classes, self.missing_label, self.C)
+        check_classifier_params(self.classes, self.missing_label, self.C)
         if not np.array_equal(self.clf.classes, self.classes):
             raise ValueError("The given classes are not the same as in the "
                              "classifier.")

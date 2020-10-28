@@ -79,8 +79,7 @@ class McPAL(PoolBasedQueryStrategy):
             raise ValueError("'m_max' must be a positive integer.")
         check_random_state(self.random_state)
         self.clf = clone(self.clf)
-        self.clf.classes, self.clf.missing_label, _ = \
-            check_classifier_params(self.clf.classes, self.clf.missing_label)
+        check_classifier_params(self.clf.classes, self.clf.missing_label)
 
         X_cand = check_array(X_cand, force_all_finite=False)
         X = check_array(X, force_all_finite=False)
