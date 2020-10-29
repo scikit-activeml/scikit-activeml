@@ -21,9 +21,6 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=['2', 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
-        np.testing.assert_array_equal([2, 3, 1], check_classes([2, 3, 1]))
-        np.testing.assert_array_equal(['2', '3', '1'],
-                                      check_classes(['2', '3', '1']))
 
     def test_check_missing_label(self):
         self.assertRaises(TypeError, check_missing_label, missing_label=[2])
@@ -34,14 +31,6 @@ class TestValidation(unittest.TestCase):
                           target_type=str)
         self.assertRaises(TypeError, check_missing_label, missing_label='2',
                           target_type=int)
-        self.assertIs(np.nan, check_missing_label(missing_label=np.nan,
-                                                  target_type=int))
-        self.assertIs(None,
-                      check_missing_label(missing_label=None, target_type=int))
-        self.assertEqual('2', check_missing_label(missing_label='2',
-                                                  target_type=str))
-        self.assertEqual(2.5, check_missing_label(missing_label=2.5,
-                                                  target_type=int))
 
 
 if __name__ == '__main__':

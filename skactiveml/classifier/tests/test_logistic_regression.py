@@ -99,7 +99,9 @@ class TestLogisticRegressionRY(unittest.TestCase):
         y[100:150, 0] = np.nan
         y[90:150, 1] = 1
         y[:, 1] = np.nan
-        lr.fit(X, y)
+        w = np.ones_like(y)
+        w[:, 1] = -1000
+        lr.fit(X, y, w)
         self.assertTrue(lr.score(X, y_true) > 0.8)
         y = np.full_like(y, fill_value=np.nan)
         lr.fit(X, y)

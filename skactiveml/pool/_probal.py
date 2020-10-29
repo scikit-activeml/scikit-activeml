@@ -1,95 +1,101 @@
-import numpy as np
 import itertools
+import numpy as np
 
-from sklearn.utils import check_array
 from scipy.special import factorial, gammaln
+from sklearn import clone
+from sklearn.utils import check_array, check_random_state
 
-from ..base import PoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL
+from skactiveml.base import PoolBasedQueryStrategy, ClassFrequencyEstimator
+from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.utils import check_classifier_params
 
 
 class McPAL(PoolBasedQueryStrategy):
-    """ PAL
+    """Multi-class Probabilistic Active Learning
 
-    This class implements multi-class probabilistic active learning (McPAL) [1] strategy.
+    This class implements multi-class probabilistic active learning (McPAL) [1]
+    strategy.
 
     Parameters
     ----------
     clf: BaseEstimator
         Probabilistic classifier for gain calculation.
-    density_estimator: 
-        Density estimator for the candidate samples.
     prior: float, optional (default=1)
         Prior probabilities for the Dirichlet distribution of the samples.
     m_max: int, optional (default=1)
         Maximum number of hypothetically acquired labels.
-    random_state_: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
-
-    Attributes
-    ----------
-    clf: BaseEstimator
-        Probabilistic classifier for gain calculation.
-    density_estimator: 
-        Density estimator for the candidate samples.
-    prior: float, optional (default=1)
-        Prior probabilities for the Dirichlet distribution of the samples.
-    m_max: int, optional (default=1)
-        Maximum number of hypothetically acquired labels.
-    random_state_: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
     ----------
-    [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra Spiliopoulou.
+    [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra
+    Spiliopoulou.
         Multi-Class Probabilistic Active Learning,
-        vol. 285 of Frontiers in Artificial Intelligence and Applications, pages 586-594. IOS Press, 2016
+        vol. 285 of Frontiers in Artificial Intelligence and Applications,
+        pages 586-594. IOS Press, 2016
     """
 
     def __init__(self, clf, prior=1, m_max=1, random_state=None):
         super().__init__(random_state=random_state)
-
-        if not hasattr(clf, 'predict_freq'):
-            raise("Classifier must implement predict_freq()")
         self.clf = clf
         self.prior = prior
         self.m_max = m_max
         self.random_state = random_state
 
     def query(self, X_cand, X, y, weights, return_utilities=False, **kwargs):
-        """
+        """Query the next instance to be labeled.
 
-        Attributes
+        Parameters
         ----------
+        X_cand: array-like, shape(n_candidates, n_features)
+            Unlabeled candidate samples
         X: array-like (n_training_samples, n_features)
             Complete data set
         y: array-like (n_training_samples)
             Labels of the data set
-        X_cand: array-like (n_candidates, n_features)
-            Unlabeled candidate samples
         weights: array-like (n_training_samples)
             Densities for each instance in X
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
+
+        Returns
+        -------
+        query_indices: np.ndarray, shape (1)
+            The index of the queried instance.
+        utilities: np.ndarray, shape (1, n_candidates)
+            The utilities of all instances in X_cand
+            (only returned if return_utilities is True).
         """
+        # Check class attributes
+        if not isinstance(self.clf, ClassFrequencyEstimator):
+            raise TypeError("'clf' must implement methods according to "
+                            "'ClassFrequencyEstimator'.")
+        if not isinstance(self.prior, (int, float)):
+            raise TypeError("'prior' must be an int or float.")
+        if self.prior <= 0:
+            raise ValueError("'prior' must be greater than zero.")
+        if self.m_max < 1 or not float(self.m_max).is_integer():
+            raise ValueError("'m_max' must be a positive integer.")
+        check_random_state(self.random_state)
+        self.clf = clone(self.clf)
+        check_classifier_params(self.clf.classes, self.clf.missing_label)
 
         X_cand = check_array(X_cand, force_all_finite=False)
-        labeled_idx = is_labeled(y)
-        X_labeled = X[labeled_idx]
-        y_labeled = y[labeled_idx]
+        X = check_array(X, force_all_finite=False)
+        y = check_array(y, force_all_finite=False, ensure_2d=False)
 
         # Calculate gains
-        self.clf.fit(X_labeled, y_labeled)
+        self.clf.fit(X, y)
         k_vec = self.clf.predict_freq(X_cand)
-        utilities = weights * cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
-        best_indices = rand_argmax(utilities, random_state=self.random_state)
+        utilities = weights * cost_reduction(k_vec, prior=self.prior,
+                                             m_max=self.m_max)
+        query_indices = rand_argmax(utilities, random_state=self.random_state)
 
-        # best_indices is a np.array (batch_size=1)
-        # utilities is a np.array (batch_size=1 x len(X_cand)
         if return_utilities:
-            return best_indices, utilities
+            return query_indices, np.array([utilities])
         else:
-            return best_indices
+            return query_indices
 
 
 class XPAL(PoolBasedQueryStrategy):
@@ -257,14 +263,16 @@ class XPAL(PoolBasedQueryStrategy):
             else:
                 return best_indices
 
+
 def cost_vector_to_cost_matrix(cost_vector):
     cost_matrix = np.array(cost_vector).reshape(-1, 1) @ np.ones((1, len(cost_vector)))
     np.fill_diagonal(cost_matrix, 0)
     return cost_matrix
 
 
-def compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat, freq_eval_new_mat, pred_eval_new_mat, classes, alpha_cand,
-                              alpha_eval, risk, **kwargs):
+def compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat,
+                              freq_eval_new_mat, pred_eval_new_mat, classes,
+                              alpha_cand, alpha_eval, risk, **kwargs):
     prob_cand = get_prior_prob(freq_cand, alpha_cand)
     prob_eval_new_mat = get_prior_prob(freq_eval_new_mat, alpha_eval)
 
@@ -280,7 +288,8 @@ def compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat, freq_eval
     return -np.sum(risk_diff_mat * prob_cand, axis=1)
 
 
-def risk_difference(prob_eval_new, freq_eval, pred_eval, freq_eval_new, pred_eval_new, risk, classes, **kwargs):
+def risk_difference(prob_eval_new, freq_eval, pred_eval, freq_eval_new,
+                    pred_eval_new, risk, classes, **kwargs):
     # prob_eval_new (n_eval, n_classes)
     # freq_eval     (n_eval, n_classes)
     # freq_eval_new  (n_eval, n_classes)
@@ -360,24 +369,27 @@ def get_alpha(CM):
     M = np.ones([1, len(CM)]) @ np.linalg.inv(CM)
     return M[0] / np.sum(M)
 
+
 def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
-    """Calculates the expected cost reduction for given maximum number of hypothetically acquired labels,
-        observed labels and cost matrix.
+    """Calculate the expected cost reduction.
+
+    Calculate the expected cost reduction for given maximum number of
+    hypothetically acquired labels, observed labels and cost matrix.
 
     Parameters
     ----------
-    k_vec_list: array-like, shape [n_classes]
+    k_vec_list: array-like, shape (n_classes)
         Observed class labels.
-    C: array-like, shape = [n_classes, n_classes]
+    C: array-like, shape = (n_classes, n_classes)
         Cost matrix.
     m_max: int
         Maximal number of hypothetically acquired labels.
-    prior : int | array-like, shape [n_classes]
+    prior : float | array-like, shape (n_classes)
        Prior value for each class.
 
     Returns
     -------
-    expected_cost_reduction: array-like, shape [n_samples]
+    expected_cost_reduction: array-like, shape (n_samples)
         Expected cost reduction for given parameters.
     """
     n_classes = len(k_vec_list[0])
@@ -387,12 +399,15 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     C = 1 - np.eye(n_classes) if C is None else np.asarray(C)
 
     # generate labelling vectors for all possible m values
-    l_vec_list = np.vstack([gen_l_vec_list(m, n_classes) for m in range(m_max + 1)])
+    l_vec_list = np.vstack([gen_l_vec_list(m, n_classes)
+                            for m in range(m_max + 1)])
     m_list = np.sum(l_vec_list, axis=1)
     n_l_vecs = len(l_vec_list)
 
-    # compute optimal cost-sensitive decision for all combination of k- and l-vectors
-    k_l_vec_list = np.swapaxes(np.tile(k_vec_list, (n_l_vecs, 1, 1)), 0, 1) + l_vec_list
+    # compute optimal cost-sensitive decision for all combination of k-vectors
+    # and l-vectors
+    k_l_vec_list = np.swapaxes(np.tile(k_vec_list, (n_l_vecs, 1, 1)), 0, 1)\
+                   + l_vec_list
     y_hats = np.argmin(k_l_vec_list @ C, axis=2)
 
     # add prior to k-vectors
@@ -401,32 +416,38 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
 
     # all combination of k-, l-, and prediction indicator vectors
     combs = [k_vec_list, l_vec_list, np.eye(n_classes)]
-    combs = np.asarray([list(elem) for elem in list(itertools.product(*combs))])
+    combs = np.asarray([list(elem)
+                        for elem in list(itertools.product(*combs))])
 
     # three factors of the closed form solution
     factor_1 = 1 / euler_beta(k_vec_list)
     factor_2 = multinomial(l_vec_list)
-    factor_3 = euler_beta(np.sum(combs, axis=1)).reshape(n_samples, n_l_vecs, n_classes)
+    factor_3 = euler_beta(np.sum(combs, axis=1)).reshape(n_samples, n_l_vecs,
+                                                         n_classes)
 
     # expected classification cost for each m
     m_sums = np.asarray(
-        [factor_1[k_idx] * np.bincount(m_list, factor_2 * [C[:, y_hats[k_idx, l_idx]] @ factor_3[k_idx, l_idx]
-                                                           for l_idx in range(n_l_vecs)]) for k_idx in
-         range(n_samples)])
+        [factor_1[k_idx]
+         * np.bincount(m_list, factor_2 * [C[:, y_hats[k_idx, l_idx]]
+                                           @ factor_3[k_idx, l_idx]
+                                           for l_idx in range(n_l_vecs)])
+         for k_idx in range(n_samples)]
+    )
 
     # compute classification cost reduction as difference
     gains = np.zeros((n_samples, m_max)) + m_sums[:, 0].reshape(-1, 1)
     gains -= m_sums[:, 1:]
 
-    # normalize classification cost reduction by number of hypothetical label acquisitions
+    # normalize  cost reduction by number of hypothetical label acquisitions
     gains /= np.arange(1, m_max + 1)
 
     return np.max(gains, axis=1)
 
+
 def gen_l_vec_list(m_approx, n_classes):
     """
-    Creates all possible class labeling vectors for given number of hypothetically acquired labels and given number of
-    classes.
+    Creates all possible class labeling vectors for given number of
+    hypothetically acquired labels and given number of classes.
 
     Parameters
     ----------
@@ -446,7 +467,9 @@ def gen_l_vec_list(m_approx, n_classes):
     for i in range(n_classes - 1):
         new_label_vec_list = []
         for labelVec in label_vec_list:
-            for newLabel in label_vec_res[label_vec_res - (m_approx - sum(labelVec)) <= 1.e-10]:
+            for newLabel in label_vec_res[label_vec_res
+                                          - (m_approx - sum(labelVec))
+                                          <= 1.e-10]:
                 new_label_vec_list.append(labelVec + [newLabel])
         label_vec_list = new_label_vec_list
 
@@ -460,7 +483,8 @@ def gen_l_vec_list(m_approx, n_classes):
 
 def euler_beta(a):
     """
-    Represents Euler beta function: B(a(i)) = Gamma(a(i,1))*...*Gamma(a_n)/Gamma(a(i,1)+...+a(i,n))
+    Represents Euler beta function:
+    B(a(i)) = Gamma(a(i,1))*...*Gamma(a_n)/Gamma(a(i,1)+...+a(i,n))
 
     Parameters
     ----------
@@ -477,7 +501,8 @@ def euler_beta(a):
 
 def multinomial(a):
     """
-    Computes Multinomial coefficient: Mult(a(i)) = (a(i,1)+...+a(i,n))!/(a(i,1)!...a(i,n)!)
+    Computes Multinomial coefficient:
+    Mult(a(i)) = (a(i,1)+...+a(i,n))!/(a(i,1)!...a(i,n)!)
 
     Parameters
     ----------
@@ -490,5 +515,3 @@ def multinomial(a):
         Multinomial coefficients [Mult(a(0)), ..., Mult(a(m))
     """
     return factorial(np.sum(a, axis=1))/np.prod(factorial(a), axis=1)
-
-

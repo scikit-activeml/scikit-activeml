@@ -24,7 +24,9 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     is_unlabeled : numpy.ndarray, shape (n_samples) or (n_samples, n_outputs)
         Boolean mask indicating missing labels in y.
     """
-    missing_label = check_missing_label(missing_label)
+    check_missing_label(missing_label)
+    if len(y) == 0:
+        raise ValueError("'y' is not allowed to be empty.")
     if not isinstance(y, np.ndarray):
         types = set(
             t.__qualname__ for t in set(type(v) for v in deepflatten(y)))
@@ -42,11 +44,12 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
                     "'NoneType' is allowed. Got {}".format(types))
         y = np.asarray(y)
     target_type = np.append(y.ravel(), missing_label).dtype
-    missing_label = check_missing_label(missing_label, target_type=target_type,
-                                        name='y')
-    if len(y) == 0:
-        return np.array([], dtype=bool)
-    elif missing_label is np.nan:
+    check_missing_label(missing_label, target_type=target_type, name='y')
+    if (y.ndim == 2 and np.size(y, axis=1) == 0) or y.ndim > 2:
+        raise ValueError("'y' must be of shape (n_samples) or '(n_samples, "
+                         "n_features)' with 'n_samples > 0' and "
+                         "'n_features > 0'.")
+    if missing_label is np.nan:
         return np.isnan(y)
     else:
         return y == missing_label
@@ -88,8 +91,8 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         Holds the label for each class.
     """
     def __init__(self, classes=None, missing_label=MISSING_LABEL):
-        self.classes, self.missing_label, _ = check_classifier_params(
-            classes=classes, missing_label=missing_label)
+        self.classes = classes
+        self.missing_label = missing_label
 
     def fit(self, y):
         """Fit label encoder.
@@ -103,6 +106,8 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
         -------
         self: returns an instance of self.
         """
+        check_classifier_params(classes=self.classes,
+                                missing_label=self.missing_label)
         y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
         self._le = LabelEncoder()
         if self.classes is None:

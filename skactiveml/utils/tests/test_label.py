@@ -87,11 +87,10 @@ class TestLabel(unittest.TestCase):
                                       is_labeled(self.y6, missing_label='nan'))
 
     def test_ExtLabelEncoder(self):
-        self.assertRaises(TypeError, ExtLabelEncoder, classes=[2, '2'])
-        self.assertRaises(TypeError, ExtLabelEncoder, classes=['1', '2'],
-                          missing_label=np.nan)
-        self.assertRaises(TypeError, ExtLabelEncoder, classes=['1', '2'],
-                          missing_label=np.nan)
+        ext_le = ExtLabelEncoder(classes=[2, '2'])
+        self.assertRaises(TypeError, ext_le.fit, self.y1)
+        ext_le = ExtLabelEncoder(classes=['1', '2'], missing_label=np.nan)
+        self.assertRaises(TypeError, ext_le.fit, self.y1)
         self.assertRaises(NotFittedError, ExtLabelEncoder().transform,
                           y=['1', '2'])
 
