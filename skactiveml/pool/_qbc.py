@@ -5,7 +5,7 @@ from ..base import PoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
 from sklearn.utils import check_random_state
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL
+from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y
 
 
 class QBC(PoolBasedQueryStrategy):
@@ -61,26 +61,6 @@ class QBC(PoolBasedQueryStrategy):
     def __init__(self, clf, ensemble=None, method='KL_divergence', missing_label=MISSING_LABEL, random_state=None, **kwargs):
         super().__init__(random_state=random_state)
 
-        if method != 'KL_divergence' and method != 'vote_entropy':
-            raise ValueError('The method \'' + method + '\' does not exist.')
-        
-        # if method == 'vote_entropy' and (getattr(ensemble.base_estimator, 'fit', None) is None or getattr(ensemble.base_estimator, 'predict', None) is None):
-        #     raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
-        # elif (getattr(ensemble.base_estimator, 'fit', None) is None or getattr(ensemble.base_estimator, 'predict_proba', None) is None):
-        #     raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
-
-        if method == 'vote_entropy' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict', None) is None)):
-            raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
-        elif method == 'KL_divergence' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict_proba', None) is None)):
-            raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
-
-        if not isinstance(clf, BaseEnsemble):
-            if ensemble is None:
-                warnings.warn('\'ensemble\' is not specified, \'BaggingClassifier\' will be used.')
-                ensemble = BaggingClassifier
-            ensemble = ensemble(base_estimator=clf, random_state=self.random_state, **kwargs)
-
-
         self.missing_label = missing_label
         self.method = method
         self.ensemble = ensemble
@@ -108,12 +88,28 @@ class QBC(PoolBasedQueryStrategy):
         np.ndarray  (shape=(1xlen(X_cnad))
             The utilities of all instances of X_cand(if return_utilities=True).
         """
+        # validation:
+        if method != 'KL_divergence' and method != 'vote_entropy':
+            raise ValueError('The method \'' + method + '\' does not exist.')
+        if method == 'vote_entropy' and ((getattr(clf, 'fit', None) is None orgetattr(clf, 'predict', None) is None)):
+            raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
+        elif method == 'KL_divergence' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict_proba', None) is None)):
+            raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
+        
+        if not isinstance(clf, BaseEnsemble):
+            if ensemble is None:
+                warnings.warn('\'ensemble\' is not specified, \'BaggingClassifier\' will be used.')
+                ensemble = BaggingClassifier
+            ensemble = ensemble(base_estimator=clf, random_state=self.random_state, **kwargs)
+
+        X, y, X_cand = check_X_y(X, y, X_cand)
+
 
         mask_labeled = is_labeled(y, self.missing_label)
         self.ensemble.fit(X[mask_labeled],y[mask_labeled])
         # choose the disagreement method and calculate the utilities
         if self.method == 'KL_divergence':
-            utilities = calc_avg_KL_divergence(self.ensemble, X_cand)
+            utilities = average_KL_divergence(self.ensemble, X_cand)
         elif self.method == 'vote_entropy':
             utilities = vote_entropy(self.ensemble, X_cand,)
 
@@ -126,16 +122,16 @@ class QBC(PoolBasedQueryStrategy):
             return best_indices
 
 
-def calc_avg_KL_divergence(ensemble, X_cand):
+def average_KL_divergence(ensemble, X_cand):
     """
     Calculate the average Kullback-Leibler (KL) divergence for measuring the level of disagreement in QBC.
 
     Parameters
     ----------
-    ensemble: sklearn.ensemble
+    ensemble : sklearn.ensemble
          fited sklearn.ensemble used as committee.
     X_cand : np.ndarray
-        The unlabeled pool from which to choose.
+        The unlabeled pool for which to calculated the calc_avg_KL_divergence.
 
     Returns
     -------
@@ -148,16 +144,26 @@ def calc_avg_KL_divergence(ensemble, X_cand):
         text classification. In Proceedings of the International Conference on Machine
         Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
     """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
 
-        est_arr = ensemble.estimators_
-        P = [est_arr[e_idx].predict_proba(X_cand) for e_idx in range(len(est_arr))]
-        P = np.array(P)
-        P_com = np.mean(P, axis=0)
-        with np.errstate(divide='ignore', invalid='ignore'):
-            scores = np.nansum(np.nansum(P * np.log(P / P_com), axis=2), axis=0)
+    # validation:
+    X_cand = check_array(X_cand, accept_sparse=False,
+                         accept_large_sparse=True, dtype="numeric", order=None,
+                         copy=False, force_all_finite=True, ensure_2d=True,
+                         allow_nd=False,ensure_min_samples=1,
+                         ensure_min_features=1, estimator=None)
+
+    if not isinstance(ensamble, BaseEnsemble):
+        raise TypeError("'ensamble' most be an instance of 'BaseEnsamble'")
+
+    # calculate the average KL divergence:
+    est_arr = ensemble.estimators_
+    P = [est_arr[e_idx].predict_proba(X_cand) for e_idx in range(len(est_arr))]
+    P = np.array(P)
+    P_com = np.mean(P, axis=0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        scores = np.nansum(np.nansum(P * np.log(P / P_com), axis=2), axis=0)
     scores = scores/ensemble.n_classes_
+    
     return scores
 
 
@@ -167,12 +173,10 @@ def vote_entropy(ensemble, X_cand):
 
     Parameters
     ----------
-    ensemble: sklearn.ensemble
+    ensemble : sklearn.ensemble
          fited sklearn BaggingClassifier used as committee.
     X_cand : np.ndarray
-        The unlabeled pool from which to choose.
-    classes : list
-        All possible classes.
+        The unlabeled pool for which to calculated the vote entropy.
 
     Returns
     -------
@@ -185,6 +189,17 @@ def vote_entropy(ensemble, X_cand):
         "Minimizing manual annotation cost in supervised training from corpora."
         arXiv preprint cmp-lg/9606030 (1996).
     """
+
+    # validation:
+    X_cand = check_array(X_cand, accept_sparse=False,
+                         accept_large_sparse=True, dtype="numeric", order=None,
+                         copy=False, force_all_finite=True, ensure_2d=True,
+                         allow_nd=False,ensure_min_samples=1,
+                         ensure_min_features=1, estimator=None)
+
+    if not isinstance(ensamble, BaseEnsemble):
+        raise TypeError("'ensamble' most be an instance of 'BaseEnsamble'")
+
     estimators = ensemble.estimators_
     # Let the models vote for unlabeled data
     votes = np.zeros((len(X_cand), len(estimators)))
@@ -202,8 +217,7 @@ def vote_entropy(ensemble, X_cand):
     vote_entropy = np.zeros(len(X_cand))
     for i in range(len(X_cand)):
         for c in range(ensemble.n_classes_):
-            if vote_count[i,c]!=0:
-                #definition gap at vote_count[i,c]==0:
+            if vote_count[i,c]!=0: #definition gap at vote_count[i,c]==0
                 a = vote_count[i,c]/len(estimators)
                 vote_entropy[i] += a*np.log(a)
     vote_entropy *= -1/np.log(len(estimators))

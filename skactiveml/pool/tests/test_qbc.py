@@ -19,12 +19,12 @@ class TestQBC(unittest.TestCase):
         self.classes = np.array([0,1])
         pass
 
-    def test_init(self):
+
+    def test_query(self):
         self.assertRaises(ValueError, QBC, clf=GaussianProcessClassifier(), method ='this_method_does_not_exist')
         self.assertRaises(TypeError, QBC, clf=None, method='vote_entropy')
         self.assertRaises(TypeError, QBC, clf=None, method='KL_divergence')
-
-    def test_query(self):
+        
         clf = PWC(random_state=self.random_state, classes=self.classes)
         ensemble = BaggingClassifier(base_estimator=clf,random_state=self.random_state)
         # KL_divergence
@@ -32,7 +32,7 @@ class TestQBC(unittest.TestCase):
         best_indices, utilities = qbc.query(self.X_cand, self.X, self.y, return_utilities=True)
 
         ensemble.fit(self.X, self.y)
-        val_utilities = np.array([calc_avg_KL_divergence(ensemble, self.X_cand)])
+        val_utilities = np.array([average_KL_divergence(ensemble, self.X_cand)])
         val_best_indices = rand_argmax(val_utilities, axis=1, random_state=self.random_state)
 
         self.assertEqual(utilities.shape, (1, len(self.X_cand)))
@@ -53,31 +53,8 @@ class TestQBC(unittest.TestCase):
         np.testing.assert_array_equal(best_indices, val_best_indices)
         np.testing.assert_array_equal(utilities, val_utilities)
 
-    def test_test(self):
-        clf = PWC(random_state=self.random_state)
-        ensemble = BaggingClassifier(base_estimator=clf,random_state=self.random_state)
-        ensemble.fit(self.X, self.y)
-        qbc = QBC(clf=clf, method='KL_divergence', random_state=self.random_state)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
 
-            qbc.ensemble.fit(self.X,self.y)
-            est_arr = qbc.ensemble.estimators_
-            P = [est_arr[e_idx].predict_proba(self.X_cand) for e_idx in range(len(est_arr))]
-            P = np.array(P)
-            P_com = np.mean(P, axis=0)
-            with np.errstate(divide='ignore', invalid='ignore'):
-                scores = np.nansum(np.nansum(P * np.log(P / P_com), axis=2), axis=0)
-
-        scores1 = scores/ensemble.n_classes_
-
-        scores2 = calc_avg_KL_divergence(ensemble, self.X_cand)
-
-        np.testing.assert_array_equal(scores1, scores2)
-
-
-
-def calc_avg_KL_divergence(ensemble, X_cand):
+def average_KL_divergence(ensemble, X_cand):
     estimators = ensemble.estimators_
     com_probas = np.zeros((len(estimators),len(X_cand),ensemble.n_classes_))
     for i, e in enumerate(estimators):
