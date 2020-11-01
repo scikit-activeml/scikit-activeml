@@ -1,11 +1,12 @@
 import numpy as np
 
 from collections.abc import Iterable
-from sklearn.utils import check_array, check_scalar
-from sklearn.utils.validation import check_array, column_or_1d
-from sklearn.utils.validation import assert_all_finite, check_consistent_length
+from sklearn.utils.validation import check_array, column_or_1d, check_scalar, \
+    assert_all_finite, check_consistent_length
 
-from ..utils import MISSING_LABEL
+# Define constant for missing label used throughout the package.
+MISSING_LABEL = np.nan
+
 
 def check_classifier_params(classes, missing_label, cost_matrix=None):
     """Check whether the parameters are compatible to each other (only if

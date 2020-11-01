@@ -19,6 +19,10 @@ class TestLabel(unittest.TestCase):
     def test_is_unlabeled(self):
         self.assertRaises(TypeError, is_unlabeled, y=self.y1,
                           missing_label='2')
+        self.assertRaises(ValueError, is_unlabeled, [],
+                          missing_label='2')
+        self.assertRaises(ValueError, is_unlabeled, [[]],
+                          missing_label='2')
         self.assertRaises(TypeError, is_unlabeled, y=self.y2,
                           missing_label=np.nan)
         self.assertRaises(TypeError, is_unlabeled, y=self.y2,

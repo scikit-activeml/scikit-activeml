@@ -86,10 +86,12 @@ def ext_confusion_matrix(y_true, y_pred, classes=None,
         with np.errstate(all='ignore'):
             if normalize == 'true':
                 cm = cm / cm.sum(axis=1, keepdims=True)
+                conf_matrices[a] = np.nan_to_num(cm, nan=1 / n_classes)
             elif normalize == 'pred':
                 cm = cm / cm.sum(axis=0, keepdims=True)
+                conf_matrices[a] = np.nan_to_num(cm, nan=1 / n_classes)
             elif normalize == 'all':
                 cm = cm / cm.sum()
-            conf_matrices[a] = np.nan_to_num(cm, nan=1./n_classes)
+                conf_matrices[a] = np.nan_to_num(cm, nan=1 / cm.size)
 
     return conf_matrices

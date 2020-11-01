@@ -4,9 +4,8 @@ from iteration_utilities import deepflatten
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils.validation import check_is_fitted, check_array
 from sklearn.preprocessing import LabelEncoder
-from ..utils._validation import check_classifier_params, check_missing_label
-
-MISSING_LABEL = np.nan
+from ..utils._validation import check_classifier_params, check_missing_label, \
+    MISSING_LABEL
 
 
 def is_unlabeled(y, missing_label=MISSING_LABEL):
@@ -73,7 +72,7 @@ def is_labeled(y, missing_label=MISSING_LABEL):
     return ~is_unlabeled(y, missing_label)
 
 
-class ExtLabelEncoder(BaseEstimator, TransformerMixin):
+class ExtLabelEncoder(TransformerMixin, BaseEstimator):
     """Encode class labels with value between 0 and classes-1.
     This transformer should be used to encode class labels, *i.e.* `y`, and
     not the input `X`.
@@ -90,6 +89,7 @@ class ExtLabelEncoder(BaseEstimator, TransformerMixin):
     classes_: array-like, shape (n_classes)
         Holds the label for each class.
     """
+
     def __init__(self, classes=None, missing_label=MISSING_LABEL):
         self.classes = classes
         self.missing_label = missing_label
