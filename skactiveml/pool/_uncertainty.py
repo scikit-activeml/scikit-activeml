@@ -18,22 +18,34 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     ----------
     clf : sklearn classifier
         A probabilistic sklearn classifier.
+    classes : array-like, shape=(n_classes), (default=None)
+        Holds the label for each class.
     method : string (default='margin_sampling')
         The method to calculate the uncertainty, entropy, least_confident, margin_sampling, expected_average_precision and epistemic are possible.
         Epistemic only works with Parzen Window Classifier or Logistic Regression.
+    precompute : boolean (default=False)
+        Whether the epistemic uncertainty should be precomputed.
+    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
+        Specifies the symbol that represents a missing label.
+        Important: We do not differ between None and np.nan.
     random_state : numeric | np.random.RandomState
         The random state to use.
 
     Attributes
     ----------
-    random_state : numeric | np.random.RandomState
-        Random state to use.
-    method : string
-        The method to calculate the uncertainty. Only entropy, least_confident, margin_sampling, expected_average_precisionare and epistemic.
     clf : sklearn classifier
         A probabilistic sklearn classifier.
+    method : string
+        The method to calculate the uncertainty. Only entropy, least_confident, margin_sampling, expected_average_precisionare and epistemic.
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
+    precompute : boolean (default=False)
+        Whether the epistemic uncertainty should be precomputed.
+    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
+        Specifies the symbol that represents a missing label.
+        Important: We do not differ between None and np.nan.
+    random_state : numeric | np.random.RandomState
+        Random state to use.
 
     Methods
     -------
@@ -57,21 +69,6 @@ class UncertaintySampling(PoolBasedQueryStrategy):
     def __init__(self, clf, classes=None, method='margin_sampling', precompute=False, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
 
-        if method != 'entropy' and method != 'least_confident' and method != 'margin_sampling' and method != 'expected_average_precision'and method != 'epistemic':
-            warnings.warn('The method \'' + method + '\' does not exist, \'margin_sampling\' will be used.')
-            method = 'margin_sampling'
-
-        if method == 'expected_average_precision' and classes is None:
-            raise ValueError('\'classes\' has to be specified')
-
-        # for pwc:
-        if method == 'epistemic':
-            if isinstance(clf, ClassFrequencyEstimator):
-                method = 'epistemic_pwc'
-            elif isinstance(clf, LogisticRegression):
-                method = 'epistemic_logreg'
-            else:
-                raise TypeError("'clf' must be a subclass of ClassFrequencyEstimator or LogisticRegression")
 
 
 
@@ -80,10 +77,8 @@ class UncertaintySampling(PoolBasedQueryStrategy):
         self.classes = classes
         self.clf = clone(clf)
         self.precompute = precompute
-        if precompute:
-            self.precomp = np.full((2,2), np.nan)
-        else:
-            self.precomp = None
+        self.precomp = None
+
 
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
@@ -109,8 +104,31 @@ class UncertaintySampling(PoolBasedQueryStrategy):
             The utilities of all instances of X_cand(if return_utilities=True).
         """
 
-        # check X_cand to be a non-empty 2D array containing only finite values.
-        X_cand = check_array(X_cand, force_all_finite=False)
+        # validation:
+        if (self.method != 'entropy' and self.method != 'least_confident' and
+            self.method != 'margin_sampling' and
+            self.method != 'expected_average_precision'and
+            self.method != 'epistemic'):
+            warnings.warn("The method '" + self.method + "' does not exist,"
+                          ",'margin_sampling' will be used.")
+            self.method = 'margin_sampling'
+
+        if self.method == 'expected_average_precision' and self.classes is None:
+            raise ValueError('\'classes\' has to be specified')
+
+        # for pwc:
+        if self.method == 'epistemic':
+            if isinstance(clf, ClassFrequencyEstimator):
+                self.method = 'epistemic_pwc'
+            elif isinstance(clf, LogisticRegression):
+                self.method = 'epistemic_logreg'
+            else:
+                raise TypeError("'clf' must be a subclass of ClassFrequencyEstimator or LogisticRegression")
+
+        if self.precompute and self.precomp is None:
+            self.precomp = np.full((2,2), np.nan)
+        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+
 
         # fit the classifier and get the probabilities
         mask_labeled = is_labeled(y, self.missing_label)
@@ -131,7 +149,7 @@ class UncertaintySampling(PoolBasedQueryStrategy):
             elif self.method == 'epistemic_pwc':
                 utilities, self.precomp = epistemic_uncertainty_pwc(self.clf, X_cand, self.precomp)
             elif self.method == 'epistemic_logreg':
-                utilities = epistemic_uncertainty_logreg(X[mask_labeled], y[mask_labeled])
+                utilities = epistemic_uncertainty_logreg(X[mask_labeled], y[mask_labeled], clf, probas)
 
         # best_indices is a np.array (batch_size=1)
         # utilities is a np.array (batch_size=1 x len(X_cand))
@@ -155,7 +173,7 @@ def expected_average_precision(X_cand, classes, probas):
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
     proba : np.ndarray, shape=(n_X_cand, n_classes)
-        The probabilities for each classes and all instance in X_cand.
+        The probabiliti estimation for each classes and all instance in X_cand.
 
     Returns
     -------
@@ -227,21 +245,21 @@ def epistemic_uncertainty_pwc(clf, X_cand, precomp):
             for N in range(precomp.shape[0]):
                 for P in range(precomp.shape[1]):
                     if np.isnan(precomp[N,P]):
-                        pi1 = -epistemic_pwc_sup_1(minimize_scalar(epistemic_pwc_sup_1,method='Bounded',bounds=(0.0,1.0), args=(N,P)).x, N, P)
-                        pi0 = -epistemic_pwc_sup_0(minimize_scalar(epistemic_pwc_sup_0,method='Bounded',bounds=(0.0,1.0), args=(N,P)).x, N, P)
+                        pi1 = -minimize_scalar(_epistemic_pwc_sup_1,method='Bounded',bounds=(0.0,1.0), args=(N,P)).fun
+                        pi0 = -minimize_scalar(_epistemic_pwc_sup_0,method='Bounded',bounds=(0.0,1.0), args=(N,P)).fun
                         pi = np.array([pi0,pi1])
                         precomp[N,P] = np.min(pi, axis=0)
-        res = interpolate(precomp,freq)
+        res = _interpolate(precomp,freq)
     else:
         for i, f in enumerate(freq):
-            pi1 = -minimize_scalar(epistemic_pwc_sup_1,method='Bounded',bounds=(0.0,1.0), args=(f[0],f[1])).fun
-            pi0 = -minimize_scalar(epistemic_pwc_sup_0,method='Bounded',bounds=(0.0,1.0), args=(f[0],f[1])).fun
+            pi1 = -minimize_scalar(_epistemic_pwc_sup_1,method='Bounded',bounds=(0.0,1.0), args=(f[0],f[1])).fun
+            pi0 = -minimize_scalar(_epistemic_pwc_sup_0,method='Bounded',bounds=(0.0,1.0), args=(f[0],f[1])).fun
             pi = np.array([pi0,pi1])
             res[i] = np.min(pi, axis=0)
     return res, precomp
 
 
-def interpolate(precomp, freq):
+def _interpolate(precomp, freq):
     # bilinear interpolation:
     points = np.zeros((precomp.shape[0]*precomp.shape[1],2))
     for n in range(precomp.shape[0]):
@@ -250,14 +268,14 @@ def interpolate(precomp, freq):
     return griddata(points, precomp.flatten(), freq, method='linear')
     
 
-def epistemic_pwc_sup_1(t, n, p):
+def _epistemic_pwc_sup_1(t, n, p):
     if ((n == 0.0) and (p == 0.0)):
         return -1.0
     piH = ((t**p)*((1-t)**n))/(((p/(n+p))**p)*((n/(n+p))**n))
     return -np.minimum(piH,2*t-1)
 
 
-def epistemic_pwc_sup_0(t, n, p):
+def _epistemic_pwc_sup_0(t, n, p):
     if ((n == 0.0) and (p == 0.0)):
         return -1.0
     piH = ((t**p)*((1-t)**n))/(((p/(n+p))**p)*((n/(n+p))**n))
@@ -266,7 +284,7 @@ def epistemic_pwc_sup_0(t, n, p):
 
 #logistic regressionepistemic_uncertainty_logreg
 #alg 3
-def epistemic_uncertainty_logreg(X_cand, X, y, probas):
+def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
     # compute pi0, pi1 for every x in X_cand:
     pi0, pi1 = np.empty((len(probas))), np.empty((len(probas)))
     for i, x in enumerate(X_cand):
@@ -282,11 +300,11 @@ def epistemic_uncertainty_logreg(X_cand, X, y, probas):
                 A = np.insert(x,len(x),1)
                 constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
                 x0 = np.zeros((A.shape[0]))#
-                theta = minimize(loglik_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(X,y)).x#
-                pi1[i] = np.maximum(pi1[i],np.min('pi_h'(theta),2*ap-1))
+                theta = minimize(loglik_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(clf,X,y)).x#
+                pi1[i] = np.maximum(pi1[i],np.min(pi_h(theta, clf, X, y),2*ap-1))
             if 1-2*an > pi0[i]:
                 #solve 22 -> theta
-                pi0[i] = np.maximum(pi0[i],np.min('pi_h'(theta),1-2*an))
+                pi0[i] = np.maximum(pi0[i],np.min(pi_h(theta, clf, X, y),1-2*an))
 
             Qn, Qp = np.delete(Qn, idx_an), np.delete(Qp, idx_ap)
 

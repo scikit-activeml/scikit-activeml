@@ -21,14 +21,19 @@ class QBC(PoolBasedQueryStrategy):
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
     clf : sklearn classifier | ensamble
-        If clf is an ensemble, it will used as committee. If clf is a classifier, it will used for ensemble construction with the specified ensemble or with BaggigngClassifier, if ensemble is None.
-        clf must implementing the methods 'fit', 'predict'(for vote entropy) and 'predict_proba'(for KL divergence).
+        If clf is an ensemble, it will used as committee. If clf is a
+        classifier, it will used for ensemble construction with the specified
+        ensemble or with BaggigngClassifier, if ensemble is None. clf must
+        implementing the methods 'fit', 'predict'(for vote entropy) and
+        'predict_proba'(for KL divergence).
     ensemble : sklearn.ensemble, default=None
         sklear.ensemble used as committee. If None, baggingClassifier is used.
     method : string, default='KL_divergence'
-        The method to calculate the disagreement. 'vote_entropy' or 'KL_divergence' are possible.
-    unlabeled_class : scalar | str | None | np.nan, default=np.nan
-        Symbol to represent a missing label. Important: We do not differ between None and np.nan.
+        The method to calculate the disagreement.
+        'vote_entropy' or 'KL_divergence' are possible.
+    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
+        Specifies the symbol that represents a missing label.
+        Important: We do not differ between None and np.nan.
     random_state : numeric | np.random.RandomState
         Random state to use.
     **kwargs :
@@ -91,7 +96,7 @@ class QBC(PoolBasedQueryStrategy):
         # validation:
         if method != 'KL_divergence' and method != 'vote_entropy':
             raise ValueError('The method \'' + method + '\' does not exist.')
-        if method == 'vote_entropy' and ((getattr(clf, 'fit', None) is None orgetattr(clf, 'predict', None) is None)):
+        if method == 'vote_entropy' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict', None) is None)):
             raise TypeError("'clf' must implement the methods 'fit' and 'predict'")
         elif method == 'KL_divergence' and ((getattr(clf, 'fit', None) is None or getattr(clf, 'predict_proba', None) is None)):
             raise TypeError("'clf' must implement the methods 'fit' and 'predict_proba'")
@@ -102,7 +107,7 @@ class QBC(PoolBasedQueryStrategy):
                 ensemble = BaggingClassifier
             ensemble = ensemble(base_estimator=clf, random_state=self.random_state, **kwargs)
 
-        X, y, X_cand = check_X_y(X, y, X_cand)
+        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
 
 
         mask_labeled = is_labeled(y, self.missing_label)

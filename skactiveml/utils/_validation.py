@@ -118,7 +118,7 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
               dtype="numeric", order=None, copy=False, force_all_finite=True,
               ensure_2d=True, allow_nd=False, multi_output=False,
               allow_nan=None, ensure_min_samples=1, ensure_min_features=1,
-              y_numeric=False, estimator=None):
+              y_numeric=False, estimator=None, missing_label=MISSING_LABEL):
     """Input validation for standard estimators.
 
     Checks X and y for consistent length, enforces X to be 2D and y 1D. By
@@ -224,7 +224,7 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
         raise ValueError("y cannot be None")
 
     if allow_nan is None:
-        allow_nan = True if MISSING_LABEL is np.nan else False
+        allow_nan = True if missing_label is np.nan else False
 
     X = check_array(X, accept_sparse=accept_sparse,
                     accept_large_sparse=accept_large_sparse,
