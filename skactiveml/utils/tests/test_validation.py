@@ -2,10 +2,23 @@ import numpy as np
 import unittest
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
-    check_missing_label
+    check_missing_label, check_scalar
 
 
 class TestValidation(unittest.TestCase):
+
+    def test_check_scalar(self):
+        x = 5
+        self.assertRaises(TypeError, check_scalar, x=x, target_type=float,
+                          name='x')
+        self.assertRaises(ValueError, check_scalar, x=x, target_type=int,
+                          max_val=4, name='x')
+        self.assertRaises(ValueError, check_scalar, x=x, target_type=int,
+                          max_inclusive=False, max_val=5, name='x')
+        self.assertRaises(ValueError, check_scalar, x=x, target_type=int,
+                          min_val=6, name='x')
+        self.assertRaises(ValueError, check_scalar, x=x, target_type=int,
+                          min_inclusive=False, min_val=5, name='x')
 
     def test_check_cost_matrix(self):
         self.assertRaises(ValueError, check_cost_matrix,

@@ -1,11 +1,63 @@
 import numpy as np
 
 from collections.abc import Iterable
-from sklearn.utils.validation import check_array, column_or_1d, check_scalar, \
+from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
 # Define constant for missing label used throughout the package.
 MISSING_LABEL = np.nan
+
+
+def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
+                 min_val=None, max_val=None):
+    """Validate scalar parameters type and value.
+
+    Parameters
+    ----------
+    x : object
+        The scalar parameter to validate.
+    name : str
+        The name of the parameter to be printed in error messages.
+    target_type : type or tuple
+        Acceptable data types for the parameter.
+    min_val : float or int, optional (default=None)
+        The minimum valid value the parameter can take. If None (default) it
+        is implied that the parameter does not have a lower bound.
+    min_inclusive : bool, optional (default=True)
+        If true, the minimum valid value is inclusive, otherwise exclusive.
+    max_val : float or int, optional (default=None)
+        The maximum valid value the parameter can take. If None (default) it
+        is implied that the parameter does not have an upper bound.
+    max_inclusive : bool, optional (default=True)
+        If true, the maximum valid value is inclusive, otherwise exclusive.
+
+    Raises
+    -------
+    TypeError
+        If the parameter's type does not match the desired type.
+    ValueError
+        If the parameter's value violates the given bounds.
+    """
+    if not isinstance(x, target_type):
+        raise TypeError('`{}` must be an instance of {}, not {}.'
+                        .format(name, target_type, type(x)))
+    if min_inclusive:
+        if min_val is not None and x < min_val:
+            raise ValueError('`{}`= {}, must be >= '
+                             '{}.'.format(name, x, min_val))
+    else:
+        if min_val is not None and x <= min_val:
+            raise ValueError('`{}`= {}, must be > '
+                             '{}.'.format(name, x, min_val))
+
+    if max_inclusive:
+        if max_val is not None and x > max_val:
+            raise ValueError('`{}`= {}, must be <= '
+                             '{}.'.format(name, x, max_val))
+    else:
+        if max_val is not None and x >= max_val:
+            raise ValueError('`{}`= {}, must be < '
+                             '{}.'.format(name, x, max_val))
 
 
 def check_classifier_params(classes, missing_label, cost_matrix=None):
