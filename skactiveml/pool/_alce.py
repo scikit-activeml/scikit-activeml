@@ -1,28 +1,38 @@
 import numpy as np
 from sklearn import clone
-from sklearn.manifold import MDS
-
-from sklearn.utils import check_array, check_X_y, check_random_state
+from sklearn.base import RegressorMixin
+from sklearn.neighbors import NearestNeighbors
+from sklearn.utils import check_array, check_random_state
 
 from skactiveml.base import PoolBasedQueryStrategy
-from skactiveml.utils import rand_argmax
+from skactiveml.pool._mdsp import MDSP
+from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.utils import check_cost_matrix, check_missing_label
 
 
 class ALCE(PoolBasedQueryStrategy):
     """Active Learning with Cost Embedding (ALCE)
 
+    Cost sensitive multi-class algorithm.
+    Assume each class has at least one sample in the labeled pool.
+
     Parameters
     ----------
-    clf: model to be trained
-        Model implementing the methods 'fit' and and 'predict_proba'.
+    base_regressor : sklearn regressor
     C: array-like, shape (n_classes, n_classes), optional (default=None)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
-        sample with the actual class i.
-        Only supported for least confident variant.
-    target_dimension: int, optional (default=None)
-        Target dimension of the embedding. If None, it is set to n_classes.
+        sample with the actual class i. Only supported for least confident
+        variant.
     random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for annotator selection.
+    missing_label: str | numeric, optional (default=MISSING_LABEL)
+        Specifies the symbol that represents a missing label
+    embed_dim : int, optional (default=None)
+        If is None, embed_dim = n_classes
+    mds_params : dict, optional
+        http://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
+    nn_params : dict, optional
+        http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
 
     Attributes
     ----------
@@ -34,74 +44,115 @@ class ALCE(PoolBasedQueryStrategy):
         IEEE International Conference on Data Mining (ICDM), 2016
     """
 
-    def __init__(self, clf, C, random_state=None, target_dimension=None,
-                 **kwargs):
+    def __init__(self,
+                 base_regressor,
+                 C,
+                 embed_dim=None,
+                 missing_label=MISSING_LABEL,
+                 classes=None,
+                 mds_params=None,
+                 nn_params=None,
+                 random_state=None):
         super().__init__(random_state=random_state)
-        self.clf = clf
+        self.base_regressor = base_regressor
         self.C = C
+        self.embed_dim = embed_dim
+        self.missing_label = missing_label
+        self.classes = classes
         self.random_state = random_state
-        self.target_dimension = target_dimension
+        self.mds_params = mds_params
+        self.nn_params = nn_params
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
         ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Unlabeled candidate samples
+        X: array-like, shape (n_samples, n_features)
+            Complete data set
+        y: array-like, shape (n_samples)
+            Labels of the data set
+        return_utilities: bool, optional (default=False)
+            If True, the utilities are additionally returned.
 
         Returns
         -------
         query_indices: np.ndarray, shape (1)
             The index of the queried instance.
-        utilities: np.ndarray shape (1, n_candidates)
+        utilities: np.ndarray, shape (1, n_candidates)
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        X, y = check_X_y(X, y, force_all_finite=False)
         X_cand = check_array(X_cand, force_all_finite=False)
-        check_random_state(self.random_state)
+        X = check_array(X, force_all_finite=False)
+        y = check_array(y, force_all_finite=False, ensure_2d=False)
 
-        self.clf = clone(self.clf)
-        self.clf.fit(X, y)
+        if not isinstance(self.base_regressor, RegressorMixin):
+            raise TypeError("'base_regressor' must be an sklearn regressor")
+        if self.classes is None:
+            self.classes = np.arange(len(self.C))
+        check_cost_matrix(self.C, len(self.classes))
+        if self.embed_dim is None:
+            self.embed_dim = len(self.classes)
+        if not float(self.embed_dim).is_integer():
+            raise TypeError("'embed_dim' must be an integer.")
+        if self.embed_dim < 1:
+            raise ValueError("'embed_dim' must be strictly positive.")
+        check_missing_label(self.missing_label)
+        self.random_state = check_random_state(self.random_state)
+        if not set(y) <= set(self.classes):
+            raise ValueError("y has labels that are not contained in "
+                             "'classes'")
 
-        if self.target_dimension is None:
-            self.target_dimension = len(self.clf.classes)
+        mds_params = {
+            'metric': False,
+            'n_components': self.embed_dim,
+            'n_uq': len(self.classes),
+            'max_iter': 300,
+            'eps': 1e-6,
+            'dissimilarity': "precomputed",
+            'n_init': 8,
+            'n_jobs': 1,
+            'random_state': self.random_state
+        }
+        if self.mds_params is not None:
+            mds_params.update(self.mds_params)
+        self.mds_params = mds_params
+        if self.nn_params is None:
+            self.nn_params = {}
 
-        utilities = _get_utilities(self.clf, X_cand, X, y, self.C,
-                                   self.random_state, self.target_dimension)
-        best_indices = rand_argmax([utilities], axis=1,
-                                   random_state=self.random_state)
+        regressors = [
+            clone(self.base_regressor) for _ in range(self.embed_dim)
+        ]
+        n_classes = len(self.classes)
+
+        dissimilarities = np.zeros((2 * n_classes, 2 * n_classes))
+        dissimilarities[:n_classes, n_classes:] = self.C
+        dissimilarities[n_classes:, :n_classes] = self.C.T
+
+        W = np.zeros((2 * n_classes, 2 * n_classes))
+        W[:n_classes, n_classes:] = 1
+        W[n_classes:, :n_classes] = 1
+
+        mds = MDSP(**self.mds_params)
+        embedding = mds.fit(dissimilarities).embedding_
+        class_embed = embedding[:n_classes, :]
+
+        nn = NearestNeighbors(n_neighbors=1, **self.nn_params)
+        nn.fit(embedding[n_classes:, :])
+
+        pred_embed = np.zeros((len(X_cand), self.embed_dim))
+        for i in range(self.embed_dim):
+            regressors[i].fit(X, class_embed[y, i])
+            pred_embed[:, i] = regressors[i].predict(X_cand)
+
+        dist, _ = nn.kneighbors(pred_embed)
+
+        utilities = dist[:, 0]
+        query_indices = rand_argmax([utilities], self.random_state, axis=1)
         if return_utilities:
-            return best_indices, np.array([utilities])
+            return query_indices, np.array([utilities])
         else:
-            return best_indices
-
-
-def _get_utilities(clf, X_cand, X, y, C, random_state, target_dimension):
-    clf = clone(clf)
-    clf.fit(X, y)
-    n_classes = len(clf.classes)
-
-    # Embedding g
-    dissimilarities = np.zeros((2 * n_classes, 2 * n_classes))
-    dissimilarities[:n_classes, n_classes:] = C
-    dissimilarities[n_classes:, :n_classes] = C.T
-
-    W = np.zeros((2 * n_classes, 2 * n_classes))
-    W[:n_classes, n_classes:] = 1
-    W[n_classes:, :n_classes] = 1
-
-    mds = MDS(n_components=target_dimension, metric=False,
-              dissimilarity='precomputed', random_state=random_state)
-    mds.fit(dissimilarities)
-    embedding = mds.embedding_
-    print()
-    print(embedding.shape)
-    print((n_classes, target_dimension))
-
-    # Nearest neighbor function phi
-
-    # labeled_indices = is_labeled(y, missing_label=clf.missing_label)
-    # X_labeled = X[labeled_indices]
-    # y_labeled = y[labeled_indices]
-
-    return np.zeros(len(X_cand))
+            return query_indices
