@@ -59,7 +59,8 @@ class TestLogisticRegressionRY(unittest.TestCase):
         lr = LogisticRegressionRY(weights_prior=-0.1, missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
         lr = LogisticRegressionRY(random_state=0, missing_label='nan',
-                                  classes=['tokyo', 'paris'])
+                                  classes=['tokyo', 'paris'],
+                                  solver='Nelder-Mead')
         lr.fit(X=self.X, y=self.y_nan)
         check_is_fitted(lr)
         Alpha_exp = np.ones_like(lr.Alpha_) * 0.5
@@ -98,7 +99,9 @@ class TestLogisticRegressionRY(unittest.TestCase):
         y[100:150, 0] = np.nan
         y[90:150, 1] = 1
         y[:, 1] = np.nan
-        lr.fit(X, y)
+        w = np.ones_like(y)
+        w[:, 1] = -1000
+        lr.fit(X, y, w)
         self.assertTrue(lr.score(X, y_true) > 0.8)
         y = np.full_like(y, fill_value=np.nan)
         lr.fit(X, y)

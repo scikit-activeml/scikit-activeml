@@ -3,7 +3,7 @@ Logistic Regression for Multiple Annotators
 """
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
-#         Timo Sturm
+#         Timo Sturm <timo.sturm@student.uni-kassel.de>
 
 import numpy as np
 import warnings
@@ -182,6 +182,12 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         if y.ndim <= 1:
             y = y.copy().reshape(-1, 1)
 
+        # Ensure sample weights to form a 2d array.
+        if sample_weight is None:
+            sample_weight = np.ones_like(y)
+        if sample_weight.ndim <= 1:
+            sample_weight = sample_weight.copy().reshape(-1, 1)
+
         # Set auxiliary variables.
         n_samples = X.shape[0]
         n_features = X.shape[1]
@@ -269,11 +275,23 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
             current_expectation = new_expectation
 
             # M-Step:
-            self._Alpha = self._calc_Alpha(y, Mu, A)
+            self._Alpha = self._calc_Alpha(y, Mu, A, sample_weight)
 
-            def error(W):
-                # evaluate error of weight vectors for scipy.minimize
-                W = W.reshape(n_features, n_classes)
+            def error(w):
+                """
+                Evaluate cross-entropy error of weights for scipy.minimize.
+
+                Parameters
+                ----------
+                w : ndarray, shape (n_features * n_classes)
+                    Weights for which cross-entropy error is to be computed.
+
+                Returns
+                -------
+                G : flaot
+                    Computed cross-entropy error.
+                """
+                W = w.reshape(n_features, n_classes)
                 P_W = softmax(X @ W, axis=1)
                 prior_W = 0
                 for c_idx in range(n_classes):
@@ -284,26 +302,52 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
                 log += prior_W
                 return -log / n_samples
 
-            def grad(W):
-                # compute gradient of error function for scipy.minimize
-                W = W.reshape(n_features, n_classes)
-                P_W = softmax(X @ W, axis=1)
-                grad = ((Mu - P_W).T @ X - (Gamma @ W).T).T.ravel()
-                return -grad / n_samples
+            def grad(w):
+                """
+                Compute gradient of error function for scipy.minimize.
 
-            def hessian(W):
-                # compute hessian matrix of error function for scipy.minimize
-                W = W.reshape(n_features, n_classes)
+                Parameters
+                ----------
+                w : ndarray, shape (n_features * n_classes)
+                    Weights whose gradient is to be computed.
+
+                Returns
+                -------
+                G : narray, shape (n_features * n_classes)
+                    Computed gradient of weights.
+                """
+                W = w.reshape(n_features, n_classes)
+                P_W = softmax(X @ W, axis=1)
+                G = (X.T @ (P_W - Mu) + Gamma @ W).ravel()
+                return G / n_samples
+
+            def hessian(w):
+                """
+                Compute Hessian matrix of error function for scipy.minimize.
+
+                Parameters
+                ----------
+                w : numpy.ndarray, shape (n_features * n_classes)
+                    Weights whose Hessian matrix is to be computed.
+
+                Returns
+                -------
+                H : numpy.narray, shape (n_features * n_classes,
+                n_features * n_classes)
+                    Computed Hessian matrix of weights.
+                """
+                W = w.reshape(n_features, n_classes)
                 H = np.empty((n_classes * n_features, n_classes * n_features))
                 P_W = softmax(X @ W, axis=1)
                 for k in range(n_classes):
                     for j in range(n_classes):
-                        H_kj = (P_W[:, k] * (I[k, j] - P_W[:, j]))
-                        H_kj = (H_kj.reshape(-1, 1) * X).T @ X + Gamma
+                        diagonal = P_W[:, j] * (I[k, j] - P_W[:, k])
+                        D = np.diag(diagonal)
+                        H_kj = X.T @ D @ X + Gamma
                         H[k * n_features:(k + 1) * n_features,
                         j * n_features:(j + 1) * n_features] \
                             = H_kj
-                return - H / n_samples
+                return H / n_samples
 
             with warnings.catch_warnings():
                 warning_msg = ".*Method .* does not use Hessian information.*"
@@ -381,15 +425,14 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         ----------
         y: numpy.ndarray, shape (n_samples, n_annotators)
             The class labels provided by the annotators for all samples.
-
         Alpha: numpy.ndarray, shape (n_annotators, n_classes, n_classes)
-            annot_prior vector (n_annotators, n_classes, n_classes) containing the new
-            estimates for Alpha. This is effectively a confusion matrix for
-            each annotator, where each row is normalized.
+            annot_prior vector (n_annotators, n_classes, n_classes) containing
+            the new estimates for Alpha. This is effectively a confusion matrix
+            for each annotator, where each row is normalized.
 
         Returns
         -------
-        out: ndarray
+        out: numpy.ndarray
             Vector of shape (n_samples, n_classes).
         """
         n_samples, n_annotators, n_classes = y.shape[0], y.shape[1], \
@@ -404,7 +447,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         return V
 
     @staticmethod
-    def _calc_Alpha(y, Mu, A):
+    def _calc_Alpha(y, Mu, A, sample_weight):
         """Calculates the class-dependent performance estimates of the
         annotators.
 
@@ -418,10 +461,13 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         A : numpy.ndarray, shape (n_annotators, n_classes, n_classes)
             A[l,i,j] is the estimated number of times.
             annotator l has provided label j for an instance of true label i.
+        sample_weight : numpy.ndarray, shape (n_samples, n_annotators)
+            It contains the weights of the training samples' class labels.
+            It must have the same shape as y.
 
         Returns
         ----------
-        new_Alpha : np.ndarray, shape (n_annotators, n_classes, n_classes)
+        new_Alpha : numpy..ndarray, shape (n_annotators, n_classes, n_classes)
             This is a confusion matrix for each annotator, where each
             row is normalized. `new_Alpha[l,k,c]` describes the probability
             that annotator l provides the class label c for a sample belonging
@@ -434,7 +480,8 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         for j in range(n_annotators):
             # Only take those rows from Y, where Y is not NaN:
             y_j = np.eye(n_classes)[y[not_nan_y[:, j], j].astype(int)]
-            new_Alpha[j] = (Mu[not_nan_y[:, j]].T @ y_j) + A[j] - 1
+            w_j = sample_weight[not_nan_y[:, j], j].reshape(-1, 1)
+            new_Alpha[j] = (Mu[not_nan_y[:, j]].T @ (w_j * y_j)) + A[j] - 1
 
         # Lazy normalization: (The real normalization factor
         # (sum_i=1^N mu_i,c + sum_k=0^K-1 A_j,c,k - K) is omitted here)
@@ -459,7 +506,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
 
         Returns
         -------
-        new_Mu : ndarray
+        new_Mu : numpy.ndarray
             new_Mu[i,k] contains the probability of a sample X[i] to be of
             class classes_[k] estimated according to the EM-algorithm.
         """

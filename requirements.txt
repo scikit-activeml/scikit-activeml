@@ -4,3 +4,8 @@ scipy==1.5.2
 scikit-learn==0.23.2
 matplotlib==3.3.0
 iteration-utilities==0.10.1
+sphinx
+nbsphinx
+sphinxcontrib-bibtex
+numpydoc
+sphinx_rtd_theme

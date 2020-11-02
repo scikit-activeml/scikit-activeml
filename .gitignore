@@ -141,3 +141,9 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+/TestResults
+/scikit-activeml.sln
+/scikit-activeml.pyproj
+/skactiveml/pool/UC_test.py
+/skactiveml/pool/Untitled.ipynb
+/examples/pool/al_cycle_random_test.ipynb
