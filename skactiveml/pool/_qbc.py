@@ -1,14 +1,14 @@
 import numpy as np
 import warnings
 
-from ..base import PoolBasedQueryStrategy
+from ..base import SingleAnnotPoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
 from sklearn.utils import check_random_state
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y
 
 
-class QBC(PoolBasedQueryStrategy):
+class QBC(SingleAnnotPoolBasedQueryStrategy):
     """QBC
 
     The Query-By-Committee (QBC) algorithm minimizes the version space, which is the set of hypotheses that are

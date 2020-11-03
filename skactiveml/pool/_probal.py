@@ -5,12 +5,12 @@ from scipy.special import factorial, gammaln
 from sklearn import clone
 from sklearn.utils import check_array, check_random_state
 
-from skactiveml.base import PoolBasedQueryStrategy, ClassFrequencyEstimator
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
 from skactiveml.utils import rand_argmax, MISSING_LABEL
 from skactiveml.utils import check_classifier_params
 
 
-class McPAL(PoolBasedQueryStrategy):
+class McPAL(SingleAnnotPoolBasedQueryStrategy):
     """Multi-class Probabilistic Active Learning
 
     This class implements multi-class probabilistic active learning (McPAL) [1]
@@ -98,7 +98,7 @@ class McPAL(PoolBasedQueryStrategy):
             return query_indices
 
 
-class XPAL(PoolBasedQueryStrategy):
+class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
     def __init__(self, clf, classes, missing_label=MISSING_LABEL, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
         # TODO @DK: clean up

@@ -2,7 +2,7 @@ from sklearn.utils import check_array
 from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression#, _logistic_loss
 from ..classifier import PWC
-from ..base import PoolBasedQueryStrategy, ClassFrequencyEstimator
+from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
 from scipy.interpolate import griddata
@@ -10,7 +10,7 @@ import numpy as np
 import warnings
 
 
-class UncertaintySampling(PoolBasedQueryStrategy):
+class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     """
     Uncertainty Sampling query stratagy.
 

@@ -2,12 +2,12 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.utils import check_array, check_random_state, check_X_y
 
-from skactiveml.base import PoolBasedQueryStrategy, ClassFrequencyEstimator
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
 from skactiveml.utils import check_classifier_params, is_labeled
 from skactiveml.utils import rand_argmax, MISSING_LABEL
 
 
-class ExpectedErrorReduction(PoolBasedQueryStrategy):
+class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     """Expected Error Reduction.
 
     This class implements the expected error reduction algorithm with different

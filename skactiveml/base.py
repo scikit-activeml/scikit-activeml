@@ -11,23 +11,106 @@ from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
 
 
 class QueryStrategy(ABC, BaseEstimator):
+    """Base class for all query strategies in scikit-activeml.
 
+    Parameters
+    ----------
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
     def __init__(self, random_state=None):
-        # set RS
         self.random_state = check_random_state(random_state)
 
     @abstractmethod
     def query(self, *args, **kwargs):
+        """Determines the query for active learning based on input arguments.
+        """
         return NotImplemented
 
 
-class PoolBasedQueryStrategy(QueryStrategy):
+class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
+    """Base class for all pool-based active learning query strategies with a
+    single annotator in scikit-activeml.
 
+    Parameters
+    ----------
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
     def __init__(self, random_state=None):
         super().__init__(random_state=random_state)
 
     @abstractmethod
-    def query(self, X_cand, *args, return_utilities=False, **kwargs):
+    def query(self, X_cand, *args, batch_size=1, return_utilities=False,
+              **kwargs):
+        """Determines which for which candidate samples labels are to be
+        queried.
+
+        Parameters
+        ----------
+        X_cand : array-like, shape (n_samples, n_features)
+            Candidate samples from which the strategy can select.
+        batch_size : int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
+
+        Returns
+        -------
+        query_indices : numpy.ndarray, shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+        utilities : numpy.ndarray, shape (batch_size, n_samples)
+            The utilities of all candidate samples after each selected
+            sample of the batch, e.g., `utilities[0]` indicates the utilities
+            used for selecting the first sample (with index `query_indices[0]`)
+            of the batch.
+        """
+        return NotImplemented
+
+
+class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
+    """Base class for all pool-based active learning query strategies with
+    multiple annotators in scikit-activeml.
+
+    Parameters
+    ----------
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
+    def __init__(self, random_state=None):
+        super().__init__(random_state=random_state)
+
+    @abstractmethod
+    def query(self, X_cand, *args, A_cand=None, return_utilities=False,
+              **kwargs):
+        """Determines which candidate sample is to be annotated by which
+        annotator.
+
+        Parameters
+        ----------
+        X_cand : array-like, shape (n_samples, n_features)
+            Candidate samples from which the strategy can select.
+        A_cand : array-like, shape (n_samples, n_features)
+            Boolean matrix where `A_cand[i,j] = True` indicates that
+            annotator `j` can be selected for annotating sample `X_cand[i]`,
+            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
+            selected for annotating sample `X_cand[i]`.
+
+        Returns
+        -------
+        query_indices : numpy.ndarray, shape (batch_size, 2)
+            The query_indices indicate which candidate sample is to be
+            annotated by which annotator, e.g., `query_indices[:, 0]`
+            indicates the selected candidate samples and `query_indices[:, 1]`
+            indicates the respectively selected annotators.
+        utilities: numpy.ndarray, shape (batch_size, n_samples, n_annotators)
+            The utilities of all candidate samples w.r.t. to the available
+            annotators after each selected sample of the batch, e.g.,
+            `utilities[0, :, j]` indicates the utilities used for selecting
+            the first sample-annotator pair (with indices `query_indices[0]`).
+        """
         return NotImplemented
 
 
@@ -251,7 +334,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
     def _validate_input(self, X, y, sample_weight):
         # Check common classifier parameters.
         check_classifier_params(self.classes, self.missing_label,
-                                    self.cost_matrix)
+                                self.cost_matrix)
         # Store and check random state.
         self._random_state = check_random_state(self.random_state)
 
