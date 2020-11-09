@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
-    check_missing_label, check_scalar
+    check_missing_label, check_scalar, check_X_y
 
 
 class TestValidation(unittest.TestCase):
@@ -45,6 +45,13 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_missing_label, missing_label='2',
                           target_type=int)
 
+    def test_check_X_y(self):
+        self.assertRaises(ValueError, check_X_y, None, None)
+        X = [[1, 2], [3, 4]]
+        y = [1, 0]
+        X_cand = [[5, 6]]
+        sample_weight = [0.4, 0.6]
+        check_X_y(X, y, X_cand, sample_weight)
 
 if __name__ == '__main__':
     unittest.main()

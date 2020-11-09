@@ -8,6 +8,7 @@ from sklearn.utils.validation import check_array, column_or_1d, \
 MISSING_LABEL = np.nan
 
 
+
 def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
                  min_val=None, max_val=None):
     """Validate scalar parameters type and value.
@@ -167,7 +168,7 @@ def check_cost_matrix(cost_matrix, n_classes):
     return cost_matrix_new
 
 
-def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
+def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, accept_large_sparse=True,
               dtype="numeric", order=None, copy=False, force_all_finite=True,
               ensure_2d=True, allow_nd=False, multi_output=False,
               allow_nan=None, ensure_min_samples=1, ensure_min_features=1,
@@ -184,10 +185,16 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
     Parameters
     ----------
     X : nd-array, list or sparse matrix
-        Input data.
+        Labeled input data.
 
     y : nd-array, list or sparse matrix
-        Labels.
+        Labels for X.
+
+    X_cand : nd-array, list or sparse matrix (default=None)
+        Unlabeled input data
+
+    sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights.
 
     accept_sparse : string, boolean or list of string (default=False)
         String[s] representing allowed sparse matrix formats, such as 'csc',
@@ -265,6 +272,9 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
     estimator : str or estimator instance (default=None)
         If passed, include the name of the estimator in warning messages.
 
+    missing_label : {scalar, string, np.nan, None}, (default=np.nan)
+        Value to represent a missing label.
+
     Returns
     -------
     X_converted : object
@@ -295,7 +305,32 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
         assert_all_finite(y, allow_nan=allow_nan)
     if y_numeric and y.dtype.kind == 'O':
         y = y.astype(np.float64)
-
     check_consistent_length(X, y)
 
+    if X_cand is not None:
+        X_cand = check_array(X_cand, accept_sparse=accept_sparse,
+                             accept_large_sparse=accept_large_sparse,
+                             dtype=dtype, order=order, copy=copy,
+                             force_all_finite=force_all_finite,
+                             ensure_2d=ensure_2d, allow_nd=allow_nd,
+                             ensure_min_samples=ensure_min_samples,
+                             ensure_min_features=ensure_min_features,
+                             estimator=estimator)
+        if X_cand.shape[1] is not X.shape[1]:
+            raise ValueError("The number of features of X_cand does not match"
+                             "the number of features of X")
+
+    if sample_weight is not None:
+        sample_weight = np.array(sample_weight)
+        check_consistent_length(y, sample_weight)
+        if y.ndim > 1 and y.shape[1] > 1 or \
+                sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
+            check_consistent_length(y.T, sample_weight.T)
+
+    if sample_weight is not None and X_cand is None:
+        return X, y, sample_weight
+    if sample_weight is None and X_cand is not None:
+        return X, y, X_cand
+    if sample_weight is not None and X_cand is not None:
+        return X, y, X_cand, sample_weight
     return X, y
