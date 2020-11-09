@@ -54,7 +54,6 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.classes = classes
         self.method = method
         self.C = C
-        self.random_state = random_state
         self.missing_label = missing_label
 
     def query(self, X_cand, X, y, return_utilities=False, **kwargs):
@@ -105,18 +104,16 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                 f"{self.method}"
             )
 
-        # Check the random state
-        self.random_state = check_random_state(self.random_state)
-
         # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
-        X, y = check_X_y(X, y, missing_label=self.missing_label)
+        X, y = check_X_y(X, y, force_all_finite=False,
+                         missing_label=self.missing_label)
 
-        # Calculate utilities and return the query indices
+        # Calculate utilities and return the output
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
                                               self.classes, self.C,
                                               self.method)
-        query_indices = rand_argmax([utilities], self.random_state, axis=1)
+        query_indices = rand_argmax(utilities, self.random_state)
         if return_utilities:
             return query_indices, np.array([utilities])
         else:

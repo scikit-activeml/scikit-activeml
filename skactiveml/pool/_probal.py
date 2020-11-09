@@ -7,7 +7,8 @@ from sklearn.utils import check_array, check_random_state
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import rand_argmax, MISSING_LABEL, check_X_y
+from skactiveml.utils import rand_argmax, MISSING_LABEL, check_X_y, \
+    check_scalar
 from skactiveml.utils import check_classifier_params
 
 
@@ -42,7 +43,6 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.clf = clf
         self.prior = prior
         self.m_max = m_max
-        self.random_state = random_state
 
     def query(self, X_cand, X, y, sample_weight, return_utilities=False):
         """Query the next instance to be labeled.
@@ -76,17 +76,12 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.clf = clone(self.clf)
 
         # Check if 'prior' is valid
-        if not isinstance(self.prior, (int, float)):
-            raise TypeError("'prior' must be an int or float.")
-        if self.prior <= 0:
-            raise ValueError("'prior' must be greater than zero.")
+        check_scalar(self.prior, 'prior', (float, int),
+                     min_inclusive=False, min_val=0)
 
         # Check if 'm_max' is valid
         if self.m_max < 1 or not float(self.m_max).is_integer():
             raise ValueError("'m_max' must be a positive integer.")
-
-        # Check the random state
-        self.random_state = check_random_state(self.random_state)
 
         # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
