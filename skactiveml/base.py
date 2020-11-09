@@ -114,7 +114,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         return NotImplemented
 
 
-class StreamBasedQueryStrategy(QueryStrategy):
+class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
        scikit-activeml.
 
