@@ -1,9 +1,10 @@
 import numpy as np
 from sklearn.base import clone
-from sklearn.utils import check_array, check_random_state, check_X_y
+from sklearn.utils import check_array, check_random_state
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from skactiveml.utils import check_classifier_params, is_labeled
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import ClassFrequencyEstimator
+from skactiveml.utils import check_classifier_params, is_labeled, check_X_y
 from skactiveml.utils import rand_argmax, MISSING_LABEL
 
 
@@ -78,16 +79,22 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        # Check class attributes
+        # Set the cost matrix to the default value if it is not given
+        if self.C is None:
+            self.C = 1 - np.eye(len(self.classes))
+
+        # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
         check_classifier_params(self.classes, self.missing_label, self.C)
+
+        # Check if the given classes are the same
         if not np.array_equal(self.clf.classes, self.classes):
             raise ValueError("The given classes are not the same as in the "
                              "classifier.")
-        if self.C is None:
-            self.C = 1 - np.eye(len(self.classes))
+
+        # Check if a valid method is given
         if self.method not in [ExpectedErrorReduction.EMR,
                                ExpectedErrorReduction.CSL,
                                ExpectedErrorReduction.LOG_LOSS]:
@@ -97,15 +104,18 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                 f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
                 f"{self.method}"
             )
+
+        # Check the random state
         self.random_state = check_random_state(self.random_state)
 
+        # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
-        X = check_array(X, force_all_finite=False)
-        y = check_array(y, force_all_finite=False, ensure_2d=False)
+        X, y = check_X_y(X, y, missing_label=self.missing_label)
 
-        utilities = expected_error_reduction(self.clf, X_cand, X, y,
-                                             self.classes, self.C, self.method)
-
+        # Calculate utilities and return the query indices
+        utilities = _expected_error_reduction(self.clf, X_cand, X, y,
+                                              self.classes, self.C,
+                                              self.method)
         query_indices = rand_argmax([utilities], self.random_state, axis=1)
         if return_utilities:
             return query_indices, np.array([utilities])
@@ -113,7 +123,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             return query_indices
 
 
-def expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
+def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
     """Compute least confidence as uncertainty scores.
 
     In case of a given cost matrix C, maximum expected cost is implemented as
@@ -144,10 +154,12 @@ def expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
     utilities: np.ndarray, shape (n_unlabeled_samples)
         The utilities of all unlabeled instances.
     """
+    # Check if 'X' and 'X_cand' have the same number of features
     if X.shape[0] > 0 and X_cand.shape[0] > 0 and \
             not X.shape[1] == X_cand.shape[1]:
         raise ValueError("X and X_cand must have the same number "
                          "of features.")
+
     clf = clone(clf)
     clf.fit(X, y)
 
