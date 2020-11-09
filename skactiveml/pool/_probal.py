@@ -5,8 +5,9 @@ from scipy.special import factorial, gammaln
 from sklearn import clone
 from sklearn.utils import check_array, check_random_state
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import ClassFrequencyEstimator
+from skactiveml.utils import rand_argmax, MISSING_LABEL, check_X_y
 from skactiveml.utils import check_classifier_params
 
 
@@ -43,7 +44,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.m_max = m_max
         self.random_state = random_state
 
-    def query(self, X_cand, X, y, weights, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, sample_weight, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
@@ -54,7 +55,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like (n_training_samples)
             Labels of the data set
-        weights: array-like (n_training_samples)
+        sample_weight: array-like (n_training_samples)
             Densities for each instance in X
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
@@ -67,31 +68,37 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        # Check class attributes
+        # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
+        check_classifier_params(self.clf.classes, self.clf.missing_label)
+        self.clf = clone(self.clf)
+
+        # Check if 'prior' is valid
         if not isinstance(self.prior, (int, float)):
             raise TypeError("'prior' must be an int or float.")
         if self.prior <= 0:
             raise ValueError("'prior' must be greater than zero.")
+
+        # Check if 'm_max' is valid
         if self.m_max < 1 or not float(self.m_max).is_integer():
             raise ValueError("'m_max' must be a positive integer.")
-        check_random_state(self.random_state)
-        self.clf = clone(self.clf)
-        check_classifier_params(self.clf.classes, self.clf.missing_label)
 
+        # Check the random state
+        self.random_state = check_random_state(self.random_state)
+
+        # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
-        X = check_array(X, force_all_finite=False)
-        y = check_array(y, force_all_finite=False, ensure_2d=False)
+        X, y = check_X_y(X, y, force_all_finite=False,
+                         missing_label=self.clf.missing_label)
 
-        # Calculate gains
+        # Calculate utilities and return the output
         self.clf.fit(X, y)
         k_vec = self.clf.predict_freq(X_cand)
-        utilities = weights * cost_reduction(k_vec, prior=self.prior,
-                                             m_max=self.m_max)
-        query_indices = rand_argmax(utilities, random_state=self.random_state)
-
+        utilities = sample_weight * _cost_reduction(k_vec, prior=self.prior,
+                                                    m_max=self.m_max)
+        query_indices = rand_argmax(utilities, self.random_state)
         if return_utilities:
             return query_indices, np.array([utilities])
         else:
@@ -370,7 +377,7 @@ def get_alpha(CM):
     return M[0] / np.sum(M)
 
 
-def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
+def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     """Calculate the expected cost reduction.
 
     Calculate the expected cost reduction for given maximum number of
@@ -399,7 +406,7 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     C = 1 - np.eye(n_classes) if C is None else np.asarray(C)
 
     # generate labelling vectors for all possible m values
-    l_vec_list = np.vstack([gen_l_vec_list(m, n_classes)
+    l_vec_list = np.vstack([_gen_l_vec_list(m, n_classes)
                             for m in range(m_max + 1)])
     m_list = np.sum(l_vec_list, axis=1)
     n_l_vecs = len(l_vec_list)
@@ -444,7 +451,7 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     return np.max(gains, axis=1)
 
 
-def gen_l_vec_list(m_approx, n_classes):
+def _gen_l_vec_list(m_approx, n_classes):
     """
     Creates all possible class labeling vectors for given number of
     hypothetically acquired labels and given number of classes.
