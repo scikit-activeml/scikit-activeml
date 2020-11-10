@@ -1,6 +1,8 @@
 import numpy as np
 import warnings
 
+from copy import deepcopy
+
 from sklearn.utils import check_array, check_random_state, check_scalar
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
@@ -43,13 +45,11 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix},
-        shape (n_cand_samples, n_features)
-            The samples which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+        X_cand : array-like, shape (n_samples, n_features)
+            Candidate samples from which the strategy can select.
+        X : array-like, shape (n_samples, n_features)
             Input samples used to fit the classifier.
-        y : {array-like, sparse matrix}, shape (n_samples)
+        y : array-like, shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
@@ -59,10 +59,14 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray, shape (batch_size)
-            The indices of samples in `X_cand` whose labels should be queried.
-        utilities: numpy.ndarray, (batch_size, n_cand_samples)
-            The utilities of all instances of `X_cand` after each selection
-            step (if return_utilities=True).
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+        utilities : numpy.ndarray, shape (batch_size, n_samples)
+            The utilities of all candidate samples after each selected
+            sample of the batch, e.g., `utilities[0]` indicates the utilities
+            used for selecting the first sample (with index `query_indices[0]`)
+            of the batch.
         """
         # Check X_cand to be a non-empty 2D array.
         X_cand = check_array(X_cand)
@@ -71,6 +75,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         if not isinstance(self.clf, CMM):
             raise TypeError(
                 "'clf' must be a 'CMM' but got {}".format(type(self.clf)))
+        cmm = deepcopy(self.clf)
 
         # Check batch size.
         check_scalar(batch_size, target_type=int, name='batch_size',
@@ -95,11 +100,11 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         random_state = check_random_state(self.random_state)
 
         # Fit the classifier and get the probabilities.
-        self.clf.fit(X, y)
-        P_cand = self.clf.predict_proba(X_cand)
-        R_cand = self.clf.mixture_model_.predict_proba(X_cand)
-        is_lbld = is_labeled(y, missing_label=self.clf.missing_label)
-        R_lbld = self.clf.mixture_model_.predict_proba(X[is_lbld])
+        cmm.fit(X, y)
+        P_cand = cmm.predict_proba(X_cand)
+        R_cand = cmm.mixture_model_.predict_proba(X_cand)
+        is_lbld = is_labeled(y, missing_label=cmm.missing_label)
+        R_lbld = cmm.mixture_model_.predict_proba(X[is_lbld])
 
         # Compute distance according to Eq. 9 in [1].
         P_cand_sorted = np.sort(P_cand, axis=1)
@@ -109,7 +114,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
                 np.max(distance_cand) - np.min(distance_cand) + 1.e-5)
 
         # Compute densities according to Eq. 10 in [1].
-        density_cand = self.clf.mixture_model_.score_samples(X_cand)
+        density_cand = cmm.mixture_model_.score_samples(X_cand)
         density_cand = (density_cand - np.min(density_cand) + 1.e-5) / (
                 np.max(density_cand) - np.min(density_cand) + 1.e-5)
 
@@ -117,14 +122,14 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         R_lbld_sum = np.sum(R_lbld, axis=0, keepdims=True)
         R_sum = R_cand + R_lbld_sum
         R_mean = R_sum / (len(R_lbld) + 1)
-        distribution_cand = self.clf.mixture_model_.weights_ - R_mean
+        distribution_cand = cmm.mixture_model_.weights_ - R_mean
         distribution_cand = np.maximum(np.zeros_like(distribution_cand),
                                        distribution_cand)
         distribution_cand = 1 - np.sum(distribution_cand, axis=1)
 
         # Compute rho according to Eq. 15  in [1].
         diff = np.sum(
-            np.abs(self.clf.mixture_model_.weights_ - np.mean(R_lbld, axis=0)))
+            np.abs(cmm.mixture_model_.weights_ - np.mean(R_lbld, axis=0)))
         rho = min(1, diff)
 
         # Compute e_dwus according to Eq. 13  in [1].
@@ -159,7 +164,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
                 R_sum = R_cand + np.sum(R_cand[is_selected], axis=0,
                                         keepdims=True) + R_lbld_sum
                 R_mean = R_sum / (len(R_lbld) + len(query_indices) + 1)
-                distribution_cand = self.clf.mixture_model_.weights_ - R_mean
+                distribution_cand = cmm.mixture_model_.weights_ - R_mean
                 distribution_cand = np.maximum(
                     np.zeros_like(distribution_cand), distribution_cand)
                 distribution_cand = 1 - np.sum(distribution_cand, axis=1)
