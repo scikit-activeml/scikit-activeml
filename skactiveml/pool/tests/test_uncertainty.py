@@ -71,7 +71,7 @@ class TestUncertainty(unittest.TestCase):
         clf.fit(self.X, self.y)
         probas = clf.predict_proba(self.X_cand)
         sort_probas = np.sort(probas, axis=1)
-        val_utilities = np.array([sort_probas[:, -2] - sort_probas[:, -1]])
+        val_utilities = np.array([1 + sort_probas[:, -2] - sort_probas[:, -1]])
         val_best_indices = rand_argmax(val_utilities, axis=1, random_state=self.random_state)
 
         np.testing.assert_array_equal(utilities, val_utilities)
@@ -87,7 +87,7 @@ class TestUncertainty(unittest.TestCase):
 
         clf.fit(self.X, self.y)
         probas = clf.predict_proba(self.X_cand)
-        val_utilities = np.array([-np.max(probas, axis=1)])
+        val_utilities = np.array([1-np.max(probas, axis=1)])
         val_best_indices = rand_argmax(val_utilities, axis=1, random_state=self.random_state)
 
         np.testing.assert_array_equal(utilities, val_utilities)

@@ -11,11 +11,13 @@ from scipy.optimize import minimize_scalar, minimize, LinearConstraint
 from scipy.interpolate import griddata
 
 from sklearn.base import clone
+from sklearn.utils import check_array
 from sklearn.linear_model import LogisticRegression  # , _logistic_loss
 from sklearn.linear_model._logistic import _logistic_loss
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, check_scalar
+from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
+    check_scalar, check_cost_matrix
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
@@ -166,13 +168,9 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
         # choose the method and calculate the utilities
         with np.errstate(divide='ignore'):
-            if self.method == 'least_confident':
-                utilities = -np.max(probas, axis=1)
-            elif self.method == 'margin_sampling':
-                sort_probas = np.sort(probas, axis=1)
-                utilities = sort_probas[:, -2] - sort_probas[:, -1]
-            elif self.method == 'entropy':
-                utilities = -np.sum(probas * np.log(probas), axis=1)
+            if self.method in ['least_confident', 'margin_sampling',
+                               'entropy']:
+                utilities = uncertainty_scores(P=probas, method=self.method)
             elif self.method == 'expected_average_precision':
                 utilities = expected_average_precision(
                     X_cand, self.classes, probas)
@@ -199,6 +197,72 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             return best_indices, batch_utilities
         else:
             return best_indices
+
+
+def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
+    """Computes uncertainty scores. Three methods are available: least
+    confident ('least_confident'), margin sampling ('margin_sampling'),
+    and entropy based uncertainty ('entropy') [1]. For the least confident and
+    margin sampling methods cost-sensitive variants are implemented in case of
+    a given cost matrix (see [2] for more information).
+
+    Parameters
+    ----------
+    P : array-like, shape (n_samples, n_classes)
+        Class membership probabilities for each sample.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i. Only supported for least confident
+        variant.
+    method : {'lc', 'sm', 'entropy'}, optional (default='lc')
+        Least confidence (lc) queries the sample whose maximal posterior
+        probability is minimal. In case of a given cost matrix, the maximial
+        expected cost variant is used. Smallest margin (sm) queries the sample
+        whose posterior probability gap between the most and the second most
+        probable class label is minimal. In case of a given cost matrix, the
+        cost-weighted minimum margin is used. Entropy ('entropy') queries the
+        sample whose posterior's have the maximal entropy. There is no
+        cost-sensitive variant of entropy based uncertainty sampling.
+
+    References
+    ----------
+    [1] Settles, Burr. "Active learning literature survey".
+        University of Wisconsin-Madison Department of Computer Sciences, 2009.
+    [2] Margineantu, Dragos D. "Active cost-sensitive learning."
+        In IJCAI, vol. 5, pp. 1622-1623. 2005.
+    """
+    # Check probabilities.
+    P = check_array(P)
+    n_classes = P.shape[1]
+
+    # Check cost matrix.
+    if cost_matrix is not None:
+        cost_matrix = check_cost_matrix(cost_matrix, n_classes=n_classes)
+
+    # Compute uncertainties.
+    if method == 'least_confident':
+        if cost_matrix is None:
+            return 1 - np.max(P, axis=1)
+        else:
+            costs = P @ cost_matrix
+            costs = np.partition(costs, 1, axis=1)[:, :2]
+            return costs[:, 0]
+    elif method == 'margin_sampling':
+        if cost_matrix is None:
+            P = -(np.partition(-P, 1, axis=1)[:, :2])
+            return 1 - np.abs(P[:, 0] - P[:, 1])
+        else:
+            costs = P @ cost_matrix
+            costs = np.partition(costs, 1, axis=1)[:, :2]
+            return -np.abs(costs[:, 0] - costs[:, 1])
+    elif method == 'entropy':
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return np.nansum(-P * np.log(P), axis=1)
+    else:
+        raise ValueError(
+            "Supported methods are ['least_confident', 'margin_sampling', "
+            "'entropy'], the given one is: {}.".format(method)
+        )
 
 
 # expected average precision:
