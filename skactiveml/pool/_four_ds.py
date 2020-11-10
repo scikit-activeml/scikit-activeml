@@ -181,7 +181,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
                         1 - distance_cand) + beta * density_cand + \
                                   lmbda * diversity_cand \
                                   + rho * distribution_cand
-                utilities[i, is_selected] = - np.inf
+                utilities[i, is_selected] = np.nan
                 query_indices[i] = rand_argmax(utilities[i], random_state)
                 is_selected[query_indices[i]] = True
 
