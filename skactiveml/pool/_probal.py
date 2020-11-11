@@ -1,12 +1,18 @@
 import itertools
+import warnings
+
 import numpy as np
 
+from copy import deepcopy
 from scipy.special import factorial, gammaln
 from sklearn import clone
+from sklearn.metrics import pairwise_kernels
 from sklearn.utils import check_array, check_random_state
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.classifier import PWC
+from skactiveml.utils import rand_argmax, MISSING_LABEL, check_cost_matrix, \
+    check_scalar, is_labeled
 from skactiveml.utils import check_classifier_params
 
 
@@ -97,10 +103,79 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         else:
             return query_indices
 
+class BayesianPriorLearner(PWC):
+    def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
+                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
+                 prior=None, random_state=None):
+        super().__init__(n_neighbors=n_neighbors, metric=metric,
+                       metric_dict=metric_dict, classes=classes,
+                       missing_label=missing_label, cost_matrix=cost_matrix,
+                       random_state=random_state)
+        self.prior = prior
+
+    def fit(self, X, y, sample_weight=None):
+        """Fit the model using X as training data and y as class labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the class labels of the training samples.
+            The number of class labels may be variable for the samples, where
+            missing labels are represented the attribute 'missing_label'.
+        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the weights of the training samples' class labels.
+            It must have the same shape as y.
+
+        Returns
+        -------
+        self: PWC,
+            The PWC is fitted on the training data.
+        """
+        super().fit(X=X, y=y, sample_weight=sample_weight)
+        n_classes = len(self.classes_)
+        if self.prior is None:
+            self._prior = np.zeros([1,n_classes])
+        else:
+            if self.prior.shape != (n_classes,):
+                raise ValueError(
+                    "Shape mismatch for 'prior': It is '{}' instead of '({"
+                    "})'".format(self.prior.shape, n_classes)
+                )
+            else:
+                self._prior = self.prior.reshape(1, -1)
+
+
+    def predict_proba(self, X):
+        """Return probability estimates for the test data X.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features) or
+        shape (n_samples, m_samples) if metric == 'precomputed'
+            Input samples.
+
+        Returns
+        -------
+        P : array-like, shape (n_samples, classes)
+            The class probabilities of the test samples. Classes are ordered
+            according to classes_.
+        """
+        # Normalize probabilities of each sample.
+        P = self.predict_freq(X) + self.prior
+        normalizer = np.sum(P, axis=1)
+        P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
+        P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
+        return P
 
 class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
-    def __init__(self, clf, classes, missing_label=MISSING_LABEL, perf_est=None, risk='error', mode='sequential', prior_cand=0.001, prior_eval=0.001, random_state=None, **kwargs):
+    def __init__(self, clf, metric='error', mode='default',
+                 max_nonmyopic_size=1, cost_vector=None, cost_matrix=None,
+                 custom_perf_func=None, prior_cand=1.e-3, prior_eval=1.e-3,
+                 estimator_metric='rbf', estimator_metric_dict={},
+                 random_state=None):
         # TODO @DK: clean up
         """ XPAL
         The cost-sensitive expected probabilistic active learning (CsXPAL) strategy is a generalization of the
@@ -110,87 +185,140 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         Attributes
         ----------
-        classes: list (n_classes)
-            List of all classes
-        risk: string
+        prob_estimator: BaseEstimator
+            The method that estimates the ground truth. The method should be
+            Bayesian, e.g. local learning with Bayesian Prior.
+        prob_estimator_eval: BaseEstimator
+            Similar to prob_estimator but used for calculating the
+            probabilities of evaluation instances. The default is to use the
+            prob_estimator if not given.
+        metric: string
             "error"
-            "accuracy"
+                equivalent to accuracy
+            "cost-vector"
+                requires cost-vector
             "misclassification-loss"
-                requires cost-matrix or cost-vector
+                requires cost-matrix
             "mean-abs-error"
             "macro-accuracy"
-                optional: prior_class_probability
+                optional: TODO: prior_class_probability
             "f1-score"
 
         cost_matrix: array-like (n_classes, n_classes)
         cost_vector: array-like (n_classes)
-        prior_class_probability: array-like (n_classes)
 
         mode: string
             The mode to select candidates:
-                "sequential" (default)
-                "batch"
-                    requires batch-size
-                "non-myopic"
-                    requires max_nonmyopic_size
+                "default" (default)
+                    Instances are selected sequentially using the non-myopic
+                    selection with max_nonmyopic_size into a batch.
+                "density-qpprox"
+                    no X_eval needed, but weights
 
-        batch_size: int
         max_nonmyopic_size: int
 
-        prior_cand: float (default 10^-3)
-        prior_eval: float (default 10^-3)
+        random_state
+
+        missing_label
 
         References
         ----------
-        [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra Spiliopoulou.
-            Multi-Class Probabilistic Active Learning,
-            vol. 285 of Frontiers in Artificial Intelligence and Applications, pages 586-594. IOS Press, 2016
-        [2] Georg Krempl, Daniel Kottke, Vincent Lemaire.
-            Optimised probabilistic active learning (OPAL),
-            vol. 100 oof Machine Learning, pages 449-476. Springer, 2015
+        [1] TODO: xpal arxiv, diss
         """
         super().__init__(random_state=random_state)
 
-        # TODO perf_est needs to implement predict_freq
         self.clf = clf
-        self.perf_est = perf_est
+        self.metric = metric
         self.mode = mode
-        self.missing_label = missing_label
+        self.max_nonmyopic_size = max_nonmyopic_size
+        self.cost_vector = cost_vector
+        self.cost_matrix = cost_matrix
+        self.custom_perf_func = custom_perf_func
+        self.prior_cand = prior_cand
+        self.prior_eval = prior_eval
+        self.estimator_metric = estimator_metric
+        self.estimator_metric_dict = estimator_metric_dict
 
-        # TODO remove self.classes
-        self.classes = classes
+    def _validate_input(self, X_cand, X, y, X_eval, batch_size, weights,
+                    return_utilities):
 
-        if risk == 'error' or risk == 'accuracy':
-            self.risk = 'misclassification-loss'
-            self.cost_matrix = 1 - np.eye(len(self.classes))
-        elif risk == 'misclassification-loss':
-            self.risk = 'misclassification-loss'
-            self.cost_matrix = kwargs.pop('cost_matrix', None)
-            if self.cost_matrix is None or self.cost_matrix.shape[0] != len(self.classes) or self.cost_matrix.shape[
-                1] != len(self.classes):
+        # init parameters
+        # TODO: implement and adapt, what happens if X_eval=self
+        # random_state = check_random_state(self.random_state, len(X_cand),
+        #                                   len(X_eval))
+        self._random_state = check_random_state(self.random_state)
+
+        check_classifier_params(self._classes, self._missing_label,
+                                self.cost_matrix)
+        check_scalar(self.prior_cand, target_type=float, name='prior_cand',
+                     min_val=0, min_inclusive=False)
+        check_scalar(self.prior_eval, target_type=float, name='prior_eval',
+                     min_val=0, min_inclusive=False)
+
+        self._batch_size = batch_size
+        check_scalar(self._batch_size, target_type=int, name='batch_size',
+                     min_val=1)
+        if len(X_cand) < self._batch_size:
+            warnings.warn(
+                "'batch_size={}' is larger than number of candidate samples "
+                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
+                    self._batch_size, len(X_cand)))
+            self._batch_size = len(X_cand)
+
+        # TODO: check if X_cand, X, X_eval have similar num_features
+        # TODO: check if X, y match
+        # TODO: check if weight match with X_cand
+        # TODO: check if return_utilities is bool
+
+    def _validate_and_transform_metric(self):
+        self._metric = None
+        if self.metric == 'error':
+            self._metric = 'misclassification-loss'
+            self._cost_matrix = 1 - np.eye(self._n_classes)
+        elif self.metric == 'cost-vector':
+            if self.cost_vector is None or \
+                    self.cost_vector.shape != (self._n_classes):
                 raise ValueError(
-                    "cost-matrix must be given and must have shape (n_classes x n_classes)"
+                    "For metric='cost-vector', the argument "
+                    "'cost_vector' must be given when initialized and must "
+                    "have shape (n_classes)"
                 )
-        elif risk == 'mean-abs-error':
-            self.risk = 'misclassification-loss'
-            row_matrix = np.arange(len(self.classes)).reshape(-1, 1) * np.ones([1, len(self.classes)])
-            self.cost_matrix = abs(row_matrix - row_matrix.T)
-        elif risk == 'macro-accuracy':
-            self.risk = risk
-            # the cost matrix for macro accuracy is overwritten in the risk difference step.
-            # it can be used to set the prior if you have prior knowledge about the data
-            prior_class_probability = kwargs.pop('prior_class_probability',
-                                                 np.ones(len(self.classes)) / len(self.classes))
-            self.cost_matrix = cost_vector_to_cost_matrix(1 / prior_class_probability)
+            self._metric = 'misclassification-loss'
+            self._cost_matrix = self.cost_vector.reshape(-1, 1) \
+                                @ np.ones([1, self._n_classes])
+            np.fill_diagonal(self._cost_matrix, 0)
 
-        # set the priors accordingly
-        alpha = get_alpha(self.cost_matrix)
-        # TODO: check alpha
+        elif self.metric == 'misclassification-loss':
+            if self.cost_matrix is None:
+                raise ValueError(
+                    "'cost_matrix' cannot be None for "
+                    "metric='misclasification-loss'"
+                )
+            check_cost_matrix(self.cost_matrix, self._n_classes)
+            self._metric = 'misclassification-loss'
+            self._cost_matrix = self.cost_matrix
+        elif self.metric == 'mean-abs-error':
+            self._metric = 'misclassification-loss'
+            row_matrix = np.arange(self._n_classes).reshape(-1, 1) @ np.ones(
+                [1, self._n_classes])
+            self._cost_matrix = abs(row_matrix - row_matrix.T)
+        elif self.metric == 'macro-accuracy':
+            self._metric = 'custom'
+            self._perf_func = macro_accuracy_func
+        elif self.metric == 'f1-score':
+            self._metric = 'custom'
+            self._perf_func = f1_score_func
+        elif self.metric == 'cohens-kappa':
+            # TODO: implement
+            self._metric = 'custom'
+            self._perf_func = self.custom_perf_func
+        else:
+            raise ValueError("Metric '{}' not implemented. Use "
+                             "metric='custom' instead.".format(
+                self.metric))
 
-        self.alpha_cand = prior_cand * alpha
-        self.alpha_eval = prior_eval * alpha
-
-    def query(self, X_cand, X, y, X_eval, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, X_eval, batch_size=1, weights=None,
+              return_utilities=False, **kwargs):
         """
 
         Attributes
@@ -201,13 +329,76 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             Labels of labeled samples
         X_cand: array-like (n_samples, n_features)
             Unlabeled candidate samples
-        X_eval: array-like (n_samples, n_features)
+        X_eval: array-like (n_samples, n_features) or string
             Unlabeled evaluation samples
         """
-        #labeled_idx = is_labeled(y, missing_label=self.missing_label)
-        #X = X[labeled_idx]
-        #y = y[labeled_idx]
 
+        # fit and initialize classifier to check if dimensions for classes
+        # are correct
+        self._cur_clf = deepcopy(self.clf).fit(X, y)
+        self._classes = self._cur_clf._le.classes_
+        self._n_classes = len(self._classes)
+        self._missing_label = self._cur_clf.missing_label
+
+        self._validate_and_transform_metric()
+
+        self._validate_input(X_cand, X, y, X_eval, batch_size, weights,
+              return_utilities)
+
+        # TODO: was passiert, wenn alpha nicht berechenbar ist oder das
+        #  perf basierend auf der confmat berechnet werden soll?
+        prior = calculate_optimal_prior(self._cost_matrix)
+        self._prior_cand = self.prior_cand * prior
+        self._prior_eval = self.prior_eval * prior
+
+
+        prob_kernel = lambda X, X_ : pairwise_kernels(X, X_,
+                                                metric=self.estimator_metric,
+                                                **self.estimator_metric_dict)
+
+        # filter out unlabeled for Bayesian Local Learner
+        mask_labeled = is_labeled(y, self._missing_label)
+        if np.sum(mask_labeled) == 0:
+            # TODO: how to cope with pairwise kernels, when X_ is empty?
+            mask_labeled[0] = True
+        X_ = X[mask_labeled]
+        y_ = y[mask_labeled]
+        K_c_x = prob_kernel(X_cand, X_)
+        K_e_x = prob_kernel(X_eval, X_)
+        K_e_c = prob_kernel(X_eval, X_cand)
+
+        prob_estimator_cand = BayesianPriorLearner(prior=self._prior_cand,
+                                    classes=self._classes,
+                                    missing_label=self._missing_label,
+                                    metric="precomputed")
+        prob_estimator_eval = BayesianPriorLearner(prior=self._prior_cand,
+                                    classes=self._classes,
+                                    missing_label=self._missing_label,
+                                    metric="precomputed")
+
+        prob_estimator_cand.fit(X_, y_)
+        prob_cand = prob_estimator_cand.predict_proba(K_c_x)
+
+        pred_old = self._cur_clf.predict(X_eval)
+
+        dperf_mat = np.empty_like(prob_cand)
+        for i_c in range(len(X_cand)):
+            X_new = np.concatenate([X_, [X_cand[i_c]]], axis=0)
+            K_e_cx = np.concatenate([K_e_x, K_e_c[:, [i_c]]], axis=1)
+            for i_y_sim, y_sim in enumerate(self._classes):
+                y_new = np.concatenate([y_, [y_sim]], axis=0)
+                prob_estimator_eval.fit(X_new, y_new)
+                prob_eval = prob_estimator_eval.predict_proba(K_e_cx)
+                new_clf = self._cur_clf.fit(X_new, y_new)
+                pred_new = new_clf.predict(X_eval)
+
+                dperf_mat[i_c, i_y_sim] = dperf(prob_eval, pred_old, pred_new,
+                                    self._metric, cost_matrix=self._cost_matrix,
+                                    perf_func=self._cost_matrix)
+
+        utilities = np.sum(prob_cand * dperf_mat, axis=1)
+
+        """
         if self.mode == 'sequential':
 
             if False: # hasattr(self.perf_est, 'predict_freq_seqal'):
@@ -256,20 +447,33 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                                                   classes=self.classes,
                                                   alpha_cand=self.alpha_cand, alpha_eval=self.alpha_eval,
                                                   risk=self.risk, cost_matrix=self.cost_matrix)
+        """
+        best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
+        if return_utilities:
+            return best_indices, np.array([utilities])
+        else:
+            return best_indices
 
-            best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
-            if return_utilities:
-                return best_indices, np.array([utilities])
-            else:
-                return best_indices
+def dperf(probs, pred_old, pred_new, metric, cost_matrix=None, perf_func=None):
+    if metric == 'misclassification-loss':
+        # TODO: check if cost_matrix is correct
+        pred_changed = (pred_new != pred_old)
+        return np.sum(probs[pred_changed, :] * (cost_matrix[pred_old[
+            pred_changed]] - cost_matrix[pred_new[pred_changed]])) / len(probs)
+    elif metric == 'custom':
+        # TODO: check if perf_func is correct
+        n_classes = probs.shape[1]
+        conf_mat_old = np.zeros([n_classes, n_classes])
+        conf_mat_new = np.zeros([n_classes, n_classes])
+        for y_pred in range(n_classes):
+            conf_mat_old[:, y_pred] += np.sum(probs[pred_old == y_pred], axis=0)
+            conf_mat_new[:, y_pred] += np.sum(probs[pred_new == y_pred], axis=0)
+        return perf_func(conf_mat_new) - perf_func(conf_mat_old)
+    else:
+        raise ValueError("metric unknown")
 
 
-def cost_vector_to_cost_matrix(cost_vector):
-    cost_matrix = np.array(cost_vector).reshape(-1, 1) @ np.ones((1, len(cost_vector)))
-    np.fill_diagonal(cost_matrix, 0)
-    return cost_matrix
-
-
+"""
 def compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat,
                               freq_eval_new_mat, pred_eval_new_mat, classes,
                               alpha_cand, alpha_eval, risk, **kwargs):
@@ -286,61 +490,13 @@ def compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat,
                                                           risk=risk, classes=classes, **kwargs)
 
     return -np.sum(risk_diff_mat * prob_cand, axis=1)
-
-
-def risk_difference(prob_eval_new, freq_eval, pred_eval, freq_eval_new,
-                    pred_eval_new, risk, classes, **kwargs):
-    # prob_eval_new (n_eval, n_classes)
-    # freq_eval     (n_eval, n_classes)
-    # freq_eval_new  (n_eval, n_classes)
-    if risk == 'error':
-        #pred_eval = np.argmax(freq_eval, axis=1)
-        #pred_eval_new = np.argmax(freq_eval_new, axis=1)
-        loss_diffs = np.array([np.array(y != pred_eval_new, int) - np.array(y != pred_eval, int) for y in classes]).T
-        return np.mean(np.sum(prob_eval_new * loss_diffs, axis=-1))
-    elif risk == 'misclassification-loss':
-        cost_matrix = kwargs.pop('cost_matrix', None)
-        #pred_eval = np.argmin(freq_eval @ cost_matrix, axis=1)
-        #pred_eval_new = np.argmin(freq_eval_new @ cost_matrix, axis=1)
-        loss_diffs = np.array([cost_matrix[y, pred_eval_new] - cost_matrix[y, pred_eval] for y in classes]).T
-        return np.mean(np.sum(prob_eval_new * loss_diffs, axis=-1))
-    elif risk == 'f1-score':
-        C = cost_vector_to_cost_matrix(1 / np.sum(prob_eval_new, axis=0))
-        #pred_eval = np.argmin(freq_eval @ C, axis=1)
-        #pred_eval_new = np.argmin(freq_eval_new @ C, axis=1)
-        conf_matrix, conf_matrix_new = get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes)
-        return score_f1(conf_matrix) - score_f1(conf_matrix_new)
-    elif risk == 'macro-accuracy':
-        C = cost_vector_to_cost_matrix(1 / np.sum(prob_eval_new, axis=0))
-        #pred_eval = np.argmin(freq_eval @ C, axis=1)
-        #pred_eval_new = np.argmin(freq_eval_new @ C, axis=1)
-        conf_matrix, conf_matrix_new = get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes)
-        # if score_macro_accuracy(conf_matrix) - score_macro_accuracy(conf_matrix_new) > 0:
-        # print(conf_matrix)
-        # print(conf_matrix_new)
-        return score_macro_accuracy(conf_matrix) - score_macro_accuracy(conf_matrix_new)
-    elif risk == 'accuracy':
-        #pred_eval = np.argmax(freq_eval, axis=1)
-        #pred_eval_new = np.argmax(freq_eval_new, axis=1)
-        conf_matrix, conf_matrix_new = get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes)
-        return score_accuracy(conf_matrix) - score_accuracy(conf_matrix_new)
-
-
-def get_conf_matrices(prob_eval_new, pred_eval, pred_eval_new, classes):
-    conf_matrix = np.full([len(classes), len(classes)], np.nan)
-    conf_matrix_new = np.full([len(classes), len(classes)], np.nan)
-    for i_y, y in enumerate(classes):
-        for i_y_hat, y_hat in enumerate(classes):
-            conf_matrix[i_y, i_y_hat] = np.sum(prob_eval_new[np.array([y_hat == pred_eval]).flatten(), i_y])
-            conf_matrix_new[i_y, i_y_hat] = np.sum(prob_eval_new[np.array([y_hat == pred_eval_new]).flatten(), i_y])
-    return conf_matrix, conf_matrix_new
-
+"""
 
 def score_recall(conf_matrix):
     return conf_matrix[-1, -1] / conf_matrix[-1, :].sum()
 
 
-def score_macro_accuracy(conf_matrix):
+def macro_accuracy_func(conf_matrix):
     return np.mean(conf_matrix.diagonal() / conf_matrix.sum(axis=1))
 
 
@@ -353,21 +509,23 @@ def score_precision(conf_matrix):
     return conf_matrix[-1, -1] / pos_pred if pos_pred > 0 else 0
 
 
-def score_f1(conf_matrix):
+def f1_score_func(conf_matrix):
     recall = score_recall(conf_matrix)
     precision = score_precision(conf_matrix)
     norm = recall + precision
     return 2 * recall * precision / norm if norm > 0 else 0
 
 
-def get_prior_prob(freq, alpha):
-    freq = freq + alpha
-    return freq / np.sum(freq, axis=-1, keepdims=True)
-
-
-def get_alpha(CM):
-    M = np.ones([1, len(CM)]) @ np.linalg.inv(CM)
-    return M[0] / np.sum(M)
+def calculate_optimal_prior(CM=None):
+    n_classes = len(CM)
+    if CM is None:
+        return np.full([n_classes], 1./n_classes)
+    else:
+        M = np.ones([1, len(CM)]) @ np.linalg.inv(CM)
+        if np.all(M[0] >= 0):
+            return M[0] / np.sum(M)
+        else:
+            return np.full([n_classes], 1. / n_classes)
 
 
 def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
