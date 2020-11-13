@@ -1,19 +1,19 @@
 import itertools
 import warnings
+from copy import deepcopy
 
 import numpy as np
-
-from copy import deepcopy
 from scipy.special import factorial, gammaln
 from sklearn import clone
 from sklearn.metrics import pairwise_kernels
 from sklearn.utils import check_array, check_random_state
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, \
+    ClassFrequencyEstimator
 from skactiveml.classifier import PWC
+from skactiveml.utils import check_classifier_params
 from skactiveml.utils import rand_argmax, MISSING_LABEL, check_cost_matrix, \
     check_scalar, is_labeled
-from skactiveml.utils import check_classifier_params
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -272,6 +272,8 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
     def _validate_and_transform_metric(self):
         self._metric = None
+        self._cost_matrix = None
+        self._perf_func = None
         if self.metric == 'error':
             self._metric = 'misclassification-loss'
             self._cost_matrix = 1 - np.eye(self._n_classes)
@@ -364,6 +366,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         X_ = X[mask_labeled]
         y_ = y[mask_labeled]
         K_c_x = prob_kernel(X_cand, X_)
+        # TODO: K_c_c only necessary when non-independent non-myopic OR
+        #  partially for batch selection
+        K_c_c = prob_kernel(X_cand, X_cand)
         K_e_x = prob_kernel(X_eval, X_)
         K_e_c = prob_kernel(X_eval, X_cand)
 
@@ -381,78 +386,86 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         pred_old = self._cur_clf.predict(X_eval)
 
+        # TODO: neighbor_mode: 'nearest', 'same'
+        #cand_idx_set = np.arange(len(X_cand)).reshape(-1,1)
+        m_max = 3
+        cand_idx_set = np.tile(np.arange(len(X_cand)), [m_max,1]).T
+        utilities = np.empty([len(X_cand)])
         dperf_mat = np.empty_like(prob_cand)
         for i_c in range(len(X_cand)):
-            X_new = np.concatenate([X_, [X_cand[i_c]]], axis=0)
-            K_e_cx = np.concatenate([K_e_x, K_e_c[:, [i_c]]], axis=1)
-            for i_y_sim, y_sim in enumerate(self._classes):
-                y_new = np.concatenate([y_, [y_sim]], axis=0)
-                prob_estimator_eval.fit(X_new, y_new)
-                prob_eval = prob_estimator_eval.predict_proba(K_e_cx)
-                new_clf = self._cur_clf.fit(X_new, y_new)
-                pred_new = new_clf.predict(X_eval)
+            utilities[i_c] = nonmyopic_gain(clf=self._cur_clf,
+                                            X_c=X_cand[cand_idx_set[i_c]],
+                                            X=X_,
+                                            y=y_,
+                                            prob_estimator_cand=prob_estimator_cand,
+                                            K_c_x=K_c_x[cand_idx_set[i_c],:],
+                                            K_c_c=K_c_c[cand_idx_set[i_c],:],
+                                            prob_estimator_eval=prob_estimator_eval,
+                                            K_e_x=K_e_x,
+                                            K_e_c=K_e_c[:, cand_idx_set[i_c]],
+                                            pred_old=pred_old, X_eval=X_eval,
+                                            classes=self._classes,
+                                            metric=self._metric,
+                                            cost_matrix=self._cost_matrix,
+                                            perf_func=self._perf_func)
 
-                dperf_mat[i_c, i_y_sim] = dperf(prob_eval, pred_old, pred_new,
-                                    self._metric, cost_matrix=self._cost_matrix,
-                                    perf_func=self._cost_matrix)
 
-        utilities = np.sum(prob_cand * dperf_mat, axis=1)
-
-        """
-        if self.mode == 'sequential':
-
-            if False: # hasattr(self.perf_est, 'predict_freq_seqal'):
-                # freq_cand          (n_cand, n_classes)
-                # pred_eval          (n_eval)
-                # freq_eval_new_mat  (n_cand, n_classes, n_eval, n_classes),
-                # pred_eval_new_mat  (n_cand, n_classes, n_eval)
-
-                freq_cand, freq_eval, freq_eval_new_mat = self.perf_est.predict_freq_seqal(X, y, X_cand, self.classes, X_eval)
-            else:
-                self.clf.fit(X, y)
-                pred_eval = self.clf.predict(X_eval).astype(int)
-                if self.perf_est is None:
-                    freq_cand = self.clf.predict_freq(X_cand)
-                    freq_eval = self.clf.predict_freq(X_eval)
-                else:
-                    self.perf_est.fit(X, y)
-                    freq_cand = self.perf_est.predict_freq(X_cand)
-                    freq_eval = self.perf_est.predict_freq(X_eval)
-
-                freq_eval_new_mat = np.full([len(X_cand), len(self.classes), len(X_eval), len(self.classes)], np.nan)
-                pred_eval_new_mat = np.full([len(X_cand), len(self.classes), len(X_eval)], np.nan, dtype=int)
-                for i_x_c, x_c in enumerate(X_cand):
-                    for i_y_c, y_c in enumerate(self.classes):
-                        X_new = np.vstack([X, [x_c]])
-                        y_new = np.hstack([y, [y_c]])
-
-                        self.clf.fit(X_new, y_new)
-                        pred_eval_new_mat[i_x_c, i_y_c, :] = self.clf.predict(X_eval).astype(int)
-                        if self.perf_est is None:
-                            freq_eval_new_mat[i_x_c, i_y_c, :, :] = self.clf.predict_freq(X_eval)
-                        else:
-                            self.perf_est.fit(X_new, y_new)
-                            freq_eval_new_mat[i_x_c, i_y_c, :, :] = self.perf_est.predict_freq(X_eval)
-
-            # TODO: np.broadcast_to (different old predictions for pred_eval => pred_eval_mat)
-            freq_eval_mat = np.tile(freq_eval, [len(X_cand), 1, 1])
-            pred_eval_mat = np.tile(pred_eval, [len(X_cand), 1]).astype(int)
-
-            # freq_cand          (n_cand, n_classes)
-            # freq_eval_mat      (n_cand, n_eval, n_classes)
-            # freq_eval_new_mat  (n_cand, n_classes, n_eval, n_classes)
-
-            utilities = compute_scores_sequential(freq_cand, freq_eval_mat, pred_eval_mat,
-                                                  freq_eval_new_mat, pred_eval_new_mat,
-                                                  classes=self.classes,
-                                                  alpha_cand=self.alpha_cand, alpha_eval=self.alpha_eval,
-                                                  risk=self.risk, cost_matrix=self.cost_matrix)
-        """
         best_indices = rand_argmax([utilities], axis=1, random_state=self.random_state)
         if return_utilities:
             return best_indices, np.array([utilities])
         else:
             return best_indices
+
+
+def nonmyopic_gain(clf, X_c, X, y,
+                   prob_estimator_cand, K_c_x, K_c_c,
+                   prob_estimator_eval, K_e_x, K_e_c,
+                   pred_old, X_eval, classes, metric, cost_matrix,
+                   perf_func, prob_mode='approx', label_mode='single'):
+    """
+    prob_mode: 'exact', 'approx' (instances are considered independent)
+    label_mode: 'all', 'single'
+    """
+
+    dperf_mat = np.full(len(X_c), np.nan)
+
+    prob_estimator_cand.fit(X, y)
+    prob_cand_y = prob_estimator_cand.predict_proba(K_c_x)
+
+    for i_c in range(len(X_c)):
+        X_new = np.concatenate([X, X_c[0:i_c+1]], axis=0)
+        K_e_cx = np.concatenate([K_e_x, K_e_c[:,0:i_c+1]], axis=1)
+
+        y_sim_list = _get_y_sim_list(n_classes=len(classes), n_instances=i_c+1,
+                                    label_mode=label_mode)
+        dperf_mat[i_c] = 0
+        for i_y_sim, y_sim in enumerate(y_sim_list):
+            if prob_mode == 'approx':
+                prob_y_sim = np.prod(prob_cand_y[range(i_c+1), y_sim])
+            elif i_c > 0 and prob_mode=='exact':
+                # TODO: all wrong
+                X_new = np.concatenate([X, X_c[0:i_c]], axis=0)
+                K_e_cx = np.concatenate([K_e_x, K_e_c[:, 0:i_c]], axis=1)
+                prob_estimator_cand.fit(X, y)
+                prob_cand_y = prob_estimator_cand.predict_proba(K_c_x)
+
+            y_new = np.concatenate([y, y_sim], axis=0)
+            prob_estimator_eval.fit(X_new, y_new)
+            prob_eval = prob_estimator_eval.predict_proba(K_e_cx)
+            new_clf = clf.fit(X_new, y_new)
+            pred_new = new_clf.predict(X_eval)
+
+            dperf_mat[i_c] += dperf(prob_eval, pred_old, pred_new,
+                                    metric=metric, cost_matrix=cost_matrix,
+                                    perf_func=perf_func) * prob_y_sim
+
+    return np.max(dperf_mat / np.arange(1, len(X_c)+1))
+
+def _get_y_sim_list(n_classes, n_instances, label_mode):
+    if label_mode=='all':
+        return list(itertools.product(*([range(n_classes)]*n_instances)))
+    if label_mode=='single':
+        return np.tile(np.arange(n_classes), [n_instances,1]).T
 
 def dperf(probs, pred_old, pred_new, metric, cost_matrix=None, perf_func=None):
     if metric == 'misclassification-loss':
