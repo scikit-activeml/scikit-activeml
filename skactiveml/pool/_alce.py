@@ -4,13 +4,13 @@ from sklearn.base import RegressorMixin
 from sklearn.neighbors import NearestNeighbors
 from sklearn.utils import check_array, check_random_state
 
-from skactiveml.base import PoolBasedQueryStrategy
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.pool._mdsp import MDSP
 from skactiveml.utils import rand_argmax, MISSING_LABEL
 from skactiveml.utils import check_cost_matrix, check_missing_label
 
 
-class ALCE(PoolBasedQueryStrategy):
+class ALCE(SingleAnnotPoolBasedQueryStrategy):
     """Active Learning with Cost Embedding (ALCE)
 
     Cost sensitive multi-class algorithm.
@@ -63,7 +63,8 @@ class ALCE(PoolBasedQueryStrategy):
         self.mds_params = mds_params
         self.nn_params = nn_params
 
-    def query(self, X_cand, X, y, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
+              **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -74,14 +75,16 @@ class ALCE(PoolBasedQueryStrategy):
             Complete data set
         y: array-like, shape (n_samples)
             Labels of the data set
+        batch_size: int, optional (default=1)
+            The number of instances to be selected.
         return_utilities: bool, optional (default=False)
             If True, the utilities are additionally returned.
 
         Returns
         -------
-        query_indices: np.ndarray, shape (1)
+        query_indices: np.ndarray, shape (batch_size)
             The index of the queried instance.
-        utilities: np.ndarray, shape (1, n_candidates)
+        utilities: np.ndarray, shape (batch_size, n_candidates)
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
