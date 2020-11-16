@@ -349,4 +349,3 @@ def check_random_state(random_state, seed_multiplier=1):
     seed = random_state.get_state()[1][0]
 
     return RandomState((seed * seed_multiplier) % (2 ** 32))
-
