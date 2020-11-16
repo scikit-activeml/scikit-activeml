@@ -83,8 +83,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         super().__init__(random_state=random_state)
 
     @abstractmethod
-    def query(self, X_cand, *args, A_cand=None, return_utilities=False,
-              **kwargs):
+    def query(self, X_cand, *args, A_cand=None, batch_size=1,
+              return_utilities=False, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
@@ -92,11 +92,17 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         ----------
         X_cand : array-like, shape (n_samples, n_features)
             Candidate samples from which the strategy can select.
-        A_cand : array-like, shape (n_samples, n_features)
+        A_cand : array-like, shape (n_samples, n_features), optional
+        (default=None)
             Boolean matrix where `A_cand[i,j] = True` indicates that
             annotator `j` can be selected for annotating sample `X_cand[i]`,
             while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`.
+            selected for annotating sample `X_cand[i]`. If A_cand=None, each
+            annotator is assumed to be available for labeling each sample.
+        batch_size : int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
 
         Returns
         -------
@@ -114,7 +120,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         return NotImplemented
 
 
-class StreamBasedQueryStrategy(QueryStrategy):
+class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
        scikit-activeml.
 

@@ -54,7 +54,7 @@ class TestFourDS(unittest.TestCase):
                                                return_utilities=True)
         self.assertEqual((3,), query_indices.shape)
         self.assertEqual((3, len(self.X)), utilities.shape)
-        self.assertEqual(3, np.sum(np.equal(utilities, -np.inf)))
+        self.assertEqual(3, np.sum(np.isnan(utilities)))
         al4ds = FourDS(clf=self.CMM, random_state=self.random_state)
         query_indices, utilities = al4ds.query(X_cand=self.X, X=self.X,
                                                batch_size=len(self.X) + 1,
@@ -62,7 +62,7 @@ class TestFourDS(unittest.TestCase):
         self.assertEqual((len(self.X),), query_indices.shape)
         self.assertEqual((len(self.X), len(self.X)), utilities.shape)
         self.assertEqual(np.sum(np.arange(0, len(self.X))),
-                         np.sum(np.equal(utilities, -np.inf)))
+                         np.sum(np.isnan(utilities)))
 
 
 if __name__ == '__main__':

@@ -2,12 +2,12 @@ import numpy as np
 
 from sklearn.utils import check_array
 
-from ..base import StreamBasedQueryStrategy
+from ..base import SingleAnnotStreamBasedQueryStrategy
 
 from .budget_manager import FixedBudget
 
 
-class RandomSampler(StreamBasedQueryStrategy):
+class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
     """The RandomSampler samples instances completely randomly. The probability
     to sample an instance is dependent on the budget specified in the
     budget_manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1) with
@@ -118,7 +118,7 @@ class RandomSampler(StreamBasedQueryStrategy):
         return self
 
 
-class PeriodicSampler(StreamBasedQueryStrategy):
+class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
     """The PeriodicSampler samples instances periodically. The length of that
     period is determined by the budget specified in the budget_manager. For
     instance, a budget of 25% would result in the PeriodicSampler sampling
