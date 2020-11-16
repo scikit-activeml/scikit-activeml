@@ -12,12 +12,13 @@ from scipy.interpolate import griddata
 
 from sklearn.base import clone
 from sklearn.utils import check_array
-from sklearn.linear_model import LogisticRegression  # , _logistic_loss
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model._logistic import _logistic_loss
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
-    check_scalar, check_cost_matrix
+    check_scalar, check_cost_matrix, simple_batch
+from ..classifier import SklearnClassifier
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
@@ -83,7 +84,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         self.missing_label = missing_label
         self.method = method
         self.classes = classes
-        self.clf = clone(clf)
+        self.clf = clf
         self.is_precompute = precompute
         self.precompute_array = None
 
@@ -108,22 +109,12 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         -------
         best_indices : np.ndarray, shape (batch_size)
             The index of the queried instance.
-        batch_utilities : np.ndarray,  shape (batch_size, len(X_cnad))
+        batch_utilities : np.ndarray,  shape (batch_size, len(X_cand))
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
 
         # validation:
-        # Check batch size
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        if len(X_cand) < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
-            batch_size = len(X_cand)
-
         # check self.method
         if (self.method != 'entropy' and self.method != 'least_confident' and
                 self.method != 'margin_sampling' and
@@ -134,7 +125,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             self.method = 'margin_sampling'
 
         # checks for method=margin_sampling
-        if (self.method is 'margin_sampling' and
+        if (self.method == 'margin_sampling' and
                 getattr(self.clf, 'predict_proba', None) is None):
             raise TypeError("'clf' must implement the method 'predict_proba'")
 
@@ -163,7 +154,8 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
         # fit the classifier and get the probabilities
         mask_labeled = is_labeled(y, self.missing_label)
-        self.clf.fit(X[mask_labeled], y[mask_labeled])
+        self.clf = SklearnClassifier(clone(self.clf))
+        self.clf.fit(X, y)
         probas = self.clf.predict_proba(X_cand)
 
         # choose the method and calculate the utilities
@@ -182,21 +174,9 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                 utilities = epistemic_uncertainty_logreg(
                     X[mask_labeled], y[mask_labeled], self.clf, probas)
 
-        # create batch
-        if batch_size is 'adaptive':
-            batch_size = 1
-        batch_utilities = np.empty((batch_size, len(X_cand)))
-        best_indices = np.empty(batch_size, dtype=int)
-        for i in range(batch_size):
-            best_indices[i] = rand_argmax(
-                [utilities], axis=1, random_state=self.random_state)
-            batch_utilities[i] = utilities
-            utilities[best_indices[i]] = np.nan
-        # Check whether utilities are to be returned.
-        if return_utilities:
-            return best_indices, batch_utilities
-        else:
-            return best_indices
+        return simple_batch(utilities, self.random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
 
 
 def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
@@ -277,7 +257,7 @@ def expected_average_precision(X_cand, classes, probas):
         precision.
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
-    proba : np.ndarray, shape=(n_X_cand, n_classes)
+    probas : np.ndarray, shape=(n_X_cand, n_classes)
         The probabiliti estimation for each classes and all instance in X_cand.
 
     Returns
@@ -332,39 +312,39 @@ def _f(n, t, p, f_arr, g_arr):
 
 
 # epistemic uncertainty:
-def epistemic_uncertainty_pwc(clf, X_cand, precomp):
+def epistemic_uncertainty_pwc(clf, X_cand, precompute_array):
     freq = clf.predict_freq(X_cand)
     n = freq[:, 0]
     p = freq[:, 1]
     res = np.full((len(freq)), np.nan)
-    if precomp is not None:
-        # enlarges the precomp array if necessary:
-        if precomp.shape[0] <= np.max(n) + 1:
-            new_shape = (int(np.max(n)) - precomp.shape[0] + 2, precomp.shape[1])
-            precomp = np.append(precomp, np.full(new_shape, np.nan), axis=0)
-        if precomp.shape[1] <= np.max(p) + 1:
-            new_shape = (precomp.shape[0], int(np.max(p)) - precomp.shape[1] + 2)
-            precomp = np.append(precomp, np.full(new_shape, np.nan), axis=1)
+    if precompute_array is not None:
+        # enlarges the precompute_array array if necessary:
+        if precompute_array.shape[0] <= np.max(n) + 1:
+            new_shape = (int(np.max(n)) - precompute_array.shape[0] + 2, precompute_array.shape[1])
+            precompute_array = np.append(precompute_array, np.full(new_shape, np.nan), axis=0)
+        if precompute_array.shape[1] <= np.max(p) + 1:
+            new_shape = (precompute_array.shape[0], int(np.max(p)) - precompute_array.shape[1] + 2)
+            precompute_array = np.append(precompute_array, np.full(new_shape, np.nan), axis=1)
 
         for f in freq:
             # compute the epistemic uncertainty:
-            for N in range(precomp.shape[0]):
-                for P in range(precomp.shape[1]):
-                    if np.isnan(precomp[N, P]):
+            for N in range(precompute_array.shape[0]):
+                for P in range(precompute_array.shape[1]):
+                    if np.isnan(precompute_array[N, P]):
                         pi1 = -minimize_scalar(_epistemic_pwc_sup_1, method='Bounded', bounds=(0.0, 1.0),
                                                args=(N, P)).fun
                         pi0 = -minimize_scalar(_epistemic_pwc_sup_0, method='Bounded', bounds=(0.0, 1.0),
                                                args=(N, P)).fun
                         pi = np.array([pi0, pi1])
-                        precomp[N, P] = np.min(pi, axis=0)
-        res = _interpolate(precomp, freq)
+                        precompute_array[N, P] = np.min(pi, axis=0)
+        res = _interpolate(precompute_array, freq)
     else:
         for i, f in enumerate(freq):
             pi1 = -minimize_scalar(_epistemic_pwc_sup_1, method='Bounded', bounds=(0.0, 1.0), args=(f[0], f[1])).fun
             pi0 = -minimize_scalar(_epistemic_pwc_sup_0, method='Bounded', bounds=(0.0, 1.0), args=(f[0], f[1])).fun
             pi = np.array([pi0, pi1])
             res[i] = np.min(pi, axis=0)
-    return res, precomp
+    return res, precompute_array
 
 
 # bilinear interpolation for epistemic_uncertainty_pwc
@@ -392,29 +372,37 @@ def _epistemic_pwc_sup_0(t, n, p):
     return -np.minimum(piH, 1 - 2 * t)
 
 
-# logistic regressionepistemic_uncertainty_logreg
+# logistic regression epistemic_uncertainty_logreg
 # alg 3
 def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
+    # calculate the maximum likelihood of the logistic function
+    theta_ml = np.insert(clf.coef_, len(X), clf.intercept_, axis=0)
+    L_ml = np.exp(loglike_logreg(theta_ml, X, y, gamma=1))
+    #
+    x0 = np.zeros((X_cand.shape[1]+1))  #
     # compute pi0, pi1 for every x in X_cand:
     pi0, pi1 = np.empty((len(probas))), np.empty((len(probas)))
     for i, x in enumerate(X_cand):
         Qn = np.linspace(0.0, 0.5, num=50, endpoint=False)
         Qp = np.linspace(0.5, 1.0, num=50, endpoint=False)
         pi1[i], pi0[i] = np.maximum(2 * probas[i] - 1, 0), np.maximum(1 - 2 * probas[i], 0)
+        #
+        A = np.insert(x, len(x), 1)
         for q in range(100):
             idx_an, idx_ap = np.argmin(Qn), np.argmax(Qp)
             alpha_n, alpha_p = Qn[idx_an], Qp[idx_ap]
             if 2 * alpha_p - 1 > pi1[i]:
                 # solve 22 -> theta
                 bounds = np.log(alpha_p / (1 - alpha_p))
-                A = np.insert(x, len(x), 1)
                 constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
-                x0 = np.zeros((A.shape[0]))  #
-                theta = minimize(loglik_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(clf, X, y)).x  #
-                pi1[i] = np.maximum(pi1[i], np.min(pi_h(theta, clf, X, y), 2 * alpha_p - 1))
+                theta = minimize(loglike_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(X, y)).x  #
+                pi1[i] = np.maximum(pi1[i], np.min(pi_h(theta, L_ml, X, y), 2 * alpha_p - 1))
             if 1 - 2 * alpha_n > pi0[i]:
                 # solve 22 -> theta
-                pi0[i] = np.maximum(pi0[i], np.min(pi_h(theta, clf, X, y), 1 - 2 * alpha_n))
+                bounds = np.log(alpha_p / (1 - alpha_p))
+                constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
+                theta = minimize(loglike_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(X, y)).x  #
+                pi0[i] = np.maximum(pi0[i], np.min(pi_h(theta, L_ml, X, y), 1 - 2 * alpha_n))
 
             Qn, Qp = np.delete(Qn, idx_an), np.delete(Qp, idx_ap)
 
@@ -422,24 +410,10 @@ def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
     return utilities
 
 
-def loglik_logreg(theta, clf, X, y, gamma=1):
-    return _logistic_loss(theta, X, y, gamma, sample_weight=None)
-    # L = np.exp(-_logistic_loss(theta, X, y, gamma, sample_weight=None))
-    #
-    # return clf.fit(X,y).get_parms(deep=False)#
-    #
-    c = theta[-1]
-    theta = theta[:-1]
-    lin = [c + np.dot(theta, x) for x in X]
-    result = y.dot(lin)
-    result -= np.sum(np.log(1 + np.exp(lin)))
-    result -= gamma * np.sum(theta ** 2) / 2
-    return -result
+def loglike_logreg(theta, X, y, gamma=1):
+    return -_logistic_loss(theta, X, y, gamma, sample_weight=None)
 
 
-def pi_h(theta, clf, X, y, gamma=1):
-    L_theta = -loglik_logreg(theta, clf, X, y, gamma)
-    # can be precomputed:
-    theta_ml = np.insert(clf.coef_, len(X), clf.intercept_, axis=0)
-    L_ml = -loglik_logreg(theta_ml, clf, X, y, gamma=1)
+def pi_h(theta, L_ml, X, y, gamma=1):
+    L_theta = np.exp(loglike_logreg(theta, X, y, gamma))
     return L_theta / L_ml
