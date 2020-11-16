@@ -1,11 +1,14 @@
 import numpy as np
 import warnings
 
+from sklearn import clone
+
 from ..base import SingleAnnotPoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_random_state, check_array
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, check_scalar
+from sklearn.utils import check_array
+from ..utils import is_labeled, MISSING_LABEL, check_X_y, check_scalar, \
+    simple_batch
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
@@ -130,7 +133,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                 warnings.warn('\'ensemble\' is not specified, '
                               '\'BaggingClassifier\' will be used.')
                 self.ensemble = BaggingClassifier
-            self.clf = self.ensemble(base_estimator=self.clf, random_state=self.random_state)
+            self.clf = self.ensemble(base_estimator=clone(self.clf),
+                                     random_state=self.random_state)
 
         # check X, y and X_cand
         X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
@@ -146,22 +150,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         elif self.method == 'vote_entropy':
             utilities = vote_entropy(self.clf, X_cand, )
 
-        # create batch
-        if batch_size is 'adaptive':
-            batch_size = 1
-        batch_utilities = np.empty((batch_size, len(X_cand)))
-        best_indices = np.empty(batch_size, dtype=int)
-        for i in range(batch_size):
-            best_indices[i] = rand_argmax(
-                [utilities], axis=1, random_state=self.random_state)
-            batch_utilities[i] = utilities
-            utilities[best_indices[i]] = np.nan
-
-        # Check whether utilities are to be returned.
-        if return_utilities:
-            return best_indices, batch_utilities
-        else:
-            return best_indices
+        return simple_batch(utilities, self.random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
 
 
 def average_KL_divergence(ensemble, X_cand):
