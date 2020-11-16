@@ -40,8 +40,9 @@ class TestEER(unittest.TestCase):
 
         eer = EER(clf=self.clf, classes=[0, 1, 2, 3])
         self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
-        self.assertRaises(ValueError, EER, self.clf, self.classes,
-                          random_state='string')
+
+        eer = EER(clf=self.clf, classes=self.classes, random_state='string')
+        self.assertRaises(ValueError, eer.query, self.X_cand, self.X, self.y)
 
         eer = EER(clf=self.clf, classes=self.classes, missing_label=[1, 2, 3])
         self.assertRaises(TypeError, eer.query, self.X_cand, self.X, self.y)

@@ -2,6 +2,7 @@ import numpy as np
 
 from sklearn.utils import check_array, check_scalar
 from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils._validation import check_random_state
 
 
 class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
@@ -43,6 +44,9 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
 
         # Check 'batch_size'
         check_scalar(batch_size, 'batch_size', int, min_val=1)
+
+        # Check random state
+        self.random_state = check_random_state(self.random_state)
 
         utilities = self.random_state.random_sample(len(X_cand))
 

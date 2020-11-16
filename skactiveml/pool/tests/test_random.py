@@ -11,7 +11,8 @@ class TestEER(unittest.TestCase):
         self.X_cand = np.zeros((1000, 2))
 
     def test_init(self):
-        self.assertRaises(ValueError, RandomSampler, random_state='string')
+        rand = RandomSampler(random_state='string')
+        self.assertRaises(ValueError, rand.query, self.X_cand)
 
     def test_query(self):
         rand = RandomSampler()

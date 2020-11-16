@@ -6,6 +6,7 @@ from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
 from skactiveml.utils import check_classifier_params, check_scalar, check_X_y
 from skactiveml.utils import rand_argmax, MISSING_LABEL, is_labeled
+from skactiveml.utils._validation import check_random_state
 
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
@@ -90,6 +91,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
         check_classifier_params(self.classes, self.missing_label, self.C)
+
+        # Check random state
+        self.random_state = check_random_state(self.random_state)
 
         # Check if the given classes are the same
         if not np.array_equal(self.clf.classes, self.classes):

@@ -86,6 +86,9 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         if self.m_max < 1 or not float(self.m_max).is_integer():
             raise ValueError("'m_max' must be a positive integer.")
 
+        # Check random state
+        self.random_state = check_random_state(self.random_state)
+
         # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
         X, y = check_X_y(X, y, force_all_finite=False,

@@ -22,17 +22,23 @@ class TestMCPAL(unittest.TestCase):
         pal = McPAL(clf=3)
         self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
-        self.assertRaises(ValueError, McPAL, self.clf, self.classes,
-                          random_state='string')
+
+        pal = McPAL(clf=self.clf, random_state='string')
+        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
+                          self.sample_weight)
+
         pal = McPAL(self.clf, prior=0)
         self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
+
         pal = McPAL(self.clf, prior='wrong_value')
         self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
+
         pal = McPAL(self.clf, m_max=-2)
         self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
+
         pal = McPAL(self.clf, m_max=1.5)
         self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
