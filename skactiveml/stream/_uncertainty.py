@@ -4,7 +4,7 @@ from sklearn.utils import check_array
 
 from sklearn.base import is_classifier, clone
 
-from ..base import StreamBasedQueryStrategy
+from ..base import SingleAnnotStreamBasedQueryStrategy
 
 from ..classifier import PWC
 
@@ -15,7 +15,7 @@ import copy
 from .budget_manager import FixedBudget
 
 
-class FixedUncertainty(StreamBasedQueryStrategy):
+class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """The FixedUncertainty (Fixed-Uncertainty in [1]) query strategy samples
     instances based on the classifiers uncertainty assessed based on the
     classifier's predictions. The instance is sampled when the probability of
@@ -94,7 +94,7 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         if X is not None and y is not None:
             if self.clf is None:
                 clf = PWC(
-                    random_state=self.random_state_.randint(2**32-1))
+                    random_state=self.random_state_.randint(2**31-1))
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
@@ -147,7 +147,7 @@ class FixedUncertainty(StreamBasedQueryStrategy):
         return self
 
 
-class VariableUncertainty(StreamBasedQueryStrategy):
+class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """The VariableUncertainty (Var-Uncertainty in [1]) query strategy samples
     instances based on the classifiers uncertainty assessed based on the
     classifier's predictions. The instance is sampled when the probability of
@@ -229,7 +229,7 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         if X is not None and y is not None:
             if self.clf is None:
                 clf = PWC(
-                    random_state=self.random_state_.randint(2**32-1))
+                    random_state=self.random_state_.randint(2**31-1))
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
@@ -313,7 +313,7 @@ class VariableUncertainty(StreamBasedQueryStrategy):
         return self
 
 
-class Split(StreamBasedQueryStrategy):
+class Split(SingleAnnotStreamBasedQueryStrategy):
     """The Split [1] query strategy samples in 100*s% of instances randomly and
     in 100*(1-s)% of cases according to VarUncertainty.
 
@@ -392,7 +392,7 @@ class Split(StreamBasedQueryStrategy):
         if X is not None and y is not None:
             if self.clf is None:
                 clf = PWC(
-                    random_state=self.random_state_.randint(2**32-1))
+                    random_state=self.random_state_.randint(2**31-1))
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
@@ -405,14 +405,14 @@ class Split(StreamBasedQueryStrategy):
         if not hasattr(self, 'random_sampler_'):
             self.random_sampler_ = RandomSampler(
                 self.budget_manager_,
-                random_state=self.random_state_.randint(2**32-1))
+                random_state=self.random_state_.randint(2**31-1))
         if not hasattr(self, 'variable_uncertainty_'):
             self.variable_uncertainty_ = VariableUncertainty(
                 clf,
                 self.budget_manager_,
                 theta=self.theta,
                 s=self.s,
-                random_state=self.random_state_.randint(2**32-1))
+                random_state=self.random_state_.randint(2**31-1))
         # copy random state in case of simulating the query
         prior_random_state_state = self.random_state_.get_state()
 

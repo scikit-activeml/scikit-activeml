@@ -1,9 +1,9 @@
 from sklearn.utils import check_array
 
-from ..base import PoolBasedQueryStrategy
+from ..base import SingleAnnotPoolBasedQueryStrategy
 
 
-class RandomSampler(PoolBasedQueryStrategy):
+class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
 
     def __init__(self, batch_size=1, random_state=None):
         super().__init__(random_state=random_state)

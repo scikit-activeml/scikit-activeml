@@ -1,34 +1,40 @@
 import numpy as np
 import unittest
-import warnings
 
-from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
+from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.ensemble import BaggingClassifier
-from skactiveml.classifier import PWC
+
+from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.utils import rand_argmax
 
 from skactiveml.pool import QBC
+
 
 class TestQBC(unittest.TestCase):
 
     def setUp(self):
         self.random_state = 42
-        self.X_cand = np.array([[8,1,6,8],[9,1,6,5],[5,1,6,5]])
-        self.X = np.array([[1,2,5,9],[5,8,4,6],[8,4,5,9],[5,4,8,5]])
-        self.y = np.array([0,0,1,1])
-        self.classes = np.array([0,1])
+        self.X_cand = np.array([[8, 1, 6, 8], [9, 1, 6, 5], [5, 1, 6, 5]])
+        self.X = np.array([[1, 2, 5, 9], [5, 8, 4, 6], [8, 4, 5, 9], [5, 4, 8, 5]])
+        self.y = np.array([0, 0, 1, 1])
+        self.classes = np.array([0, 1])
         pass
 
-
     def test_query(self):
-        self.assertRaises(ValueError, QBC, clf=GaussianProcessClassifier(), method ='this_method_does_not_exist')
-        self.assertRaises(TypeError, QBC, clf=None, method='vote_entropy')
-        self.assertRaises(TypeError, QBC, clf=None, method='KL_divergence')
-        
+        clf = SklearnClassifier(GaussianProcessClassifier())
+        select = QBC(clf=clf, method='this_method_does_not_exist')
+        self.assertRaises(ValueError, select.query, self.X_cand, self.X, self.y)
+        select = QBC(clf=None, method='vote_entropy')
+        self.assertRaises(TypeError, select.query, self.X_cand, self.X, self.y)
+        select = QBC(clf=None, method='KL_divergence')
+        self.assertRaises(TypeError, select.query, self.X_cand, self.X, self.y)
+
         clf = PWC(random_state=self.random_state, classes=self.classes)
-        ensemble = BaggingClassifier(base_estimator=clf,random_state=self.random_state)
+        QBC(clf=clf).query(self.X_cand, self.X, self.y)
+        ensemble = BaggingClassifier(base_estimator=clf, random_state=self.random_state)
+
         # KL_divergence
-        qbc = QBC(clf=clf, method='KL_divergence', random_state=self.random_state)
+        qbc = QBC(clf=ensemble, method='KL_divergence', random_state=self.random_state)
         best_indices, utilities = qbc.query(self.X_cand, self.X, self.y, return_utilities=True)
 
         ensemble.fit(self.X, self.y)
@@ -42,7 +48,7 @@ class TestQBC(unittest.TestCase):
 
         # vote_entropy
         qbc = QBC(clf=clf, method='vote_entropy', random_state=self.random_state)
-        best_indices, utilities = qbc.query(self.X_cand, self.X, self.y, return_utilities=True, random_state=self.random_state)
+        best_indices, utilities = qbc.query(self.X_cand, self.X, self.y, return_utilities=True)
 
         ensemble.fit(self.X, self.y)
         val_utilities = np.array([vote_entropy(ensemble, self.X_cand, self.classes)])
@@ -56,19 +62,19 @@ class TestQBC(unittest.TestCase):
 
 def average_KL_divergence(ensemble, X_cand):
     estimators = ensemble.estimators_
-    com_probas = np.zeros((len(estimators),len(X_cand),ensemble.n_classes_))
+    com_probas = np.zeros((len(estimators), len(X_cand), ensemble.n_classes_))
     for i, e in enumerate(estimators):
-        com_probas[i,:,:] = e.predict_proba(X_cand)
+        com_probas[i, :, :] = e.predict_proba(X_cand)
 
-    consensus = np.sum(com_probas, axis=0)/len(estimators)
+    consensus = np.sum(com_probas, axis=0) / len(estimators)
     scores = np.zeros((len(X_cand)))
     for i, x in enumerate(X_cand):
         for c in range(len(estimators)):
             for y in range(ensemble.n_classes_):
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    if com_probas[c,i,y] != 0.0:
-                        scores[i] += com_probas[c,i,y]*np.log(com_probas[c,i,y]/consensus[i,y])
-    scores = scores/ensemble.n_classes_
+                    if com_probas[c, i, y] != 0.0:
+                        scores[i] += com_probas[c, i, y] * np.log(com_probas[c, i, y] / consensus[i, y])
+    scores = scores / ensemble.n_classes_
     return scores
 
 
@@ -82,16 +88,16 @@ def vote_entropy(ensemble, X_cand, classes):
     for i in range(len(X_cand)):
         for c in range(len(classes)):
             for m in range(len(estimators)):
-                vote_count[i,c] += (votes[i,m] == c)
-        
+                vote_count[i, c] += (votes[i, m] == c)
+
     vote_entropy = np.zeros(len(X_cand))
     for i in range(len(X_cand)):
         for c in range(len(classes)):
-            if vote_count[i,c]!=0:
-                a = vote_count[i,c]/len(estimators)
-                vote_entropy[i] += a*np.log(a)
-    vote_entropy *= -1/np.log(len(estimators))
-        
+            if vote_count[i, c] != 0:
+                a = vote_count[i, c] / len(estimators)
+                vote_entropy[i] += a * np.log(a)
+    vote_entropy *= -1 / np.log(len(estimators))
+
     return vote_entropy
 
 
