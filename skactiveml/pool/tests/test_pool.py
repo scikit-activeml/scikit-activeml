@@ -38,6 +38,6 @@ class TestGeneral(unittest.TestCase):
                     unlabeled = np.where(is_unlabeled(y))[0]
                     clf.fit(self.X, y)
                     unlabeled_id = qs.query(self.X[unlabeled], X=self.X, y=y, X_eval=self.X,
-                                            weights=np.ones(len(unlabeled)))
+                                            sample_weight=np.ones(len(unlabeled)))
                     sample_id = unlabeled[unlabeled_id]
                     y[sample_id] = self.y_true[sample_id]
