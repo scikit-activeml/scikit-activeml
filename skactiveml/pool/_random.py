@@ -46,7 +46,7 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
 
         utilities = self.random_state.random_sample(len(X_cand))
 
-        best_indices = utilities.argsort()[-self.batch_size:][::-1]
+        best_indices = utilities.argsort()[-batch_size:][::-1]
 
         if return_utilities:
             return best_indices, np.array([utilities])
