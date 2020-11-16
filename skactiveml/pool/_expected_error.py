@@ -1,11 +1,11 @@
 import numpy as np
 from sklearn.base import clone
-from sklearn.utils import check_array, check_random_state
+from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import check_classifier_params, is_labeled, check_X_y
-from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.utils import check_classifier_params, check_scalar, check_X_y
+from skactiveml.utils import rand_argmax, MISSING_LABEL, is_labeled
 
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
@@ -56,7 +56,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.C = C
         self.missing_label = missing_label
 
-    def query(self, X_cand, X, y, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
+              **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -67,14 +68,16 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like, shape (n_samples)
             Labels of the data set
+        batch_size: int, optional (default=1)
+            The number of instances to be selected.
         return_utilities: bool, optional (default=False)
             If True, the utilities are additionally returned.
 
         Returns
         -------
-        query_indices: np.ndarray, shape (1)
+        query_indices: np.ndarray, shape (batch_size)
             The index of the queried instance.
-        utilities: np.ndarray, shape (1, n_candidates)
+        utilities: np.ndarray, shape (batch_size, n_candidates)
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
@@ -108,6 +111,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
         X, y = check_X_y(X, y, force_all_finite=False,
                          missing_label=self.missing_label)
+
+        # Check 'batch_size'
+        check_scalar(batch_size, 'batch_size', int, min_val=1)
 
         # Calculate utilities and return the output
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,

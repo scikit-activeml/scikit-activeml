@@ -44,7 +44,8 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X_cand, X, y, sample_weight, return_utilities=False):
+    def query(self, X_cand, X, y, sample_weight, batch_size=1,
+              return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
@@ -55,6 +56,8 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like (n_training_samples)
             Labels of the data set
+        batch_size: int, optional (default=1)
+            The number of instances to be selected.
         sample_weight: array-like (n_training_samples)
             Densities for each instance in X
         return_utilities: bool (default=False)
@@ -87,6 +90,9 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
         X, y = check_X_y(X, y, force_all_finite=False,
                          missing_label=self.clf.missing_label)
+
+        # Check 'batch_size'
+        check_scalar(batch_size, 'batch_size', int, min_val=1)
 
         # Calculate utilities and return the output
         self.clf.fit(X, y)
