@@ -3,6 +3,7 @@ import unittest
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_missing_label, check_scalar, check_X_y
+from skactiveml.utils._validation import check_random_state
 
 
 class TestValidation(unittest.TestCase):
@@ -52,6 +53,14 @@ class TestValidation(unittest.TestCase):
         X_cand = [[5, 6]]
         sample_weight = [0.4, 0.6]
         check_X_y(X, y, X_cand, sample_weight)
+
+    def test_check_random_state(self):
+        seed = 12
+        multiplier = 3
+        random_state = check_random_state(seed, seed_multiplier=multiplier)
+        new_seed = random_state.get_state()[1][0]
+        self.assertEqual(new_seed, seed * multiplier)
+
 
 if __name__ == '__main__':
     unittest.main()
