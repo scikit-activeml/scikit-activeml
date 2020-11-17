@@ -1,10 +1,11 @@
 import numpy as np
 from sklearn.base import clone
-from sklearn.utils import check_array, check_random_state, check_X_y
+from sklearn.utils import check_array
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from skactiveml.utils import check_classifier_params, is_labeled
-from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import ClassFrequencyEstimator
+from skactiveml.utils import check_classifier_params, check_scalar, check_X_y
+from skactiveml.utils import rand_argmax, MISSING_LABEL, is_labeled
 
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
@@ -53,10 +54,10 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.classes = classes
         self.method = method
         self.C = C
-        self.random_state = random_state
         self.missing_label = missing_label
 
-    def query(self, X_cand, X, y, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
+              **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -67,27 +68,35 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like, shape (n_samples)
             Labels of the data set
+        batch_size: int, optional (default=1)
+            The number of instances to be selected.
         return_utilities: bool, optional (default=False)
             If True, the utilities are additionally returned.
 
         Returns
         -------
-        query_indices: np.ndarray, shape (1)
+        query_indices: np.ndarray, shape (batch_size)
             The index of the queried instance.
-        utilities: np.ndarray, shape (1, n_candidates)
+        utilities: np.ndarray, shape (batch_size, n_candidates)
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        # Check class attributes
+        # Set the cost matrix to the default value if it is not given
+        if self.C is None:
+            self.C = 1 - np.eye(len(self.classes))
+
+        # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
         check_classifier_params(self.classes, self.missing_label, self.C)
+
+        # Check if the given classes are the same
         if not np.array_equal(self.clf.classes, self.classes):
             raise ValueError("The given classes are not the same as in the "
                              "classifier.")
-        if self.C is None:
-            self.C = 1 - np.eye(len(self.classes))
+
+        # Check if a valid method is given
         if self.method not in [ExpectedErrorReduction.EMR,
                                ExpectedErrorReduction.CSL,
                                ExpectedErrorReduction.LOG_LOSS]:
@@ -97,23 +106,27 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                 f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
                 f"{self.method}"
             )
-        self.random_state = check_random_state(self.random_state)
 
+        # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
-        X = check_array(X, force_all_finite=False)
-        y = check_array(y, force_all_finite=False, ensure_2d=False)
+        X, y = check_X_y(X, y, force_all_finite=False,
+                         missing_label=self.missing_label)
 
-        utilities = expected_error_reduction(self.clf, X_cand, X, y,
-                                             self.classes, self.C, self.method)
+        # Check 'batch_size'
+        check_scalar(batch_size, 'batch_size', int, min_val=1)
 
-        query_indices = rand_argmax([utilities], self.random_state, axis=1)
+        # Calculate utilities and return the output
+        utilities = _expected_error_reduction(self.clf, X_cand, X, y,
+                                              self.classes, self.C,
+                                              self.method)
+        query_indices = rand_argmax(utilities, self.random_state)
         if return_utilities:
             return query_indices, np.array([utilities])
         else:
             return query_indices
 
 
-def expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
+def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
     """Compute least confidence as uncertainty scores.
 
     In case of a given cost matrix C, maximum expected cost is implemented as
@@ -144,10 +157,12 @@ def expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
     utilities: np.ndarray, shape (n_unlabeled_samples)
         The utilities of all unlabeled instances.
     """
+    # Check if 'X' and 'X_cand' have the same number of features
     if X.shape[0] > 0 and X_cand.shape[0] > 0 and \
             not X.shape[1] == X_cand.shape[1]:
         raise ValueError("X and X_cand must have the same number "
                          "of features.")
+
     clf = clone(clf)
     clf.fit(X, y)
 
