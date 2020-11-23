@@ -17,16 +17,29 @@ Homogeneous naming scheme
 -------------------------
 To simplify the use of this library, a homogeneous naming scheme is important. Thus, the following attribute and parameter names are to be used when appropriately:
 
-* Attributes:
-    * clf
-    * classes
-    * missing_label
-* Parameters
-    * X_cand
-    * X
-    * y
-    * return_utilities
-    * batch_size
+* Parameters of `__init__()`:
+    * all optional
+    * `clf`
+    * `classes`
+    * `missing_label`
+    * `random_state`
+    * `metric`
+    * `cost_matrix`
+    * `budget_manager` (stream)
+* Parameters of `query()`:
+    * `X_cand`
+    * `X` | `X_train`
+    * `y` | `y_train`
+    * `X_eval`
+    * `y_eval`
+    * `A_cand` (multiannot) - matrix wer was noch labeln kann
+    * (kernel kram...)
+    * `sample_weight_cand`
+    * `sample_weight` (same dim as y)
+    * `sample_weight_eval`
+    * `simulate` (esp stream)
+    * `batch_size`
+    * `return_utilities`
 
 Handling of unlabeled instances
 -------------------------------
