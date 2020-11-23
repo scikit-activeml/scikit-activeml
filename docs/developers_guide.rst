@@ -28,8 +28,8 @@ To simplify the use of this library, a homogeneous naming scheme is important. T
     * `budget_manager` (stream)
 * Parameters of `query()`:
     * `X_cand`
-    * `X` | `X_train`
-    * `y` | `y_train`
+    * `X`
+    * `y`
     * `X_eval`
     * `y_eval`
     * `A_cand` (multiannot) - matrix wer was noch labeln kann
