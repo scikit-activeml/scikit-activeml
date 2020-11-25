@@ -19,7 +19,7 @@ class QueryStrategy(ABC, BaseEstimator):
         Controls the randomness of the estimator.
     """
     def __init__(self, random_state=None):
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     @abstractmethod
     def query(self, *args, **kwargs):

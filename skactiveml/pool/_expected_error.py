@@ -48,7 +48,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     LOG_LOSS = 'log_loss'
 
     def __init__(self, clf, classes, method=EMR, C=None, random_state=None,
-                 missing_label=MISSING_LABEL, **kwargs):
+                 missing_label=MISSING_LABEL):
         super().__init__(random_state=random_state)
         self.clf = clf
         self.classes = classes
