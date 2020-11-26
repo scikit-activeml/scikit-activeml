@@ -154,7 +154,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
         # fit the classifier and get the probabilities
         mask_labeled = is_labeled(y, self.missing_label)
-        self.clf = SklearnClassifier(clone(self.clf))
+        self.clf = clone(self.clf)
         self.clf.fit(X, y)
         probas = self.clf.predict_proba(X_cand)
 
