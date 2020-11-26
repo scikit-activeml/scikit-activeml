@@ -46,13 +46,13 @@ General Unittest for Query Strategies (`test_pool.py`):
 
 1. Querying of every method is tested with standard configurations with `0`, `1`, and `5` initial labels.
 
-2. For every class `ExampleQueryStrategy` that inherits from `SingleAnnotPoolBasedQueryStrategy` (stored in `_example.py`), it is automatically tested if there exist a file `test/test_example.py`. In it necessary that both filenames are similar. Moreover, the test class must be called `ExampleQueryStrategyTest(unittest.TestCase)`
+2. For every class `ExampleQueryStrategy` that inherits from `SingleAnnotPoolBasedQueryStrategy` (stored in `_example.py`), it is automatically tested if there exists a file `test/test_example.py`. It is necessary that both filenames are the same. Moreover, the test class must be called `ExampleQueryStrategyTest(unittest.TestCase)`
 
-3. Every parameter in `__init__()` will be tested if it is written similarly as class variable.
+3. Every parameter in `__init__()` will be tested if it is written the same as a class variable.
 
-4. Every parameter `arg` in `__init__()` will be evaluated if there exist a method in the testclass `ExampleQueryStrategyTest` that is called `test_init_param_arg()`.
+4. Every parameter `arg` in `__init__()` will be evaluated if there exists a method in the testclass `ExampleQueryStrategyTest` that is called `test_init_param_arg()`.
 
-5. Every parameter `arg` in `query()` will be evaluated if there exist a method in the testclass `ExampleQueryStrategyTest` that is called `test_query_param_arg()`.
+5. Every parameter `arg` in `query()` will be evaluated if there exists a method in the testclass `ExampleQueryStrategyTest` that is called `test_query_param_arg()`.
 
 Handling of unlabeled instances
 -------------------------------
