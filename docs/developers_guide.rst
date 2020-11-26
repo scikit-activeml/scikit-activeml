@@ -41,6 +41,19 @@ To simplify the use of this library, a homogeneous naming scheme is important. T
     * `batch_size`
     * `return_utilities`
 
+General Unittest for Query Strategies (`test_pool.py`):
+-------------------------------------------------------
+
+1. Querying of every method is tested with standard configurations with `0`, `1`, and `5` initial labels.
+
+2. For every class `ExampleQueryStrategy` that inherits from `SingleAnnotPoolBasedQueryStrategy` (stored in `_example.py`), it is automatically tested if there exist a file `test/test_example.py`. In it necessary that both filenames are similar. Moreover, the test class must be called `ExampleQueryStrategyTest(unittest.TestCase)`
+
+3. Every parameter in `__init__()` will be tested if it is written similarly as class variable.
+
+4. Every parameter `arg` in `__init__()` will be evaluated if there exist a method in the testclass `ExampleQueryStrategyTest` that is called `test_init_param_arg()`.
+
+5. Every parameter `arg` in `query()` will be evaluated if there exist a method in the testclass `ExampleQueryStrategyTest` that is called `test_query_param_arg()`.
+
 Handling of unlabeled instances
 -------------------------------
 Active learning generally uses labeled and unlabeled instances. To simplify the data handling, the SkactivemlClassifier is able to handle unlabeled data. The unlabeled data is marked as such by setting corresponding entry in y (the label) during fitting to missing_label which is set during the initialization of the classifier. All classifier and the wrappers (e.g. for scikit-learn classifiers) are compatible with unlabeled instances.
