@@ -6,7 +6,7 @@ from numpy.random import RandomState
 from skactiveml.pool import RandomSampler
 
 
-class TestRandomSampler(unittest.TestCase):
+class RandomSamplerTest(unittest.TestCase):
 
     def setUp(self):
         self.X_cand = np.zeros((100, 2))
