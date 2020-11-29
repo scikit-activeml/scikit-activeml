@@ -47,13 +47,13 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     CSL = 'csl'
     LOG_LOSS = 'log_loss'
 
-    def __init__(self, clf, classes, method=EMR, C=None, random_state=None,
-                 missing_label=MISSING_LABEL):
+    def __init__(self, clf, classes, method=EMR, cost_matrix=None,
+                 random_state=None, missing_label=MISSING_LABEL):
         super().__init__(random_state=random_state)
         self.clf = clf
         self.classes = classes
         self.method = method
-        self.C = C
+        self.cost_matrix = cost_matrix
         self.missing_label = missing_label
 
     def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
@@ -82,14 +82,15 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             (only returned if return_utilities is True).
         """
         # Set the cost matrix to the default value if it is not given
-        if self.C is None:
-            self.C = 1 - np.eye(len(self.classes))
+        if self.cost_matrix is None:
+            self.cost_matrix = 1 - np.eye(len(self.classes))
 
         # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
-        check_classifier_params(self.classes, self.missing_label, self.C)
+        check_classifier_params(self.classes, self.missing_label,
+                                self.cost_matrix)
 
         # Check if the given classes are the same
         if not np.array_equal(self.clf.classes, self.classes):
@@ -117,7 +118,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
         # Calculate utilities and return the output
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
-                                              self.classes, self.C,
+                                              self.classes, self.cost_matrix,
                                               self.method)
         query_indices = rand_argmax(utilities, self.random_state)
         if return_utilities:
