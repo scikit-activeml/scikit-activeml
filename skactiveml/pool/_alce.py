@@ -6,7 +6,7 @@ from sklearn.utils import check_array, check_random_state
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.pool._mdsp import MDSP
-from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.utils import rand_argmax, MISSING_LABEL, check_scalar
 from skactiveml.utils import check_cost_matrix, check_missing_label
 
 
@@ -99,10 +99,7 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
         check_cost_matrix(self.C, len(self.classes))
         if self.embed_dim is None:
             self.embed_dim = len(self.classes)
-        if not float(self.embed_dim).is_integer():
-            raise TypeError("'embed_dim' must be an integer.")
-        if self.embed_dim < 1:
-            raise ValueError("'embed_dim' must be strictly positive.")
+        check_scalar(self.embed_dim, 'embed_dim', int, min_val=1)
         check_missing_label(self.missing_label)
         self.random_state = check_random_state(self.random_state)
         if not set(y) <= set(self.classes):
