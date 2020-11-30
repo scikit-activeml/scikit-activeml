@@ -76,6 +76,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     def __init__(self, clf, ensemble=None, method='KL_divergence',
                  classes=None, missing_label=MISSING_LABEL, random_state=None,
                  **kwargs_ensemble):
+
         super().__init__(random_state=random_state)
 
         self.missing_label = missing_label
@@ -84,6 +85,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         self.clf = clf
         self.classes = classes
         self.kwargs_ensemble = kwargs_ensemble
+
 
     def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
               **kwargs):

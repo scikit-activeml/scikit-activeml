@@ -6,7 +6,7 @@ from skactiveml.classifier import PWC
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestMCPAL(unittest.TestCase):
+class McPALTest(unittest.TestCase):
 
     def setUp(self):
         self.X = np.zeros((6, 2))
@@ -17,25 +17,86 @@ class TestMCPAL(unittest.TestCase):
         self.C = np.eye(3)
         self.clf = PWC(classes=self.classes)
 
-    def test_init(self):
-        self.assertRaises(TypeError, McPAL)
+    # Test init parameters
+    def test_init_param_clf(self):
         pal = McPAL(clf=3)
+        self.assertTrue(hasattr(pal, 'clf'))
         self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
-        self.assertRaises(ValueError, McPAL, self.clf, self.classes,
-                          random_state='string')
+
+    def test_init_param_prior(self):
         pal = McPAL(self.clf, prior=0)
+        self.assertTrue(hasattr(pal, 'prior'))
         self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
-        pal = McPAL(self.clf, prior='wrong_value')
+
+        pal = McPAL(self.clf, prior='string')
+        self.assertTrue(hasattr(pal, 'prior'))
         self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
+
+    def test_init_param_m_max(self):
         pal = McPAL(self.clf, m_max=-2)
+        self.assertTrue(hasattr(pal, 'm_max'))
         self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
+
         pal = McPAL(self.clf, m_max=1.5)
+        self.assertTrue(hasattr(pal, 'm_max'))
         self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
                           self.sample_weight)
+
+    def test_init_param_random_state(self):
+        pal = McPAL(self.clf)
+        self.assertTrue(hasattr(pal, 'random_state'))
+        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
+                          self.sample_weight)
+
+    # Test query parameters
+    def test_query_param_X_cand(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(ValueError, pal.query, X_cand=[], X=[], y=[],
+                          sample_weight=self.sample_weight)
+        self.assertRaises(ValueError, pal.query, X_cand=[], X=self.X, y=self.y,
+                          sample_weight=self.sample_weight)
+
+    def test_query_param_X(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
+                          X=np.ones((5, 3)), y=self.y,
+                          sample_weight=self.sample_weight)
+
+    def test_query_param_y(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
+                          X=self.X, y=[0, 1, 4, 0, 2, 1],
+                          sample_weight=self.sample_weight)
+
+    def test_query_param_sample_weight(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight='string')
+        self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight=np.ones(3))
+
+    def test_query_param_batch_size(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y,
+                          batch_size=1.0, sample_weight=self.sample_weight)
+        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
+                          batch_size=0, sample_weight=self.sample_weight)
+
+    def test_query_param_return_utilities(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+                          sample_weight=self.sample_weight,
+                          return_utilities=None)
+        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+                          sample_weight=self.sample_weight,
+                          return_utilities=[])
+        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+                          sample_weight=self.sample_weight,
+                          return_utilities=0)
 
     def test_query(self):
         mcpal = McPAL(clf=self.clf)
@@ -47,7 +108,7 @@ class TestMCPAL(unittest.TestCase):
                           X=self.X, y=[0, 1, 4, 0, 2, 1],
                           sample_weight=self.sample_weight)
 
-    def test_missing_label(self):
+        # Test missing labels
         X_cand = [[0], [1], [2]]
         mcpal = McPAL(clf=PWC(classes=[0, 1]))
         _, utilities = mcpal.query(X_cand, [[1]], [MISSING_LABEL],
@@ -63,7 +124,7 @@ class TestMCPAL(unittest.TestCase):
         self.assertGreater(utilities[0, 2], utilities[0, 1])
         self.assertGreater(utilities[0, 2], utilities[0, 0])
 
-    def test_scenario(self):
+        # Test scenario
         X_cand = [[0], [1], [2], [5]]
         mcpal = McPAL(clf=PWC(classes=[0, 1]))
 
