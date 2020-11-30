@@ -66,15 +66,14 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         pages 1-9. Morgan Kaufmann, 1998.
     """
 
-    def __init__(self, clf, ensemble=None, method='KL_divergence', missing_label=MISSING_LABEL, random_state=None,
-                 **kwargs):
+    def __init__(self, clf, ensemble=None, method='KL_divergence',
+                 missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
 
         self.missing_label = missing_label
         self.method = method
         self.ensemble = ensemble
         self.clf = clf
-        self.kwargs_init = kwargs
 
     def query(self, X_cand, X, y, batch_size=1, return_utilities=False, **kwargs):
         """
