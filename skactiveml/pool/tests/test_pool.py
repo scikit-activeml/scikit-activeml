@@ -26,24 +26,69 @@ class TestGeneral(unittest.TestCase):
         print(self.query_strategies.keys())
 
     def test_al_cycle(self):
-        for init_budget in [5, 1, 0]:
-            for qs_name in self.query_strategies:
-                if qs_name == "FourDS":
-                    clf = CMM(classes=np.unique(self.y_true),
-                              missing_label=MISSING_LABEL)
-                else:
-                    clf = PWC(classes=np.unique(self.y_true),
-                              missing_label=MISSING_LABEL)
+        for qs_name in self.query_strategies:
+            if qs_name == "FourDS":
+                clf = CMM(classes=np.unique(self.y_true),
+                          missing_label=MISSING_LABEL,
+                          random_state=np.random.RandomState(0))
+            else:
+                clf = PWC(classes=np.unique(self.y_true),
+                          missing_label=MISSING_LABEL,
+                          random_state=np.random.RandomState(0))
+
+
+            with self.subTest(msg="Random State", qs_name=qs_name):
+                y = np.full(self.y_true.shape, self.MISSING_LABEL)
+                qs = initialize_class_with_kwargs(
+                    self.query_strategies[qs_name], clf=clf,
+                    perf_est=clf, classes=np.unique(self.y_true),
+                    random_state=np.random.RandomState(0))
+
+                unlabeled = np.where(is_unlabeled(y))[0]
+                id1, u1 = qs.query(self.X[unlabeled], X=self.X,
+                                   y=y, X_eval=self.X,
+                                   return_utilities=True)
+                id2, u2 = qs.query(self.X[unlabeled], X=self.X,
+                                   y=y, X_eval=self.X,
+                                   return_utilities=True)
+                np.testing.assert_array_equal(id1, id2)
+                np.testing.assert_array_equal(u1, u2)
+
+            with self.subTest(msg="Batch",
+                              qs_name=qs_name):
+                y = np.full(self.y_true.shape, self.MISSING_LABEL)
+                qs = initialize_class_with_kwargs(
+                    self.query_strategies[qs_name], clf=clf,
+                    perf_est=clf, classes=np.unique(self.y_true),
+                    random_state=np.random.RandomState(0))
+
+                id, u = qs.query(self.X[unlabeled], X=self.X,
+                                 y=y, X_eval=self.X, batch_size=5,
+                                 return_utilities=True)
+                self.assertEqual(len(id), 5)
+                self.assertEqual(len(u), 5, msg='utility score should '
+                                                'have shape (5xN)')
+                self.assertEqual(len(u[0]), len(unlabeled),
+                                 msg='utility score must have shape (5xN)')
+
+                self.assertWarns(Warning, qs.query, X_cand=self.X[unlabeled],
+                                 X=self.X, y=y, X_eval=self.X, batch_size=15)
+                id = qs.query(X_cand=self.X[unlabeled], X = self.X, y = y,
+                              X_eval = self.X, batch_size = 15)
+                self.assertEqual(len(id), 10)
+
+            for init_budget in [5, 1, 0]:
+                y = np.full(self.y_true.shape, self.MISSING_LABEL)
+                y[0:init_budget] = self.y_true[0:init_budget]
 
                 with self.subTest(msg="Basic AL Cycle",
                                   init_budget=init_budget, qs_name=qs_name):
-                    y = np.full(self.y_true.shape, self.MISSING_LABEL)
-                    y[0:init_budget] = self.y_true[0:init_budget]
-
                     qs = initialize_class_with_kwargs(
                         self.query_strategies[qs_name], clf=clf,
                         perf_est=clf, classes=np.unique(self.y_true),
                         random_state=1)
+
+                    unlabeled = np.where(is_unlabeled(y))[0]
 
                     for b in range(self.budget):
                         unlabeled = np.where(is_unlabeled(y))[0]
