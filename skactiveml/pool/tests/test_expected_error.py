@@ -7,7 +7,7 @@ from skactiveml.pool import ExpectedErrorReduction as EER
 from skactiveml.utils import MISSING_LABEL
 
 
-class ExpectedErrorReductionTest(unittest.TestCase):
+class TestExpectedErrorReduction(unittest.TestCase):
 
     def setUp(self):
         self.X_cand = np.zeros((100, 2))

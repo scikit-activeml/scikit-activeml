@@ -6,7 +6,7 @@ from skactiveml.classifier import PWC
 from skactiveml.utils import MISSING_LABEL
 
 
-class McPALTest(unittest.TestCase):
+class TestMcPAL(unittest.TestCase):
 
     def setUp(self):
         self.X = np.zeros((6, 2))
