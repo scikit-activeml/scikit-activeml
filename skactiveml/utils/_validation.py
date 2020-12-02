@@ -3,7 +3,6 @@ import sklearn
 
 from collections.abc import Iterable
 
-from numpy.random.mtrand import RandomState
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
@@ -348,4 +347,4 @@ def check_random_state(random_state, seed_multiplier=1):
 
     seed = random_state.get_state()[1][0]
 
-    return RandomState((seed * seed_multiplier) % (2 ** 32))
+    return np.random.RandomState((seed * seed_multiplier) % (2 ** 32))
