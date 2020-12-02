@@ -8,11 +8,11 @@ from sklearn.base import BaseEstimator
 from ..base import SingleAnnotPoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_array, check_random_state
+from sklearn.utils import check_array
 
 from ..classifier import SklearnClassifier
 from ..utils import MISSING_LABEL, check_X_y, check_scalar, \
-    simple_batch, check_classifier_params, check_classes
+    simple_batch, check_classifier_params, check_classes, check_random_state
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
