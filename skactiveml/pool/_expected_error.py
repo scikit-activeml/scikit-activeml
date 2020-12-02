@@ -27,7 +27,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is
         cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
-    C: array-like, shape (n_classes, n_classes), optional (default=None)
+    cost_matrix: array-like, shape (n_classes, n_classes),
+                 optional (default=None)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
@@ -48,13 +49,13 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     CSL = 'csl'
     LOG_LOSS = 'log_loss'
 
-    def __init__(self, clf, classes, method=EMR, C=None, random_state=None,
-                 missing_label=MISSING_LABEL, **kwargs):
+    def __init__(self, clf, classes, method=EMR, cost_matrix=None,
+                 random_state=None, missing_label=MISSING_LABEL):
         super().__init__(random_state=random_state)
         self.clf = clf
         self.classes = classes
         self.method = method
-        self.C = C
+        self.cost_matrix = cost_matrix
         self.missing_label = missing_label
 
     def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
@@ -83,14 +84,15 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             (only returned if return_utilities is True).
         """
         # Set the cost matrix to the default value if it is not given
-        if self.C is None:
-            self.C = 1 - np.eye(len(self.classes))
+        if self.cost_matrix is None:
+            self.cost_matrix = 1 - np.eye(len(self.classes))
 
         # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
-        check_classifier_params(self.classes, self.missing_label, self.C)
+        check_classifier_params(self.classes, self.missing_label,
+                                self.cost_matrix)
 
         # Check random state
         self.random_state = check_random_state(self.random_state)
@@ -121,7 +123,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
         # Calculate utilities and return the output
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
-                                              self.classes, self.C,
+                                              self.classes, self.cost_matrix,
                                               self.method)
         query_indices = rand_argmax(utilities, self.random_state)
         if return_utilities:

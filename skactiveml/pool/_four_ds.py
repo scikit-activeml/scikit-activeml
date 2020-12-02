@@ -3,7 +3,8 @@ import warnings
 
 from copy import deepcopy
 
-from sklearn.utils import check_array, check_random_state, check_scalar
+from sklearn.utils import check_array, check_random_state, check_scalar, \
+    column_or_1d
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..utils import rand_argmax, is_labeled
@@ -71,6 +72,10 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         # Check X_cand to be a non-empty 2D array.
         X_cand = check_array(X_cand)
 
+        # Check input training data.
+        X = check_array(X, ensure_min_samples=0)
+        y = column_or_1d(y)
+
         # Check classifier type.
         if not isinstance(self.clf, CMM):
             raise TypeError(
@@ -96,6 +101,10 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         check_scalar(lmbda, target_type=float, name='lmbda', min_val=0,
                      max_val=1)
 
+        # Ensure return_utlities to be a boolean.
+        check_scalar(return_utilities, target_type=bool,
+                     name='return_utilities')
+
         # Set and check random state.
         random_state = check_random_state(self.random_state)
 
@@ -104,7 +113,10 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         P_cand = cmm.predict_proba(X_cand)
         R_cand = cmm.mixture_model_.predict_proba(X_cand)
         is_lbld = is_labeled(y, missing_label=cmm.missing_label)
-        R_lbld = cmm.mixture_model_.predict_proba(X[is_lbld])
+        if np.sum(is_lbld) >= 1:
+            R_lbld = cmm.mixture_model_.predict_proba(X[is_lbld])
+        else:
+            R_lbld = np.array([0])
 
         # Compute distance according to Eq. 9 in [1].
         P_cand_sorted = np.sort(P_cand, axis=1)

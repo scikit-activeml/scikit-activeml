@@ -458,8 +458,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return P
 
 
-class AnnotatorModel(BaseEstimator, ABC):
-    """AnnotatorModel
+class AnnotModelMixing(ABC):
+    """AnnotModelMixing
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.
@@ -476,8 +476,8 @@ class AnnotatorModel(BaseEstimator, ABC):
 
         Returns
         -------
-        P_annot : numpy.ndarray, shape (n_samples, classes)
-            P_annot[i,l] is the probability, that annotator l provides the
-            correct class label for sample X[i].
+        P_annot : numpy.ndarray, shape (n_samples, n_annotators)
+            `P_annot[i,l]` is the probability, that annotator `l` provides the
+            correct class label for sample `X[i]`.
         """
         return NotImplemented

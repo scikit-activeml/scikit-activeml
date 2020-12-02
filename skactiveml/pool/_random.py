@@ -2,6 +2,7 @@ import numpy as np
 
 from sklearn.utils import check_array, check_scalar
 from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils import simple_batch
 from ..utils._validation import check_random_state
 
 
@@ -39,8 +40,16 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
+        # initialize random_state
+        # TODO: change to skaml random state
+        random_state = check_random_state(self.random_state) #, len(X_cand))
+
         # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
+
+        if not isinstance(return_utilities, bool):
+            raise TypeError('return_utilities should be of boolean type but is '
+                            '{}'.format(return_utilities))
 
         # Check 'batch_size'
         check_scalar(batch_size, 'batch_size', int, min_val=1)
@@ -50,9 +59,6 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
 
         utilities = self.random_state.random_sample(len(X_cand))
 
-        best_indices = utilities.argsort()[-batch_size:][::-1]
-
-        if return_utilities:
-            return best_indices, np.array([utilities])
-        else:
-            return best_indices
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
