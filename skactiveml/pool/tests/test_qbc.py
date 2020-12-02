@@ -85,7 +85,8 @@ class TestQBC(unittest.TestCase):
         selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
     def test_init_param_random_state(self):
-        self.assertRaises(ValueError, QBC, clf=self.clf, random_state='string')
+        qbc = QBC(clf=self.clf, random_state='string')
+        self.assertRaises(ValueError, qbc.query, self.X_cand, self.X, self.y)
         selector = QBC(clf=self.clf, random_state=self.random_state)
         self.assertTrue(hasattr(selector, 'random_state'))
         self.assertRaises(ValueError, selector.query, X_cand=[[1]], X=self.X,
