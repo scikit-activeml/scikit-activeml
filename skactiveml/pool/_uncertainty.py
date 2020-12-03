@@ -17,7 +17,7 @@ from sklearn.linear_model._logistic import _logistic_loss
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
-    check_scalar, check_cost_matrix, simple_batch
+    check_scalar, check_cost_matrix, simple_batch, check_random_state
 from ..classifier import SklearnClassifier
 
 
@@ -115,6 +115,9 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         """
 
         # validation:
+        # check random state
+        random_state = check_random_state(self.random_state)
+
         # check self.method
         if (self.method != 'entropy' and self.method != 'least_confident' and
                 self.method != 'margin_sampling' and
@@ -174,7 +177,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                 utilities = epistemic_uncertainty_logreg(
                     X[mask_labeled], y[mask_labeled], self.clf, probas)
 
-        return simple_batch(utilities, self.random_state,
+        return simple_batch(utilities, random_state,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 

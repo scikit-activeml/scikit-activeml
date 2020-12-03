@@ -3,13 +3,12 @@ import numpy as np
 
 from scipy.special import factorial, gammaln
 from sklearn import clone
-from sklearn.utils import check_array, check_random_state
+from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
 from skactiveml.utils import rand_argmax, MISSING_LABEL, check_X_y, \
-    check_scalar
-from skactiveml.utils import check_classifier_params
+    check_scalar, check_classifier_params, check_random_state
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -86,6 +85,9 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         if self.m_max < 1 or not float(self.m_max).is_integer():
             raise ValueError("'m_max' must be a positive integer.")
 
+        # Check random state
+        random_state = check_random_state(self.random_state)
+
         # Check the given data
         X_cand = check_array(X_cand, force_all_finite=False)
         X, y = check_X_y(X, y, force_all_finite=False,
@@ -99,7 +101,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         k_vec = self.clf.predict_freq(X_cand)
         utilities = sample_weight * _cost_reduction(k_vec, prior=self.prior,
                                                     m_max=self.m_max)
-        query_indices = rand_argmax(utilities, self.random_state)
+        query_indices = rand_argmax(utilities, random_state)
         if return_utilities:
             return query_indices, np.array([utilities])
         else:

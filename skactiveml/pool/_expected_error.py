@@ -4,8 +4,8 @@ from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import check_classifier_params, check_scalar, check_X_y
-from skactiveml.utils import rand_argmax, MISSING_LABEL, is_labeled
+from skactiveml.utils import check_classifier_params, check_scalar, check_X_y,\
+    rand_argmax, MISSING_LABEL, is_labeled, check_random_state
 
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
@@ -93,6 +93,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         check_classifier_params(self.classes, self.missing_label,
                                 self.cost_matrix)
 
+        # Check random state
+        random_state = check_random_state(self.random_state)
+
         # Check if the given classes are the same
         if not np.array_equal(self.clf.classes, self.classes):
             raise ValueError("The given classes are not the same as in the "
@@ -121,7 +124,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
                                               self.classes, self.cost_matrix,
                                               self.method)
-        query_indices = rand_argmax(utilities, self.random_state)
+        query_indices = rand_argmax(utilities, random_state)
         if return_utilities:
             return query_indices, np.array([utilities])
         else:

@@ -3,11 +3,10 @@ import warnings
 
 from copy import deepcopy
 
-from sklearn.utils import check_array, check_random_state, check_scalar, \
-    column_or_1d
+from sklearn.utils import check_array, check_scalar, column_or_1d
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled
+from ..utils import rand_argmax, is_labeled, check_random_state
 from ..classifier import CMM
 
 
@@ -38,7 +37,6 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         super().__init__(random_state=random_state)
         self.clf = clf
         self.lmbda = lmbda
-        self.random_state = random_state
 
     def query(self, X_cand, X, y, return_utilities=False, batch_size=1,
               **kwargs):
