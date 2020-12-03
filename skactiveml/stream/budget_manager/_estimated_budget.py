@@ -12,12 +12,10 @@ class EstimatedBudget(BudgetManager):
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
     """
-    def __init__(self, budget=None):
+    def __init__(self, budget=None, w=100):
         super().__init__(budget)
         #size of the memory/step window
-        self.w = 100
-        self.cnt = 0
-        self.u_t = 0
+        self.w = w
 
     def is_budget_left(self):
         """Check whether there is any utility given to sample(...), which may
@@ -35,7 +33,7 @@ class EstimatedBudget(BudgetManager):
             instance.
         """
         #TODO
-        return self.budget_ > self.u_t/self.w
+        return self.budget_ > self.u_t_/self.w
 
     def sample(self, utilities, simulate=False, return_budget_left=False,
                **kwargs):
@@ -69,18 +67,29 @@ class EstimatedBudget(BudgetManager):
             provided if return_utilities is True.
         """
         self._validate_budget(get_default_budget())
-        qs_decisions = np.array(utilities) >= self.budget_
+        
+        if not hasattr(self, 'u_t_'):
+            self.u_t_ = 0
+        
+        qs_decisions = utilities
         sampled_indices = []
         budget_left = []
+        
+        tmp_u_t = self.u_t_
+        
         # check after 100 steps if budget is left 
         for i , d in enumerate(qs_decisions) :
-            budget_left.append(self.budget_ > self.u_t/self.w)
-            
+            budget_left.append(tmp_u_t/self.w < self.budget_)
+            if not budget_left[-1]:
+                d = False
             #u_t = u_t-1 * (w-1)/w + labeling_t
-            self.u_t = self.u_t * ((self.w-1)/self.w) + d
-            if self.u_t/self.w < self.budget_:
+            tmp_u_t = tmp_u_t * ((self.w-1)/self.w) + d
+            if d:
                 sampled_indices.append(i)
-                       
+        
+        if not simulate:
+            self.u_t_ = tmp_u_t
+            
         # check if budget_left should be returned
         if return_budget_left:
             return sampled_indices, budget_left
@@ -102,11 +111,11 @@ class EstimatedBudget(BudgetManager):
         """
         # check if budget has been set
         self._validate_budget(get_default_budget())
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
-        self.observed_instances_ += sampled.shape[0]
-        self.queried_instances_ += np.sum(sampled)
+        
+        if not hasattr(self, 'u_t_'):
+            self.u_t_ = 0
+        
+        for i , s in enumerate(sampled):
+            self.u_t_ = self.u_t_ * ((self.w-1)/self.w) + s
+        
         return self
