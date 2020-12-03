@@ -12,7 +12,7 @@ from ._random import RandomSampler
 
 import copy
 
-from .budget_manager import FixedBudget
+from .budget_manager import EstimatedBudget
 
 
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -43,7 +43,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -176,7 +176,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
                  theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -338,7 +338,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(), v=0.1,
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(), v=0.1,
                  theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
