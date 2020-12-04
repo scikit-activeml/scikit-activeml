@@ -2,7 +2,8 @@ import numpy as np
 import unittest
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor, \
+    GaussianProcessClassifier
 from sklearn.ensemble import BaggingClassifier
 
 from skactiveml.classifier import PWC
@@ -28,7 +29,8 @@ class TestQBC(unittest.TestCase):
         self.assertTrue(hasattr(selector, 'clf'))
         # selector = QBC(clf=GaussianProcessClassifier(
         #    random_state=self.random_state), random_state=self.random_state)
-        selector.query(**self.kwargs)
+        # selector.query(**self.kwargs)
+
         selector = QBC(clf='string')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf=None)
@@ -39,15 +41,9 @@ class TestQBC(unittest.TestCase):
     def test_init_param_ensemble(self):
         selector = QBC(clf=self.clf, ensemble=None)
         self.assertTrue(hasattr(selector, 'ensemble'))
-        selector.query(**self.kwargs)
-        self.assertTrue(isinstance(selector._clf.estimator, BaggingClassifier))
 
         selector = QBC(clf=self.clf, ensemble='String')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
-
-        selector = QBC(clf=self.clf, ensemble=RandomForestClassifier,
-                       n_estimators=5)
-        selector.query(**self.kwargs)
 
     def test_init_param_method(self):
         selector = QBC(clf=self.clf)
@@ -57,35 +53,16 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=self.clf, method=1)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
-        selector = QBC(clf=self.clf, method='KL_divergence')
-        selector.query(**self.kwargs)
         selector = QBC(clf=GaussianProcessRegressor, method='KL_divergence')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
-
-        selector = QBC(clf=self.clf, method='vote_entropy')
-        selector.query(**self.kwargs)
-
-    def test_init_param_classes(self):
-        selector = QBC(clf=PWC())
-        self.assertTrue(hasattr(selector, 'missing_label'))
-        selector.query(X_cand=[[1]], X=[[1]], y=[0])
-        # self.assertRaises(ValueError, selector.query, X_cand=[[1]], X=[[1]],
-        #                  y=[np.nan])
-        # selector = QBC(clf=PWC, classes=self.classes)
-        # selector.query(X_cand=[[1]], X=[[1]], y=[2])
-        # selector.query(X_cand=[[1]], X=[[1]], y=[0])
-        # selector.query(X_cand=[[1]], X=[[1]], y=[np.nan])
 
     def test_init_param_missing_label(self):
         selector = QBC(clf=self.clf, missing_label='string')
         self.assertTrue(hasattr(selector, 'missing_label'))
-        self.assertRaises(ValueError, selector.query, X_cand=[[1]], X=[[1]],
-                          y=[np.nan])
-        selector = QBC(clf=self.clf, classes=self.classes)
-        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
     def test_init_param_random_state(self):
-        self.assertRaises(ValueError, QBC, clf=self.clf, random_state='string')
+        selector = QBC(clf=self.clf, random_state='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
         selector = QBC(clf=self.clf, random_state=self.random_state)
         self.assertTrue(hasattr(selector, 'random_state'))
         self.assertRaises(ValueError, selector.query, X_cand=[[1]], X=self.X,
@@ -113,17 +90,14 @@ class TestQBC(unittest.TestCase):
 
     def test_query_param_y(self):
         selector = QBC(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=None)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=self.X, y='string')
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=[])
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=self.y[0:-1])
-
-        selector.query(X_cand=[[1]], X=[[1]], y=[0])
-        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
     def test_query_param_batch_size(self):
         selector = QBC(clf=self.clf)
@@ -141,16 +115,48 @@ class TestQBC(unittest.TestCase):
         self.assertRaises(TypeError, selector.query, **self.kwargs,
                           return_utilities=0)
 
+    def test_query(self):
+        # clf
+        # TODO sklearn classifiers dont have a classes attribute
+        #selector = QBC(clf=GaussianProcessClassifier(classes=self.classes))
+        #selector.query(**self.kwargs)
+        #selector = QBC(clf=BaggingClassifier())
+        #selector.query(**self.kwargs)
+
+        # ensemble
+        selector = QBC(clf=self.clf, ensemble=BaggingClassifier)
+        selector.query(**self.kwargs)
+        self.assertTrue(isinstance(selector._clf.estimator, BaggingClassifier))
+        selector = QBC(clf=self.clf, ensemble=RandomForestClassifier)
+        selector.query(**self.kwargs)
+
+        # missing_label
+        selector = QBC(clf=self.clf, missing_label='string')
+        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
+
+        # ensemble_dict
+        selector = QBC(clf=self.clf, ensemble=RandomForestClassifier,
+                       ensemble_dict=dict(n_estimators=5))
+        selector.query(**self.kwargs)
+        self.assertTrue(selector._clf.estimator.n_estimators == 5)
+
+        # return_utilities
         L = list(selector.query(**self.kwargs, return_utilities=True))
         self.assertTrue(len(L) == 2)
         L = list(selector.query(**self.kwargs, return_utilities=False))
         self.assertTrue(len(L) == 1)
 
-    def test_query(self):
+        # query
+        selector = QBC(clf=self.clf, method='vote_entropy')
+        selector.query(**self.kwargs)
+        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
+
+        selector = QBC(clf=self.clf, method='KL_divergence')
+        selector.query(**self.kwargs)
+
         selector = QBC(clf=self.clf, random_state=self.random_state)
         best_indices1, utilities1 = selector.query(**self.kwargs,
                                                    return_utilities=True)
-        selector = QBC(clf=self.clf, random_state=self.random_state)
         best_indices2, utilities2 = selector.query(**self.kwargs,
                                                    return_utilities=True)
         np.testing.assert_array_equal(utilities1, utilities2)
@@ -174,6 +180,8 @@ class TestAverageKlDivergence(unittest.TestCase):
                           np.ones((1, 1, 1, 1)))
 
     def test_average_kl_divergence(self):
+        average_kl_divergence(np.full((10, 10, 10), 0.5))
+        average_kl_divergence(np.zeros((10, 10, 10)))
         scores = average_kl_divergence(self.probas)
         np.testing.assert_array_equal(scores, self.scores)
 
@@ -196,18 +204,28 @@ class TestVoteEntropy(unittest.TestCase):
         self.assertRaises(ValueError, vote_entropy, votes=[[[1]]],
                           classes=self.classes)
 
+        self.assertRaises(ValueError, vote_entropy, votes=np.array([[10]]),
+                          classes=self.classes)
+        self.assertRaises(
+            ValueError, vote_entropy, votes=np.full((9, 9), np.nan),
+            classes=self.classes
+        )
+
     def test_param_classes(self):
-        vote_entropy(votes=self.votes, classes='string')
+        self.assertRaises(TypeError, vote_entropy, votes=self.votes,
+                          classes='string')
         self.assertRaises(ValueError, vote_entropy, votes=self.votes,
                           classes='class')
         self.assertRaises(TypeError, vote_entropy, votes=self.votes,
                           classes=1)
         self.assertRaises(TypeError, vote_entropy, votes=self.votes,
                           classes=[[1]])
-#        self.assertRaises(ValueError, vote_entropy, votes=self.votes,
-#                          classes=[MISSING_LABEL, 1])
+        self.assertRaises(ValueError, vote_entropy, votes=self.votes,
+                          classes=[MISSING_LABEL, 1])
 
     def test_vote_entropy(self):
+        vote_entropy(votes=np.full((10, 10), 0), classes=self.classes)
+        vote_entropy(votes=[['s', 't']], classes='string')
         scores = vote_entropy(votes=self.votes, classes=self.classes)
         np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
 
