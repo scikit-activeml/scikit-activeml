@@ -7,8 +7,8 @@ from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import rand_argmax, MISSING_LABEL, check_X_y, \
-    check_scalar, check_classifier_params, check_random_state
+from skactiveml.utils import rand_argmax, check_X_y, check_scalar, \
+    check_classifier_params, check_random_state
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -43,7 +43,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X_cand, X, y, sample_weight, batch_size=1,
+    def query(self, X_cand, X, y, utility_weight=None, batch_size=1,
               return_utilities=False, **kwargs):
         """Query the next instance to be labeled.
 
@@ -57,7 +57,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             Labels of the data set
         batch_size: int, optional (default=1)
             The number of instances to be selected.
-        sample_weight: array-like (n_training_samples)
+        utility_weight: array-like (n_candidate_samples)
             Densities for each instance in X
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
@@ -93,14 +93,19 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         X, y = check_X_y(X, y, force_all_finite=False,
                          missing_label=self.clf.missing_label)
 
+        # Check 'utility_weight'
+        if utility_weight is None:
+            utility_weight = np.ones(len(X_cand))
+        utility_weight = check_array(utility_weight, ensure_2d=False)
+
         # Check 'batch_size'
         check_scalar(batch_size, 'batch_size', int, min_val=1)
 
         # Calculate utilities and return the output
         self.clf.fit(X, y)
         k_vec = self.clf.predict_freq(X_cand)
-        utilities = sample_weight * _cost_reduction(k_vec, prior=self.prior,
-                                                    m_max=self.m_max)
+        utilities = utility_weight * _cost_reduction(k_vec, prior=self.prior,
+                                                     m_max=self.m_max)
         query_indices = rand_argmax(utilities, random_state)
         if return_utilities:
             return query_indices, np.array([utilities])
@@ -116,7 +121,7 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
 
     Parameters
     ----------
-    k_vec_list: array-like, shape (n_classes)
+    k_vec_list: array-like, shape (n_samples, n_classes)
         Observed class labels.
     C: array-like, shape = (n_classes, n_classes)
         Cost matrix.
@@ -144,8 +149,8 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
 
     # compute optimal cost-sensitive decision for all combination of k-vectors
     # and l-vectors
-    k_l_vec_list = np.swapaxes(np.tile(k_vec_list, (n_l_vecs, 1, 1)), 0, 1)\
-                   + l_vec_list
+    tile = np.tile(k_vec_list, (n_l_vecs, 1, 1))
+    k_l_vec_list = np.swapaxes(tile, 0, 1) + l_vec_list
     y_hats = np.argmin(k_l_vec_list @ C, axis=2)
 
     # add prior to k-vectors
