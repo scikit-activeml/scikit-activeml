@@ -68,6 +68,12 @@ class TestQBC(unittest.TestCase):
         self.assertRaises(ValueError, selector.query, X_cand=[[1]], X=self.X,
                           y=self.y)
 
+    def test_init_param_ensemble_dict(self):
+        selector = QBC(clf=self.clf, ensemble_dict='string')
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = QBC(clf=self.clf, ensemble_dict=dict(kwargg='kwargg'))
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
     def test_query_param_X_cand(self):
         selector = QBC(clf=self.clf)
         self.assertRaises(ValueError, selector.query, X_cand=[], X=self.X,
@@ -90,9 +96,9 @@ class TestQBC(unittest.TestCase):
 
     def test_query_param_y(self):
         selector = QBC(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=None)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y='string')
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=[])
@@ -103,8 +109,12 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=self.clf)
         self.assertRaises(TypeError, selector.query, **self.kwargs,
                           batch_size=1.2)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          batch_size='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           batch_size=0)
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          batch_size=-10)
 
     def test_query_param_return_utilities(self):
         selector = QBC(clf=self.clf)
@@ -124,7 +134,8 @@ class TestQBC(unittest.TestCase):
         #selector.query(**self.kwargs)
 
         # ensemble
-        selector = QBC(clf=self.clf, ensemble=BaggingClassifier)
+        selector = QBC(clf=self.clf, ensemble=BaggingClassifier,
+                       ensemble_dict=dict(n_estimators=10))
         selector.query(**self.kwargs)
         self.assertTrue(isinstance(selector._clf.estimator, BaggingClassifier))
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier)

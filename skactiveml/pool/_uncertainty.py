@@ -17,7 +17,8 @@ from sklearn.linear_model._logistic import _logistic_loss
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
-    check_scalar, check_cost_matrix, simple_batch, check_random_state
+    check_scalar, check_cost_matrix, simple_batch, check_random_state, \
+    check_classes
 from ..classifier import SklearnClassifier
 
 
@@ -85,7 +86,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         self.method = method
         self.classes = classes
         self.clf = clf
-        self.is_precompute = precompute
+        self.precompute = precompute
         self.precompute_array = None
 
     def query(self, X_cand, X, y, batch_size=1, return_utilities=False, **kwargs):
@@ -118,14 +119,22 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         # check random state
         random_state = check_random_state(self.random_state)
 
+        # Check if the argument return_utilities is valid
+        if not isinstance(return_utilities, bool):
+            raise TypeError(
+                '{} is an invalid type for return_utilities. Type {} is '
+                'expected'.format(type(return_utilities), bool))
+
         # check self.method
-        if (self.method != 'entropy' and self.method != 'least_confident' and
-                self.method != 'margin_sampling' and
-                self.method != 'expected_average_precision' and
-                self.method != 'epistemic'):
-            warnings.warn("The method '" + self.method + "' does not exist,"
-                                                         ",'margin_sampling' will be used.")
-            self.method = 'margin_sampling'
+        if not isinstance(self.method, str):
+            raise TypeError('{} is an invalid type for method. Type {} is '
+                            'expected'.format(type(self.method), str))
+
+        if self.method not in ['entropy', 'least_confident', 'margin_sampling',
+                               'expected_average_precision', 'epistemic']:
+            raise ValueError(
+                "The given method {} is not valid. Supported methods are "
+                "'KL_divergence' and 'vote_entropy'".format(self.method))
 
         # checks for method=margin_sampling
         if (self.method == 'margin_sampling' and
@@ -152,7 +161,11 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
 
         # create precompute_array if necessary
-        if self.is_precompute and self.precompute_array is None:
+        if not isinstance(self.precompute, bool) or self.precompute is None:
+            raise TypeError(
+                '{} is an invalid type for precompute. Type {} is '
+                'expected'.format(type(self.precompute), bool))
+        if self.precompute and self.precompute_array is None:
             self.precompute_array = np.full((2, 2), np.nan)
 
         # fit the classifier and get the probabilities
@@ -167,8 +180,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                                'entropy']:
                 utilities = uncertainty_scores(P=probas, method=self.method)
             elif self.method == 'expected_average_precision':
-                utilities = expected_average_precision(
-                    X_cand, self.classes, probas)
+                utilities = expected_average_precision(self.classes, probas)
             elif self.method == 'epistemic_pwc':
                 utilities, self.precompute_array = epistemic_uncertainty_pwc(
                     self.clf, X_cand, self.precompute_array)
@@ -249,15 +261,12 @@ def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
 
 
 # expected average precision:
-def expected_average_precision(X_cand, classes, probas):
+def expected_average_precision(classes, probas):
     """
     Calculate the expected average precision.
 
     Parameters
     ----------
-    X_cand : np.ndarray
-        The unlabeled pool for which to calculated the expected average
-        precision.
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
     probas : np.ndarray, shape=(n_X_cand, n_classes)
@@ -268,9 +277,24 @@ def expected_average_precision(X_cand, classes, probas):
     score : np.ndarray, shape=(n_X_cand)
         The expected average precision score of all instances in X_cand.
     """
-    score = np.zeros(len(X_cand))
+    # check if probas is valid
+    probas = check_array(probas, accept_sparse=False,
+            accept_large_sparse=True, dtype="numeric", order=None,
+            copy=False, force_all_finite=True, ensure_2d=True,
+            allow_nd=False, ensure_min_samples=1,
+            ensure_min_features=1, estimator=None)
+
+    # check if classes is valid
+    check_classes(classes)
+    if len(classes) < 2:
+        raise ValueError('classes must contain at least 2 entries.')
+    if len(classes) != probas.shape[1]:
+        raise ValueError('classes must have the same length as probas has '
+                         'columns.')
+
+    score = np.zeros(len(probas))
     for i in range(len(classes)):
-        for j, x in enumerate(X_cand):
+        for j in range(len(probas)):
             # The i-th column of p without p[j,i]
             p = probas[:, i]
             p = np.delete(p, [j])

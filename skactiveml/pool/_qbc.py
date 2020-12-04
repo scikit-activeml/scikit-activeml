@@ -123,6 +123,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         # Set and check random state.
         random_state = check_random_state(self.random_state)
 
+        # check X, y and X_cand
+        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+
         # Check if the given classes are the same
         # TODO sklearn classifiers dont have a classes attribute
         label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
@@ -131,9 +134,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
         # Check if the classifier and its arguments are valid
         check_classifier_params(classes, self.missing_label)
-
-        # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
 
         # Check if the batch_size argument is valid.
         check_scalar(batch_size, target_type=int, name='batch_size',
