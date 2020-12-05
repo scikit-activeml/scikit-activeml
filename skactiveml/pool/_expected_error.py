@@ -84,7 +84,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
         # Calculate utilities
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
-                                              self.cost_matrix, self.method)
+                                              self.cost_matrix, self.method,
+                                              sample_weight)
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
