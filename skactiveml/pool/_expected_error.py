@@ -51,8 +51,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.method = method
         self.cost_matrix = cost_matrix
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
-              **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+              return_utilities=False, **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -63,6 +63,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like, shape (n_samples)
             Labels of the data set
+        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Weights for uncertain annotators
         batch_size: int, optional (default=1)
             The number of instances to be selected.
         return_utilities: bool, optional (default=False)
@@ -105,7 +107,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         return X_cand, return_utilities, batch_size, random_state
 
 
-def _expected_error_reduction(clf, X_cand, X, y, C, method='emr'):
+def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
+                              sample_weight=None):
     """Compute least confidence as uncertainty scores.
 
     In case of a given cost matrix C, maximum expected cost is implemented as
@@ -128,6 +131,8 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr'):
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is
         cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
+    sample_weight: array-like, shape (n_samples), optional (default=None)
+        Weights for uncertain annotators
 
     Returns
     -------
@@ -141,17 +146,17 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr'):
     check_classifier_params(clf.classes, clf.missing_label, C)
 
     # Check the given data
-    X, y = check_X_y(X, y, force_all_finite=False,
-                     missing_label=clf.missing_label)
-
-    # Check if 'X' and 'X_cand' have the same number of features
-    if X.shape[0] > 0 and X_cand.shape[0] > 0 and \
-            not X.shape[1] == X_cand.shape[1]:
-        raise ValueError("X and X_cand must have the same number "
-                         "of features.")
+    if sample_weight is None:
+        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False,
+                                 missing_label=clf.missing_label)
+    else:
+        X, y, X_cand, sample_weight = check_X_y(
+            X, y, X_cand, sample_weight, force_all_finite=False,
+            missing_label=clf.missing_label
+        )
 
     clf = clone(clf)
-    clf.fit(X, y)
+    clf.fit(X, y, sample_weight)
 
     n_classes = len(clf.classes)
     P = clf.predict_proba(X_cand)
