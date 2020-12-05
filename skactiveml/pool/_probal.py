@@ -7,8 +7,8 @@ from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import rand_argmax, check_X_y, check_scalar, \
-    check_classifier_params, check_random_state
+from skactiveml.utils import check_scalar, check_classifier_params, \
+    check_random_state, simple_batch
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -70,47 +70,56 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
+        # Validate input
+        X_cand, return_utilities, batch_size, utility_weight, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                utility_weight)
+
+        # Calculate utilities and return the output
+        clf = clone(self.clf)
+        clf.fit(X, y)
+        k_vec = clf.predict_freq(X_cand)
+        utilities = utility_weight * _cost_reduction(k_vec, prior=self.prior,
+                                                     m_max=self.m_max)
+
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
+
+    def _validate_data(self, X_cand, return_utilities, batch_size,
+                       utility_weight):
         # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
         check_classifier_params(self.clf.classes, self.clf.missing_label)
-        self.clf = clone(self.clf)
 
-        # Check if 'prior' is valid
-        check_scalar(self.prior, 'prior', (float, int),
-                     min_inclusive=False, min_val=0)
-
-        # Check if 'm_max' is valid
-        if self.m_max < 1 or not float(self.m_max).is_integer():
-            raise ValueError("'m_max' must be a positive integer.")
-
-        # Check random state
-        random_state = check_random_state(self.random_state)
-
-        # Check the given data
+        # Check candidate instances
         X_cand = check_array(X_cand, force_all_finite=False)
-        X, y = check_X_y(X, y, force_all_finite=False,
-                         missing_label=self.clf.missing_label)
+
+        # Check return_utilities
+        if type(return_utilities) is not bool:
+            raise TypeError("The type of 'return_utilities' must be bool")
+
+        # Check batch size
+        check_scalar(batch_size, 'batch_size', int, min_val=1)
 
         # Check 'utility_weight'
         if utility_weight is None:
             utility_weight = np.ones(len(X_cand))
         utility_weight = check_array(utility_weight, ensure_2d=False)
 
-        # Check 'batch_size'
-        check_scalar(batch_size, 'batch_size', int, min_val=1)
+        # Check if X_cand and utility_weight have the same length
+        if not len(X_cand) == len(utility_weight):
+            raise ValueError(
+                "'X_cand' and 'utility_weight' must have the same length."
+            )
 
-        # Calculate utilities and return the output
-        self.clf.fit(X, y)
-        k_vec = self.clf.predict_freq(X_cand)
-        utilities = utility_weight * _cost_reduction(k_vec, prior=self.prior,
-                                                     m_max=self.m_max)
-        query_indices = rand_argmax(utilities, random_state)
-        if return_utilities:
-            return query_indices, np.array([utilities])
-        else:
-            return query_indices
+        # Check random state
+        random_state = check_random_state(self.random_state)
+
+        return X_cand, return_utilities, batch_size, utility_weight, \
+            random_state
 
 
 def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
@@ -135,6 +144,13 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     expected_cost_reduction: array-like, shape (n_samples)
         Expected cost reduction for given parameters.
     """
+    # Check if 'prior' is valid
+    check_scalar(prior, 'prior', (float, int),
+                 min_inclusive=False, min_val=0)
+
+    # Check if 'm_max' is valid
+    check_scalar(m_max, 'm_max', int, min_val=1)
+
     n_classes = len(k_vec_list[0])
     n_samples = len(k_vec_list)
 
@@ -239,7 +255,7 @@ def euler_beta(a):
     result: array-like, shape (m)
         Euler beta function results [B(a(0)), ..., B(a(m))
     """
-    return np.exp(np.sum(gammaln(a), axis=1)-gammaln(np.sum(a, axis=1)))
+    return np.exp(np.sum(gammaln(a), axis=1) - gammaln(np.sum(a, axis=1)))
 
 
 def multinomial(a):
@@ -257,4 +273,4 @@ def multinomial(a):
     result: array-like, shape (m)
         Multinomial coefficients [Mult(a(0)), ..., Mult(a(m))
     """
-    return factorial(np.sum(a, axis=1))/np.prod(factorial(a), axis=1)
+    return factorial(np.sum(a, axis=1)) / np.prod(factorial(a), axis=1)

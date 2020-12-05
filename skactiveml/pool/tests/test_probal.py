@@ -39,7 +39,7 @@ class TestMcPAL(unittest.TestCase):
 
         pal = McPAL(self.clf, m_max=1.5)
         self.assertTrue(hasattr(pal, 'm_max'))
-        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y)
+        self.assertRaises(TypeError, pal.query, self.X_cand, self.X, self.y)
 
     def test_init_param_random_state(self):
         pal = McPAL(self.clf, random_state='string')
