@@ -43,8 +43,8 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X_cand, X, y, utility_weight=None, batch_size=1,
-              return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, utility_weight=None,
+              batch_size=1, return_utilities=False, **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -55,6 +55,9 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like (n_training_samples)
             Labels of the data set
+        sample_weight: array-like, shape (n_training_samples),
+                       optional (default=None)
+            Weights for uncertain annotators
         batch_size: int, optional (default=1)
             The number of instances to be selected.
         utility_weight: array-like (n_candidate_samples)
@@ -77,7 +80,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # Calculate utilities and return the output
         clf = clone(self.clf)
-        clf.fit(X, y)
+        clf.fit(X, y, sample_weight)
         k_vec = clf.predict_freq(X_cand)
         utilities = utility_weight * _cost_reduction(k_vec, prior=self.prior,
                                                      m_max=self.m_max)

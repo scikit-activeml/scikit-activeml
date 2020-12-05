@@ -62,6 +62,13 @@ class TestMcPAL(unittest.TestCase):
         self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
 
+    def test_query_param_sample_weight(self):
+        pal = McPAL(self.clf)
+        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight='string')
+        self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight=np.ones(3))
+
     def test_query_param_utility_weight(self):
         pal = McPAL(self.clf)
         self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
