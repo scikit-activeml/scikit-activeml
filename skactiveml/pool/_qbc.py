@@ -1,20 +1,29 @@
+
 import numpy as np
 import warnings
+
+from sklearn import clone
+from sklearn.base import BaseEstimator
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_random_state, check_array
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, check_scalar
+from sklearn.utils import check_array, column_or_1d
+
+from ..classifier import SklearnClassifier
+from ..utils import MISSING_LABEL, check_X_y, check_scalar, \
+    simple_batch, check_classifier_params, check_classes, check_random_state, \
+    ExtLabelEncoder
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
     """QBC
 
-    The Query-By-Committee (QBC) algorithm minimizes the version space, which is the set of hypotheses that are
-    consistent with the current labeled training data.
-    This class implement the query-by-bagging method, which uses the bagging in sklearn to
-    construct the committee. So your model should be a sklearn model.
+    The Query-By-Committee (QBC) algorithm minimizes the version space, which
+    is the set of hypotheses that are consistent with the current labeled
+    training data. This class implement the query-by-bagging method, which uses
+    the bagging in sklearn to construct the committee. So your model should be
+    a sklearn model.
 
     Parameters
     ----------
@@ -42,14 +51,16 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     Attributes
     ----------
     ensemble : sklearn.ensemble
-        Ensemble used as committee.
-        Implementing the methods 'fit', 'predict'(for vote entropy) and 'predict_proba'(for KL divergence).
+        Ensemble used as committee. Implementing the methods 'fit',
+        'predict'(for vote entropy) and 'predict_proba'(for KL divergence).
     method : string, default='KL_divergence'
-        The method to calculate the disagreement. 'vote_entropy' or 'KL_divergence' are possible.
+        The method to calculate the disagreement. 'vote_entropy' or
+        'KL_divergence' are possible.
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
     unlabeled_class : scalar | str | None | np.nan, default=np.nan
-        Symbol to represent a missing label. Important: We do not differ between None and np.nan.
+        Symbol to represent a missing label. Important: We do not differ
+        between None and np.nan.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
@@ -58,32 +69,36 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     [1] H.S. Seung, M. Opper, and H. Sompolinsky. Query by committee.
         In Proceedings of the ACM Workshop on Computational Learning Theory,
         pages 287-294, 1992.
-    [2] N. Abe and H. Mamitsuka. Query learning strategies using boosting and bagging.
-        In Proceedings of the International Conference on Machine Learning (ICML),
-        pages 1-9. Morgan Kaufmann, 1998.
+    [2] N. Abe and H. Mamitsuka. Query learning strategies using boosting and
+        bagging. In Proceedings of the International Conference on Machine
+        Learning (ICML), pages 1-9. Morgan Kaufmann, 1998.
     """
 
-    def __init__(self, clf, ensemble=None, method='KL_divergence', missing_label=MISSING_LABEL, random_state=None,
-                 **kwargs):
+    def __init__(self, clf, ensemble=None, method='KL_divergence',
+                 missing_label=MISSING_LABEL, random_state=None,
+                 ensemble_dict=dict()):
+
         super().__init__(random_state=random_state)
 
         self.missing_label = missing_label
         self.method = method
         self.ensemble = ensemble
         self.clf = clf
-        self.kwargs_init = kwargs
+        self.ensemble_dict = ensemble_dict
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False, **kwargs):
+
+    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
+              **kwargs):
         """
         Queries the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand : np.ndarray
+        X_cand : array-like
             The unlabeled pool from which to choose.
-        X : np.ndarray
+        X : array-like
             The labeled pool used to fit the classifier.
-        y : np.array
+        y : array-like
             The labels of the labeled pool X.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
@@ -98,8 +113,29 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
-        # validation:
-        # Check batch size.
+        # Check if the attribute clf is valid
+        if not isinstance(self.clf, BaseEstimator):
+            raise TypeError("'clf' has to be from type BaseEstimator. "
+                            "The given type is {}".format(type(self.clf)))
+
+        self._clf = clone(self.clf)
+
+        # Set and check random state.
+        random_state = check_random_state(self.random_state)
+
+        # check X, y and X_cand
+        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+
+        # Check if the given classes are the same
+        # TODO sklearn classifiers dont have a classes attribute
+        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
+                                        classes=self.clf.classes).fit(y)
+        classes = label_encoder.classes_
+
+        # Check if the classifier and its arguments are valid
+        check_classifier_params(classes, self.missing_label)
+
+        # Check if the batch_size argument is valid.
         check_scalar(batch_size, target_type=int, name='batch_size',
                      min_val=1)
         if len(X_cand) < batch_size:
@@ -109,76 +145,89 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                     batch_size, len(X_cand)))
             batch_size = len(X_cand)
 
-        # check self.clf and self.method
-        if self.method != 'KL_divergence' and self.method != 'vote_entropy':
+        # Check if the argument return_utilities is valid
+        if not isinstance(return_utilities, bool):
+            raise TypeError(
+                '{} is an invalid type for return_utilities. Type {} is '
+                'expected'.format(type(return_utilities), bool))
+
+        # Check self.clf and self.method
+        if not isinstance(self.method, str):
+            raise TypeError("{} is an invalid type for the attribute "
+                            "'self.method'.".format(type(self.method)))
+        if self.method not in ['KL_divergence', 'vote_entropy']:
             raise ValueError(
-                'The method {} does not exist.'.format(self.method))
+                "The given method {} is not valid. Supported methods are "
+                "'KL_divergence' and 'vote_entropy'".format(self.method))
         if self.method == 'vote_entropy' and \
-                ((getattr(self.clf, 'fit', None) is None or
-                  getattr(self.clf, 'predict', None) is None)):
+                ((getattr(self._clf, 'fit', None) is None or
+                  getattr(self._clf, 'predict', None) is None)):
             raise TypeError(
                 "'clf' must implement the methods 'fit' and 'predict'")
         elif self.method == 'KL_divergence' and \
-                ((getattr(self.clf, 'fit', None) is None or
-                  getattr(self.clf, 'predict_proba', None) is None)):
+                ((getattr(self._clf, 'fit', None) is None or
+                  getattr(self._clf, 'predict_proba', None) is None)):
             raise TypeError(
                 "'clf' must implement the methods 'fit' and 'predict_proba'")
 
         # check self.ensemble and self.clf
-        if not isinstance(self.clf, BaseEnsemble):
+        if not isinstance(self._clf, BaseEnsemble):
             if self.ensemble is None:
                 warnings.warn('\'ensemble\' is not specified, '
                               '\'BaggingClassifier\' will be used.')
-                self.ensemble = BaggingClassifier
-            self.clf = self.ensemble(base_estimator=self.clf, random_state=self.random_state)
+                ensemble = BaggingClassifier
+            elif not callable(self.ensemble):
+                raise TypeError("{} is not valid for the attribute "
+                                "'self.ensemble'.".format(self.ensemble))
+            elif not isinstance(self.ensemble(), BaseEnsemble):
+                raise TypeError("{} is an invalid type for the attribute "
+                                "'self.ensemble'.".format(type(self.ensemble)))
+            else:
+                ensemble = self.ensemble
+            parameters = ensemble.__init__.__code__.co_varnames
+            if not isinstance(self.ensemble_dict, dict):
+                raise TypeError("ensemble_dict is not a dictionary.")
+            ensemble_dict = self.ensemble_dict
+            if 'base_estimator' in parameters:
+                ensemble_dict['base_estimator'] = self._clf
+            self._clf = ensemble(random_state=random_state, **ensemble_dict)
 
-        # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+        if not isinstance(self._clf, SklearnClassifier):
+            self._clf = SklearnClassifier(self._clf, classes=classes)
 
-        # remove unlabeled instances from X and y
-
-        mask_labeled = is_labeled(y, self.missing_label)
-        self.clf.fit(X[mask_labeled], y[mask_labeled])
+        # fit the classifier
+        self._clf.fit(X, y)
 
         # choose the disagreement method and calculate the utilities
-        if self.method == 'KL_divergence':
-            utilities = average_KL_divergence(self.clf, X_cand)
-        elif self.method == 'vote_entropy':
-            utilities = vote_entropy(self.clf, X_cand, )
-
-        # create batch
-        if batch_size is 'adaptive':
-            batch_size = 1
-        batch_utilities = np.empty((batch_size, len(X_cand)))
-        best_indices = np.empty(batch_size, dtype=int)
-        for i in range(batch_size):
-            best_indices[i] = rand_argmax(
-                [utilities], axis=1, random_state=self.random_state)
-            batch_utilities[i] = utilities
-            utilities[best_indices[i]] = np.nan
-
-        # Check whether utilities are to be returned.
-        if return_utilities:
-            return best_indices, batch_utilities
+        if hasattr(self._clf, 'estimators_'):
+            est_arr = self._clf.estimators_
         else:
-            return best_indices
+            est_arr = [self._clf] * self._clf.n_estimators
+        if self.method == 'KL_divergence':
+            P = [est.predict_proba(X_cand) for est in est_arr]
+            utilities = average_kl_divergence(P)
+        elif self.method == 'vote_entropy':
+            votes = [est.predict(X_cand) for est in est_arr]
+            utilities = vote_entropy(votes, classes)
+
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
 
 
-def average_KL_divergence(ensemble, X_cand):
+def average_kl_divergence(probas):
     """
     Calculate the average Kullback-Leibler (KL) divergence for measuring the
     level of disagreement in QBC.
 
     Parameters
     ----------
-    ensemble : sklearn.ensemble
-         fited sklearn.ensemble used as committee.
-    X_cand : np.ndarray
-        The unlabeled pool for which to calculated the calc_avg_KL_divergence.
+    probas : array-like, shape (n_estimators, n_X_cand, n_classes)
+        The probability estimations of all estimators, instances and classes.
 
     Returns
     -------
-    scores: np.ndarray, shape=(len(X_cand)
+    scores: np.ndarray, shape (n_X_cand)
         The Kullback-Leibler (KL) divergences.
 
     References
@@ -189,43 +238,41 @@ def average_KL_divergence(ensemble, X_cand):
     """
 
     # validation:
-    # check X
-    X_cand = check_array(X_cand, accept_sparse=False,
+    # check P
+    probas = check_array(probas, accept_sparse=False,
                          accept_large_sparse=True, dtype="numeric", order=None,
                          copy=False, force_all_finite=True, ensure_2d=True,
-                         allow_nd=False, ensure_min_samples=1,
+                         allow_nd=True, ensure_min_samples=1,
                          ensure_min_features=1, estimator=None)
-
-    # check ensemble
-    if not isinstance(ensemble, BaseEnsemble):
-        raise TypeError("'ensemble' most be an instance of 'BaseEnsemble'")
+    if probas.ndim != 3:
+        raise ValueError("Expected 2D array, got 1D array instead:"
+                         "\narray={}.".format(probas))
 
     # calculate the average KL divergence:
-    est_arr = ensemble.estimators_
-    P = [est_arr[e_idx].predict_proba(X_cand) for e_idx in range(len(est_arr))]
-    P = np.array(P)
-    P_com = np.mean(P, axis=0)
+    probas = np.array(probas)
+    probas_mean = np.mean(probas, axis=0)
     with np.errstate(divide='ignore', invalid='ignore'):
-        scores = np.nansum(np.nansum(P * np.log(P / P_com), axis=2), axis=0)
-    scores = scores / ensemble.n_classes_
+        scores = np.nansum(
+            np.nansum(probas * np.log(probas / probas_mean), axis=2), axis=0)
+    scores = scores / probas.shape[0]
 
     return scores
 
 
-def vote_entropy(ensemble, X_cand):
+def vote_entropy(votes, classes):
     """
     Calculate the vote entropy for measuring the level of disagreement in QBC.
 
     Parameters
     ----------
-    ensemble : sklearn.ensemble
-         fited sklearn BaggingClassifier used as committee.
-    X_cand : np.ndarray
-        The unlabeled pool for which to calculated the vote entropy.
+    votes : array-like, shape (n_estimators, n_X_cand)
+        The class predicted by the estimators for each instance.
+    classes : array-like, shape (n_classes)
+        A list of all possible classes.
 
     Returns
     -------
-    vote_entropy : np.ndarray, shape=(len(X_cand))
+    vote_entropy : np.ndarray, shape (n_X_cand))
         The vote entropy of each instance in X_cand.
 
     References
@@ -234,39 +281,31 @@ def vote_entropy(ensemble, X_cand):
     "Minimizing manual annotation cost in supervised training from corpora."
     arXiv preprint cmp-lg/9606030 (1996).
     """
+    # check votes to be valid
+    votes = check_array(votes, accept_sparse=False,
+                        accept_large_sparse=True, dtype=None, order=None,
+                        copy=False, force_all_finite=True, ensure_2d=True,
+                        allow_nd=False, ensure_min_samples=1,
+                        ensure_min_features=1, estimator=None)
 
-    # validation:
-    # check x
-    X_cand = check_array(X_cand, accept_sparse=False,
-                         accept_large_sparse=True, dtype="numeric", order=None,
-                         copy=False, force_all_finite=True, ensure_2d=True,
-                         allow_nd=False, ensure_min_samples=1,
-                         ensure_min_features=1, estimator=None)
-
-    # check ensemble
-    if not isinstance(ensemble, BaseEnsemble):
-        raise TypeError("'ensamble' most be an instance of 'BaseEnsamble'")
-
-    estimators = ensemble.estimators_
-    # Let the models vote for unlabeled data
-    votes = np.zeros((len(X_cand), len(estimators)))
-    for i, model in enumerate(estimators):
-        votes[:, i] = model.predict(X_cand)
-
+    # Check classes to be valid
+    check_classes(classes)
+    try:
+        for c in np.unique(votes.flatten()):
+            if c not in classes:
+                raise ValueError("The votes element '{}' "
+                                 "is not in classes.".format(c))
+    except TypeError:
+        raise TypeError("The type of classes and votes are not compatible.")
     # count the votes
-    vote_count = np.zeros((len(X_cand), ensemble.n_classes_))
-    for i in range(len(X_cand)):
-        for c in range(ensemble.n_classes_):
-            for m in range(len(estimators)):
-                vote_count[i, c] += (votes[i, m] == c)
+    vote_count = np.zeros((votes.shape[1], len(classes)))
+    for i in range(votes.shape[1]):
+        for c_idx, c in enumerate(classes):
+            for m in range(len(votes)):
+                vote_count[i, c_idx] += (votes[m, i] == c)
 
     # compute vote entropy
-    vote_entropy = np.zeros(len(X_cand))
-    for i in range(len(X_cand)):
-        for c in range(ensemble.n_classes_):
-            if vote_count[i, c] != 0:  # definition gap at vote_count[i,c]==0
-                a = vote_count[i, c] / len(estimators)
-                vote_entropy[i] += a * np.log(a)
-    vote_entropy *= -1 / np.log(len(estimators))
-
-    return vote_entropy
+    v = vote_count / len(votes)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        scores = -np.nansum(v*np.log(v), axis=1) / np.log(len(votes))
+    return scores
