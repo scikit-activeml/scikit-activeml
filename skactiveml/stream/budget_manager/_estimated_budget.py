@@ -11,17 +11,20 @@ class EstimatedBudget(BudgetManager):
     budget : float
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
+    
+    w : int
+        Specifies the size of the memory window. Controlles the budget in the 
+        last w steps taken. Default = 100
     """
     def __init__(self, budget=None, w=100):
         super().__init__(budget)
-        #size of the memory/step window
         self.w = w
 
     def is_budget_left(self):
         """Check whether there is any utility given to sample(...), which may
         lead to sampling the corresponding instance, i.e., check if sampling
-        another instance is currently possible under the estimated budgeting
-        constraint. This function is useful to determine, whether a provided
+        another instance is currently possible under the budgeting constraint. 
+        This function is useful to determine, whether a provided
         utility is not sufficient, or the budgeting constraint was simply
         exhausted. For this budget manager this function returns True, when
         budget > estimated_spending
@@ -32,7 +35,7 @@ class EstimatedBudget(BudgetManager):
             True, if there is a utility which leads to sampling another
             instance.
         """
-        #TODO
+        
         return self.budget_ > self.u_t_/self.w
 
     def sample(self, utilities, simulate=False, return_budget_left=False,
@@ -66,27 +69,30 @@ class EstimatedBudget(BudgetManager):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
+        # check if budget has been set
         self._validate_budget(get_default_budget())
-        
+        # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, 'u_t_'):
             self.u_t_ = 0
-        
-        qs_decisions = utilities
+        # intialise return parameters
         sampled_indices = []
         budget_left = []
-        
+        # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
         
-        # check after 100 steps if budget is left 
-        for i , d in enumerate(qs_decisions) :
+        # check for each sample separately if budget is left and the utility is
+        # high enough
+        for i , d in enumerate(utilities) :
             budget_left.append(tmp_u_t/self.w < self.budget_)
             if not budget_left[-1]:
                 d = False
-            #u_t = u_t-1 * (w-1)/w + labeling_t
+            # u_t = u_t-1 * (w-1)/w + labeling_t
             tmp_u_t = tmp_u_t * ((self.w-1)/self.w) + d
+            # get the indices instances that should be sampled
             if d:
                 sampled_indices.append(i)
         
+        # set the internal state to the previous values
         if not simulate:
             self.u_t_ = tmp_u_t
             
@@ -106,16 +112,16 @@ class EstimatedBudget(BudgetManager):
 
         Returns
         -------
-        self : FixedBudget
-            The FixedBudget returns itself, after it is updated.
+        self : EstimatedBudget
+            The EstimatedBudget returns itself, after it is updated.
         """
         # check if budget has been set
         self._validate_budget(get_default_budget())
-        
+        # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, 'u_t_'):
             self.u_t_ = 0
-        
-        for i , s in enumerate(sampled):
+        # update u_t for sampled X_cand
+        for s in sampled:
             self.u_t_ = self.u_t_ * ((self.w-1)/self.w) + s
         
         return self
