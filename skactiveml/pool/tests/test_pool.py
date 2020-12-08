@@ -36,7 +36,6 @@ class TestGeneral(unittest.TestCase):
                           missing_label=MISSING_LABEL,
                           random_state=np.random.RandomState(0))
 
-
             with self.subTest(msg="Random State", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
                 qs = call_func(
@@ -149,6 +148,7 @@ class TestGeneral(unittest.TestCase):
                         hasattr(test_obj, test_func_name),
                         msg="'{}()' missing for parameter '{}' of "
                             "query()".format(test_func_name, param))
+
 
 class Dummy:
     def __init__(self):
