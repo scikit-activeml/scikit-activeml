@@ -1,5 +1,6 @@
 import inspect
 import unittest
+import warnings
 from importlib import import_module
 from os import path
 
@@ -8,8 +9,7 @@ from sklearn.datasets import make_blobs
 
 from skactiveml import pool
 from skactiveml.classifier import PWC, CMM
-from skactiveml.utils import is_unlabeled, MISSING_LABEL, \
-    initialize_class_with_kwargs
+from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL
 
 
 class TestGeneral(unittest.TestCase):
@@ -39,43 +39,47 @@ class TestGeneral(unittest.TestCase):
 
             with self.subTest(msg="Random State", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
-                qs = initialize_class_with_kwargs(
-                    self.query_strategies[qs_name], clf=clf,
-                    perf_est=clf, classes=np.unique(self.y_true),
+                qs = call_func(
+                    self.query_strategies[qs_name], only_mandatory=True,
+                    clf=clf, classes=np.unique(self.y_true),
                     random_state=np.random.RandomState(0))
 
                 unlabeled = np.where(is_unlabeled(y))[0]
-                id1, u1 = qs.query(self.X[unlabeled], X=self.X,
-                                   y=y, X_eval=self.X,
-                                   return_utilities=True)
-                id2, u2 = qs.query(self.X[unlabeled], X=self.X,
-                                   y=y, X_eval=self.X,
-                                   return_utilities=True)
+                id1, u1 = call_func(qs.query, X_cand=self.X[unlabeled],
+                                    X=self.X, y=y, X_eval=self.X,
+                                    return_utilities=True)
+                id2, u2 = call_func(qs.query, X_cand=self.X[unlabeled],
+                                    X=self.X, y=y, X_eval=self.X,
+                                    return_utilities=True)
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_array_equal(u1, u2)
 
             with self.subTest(msg="Batch",
                               qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
-                qs = initialize_class_with_kwargs(
-                    self.query_strategies[qs_name], clf=clf,
-                    perf_est=clf, classes=np.unique(self.y_true),
+                qs = call_func(
+                    self.query_strategies[qs_name], only_mandatory=True,
+                    clf=clf, classes=np.unique(self.y_true),
                     random_state=np.random.RandomState(0))
 
-                id, u = qs.query(self.X[unlabeled], X=self.X,
-                                 y=y, X_eval=self.X, batch_size=5,
-                                 return_utilities=True)
-                self.assertEqual(len(id), 5)
+                ids, u = call_func(qs.query, X_cand=self.X[unlabeled],
+                                   X=self.X, y=y, X_eval=self.X,
+                                   batch_size=5, return_utilities=True)
+                self.assertEqual(len(ids), 5)
                 self.assertEqual(len(u), 5, msg='utility score should '
                                                 'have shape (5xN)')
                 self.assertEqual(len(u[0]), len(unlabeled),
                                  msg='utility score must have shape (5xN)')
 
-                self.assertWarns(Warning, qs.query, X_cand=self.X[unlabeled],
-                                 X=self.X, y=y, X_eval=self.X, batch_size=15)
-                id = qs.query(X_cand=self.X[unlabeled], X = self.X, y = y,
-                              X_eval = self.X, batch_size = 15)
-                self.assertEqual(len(id), 10)
+                self.assertWarns(Warning, call_func, f_callable=qs.query,
+                                 X_cand=self.X[unlabeled], X=self.X, y=y,
+                                 X_eval=self.X, batch_size=15)
+
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore")
+                    ids = call_func(qs.query, X_cand=self.X[unlabeled],
+                                    X=self.X, y=y, X_eval=self.X, batch_size=15)
+                    self.assertEqual(len(ids), 10)
 
             for init_budget in [5, 1, 0]:
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
@@ -83,9 +87,9 @@ class TestGeneral(unittest.TestCase):
 
                 with self.subTest(msg="Basic AL Cycle",
                                   init_budget=init_budget, qs_name=qs_name):
-                    qs = initialize_class_with_kwargs(
-                        self.query_strategies[qs_name], clf=clf,
-                        perf_est=clf, classes=np.unique(self.y_true),
+                    qs = call_func(
+                        self.query_strategies[qs_name], only_mandatory=True,
+                        clf=clf, classes=np.unique(self.y_true),
                         random_state=1)
 
                     unlabeled = np.where(is_unlabeled(y))[0]
@@ -93,9 +97,9 @@ class TestGeneral(unittest.TestCase):
                     for b in range(self.budget):
                         unlabeled = np.where(is_unlabeled(y))[0]
                         clf.fit(self.X, y)
-                        unlabeled_id = qs.query(self.X[unlabeled], X=self.X,
-                                                y=y, X_eval=self.X)
-                        sample_id = unlabeled[unlabeled_id]
+                        ids = call_func(qs.query, X_cand=self.X[unlabeled],
+                                        X=self.X, y=y, X_eval=self.X)
+                        sample_id = unlabeled[ids]
                         y[sample_id] = self.y_true[sample_id]
 
     def test_param(self):

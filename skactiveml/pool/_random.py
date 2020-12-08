@@ -18,7 +18,7 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
     def __init__(self, random_state=None):
         super().__init__(random_state=random_state)
 
-    def query(self, X_cand, batch_size=1, return_utilities=False, **kwargs):
+    def query(self, X_cand, batch_size=1, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
