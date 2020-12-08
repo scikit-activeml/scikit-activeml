@@ -8,11 +8,12 @@ from sklearn.base import BaseEstimator
 from ..base import SingleAnnotPoolBasedQueryStrategy
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_array, check_random_state
+from sklearn.utils import check_array, column_or_1d
 
 from ..classifier import SklearnClassifier
 from ..utils import MISSING_LABEL, check_X_y, check_scalar, \
-    simple_batch, check_classifier_params, check_classes
+    simple_batch, check_classifier_params, check_classes, check_random_state, \
+    ExtLabelEncoder
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
@@ -74,8 +75,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     """
 
     def __init__(self, clf, ensemble=None, method='KL_divergence',
-                 classes=None, missing_label=MISSING_LABEL, random_state=None,
-                 **kwargs_ensemble):
+                 missing_label=MISSING_LABEL, random_state=None,
+                 ensemble_dict=dict()):
 
         super().__init__(random_state=random_state)
 
@@ -83,8 +84,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         self.method = method
         self.ensemble = ensemble
         self.clf = clf
-        self.classes = classes
-        self.kwargs_ensemble = kwargs_ensemble
+        self.ensemble_dict = ensemble_dict
 
 
     def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
@@ -123,11 +123,17 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         # Set and check random state.
         random_state = check_random_state(self.random_state)
 
-        # Check if the classifier and its arguments are valid
-        check_classifier_params(self.classes, self.missing_label)
-
         # check X, y and X_cand
         X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+
+        # Check if the given classes are the same
+        # TODO sklearn classifiers dont have a classes attribute
+        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
+                                        classes=self.clf.classes).fit(y)
+        classes = label_encoder.classes_
+
+        # Check if the classifier and its arguments are valid
+        check_classifier_params(classes, self.missing_label)
 
         # Check if the batch_size argument is valid.
         check_scalar(batch_size, target_type=int, name='batch_size',
@@ -179,21 +185,18 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             else:
                 ensemble = self.ensemble
             parameters = ensemble.__init__.__code__.co_varnames
-            kwargs = self.kwargs_ensemble
+            if not isinstance(self.ensemble_dict, dict):
+                raise TypeError("ensemble_dict is not a dictionary.")
+            ensemble_dict = self.ensemble_dict
             if 'base_estimator' in parameters:
-                kwargs['base_estimator'] = self._clf
-            self._clf = ensemble(random_state=random_state, **kwargs)
+                ensemble_dict['base_estimator'] = self._clf
+            self._clf = ensemble(random_state=random_state, **ensemble_dict)
 
         if not isinstance(self._clf, SklearnClassifier):
-            self._clf = SklearnClassifier(self._clf, classes=self.classes)
+            self._clf = SklearnClassifier(self._clf, classes=classes)
 
+        # fit the classifier
         self._clf.fit(X, y)
-        # Check if the given classes are the same
-        if self.classes is None:
-            self.classes = self._clf.classes_
-        if not np.array_equal(self._clf.classes_, self.classes):
-            raise ValueError("The given classes are not the same as in the "
-                             "classifier.")
 
         # choose the disagreement method and calculate the utilities
         if hasattr(self._clf, 'estimators_'):
@@ -205,7 +208,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             utilities = average_kl_divergence(P)
         elif self.method == 'vote_entropy':
             votes = [est.predict(X_cand) for est in est_arr]
-            utilities = vote_entropy(votes, self.classes)
+            utilities = vote_entropy(votes, classes)
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
@@ -280,13 +283,20 @@ def vote_entropy(votes, classes):
     """
     # check votes to be valid
     votes = check_array(votes, accept_sparse=False,
-                        accept_large_sparse=True, dtype="numeric", order=None,
+                        accept_large_sparse=True, dtype=None, order=None,
                         copy=False, force_all_finite=True, ensure_2d=True,
                         allow_nd=False, ensure_min_samples=1,
                         ensure_min_features=1, estimator=None)
+
     # Check classes to be valid
     check_classes(classes)
-
+    try:
+        for c in np.unique(votes.flatten()):
+            if c not in classes:
+                raise ValueError("The votes element '{}' "
+                                 "is not in classes.".format(c))
+    except TypeError:
+        raise TypeError("The type of classes and votes are not compatible.")
     # count the votes
     vote_count = np.zeros((votes.shape[1], len(classes)))
     for i in range(votes.shape[1]):
@@ -296,4 +306,6 @@ def vote_entropy(votes, classes):
 
     # compute vote entropy
     v = vote_count / len(votes)
-    return -np.nansum(v*np.log(v), axis=1) / np.log(len(votes))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        scores = -np.nansum(v*np.log(v), axis=1) / np.log(len(votes))
+    return scores

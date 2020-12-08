@@ -1,6 +1,8 @@
 import numpy as np
+import sklearn
 
 from collections.abc import Iterable
+
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
@@ -334,3 +336,15 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
     if sample_weight is not None and X_cand is not None:
         return X, y, X_cand, sample_weight
     return X, y
+
+
+def check_random_state(random_state, seed_multiplier=1):
+    # Check given random state
+    random_state = sklearn.utils.check_random_state(random_state)
+
+    # Check multiplier
+    check_scalar(seed_multiplier, 'seed_multiplier', int, min_val=1)
+
+    seed = random_state.get_state()[1][0]
+
+    return np.random.RandomState((seed * seed_multiplier) % (2 ** 32))

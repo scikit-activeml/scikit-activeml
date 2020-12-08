@@ -2,15 +2,17 @@ import itertools
 import warnings
 
 import numpy as np
+
 from scipy.special import factorial, gammaln
 from sklearn import clone
 from sklearn.metrics import pairwise_kernels
-from sklearn.utils import check_array, check_random_state
+from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, \
     ClassFrequencyEstimator
 from skactiveml.classifier import PWC
-from skactiveml.utils import check_classifier_params, check_X_y, ExtLabelEncoder
+from skactiveml.utils import check_classifier_params, check_X_y, \
+    ExtLabelEncoder, simple_batch, check_random_state
 from skactiveml.utils import rand_argmax, MISSING_LABEL, check_cost_matrix, \
     check_scalar, is_labeled
 
@@ -47,8 +49,8 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X_cand, X, y, sample_weight, batch_size=1,
-              return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, utility_weight=None,
+              batch_size=1, return_utilities=False, **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -59,9 +61,12 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like (n_training_samples)
             Labels of the data set
+        sample_weight: array-like, shape (n_training_samples),
+                       optional (default=None)
+            Weights for uncertain annotators
         batch_size: int, optional (default=1)
             The number of instances to be selected.
-        sample_weight: array-like (n_training_samples)
+        utility_weight: array-like (n_candidate_samples)
             Densities for each instance in X
         return_utilities: bool (default=False)
             If True, the utilities are additionally returned.
@@ -74,40 +79,56 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
+        # Validate input
+        X_cand, return_utilities, batch_size, utility_weight, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                utility_weight)
+
+        # Calculate utilities and return the output
+        clf = clone(self.clf)
+        clf.fit(X, y, sample_weight)
+        k_vec = clf.predict_freq(X_cand)
+        utilities = utility_weight * _cost_reduction(k_vec, prior=self.prior,
+                                                     m_max=self.m_max)
+
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
+
+    def _validate_data(self, X_cand, return_utilities, batch_size,
+                       utility_weight):
         # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
         check_classifier_params(self.clf.classes, self.clf.missing_label)
-        self.clf = clone(self.clf)
 
-        # Check if 'prior' is valid
-        check_scalar(self.prior, 'prior', (float, int),
-                     min_inclusive=False, min_val=0)
-
-        # Check if 'm_max' is valid
-        if self.m_max < 1 or not float(self.m_max).is_integer():
-            raise ValueError("'m_max' must be a positive integer.")
-
-        # Check the given data
+        # Check candidate instances
         X_cand = check_array(X_cand, force_all_finite=False)
-        X, y = check_X_y(X, y, force_all_finite=False,
-                         missing_label=self.clf.missing_label)
 
-        # Check 'batch_size'
+        # Check return_utilities
+        if type(return_utilities) is not bool:
+            raise TypeError("The type of 'return_utilities' must be bool")
+
+        # Check batch size
         check_scalar(batch_size, 'batch_size', int, min_val=1)
 
-        # Calculate utilities and return the output
-        self.clf.fit(X, y)
-        k_vec = self.clf.predict_freq(X_cand)
-        utilities = sample_weight * _cost_reduction(k_vec, prior=self.prior,
-                                                    m_max=self.m_max)
-        query_indices = rand_argmax(utilities, self.random_state)
-        if return_utilities:
-            return query_indices, np.array([utilities])
-        else:
-            return query_indices
+        # Check 'utility_weight'
+        if utility_weight is None:
+            utility_weight = np.ones(len(X_cand))
+        utility_weight = check_array(utility_weight, ensure_2d=False)
 
+        # Check if X_cand and utility_weight have the same length
+        if not len(X_cand) == len(utility_weight):
+            raise ValueError(
+                "'X_cand' and 'utility_weight' must have the same length."
+            )
+
+        # Check random state
+        random_state = check_random_state(self.random_state)
+
+        return X_cand, return_utilities, batch_size, utility_weight, \
+            random_state
 
 class BayesianPriorLearner(PWC):
     # TODO: commment
@@ -724,7 +745,7 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
 
     Parameters
     ----------
-    k_vec_list: array-like, shape (n_classes)
+    k_vec_list: array-like, shape (n_samples, n_classes)
         Observed class labels.
     C: array-like, shape = (n_classes, n_classes)
         Cost matrix.
@@ -738,6 +759,13 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     expected_cost_reduction: array-like, shape (n_samples)
         Expected cost reduction for given parameters.
     """
+    # Check if 'prior' is valid
+    check_scalar(prior, 'prior', (float, int),
+                 min_inclusive=False, min_val=0)
+
+    # Check if 'm_max' is valid
+    check_scalar(m_max, 'm_max', int, min_val=1)
+
     n_classes = len(k_vec_list[0])
     n_samples = len(k_vec_list)
 
@@ -752,8 +780,8 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
 
     # compute optimal cost-sensitive decision for all combination of k-vectors
     # and l-vectors
-    k_l_vec_list = np.swapaxes(np.tile(k_vec_list, (n_l_vecs, 1, 1)), 0,
-                               1) + l_vec_list
+    tile = np.tile(k_vec_list, (n_l_vecs, 1, 1))
+    k_l_vec_list = np.swapaxes(tile, 0, 1) + l_vec_list
     y_hats = np.argmin(k_l_vec_list @ C, axis=2)
 
     # add prior to k-vectors
