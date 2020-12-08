@@ -15,10 +15,11 @@ not yet finished
 Development
 ===========
 
-More information are available in the `Developer's Guide<https://scikit-activeml.readthedocs.io/en/latest/developers_guide.html>`_.
+More information are available in the `Developer's Guide
+<https://scikit-activeml.readthedocs.io/en/latest/developers_guide.html>`_.
 
 Development
 ===========
 
 The doumentation is available here:
-`https://scikit-activeml.readthedocs.io<https://scikit-activeml.readthedocs.io>`_.
+https://scikit-activeml.readthedocs.io
