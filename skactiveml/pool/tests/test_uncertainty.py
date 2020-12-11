@@ -115,10 +115,11 @@ class TestUncertainty(unittest.TestCase):
     def test_query(self):
         compare_list = []
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
-                                random_state=self.random_state)
+                                random_state=self.random_state,
+                                classes=self.classes)
 
         # missing_label
-        selector = UncertaintySampling(clf=self.clf, missing_label='string')
+        selector = UncertaintySampling(clf=clf, missing_label='string')
         selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
         # return_utilities
@@ -152,7 +153,8 @@ class TestUncertainty(unittest.TestCase):
         selector = UncertaintySampling(clf=clf,
                                        method='expected_average_precision')
         selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
-        best_indices, utilities = selector.query(**self.kwargs)
+        best_indices, utilities = selector.query(**self.kwargs,
+                                                 return_utilities=True)
         self.assertEqual(utilities.shape, (1, len(self.X_cand)))
         self.assertEqual(best_indices.shape, (1,))
 
