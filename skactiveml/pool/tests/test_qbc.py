@@ -6,7 +6,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor, \
     GaussianProcessClassifier
 from sklearn.ensemble import BaggingClassifier
 
-from skactiveml.classifier import PWC
+from skactiveml.base import SkactivemlClassifier
+from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.pool._qbc import QBC, average_kl_divergence, vote_entropy
 
@@ -27,10 +28,9 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=PWC(), random_state=self.random_state)
         selector.query(**self.kwargs)
         self.assertTrue(hasattr(selector, 'clf'))
-        # selector = QBC(clf=GaussianProcessClassifier(
-        #    random_state=self.random_state), random_state=self.random_state)
-        # selector.query(**self.kwargs)
 
+        selector = QBC(clf=GaussianProcessClassifier())
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf='string')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf=None)
@@ -105,6 +105,17 @@ class TestQBC(unittest.TestCase):
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=self.y[0:-1])
 
+    def test_query_param_sample_weight(self):
+        selector = QBC(clf=self.clf)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          sample_weight='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=self.X_cand)
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.empty((len(self.X) - 1)))
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.empty((len(self.X) + 1)))
+
     def test_query_param_batch_size(self):
         selector = QBC(clf=self.clf)
         self.assertRaises(TypeError, selector.query, **self.kwargs,
@@ -127,11 +138,12 @@ class TestQBC(unittest.TestCase):
 
     def test_query(self):
         # clf
-        # TODO sklearn classifiers dont have a classes attribute
-        #selector = QBC(clf=GaussianProcessClassifier(classes=self.classes))
-        #selector.query(**self.kwargs)
-        #selector = QBC(clf=BaggingClassifier())
-        #selector.query(**self.kwargs)
+        selector = QBC(clf=SklearnClassifier(GaussianProcessClassifier(),
+                                                classes=self.classes))
+        selector.query(**self.kwargs)
+        selector = QBC(clf=SklearnClassifier(BaggingClassifier(),
+                                                classes=self.classes))
+        selector.query(**self.kwargs)
 
         # ensemble
         selector = QBC(clf=self.clf, ensemble=BaggingClassifier,
@@ -194,7 +206,7 @@ class TestAverageKlDivergence(unittest.TestCase):
         average_kl_divergence(np.full((10, 10, 10), 0.5))
         average_kl_divergence(np.zeros((10, 10, 10)))
         scores = average_kl_divergence(self.probas)
-        np.testing.assert_array_equal(scores, self.scores)
+        np.testing.assert_allclose(scores, self.scores)
 
 
 class TestVoteEntropy(unittest.TestCase):

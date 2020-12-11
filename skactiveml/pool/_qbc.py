@@ -3,12 +3,12 @@ import numpy as np
 import warnings
 
 from sklearn import clone
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, ClassifierMixin
 
-from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_array, column_or_1d
+from sklearn.utils import check_array
 
 from ..classifier import SklearnClassifier
 from ..utils import MISSING_LABEL, check_X_y, check_scalar, \
@@ -87,8 +87,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         self.ensemble_dict = ensemble_dict
 
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
-              **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None,  batch_size=1,
+              return_utilities=False):
         """
         Queries the next instance to be labeled.
 
@@ -113,21 +113,22 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
-        # Check if the attribute clf is valid
-        if not isinstance(self.clf, BaseEstimator):
-            raise TypeError("'clf' has to be from type BaseEstimator. "
-                            "The given type is {}".format(type(self.clf)))
-
         self._clf = clone(self.clf)
 
-        # Set and check random state.
-        random_state = check_random_state(self.random_state)
+        # Check if the attribute clf is valid
+        if not isinstance(self._clf, SkactivemlClassifier):
+            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
+                            'given type is {}. Use the wrapper in '
+                            'skactiveml.classifier to use a sklearn '
+                            'classifier/ensemble.'.format(type(self.clf)))
 
         # check X, y and X_cand
         X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
 
-        # Check if the given classes are the same
-        # TODO sklearn classifiers dont have a classes attribute
+        # Set and check random state.
+        random_state = check_random_state(self.random_state, len(X_cand))
+
+        # Extract classes from clf
         label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
@@ -171,7 +172,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                 "'clf' must implement the methods 'fit' and 'predict_proba'")
 
         # check self.ensemble and self.clf
-        if not isinstance(self._clf, BaseEnsemble):
+        if not isinstance(self._clf, SklearnClassifier) or \
+                not isinstance(self._clf.estimator, BaseEnsemble):
             if self.ensemble is None:
                 warnings.warn('\'ensemble\' is not specified, '
                               '\'BaggingClassifier\' will be used.')
@@ -190,13 +192,13 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             ensemble_dict = self.ensemble_dict
             if 'base_estimator' in parameters:
                 ensemble_dict['base_estimator'] = self._clf
-            self._clf = ensemble(random_state=random_state, **ensemble_dict)
-
-        if not isinstance(self._clf, SklearnClassifier):
-            self._clf = SklearnClassifier(self._clf, classes=classes)
+            self._clf = SklearnClassifier(
+                ensemble(random_state=random_state, **ensemble_dict),
+                classes=classes
+            )
 
         # fit the classifier
-        self._clf.fit(X, y)
+        self._clf.fit(X, y, sample_weight=sample_weight)
 
         # choose the disagreement method and calculate the utilities
         if hasattr(self._clf, 'estimators_'):
