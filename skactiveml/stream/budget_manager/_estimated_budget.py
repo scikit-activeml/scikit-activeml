@@ -4,7 +4,18 @@ from .base import BudgetManager, get_default_budget
 
 
 class EstimatedBudget(BudgetManager):
-    """
+    """Budget manager which checks, whether the specified budget has been
+    exhausted already. If not, an instance is sampled, when the utility is
+    higher than the specified budget.
+
+    This budget manager calculates the estimated budget spent in the last 
+    w steps and compares that to the budget. If the ratio is smaller
+    than the specified budget, i.e.,
+    budget - u_t / w > 0 , the budget
+    manager samples an instance when its utility is higher than the budget.
+    u is the estimate of how many true lables were queried within the last 
+    w steps. The recursive funktion, 
+    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
 
     Parameters
     ----------
