@@ -3,11 +3,11 @@ import numpy as np
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.utils import check_random_state, check_array, \
-    check_consistent_length
+    check_consistent_length, column_or_1d
 from sklearn.utils.multiclass import type_of_target
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
-    rand_argmin, ExtLabelEncoder, check_cost_matrix, is_labeled
+    rand_argmin, ExtLabelEncoder, check_cost_matrix, is_labeled, check_scalar
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -399,25 +399,34 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     classes : array-like, shape (n_classes), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
-    missing_label : {scalar, string, np.nan, None}, default=np.nan
+    missing_label : scalar | string | np.nan | None|, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] indicating cost of predicting class
-        classes[j]  for a sample of class classes[i]. Can be only set, if
+        Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
+        `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
         classes is not none.
-    random_state : int, RandomState instance or None, optional (default=None)
+    class_prior : float | array-like, shape (n_classes), optional (default=0)
+        Prior observations of the class frequency estimates. If `class_prior`
+        is an array, the entry `class_prior[i]` indicates the non-negative
+        prior number of samples belonging to class `classes_[i]`. If
+        `class_prior` is a float, `class_prior` indicates the non-negative
+        prior number of samples per class.
+    random_state : int | np.RandomState | None, optional (default=None)
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_ : array-like, shape (n_classes)
+    classes_ : np.ndarray, shape (n_classes)
         Holds the label for each class after fitting.
-    cost_matrix_ : array-like, shape (classes, classes)
-        Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
-        for a sample of class classes_[i].
+    class_prior : np.ndarray, shape (n_classes)
+        Prior observations of the class frequency estimates. The entry
+        `class_prior_[i]` indicates the non-negative prior number of samples
+        belonging to class `classes_[i]`.
+    cost_matrix_ : np.ndarray, shape (classes, classes)
+        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+        class `classes_[j]` for a sample of class `classes_[i]`.
     """
-
     @abstractmethod
     def predict_freq(self, X):
         """Return class frequency estimates for the test samples X.
@@ -456,6 +465,26 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
+    
+    def _validate_input(self, X, y, sample_weight):
+        X, y, sample_weight = super()._validate_input(X, y, sample_weight)
+        # Check class prior.
+        if isinstance(self.class_prior, float):
+            check_scalar(self.class_prior, name='class_prior',
+                         target_type=float, min_val=0)
+            class_prior = np.array([self.class_prior] * len(self.classes_))
+        else:
+            class_prior = column_or_1d(self.class_prior)
+            is_negative = np.sum(class_prior < 0)
+            if len(self.class_prior) != len(self.classes_) or is_negative:
+                raise ValueError("`class_prior` must be either a non-negative"
+                                 "float or a list of `n_classes` non-negative "
+                                 "floats.")
+        self.class_prior_ = class_prior.reshape(1, -1)
+        return X, y, sample_weight
+
+
+
 
 
 class AnnotModelMixing(ABC):
