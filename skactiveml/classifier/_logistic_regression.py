@@ -16,12 +16,12 @@ from scipy.stats import dirichlet
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
-from ..base import SkactivemlClassifier, AnnotatorModel
+from ..base import SkactivemlClassifier, AnnotModelMixing
 from ..utils import MISSING_LABEL, compute_vote_vectors, \
     ext_confusion_matrix, rand_argmax
 
 
-class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
+class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
     """LogisticRegressionRY
 
     Logistic Regression based on Raykar [1] is a classification algorithm that
@@ -92,6 +92,8 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
 
     Attributes
     ----------
+    n_annotators_ : int
+        Number of annotators.
     W_ : numpy.ndarray, shape (n_features, n_classes)
         The weight vectors of the logistic regression model.
     Alpha_ : numpy.ndarray, shape (n_annotators, n_classes, n_classes)
@@ -192,7 +194,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         n_samples = X.shape[0]
         n_features = X.shape[1]
         n_classes = len(self.classes_)
-        n_annotators = y.shape[1]
+        self.n_annotators_ = y.shape[1]
         I = np.eye(n_classes)
 
         # Convert Gamma to matrix, if it is a number:
@@ -211,14 +213,14 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
         for name, prior in [('annot_prior_full', self.annot_prior_full),
                             ('annot_prior_diag', self.annot_prior_diag)]:
             if isinstance(prior, int or float):
-                prior_array = np.ones(n_annotators) * prior
+                prior_array = np.ones(self.n_annotators_) * prior
             else:
                 prior_array = column_or_1d(prior)
             if name == 'annot_prior_full':
                 is_invalid_prior = np.sum(prior_array <= 0)
             else:
                 is_invalid_prior = np.sum(prior_array < 0)
-            if len(prior_array) != n_annotators \
+            if len(prior_array) != self.n_annotators_ \
                     or is_invalid_prior:
                 raise ValueError(
                     "'{}' must be either 'int', 'float' or "
@@ -228,8 +230,8 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotatorModel):
             annot_prior.append(prior_array)
 
         # Set up prior matrix for each annotator.
-        A = np.ones((n_annotators, n_classes, n_classes))
-        for a in range(n_annotators):
+        A = np.ones((self.n_annotators_, n_classes, n_classes))
+        for a in range(self.n_annotators_):
             A[a] *= annot_prior[0][a]
             A[a] += np.eye(n_classes) * annot_prior[1][a]
 
