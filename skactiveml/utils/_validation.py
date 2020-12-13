@@ -110,7 +110,7 @@ def check_missing_label(missing_label, target_type=None, name=None):
             "'missing_label' has type '{}', but must be a either a number, "
             "a string, np.nan, or None.".format(type(missing_label)))
     if target_type is not None:
-        is_object_type = np.issubdtype(target_type, np.object)
+        is_object_type = np.issubdtype(target_type, np.object_)
         is_character_type = np.issubdtype(target_type, np.character)
         is_number_type = np.issubdtype(target_type, np.number)
         if (is_character_type and is_number) or (
