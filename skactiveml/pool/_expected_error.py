@@ -52,7 +52,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.cost_matrix = cost_matrix
 
     def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
-              return_utilities=False, **kwargs):
+              return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
