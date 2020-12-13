@@ -77,19 +77,6 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(clf=self.clf, method=1)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
-    def test_init_param_precompute(self):
-        selector = UncertaintySampling(clf=self.clf, method='epistemic',
-                                       precompute=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-
-        selector = UncertaintySampling(clf=self.clf, method='epistemic',
-                                       precompute=[])
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-
-        selector = UncertaintySampling(clf=self.clf, method='epistemic',
-                                       precompute=0)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-
     def test_init_param_missing_label(self):
         selector = UncertaintySampling(clf=self.clf, missing_label='string')
         self.assertTrue(hasattr(selector, 'missing_label'))
@@ -241,42 +228,6 @@ class TestUncertaintySampling(unittest.TestCase):
         self.assertEqual(best_indices.shape, (1,))
         compare_list.append(best_indices)
 
-        # epistemic_uncertainty - pwc
-
-
-#        clf = dummyPWC()
-#        freq = np.zeros((121, 2))
-#         for n in range(11):
-#             for p in range(11):
-#                 freq[n * 11 + p] = n, p
-#         uncertainty = UncertaintySampling(clf, method='epistemic', precompute=True, random_state=self.random_state)
-#         best_indices, utilities = uncertainty.query(freq, self.X, self.y, return_utilities=True)
-#
-#         pi0 = np.zeros((11, 11))
-#         pi1 = np.zeros((11, 11))
-#         for n in range(11):
-#             for p in range(11):
-#                 if (n == 0 | p == 0):
-#                     pi0[n, p] = 1
-#                     pi1[n, p] = 1
-#                 else:
-#                     pi0[n, p] = -epistemic_pwc_sup_1(
-#                         minimize_scalar(epistemic_pwc_sup_1, method='Bounded', bounds=(0.0, 1.0), args=(n, p)).x, n, p)
-#                     pi1[n, p] = -epistemic_pwc_sup_0(
-#                         minimize_scalar(epistemic_pwc_sup_0, method='Bounded', bounds=(0.0, 1.0), args=(n, p)).x, n, p)
-#         pi = np.min(np.array([pi0, pi1]), axis=0)
-#         val_utilities = pi
-#         np.testing.assert_array_equal(utilities, [val_utilities.flatten()])
-#         print(utilities.shape)
-#         self.assertEqual(utilities.shape, (1, 121))
-#         self.assertEqual(best_indices.shape, (1,))
-#         compare_list.append(best_indices)
-
-# epistemic_uncertainty - logistic regression#
-# clf = LogisticRegression()
-# uncertainty = UncertaintySampling(clf, method='epistemic', random_state=self.random_state)
-# best_indices, utilities = uncertainty.query(self.X_cand, self.X, self.y, return_utilities=True)
-
 
 class TestExpectedAveragePrecision(unittest.TestCase):
     def setUp(self):
@@ -346,22 +297,6 @@ def f(p, n, t):
         return 1
     return p[n - 1] * f(p, n - 1, t - 1) + (1 - p[n - 1]) * f(p, n - 1, t) + (
                 p[n - 1] * t * g(p, n - 1, t - 1)) / n
-
-
-def epistemic_pwc_sup_1(t, n, p):
-    if ((n == 0.0) and (p == 0.0)):
-        return -1.0
-    piH = ((t ** p) * ((1 - t) ** n)) / (
-                ((p / (n + p)) ** p) * ((n / (n + p)) ** n))
-    return -np.minimum(piH, 2 * t - 1)
-
-
-def epistemic_pwc_sup_0(t, n, p):
-    if ((n == 0.0) and (p == 0.0)):
-        return -1.0
-    piH = ((t ** p) * ((1 - t) ** n)) / (
-                ((p / (n + p)) ** p) * ((n / (n + p)) ** n))
-    return -np.minimum(piH, 1 - 2 * t)
 
 
 if __name__ == '__main__':
