@@ -1,13 +1,14 @@
 import numpy as np
+import warnings
 
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
-from sklearn.utils import check_random_state, check_array, \
-    check_consistent_length
+from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.multiclass import type_of_target
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
-    rand_argmin, ExtLabelEncoder, check_cost_matrix, is_labeled
+    rand_argmin, ExtLabelEncoder, check_cost_matrix, is_labeled,\
+    check_random_state, check_scalar
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -68,6 +69,64 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
             of the batch.
         """
         return NotImplemented
+
+    def _validate_data(self, X_cand, return_utilities, batch_size,
+                       random_state, reset=True, **check_X_cand_params):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, 'return_utilities', bool)
+
+        # Check batch size.
+        check_scalar(batch_size, target_type=int, name='batch_size',
+                     min_val=1)
+        batch_size = batch_size
+        if len(X_cand) < batch_size:
+            warnings.warn(
+                "'batch_size={}' is larger than number of candidate samples "
+                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
+                    batch_size, len(X_cand)))
+            batch_size = len(X_cand)
+
+        # Check random state.
+        random_state = check_random_state(random_state=self.random_state,
+                                          seed_multiplier=len(X_cand))
+
+        return X_cand, return_utilities, batch_size, random_state
 
 
 class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
