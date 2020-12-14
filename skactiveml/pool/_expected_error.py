@@ -1,11 +1,10 @@
 import numpy as np
 from sklearn.base import clone
-from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import check_classifier_params, check_scalar, \
-    check_X_y, is_labeled, check_random_state, simple_batch
+from skactiveml.utils import check_classifier_params, \
+    check_X_y, is_labeled, simple_batch
 
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
@@ -78,9 +77,10 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        # Validate input
+        # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size)
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
 
         # Calculate utilities
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
@@ -90,22 +90,6 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
-
-    def _validate_data(self, X_cand, return_utilities, batch_size):
-        # Check candidate instances
-        X_cand = check_array(X_cand, force_all_finite=False)
-
-        # Check return_utilities
-        if type(return_utilities) is not bool:
-            raise TypeError("The type of 'return_utilities' must be bool")
-
-        # Check batch size
-        check_scalar(batch_size, 'batch_size', int, min_val=1)
-
-        # Check random state
-        random_state = check_random_state(self.random_state)
-
-        return X_cand, return_utilities, batch_size, random_state
 
 
 def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',

@@ -15,6 +15,9 @@ from sklearn.utils import check_array
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model._logistic import _logistic_loss
 
+from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils import is_labeled, MISSING_LABEL, check_X_y, check_cost_matrix, \
+    simple_batch, check_classes
 from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator, \
     SkactivemlClassifier
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
@@ -103,6 +106,10 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
+        # Validate input parameters.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
         self._clf = clone(self.clf)
 
         # Check if the attribute clf is valid
@@ -112,35 +119,11 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                             'skactiveml.classifier to use a sklearn '
                             'classifier/ensemble.'.format(type(self._clf)))
 
-        # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
-
-        # check random state
-        random_state = check_random_state(self.random_state, len(X_cand))
-
         # Extract classes from clf
-        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
-                                        classes=self.clf.classes).fit(y)
-        classes = label_encoder.classes_
-
-        # Check if the classifier and its arguments are valid
-        check_classifier_params(classes, self._clf.missing_label)
-
-        # Check if the batch_size argument is valid.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        if len(X_cand) < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
-            batch_size = len(X_cand)
-
-        # Check if the argument return_utilities is valid
-        if not isinstance(return_utilities, bool):
-            raise TypeError(
-                '{} is an invalid type for return_utilities. Type {} is '
-                'expected'.format(type(return_utilities), bool))
+            label_encoder = ExtLabelEncoder(
+                missing_label=self._clf.missing_label,
+                classes=self.clf.classes).fit(y)
+            classes = label_encoder.classes_
 
         # check self.method
         if not isinstance(self.method, str):

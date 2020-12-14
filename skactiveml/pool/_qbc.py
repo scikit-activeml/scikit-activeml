@@ -11,9 +11,8 @@ from sklearn.ensemble import BaggingClassifier, BaseEnsemble
 from sklearn.utils import check_array
 
 from ..classifier import SklearnClassifier
-from ..utils import MISSING_LABEL, check_X_y, check_scalar, \
-    simple_batch, check_classifier_params, check_classes, check_random_state, \
-    ExtLabelEncoder
+from ..utils import MISSING_LABEL, check_X_y, simple_batch, \
+    check_classifier_params, check_classes, ExtLabelEncoder
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
@@ -103,6 +102,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
+        # Validate input parameters.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
+
         self._clf = clone(self.clf)
 
         # Check if the attribute clf is valid
@@ -115,9 +119,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         # check X, y and X_cand
         X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
 
-        # Set and check random state.
-        random_state = check_random_state(self.random_state, len(X_cand))
-
         # Extract classes from clf
         label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
                                         classes=self.clf.classes).fit(y)
@@ -125,16 +126,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
         # Check if the classifier and its arguments are valid
         check_classifier_params(classes, self._clf.missing_label)
-
-        # Check if the batch_size argument is valid.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        if len(X_cand) < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
-            batch_size = len(X_cand)
 
         # Check if the argument return_utilities is valid
         if not isinstance(return_utilities, bool):
