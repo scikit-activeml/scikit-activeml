@@ -19,7 +19,7 @@ class QueryStrategy(ABC, BaseEstimator):
         Controls the randomness of the estimator.
     """
     def __init__(self, random_state=None):
-        self.random_state = check_random_state(random_state)
+        self.random_state = random_state
 
     @abstractmethod
     def query(self, *args, **kwargs):
@@ -458,8 +458,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return P
 
 
-class AnnotatorModel(BaseEstimator, ABC):
-    """AnnotatorModel
+class AnnotModelMixing(ABC):
+    """AnnotModelMixing
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.
@@ -476,8 +476,8 @@ class AnnotatorModel(BaseEstimator, ABC):
 
         Returns
         -------
-        P_annot : numpy.ndarray, shape (n_samples, classes)
-            P_annot[i,l] is the probability, that annotator l provides the
-            correct class label for sample X[i].
+        P_annot : numpy.ndarray, shape (n_samples, n_annotators)
+            `P_annot[i,l]` is the probability, that annotator `l` provides the
+            correct class label for sample `X[i]`.
         """
         return NotImplemented

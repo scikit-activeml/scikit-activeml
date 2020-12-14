@@ -4,8 +4,8 @@ from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import check_classifier_params, check_scalar, check_X_y
-from skactiveml.utils import rand_argmax, MISSING_LABEL, is_labeled
+from skactiveml.utils import check_classifier_params, check_scalar, \
+    check_X_y, is_labeled, check_random_state, simple_batch
 
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
@@ -21,19 +21,16 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     ----------
     clf : ClassFrequencyEstimator
         Model implementing the methods 'fit' and and 'predict_proba'.
-    classes: array-like, shape (n_classes)
-        List of all possible classes. Must correspond to the classes of clf.
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is
         cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
-    C: array-like, shape (n_classes, n_classes), optional (default=None)
+    cost_matrix: array-like, shape (n_classes, n_classes),
+                 optional (default=None)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
     random_state: numeric | np.random.RandomState, optional (defatult=None)
         Random state for annotator selection.
-    missing_label: str | numeric, optional (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label
 
     References
     ----------
@@ -47,17 +44,15 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     CSL = 'csl'
     LOG_LOSS = 'log_loss'
 
-    def __init__(self, clf, classes, method=EMR, C=None, random_state=None,
-                 missing_label=MISSING_LABEL, **kwargs):
+    def __init__(self, clf, method=EMR, cost_matrix=None,
+                 random_state=None):
         super().__init__(random_state=random_state)
         self.clf = clf
-        self.classes = classes
         self.method = method
-        self.C = C
-        self.missing_label = missing_label
+        self.cost_matrix = cost_matrix
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
-              **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+              return_utilities=False, **kwargs):
         """Query the next instance to be labeled.
 
         Parameters
@@ -68,6 +63,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             Complete data set
         y: array-like, shape (n_samples)
             Labels of the data set
+        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Weights for uncertain annotators
         batch_size: int, optional (default=1)
             The number of instances to be selected.
         return_utilities: bool, optional (default=False)
@@ -81,52 +78,38 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        # Set the cost matrix to the default value if it is not given
-        if self.C is None:
-            self.C = 1 - np.eye(len(self.classes))
+        # Validate input
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size)
 
-        # Check if the classifier and its arguments are valid
-        if not isinstance(self.clf, ClassFrequencyEstimator):
-            raise TypeError("'clf' must implement methods according to "
-                            "'ClassFrequencyEstimator'.")
-        check_classifier_params(self.classes, self.missing_label, self.C)
+        # Calculate utilities
+        utilities = _expected_error_reduction(self.clf, X_cand, X, y,
+                                              self.cost_matrix, self.method,
+                                              sample_weight)
 
-        # Check if the given classes are the same
-        if not np.array_equal(self.clf.classes, self.classes):
-            raise ValueError("The given classes are not the same as in the "
-                             "classifier.")
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
 
-        # Check if a valid method is given
-        if self.method not in [ExpectedErrorReduction.EMR,
-                               ExpectedErrorReduction.CSL,
-                               ExpectedErrorReduction.LOG_LOSS]:
-            raise ValueError(
-                f"supported methods are [{ExpectedErrorReduction.EMR}, "
-                f"{ExpectedErrorReduction.CSL}, "
-                f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
-                f"{self.method}"
-            )
-
-        # Check the given data
+    def _validate_data(self, X_cand, return_utilities, batch_size):
+        # Check candidate instances
         X_cand = check_array(X_cand, force_all_finite=False)
-        X, y = check_X_y(X, y, force_all_finite=False,
-                         missing_label=self.missing_label)
 
-        # Check 'batch_size'
+        # Check return_utilities
+        if type(return_utilities) is not bool:
+            raise TypeError("The type of 'return_utilities' must be bool")
+
+        # Check batch size
         check_scalar(batch_size, 'batch_size', int, min_val=1)
 
-        # Calculate utilities and return the output
-        utilities = _expected_error_reduction(self.clf, X_cand, X, y,
-                                              self.classes, self.C,
-                                              self.method)
-        query_indices = rand_argmax(utilities, self.random_state)
-        if return_utilities:
-            return query_indices, np.array([utilities])
-        else:
-            return query_indices
+        # Check random state
+        random_state = check_random_state(self.random_state)
+
+        return X_cand, return_utilities, batch_size, random_state
 
 
-def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
+def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
+                              sample_weight=None):
     """Compute least confidence as uncertainty scores.
 
     In case of a given cost matrix C, maximum expected cost is implemented as
@@ -142,8 +125,6 @@ def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
         Complete data set
     y: array-like, shape (n_samples)
         Labels of the data set
-    classes: array-like, shape (n_classes)
-        List of classes.
     C: array-like, shape (n_classes, n_classes)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i.
@@ -151,22 +132,34 @@ def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is
         cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
+    sample_weight: array-like, shape (n_samples), optional (default=None)
+        Weights for uncertain annotators
 
     Returns
     -------
     utilities: np.ndarray, shape (n_unlabeled_samples)
         The utilities of all unlabeled instances.
     """
-    # Check if 'X' and 'X_cand' have the same number of features
-    if X.shape[0] > 0 and X_cand.shape[0] > 0 and \
-            not X.shape[1] == X_cand.shape[1]:
-        raise ValueError("X and X_cand must have the same number "
-                         "of features.")
+    # Check if the classifier and its arguments are valid
+    if not isinstance(clf, ClassFrequencyEstimator):
+        raise TypeError("'clf' must implement methods according to "
+                        "'ClassFrequencyEstimator'.")
+    check_classifier_params(clf.classes, clf.missing_label, C)
+
+    # Check the given data
+    if sample_weight is None:
+        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False,
+                                 missing_label=clf.missing_label)
+    else:
+        X, y, X_cand, sample_weight = check_X_y(
+            X, y, X_cand, sample_weight, force_all_finite=False,
+            missing_label=clf.missing_label
+        )
 
     clf = clone(clf)
-    clf.fit(X, y)
+    clf.fit(X, y, sample_weight)
 
-    n_classes = len(classes)
+    n_classes = len(clf.classes)
     P = clf.predict_proba(X_cand)
     C = 1 - np.eye(np.size(P, axis=1)) if C is None else C
     errors = np.zeros(len(X_cand))
@@ -181,7 +174,7 @@ def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
                 labeled_indices = is_labeled(y, clf.missing_label)
                 X_labeled = X[labeled_indices]
                 y_labeled = y[labeled_indices]
-                y_indices = [np.where(classes == label)[0][0]
+                y_indices = [np.where(clf.classes == label)[0][0]
                              for label in y_labeled]
                 if len(X_labeled) > 0:
                     costs = np.sum(clf.predict_proba(X_labeled) * C[y_indices])
@@ -191,8 +184,12 @@ def _expected_error_reduction(clf, X_cand, X, y, classes, C, method='emr'):
                 P_new = clf.predict_proba(X_cand)
                 costs = -np.sum(P_new * np.log(P_new + np.finfo(float).eps))
             else:
-                raise ValueError(f"supported methods are ['emr', 'csl'], the "
-                                 f"given one " "is: {method}")
+                raise ValueError(
+                    f"Supported methods are [{ExpectedErrorReduction.EMR}, "
+                    f"{ExpectedErrorReduction.CSL}, "
+                    f"{ExpectedErrorReduction.LOG_LOSS}], the given one is: "
+                    f"{method}"
+                )
             errors_per_class[yi] = P[i, yi] * costs
         errors[i] = errors_per_class.sum()
     return -errors
