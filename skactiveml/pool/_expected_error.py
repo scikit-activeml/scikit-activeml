@@ -50,8 +50,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.method = method
         self.cost_matrix = cost_matrix
 
-    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
-              return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, sample_weight_cand=None,
+              batch_size=1, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
@@ -64,6 +64,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             Labels of the data set
         sample_weight: array-like, shape (n_samples), optional (default=None)
             Weights for uncertain annotators
+        sample_weight_cand: array-like, shape (n_candidates),
+                            optional (default=None)
+            Weights for the candidate samples
         batch_size: int, optional (default=1)
             The number of instances to be selected.
         return_utilities: bool, optional (default=False)
@@ -85,7 +88,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         # Calculate utilities
         utilities = _expected_error_reduction(self.clf, X_cand, X, y,
                                               self.cost_matrix, self.method,
-                                              sample_weight)
+                                              sample_weight,
+                                              sample_weight_cand)
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
@@ -93,7 +97,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
 
 def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
-                              sample_weight=None):
+                              sample_weight_cand=None, sample_weight=None):
     """Compute least confidence as uncertainty scores.
 
     In case of a given cost matrix C, maximum expected cost is implemented as
@@ -118,6 +122,9 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
         cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
     sample_weight: array-like, shape (n_samples), optional (default=None)
         Weights for uncertain annotators
+    sample_weight_cand: array-like, shape (n_candidates),
+                        optional (default=None)
+        Weights for the candidate samples
 
     Returns
     -------
@@ -131,14 +138,10 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
     check_classifier_params(clf.classes, clf.missing_label, C)
 
     # Check the given data
-    if sample_weight is None:
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False,
-                                 missing_label=clf.missing_label)
-    else:
-        X, y, X_cand, sample_weight = check_X_y(
-            X, y, X_cand, sample_weight, force_all_finite=False,
-            missing_label=clf.missing_label
-        )
+    X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
+        X, y, X_cand, sample_weight, sample_weight_cand,
+        force_all_finite=False, missing_label=clf.missing_label
+    )
 
     clf = clone(clf)
     clf.fit(X, y, sample_weight)
@@ -149,8 +152,11 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
     errors = np.zeros(len(X_cand))
     errors_per_class = np.zeros(n_classes)
     for i, x in enumerate(X_cand):
+        w = sample_weight_cand[i]
         for yi in range(n_classes):
-            clf.fit(np.vstack((X, [x])), np.append(y, [[yi]]))
+            clf.fit(np.vstack((X, [x])),
+                    np.append(y, [[yi]]),
+                    np.append(sample_weight, w))
             if method == 'emr':
                 P_new = clf.predict_proba(X_cand)
                 costs = np.sum((P_new.T[:, None] * P_new.T).T * C)

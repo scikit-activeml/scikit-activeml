@@ -121,11 +121,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
 
-
-
-        # Check if the classifier and its arguments are valid
-        check_classifier_params(classes, self._clf.missing_label)
-
         # Check if the argument return_utilities is valid
         if not isinstance(return_utilities, bool):
             raise TypeError(
