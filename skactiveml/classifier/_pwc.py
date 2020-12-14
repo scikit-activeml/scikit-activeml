@@ -170,4 +170,4 @@ class PWC(ClassFrequencyEstimator):
             F = np.empty((np.size(X, 0), len(self.classes_)))
             for i in range(np.size(X, 0)):
                 F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
-        return F + self.class_prior_
+        return F

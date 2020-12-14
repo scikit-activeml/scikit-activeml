@@ -83,16 +83,6 @@ class TestPWC(unittest.TestCase):
         self.assertRaises(ValueError, pwc.predict_freq, X=[[1], [0]])
         F = pwc.predict_freq(X=[[1, 0]])
         np.testing.assert_array_equal([[0, 1, 2]], F)
-        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
-                  n_neighbors=1, metric='precomputed', class_prior=1)
-        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
-        F = pwc.predict_freq(X=[[1, 0]])
-        np.testing.assert_array_equal([[1, 2, 3]], F)
-        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
-                  n_neighbors=1, metric='precomputed', class_prior=[0, 0, 1])
-        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
-        F = pwc.predict_freq(X=[[1, 0]])
-        np.testing.assert_array_equal([[0, 1, 3]], F)
 
     def test_predict_proba(self):
         pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan')
@@ -103,6 +93,16 @@ class TestPWC(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
         P = pwc.predict_proba(X=[self.X[0]])
         np.testing.assert_array_equal([[1 / 4, 3 / 4]], P)
+        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
+                  n_neighbors=1, metric='precomputed', class_prior=1)
+        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = pwc.predict_proba(X=[[1, 0]])
+        np.testing.assert_array_equal([[1/6, 2/6, 3/6]], P)
+        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
+                  n_neighbors=1, metric='precomputed', class_prior=[0, 0, 1])
+        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = pwc.predict_proba(X=[[1, 0]])
+        np.testing.assert_array_equal([[0, 1/4, 3/4]], P)
 
     def test_predict(self):
         pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',

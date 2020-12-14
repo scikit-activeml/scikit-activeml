@@ -460,7 +460,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             according to classes_.
         """
         # Normalize probabilities of each sample.
-        P = self.predict_freq(X)
+        P = self.predict_freq(X) + self.class_prior_
         normalizer = np.sum(P, axis=1)
         P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
@@ -487,9 +487,6 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
                                  "floats.")
         self.class_prior_ = class_prior.reshape(1, -1)
         return X, y, sample_weight
-
-
-
 
 
 class AnnotModelMixing(ABC):

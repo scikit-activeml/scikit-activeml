@@ -81,17 +81,6 @@ class TestCMM(unittest.TestCase):
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         F = cmm.predict_freq(X=[self.X[0]])
         np.testing.assert_array_equal([[0, 1, 3]], F)
-        cmm = CMM(mixture_model=mixture, missing_label='nan',
-                  classes=['tokyo', 'paris', 'new york'], class_prior=1)
-        cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
-        F = cmm.predict_freq(X=[self.X[0]])
-        np.testing.assert_array_equal([[1, 2, 4]], F)
-        cmm = CMM(mixture_model=mixture, missing_label='nan',
-                  classes=['tokyo', 'paris', 'new york'],
-                  class_prior=[0, 0, 1])
-        cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
-        F = cmm.predict_freq(X=[self.X[0]])
-        np.testing.assert_array_equal([[0, 1, 4]], F)
 
     def test_predict_proba(self):
         mixture = BayesianGaussianMixture(n_components=1).fit(X=self.X)
@@ -104,6 +93,17 @@ class TestCMM(unittest.TestCase):
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         P = cmm.predict_proba(X=[self.X[0]])
         np.testing.assert_array_equal([[1 / 4, 3 / 4]], P)
+        cmm = CMM(mixture_model=mixture, missing_label='nan',
+                  classes=['tokyo', 'paris', 'new york'], class_prior=1)
+        cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = cmm.predict_proba(X=[self.X[0]])
+        np.testing.assert_array_equal([[1/7, 2/7, 4/7]], P)
+        cmm = CMM(mixture_model=mixture, missing_label='nan',
+                  classes=['tokyo', 'paris', 'new york'],
+                  class_prior=[0, 0, 1])
+        cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = cmm.predict_proba(X=[self.X[0]])
+        np.testing.assert_array_equal([[0, 1/5, 4/5]], P)
 
     def test_predict(self):
         mixture = BayesianGaussianMixture(n_components=1, random_state=0)

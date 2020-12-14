@@ -172,4 +172,4 @@ class CMM(ClassFrequencyEstimator):
             F = S @ self.F_components_
         else:
             F = np.zeros((len(X), len(self.classes_)))
-        return F + self.class_prior
+        return F
