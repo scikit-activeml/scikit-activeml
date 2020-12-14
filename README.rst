@@ -18,8 +18,8 @@ Development
 More information are available in the `Developer's Guide
 <https://scikit-activeml.readthedocs.io/en/latest/developers_guide.html>`_.
 
-Development
-===========
+Documentation
+=============
 
 The doumentation is available here:
 https://scikit-activeml.readthedocs.io
