@@ -21,6 +21,7 @@ class TestPWC(unittest.TestCase):
         self.assertEqual(pwc.metric_dict, {})
         self.assertEqual(pwc.random_state, None)
         self.assertEqual(pwc.cost_matrix, None)
+        self.assertEqual(pwc.class_prior, 0)
 
     def test_fit(self):
         pwc = PWC(missing_label='nan', metric="Test")
@@ -28,6 +29,12 @@ class TestPWC(unittest.TestCase):
         pwc = PWC(missing_label='nan', n_neighbors=-1)
         self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
         pwc = PWC(missing_label='nan', n_neighbors=1.0)
+        self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', class_prior=-1.0)
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', class_prior=['test'])
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', class_prior='test')
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
         pwc = PWC(missing_label='nan', metric_dict=['gamma'])
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
@@ -86,6 +93,16 @@ class TestPWC(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
         P = pwc.predict_proba(X=[self.X[0]])
         np.testing.assert_array_equal([[1 / 4, 3 / 4]], P)
+        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
+                  n_neighbors=1, metric='precomputed', class_prior=1)
+        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = pwc.predict_proba(X=[[1, 0]])
+        np.testing.assert_array_equal([[1/6, 2/6, 3/6]], P)
+        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
+                  n_neighbors=1, metric='precomputed', class_prior=[0, 0, 1])
+        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = pwc.predict_proba(X=[[1, 0]])
+        np.testing.assert_array_equal([[0, 1/4, 3/4]], P)
 
     def test_predict(self):
         pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',
