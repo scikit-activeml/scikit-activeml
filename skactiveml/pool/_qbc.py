@@ -42,7 +42,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         'vote_entropy' or 'KL_divergence' are possible.
     random_state : numeric | np.random.RandomState
         Random state to use.
-    **ensemble_dict :
+    ensemble_dict :
         will be passed on to the ensemble.
 
     Attributes
@@ -67,7 +67,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     """
 
     def __init__(self, clf, ensemble=None, method='KL_divergence',
-                 random_state=None, ensemble_dict=dict()):
+                 random_state=None, ensemble_dict=None):
 
         super().__init__(random_state=random_state)
 
@@ -107,6 +107,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         """
         self._clf = clone(self.clf)
 
+        if self.ensemble_dict is None:
+            self.ensemble_dict = dict()
+
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
@@ -123,12 +126,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
-
-        # Check if the argument return_utilities is valid
-        if not isinstance(return_utilities, bool):
-            raise TypeError(
-                '{} is an invalid type for return_utilities. Type {} is '
-                'expected'.format(type(return_utilities), bool))
 
         # Check self.clf and self.method
         if not isinstance(self.method, str):

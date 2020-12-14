@@ -29,7 +29,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         Epistemic only works with Parzen Window Classifier or
         Logistic Regression.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        Cost matrix with cost_matrix[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
     random_state : numeric | np.random.RandomState
@@ -119,12 +119,6 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError('{} is an invalid type for method. Type {} is '
                             'expected'.format(type(self.method), str))
 
-        if self.method not in ['entropy', 'least_confident', 'margin_sampling',
-                               'expected_average_precision']:
-            raise ValueError(
-                "The given method {} is not valid. Supported methods are "
-                "'KL_divergence' and 'vote_entropy'".format(self.method))
-
         if getattr(self.clf, 'predict_proba', None) is None:
             raise TypeError("'clf' must implement the method 'predict_proba'")
 
@@ -141,6 +135,11 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                                                cost_matrix=self.cost_matrix)
             elif self.method == 'expected_average_precision':
                 utilities = expected_average_precision(classes, probas)
+            else:
+                raise ValueError(
+                    "The given method {} is not valid. Supported methods are "
+                    "'entropy', 'least_confident', 'margin_sampling' and "
+                    "'expected_average_precision'".format(self.method))
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,

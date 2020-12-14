@@ -149,6 +149,10 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier)
         selector.query(**self.kwargs)
 
+        clf = SklearnClassifier(BaggingClassifier())
+        selector = QBC(clf)
+        selector.query(**self.kwargs)
+
         # ensemble_dict
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier,
                        ensemble_dict=dict(n_estimators=5))
