@@ -151,7 +151,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
             The LogisticRegressionRY is fitted on the training data.
         """
         # Check input data.
-        X, y, sample_weight = self._validate_input(X=X, y=y,
+        X, y, sample_weight = self._validate_data(X=X, y=y,
                                                    sample_weight=sample_weight)
         self._check_n_features(X, reset=True)
 
