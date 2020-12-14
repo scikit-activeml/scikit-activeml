@@ -4,18 +4,19 @@ import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.utils import check_random_state
 
+from ...classifier import PWC
 from .._uncertainty import FixedUncertainty, VariableUncertainty, Split
 
 class TestUncertainty (unittest.TestCase):
     
-    def setup():
+    def setUp(self):
         rand = np.random.RandomState(0)
         stream_length = 1000
         train_init_size = 10
         training_size = 100
         X, y = make_classification(
             n_samples=stream_length+train_init_size,
-            random_state=rand.randint(2**32-1), shuffle=True)
+            random_state=rand.randint(2**31-1), shuffle=True)
         
         self.X = X[:train_init_size, :]
         self.X_cand = X[train_init_size:, :]
@@ -53,9 +54,9 @@ class TestUncertainty (unittest.TestCase):
         self._test_init_param_theta(Split)
         self._test_init_param_s(Split)
         query_strategy = Split(clf=self.clf, v="string")
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = Split(clf=self.clf, v=1.1)
-        self.assertRaises(ValueError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
         # quary param test
         self._test_query_param_X_cand(FixedUncertainty)
@@ -65,31 +66,31 @@ class TestUncertainty (unittest.TestCase):
         
     def _test_init_param_clf(self, query_strategy_name):
         query_strategy = query_strategy_name(clf='string')
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=1)
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name()
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_init_param_budget_manager(self, query_strategy_name):
         query_strategy = query_strategy_name(clf=self.clf, 
                                              budget_manager="string")
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, 
                                              budget_manager=None)
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_init_param_theta(self, query_strategy_name):
         query_strategy = query_strategy_name(clf=self.clf, theta="string")
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, theta=1.1)
-        self.assertRaises(ValueError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
     
     def _test_init_param_s(self, query_strategy_name):
         query_strategy = query_strategy_name(clf=self.clf, s="string")
-        self.assertRaises(TypeError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, s=1.1)
-        self.assertRaises(ValueError, query_strategy.query, **self.kwargs)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_query_param_X_cand (self, query_strategy_name):
         query_strategy = query_strategy_name(self.clf)
