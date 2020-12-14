@@ -102,12 +102,12 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
+        self._clf = clone(self.clf)
+
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
-
-        self._clf = clone(self.clf)
 
         # Check if the attribute clf is valid
         if not isinstance(self._clf, SkactivemlClassifier):
@@ -116,13 +116,12 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                             'skactiveml.classifier to use a sklearn '
                             'classifier/ensemble.'.format(type(self.clf)))
 
-        # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
-
         # Extract classes from clf
         label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
+
+
 
         # Check if the classifier and its arguments are valid
         check_classifier_params(classes, self._clf.missing_label)

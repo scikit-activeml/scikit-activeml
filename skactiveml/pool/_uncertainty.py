@@ -106,11 +106,12 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
+        self._clf = clone(self.clf)
+
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
-        self._clf = clone(self.clf)
 
         # Check if the attribute clf is valid
         if not isinstance(self._clf, SkactivemlClassifier):
@@ -120,10 +121,9 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                             'classifier/ensemble.'.format(type(self._clf)))
 
         # Extract classes from clf
-            label_encoder = ExtLabelEncoder(
-                missing_label=self._clf.missing_label,
-                classes=self.clf.classes).fit(y)
-            classes = label_encoder.classes_
+        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
+                                        classes=self.clf.classes).fit(y)
+        classes = label_encoder.classes_
 
         # check self.method
         if not isinstance(self.method, str):
