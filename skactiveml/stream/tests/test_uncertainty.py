@@ -54,7 +54,7 @@ class TestUncertainty (unittest.TestCase):
         self._test_init_param_theta(Split)
         self._test_init_param_s(Split)
         query_strategy = Split(clf=self.clf, v="string")
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = Split(clf=self.clf, v=1.1)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
@@ -66,29 +66,29 @@ class TestUncertainty (unittest.TestCase):
         
     def _test_init_param_clf(self, query_strategy_name):
         query_strategy = query_strategy_name(clf='string')
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=1)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name()
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_init_param_budget_manager(self, query_strategy_name):
         query_strategy = query_strategy_name(clf=self.clf, 
                                              budget_manager="string")
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, 
                                              budget_manager=None)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_init_param_theta(self, query_strategy_name):
         query_strategy = query_strategy_name(clf=self.clf, theta="string")
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, theta=1.1)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
     
     def _test_init_param_s(self, query_strategy_name):
         query_strategy = query_strategy_name(clf=self.clf, s="string")
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, s=1.1)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
