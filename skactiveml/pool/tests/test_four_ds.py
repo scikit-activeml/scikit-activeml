@@ -79,6 +79,13 @@ class TestFourDS(unittest.TestCase):
         self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
                           y=np.zeros((len(self.y), 2)))
 
+    def test_query_param_sample_weight(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
+                          y=self.y, sample_weight=np.ones(1))
+        self.assertRaises(TypeError, al4ds.query, X=self.X, X_cand=self.X,
+                          y=self.y, sample_weight='test')
+
     def test_query(self):
         al4ds = FourDS(clf=self.CMM, random_state=self.random_state)
         query_indices = al4ds.query(X_cand=self.X, X=self.X, y=self.y)
