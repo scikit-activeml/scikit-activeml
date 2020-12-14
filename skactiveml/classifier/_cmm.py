@@ -101,7 +101,7 @@ class CMM(ClassFrequencyEstimator):
             The CMM is fitted on the training data.
         """
         # Check input parameters.
-        X, y, sample_weight = self._validate_input(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
         self._check_n_features(X, reset=True)
 
         # Check mixture model.

@@ -22,12 +22,19 @@ class TestCMM(unittest.TestCase):
         self.assertEqual(cmm.mixture_model, None)
         self.assertEqual(cmm.random_state, None)
         self.assertEqual(cmm.cost_matrix, None)
+        self.assertEqual(cmm.class_prior, 0)
 
     def test_fit(self):
         cmm = CMM(missing_label='nan', mixture_model="Test")
         self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
         cmm = CMM(missing_label='nan', weight_mode="Test")
         self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label='nan', class_prior=-1.0)
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label='nan', class_prior=['test'])
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        cmm = CMM(missing_label='nan', class_prior='test')
+        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
         mixture = GaussianMixture(random_state=0, n_components=4)
         cmm = CMM(missing_label='nan', mixture_model=mixture, classes=[1, 2],
                   cost_matrix=1 - np.eye(3))
@@ -74,6 +81,17 @@ class TestCMM(unittest.TestCase):
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         F = cmm.predict_freq(X=[self.X[0]])
         np.testing.assert_array_equal([[0, 1, 3]], F)
+        cmm = CMM(mixture_model=mixture, missing_label='nan',
+                  classes=['tokyo', 'paris', 'new york'], class_prior=1)
+        cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
+        F = cmm.predict_freq(X=[self.X[0]])
+        np.testing.assert_array_equal([[1, 2, 4]], F)
+        cmm = CMM(mixture_model=mixture, missing_label='nan',
+                  classes=['tokyo', 'paris', 'new york'],
+                  class_prior=[0, 0, 1])
+        cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
+        F = cmm.predict_freq(X=[self.X[0]])
+        np.testing.assert_array_equal([[0, 1, 4]], F)
 
     def test_predict_proba(self):
         mixture = BayesianGaussianMixture(n_components=1).fit(X=self.X)

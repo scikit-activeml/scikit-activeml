@@ -337,7 +337,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         y_pred = self._le.transform(self.predict(X))
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
-    def _validate_input(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight):
         # Check common classifier parameters.
         check_classifier_params(self.classes, self.missing_label,
                                 self.cost_matrix)
@@ -466,17 +466,22 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
     
-    def _validate_input(self, X, y, sample_weight):
-        X, y, sample_weight = super()._validate_input(X, y, sample_weight)
+    def _validate_data(self, X, y, sample_weight):
+        X, y, sample_weight = super()._validate_data(X, y, sample_weight)
         # Check class prior.
-        if isinstance(self.class_prior, float):
+        if np.isscalar(self.class_prior):
             check_scalar(self.class_prior, name='class_prior',
-                         target_type=float, min_val=0)
+                         target_type=(int, float), min_val=0)
             class_prior = np.array([self.class_prior] * len(self.classes_))
         else:
-            class_prior = column_or_1d(self.class_prior)
+            class_prior = check_array(self.class_prior, ensure_2d=False)
+            class_prior = column_or_1d(class_prior)
+            if self.classes is None:
+                raise ValueError("You cannot specify 'class_prior' as an "
+                                 "array-like parameter without specifying "
+                                 "'classes'.")
             is_negative = np.sum(class_prior < 0)
-            if len(self.class_prior) != len(self.classes_) or is_negative:
+            if len(class_prior) != len(self.classes_) or is_negative:
                 raise ValueError("`class_prior` must be either a non-negative"
                                  "float or a list of `n_classes` non-negative "
                                  "floats.")

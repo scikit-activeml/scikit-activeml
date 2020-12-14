@@ -104,7 +104,7 @@ class PWC(ClassFrequencyEstimator):
             The PWC is fitted on the training data.
         """
         # Check input parameters.
-        X, y, sample_weight = self._validate_input(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         # Check whether metric is available.
         if self.metric not in PWC.METRICS:
