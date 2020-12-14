@@ -9,9 +9,10 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.utils import check_array
 
-from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..utils import is_labeled, MISSING_LABEL, check_X_y, check_cost_matrix, \
-    simple_batch, check_classes
+from ..base import SingleAnnotPoolBasedQueryStrategy,\
+    SkactivemlClassifier
+from ..utils import check_cost_matrix, simple_batch, check_classes, \
+    ExtLabelEncoder
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
@@ -22,16 +23,15 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     ----------
     clf : sklearn classifier
         A probabilistic sklearn classifier.
-    classes : array-like, shape=(n_classes), (default=None)
-        Holds the label for each class.
     method : string (default='margin_sampling')
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
         Epistemic only works with Parzen Window Classifier or
         Logistic Regression.
-    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-        Important: We do not differ between None and np.nan.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with cost_matrix[i,j] defining the cost of predicting class j for a
+        sample with the actual class i. Only supported for least confident
+        variant.
     random_state : numeric | np.random.RandomState
         The random state to use.
 
@@ -41,12 +41,11 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         A probabilistic sklearn classifier.
     method : string
         The method to calculate the uncertainty. Only entropy, least_confident,
-        margin_sampling, expected_average_precisionare and epistemic.
-    classes : array-like, shape=(n_classes)
-        Holds the label for each class.
-    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-        Important: We do not differ between None and np.nan.
+        margin_sampling and expected_average_precisionare.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i. Only supported for least confident
+        variant.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
@@ -55,27 +54,21 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
         http://www.burrsettles.com/pub/settles.activelearning.pdf
-
     [2] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
-
-    [3] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
-        "Epistemic uncertainty sampling." International Conference on
-        Discovery Science. Springer, Cham, 2019.
     """
 
-    def __init__(self, clf, classes=None, method='margin_sampling',
-                 missing_label=MISSING_LABEL,
+    def __init__(self, clf, method='margin_sampling', cost_matrix=None,
                  random_state=None):
         super().__init__(random_state=random_state)
 
-        self.missing_label = missing_label
         self.method = method
-        self.classes = classes
+        self.cost_matrix = cost_matrix
         self.clf = clf
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+              return_utilities=False):
         """
         Queries the next instance to be labeled.
 
@@ -87,6 +80,8 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             The labeled pool used to fit the classifier.
         y : np.array
             The labels of the labeled pool X.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)
@@ -100,55 +95,58 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
+        self._clf = clone(self.clf)
+
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
+
+        # Check if the attribute clf is valid
+        if not isinstance(self._clf, SkactivemlClassifier):
+            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
+                            'given type is {}. Use the wrapper in '
+                            'skactiveml.classifier to use a sklearn '
+                            'classifier/ensemble.'.format(type(self._clf)))
+
+        # Extract classes from clf
+        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
+                                        classes=self.clf.classes).fit(y)
+        classes = label_encoder.classes_
 
         # check self.method
         if not isinstance(self.method, str):
             raise TypeError('{} is an invalid type for method. Type {} is '
                             'expected'.format(type(self.method), str))
 
-        if self.method not in ['entropy', 'least_confident', 'margin_sampling',
-                               'expected_average_precision']:
-            raise ValueError(
-                "The given method {} is not valid. Supported methods are "
-                "'KL_divergence' and 'vote_entropy'".format(self.method))
-
-        # checks for method=margin_sampling
-        if (self.method == 'margin_sampling' and
-                getattr(self.clf, 'predict_proba', None) is None):
+        if getattr(self.clf, 'predict_proba', None) is None:
             raise TypeError("'clf' must implement the method 'predict_proba'")
 
-        # checks for method=expected_average_precision
-        if (self.method == 'expected_average_precision' and
-                self.classes is None):
-            raise ValueError('\'classes\' has to be specified')
-
-        # check X, y and X_cand
-        X, y, X_cand, _, _ = check_X_y(X, y, X_cand, force_all_finite=False)
-
         # fit the classifier and get the probabilities
-        mask_labeled = is_labeled(y, self.missing_label)
-        self.clf = clone(self.clf)
-        self.clf.fit(X, y)
-        probas = self.clf.predict_proba(X_cand)
+        self._clf.fit(X, y, sample_weight=sample_weight)
+        probas = self._clf.predict_proba(X_cand)
 
         # choose the method and calculate the utilities
         with np.errstate(divide='ignore'):
             if self.method in ['least_confident', 'margin_sampling',
                                'entropy']:
-                utilities = uncertainty_scores(P=probas, method=self.method)
+                utilities = uncertainty_scores(probas=probas,
+                                               method=self.method,
+                                               cost_matrix=self.cost_matrix)
             elif self.method == 'expected_average_precision':
-                utilities = expected_average_precision(self.classes, probas)
+                utilities = expected_average_precision(classes, probas)
+            else:
+                raise ValueError(
+                    "The given method {} is not valid. Supported methods are "
+                    "'entropy', 'least_confident', 'margin_sampling' and "
+                    "'expected_average_precision'".format(self.method))
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
 
-def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
+def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]. For the least confident and
@@ -157,13 +155,14 @@ def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
 
     Parameters
     ----------
-    P : array-like, shape (n_samples, n_classes)
+    probas : array-like, shape (n_samples, n_classes)
         Class membership probabilities for each sample.
     cost_matrix : array-like, shape (n_classes, n_classes)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
-    method : {'lc', 'sm', 'entropy'}, optional (default='lc')
+    method : {'least_confident', 'margin_sampling', 'entropy'},
+            optional (default='least_confident')
         Least confidence (lc) queries the sample whose maximal posterior
         probability is minimal. In case of a given cost matrix, the maximial
         expected cost variant is used. Smallest margin (sm) queries the sample
@@ -177,12 +176,23 @@ def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
     ----------
     [1] Settles, Burr. "Active learning literature survey".
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
-    [2] Margineantu, Dragos D. "Active cost-sensitive learning."
-        In IJCAI, vol. 5, pp. 1622-1623. 2005.
+    [2] Chen, Po-Lung, and Hsuan-Tien Lin. "Active learning for multiclass
+        cost-sensitive classification using probabilistic models." 2013
+        Conference on Technologies and Applications of Artificial Intelligence.
+        IEEE, 2013.
     """
     # Check probabilities.
-    P = check_array(P)
-    n_classes = P.shape[1]
+    probas = check_array(probas, accept_sparse=False,
+            accept_large_sparse=True, dtype="numeric", order=None,
+            copy=False, force_all_finite=True, ensure_2d=True,
+            allow_nd=False, ensure_min_samples=1,
+            ensure_min_features=1, estimator=None)
+
+    if (np.sum(probas, axis=1) - 1).all():
+        raise ValueError('probas are invalid. The sum over axis 1 must be '
+                         'one.')
+
+    n_classes = probas.shape[1]
 
     # Check cost matrix.
     if cost_matrix is not None:
@@ -191,22 +201,22 @@ def uncertainty_scores(P, cost_matrix=None, method='least_confident'):
     # Compute uncertainties.
     if method == 'least_confident':
         if cost_matrix is None:
-            return 1 - np.max(P, axis=1)
+            return 1 - np.max(probas, axis=1)
         else:
-            costs = P @ cost_matrix
+            costs = probas @ cost_matrix
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return costs[:, 0]
     elif method == 'margin_sampling':
         if cost_matrix is None:
-            P = -(np.partition(-P, 1, axis=1)[:, :2])
-            return 1 - np.abs(P[:, 0] - P[:, 1])
+            probas = -(np.partition(-probas, 1, axis=1)[:, :2])
+            return 1 - np.abs(probas[:, 0] - probas[:, 1])
         else:
-            costs = P @ cost_matrix
+            costs = probas @ cost_matrix
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return -np.abs(costs[:, 0] - costs[:, 1])
     elif method == 'entropy':
         with np.errstate(divide='ignore', invalid='ignore'):
-            return np.nansum(-P * np.log(P), axis=1)
+            return np.nansum(-probas * np.log(probas), axis=1)
     else:
         raise ValueError(
             "Supported methods are ['least_confident', 'margin_sampling', "
@@ -237,6 +247,10 @@ def expected_average_precision(classes, probas):
             copy=False, force_all_finite=True, ensure_2d=True,
             allow_nd=False, ensure_min_samples=1,
             ensure_min_features=1, estimator=None)
+
+    if (np.sum(probas, axis=1) - 1).all():
+        raise ValueError('probas are invalid. The sum over axis 1 must be '
+                         'one.')
 
     # check if classes is valid
     check_classes(classes)
