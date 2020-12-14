@@ -1,19 +1,15 @@
 import numpy as np
 import unittest
 
-from sklearn.gaussian_process import GaussianProcessClassifier, \
-    GaussianProcessRegressor
-from sklearn.linear_model import LogisticRegression
+from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.pool._uncertainty import uncertainty_scores
-from skactiveml.utils import rand_argmax, MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import SklearnClassifier, PWC
 from skactiveml.pool import UncertaintySampling, expected_average_precision
-from skactiveml.base import ClassFrequencyEstimator
-from scipy.optimize import minimize_scalar
 
 
-class TestUncertainty(unittest.TestCase):
+class TestUncertaintySampling(unittest.TestCase):
 
     def setUp(self):
         self.random_state = 1
@@ -47,6 +43,20 @@ class TestUncertainty(unittest.TestCase):
         self.assertRaises(ValueError, selector.query, **self.kwargs)
         selector = UncertaintySampling(clf=self.clf, method=1)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+    def test_init_param_cost_matrix(self):
+        selector = UncertaintySampling(clf=self.clf,
+                                       cost_matrix=np.ones((2, 3)))
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+        selector = UncertaintySampling(clf=self.clf,
+                                       cost_matrix='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+        selector = UncertaintySampling(clf=self.clf,
+                                       cost_matrix=np.ones((3, 3)))
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
 
     def test_init_param_random_state(self):
         selector = UncertaintySampling(clf=self.clf, random_state='string')
@@ -87,6 +97,17 @@ class TestUncertainty(unittest.TestCase):
                           X=self.X, y=[])
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=self.y[0:-1])
+
+    def test_query_param_sample_weight(self):
+        selector = UncertaintySampling(clf=self.clf)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          sample_weight='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=self.X_cand)
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.empty((len(self.X) - 1)))
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.empty((len(self.X) + 1)))
 
     def test_query_param_batch_size(self):
         selector = UncertaintySampling(clf=self.clf)
