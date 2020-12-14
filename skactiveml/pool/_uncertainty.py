@@ -5,21 +5,13 @@ Uncertainty query strategies
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 
 import numpy as np
-import warnings
-
-from scipy.optimize import minimize_scalar, minimize, LinearConstraint
-from scipy.interpolate import griddata
 
 from sklearn.base import clone
 from sklearn.utils import check_array
-from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model._logistic import _logistic_loss
 
-from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
-    check_scalar, check_cost_matrix, simple_batch, check_random_state, \
-    check_classes
-from ..classifier import SklearnClassifier
+from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils import is_labeled, MISSING_LABEL, check_X_y, check_cost_matrix, \
+    simple_batch, check_classes
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
@@ -108,16 +100,10 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
-
-        # validation:
-        # check random state
-        random_state = check_random_state(self.random_state)
-
-        # Check if the argument return_utilities is valid
-        if not isinstance(return_utilities, bool):
-            raise TypeError(
-                '{} is an invalid type for return_utilities. Type {} is '
-                'expected'.format(type(return_utilities), bool))
+        # Validate input parameters.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
 
         # check self.method
         if not isinstance(self.method, str):

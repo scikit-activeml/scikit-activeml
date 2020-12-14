@@ -8,7 +8,7 @@ from sklearn.utils import check_array
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.base import ClassFrequencyEstimator
 from skactiveml.utils import check_scalar, check_classifier_params, \
-    check_random_state, simple_batch
+    simple_batch
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -76,7 +76,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         # Validate input
         X_cand, return_utilities, batch_size, utility_weight, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
-                                utility_weight)
+                                utility_weight, self.random_state, reset=True)
 
         # Calculate utilities and return the output
         clf = clone(self.clf)
@@ -90,21 +90,15 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
                             return_utilities=return_utilities)
 
     def _validate_data(self, X_cand, return_utilities, batch_size,
-                       utility_weight):
+                       utility_weight, random_state, reset=True):
+        X_cand, return_utilities, batch_size, random_state = \
+            super()._validate_data(X_cand, return_utilities, batch_size,
+                                   self.random_state, reset=True)
         # Check if the classifier and its arguments are valid
         if not isinstance(self.clf, ClassFrequencyEstimator):
             raise TypeError("'clf' must implement methods according to "
                             "'ClassFrequencyEstimator'.")
         check_classifier_params(self.clf.classes, self.clf.missing_label)
-
-        # Check candidate instances
-        X_cand = check_array(X_cand, force_all_finite=False)
-
-        # Check return_utilities
-        check_scalar(return_utilities, 'return_utilities', bool)
-
-        # Check batch size
-        check_scalar(batch_size, 'batch_size', int, min_val=1)
 
         # Check 'utility_weight'
         if utility_weight is None:
@@ -116,9 +110,6 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             raise ValueError(
                 "'X_cand' and 'utility_weight' must have the same length."
             )
-
-        # Check random state
-        random_state = check_random_state(self.random_state, len(X_cand))
 
         return X_cand, return_utilities, batch_size, utility_weight, \
             random_state
