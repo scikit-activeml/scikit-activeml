@@ -119,7 +119,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             )
 
         # Check random state
-        random_state = check_random_state(self.random_state)
+        random_state = check_random_state(self.random_state, len(X_cand))
 
         return X_cand, return_utilities, batch_size, utility_weight, \
             random_state

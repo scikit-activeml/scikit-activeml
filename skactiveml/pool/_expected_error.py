@@ -107,7 +107,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         check_scalar(batch_size, 'batch_size', int, min_val=1)
 
         # Check random state
-        random_state = check_random_state(self.random_state)
+        random_state = check_random_state(self.random_state, len(X_cand))
 
         return X_cand, return_utilities, batch_size, random_state
 
