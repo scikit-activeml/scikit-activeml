@@ -87,12 +87,12 @@ class TestExpectedErrorReduction(unittest.TestCase):
 
     def test_query_param_return_utilities(self):
         eer = EER(self.clf, cost_matrix=self.cost_matrix)
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                          return_utilities=None)
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                          return_utilities=[])
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                          return_utilities=0)
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
+                          y=self.y, return_utilities=None)
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
+                          y=self.y, return_utilities=[])
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
+                          y=self.y, return_utilities=0)
 
     def test_query(self):
         # Test methods

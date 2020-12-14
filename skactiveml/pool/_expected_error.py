@@ -158,8 +158,6 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
         X, y, X_cand, sample_weight, sample_weight_cand,
         force_all_finite=False, missing_label=clf.missing_label
     )
-    if sample_weight_cand is None:
-        sample_weight_cand = np.ones(len(X_cand))
 
     clf = clone(clf)
     clf.fit(X, y, sample_weight)
