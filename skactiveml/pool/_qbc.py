@@ -124,7 +124,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         random_state = check_random_state(self.random_state)
 
         # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+        X, y, X_cand, _, _ = check_X_y(X, y, X_cand, force_all_finite=False)
 
         # Check if the given classes are the same
         # TODO sklearn classifiers dont have a classes attribute
