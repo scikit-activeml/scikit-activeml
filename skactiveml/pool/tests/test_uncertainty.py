@@ -48,10 +48,6 @@ class TestUncertainty(unittest.TestCase):
         selector = UncertaintySampling(clf=self.clf, method=1)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
-    def test_init_param_missing_label(self):
-        selector = UncertaintySampling(clf=self.clf, missing_label='string')
-        self.assertTrue(hasattr(selector, 'missing_label'))
-
     def test_init_param_random_state(self):
         selector = UncertaintySampling(clf=self.clf, random_state='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs)
@@ -118,9 +114,7 @@ class TestUncertainty(unittest.TestCase):
                                 random_state=self.random_state,
                                 classes=self.classes)
 
-        # missing_label
-        selector = UncertaintySampling(clf=clf, missing_label='string')
-        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
+        selector = UncertaintySampling(clf=clf)
 
         # return_utilities
         L = list(selector.query(**self.kwargs, return_utilities=True))

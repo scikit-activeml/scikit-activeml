@@ -27,8 +27,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    classes : array-like, shape=(n_classes)
-        Holds the label for each class.
     clf : sklearn classifier | ensamble
         If clf is an ensemble, it will used as committee. If clf is a
         classifier, it will used for ensemble construction with the specified
@@ -40,12 +38,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     method : string, default='KL_divergence'
         The method to calculate the disagreement.
         'vote_entropy' or 'KL_divergence' are possible.
-    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-        Important: We do not differ between None and np.nan.
     random_state : numeric | np.random.RandomState
         Random state to use.
-    **kwargs :
+    **ensemble_dict :
         will be passed on to the ensemble.
 
     Attributes
@@ -56,11 +51,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     method : string, default='KL_divergence'
         The method to calculate the disagreement. 'vote_entropy' or
         'KL_divergence' are possible.
-    classes : array-like, shape=(n_classes)
-        Holds the label for each class.
-    unlabeled_class : scalar | str | None | np.nan, default=np.nan
-        Symbol to represent a missing label. Important: We do not differ
-        between None and np.nan.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
@@ -75,12 +65,10 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     """
 
     def __init__(self, clf, ensemble=None, method='KL_divergence',
-                 missing_label=MISSING_LABEL, random_state=None,
-                 ensemble_dict=dict()):
+                 random_state=None, ensemble_dict=dict()):
 
         super().__init__(random_state=random_state)
 
-        self.missing_label = missing_label
         self.method = method
         self.ensemble = ensemble
         self.clf = clf
@@ -100,6 +88,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The labeled pool used to fit the classifier.
         y : array-like
             The labels of the labeled pool X.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)
@@ -129,12 +119,12 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         random_state = check_random_state(self.random_state, len(X_cand))
 
         # Extract classes from clf
-        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
+        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
 
         # Check if the classifier and its arguments are valid
-        check_classifier_params(classes, self.missing_label)
+        check_classifier_params(classes, self._clf.missing_label)
 
         # Check if the batch_size argument is valid.
         check_scalar(batch_size, target_type=int, name='batch_size',
@@ -171,7 +161,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError(
                 "'clf' must implement the methods 'fit' and 'predict_proba'")
 
-        # check self.ensemble and self.clf
+        # build a ensemble if necessary
         if not isinstance(self._clf, SklearnClassifier) or \
                 not isinstance(self._clf.estimator, BaseEnsemble):
             if self.ensemble is None:

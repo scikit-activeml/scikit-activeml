@@ -31,16 +31,15 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     ----------
     clf : sklearn classifier
         A probabilistic sklearn classifier.
-    classes : array-like, shape=(n_classes), (default=None)
-        Holds the label for each class.
     method : string (default='margin_sampling')
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
         Epistemic only works with Parzen Window Classifier or
         Logistic Regression.
-    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-        Important: We do not differ between None and np.nan.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i. Only supported for least confident
+        variant.
     random_state : numeric | np.random.RandomState
         The random state to use.
 
@@ -51,11 +50,10 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     method : string
         The method to calculate the uncertainty. Only entropy, least_confident,
         margin_sampling and expected_average_precisionare.
-    classes : array-like, shape=(n_classes)
-        Holds the label for each class.
-    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-        Important: We do not differ between None and np.nan.
+    cost_matrix : array-like, shape (n_classes, n_classes)
+        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        sample with the actual class i. Only supported for least confident
+        variant.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
@@ -64,18 +62,15 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
         http://www.burrsettles.com/pub/settles.activelearning.pdf
-
     [2] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
 
     def __init__(self, clf, method='margin_sampling', cost_matrix=None,
-                 missing_label=MISSING_LABEL,
                  random_state=None):
         super().__init__(random_state=random_state)
 
-        self.missing_label = missing_label
         self.method = method
         self.cost_matrix = cost_matrix
         self.clf = clf
@@ -93,6 +88,8 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             The labeled pool used to fit the classifier.
         y : np.array
             The labels of the labeled pool X.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)
@@ -122,12 +119,12 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         random_state = check_random_state(self.random_state, len(X_cand))
 
         # Extract classes from clf
-        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
+        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
 
         # Check if the classifier and its arguments are valid
-        check_classifier_params(classes, self.missing_label)
+        check_classifier_params(classes, self._clf.missing_label)
 
         # Check if the batch_size argument is valid.
         check_scalar(batch_size, target_type=int, name='batch_size',
@@ -193,7 +190,8 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
-    method : {'lc', 'sm', 'entropy'}, optional (default='lc')
+    method : {'least_confident', 'margin_sampling', 'entropy'},
+            optional (default='least_confident')
         Least confidence (lc) queries the sample whose maximal posterior
         probability is minimal. In case of a given cost matrix, the maximial
         expected cost variant is used. Smallest margin (sm) queries the sample

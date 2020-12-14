@@ -56,10 +56,6 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=GaussianProcessRegressor, method='KL_divergence')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
-    def test_init_param_missing_label(self):
-        selector = QBC(clf=self.clf, missing_label='string')
-        self.assertTrue(hasattr(selector, 'missing_label'))
-
     def test_init_param_random_state(self):
         selector = QBC(clf=self.clf, random_state='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs)
@@ -153,10 +149,6 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier)
         selector.query(**self.kwargs)
 
-        # missing_label
-        selector = QBC(clf=self.clf, missing_label='string')
-        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
-
         # ensemble_dict
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier,
                        ensemble_dict=dict(n_estimators=5))
@@ -169,6 +161,12 @@ class TestQBC(unittest.TestCase):
         L = list(selector.query(**self.kwargs, return_utilities=False))
         self.assertTrue(len(L) == 1)
 
+        # batch_size
+        bs = 3
+        selector = QBC(clf=self.clf)
+        best_idx = selector.query(**self.kwargs, batch_size=bs)
+        self.assertEqual(bs, len(best_idx))
+
         # query
         selector = QBC(clf=self.clf, method='vote_entropy')
         selector.query(**self.kwargs)
@@ -180,6 +178,8 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=self.clf, random_state=self.random_state)
         best_indices1, utilities1 = selector.query(**self.kwargs,
                                                    return_utilities=True)
+        self.assertEqual(utilities1.shape, (1, len(self.X_cand)))
+        self.assertEqual(best_indices1.shape, (1,))
         best_indices2, utilities2 = selector.query(**self.kwargs,
                                                    return_utilities=True)
         np.testing.assert_array_equal(utilities1, utilities2)
