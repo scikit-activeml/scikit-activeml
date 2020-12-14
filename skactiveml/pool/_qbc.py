@@ -1,9 +1,13 @@
+"""
+query by committee strategies
+"""
+
+# Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 
 import numpy as np
 import warnings
 
 from sklearn import clone
-from sklearn.base import BaseEstimator, ClassifierMixin
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 
@@ -11,8 +15,7 @@ from sklearn.ensemble import BaggingClassifier, BaseEnsemble
 from sklearn.utils import check_array
 
 from ..classifier import SklearnClassifier
-from ..utils import MISSING_LABEL, check_X_y, simple_batch, \
-    check_classifier_params, check_classes, ExtLabelEncoder
+from ..utils import simple_batch, check_classes, ExtLabelEncoder
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):

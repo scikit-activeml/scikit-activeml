@@ -5,25 +5,14 @@ Uncertainty query strategies
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 
 import numpy as np
-import warnings
-
-from scipy.optimize import minimize_scalar, minimize, LinearConstraint
-from scipy.interpolate import griddata
 
 from sklearn.base import clone
 from sklearn.utils import check_array
-from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model._logistic import _logistic_loss
 
-from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..utils import is_labeled, MISSING_LABEL, check_X_y, check_cost_matrix, \
-    simple_batch, check_classes
-from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator, \
+from ..base import SingleAnnotPoolBasedQueryStrategy,\
     SkactivemlClassifier
-from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
-    check_scalar, check_cost_matrix, simple_batch, check_random_state, \
-    check_classes, ExtLabelEncoder, check_classifier_params
-from ..classifier import SklearnClassifier
+from ..utils import check_cost_matrix, simple_batch, check_classes, \
+    ExtLabelEncoder
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
