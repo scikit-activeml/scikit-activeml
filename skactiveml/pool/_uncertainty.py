@@ -127,7 +127,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             raise ValueError('\'classes\' has to be specified')
 
         # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+        X, y, X_cand, _, _ = check_X_y(X, y, X_cand, force_all_finite=False)
 
         # fit the classifier and get the probabilities
         mask_labeled = is_labeled(y, self.missing_label)

@@ -44,7 +44,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         self.m_max = m_max
 
     def query(self, X_cand, X, y, sample_weight=None, utility_weight=None,
-              batch_size=1, return_utilities=False, **kwargs):
+              batch_size=1, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
