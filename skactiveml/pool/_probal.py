@@ -101,8 +101,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         X_cand = check_array(X_cand, force_all_finite=False)
 
         # Check return_utilities
-        if type(return_utilities) is not bool:
-            raise TypeError("The type of 'return_utilities' must be bool")
+        check_scalar(return_utilities, 'return_utilities', bool)
 
         # Check batch size
         check_scalar(batch_size, 'batch_size', int, min_val=1)
