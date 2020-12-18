@@ -87,7 +87,7 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
             The MultiAnnotClassifier is fitted on the training data.
         """
         self._validate_estimators()
-        X, y, sample_weight = self._validate_input(X=X, y=y,
+        X, y, sample_weight = self._validate_data(X=X, y=y,
                                                    sample_weight=sample_weight)
         if self.voting not in ('soft', 'hard'):
             raise ValueError("Voting must be 'soft' or 'hard'; got (voting={})"
@@ -166,9 +166,9 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
                     not np.array_equal(self.classes, est.classes):
                 raise ValueError(error_msg)
 
-    def _validate_input(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight):
         X, y, sample_weight = SkactivemlClassifier.\
-            _validate_input(self, X=X, y=y, sample_weight=sample_weight)
+            _validate_data(self, X=X, y=y, sample_weight=sample_weight)
         error_msg = "'y' must have shape (n_samples={}, n_estimators={}) but" \
                     " has shape {}.".format(len(y), len(self.estimators),
                                             y.shape)
