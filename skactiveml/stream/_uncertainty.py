@@ -12,7 +12,7 @@ from ._random import RandomSampler
 
 import copy
 
-from .budget_manager import FixedBudget
+from .budget_manager import EstimatedBudget
 
 
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -43,7 +43,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -117,8 +117,10 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         # to scale this inequation to the desired range, i.e., utilities
         # higher than 1-budget should lead to sampling the instance, we use
         # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-        utilities = theta + (1 - budget) - y_hat
-
+        # utilities = theta + (1 - budget) - y_hat
+        
+        utilities = y_hat <= theta
+        
         sampled_indices = self.budget_manager_.sample(utilities,
                                                       simulate=simulate)
 
@@ -180,7 +182,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
                  theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -272,7 +274,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             # to scale this inequation to the desired range, i.e., utilities
             # higher than 1-budget should lead to sampling the instance, we use
             # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-            utilities.append(tmp_theta + (1 - budget) - y_)
+            utilities.append(y_ <= tmp_theta)
             sampled, budget_left = self.budget_manager_.sample(
                 utilities,
                 simulate=True,
@@ -354,7 +356,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(), v=0.1,
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(), v=0.1,
                  theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
