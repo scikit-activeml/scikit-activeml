@@ -97,7 +97,7 @@ class TestUncertainty (unittest.TestCase):
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_init_param_v(self, query_strategy_name):
-        # v must be defined as an float with a range of: 0 < v <= 1
+        # v must be defined as an float with a range of: 0 < v < 1
         query_strategy = query_strategy_name(clf=self.clf, v="string")
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, v=1.1)

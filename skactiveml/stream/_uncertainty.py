@@ -254,6 +254,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             clf = self.clf
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
+        # check if theta is set
+        if not isinstance(self.theta, float):
+            raise TypeError("{} is not a valid type for theta")
         predict_proba = clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
         budget = getattr(self.budget_manager_, "budget_", 0)
@@ -395,18 +398,12 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # ckeck if s a float and in range (0,1]
-        if not isinstance(self.s, float):
-            raise TypeError("{} is not a valid type for s")
-        if self.s <= 0 or self.s > 1.0:
-            raise ValueError("The value of s is incorrect." +
-                             " s must be defined in range (0,1]")
         # ckeck if v is a float and in range (0,1]
         if not isinstance(self.v, float):
             raise TypeError("{} is not a valid type for s")
-        if self.v <= 0 or self.v > 1:
+        if self.v <= 0 or self.v >= 1:
             raise ValueError("The value of v is incorrect." +
-                             " v must be defined in range (0,1]")
+                             " v must be defined in range (0,1)")
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
