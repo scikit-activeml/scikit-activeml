@@ -1,19 +1,21 @@
+"""
+query by committee strategies
+"""
+
+# Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 
 import numpy as np
 import warnings
 
 from sklearn import clone
-from sklearn.base import BaseEstimator
 
-from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 
 from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_array, column_or_1d
+from sklearn.utils import check_array
 
 from ..classifier import SklearnClassifier
-from ..utils import MISSING_LABEL, check_X_y, check_scalar, \
-    simple_batch, check_classifier_params, check_classes, check_random_state, \
-    ExtLabelEncoder
+from ..utils import simple_batch, check_classes, ExtLabelEncoder
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
@@ -27,8 +29,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    classes : array-like, shape=(n_classes)
-        Holds the label for each class.
     clf : sklearn classifier | ensamble
         If clf is an ensemble, it will used as committee. If clf is a
         classifier, it will used for ensemble construction with the specified
@@ -40,12 +40,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     method : string, default='KL_divergence'
         The method to calculate the disagreement.
         'vote_entropy' or 'KL_divergence' are possible.
-    missing_label : scalar | str | None | np.nan, (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-        Important: We do not differ between None and np.nan.
     random_state : numeric | np.random.RandomState
         Random state to use.
-    **kwargs :
+    ensemble_dict :
         will be passed on to the ensemble.
 
     Attributes
@@ -56,11 +53,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     method : string, default='KL_divergence'
         The method to calculate the disagreement. 'vote_entropy' or
         'KL_divergence' are possible.
-    classes : array-like, shape=(n_classes)
-        Holds the label for each class.
-    unlabeled_class : scalar | str | None | np.nan, default=np.nan
-        Symbol to represent a missing label. Important: We do not differ
-        between None and np.nan.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
@@ -75,20 +67,18 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     """
 
     def __init__(self, clf, ensemble=None, method='KL_divergence',
-                 missing_label=MISSING_LABEL, random_state=None,
-                 ensemble_dict=dict()):
+                 random_state=None, ensemble_dict=None):
 
         super().__init__(random_state=random_state)
 
-        self.missing_label = missing_label
         self.method = method
         self.ensemble = ensemble
         self.clf = clf
         self.ensemble_dict = ensemble_dict
 
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
-              **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None,  batch_size=1,
+              return_utilities=False):
         """
         Queries the next instance to be labeled.
 
@@ -100,6 +90,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The labeled pool used to fit the classifier.
         y : array-like
             The labels of the labeled pool X.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)
@@ -113,43 +105,27 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
-        # Check if the attribute clf is valid
-        if not isinstance(self.clf, BaseEstimator):
-            raise TypeError("'clf' has to be from type BaseEstimator. "
-                            "The given type is {}".format(type(self.clf)))
-
         self._clf = clone(self.clf)
 
-        # Set and check random state.
-        random_state = check_random_state(self.random_state)
+        if self.ensemble_dict is None:
+            self.ensemble_dict = dict()
 
-        # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+        # Validate input parameters.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
 
-        # Check if the given classes are the same
-        # TODO sklearn classifiers dont have a classes attribute
-        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
+        # Check if the attribute clf is valid
+        if not isinstance(self._clf, SkactivemlClassifier):
+            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
+                            'given type is {}. Use the wrapper in '
+                            'skactiveml.classifier to use a sklearn '
+                            'classifier/ensemble.'.format(type(self.clf)))
+
+        # Extract classes from clf
+        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
-
-        # Check if the classifier and its arguments are valid
-        check_classifier_params(classes, self.missing_label)
-
-        # Check if the batch_size argument is valid.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        if len(X_cand) < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
-            batch_size = len(X_cand)
-
-        # Check if the argument return_utilities is valid
-        if not isinstance(return_utilities, bool):
-            raise TypeError(
-                '{} is an invalid type for return_utilities. Type {} is '
-                'expected'.format(type(return_utilities), bool))
 
         # Check self.clf and self.method
         if not isinstance(self.method, str):
@@ -170,8 +146,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError(
                 "'clf' must implement the methods 'fit' and 'predict_proba'")
 
-        # check self.ensemble and self.clf
-        if not isinstance(self._clf, BaseEnsemble):
+        # build a ensemble if necessary
+        if not isinstance(self._clf, SklearnClassifier) or \
+                not isinstance(self._clf.estimator, BaseEnsemble):
             if self.ensemble is None:
                 warnings.warn('\'ensemble\' is not specified, '
                               '\'BaggingClassifier\' will be used.')
@@ -190,13 +167,13 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             ensemble_dict = self.ensemble_dict
             if 'base_estimator' in parameters:
                 ensemble_dict['base_estimator'] = self._clf
-            self._clf = ensemble(random_state=random_state, **ensemble_dict)
-
-        if not isinstance(self._clf, SklearnClassifier):
-            self._clf = SklearnClassifier(self._clf, classes=classes)
+            self._clf = SklearnClassifier(
+                ensemble(random_state=random_state, **ensemble_dict),
+                classes=classes
+            )
 
         # fit the classifier
-        self._clf.fit(X, y)
+        self._clf.fit(X, y, sample_weight=sample_weight)
 
         # choose the disagreement method and calculate the utilities
         if hasattr(self._clf, 'estimators_'):

@@ -1,12 +1,11 @@
 import numpy as np
-import warnings
 
 from copy import deepcopy
 
 from sklearn.utils import check_array, check_scalar, column_or_1d
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..utils import rand_argmax, is_labeled, check_random_state
+from ..utils import rand_argmax, is_labeled
 from ..classifier import CMM
 
 
@@ -38,8 +37,8 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         self.clf = clf
         self.lmbda = lmbda
 
-    def query(self, X_cand, X, y, return_utilities=False, batch_size=1,
-              **kwargs):
+    def query(self, X_cand, X, y, sample_weight=None, return_utilities=False,
+              batch_size=1):
         """Ask the query strategy which sample in 'X_cand' to query.
 
         Parameters
@@ -67,11 +66,14 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
             used for selecting the first sample (with index `query_indices[0]`)
             of the batch.
         """
-        # Check X_cand to be a non-empty 2D array.
-        X_cand = check_array(X_cand)
+        # Validate input.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
 
         # Check input training data.
         X = check_array(X, ensure_min_samples=0)
+        self._check_n_features(X, reset=False)
         y = column_or_1d(y)
 
         # Check classifier type.
@@ -80,16 +82,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
                 "'clf' must be a 'CMM' but got {}".format(type(self.clf)))
         cmm = deepcopy(self.clf)
 
-        # Check batch size.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        batch_size = batch_size
-        if len(X_cand) < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
-            batch_size = len(X_cand)
+        # Storage for query indices.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
 
         # Check lmbda.
@@ -99,15 +92,8 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         check_scalar(lmbda, target_type=float, name='lmbda', min_val=0,
                      max_val=1)
 
-        # Ensure return_utlities to be a boolean.
-        check_scalar(return_utilities, target_type=bool,
-                     name='return_utilities')
-
-        # Set and check random state.
-        random_state = check_random_state(self.random_state)
-
         # Fit the classifier and get the probabilities.
-        cmm.fit(X, y)
+        cmm.fit(X, y, sample_weight=sample_weight)
         P_cand = cmm.predict_proba(X_cand)
         R_cand = cmm.mixture_model_.predict_proba(X_cand)
         is_lbld = is_labeled(y, missing_label=cmm.missing_label)

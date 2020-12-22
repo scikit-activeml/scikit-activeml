@@ -1,13 +1,14 @@
 import numpy as np
+import warnings
 
 from abc import ABC, abstractmethod
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
-from sklearn.utils import check_random_state, check_array, \
-    check_consistent_length
+from sklearn.utils import check_array, check_consistent_length, column_or_1d
 from sklearn.utils.multiclass import type_of_target
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
-    rand_argmin, ExtLabelEncoder, check_cost_matrix, is_labeled
+    check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
+    is_labeled, check_scalar
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -68,6 +69,64 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
             of the batch.
         """
         return NotImplemented
+
+    def _validate_data(self, X_cand, return_utilities, batch_size,
+                       random_state, reset=True, **check_X_cand_params):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, 'return_utilities', bool)
+
+        # Check batch size.
+        check_scalar(batch_size, target_type=int, name='batch_size',
+                     min_val=1)
+        batch_size = batch_size
+        if len(X_cand) < batch_size:
+            warnings.warn(
+                "'batch_size={}' is larger than number of candidate samples "
+                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
+                    batch_size, len(X_cand)))
+            batch_size = len(X_cand)
+
+        # Check random state.
+        random_state = check_random_state(random_state=self.random_state,
+                                          seed_multiplier=len(X_cand))
+
+        return X_cand, return_utilities, batch_size, random_state
 
 
 class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
@@ -337,7 +396,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         y_pred = self._le.transform(self.predict(X))
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
-    def _validate_input(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight):
         # Check common classifier parameters.
         check_classifier_params(self.classes, self.missing_label,
                                 self.cost_matrix)
@@ -399,25 +458,34 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     classes : array-like, shape (n_classes), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
-    missing_label : {scalar, string, np.nan, None}, default=np.nan
+    missing_label : scalar | string | np.nan | None|, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] indicating cost of predicting class
-        classes[j]  for a sample of class classes[i]. Can be only set, if
+        Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
+        `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
         classes is not none.
-    random_state : int, RandomState instance or None, optional (default=None)
+    class_prior : float | array-like, shape (n_classes), optional (default=0)
+        Prior observations of the class frequency estimates. If `class_prior`
+        is an array, the entry `class_prior[i]` indicates the non-negative
+        prior number of samples belonging to class `classes_[i]`. If
+        `class_prior` is a float, `class_prior` indicates the non-negative
+        prior number of samples per class.
+    random_state : int | np.RandomState | None, optional (default=None)
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_ : array-like, shape (n_classes)
+    classes_ : np.ndarray, shape (n_classes)
         Holds the label for each class after fitting.
-    cost_matrix_ : array-like, shape (classes, classes)
-        Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
-        for a sample of class classes_[i].
+    class_prior : np.ndarray, shape (n_classes)
+        Prior observations of the class frequency estimates. The entry
+        `class_prior_[i]` indicates the non-negative prior number of samples
+        belonging to class `classes_[i]`.
+    cost_matrix_ : np.ndarray, shape (classes, classes)
+        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+        class `classes_[j]` for a sample of class `classes_[i]`.
     """
-
     @abstractmethod
     def predict_freq(self, X):
         """Return class frequency estimates for the test samples X.
@@ -451,11 +519,33 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             according to classes_.
         """
         # Normalize probabilities of each sample.
-        P = self.predict_freq(X)
+        P = self.predict_freq(X) + self.class_prior_
         normalizer = np.sum(P, axis=1)
         P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
+
+    def _validate_data(self, X, y, sample_weight):
+        X, y, sample_weight = super()._validate_data(X, y, sample_weight)
+        # Check class prior.
+        if np.isscalar(self.class_prior):
+            check_scalar(self.class_prior, name='class_prior',
+                         target_type=(int, float), min_val=0)
+            class_prior = np.array([self.class_prior] * len(self.classes_))
+        else:
+            class_prior = check_array(self.class_prior, ensure_2d=False)
+            class_prior = column_or_1d(class_prior)
+            if self.classes is None:
+                raise ValueError("You cannot specify 'class_prior' as an "
+                                 "array-like parameter without specifying "
+                                 "'classes'.")
+            is_negative = np.sum(class_prior < 0)
+            if len(class_prior) != len(self.classes_) or is_negative:
+                raise ValueError("`class_prior` must be either a non-negative"
+                                 "float or a list of `n_classes` non-negative "
+                                 "floats.")
+        self.class_prior_ = class_prior.reshape(1, -1)
+        return X, y, sample_weight
 
 
 class AnnotModelMixing(ABC):

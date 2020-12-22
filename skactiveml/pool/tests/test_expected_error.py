@@ -71,6 +71,13 @@ class TestExpectedErrorReduction(unittest.TestCase):
         self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight=np.ones(3))
 
+    def test_query_param_sample_weight_cand(self):
+        eer = EER(self.clf)
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight_cand='string')
+        self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight_cand=np.ones(3))
+
     def test_query_param_batch_size(self):
         eer = EER(self.clf)
         self.assertRaises(TypeError, eer.query, self.X_cand, self.X, self.y,
@@ -80,12 +87,12 @@ class TestExpectedErrorReduction(unittest.TestCase):
 
     def test_query_param_return_utilities(self):
         eer = EER(self.clf, cost_matrix=self.cost_matrix)
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                          return_utilities=None)
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                          return_utilities=[])
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                          return_utilities=0)
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
+                          y=self.y, return_utilities=None)
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
+                          y=self.y, return_utilities=[])
+        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
+                          y=self.y, return_utilities=0)
 
     def test_query(self):
         # Test methods
