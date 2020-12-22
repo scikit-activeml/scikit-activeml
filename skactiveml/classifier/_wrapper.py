@@ -188,7 +188,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
-        X, y, sample_weight = self._validate_input(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         # Check whether estimator is a valid classifier.
         if not is_classifier(estimator=self.estimator):

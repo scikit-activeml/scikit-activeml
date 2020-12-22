@@ -10,7 +10,6 @@ from sklearn.utils.validation import check_array, column_or_1d, \
 MISSING_LABEL = np.nan
 
 
-
 def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
                  min_val=None, max_val=None):
     """Validate scalar parameters type and value.
@@ -110,7 +109,7 @@ def check_missing_label(missing_label, target_type=None, name=None):
             "'missing_label' has type '{}', but must be a either a number, "
             "a string, np.nan, or None.".format(type(missing_label)))
     if target_type is not None:
-        is_object_type = np.issubdtype(target_type, np.object)
+        is_object_type = np.issubdtype(target_type, np.object_)
         is_character_type = np.issubdtype(target_type, np.character)
         is_number_type = np.issubdtype(target_type, np.number)
         if (is_character_type and is_number) or (
@@ -170,7 +169,8 @@ def check_cost_matrix(cost_matrix, n_classes):
     return cost_matrix_new
 
 
-def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, accept_large_sparse=True,
+def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
+              accept_sparse=False, *, accept_large_sparse=True,
               dtype="numeric", order=None, copy=False, force_all_finite=True,
               ensure_2d=True, allow_nd=False, multi_output=False,
               allow_nan=None, ensure_min_samples=1, ensure_min_features=1,
@@ -197,6 +197,9 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
 
     sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights.
+
+    sample_weight_cand : array-like of shape (n_candidates,) (default=None)
+            Sample weights of the candidates.
 
     accept_sparse : string, boolean or list of string (default=False)
         String[s] representing allowed sparse matrix formats, such as 'csc',
@@ -284,6 +287,17 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
 
     y_converted : object
         The converted and validated y.
+
+    X_cand : object
+        The converted and validated X_cand
+        Only returned if X_cand is not None.
+
+    sample_weight : np.ndarray
+        The converted and validated sample_weight.
+
+    sample_weight_cand : np.ndarray
+        The converted and validated sample_weight_cand.
+        Only returned if X_cand is not None.
     """
     if y is None:
         raise ValueError("y cannot be None")
@@ -322,20 +336,24 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
             raise ValueError("The number of features of X_cand does not match"
                              "the number of features of X")
 
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-        check_consistent_length(y, sample_weight)
-        if y.ndim > 1 and y.shape[1] > 1 or \
-                sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
-            check_consistent_length(y.T, sample_weight.T)
+        if sample_weight_cand is None:
+            sample_weight_cand = np.ones(len(X_cand))
+        sample_weight_cand = check_array(sample_weight_cand, ensure_2d=False)
+        check_consistent_length(X_cand, sample_weight_cand)
 
-    if sample_weight is not None and X_cand is None:
+    if sample_weight is None:
+        sample_weight = np.ones(y.shape)
+
+    sample_weight = check_array(sample_weight, ensure_2d=False)
+    check_consistent_length(y, sample_weight)
+    if y.ndim > 1 and y.shape[1] > 1 or \
+            sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
+        check_consistent_length(y.T, sample_weight.T)
+
+    if X_cand is None:
         return X, y, sample_weight
-    if sample_weight is None and X_cand is not None:
-        return X, y, X_cand
-    if sample_weight is not None and X_cand is not None:
-        return X, y, X_cand, sample_weight
-    return X, y
+    else:
+        return X, y, X_cand, sample_weight, sample_weight_cand
 
 
 def check_random_state(random_state, seed_multiplier=1):

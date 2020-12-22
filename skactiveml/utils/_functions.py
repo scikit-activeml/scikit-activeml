@@ -1,14 +1,38 @@
+import inspect
 import warnings
+
 import numpy as np
 
-from skactiveml.utils._validation import check_scalar, check_array
 from skactiveml.utils._selection import rand_argmax
+from skactiveml.utils._validation import check_scalar, check_array
 
-def initialize_class_with_kwargs(class_obj, **kwargs):
-    parameters = class_obj.__init__.__code__.co_varnames
-    kwargs = dict(filter(lambda e: e[0] in parameters, kwargs.items()))
-    return class_obj(**kwargs)
 
+def call_func(f_callable, only_mandatory=False, **kwargs):
+    """ Calls a function with the given parameters given in kwargs if they
+    exist as parameters in f_callable.
+
+    Parameters
+    ----------
+    f_callable : callable
+        The function or object that is to be called
+    only_mandatory : boolean
+        If True only mandatory parameters are set.
+    kwargs : kwargs
+        All parameters that could be used for calling f_callable.
+
+    Returns
+    -------
+    called object
+    """
+    params = inspect.signature(f_callable).parameters
+    param_keys = params.keys()
+    if only_mandatory:
+        param_keys = list(filter(lambda k: params[k].default == inspect._empty,
+                                 param_keys))
+
+    vars = dict(filter(lambda e: e[0] in param_keys, kwargs.items()))
+
+    return f_callable(**vars)
 
 def simple_batch(
         utilities, random_state, batch_size=1, return_utilities=False):

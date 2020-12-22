@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.estimator_checks import check_estimator
 
 from skactiveml import classifier
-from skactiveml.utils import initialize_class_with_kwargs
+from skactiveml.utils import call_func
 
 
 class TestClassifier(unittest.TestCase):
@@ -42,14 +42,13 @@ class TestClassifier(unittest.TestCase):
 
     def _test_classifier(self, clf):
         # Test classifier without fitting.
-        clf_mdl = initialize_class_with_kwargs(self.classifiers[clf],
-                                               estimator=self.estimator,
-                                               estimators=self.estimators,
-                                               classes=self.classes,
-                                               missing_label=
-                                               self.missing_label,
-                                               voting='soft',
-                                               random_state=0)
+        clf_mdl = call_func(self.classifiers[clf],
+                            estimator=self.estimator,
+                            estimators=self.estimators,
+                            classes=self.classes,
+                            missing_label=self.missing_label,
+                            voting='soft',
+                            random_state=0)
         clf_mdl_copy = deepcopy(clf_mdl)
         clf_mdl_copy.classes = None
         if isinstance(clf_mdl_copy, classifier.MultiAnnotClassifier):
@@ -81,13 +80,12 @@ class TestClassifier(unittest.TestCase):
             self.assertTrue(np.sum(F) > 0)
 
         # Training on data with only missing labels.
-        clf_mdl = initialize_class_with_kwargs(self.classifiers[clf],
-                                               estimator=self.estimator,
-                                               estimators=self.estimators,
-                                               classes=self.classes,
-                                               missing_label=
-                                               self.missing_label,
-                                               voting='soft',
-                                               random_state=0)
+        clf_mdl = call_func(self.classifiers[clf],
+                            estimator=self.estimator,
+                            estimators=self.estimators,
+                            classes=self.classes,
+                            missing_label=self.missing_label,
+                            voting='soft',
+                            random_state=0)
         clf_mdl.fit(X=self.X, y=self.y_missing_label)
         self.assertEqual(clf_mdl.score(self.X, self.y_true), score)
