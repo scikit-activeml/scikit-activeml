@@ -108,7 +108,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         self._clf = clone(self.clf)
 
         if self.ensemble_dict is None:
-            self.ensemble_dict = dict()
+            ensemble_dict = dict()
+        else:
+            ensemble_dict = self.ensemble_dict
 
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
@@ -162,9 +164,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             else:
                 ensemble = self.ensemble
             parameters = ensemble.__init__.__code__.co_varnames
-            if not isinstance(self.ensemble_dict, dict):
+            if not isinstance(ensemble_dict, dict):
                 raise TypeError("ensemble_dict is not a dictionary.")
-            ensemble_dict = self.ensemble_dict
             if 'base_estimator' in parameters:
                 ensemble_dict['base_estimator'] = self._clf
             self._clf = SklearnClassifier(
