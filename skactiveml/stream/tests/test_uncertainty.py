@@ -10,7 +10,7 @@ from .._uncertainty import FixedUncertainty, VariableUncertainty, Split
 class TestUncertainty (unittest.TestCase):
     
     def setUp(self):
-        # initialise valid data to test uncurtainty parameters
+        # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
         stream_length = 1000
         train_init_size = 10
@@ -81,12 +81,12 @@ class TestUncertainty (unittest.TestCase):
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         
     def _test_init_param_theta(self, query_strategy_name):
-        # theta must be defined as an float
+        # theta must be defined as a float
         query_strategy = query_strategy_name(clf=self.clf, theta="string")
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
     
     def _test_init_param_s(self, query_strategy_name):
-        # s must be defined as an float with a range of: 0 < s <= 1
+        # s must be defined as a float with a range of: 0 < s <= 1
         query_strategy = query_strategy_name(clf=self.clf, s="string")
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(clf=self.clf, s=1.1)
