@@ -31,10 +31,6 @@ class TestEpistemicUncertainty(unittest.TestCase):
         selector = EpistemicUncertainty(clf=self.clf, precompute=0)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
-    def test_init_param_missing_label(self):
-        selector = EpistemicUncertainty(clf=self.clf, missing_label='string')
-        self.assertTrue(hasattr(selector, 'missing_label'))
-
     def test_init_param_random_state(self):
         selector = EpistemicUncertainty(clf=self.clf, random_state='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs)
@@ -66,9 +62,9 @@ class TestEpistemicUncertainty(unittest.TestCase):
 
     def test_query_param_y(self):
         selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=None)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=self.X, y='string')
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=[])

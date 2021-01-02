@@ -15,11 +15,12 @@ from sklearn.utils import check_array
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model._logistic import _logistic_loss
 
-from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
+from ..base import SingleAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator, \
+    SkactivemlClassifier
 from ..utils import rand_argmax, is_labeled, MISSING_LABEL, check_X_y, \
     check_scalar, check_cost_matrix, simple_batch, check_random_state, \
     check_classes, ExtLabelEncoder
-from ..classifier import SklearnClassifier
+from ..classifier import SklearnClassifier, PWC
 
 
 class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
@@ -96,22 +97,20 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances of
             X_cand(if return_utilities=True).
         """
+        # Validate input parameters.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
 
-        # validation:
-        # check random state
-        random_state = check_random_state(self.random_state)
-
-        # Check if the argument return_utilities is valid
-        if not isinstance(return_utilities, bool):
-            raise TypeError(
-                '{} is an invalid type for return_utilities. Type {} is '
-                'expected'.format(type(return_utilities), bool))
-
-        # check X, y and X_cand
-        X, y, X_cand = check_X_y(X, y, X_cand, force_all_finite=False)
+        # Check if the attribute clf is valid
+        if not isinstance(self.clf, SkactivemlClassifier):
+            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
+                            'given type is {}. Use the wrapper in '
+                            'skactiveml.classifier to use a sklearn '
+                            'classifier/ensemble.'.format(type(self._clf)))
 
         # create precompute_array if necessary
-        if not isinstance(self.precompute, bool) or self.precompute is None:
+        if not isinstance(self.precompute, bool):
             raise TypeError(
                 '{} is an invalid type for precompute. Type {} is '
                 'expected'.format(type(self.precompute), bool))
@@ -119,22 +118,26 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             self.precompute_array = np.full((2, 2), np.nan)
 
         # fit the classifier and get the probabilities
+        # TODO
         clf = clone(self.clf)
         clf.fit(X, y)
 
         # checks for method=epistemic
-        if isinstance(clf, ClassFrequencyEstimator):
+        # TODO sklearn.neighbors.RadiusNeighborsClassifier ???
+        if isinstance(clf, PWC):
             utilities, self.precompute_array = epistemic_uncertainty_pwc(
                 clf, X_cand, self.precompute_array)
-        elif isinstance(clf, LogisticRegression):
+        elif isinstance(clf, SklearnClassifier) and \
+                isinstance(clf.estimator, LogisticRegression):
             mask_labeled = is_labeled(y, self.clf.missing_label)
             probas = clf.predict_proba(X_cand)
             utilities = epistemic_uncertainty_logreg(
                 X[mask_labeled], y[mask_labeled], self.clf, probas)
         else:
-            raise TypeError("'clf' must be a subclass of"
-                            "ClassFrequencyEstimator or"
-                                "LogisticRegression")
+            raise TypeError("'clf' must be from type PWC or "
+                            "a wrapped LogisticRegression classifier. "
+                            "The given is from type {}."
+                            "".format(type(self.clf)))
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
