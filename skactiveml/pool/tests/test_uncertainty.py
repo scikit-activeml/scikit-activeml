@@ -210,7 +210,7 @@ class TestExpectedAveragePrecision(unittest.TestCase):
         np.testing.assert_array_equal(scores, self.scores_val)
 
 
-class TestUncertaintyScoresn(unittest.TestCase):
+class TestUncertaintyScores(unittest.TestCase):
     def setUp(self):
         self.probas = np.array([[0.2, 0.5, 0.3], [0.1, 0.7, 0.2]])
         self.classes = np.array([0, 1, 2])

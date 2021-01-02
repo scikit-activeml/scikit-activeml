@@ -70,7 +70,6 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
         self.clf = clf
         self.precompute = precompute
-        self.precompute_array = None
 
     def query(self, X_cand, X, y, sample_weight=None,batch_size=1,
               return_utilities=False):
@@ -110,15 +109,7 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError('clf as to be from type SkactivemlClassifier. The #'
                             'given type is {}. Use the wrapper in '
                             'skactiveml.classifier to use a sklearn '
-                            'classifier/ensemble.'.format(type(self._clf)))
-
-        # create precompute_array if necessary
-        if not isinstance(self.precompute, bool):
-            raise TypeError(
-                '{} is an invalid type for precompute. Type {} is '
-                'expected'.format(type(self.precompute), bool))
-        if self.precompute and self.precompute_array is None:
-            self.precompute_array = np.full((2, 2), np.nan)
+                            'classifier/ensemble.'.format(type(self.clf)))
 
         # fit the classifier and get the probabilities
         clf = clone(self.clf)
@@ -127,8 +118,20 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         # checks for method=epistemic
         # TODO sklearn.neighbors.RadiusNeighborsClassifier ???
         if isinstance(clf, PWC):
-            utilities, self.precompute_array = epistemic_uncertainty_pwc(
-                clf, X_cand, self.precompute_array)
+            if not hasattr(self, 'precompute_array'):
+                self._precompute_array = None
+
+            # create precompute_array if necessary
+            if not isinstance(self.precompute, bool):
+                raise TypeError(
+                    '{} is an invalid type for precompute. Type {} is '
+                    'expected'.format(type(self.precompute), bool))
+            if self.precompute and self._precompute_array is None:
+                self._precompute_array = np.full((2, 2), np.nan)
+
+            freq = clf.predict_freq(X_cand)
+            utilities, self._precompute_array = epistemic_uncertainty_pwc(
+                freq, self._precompute_array)
         elif isinstance(clf, SklearnClassifier) and \
                 isinstance(clf.estimator, LogisticRegression):
             mask_labeled = is_labeled(y, clf.missing_label)
@@ -146,37 +149,52 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                             return_utilities=return_utilities)
 
 
-# epistemic uncertainty:
-def epistemic_uncertainty_pwc(clf, X_cand, precompute_array):
-    freq = clf.predict_freq(X_cand)
+# epistemic uncertainty scores:
+def epistemic_uncertainty_pwc(freq, precompute_array):
     n = freq[:, 0]
     p = freq[:, 1]
     res = np.full((len(freq)), np.nan)
     if precompute_array is not None:
         # enlarges the precompute_array array if necessary:
-        if precompute_array.shape[0] <= np.max(n) + 1:
-            new_shape = (int(np.max(n)) - precompute_array.shape[0] + 2, precompute_array.shape[1])
-            precompute_array = np.append(precompute_array, np.full(new_shape, np.nan), axis=0)
-        if precompute_array.shape[1] <= np.max(p) + 1:
-            new_shape = (precompute_array.shape[0], int(np.max(p)) - precompute_array.shape[1] + 2)
-            precompute_array = np.append(precompute_array, np.full(new_shape, np.nan), axis=1)
+        if precompute_array.shape[0] < np.max(n) + 1:
+            new_shape = (int(np.max(n)) - precompute_array.shape[0] + 2,
+                         precompute_array.shape[1])
+            old_shape = precompute_array.shape
+            precompute_array = np.append(precompute_array,
+                                         np.full(new_shape, np.nan), axis=0)
+        if precompute_array.shape[1] < np.max(p) + 1:
+            new_shape = (precompute_array.shape[0],
+                         int(np.max(p)) - precompute_array.shape[1] + 2)
+            precompute_array = np.append(precompute_array,
+                                         np.full(new_shape, np.nan), axis=1)
 
-        for f in freq:
-            # compute the epistemic uncertainty:
-            for N in range(precompute_array.shape[0]):
-                for P in range(precompute_array.shape[1]):
-                    if np.isnan(precompute_array[N, P]):
-                        pi1 = -minimize_scalar(_epistemic_pwc_sup_1, method='Bounded', bounds=(0.0, 1.0),
-                                               args=(N, P)).fun
-                        pi0 = -minimize_scalar(_epistemic_pwc_sup_0, method='Bounded', bounds=(0.0, 1.0),
-                                               args=(N, P)).fun
-                        pi = np.array([pi0, pi1])
-                        precompute_array[N, P] = np.min(pi, axis=0)
+        # precompute the epistemic uncertainty:
+        for N in range(precompute_array.shape[0]):
+            for P in range(precompute_array.shape[1]):
+                if np.isnan(precompute_array[N, P]):
+                    pi1 = -minimize_scalar(
+                        _epistemic_pwc_sup_1, method='Bounded',
+                        bounds=(0.0, 1.0), args=(N, P)
+                    ).fun
+
+                    pi0 = -minimize_scalar(
+                        _epistemic_pwc_sup_0, method='Bounded',
+                        bounds=(0.0, 1.0), args=(N, P)
+                    ).fun
+
+                    pi = np.array([pi0, pi1])
+                    precompute_array[N, P] = np.min(pi, axis=0)
         res = _interpolate(precompute_array, freq)
     else:
         for i, f in enumerate(freq):
-            pi1 = -minimize_scalar(_epistemic_pwc_sup_1, method='Bounded', bounds=(0.0, 1.0), args=(f[0], f[1])).fun
-            pi0 = -minimize_scalar(_epistemic_pwc_sup_0, method='Bounded', bounds=(0.0, 1.0), args=(f[0], f[1])).fun
+            pi1 = -minimize_scalar(
+                _epistemic_pwc_sup_1, method='Bounded', bounds=(0.0, 1.0),
+                args=(f[0], f[1])).fun
+
+            pi0 = -minimize_scalar(
+                _epistemic_pwc_sup_0, method='Bounded', bounds=(0.0, 1.0),
+                args=(f[0], f[1])).fun
+
             pi = np.array([pi0, pi1])
             res[i] = np.min(pi, axis=0)
     return res, precompute_array
@@ -184,7 +202,9 @@ def epistemic_uncertainty_pwc(clf, X_cand, precompute_array):
 
 # bilinear interpolation for epistemic_uncertainty_pwc
 def _interpolate(precompute_array, freq):
-    points = np.zeros((precompute_array.shape[0] * precompute_array.shape[1], 2))
+    points = np.zeros(
+        (precompute_array.shape[0] * precompute_array.shape[1], 2)
+    )
     for n in range(precompute_array.shape[0]):
         for p in range(precompute_array.shape[1]):
             points[n * precompute_array.shape[1] + p] = n, p
@@ -192,19 +212,21 @@ def _interpolate(precompute_array, freq):
 
 
 # support 1 for epistemic_uncertainty_pwc
-def _epistemic_pwc_sup_1(t, n, p):
+def _epistemic_pwc_sup_1(theta, n, p):
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((t ** p) * ((1 - t) ** n)) / (((p / (n + p)) ** p) * ((n / (n + p)) ** n))
-    return -np.minimum(piH, 2 * t - 1)
+    piH = ((theta ** p) * ((1 - theta) ** n)) / \
+          (((p / (n + p)) ** p) * ((n / (n + p)) ** n))
+    return -np.minimum(piH, 2 * theta - 1)
 
 
-# support 1 for epistemic_uncertainty_pwc
-def _epistemic_pwc_sup_0(t, n, p):
+# support 0 for epistemic_uncertainty_pwc
+def _epistemic_pwc_sup_0(theta, n, p):
     if ((n == 0.0) and (p == 0.0)):
         return -1.0
-    piH = ((t ** p) * ((1 - t) ** n)) / (((p / (n + p)) ** p) * ((n / (n + p)) ** n))
-    return -np.minimum(piH, 1 - 2 * t)
+    piH = ((theta ** p) * ((1 - theta) ** n)) / \
+          (((p / (n + p)) ** p) * ((n / (n + p)) ** n))
+    return -np.minimum(piH, 1 - 2 * theta)
 
 
 # logistic regression epistemic_uncertainty_logreg
@@ -220,7 +242,8 @@ def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
     for i, x in enumerate(X_cand):
         Qn = np.linspace(0.0, 0.5, num=50, endpoint=False)
         Qp = np.linspace(0.5, 1.0, num=50, endpoint=False)
-        pi1[i], pi0[i] = np.maximum(2 * probas[i] - 1, 0), np.maximum(1 - 2 * probas[i], 0)
+        pi1[i] = np.maximum(2 * probas[i] - 1, 0)
+        pi0[i] = np.maximum(1 - 2 * probas[i], 0)
         #
         A = np.insert(x, len(x), 1)
         for q in range(100):
@@ -230,15 +253,20 @@ def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
                 # solve 22 -> theta
                 bounds = np.log(alpha_p / (1 - alpha_p))
                 constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
-                theta = minimize(loglike_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(X, y)).x  #
-                pi1[i] = np.maximum(pi1[i], np.min(pi_h(theta, L_ml, X, y), 2 * alpha_p - 1))
+                theta = minimize(loglike_logreg, x0=x0, method='SLSQP',
+                                 constraints=constraints, args=(X, y)).x  #
+                pi1[i] = np.maximum(
+                    pi1[i], np.min(pi_h(theta, L_ml, X, y), 2 * alpha_p - 1)
+                )
             if 1 - 2 * alpha_n > pi0[i]:
                 # solve 22 -> theta
                 bounds = np.log(alpha_p / (1 - alpha_p))
                 constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
-                theta = minimize(loglike_logreg, x0=x0, method='SLSQP', constraints=constraints, args=(X, y)).x  #
-                pi0[i] = np.maximum(pi0[i], np.min(pi_h(theta, L_ml, X, y), 1 - 2 * alpha_n))
-
+                theta = minimize(loglike_logreg, x0=x0, method='SLSQP',
+                                 constraints=constraints, args=(X, y)).x  #
+                pi0[i] = np.maximum(
+                    pi0[i], np.min(pi_h(theta, L_ml, X, y), 1 - 2 * alpha_n)
+                )
             Qn, Qp = np.delete(Qn, idx_an), np.delete(Qp, idx_ap)
 
     utilities = np.min(np.array([pi0, pi1]), axis=1)
@@ -246,6 +274,7 @@ def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
 
 
 def loglike_logreg(theta, X, y, gamma=1):
+    # TODO sample_weights ???
     return -_logistic_loss(theta, X, y, gamma, sample_weight=None)
 
 
