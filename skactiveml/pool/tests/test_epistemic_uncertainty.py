@@ -71,6 +71,17 @@ class TestEpistemicUncertainty(unittest.TestCase):
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=self.y[0:-1])
 
+    def test_query_param_sample_weight(self):
+        selector = EpistemicUncertainty(clf=self.clf)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          sample_weight='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=self.X_cand)
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.empty((len(self.X) - 1)))
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.empty((len(self.X) + 1)))
+
     def test_query_param_batch_size(self):
         selector = EpistemicUncertainty(clf=self.clf)
         self.assertRaises(TypeError, selector.query, **self.kwargs,

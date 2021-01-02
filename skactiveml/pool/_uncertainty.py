@@ -81,7 +81,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         y : np.array
             The labels of the labeled pool X.
         sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights.
+            Sample weights for X, used to fit the clf.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)

@@ -72,7 +72,8 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         self.precompute = precompute
         self.precompute_array = None
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False):
+    def query(self, X_cand, X, y, sample_weight=None,batch_size=1,
+              return_utilities=False):
         """
         Queries the next instance to be labeled.
 
@@ -84,6 +85,8 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             The labeled pool used to fit the classifier.
         y : np.array
             The labels of the labeled pool X.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)
@@ -118,9 +121,8 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             self.precompute_array = np.full((2, 2), np.nan)
 
         # fit the classifier and get the probabilities
-        # TODO
         clf = clone(self.clf)
-        clf.fit(X, y)
+        clf.fit(X, y, sample_weight=sample_weight)
 
         # checks for method=epistemic
         # TODO sklearn.neighbors.RadiusNeighborsClassifier ???
@@ -129,10 +131,10 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                 clf, X_cand, self.precompute_array)
         elif isinstance(clf, SklearnClassifier) and \
                 isinstance(clf.estimator, LogisticRegression):
-            mask_labeled = is_labeled(y, self.clf.missing_label)
+            mask_labeled = is_labeled(y, clf.missing_label)
             probas = clf.predict_proba(X_cand)
             utilities = epistemic_uncertainty_logreg(
-                X[mask_labeled], y[mask_labeled], self.clf, probas)
+                X[mask_labeled], y[mask_labeled], clf, probas)
         else:
             raise TypeError("'clf' must be from type PWC or "
                             "a wrapped LogisticRegression classifier. "
