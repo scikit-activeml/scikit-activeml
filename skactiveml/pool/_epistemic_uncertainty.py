@@ -64,11 +64,9 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         Discovery Science. Springer, Cham, 2019.
     """
 
-    def __init__(self, clf, precompute=False, missing_label=MISSING_LABEL,
-                 random_state=None):
+    def __init__(self, clf, precompute=False, random_state=None):
         super().__init__(random_state=random_state)
 
-        self.missing_label = missing_label
         self.clf = clf
         self.precompute = precompute
         self.precompute_array = None
@@ -129,8 +127,7 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             utilities, self.precompute_array = epistemic_uncertainty_pwc(
                 clf, X_cand, self.precompute_array)
         elif isinstance(clf, LogisticRegression):
-            #return NotImplemented
-            mask_labeled = is_labeled(y, self.missing_label)
+            mask_labeled = is_labeled(y, self.clf.missing_label)
             probas = clf.predict_proba(X_cand)
             utilities = epistemic_uncertainty_logreg(
                 X[mask_labeled], y[mask_labeled], self.clf, probas)
@@ -142,6 +139,7 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
+
 
 # epistemic uncertainty:
 def epistemic_uncertainty_pwc(clf, X_cand, precompute_array):
