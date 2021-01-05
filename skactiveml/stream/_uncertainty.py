@@ -12,7 +12,7 @@ from ._random import RandomSampler
 
 import copy
 
-from .budget_manager import FixedBudget
+from .budget_manager import EstimatedBudget
 
 
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -43,7 +43,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -98,9 +98,13 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
-                raise ValueError("clf is not a classifier. Please refer to " +
+                raise TypeError("clf is not a classifier. Please refer to " +
                                  "sklearn.base.is_classifier")
             clf.fit(X, y)
+            # check if y is not multi dimensinal
+            if isinstance(y, np.ndarray):
+                if y.ndim > 1:
+                    raise ValueError("{} is not a valid Value for y")
         else:
             clf = self.clf
         predict_proba = clf.predict_proba(X_cand)
@@ -113,8 +117,10 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         # to scale this inequation to the desired range, i.e., utilities
         # higher than 1-budget should lead to sampling the instance, we use
         # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-        utilities = theta + (1 - budget) - y_hat
-
+        # utilities = theta + (1 - budget) - y_hat
+        
+        utilities = y_hat <= theta
+        
         sampled_indices = self.budget_manager_.sample(utilities,
                                                       simulate=simulate)
 
@@ -176,14 +182,14 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
                  theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
         self.theta = theta
         self.s = s
-
+    
     def query(self, X_cand, X, y, return_utilities=False, simulate=False,
               **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -219,6 +225,12 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # ckeck if s a float and in range (0,1]
+        if not isinstance(self.s, float):
+            raise TypeError("{} is not a valid type for s")
+        if self.s <= 0 or self.s > 1.0:
+            raise ValueError("The value of s is incorrect." +
+                             " s must be defined in range (0,1]")
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
@@ -233,14 +245,20 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
-                raise ValueError("clf is not a classifier. Please refer to " +
+                raise TypeError("clf is not a classifier. Please refer to " +
                                  "sklearn.base.is_classifier")
             clf.fit(X, y)
+            # check if y is not multi dimensinal
+            if isinstance(y, np.ndarray):
+                if y.ndim > 1:
+                    raise ValueError("{} is not a valid Value for y")
         else:
             clf = self.clf
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-
+        # check if theta is set
+        if not isinstance(self.theta, float):
+            raise TypeError("{} is not a valid type for theta")
         predict_proba = clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
         budget = getattr(self.budget_manager_, "budget_", 0)
@@ -256,7 +274,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             # to scale this inequation to the desired range, i.e., utilities
             # higher than 1-budget should lead to sampling the instance, we use
             # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-            utilities.append(tmp_theta + (1 - budget) - y_)
+            utilities.append(y_ <= tmp_theta)
             sampled, budget_left = self.budget_manager_.sample(
                 utilities,
                 simulate=True,
@@ -338,7 +356,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedBudget(), v=0.1,
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(), v=0.1,
                  theta=1.0, s=0.01, random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -346,7 +364,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         self.s = s
         self.v = v
         self.theta = theta
-
+    
     def query(self, X_cand, X, y, return_utilities=False, simulate=False,
               **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -382,6 +400,12 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
+        # ckeck if v is a float and in range (0,1]
+        if not isinstance(self.v, float):
+            raise TypeError("{} is not a valid type for s")
+        if self.v <= 0 or self.v >= 1:
+            raise ValueError("The value of v is incorrect." +
+                             " v must be defined in range (0,1)")
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
@@ -396,9 +420,13 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
-                raise ValueError("clf is not a classifier. Please refer to " +
+                raise TypeError("clf is not a classifier. Please refer to " +
                                  "sklearn.base.is_classifier")
             clf.fit(X, y)
+            # check if y is not multi dimensinal
+            if isinstance(y, np.ndarray):
+                if y.ndim > 1:
+                    raise ValueError("{} is not a valid Value for y.")
         else:
             clf = self.clf
 

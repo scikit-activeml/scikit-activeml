@@ -6,5 +6,6 @@ learning settings.
 
 from .base import BudgetManager
 from ._fixed_budget import FixedBudget
+from ._estimated_budget import EstimatedBudget
 
-__all__ = ['BudgetManager', 'FixedBudget']
+__all__ = ['BudgetManager', 'FixedBudget', 'EstimatedBudget']
