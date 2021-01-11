@@ -27,8 +27,8 @@ class EstimatedBudget(BudgetManager):
         Specifies the size of the memory window. Controlles the budget in the 
         last w steps taken. Default = 100
     """
-    def __init__(self, budget=None, w=100):
-        super().__init__(budget)
+    def __init__(self, budget=None, theta=None, s=None, w=100):
+        super().__init__(budget, theta, s)
         self.w = w
 
     def is_budget_left(self):
@@ -49,8 +49,8 @@ class EstimatedBudget(BudgetManager):
         
         return self.budget_ > self.u_t_/self.w
 
-    def sample(self, utilities, simulate=False, return_budget_left=False,
-               **kwargs):
+    def sample(self, y_hat, simulate=False, return_budget_left=False,
+               return_utilities=False, use_theta=True, **kwargs):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
 
@@ -82,15 +82,41 @@ class EstimatedBudget(BudgetManager):
         """
         # check if budget has been set
         self._validate_budget(get_default_budget())
+        if not hasattr(self, "theta_"):
+            self.theta_ = self.theta
+        # check if theta is set
+        if not isinstance(self.theta, float) and self.theta is not None:
+            raise TypeError("{} is not a valid type for theta")
+        # ckeck if s a float and in range (0,1]
+        if self.s is not None:
+                if not isinstance(self.s, float):
+                    raise TypeError("{} is not a valid type for s")
+                if self.s <= 0 or self.s > 1.0:
+                    raise ValueError("The value of s is incorrect." +
+                                     " s must be defined in range (0,1]")
+        
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, 'u_t_'):
             self.u_t_ = 0
         # intialise return parameters
+        utilities = []
         sampled_indices = []
         budget_left = []
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
-        
+        tmp_theta = self.theta
+        # get utilities
+        for y_ in y_hat:
+                # the original inequation is:
+                # sample_instance: True if y < theta_t
+                # to scale this inequation to the desired range, i.e., utilities
+                # higher than 1-budget should lead to sampling the instance, we use
+                # sample_instance: True if 1-budget < theta_t + (1-budget) - y
+                if tmp_theta is not None and use_theta:
+                    utilities.append(y_ <= tmp_theta)
+                else:
+                    utilities.append(y_)
+
         # check for each sample separately if budget is left and the utility is
         # high enough
         for i , d in enumerate(utilities) :
@@ -103,15 +129,33 @@ class EstimatedBudget(BudgetManager):
             if d:
                 sampled_indices.append(i)
         
+        # calculate theta for Varuncertainty
+        for y_ in y_hat:
+                if self.s is not None:
+                    #tmp_theata = self.calculate_var_theta(budget_left, sampled_indices)
+                    if budget_left[-1] and use_theta:
+                        if len(sampled_indices):
+                            tmp_theta = tmp_theta * (1-self.s)
+                        else:
+                            tmp_theta = tmp_theta * (1+self.s)
+        
         # set the internal state to the previous values
         if not simulate:
             self.u_t_ = tmp_u_t
+            self.theta_ = tmp_theta
             
-        # check if budget_left should be returned
-        if return_budget_left:
-            return sampled_indices, budget_left
+        # check if budget_left and utilities should be returned
+        if return_utilities:
+            if return_budget_left:
+                return sampled_indices, budget_left, utilities
+            else:
+                return sampled_indices, utilities
         else:
-            return sampled_indices
+            if return_budget_left:
+                return sampled_indices, budget_left
+            else:
+                return sampled_indices
+        
 
     def update(self, sampled, **kwargs):
         """Updates the budget manager.

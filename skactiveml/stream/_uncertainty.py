@@ -43,7 +43,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(theta=0.0),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -110,19 +110,13 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         predict_proba = clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
         num_classes = predict_proba.shape[1]
+        # since budget is not initialised
         budget = getattr(self.budget_manager_, "budget_", 0)
-        theta = 1/num_classes + budget*(1-1/num_classes)
-        # the original inequation is:
-        # sample_instance: True if y < theta_t
-        # to scale this inequation to the desired range, i.e., utilities
-        # higher than 1-budget should lead to sampling the instance, we use
-        # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-        # utilities = theta + (1 - budget) - y_hat
         
-        utilities = y_hat <= theta
-        
-        sampled_indices = self.budget_manager_.sample(utilities,
-                                                      simulate=simulate)
+        # calculate theta with num_classes
+        self.budget_manager_.calculate_fixed_theta(num_classes, budget)
+        sampled_indices, utilities = self.budget_manager_.sample(y_hat,
+                                                      simulate=simulate, return_utilities=True)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -182,13 +176,11 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=EstimatedBudget(),
-                 theta=1.0, s=0.01, random_state=None):
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(theta=1.0, s=0.01),
+                 random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
-        self.theta = theta
-        self.s = s
     
     def query(self, X_cand, X, y, return_utilities=False, simulate=False,
               **kwargs):
@@ -225,12 +217,6 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # ckeck if s a float and in range (0,1]
-        if not isinstance(self.s, float):
-            raise TypeError("{} is not a valid type for s")
-        if self.s <= 0 or self.s > 1.0:
-            raise ValueError("The value of s is incorrect." +
-                             " s must be defined in range (0,1]")
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
@@ -254,44 +240,22 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
                     raise ValueError("{} is not a valid Value for y")
         else:
             clf = self.clf
-        if not hasattr(self, "theta_"):
-            self.theta_ = self.theta
-        # check if theta is set
-        if not isinstance(self.theta, float):
-            raise TypeError("{} is not a valid type for theta")
         predict_proba = clf.predict_proba(X_cand)
         y_hat = np.max(predict_proba, axis=1)
-        budget = getattr(self.budget_manager_, "budget_", 0)
-
-        tmp_theta = self.theta_
 
         utilities = []
         sampled_indices = []
-
-        for y_ in y_hat:
-            # the original inequation is:
-            # sample_instance: True if y < theta_t
-            # to scale this inequation to the desired range, i.e., utilities
-            # higher than 1-budget should lead to sampling the instance, we use
-            # sample_instance: True if 1-budget < theta_t + (1-budget) - y
-            utilities.append(y_ <= tmp_theta)
-            sampled, budget_left = self.budget_manager_.sample(
-                utilities,
-                simulate=True,
-                return_budget_left=True
-            )
-            sampled_indices.append(sampled)
-            if budget_left[-1]:
-                if len(sampled):
-                    tmp_theta = tmp_theta * (1-self.s)
-                else:
-                    tmp_theta = tmp_theta * (1+self.s)
-
-        if not simulate:
-            self.theta_ = tmp_theta
-
+        #not completed
+        sampled_indices, budget_left, utilities = self.budget_manager_.sample(
+                 y_hat,
+                 simulate=False,
+                 return_budget_left=True,
+                 return_utilities=True
+             )
+        #not completed
         sampled_indices = self.budget_manager_.sample(utilities,
-                                                      simulate=simulate)
+                                                      simulate=simulate,
+                                                      use_theta=False)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -356,14 +320,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=EstimatedBudget(), v=0.1,
-                 theta=1.0, s=0.01, random_state=None):
+    def __init__(self, clf=None, budget_manager=EstimatedBudget(theta=1.0, s=0.01), v=0.1,
+                 random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
-        self.s = s
+        #self.s = s
         self.v = v
-        self.theta = theta
+        #self.theta = theta
     
     def query(self, X_cand, X, y, return_utilities=False, simulate=False,
               **kwargs):
@@ -438,8 +402,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             self.variable_uncertainty_ = VariableUncertainty(
                 clf,
                 self.budget_manager_,
-                theta=self.theta,
-                s=self.s,
                 random_state=self.random_state_.randint(2**31-1))
         # copy random state in case of simulating the query
         prior_random_state_state = self.random_state_.get_state()

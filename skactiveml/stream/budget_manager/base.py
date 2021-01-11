@@ -16,8 +16,11 @@ class BudgetManager(ABC, BaseEstimator):
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
     """
-    def __init__(self, budget):
+    def __init__(self, budget, theta, s):
         self.budget = budget
+        self.theta = theta
+        self.s = s
+        
 
     @abstractmethod
     def is_budget_left(self):
@@ -38,7 +41,7 @@ class BudgetManager(ABC, BaseEstimator):
 
     @abstractmethod
     def sample(self, utilities, return_budget_left=True, simulate=False,
-               **kwargs):
+               return_utilities=False, use_theta=True, **kwargs):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
 
@@ -101,6 +104,21 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = default
         check_scalar(self.budget_, 'budget',
                      np.float, min_val=0.0, max_val=1.0)
+                    
+    def calculate_fixed_theta(self, num_classes, budget):
+        """calculate theta for Fixeduncertainty and returns theta
+        
+        Parameters
+        ----------
+        num_classes : int
+            the number of classes is used to calculate theta
+            
+        budget : float
+            
+        """
+        self.theta = 1/num_classes + budget*(1-1/num_classes)
+        
+        
 
 
 def get_default_budget():
