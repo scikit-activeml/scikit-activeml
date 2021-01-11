@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
 
+from sklearn.datasets import make_blobs
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor, \
     GaussianProcessClassifier
@@ -135,10 +136,10 @@ class TestQBC(unittest.TestCase):
     def test_query(self):
         # clf
         selector = QBC(clf=SklearnClassifier(GaussianProcessClassifier(),
-                                                classes=self.classes))
+                                             classes=self.classes))
         selector.query(**self.kwargs)
         selector = QBC(clf=SklearnClassifier(BaggingClassifier(),
-                                                classes=self.classes))
+                                             classes=self.classes))
         selector.query(**self.kwargs)
 
         # ensemble
@@ -149,9 +150,11 @@ class TestQBC(unittest.TestCase):
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier)
         selector.query(**self.kwargs)
 
-        clf = SklearnClassifier(BaggingClassifier())
+        clf = PWC()
         selector = QBC(clf)
         selector.query(**self.kwargs)
+        estimators = selector._clf.estimators_
+        self.assertTrue(type(clf) == type(estimators[0]))
 
         # ensemble_dict
         selector = QBC(clf=self.clf, ensemble=RandomForestClassifier,
