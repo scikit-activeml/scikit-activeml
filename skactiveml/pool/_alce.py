@@ -7,11 +7,13 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import euclidean_distances
 from sklearn.neighbors import NearestNeighbors
+from sklearn.svm import SVR
 from sklearn.utils import check_array, check_symmetric
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.utils import simple_batch, check_classifier_params, \
-    MISSING_LABEL, check_scalar, check_random_state, check_X_y
+    MISSING_LABEL, check_scalar, check_random_state, check_X_y, is_labeled, \
+    ExtLabelEncoder
 
 
 class ALCE(SingleAnnotPoolBasedQueryStrategy):
@@ -22,8 +24,8 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    base_regressor : sklearn regressor
     classes: array-like, shape(n_classes)
+    base_regressor : sklearn regressor, optional (default=None)
     cost_matrix: array-like, shape (n_classes, n_classes),
                  optional (default=None)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
@@ -48,8 +50,8 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
     """
 
     def __init__(self,
-                 base_regressor,
                  classes,
+                 base_regressor=None,
                  cost_matrix=None,
                  embed_dim=None,
                  sample_weight=None,
@@ -58,8 +60,8 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
                  nn_params=None,
                  random_state=None):
         super().__init__(random_state=random_state)
-        self.base_regressor = base_regressor
         self.classes = classes
+        self.base_regressor = base_regressor
         self.cost_matrix = cost_matrix
         self.embed_dim = embed_dim
         self.sample_weight = sample_weight
@@ -159,6 +161,8 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
           sample_weight, missing_label, random_state, mds_params, nn_params):
     # Check base regressor
+    if base_regressor is None:
+        base_regressor = SVR()
     if not isinstance(base_regressor, RegressorMixin):
         raise TypeError("'base_regressor' must be an sklearn regressor")
     check_classifier_params(classes, missing_label, cost_matrix)
@@ -175,10 +179,17 @@ def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
         missing_label=missing_label
     )
 
-    # Check if all labels in y are valid classes
-    if not set(y) <= set(classes):
-        raise ValueError("y has labels that are not contained in "
-                         "'classes'")
+    labeled = is_labeled(y, missing_label=missing_label)
+    y = ExtLabelEncoder(classes, missing_label).fit_transform(y)
+    X = X[labeled]
+    y = y[labeled].astype(int)
+    sample_weight = sample_weight[labeled]
+
+    # If all samples are unlabeled, the strategy randomly selects an instance
+    if len(X) == 0:
+        warnings.warn("There are no labeled instances. The strategy selects "
+                      "one random instance.")
+        return np.ones(len(X_cand))
 
     # Check embedding dimension
     embed_dim = len(classes) if embed_dim is None else embed_dim
