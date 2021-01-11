@@ -88,9 +88,9 @@ class TestEpistemicUncertainty(unittest.TestCase):
 
     def test_query_param_y(self):
         selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=None)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y='string')
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=self.X, y=[])
@@ -99,7 +99,7 @@ class TestEpistemicUncertainty(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=self.X_cand)
@@ -128,6 +128,7 @@ class TestEpistemicUncertainty(unittest.TestCase):
         self.assertRaises(TypeError, selector.query, **self.kwargs,
                           return_utilities=0)
 
+    # tests for epistemic PWC
     def test_interpolate(self):
         interpolated = _interpolate(np.array([[0, 0], [1, 1]]),
                                     np.array([[0.5, 0.5]]))
@@ -139,7 +140,6 @@ class TestEpistemicUncertainty(unittest.TestCase):
         self.assertAlmostEqual(0.36, -_epistemic_pwc_sup_1(0.9, 1, 1))
         self.assertEqual(-0.8, -_epistemic_pwc_sup_1(0.1, 1, 1))
 
-
     def test_epistemic_pwc_sup_0(self):
         self.assertEqual(1.0, -_epistemic_pwc_sup_0(None, 0.0, 0.0))
         self.assertEqual(-1.0, -_epistemic_pwc_sup_0(1, 0.5, 0.8))
@@ -149,8 +149,8 @@ class TestEpistemicUncertainty(unittest.TestCase):
     def test_epistemic_uncertainty_pwc(self):
         freq = np.empty((121, 2))
         for n in range(11):
-         for p in range(11):
-             freq[n * 11 + p] = n, p
+            for p in range(11):
+                freq[n * 11 + p] = n, p
 
         indices = [39, 27, 18, 68, 20]
         expected = np.array([0.23132135217407046,
@@ -173,9 +173,20 @@ class TestEpistemicUncertainty(unittest.TestCase):
         np.testing.assert_array_equal(
             val_utilities, precompute_array[:11, :11].flatten())
 
-    def test_query(self):
+    # tests for epistemic logistic regression
+    def _loglike_logreg(self):
         pass
-        # TODO has to be revised
+        # TODO
+
+    def _pi_h(self):
+        pass
+        # TODO
+
+    def epistemic_uncertainty_logreg(self):
+        pass
+        # TODO
+
+    def test_query(self):
         selector = EpistemicUncertainty(clf=self.clf)
 
         # return_utilities
@@ -190,14 +201,28 @@ class TestEpistemicUncertainty(unittest.TestCase):
         best_idx = selector.query(**self.kwargs, batch_size=bs)
         self.assertEqual(bs, len(best_idx))
 
-        # query
-        selector = EpistemicUncertainty(
-            clf=PWC(classes=self.classes, random_state=self.random_state)
-        )
+        # query - PWC
+        clf = PWC(classes=self.classes, random_state=self.random_state)
+        selector = EpistemicUncertainty(clf=clf)
         selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
-        #selector = EpistemicUncertainty(clf=LogisticRegression)
-        #selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
+        best_indices, utilities = selector.query(**self.kwargs,
+                                                 return_utilities=True)
+        self.assertEqual(utilities.shape, (1, len(self.X_cand)))
+        self.assertEqual(best_indices.shape, (1,))
+
+        # query - logistic regression
+        clf = SklearnClassifier(
+            LogisticRegression(), classes=self.classes,
+            random_state=self.random_state
+        )
+        selector = EpistemicUncertainty(clf=clf)
+        #selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL]) TODO
+
+        best_indices, utilities = selector.query(**self.kwargs,
+                                                 return_utilities=True)
+        self.assertEqual(utilities.shape, (1, len(self.X_cand)))
+        self.assertEqual(best_indices.shape, (1,))
 
 
 if __name__ == '__main__':

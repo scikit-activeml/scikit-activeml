@@ -71,7 +71,7 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         self.clf = clf
         self.precompute = precompute
 
-    def query(self, X_cand, X, y, sample_weight=None,batch_size=1,
+    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
               return_utilities=False):
         """
         Queries the next instance to be labeled.
@@ -104,12 +104,15 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
 
+        X, y, sample_weight = check_X_y(X, y, sample_weight)
+
         # Check if the attribute clf is valid
         if not isinstance(self.clf, SkactivemlClassifier):
-            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
-                            'given type is {}. Use the wrapper in '
-                            'skactiveml.classifier to use a sklearn '
-                            'classifier/ensemble.'.format(type(self.clf)))
+            raise TypeError(
+                'clf as to be from type SkactivemlClassifier. The #'
+                'given type is {}. Use the wrapper in '
+                'skactiveml.classifier to use a sklearn '
+                'classifier/ensemble.'.format(type(self.clf)))
 
         # fit the classifier and get the probabilities
         clf = clone(self.clf)
@@ -136,8 +139,10 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                 isinstance(clf.estimator, LogisticRegression):
             mask_labeled = is_labeled(y, clf.missing_label)
             probas = clf.predict_proba(X_cand)
-            utilities = epistemic_uncertainty_logreg(
-                X[mask_labeled], y[mask_labeled], clf, probas)
+            utilities = epistemic_uncertainty_logreg(X_cand=X_cand,
+                                                     X=X[mask_labeled],
+                                                     y=y[mask_labeled],
+                                                     clf=clf, probas=probas)
         else:
             raise TypeError("'clf' must be from type PWC or "
                             "a wrapped LogisticRegression classifier. "
@@ -151,6 +156,10 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
 # epistemic uncertainty scores:
 def epistemic_uncertainty_pwc(freq, precompute_array):
+    if freq.shape[1] != 2:
+        raise ValueError('epistemic is only implemented for two-class '
+                         'problems, {} classes were given.'
+                         ''.format(freq.shape[1]))
     n = freq[:, 0]
     p = freq[:, 1]
     res = np.full((len(freq)), np.nan)
@@ -232,52 +241,57 @@ def _epistemic_pwc_sup_0(theta, n, p):
 # logistic regression epistemic_uncertainty_logreg
 # alg 3
 def epistemic_uncertainty_logreg(X_cand, X, y, clf, probas):
+    if len(clf.classes) != 2:
+        raise ValueError('epistemic is only implemented for two-class '
+                         'problems, {} classes were given.'
+                         ''.format(len(clf.classes)))
     # calculate the maximum likelihood of the logistic function
-    theta_ml = np.insert(clf.coef_, len(X), clf.intercept_, axis=0)
-    L_ml = np.exp(loglike_logreg(theta_ml, X, y, gamma=1))
+    theta_ml = np.append(clf.coef_, clf.intercept_).flatten()
+    L_ml = np.exp(-_loglike_logreg(theta_ml, X, y, gamma=1))
     #
-    x0 = np.zeros((X_cand.shape[1]+1))  #
+    x0 = np.zeros((X_cand.shape[1] + 1))  #
     # compute pi0, pi1 for every x in X_cand:
-    pi0, pi1 = np.empty((len(probas))), np.empty((len(probas)))
+    pi1 = np.maximum(2 * probas[:, 0] - 1, 0)
+    pi0 = np.maximum(1 - 2 * probas[:, 0], 0)
     for i, x in enumerate(X_cand):
-        Qn = np.linspace(0.0, 0.5, num=50, endpoint=False)
+        Qn = np.linspace(0.01, 0.5, num=50, endpoint=True)
         Qp = np.linspace(0.5, 1.0, num=50, endpoint=False)
-        pi1[i] = np.maximum(2 * probas[i] - 1, 0)
-        pi0[i] = np.maximum(1 - 2 * probas[i], 0)
         #
-        A = np.insert(x, len(x), 1)
-        for q in range(100):
-            idx_an, idx_ap = np.argmin(Qn), np.argmax(Qp)
-            alpha_n, alpha_p = Qn[idx_an], Qp[idx_ap]
+        A = np.append(x, 1)  # used for the LinearConstraint
+        for q in range(50):
+            alpha_n, alpha_p = Qn[0], Qp[-1]
             if 2 * alpha_p - 1 > pi1[i]:
                 # solve 22 -> theta
                 bounds = np.log(alpha_p / (1 - alpha_p))
                 constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
-                theta = minimize(loglike_logreg, x0=x0, method='SLSQP',
+                theta = minimize(_loglike_logreg, x0=x0, method='SLSQP',
                                  constraints=constraints, args=(X, y)).x  #
                 pi1[i] = np.maximum(
-                    pi1[i], np.min(pi_h(theta, L_ml, X, y), 2 * alpha_p - 1)
+                    pi1[i], np.minimum(_pi_h(theta=theta, L_ml=L_ml, X=X, y=y),
+                                       2 * alpha_p - 1)
                 )
             if 1 - 2 * alpha_n > pi0[i]:
                 # solve 22 -> theta
-                bounds = np.log(alpha_p / (1 - alpha_p))
+                bounds = np.log(alpha_n / (1 - alpha_n))
                 constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
-                theta = minimize(loglike_logreg, x0=x0, method='SLSQP',
+                theta = minimize(_loglike_logreg, x0=x0, method='SLSQP',
                                  constraints=constraints, args=(X, y)).x  #
                 pi0[i] = np.maximum(
-                    pi0[i], np.min(pi_h(theta, L_ml, X, y), 1 - 2 * alpha_n)
+                    pi0[i], np.minimum(_pi_h(theta=theta, L_ml=L_ml, X=X, y=y),
+                                       1 - 2 * alpha_n)
                 )
-            Qn, Qp = np.delete(Qn, idx_an), np.delete(Qp, idx_ap)
+            Qn, Qp = np.delete(Qn, 0), np.delete(Qp, -1)
 
-    utilities = np.min(np.array([pi0, pi1]), axis=1)
+    utilities = np.min(np.array([pi0, pi1]), axis=0)
+    print(utilities)
     return utilities
 
 
-def loglike_logreg(theta, X, y, gamma=1):
-    # TODO sample_weights ???
-    return -_logistic_loss(theta, X, y, gamma, sample_weight=None)
-
-
-def pi_h(theta, L_ml, X, y, gamma=1):
-    L_theta = np.exp(loglike_logreg(theta, X, y, gamma))
+def _pi_h(theta, L_ml, X, y, gamma=1):
+    L_theta = np.exp(-_loglike_logreg(theta, X, y, gamma))
     return L_theta / L_ml
+
+
+def _loglike_logreg(theta, X, y, gamma=1):
+    # TODO sample_weights ???
+    return _logistic_loss(theta, X, y, gamma, sample_weight=None)
