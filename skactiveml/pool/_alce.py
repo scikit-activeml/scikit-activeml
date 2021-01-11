@@ -1,20 +1,17 @@
 import warnings
 
 import numpy as np
-from joblib import Parallel
-from joblib import delayed
+from joblib import Parallel, delayed
 from sklearn import clone
-from sklearn.base import BaseEstimator
-from sklearn.base import RegressorMixin
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import euclidean_distances
 from sklearn.neighbors import NearestNeighbors
-from sklearn.utils import check_array, check_random_state
-from sklearn.utils import check_symmetric
+from sklearn.utils import check_array, check_symmetric
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.utils import check_cost_matrix, check_missing_label
-from skactiveml.utils import rand_argmax, MISSING_LABEL, check_scalar
+from skactiveml.utils import simple_batch, check_classifier_params, \
+    MISSING_LABEL, check_scalar, check_random_state, check_X_y
 
 
 class ALCE(SingleAnnotPoolBasedQueryStrategy):
@@ -26,6 +23,7 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
     Parameters
     ----------
     base_regressor : sklearn regressor
+    classes: array-like, shape(n_classes)
     cost_matrix: array-like, shape (n_classes, n_classes),
                  optional (default=None)
         Cost matrix with C[i,j] defining the cost of predicting class j for a
@@ -42,9 +40,6 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
     nn_params : dict, optional
         http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
 
-    Attributes
-    ----------
-
     References
     ----------
     [1] Kuan-Hao, and Hsuan-Tien Lin. "A Novel Uncertainty Sampling Algorithm
@@ -54,25 +49,26 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 
     def __init__(self,
                  base_regressor,
-                 cost_matrix,
+                 classes,
+                 cost_matrix=None,
                  embed_dim=None,
+                 sample_weight=None,
                  missing_label=MISSING_LABEL,
-                 classes=None,
                  mds_params=None,
                  nn_params=None,
                  random_state=None):
         super().__init__(random_state=random_state)
         self.base_regressor = base_regressor
+        self.classes = classes
         self.cost_matrix = cost_matrix
         self.embed_dim = embed_dim
+        self.sample_weight = sample_weight
         self.missing_label = missing_label
-        self.classes = classes
         self.random_state = random_state
         self.mds_params = mds_params
         self.nn_params = nn_params
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False,
-              **kwargs):
+    def query(self, X_cand, X, y, batch_size=1, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
@@ -96,92 +92,150 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        X_cand = check_array(X_cand, force_all_finite=False)
-        X = check_array(X, force_all_finite=False)
-        y = check_array(y, force_all_finite=False, ensure_2d=False)
+        # Validate input
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size)
 
-        # Check base regressor
-        if not isinstance(self.base_regressor, RegressorMixin):
-            raise TypeError("'base_regressor' must be an sklearn regressor")
+        utilities = _alce(X_cand, X, y, self.base_regressor, self.cost_matrix,
+                          self.classes, self.embed_dim, self.sample_weight,
+                          self.missing_label, self.random_state,
+                          self.mds_params, self.nn_params)
 
-        # Check cost matrix
-        check_cost_matrix(self.cost_matrix, len(self.classes))
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
 
-        # Check classes
-        if self.classes is None:
-            self.classes = np.arange(len(self.cost_matrix))
-        if not set(y) <= set(self.classes):
-            raise ValueError("y has labels that are not contained in "
-                             "'classes'")
+    def _validate_data(self, X_cand, return_utilities, batch_size, reset=True,
+                       **check_X_cand_params):
+        """Validate input data and set or check the `n_features_in_` attribute.
 
-        # Check embedding dimension
-        if self.embed_dim is None:
-            self.embed_dim = len(self.classes)
-        check_scalar(self.embed_dim, 'embed_dim', int, min_val=1)
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
 
-        # Check missing label
-        check_missing_label(self.missing_label)
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
 
-        # Check random state
-        self.random_state = check_random_state(self.random_state)
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
 
-        # Update mds parameters
-        mds_params = {
-            'metric': False,
-            'n_components': self.embed_dim,
-            'n_uq': len(self.classes),
-            'max_iter': 300,
-            'eps': 1e-6,
-            'dissimilarity': "precomputed",
-            'n_init': 8,
-            'n_jobs': 1,
-            'random_state': self.random_state
-        }
-        if self.mds_params is not None:
-            if type(self.mds_params) is not dict:
-                raise TypeError("'mds_params' must be a dictionary or None")
-            mds_params.update(self.mds_params)
-        self.mds_params = mds_params
+        # Check return_utilities.
+        check_scalar(return_utilities, 'return_utilities', bool)
 
-        # Update nearest neighbor parameters
-        if self.nn_params is None:
-            self.nn_params = {}
-        if type(self.nn_params) is not dict:
-            raise TypeError("'nn_params' must be a dictionary or None")
+        # Check batch size.
+        check_scalar(batch_size, 'batch_size', int, min_val=1)
 
-        regressors = [
-            clone(self.base_regressor) for _ in range(self.embed_dim)
-        ]
-        n_classes = len(self.classes)
+        # Check random state.
+        random_state = check_random_state(random_state=self.random_state,
+                                          seed_multiplier=len(X_cand))
 
-        dissimilarities = np.zeros((2 * n_classes, 2 * n_classes))
-        dissimilarities[:n_classes, n_classes:] = self.cost_matrix
-        dissimilarities[n_classes:, :n_classes] = self.cost_matrix.T
+        return X_cand, return_utilities, batch_size, random_state
 
-        W = np.zeros((2 * n_classes, 2 * n_classes))
-        W[:n_classes, n_classes:] = 1
-        W[n_classes:, :n_classes] = 1
 
-        mds = MDSP(**self.mds_params)
-        embedding = mds.fit(dissimilarities).embedding_
-        class_embed = embedding[:n_classes, :]
+def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
+          sample_weight, missing_label, random_state, mds_params, nn_params):
+    # Check base regressor
+    if not isinstance(base_regressor, RegressorMixin):
+        raise TypeError("'base_regressor' must be an sklearn regressor")
+    check_classifier_params(classes, missing_label, cost_matrix)
+    if cost_matrix is None:
+        cost_matrix = 1 - np.eye(len(classes))
 
-        nn = NearestNeighbors(n_neighbors=1, **self.nn_params)
-        nn.fit(embedding[n_classes:, :])
+    if np.count_nonzero(cost_matrix) == 0:
+        raise ValueError("The cost matrix must contain at least one positive "
+                         "number.")
 
-        pred_embed = np.zeros((len(X_cand), self.embed_dim))
-        for i in range(self.embed_dim):
-            regressors[i].fit(X, class_embed[y, i])
-            pred_embed[:, i] = regressors[i].predict(X_cand)
+    # Check the given data
+    X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
+        X, y, X_cand, sample_weight, force_all_finite=False,
+        missing_label=missing_label
+    )
 
-        dist, _ = nn.kneighbors(pred_embed)
+    # Check if all labels in y are valid classes
+    if not set(y) <= set(classes):
+        raise ValueError("y has labels that are not contained in "
+                         "'classes'")
 
-        utilities = dist[:, 0]
-        query_indices = rand_argmax([utilities], self.random_state, axis=1)
-        if return_utilities:
-            return query_indices, np.array([utilities])
-        else:
-            return query_indices
+    # Check embedding dimension
+    embed_dim = len(classes) if embed_dim is None else embed_dim
+    check_scalar(embed_dim, 'embed_dim', int, min_val=1)
+
+    # Update mds parameters
+    mds_params_default = {
+        'metric': False,
+        'n_components': embed_dim,
+        'n_uq': len(classes),
+        'max_iter': 300,
+        'eps': 1e-6,
+        'dissimilarity': "precomputed",
+        'n_init': 8,
+        'n_jobs': 1,
+        'random_state': random_state
+    }
+    if mds_params is not None:
+        if type(mds_params) is not dict:
+            raise TypeError("'mds_params' must be a dictionary or None")
+        mds_params_default.update(mds_params)
+    mds_params = mds_params_default
+
+    # Update nearest neighbor parameters
+    nn_params = {} if nn_params is None else nn_params
+    if type(nn_params) is not dict:
+        raise TypeError("'nn_params' must be a dictionary or None")
+
+    regressors = [
+        clone(base_regressor) for _ in range(embed_dim)
+    ]
+    n_classes = len(classes)
+
+    dissimilarities = np.zeros((2 * n_classes, 2 * n_classes))
+    dissimilarities[:n_classes, n_classes:] = cost_matrix
+    dissimilarities[n_classes:, :n_classes] = cost_matrix.T
+
+    W = np.zeros((2 * n_classes, 2 * n_classes))
+    W[:n_classes, n_classes:] = 1
+    W[n_classes:, :n_classes] = 1
+
+    mds = MDSP(**mds_params)
+    embedding = mds.fit(dissimilarities).embedding_
+    class_embed = embedding[:n_classes, :]
+
+    nn = NearestNeighbors(n_neighbors=1, **nn_params)
+    nn.fit(embedding[n_classes:, :])
+
+    pred_embed = np.zeros((len(X_cand), embed_dim))
+    for i in range(embed_dim):
+        regressors[i].fit(X, class_embed[y, i], sample_weight)
+        pred_embed[:, i] = regressors[i].predict(X_cand)
+
+    dist, _ = nn.kneighbors(pred_embed)
+
+    utilities = dist[:, 0]
+    return utilities
 
 
 """
