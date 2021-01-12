@@ -1,12 +1,14 @@
-import numpy as np
 import unittest
 
+import numpy as np
 from sklearn.datasets import load_breast_cancer
-from sklearn.utils.validation import NotFittedError, check_is_fitted
+from sklearn.ensemble import BaggingClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier, \
     GaussianProcessRegressor
-from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import Perceptron
+from sklearn.naive_bayes import GaussianNB
+from sklearn.utils.validation import NotFittedError, check_is_fitted
+
 from skactiveml.classifier import SklearnClassifier
 
 
@@ -67,6 +69,13 @@ class TestClassifierWrapper(unittest.TestCase):
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertFalse(hasattr(clf, 'partial_fit'))
+
+        X = [[1], [0]]
+        y_true = [1, 0]
+        clf = SklearnClassifier(GaussianProcessClassifier(), classes=[0, 1])
+        ensemble = SklearnClassifier(BaggingClassifier(clf), classes=[0, 1])
+        ensemble.fit(X, y_true)
+        self.assertTrue(ensemble.is_fitted_, True)
 
     def test_partial_fit(self):
         clf = SklearnClassifier(estimator=GaussianNB())
@@ -137,7 +146,7 @@ class TestClassifierWrapper(unittest.TestCase):
         y[200:, 0] = -1
         sample_weights = np.ones_like(y) * 0.9
         clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1,
-                                classes=[0, 1], cost_matrix=1-np.eye(2),
+                                classes=[0, 1], cost_matrix=1 - np.eye(2),
                                 random_state=0)
         clf.fit(X[:250], y[:250], sample_weight=sample_weights[:250])
         self.assertTrue(clf.score(X[250:], y_true[250:]) > 0.5)
