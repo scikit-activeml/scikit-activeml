@@ -1,5 +1,7 @@
 import warnings
 
+import itertools
+
 import numpy as np
 from sklearn import clone
 
@@ -13,7 +15,7 @@ from skactiveml.utils import check_random_state, ExtLabelEncoder, rand_argmax
 class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
     def __init__(self, clf, score=accuracy_score, maximize_score=True,
-                 nonmyopic_look_ahead=3,
+                 nonmyopic_look_ahead=2,
                  similarity_metric='rbf', similarity_metric_dict=None,
                  random_state=None):
         """ An optimal Al strategy
@@ -63,9 +65,13 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
             unlbld_cand_idx = np.setdiff1d(np.arange(len(X_cand)), best_idx)
 
             sim_unlbld_cand = sim_cand[unlbld_cand_idx][:, unlbld_cand_idx]
-            cand_idx_set = (-sim_unlbld_cand).argsort(axis=1)[:, :self.nonmyopic_look_ahead]
+            # cand_idx_set = (-sim_unlbld_cand).argsort(axis=1)[:, :self.nonmyopic_look_ahead]
 
-            batch_utilities = np.empty(cand_idx_set.shape)
+            cand_idx_set = np.array(list(itertools.permutations(range(len(
+                X_cand)), self.nonmyopic_look_ahead)))
+
+            batch_utilities = np.empty([len(cand_idx_set),
+                                        self.nonmyopic_look_ahead])
 
             X_ = np.concatenate([X_cand, X_cand[best_idx[:i_batch]], X], axis=0)
             y_ = np.concatenate([y_cand, y_cand[best_idx[:i_batch]], y], axis=0)
@@ -75,6 +81,15 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
             lbld_idx_ = list(range(len(X_cand), len(X_)))
             append_lbld = lambda x: list(x) + lbld_idx_
+
+            idx_new = append_lbld([])
+            X_new = X_[idx_new]
+            y_new = y_[idx_new]
+            sample_weight_new = sample_weight_[idx_new]
+            clf_new = clf.fit(X_new, y_new, sample_weight_new)
+            pred_eval = clf_new.predict(X_eval)
+
+            old_perf = self.score(y_eval, pred_eval)  # TODO, sample_weight_eval)
 
             for i_full_cand_idx, full_cand_idx in enumerate(cand_idx_set):
                 full_cand_idx = list(full_cand_idx)
@@ -91,8 +106,8 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
                     pred_eval = clf_new.predict(X_eval)
 
-                    batch_utilities[i_full_cand_idx, i_cand_idx] += \
-                        self.score(y_eval, pred_eval) # TODO, sample_weight_eval)
+                    batch_utilities[i_full_cand_idx, i_cand_idx] = \
+                        self.score(y_eval, pred_eval) - old_perf# TODO, sample_weight_eval)
 
                 if not self.maximize_score:
                     batch_utilities *= -1
@@ -101,15 +116,21 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
                 if not ((signs >= 0).all() or (signs <= 0).all()):
                     warnings.warn("There exist positive and negative utilities")
 
-                batch_utilities /= np.arange(1, self.nonmyopic_look_ahead + 1).\
-                    reshape(1, -1)
+            batch_utilities /= np.arange(1, self.nonmyopic_look_ahead + 1).\
+                reshape(1, -1)
 
-            batch_utilities = np.nanmax(batch_utilities, axis=1)
-            cur_best_idx = rand_argmax([batch_utilities], axis=1,
-                                       random_state=random_state)
+            look_ahead_maximums = np.nanmax(batch_utilities, axis=0)
+            opt_look_ahead = np.argmax(look_ahead_maximums)
 
-            best_idx[i_batch] = unlbld_cand_idx[cur_best_idx]
-            utilities[i_batch, unlbld_cand_idx] = batch_utilities
+            cur_best_idx = rand_argmax([batch_utilities[:, opt_look_ahead]],
+                                       axis=1, random_state=random_state)
+
+            best_idx[i_batch] = cand_idx_set[cur_best_idx, 0]
+
+            batch_utilities_ = np.nanmax(batch_utilities, axis=1)
+            for c_idx in unlbld_cand_idx:
+                subset = (cand_idx_set[:,0] == c_idx)
+                utilities[i_batch, c_idx] = np.max(batch_utilities_[subset])
 
         if return_utilities:
             return best_idx, utilities
