@@ -9,7 +9,7 @@ from sklearn.metrics import pairwise_kernels
 from sklearn.utils import check_array
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, \
-    ClassFrequencyEstimator
+    ClassFrequencyEstimator, SkactivemlClassifier
 from skactiveml.classifier import PWC
 from skactiveml.utils import check_classifier_params, check_X_y, \
     ExtLabelEncoder, simple_batch, check_random_state
@@ -187,11 +187,12 @@ class BayesianPriorLearner(PWC):
 
 class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
-    def __init__(self, clf, metric='error',
+    def __init__(self, clf, scoring='error',
                  cost_vector=None, cost_matrix=None, custom_perf_func=None,
                  prior_cand=1.e-3, prior_eval=1.e-3,
                  estimator_metric='rbf', estimator_metric_dict=None,
-                 batch_mode='greedy', all_sim_labels_equal=True,
+                 batch_mode='greedy',
+                 all_sim_labels_equal=True, # TODO check if ok for batch?
                  nonmyopic_look_ahead=1, nonmyopic_neighbors='nearest',
                  nonmyopic_independence=True,
                  random_state=None):
@@ -210,7 +211,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             Similar to prob_estimator but used for calculating the
             probabilities of evaluation instances. The default is to use the
             prob_estimator if not given.
-        metric: string
+        scoring: string
             "error"
                 equivalent to accuracy
             "cost-vector"
@@ -246,7 +247,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         super().__init__(random_state=random_state)
 
         self.clf = clf
-        self.metric = metric
+        self.scoring = scoring
         self.cost_vector = cost_vector
         self.cost_matrix = cost_matrix
         self.custom_perf_func = custom_perf_func
@@ -312,46 +313,66 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             Unlabeled evaluation samples
         """
 
+        ### TEST query parameters
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
+
+        # TODO X, y will be tested by clf when is fitted; X_cand, X equal num features
+        # CHECK X_eval will be tested by clf when predicted
+
+        # TODO sample_weight, sample_weight_cand, sample_weight_eval should have correct size
+        if sample_weight_cand is None:
+            sample_weight_cand = np.ones(len(X_cand))
+        if sample_weight is None:
+            sample_weight = np.ones(len(X))
+        if sample_weight_eval is None:
+            sample_weight_eval = np.ones(len(X_eval))
+
+        ### TEST init parameters
+        # CHECK self.clf
+        if not isinstance(self.clf, SkactivemlClassifier):
+            raise TypeError('clf has to be from type SkactivemlClassifier. The '
+                            'given type is {}. Use the wrapper in '
+                            'skactiveml.classifier to use a sklearn '
+                            'classifier.'.format(type(self.clf)))
+
         missing_label = self.clf.missing_label
         label_encoder = ExtLabelEncoder(missing_label=missing_label,
                                         classes=self.clf.classes).fit(y)
         classes = label_encoder.classes_
         n_classes = len(classes)
 
-        # TODO: n_features should come from _validate_data (check dimensions)
-        n_features = X_cand.shape[1]
-        #X_cand = check_X_y(X_cand)
+        # TODO self.metric, self.cost_vector, self.cost_matrix, self.custom_perf_func will be checked in _transform_metric
+        # TODO: maybe return dperf function instead of 3 variables
+        scoring, cost_matrix, perf_func = \
+            _transform_scoring(self.scoring, self.cost_vector, self.cost_matrix,
+                               self.custom_perf_func, n_classes=n_classes)
 
+        # TODO self.prior_cand, self.prior_eval, if prior is vector, use the vector instead
+        opt_prior = calculate_optimal_prior(cost_matrix)
+        self._prior_cand = self.prior_cand * opt_prior
+        self._prior_eval = self.prior_eval * opt_prior
 
+        #self.estimator_metric, self.estimator_metric_dict
         if self.estimator_metric_dict is None:
             self.estimator_metric_dict = {}
-
-        metric, cost_matrix, perf_func = \
-            _transform_metric(self.metric, self.cost_vector, self.cost_matrix,
-                              self.custom_perf_func, n_classes=n_classes)
-
-        # TODO: check if cost_matrix is similar to clf, otherwise warning
-
-
-        #self._validate_input(X_cand, X, y, X_eval, batch_size, sample_weight,
-        #                     return_utilities)
-
-        if sample_weight is None:
-            sample_weight = np.ones(len(X))
-
-        prior = calculate_optimal_prior(cost_matrix)
-        self._prior_cand = self.prior_cand * prior
-        self._prior_eval = self.prior_eval * prior
+        else:
+            estimator_metric_dict = self.estimator_metric_dict
 
         if self.estimator_metric == 'rbf' and \
                 self.estimator_metric_dict is None:
             # TODO: include std, citations, check gamma-bandwidth transformation
             bandwidth = estimate_bandwidth(X.shape[0], X.shape[1])
             estimator_metric_dict = {'gamma': 1/bandwidth}
-        if self.estimator_metric_dict is None:
-            estimator_metric_dict = {}
-        else:
-            estimator_metric_dict = self.estimator_metric_dict
+
+        # TODO self.batch_mode
+        # TODO self.all_sim_labels_equal
+        # TODO self.nonmyopic_look_ahead
+        # TODO self.nonmyopic_neighbors
+        # TODO self.nonmyopic_independence
+
+        ### CODE
 
         K = lambda X1, X2: pairwise_kernels(X1, X2,
                                             metric=self.estimator_metric,
@@ -362,11 +383,12 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         if np.sum(mask_lbld) == 0:
             mask_lbld[0] = True
 
+        # TODO ALL
         X_ = X[mask_lbld]
         y_ = y[mask_lbld]
         sample_weight_ = sample_weight[mask_lbld]
         sim_c_x = K(X_cand, X_)
-        if X_eval is None:
+        if X_eval is None: # opal like
             sim_e_x = sim_c_x
             sim_e_c = K(X_cand, X_cand)
         else:
@@ -377,22 +399,32 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         else:
             sim_c_c = np.full([len(X_cand), len(X_cand)], np.nan)
 
-        prob_estimator_cand = BayesianPriorLearner(prior=self._prior_cand,
-                                                   classes=classes,
-                                                   missing_label=missing_label,
-                                                   metric="precomputed")
-        prob_estimator_eval = BayesianPriorLearner(prior=self._prior_cand,
-                                                   classes=classes,
-                                                   missing_label=missing_label,
-                                                   metric="precomputed")
+        cand_prob_est = PWC(metric="precomputed", classes=classes,
+                            missing_label=missing_label,
+                            class_prior=self._prior_cand,
+                            random_state=random_state)
+        eval_prob_est = PWC(metric="precomputed", classes=classes,
+                            missing_label=missing_label,
+                            class_prior=self._prior_eval,
+                            random_state=random_state)
 
+        # concatenating
+        X_cx = np.concatenate([X_cand, X_], axis=0)
+        y_cx = np.concatenate([np.full(len(X_cand), missing_label), y_], axis=0)
+        sim_c_cx_ = np.concatenate([sim_c_c, sim_c_x], axis=1)
+        sim_e_cx_ = np.concatenate([sim_e_c, sim_e_x], axis=1)
+        sample_weight_cx_ = np.concatenate([sample_weight_cand, sample_weight])
+
+
+        utilities = np.full([batch_size, len(X_cand)], np.nan,
+                            dtype=float)
+        best_indices = np.full([batch_size], np.nan, dtype=int)
         if self.batch_mode == 'full':
             if self.nonmyopic_look_ahead > 1:
                 raise NotImplementedError("batch_mode = 'full' can only be "
                                           "combined with "
                                           "nonmyopic_look_ahead = 1")
-            cand_idx_set = np.array(list(itertools.permutations(range(len(
-                X_cand)), batch_size)))
+            cand_idx_set = np.array(list(itertools.combinations(range(3),2)))
 
             batch_utilities = nonmyopic_gain(
                 clf=self.clf,
@@ -401,15 +433,15 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 X=X_,
                 y=y_,
                 sample_weight=sample_weight_,
-                prob_estimator_cand=prob_estimator_cand,
+                prob_estimator_cand=cand_prob_est,
                 K_c_x=sim_c_x,
                 K_c_c=sim_c_c,
-                prob_estimator_eval=prob_estimator_eval,
+                prob_estimator_eval=eval_prob_est,
                 K_e_x=sim_e_x,
                 K_e_c=sim_e_c,
                 X_eval=X_eval,
                 classes=classes,
-                metric=metric,
+                metric=scoring,
                 cost_matrix=cost_matrix,
                 perf_func=perf_func,
                 gain_mode='batch',
@@ -417,19 +449,19 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 all_sim_labels_equal=self.all_sim_labels_equal
             )
 
-            utilities = np.full([batch_size, len(X_cand)], np.nan)
+            # TODO: get utilities for each individual instance by maximizing all
+            #  utilities where the instance is contined
             tmp_utilities = np.nanmax(batch_utilities, axis=1)
             cur_best_idx = rand_argmax([tmp_utilities], axis=1,
-                                           random_state=self.random_state)
-            best_indices = cand_idx_set[cur_best_idx]
+                                           random_state=random_state)
+            best_indices[:] = cand_idx_set[cur_best_idx]
 
         elif self.batch_mode == 'greedy':
+
             for i_greedy in range(batch_size):
-                utilities = np.full([batch_size, len(X_cand)], np.nan,
-                                    dtype=float)
-                best_indices = np.full([batch_size], np.nan, dtype=int)
                 unlabeled_cand_idx = np.setdiff1d(np.arange(len(X_cand)),
                                                   best_indices)
+                # TODO: non_myopic modes: full, nearest, same
                 cand_idx_set = _get_nonmyopic_cand_set(
                     neighbors=self.nonmyopic_neighbors,
                     cand_idx=unlabeled_cand_idx,
@@ -438,32 +470,34 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 # concatenate new candidates to previous selection
                 cand_idx_set = np.array([np.hstack([best_indices[:i_greedy],
                                                     c]) for c in cand_idx_set])
+                # TODO: sample_weight_*  missing
                 tmp_utilities = nonmyopic_gain(
                     clf=self.clf,
-                    X_c=X_cand,
+                    X_c=X_cand, # REM
                     cand_idx_set=cand_idx_set,
-                    X=X_,
-                    y=y_,
-                    sample_weight=sample_weight_,
-                    prob_estimator_cand=prob_estimator_cand,
-                    K_c_x=sim_c_x,
-                    K_c_c=sim_c_c,
-                    prob_estimator_eval=prob_estimator_eval,
-                    K_e_x=sim_e_x,
-                    K_e_c=sim_e_c,
+                    # pre_sel_cand_idx
+                    # training_idx
+                    X=X_,  # X_cx
+                    y=y_,  # y_cx (UNL für alle ungelabelten)
+                    sample_weight=sample_weight_, # samplw_cx
+                    prob_estimator_cand=cand_prob_est,
+                    K_c_x=sim_c_x, # K_c_cx
+                    K_c_c=sim_c_c, # REM
+                    prob_estimator_eval=eval_prob_est,
+                    K_e_x=sim_e_x, # K_e_cx
+                    K_e_c=sim_e_c, # REM
                     X_eval=X_eval,
                     classes=classes,
-                    metric=metric,
+                    metric=scoring,
                     cost_matrix=cost_matrix,
                     perf_func=perf_func,
                     gain_mode='nonmyopic',
-
                     nonmyopic_independence=self.nonmyopic_independence,
                     all_sim_labels_equal=self.all_sim_labels_equal
                 )
                 tmp_utilities = np.nanmax(tmp_utilities, axis=1)
                 cur_best_idx = rand_argmax([tmp_utilities], axis=1,
-                                           random_state=self.random_state)
+                                           random_state=random_state)
 
                 best_indices[i_greedy] = unlabeled_cand_idx[cur_best_idx]
                 utilities[i_greedy, unlabeled_cand_idx] = tmp_utilities
@@ -495,15 +529,17 @@ def nonmyopic_gain(clf, X_c, cand_idx_set, X, y, sample_weight,
                    nonmyopic_independence=False,
                    all_sim_labels_equal=True):
 
+    # TODO Parameter check
+    if sample_weight is None:
+        sample_weight = np.ones(len(X))
+
     clf = clone(clf)
     clf.fit(X, y, sample_weight)
-    if X_eval is None:
+    if X_eval is None: # TODO probably not relevant
         pred_old_cand = clf.predict(X_c)
     else:
         pred_old_cand = clf.predict(X_eval)
 
-    if sample_weight is None:
-        sample_weight = np.ones(len(X))
 
     if gain_mode == 'nonmyopic':
         tmp_utilities = np.empty(cand_idx_set.shape)
@@ -619,7 +655,7 @@ def _get_y_sim_list(n_classes, n_instances, all_sim_labels_equal=True):
         return list(itertools.product(*([range(n_classes)] * n_instances)))
 
 
-def _transform_metric(metric, cost_matrix, cost_vector, perf_func, n_classes):
+def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
     if metric == 'error':
         metric = 'misclassification-loss'
         cost_matrix = 1 - np.eye(n_classes)
