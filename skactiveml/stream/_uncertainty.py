@@ -12,7 +12,7 @@ from ._random import RandomSampler
 
 import copy
 
-from .budget_manager import EstimatedBudget
+from .budget_manager import EstimatedBudget, FixedUncertaintyBudget, VarUncertaintyBudget, SplitBudget
 
 
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -43,7 +43,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=EstimatedBudget(theta=0.0),
+    def __init__(self, clf=None, budget_manager=FixedUncertaintyBudget(),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -108,15 +108,11 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             clf = self.clf
         predict_proba = clf.predict_proba(X_cand)
-        y_hat = np.max(predict_proba, axis=1)
+        utilities = np.max(predict_proba, axis=1)
         num_classes = predict_proba.shape[1]
-        # since budget is not initialised
-        budget = getattr(self.budget_manager_, "budget_", 0)
         
-        # calculate theta with num_classes
-        self.budget_manager_.calculate_fixed_theta(num_classes, budget)
-        sampled_indices, utilities = self.budget_manager_.sample(y_hat,
-                                                      simulate=simulate, return_utilities=True)
+        sampled_indices = self.budget_manager_.sample(utilities, num_classes,
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -176,7 +172,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=EstimatedBudget(theta=1.0, s=0.01),
+    def __init__(self, clf=None, budget_manager=VarUncertaintyBudget(),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
@@ -241,21 +237,12 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             clf = self.clf
         predict_proba = clf.predict_proba(X_cand)
-        y_hat = np.max(predict_proba, axis=1)
-
-        utilities = []
+        utilities = np.max(predict_proba, axis=1)
+        
         sampled_indices = []
-        #not completed
-        sampled_indices, budget_left, utilities = self.budget_manager_.sample(
-                 y_hat,
-                 simulate=False,
-                 return_budget_left=True,
-                 return_utilities=True
-             )
-        #not completed
+        
         sampled_indices = self.budget_manager_.sample(utilities,
-                                                      simulate=simulate,
-                                                      use_theta=False)
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -320,14 +307,12 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=EstimatedBudget(theta=1.0, s=0.01), v=0.1,
+    def __init__(self, clf=None, 
+                 budget_manager=SplitBudget(),
                  random_state=None):
         super().__init__(budget_manager=budget_manager,
                          random_state=random_state)
         self.clf = clf
-        #self.s = s
-        self.v = v
-        #self.theta = theta
     
     def query(self, X_cand, X, y, return_utilities=False, simulate=False,
               **kwargs):
@@ -364,12 +349,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # ckeck if v is a float and in range (0,1]
-        if not isinstance(self.v, float):
-            raise TypeError("{} is not a valid type for s")
-        if self.v <= 0 or self.v >= 1:
-            raise ValueError("The value of v is incorrect." +
-                             " v must be defined in range (0,1)")
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
         # check if a budget_manager is set
@@ -394,59 +373,12 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         else:
             clf = self.clf
 
-        if not hasattr(self, 'random_sampler_'):
-            self.random_sampler_ = RandomSampler(
-                self.budget_manager_,
-                random_state=self.random_state_.randint(2**31-1))
-        if not hasattr(self, 'variable_uncertainty_'):
-            self.variable_uncertainty_ = VariableUncertainty(
-                clf,
-                self.budget_manager_,
-                random_state=self.random_state_.randint(2**31-1))
-        # copy random state in case of simulating the query
-        prior_random_state_state = self.random_state_.get_state()
-
-        utilities = []
+        predict_proba = clf.predict_proba(X_cand)
+        utilities = np.max(predict_proba, axis=1)
         sampled_indices = []
-
-        use_random_sampler = self.random_state_.choice([0, 1], X_cand.shape[0],
-                                                       p=[(1-self.v), self.v])
-
-        tmp_budget_manager = copy.deepcopy(self.budget_manager_)
-        tmp_random_sampler = copy.deepcopy(self.random_sampler_)
-        tmp_random_sampler.budget_manager_ = tmp_budget_manager
-        tmp_random_sampler.clf = self.clf
-        tmp_var_uncertainty = copy.deepcopy(self.variable_uncertainty_)
-        tmp_var_uncertainty.budget_manager_ = tmp_budget_manager
-        tmp_var_uncertainty.clf = self.clf
-
-        merged_sampled_indices = []
-        merged_utilities = []
-
-        for x, use_rand in zip(X_cand, use_random_sampler):
-            if use_rand:
-                sampled_indices, utilities = tmp_random_sampler.query(
-                    x.reshape([1, -1]),
-                    X=X,
-                    y=y,
-                    return_utilities=True,
-                    simulate=False)
-            else:
-                sampled_indices, utilities = tmp_var_uncertainty.query(
-                    x.reshape([1, -1]),
-                    X=X,
-                    y=y,
-                    return_utilities=True,
-                    simulate=False)
-            merged_sampled_indices.extend(sampled_indices)
-            merged_utilities.extend(utilities)
-
-        if not simulate:
-            self.budget_manager_ = tmp_budget_manager
-            self.random_sampler_ = tmp_random_sampler
-            self.variable_uncertainty_ = tmp_var_uncertainty
-        else:
-            self.random_state_.set_state(prior_random_state_state)
+        
+        sampled_indices = self.budget_manager_.sample(utilities, 
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
