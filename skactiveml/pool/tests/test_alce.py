@@ -1,6 +1,6 @@
-import numpy as np
 import unittest
 
+import numpy as np
 from sklearn.svm import SVR
 
 from skactiveml.classifier import PWC
@@ -14,7 +14,7 @@ class TestALCE(unittest.TestCase):
         self.X = np.zeros((6, 2))
         self.y = [0, 1, 1, 0, 2, 1]
         self.classes = [0, 1, 2]
-        self.cost_matrix = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        self.cost_matrix = np.array([[0, 2, 3], [4, 0, 6], [7, 8, 0]])
         self.regressor = SVR()
         self.pwc = PWC()
 
