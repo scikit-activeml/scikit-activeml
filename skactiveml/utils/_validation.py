@@ -1,8 +1,7 @@
-import numpy as np
-import sklearn
-
 from collections.abc import Iterable
 
+import numpy as np
+import sklearn
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
@@ -144,7 +143,8 @@ def check_classes(classes):
                 types))
 
 
-def check_cost_matrix(cost_matrix, n_classes):
+def check_cost_matrix(cost_matrix, n_classes, only_non_negative=True,
+                      contains_non_zero=True, diagonal_is_zero=True):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
 
     Parameters
@@ -153,6 +153,15 @@ def check_cost_matrix(cost_matrix, n_classes):
         Cost matrix.
     n_classes : int
         Number of classes.
+    only_non_negative : bool, optional (default=True)
+        This parameter determines whether the matrix must contain only non
+        negative cost entries.
+    contains_non_zero : bool, optional (default=True)
+        This parameter determines whether the matrix must contain at least on
+        non-zero cost entry.
+    diagonal_is_zero : bool, optional (default=True)
+        This parameter determines whether the diagonal cost entries must be
+        zero.
 
     Returns
     -------
@@ -166,6 +175,20 @@ def check_cost_matrix(cost_matrix, n_classes):
         raise ValueError(
             "'cost_matrix' must have shape ({}, {}). "
             "Got {}.".format(n_classes, n_classes, cost_matrix_new.shape))
+    if only_non_negative and np.sum(cost_matrix_new < 0) > 0:
+        raise ValueError(
+            "'cost_matrix' must contain only non-negative cost entries."
+        )
+    if n_classes != 1 and \
+            contains_non_zero and (np.sum(cost_matrix_new != 0) == 0):
+        raise ValueError(
+            "'cost_matrix' must contain at least one non-zero cost entry."
+        )
+    if diagonal_is_zero and np.sum(np.diag(cost_matrix_new)) > 0:
+        raise ValueError(
+            "'cost_matrix' must contain at only zero cost entries on its "
+            "diagonal."
+        )
     return cost_matrix_new
 
 

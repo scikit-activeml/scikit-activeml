@@ -1,5 +1,6 @@
-import numpy as np
 import unittest
+
+import numpy as np
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_missing_label, check_scalar, check_X_y
@@ -25,11 +26,17 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(ValueError, check_cost_matrix,
                           cost_matrix=[['2', '5'], ['a', '5']], n_classes=2)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=3)
+                          cost_matrix=[[0, 1], [2, 0]], n_classes=3)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=-1)
+                          cost_matrix=[[0, 1], [2, 0]], n_classes=-1)
         self.assertRaises(TypeError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=2.5)
+                          cost_matrix=[[0, 1], [2, 0]], n_classes=2.5)
+        self.assertRaises(ValueError, check_cost_matrix,
+                          cost_matrix=[[2, 1], [2, 2]], n_classes=2)
+        self.assertRaises(ValueError, check_cost_matrix,
+                          cost_matrix=[[0, 1], [0, -1]], n_classes=2)
+        self.assertRaises(ValueError, check_cost_matrix,
+                          cost_matrix=[[0, 0], [0, 0]], n_classes=2)
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
