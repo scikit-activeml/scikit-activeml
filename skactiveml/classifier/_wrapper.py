@@ -5,6 +5,8 @@ from multiple annotators.
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
+
+import warnings
 from copy import deepcopy
 
 import numpy as np
@@ -205,6 +207,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self._check_n_features(X, reset=True)
         elif fit_function == 'partial_fit':
             self._check_n_features(X, reset=False)
+        if not has_fit_parameter(self.estimator, 'sample_weight') \
+                and sample_weight is not None:
+            warnings.warn(
+                "{} does not support 'sample_weight'. "
+                "Therefore, they will be ignored.".format(self.estimator))
         self.estimator_ = deepcopy(self.estimator)
         # Transform in case of 2-dimensional array of class labels.
         if y.ndim == 2:
