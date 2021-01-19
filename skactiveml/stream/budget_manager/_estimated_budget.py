@@ -1,6 +1,7 @@
 import numpy as np
 
 from .base import BudgetManager, get_default_budget
+from skactiveml.utils import check_random_state
 
 #TODO add classes estimadetBudget for split var and Fixed. Return to standart
 class EstimatedBudget(BudgetManager):
@@ -49,76 +50,6 @@ class EstimatedBudget(BudgetManager):
         
         return self.budget_ > self.u_t_/self.w
 
-    
-    
-#     def sample(self, utilities, simulate=False, return_budget_left=False,
-#                **kwargs):
-#         """Ask the budget manager which utilities are sufficient to sample the
-#         corresponding instance.
-
-#         Parameters
-#         ----------
-#         utilities : ndarray of shape (n_samples,)
-#             The utilities provided by the stream-based active learning
-#             strategy, which are used to determine whether sampling an instance
-#             is worth it given the budgeting constraint.
-
-#         return_utilities : bool, optional
-#             If true, also return whether there was budget left for each
-#             assessed utility. The default is False.
-
-#         simulate : bool, optional
-#             If True, the internal state of the budget manager before and after
-#             the query is the same. This should only be used to prevent the
-#             budget manager from adapting itself. The default is False.
-
-#         Returns
-#         -------
-#         sampled_indices : ndarray of shape (n_sampled_instances,)
-#             The indices of instances represented by utilities which should be
-#             sampled, with 0 <= n_sampled_instances <= n_samples.
-
-#         budget_left: ndarray of shape (n_samples,), optional
-#             Shows whether there was budget left for each assessed utility. Only
-#             provided if return_utilities is True.
-#         """
-#         # check if budget has been set
-#         self._validate_budget(get_default_budget())
-        
-#         # check if calculation of estimate bought/true lables has begun
-#         if not hasattr(self, 'u_t_'):
-#             self.u_t_ = 0
-#         # intialise return parameters
-#         sampled_indices = []
-#         budget_left = []
-#         # keep the internal state to reset it later if simulate is true
-#         tmp_u_t = self.u_t_
-#         tmp_theta = self.theta_
-        
-
-#         # check for each sample separately if budget is left and the utility is
-#         # high enough
-#         for i , d in enumerate(utilities) :
-#             budget_left.append(tmp_u_t/self.w < self.budget_)
-#             if not budget_left[-1]:
-#                 d = False
-#             # u_t = u_t-1 * (w-1)/w + labeling_t
-#             tmp_u_t = tmp_u_t * ((self.w-1)/self.w) + d
-#             # get the indices instances that should be sampled
-#             if d:
-#                 sampled_indices.append(i)
-        
-#         # set the internal state to the previous values
-#         if not simulate:
-#             self.u_t_ = tmp_u_t
-#             self.theta_ = tmp_theta
-            
-#         # check if budget_left should be returned
-#         if return_budget_left:
-#             return sampled_indices, budget_left
-#         else:
-#             return sampled_indices
-        
 
     def update(self, sampled, **kwargs):
         """Updates the budget manager.
@@ -148,11 +79,12 @@ class FixedUncertaintyBudget(EstimatedBudget):
     """
     
     """
+    #num_classes in init
     def __init__(self,  budget=None, w=100):
         super().__init__(budget, w)
         
         
-    def sample(self, utilities, num_classes, return_budget_left=True, simulate=False, **kwargs):
+    def sample(self, utilities, num_classes, return_budget_left=False, simulate=False, **kwargs):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
 
@@ -208,6 +140,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
+        #tmp_theta raus
         tmp_theta = self.theta_
         
         samples = np.array(utilities <= tmp_theta)
@@ -272,7 +205,7 @@ class VarUncertaintyBudget(EstimatedBudget):
         self.theta = theta
         self.s = s
         
-    def sample(self, utilities, return_budget_left=True, simulate=False, **kwargs):
+    def sample(self, utilities, return_budget_left=False, simulate=False, **kwargs):
         """
         
         """
@@ -339,13 +272,14 @@ class VarUncertaintyBudget(EstimatedBudget):
 class SplitBudget(EstimatedBudget):
     """    
     """
-    def __init__(self, budget=None, w=100, theta=1.0, s=0.01, v=0.1):
+    def __init__(self, budget=None, w=100, theta=1.0, s=0.01, v=0.1, random_state=None):
         super().__init__(budget, w)
         self.v = v
         self.theta = theta
         self.s = s
+        self.random_state = random_state
         
-    def sample(self, utilities, return_budget_left=True, simulate=False, **kwargs):
+    def sample(self, utilities, return_budget_left=False, simulate=False, **kwargs):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
 
@@ -386,8 +320,8 @@ class SplitBudget(EstimatedBudget):
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, 'u_t_'):
             self.u_t_ = 0
-        if not hasattr(self, 'rand_'):
-            self.rand_ = np.random
+        #
+        self._validate_random_state()
         # ckeck if s a float and in range (0,1]
         if self.s is not None:
                 if not isinstance(self.s, float):
@@ -416,8 +350,8 @@ class SplitBudget(EstimatedBudget):
                 sample = False
             else:
                 # changed self.v < self.rand_.random_sample()
-                if self.v > self.rand_.random_sample():
-                    sample = self.rand_.random_sample() <= self.budget_
+                if self.v > self.random_state_.random_sample():
+                    sample = self.random_state_.random_sample() <= self.budget_
                 else: 
                     # the original inequation is:
                     # sample_instance: True if y < theta_t
@@ -445,3 +379,8 @@ class SplitBudget(EstimatedBudget):
             return sampled_indices, budget_left
         else:
             return sampled_indices
+        
+    def _validate_random_state(self):
+        if not hasattr(self, 'random_state_'):
+            self.random_state_ = self.random_state
+        self.random_state_ = check_random_state(self.random_state_)
