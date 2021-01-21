@@ -560,10 +560,14 @@ def nonmyopic_gain(clf, X, y, sample_weight,
         pass
 
     # include pre_sel_cand
-    y_sim_lists = [_get_y_sim_list(n_classes=len(classes),
-                                   n_instances=n,
+    y_sim_list_pre = _get_y_sim_list(classes=classes,
+                                     n_instances=len(pre_sel_cand_idx),
+                                     all_sim_labels_equal=False)
+    y_sim_lists = [_get_y_sim_list(classes=classes, n_instances=n,
                                    all_sim_labels_equal=all_sim_labels_equal)
                    for n in range(1, cand_idx_set.shape[1]+1)]
+
+    [a + b for a, b in itertools.product(pre, post)]
 
     # X_ = np.concatenate([X_c, X], axis=0)
     # K_c_cx_ = np.concatenate([K_c_c, K_c_x], axis=1)
@@ -649,11 +653,11 @@ def dependent_cand_prob(cand_idx, train_idx, y_sim_list,
             prob_y_sim[i_y_sim] *= prob_cand_y[0][y_sim[i_y]]
     return prob_y_sim
 
-def _get_y_sim_list(n_classes, n_instances, all_sim_labels_equal=True):
+def _get_y_sim_list(classes, n_instances, all_sim_labels_equal=True):
     if all_sim_labels_equal:
-        return np.tile(np.arange(n_classes), [n_instances, 1]).T
+        return (np.tile(np.asarray(classes), [n_instances, 1]).T).tolist()
     else:
-        return list(itertools.product(*([range(n_classes)] * n_instances)))
+        return [list(x) for x in itertools.product(classes, repeat=n_instances)]
 
 
 def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
