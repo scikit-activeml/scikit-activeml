@@ -411,10 +411,10 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         # concatenating
         X_cx = np.concatenate([X_cand, X_], axis=0)
         y_cx = np.concatenate([np.full(len(X_cand), missing_label), y_], axis=0)
-        sim_c_cx_ = np.concatenate([sim_c_c, sim_c_x], axis=1)
-        sim_e_cx_ = np.concatenate([sim_e_c, sim_e_x], axis=1)
-        sample_weight_cx_ = np.concatenate([sample_weight_cand, sample_weight])
-
+        sim_c_cx = np.concatenate([sim_c_c, sim_c_x], axis=1)
+        sim_e_cx = np.concatenate([sim_e_c, sim_e_x], axis=1)
+        sample_weight_cx = np.concatenate([sample_weight_cand, sample_weight])
+        train_idx = list(range(len(X_cand), len(X_cand)+len(X_)))
 
         utilities = np.full([batch_size, len(X_cand)], np.nan,
                             dtype=float)
@@ -433,10 +433,10 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 X=X_,
                 y=y_,
                 sample_weight=sample_weight_,
-                prob_estimator_cand=cand_prob_est,
+                cand_prob_est=cand_prob_est,
                 K_c_x=sim_c_x,
                 K_c_c=sim_c_c,
-                prob_estimator_eval=eval_prob_est,
+                eval_prob_est=eval_prob_est,
                 K_e_x=sim_e_x,
                 K_e_c=sim_e_c,
                 X_eval=X_eval,
@@ -473,20 +473,18 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 # TODO: sample_weight_*  missing
                 tmp_utilities = nonmyopic_gain(
                     clf=self.clf,
-                    X_c=X_cand, # REM
+                    X=X_cx,
+                    y=y_cx,
+                    sample_weight=sample_weight_cx,
                     cand_idx_set=cand_idx_set,
-                    # pre_sel_cand_idx
-                    # training_idx
-                    X=X_,  # X_cx
-                    y=y_,  # y_cx (UNL für alle ungelabelten)
-                    sample_weight=sample_weight_, # samplw_cx
-                    prob_estimator_cand=cand_prob_est,
-                    K_c_x=sim_c_x, # K_c_cx
-                    K_c_c=sim_c_c, # REM
-                    prob_estimator_eval=eval_prob_est,
-                    K_e_x=sim_e_x, # K_e_cx
-                    K_e_c=sim_e_c, # REM
+                    pre_sel_cand_idx=[],
+                    train_idx=train_idx,
+                    cand_prob_est=cand_prob_est,
+                    sim_cand=sim_c_cx,
+                    eval_prob_est=eval_prob_est,
+                    sim_eval=sim_e_cx,
                     X_eval=X_eval,
+                    sample_weight_eval=sample_weight_eval,
                     classes=classes,
                     metric=scoring,
                     cost_matrix=cost_matrix,
@@ -520,131 +518,134 @@ def _get_nonmyopic_cand_set(neighbors, cand_idx, sim_cand, M):
         raise ValueError('neighbor_mode unknown')
     return cand_idx_set
 
-def nonmyopic_gain(clf, X_c, cand_idx_set, X, y, sample_weight,
-                   prob_estimator_cand, K_c_x, K_c_c,
-                   prob_estimator_eval, K_e_x, K_e_c,
-                   X_eval, classes,
+def nonmyopic_gain(clf, X, y, sample_weight,
+                   cand_idx_set, pre_sel_cand_idx, train_idx,
+                   cand_prob_est, sim_cand,
+                   eval_prob_est, sim_eval,
+                   X_eval, sample_weight_eval,
+                   classes,
                    metric, cost_matrix, perf_func,
                    gain_mode='nonmyopic',
                    nonmyopic_independence=False,
                    all_sim_labels_equal=True):
 
-    # TODO Parameter check
-    if sample_weight is None:
-        sample_weight = np.ones(len(X))
+    decomposable = (metric == 'misclassification-loss')
+    all_cand_idx = np.unique(cand_idx_set)
+    # TODO: if X_eval == None: sim_eval must have shape |X| x |X|
+
+    train_idx = list(train_idx)
+    pre_sel_cand_idx = list(pre_sel_cand_idx)
 
     clf = clone(clf)
-    clf.fit(X, y, sample_weight)
-    if X_eval is None: # TODO probably not relevant
-        pred_old_cand = clf.predict(X_c)
+    clf.fit(X[train_idx], y[train_idx], sample_weight[train_idx])
+    if X_eval is None:
+        pred_old_cand = np.full_like(y, clf.missing_label)
+        pred_old_cand[all_cand_idx] = clf.predict(X[all_cand_idx])
     else:
         pred_old_cand = clf.predict(X_eval)
 
 
     if gain_mode == 'nonmyopic':
-        tmp_utilities = np.empty(cand_idx_set.shape)
+        utilities = np.full_like(cand_idx_set, np.nan, float)
     elif gain_mode == 'batch':
-        tmp_utilities = np.empty([len(cand_idx_set), 1])
+        utilities = np.full([len(cand_idx_set), 1], np.nan, float)
 
-    if nonmyopic_independence:
-        prob_estimator_cand.fit(X, y, sample_weight)
-        prob_cand_X = prob_estimator_cand.predict_proba(K_c_x)
+    if gain_mode == 'batch' or nonmyopic_independence:
+        prob_cand_X = np.full([len(y), len(classes)], clf.missing_label)
+        cand_prob_est.fit(X[train_idx], y[train_idx], sample_weight[train_idx])
+        prob_cand_X[all_cand_idx] = \
+            cand_prob_est.predict_proba(sim_cand[all_cand_idx,:][:,train_idx])
     else:
         # TODO: speed up
         pass
 
+    # include pre_sel_cand
     y_sim_lists = [_get_y_sim_list(n_classes=len(classes),
                                    n_instances=n,
                                    all_sim_labels_equal=all_sim_labels_equal)
                    for n in range(1, cand_idx_set.shape[1]+1)]
 
-    X_ = np.concatenate([X_c, X], axis=0)
-    K_c_cx_ = np.concatenate([K_c_c, K_c_x], axis=1)
-    K_e_cx_ = np.concatenate([K_e_c, K_e_x], axis=1)
-    sample_weight_ = np.concatenate([np.ones(len(X_c)), sample_weight])
-
-    idx_lbld = np.arange(len(X_c), len(X_c)+len(X))
-    append_lbld = lambda x : np.concatenate([x, idx_lbld])
-
-    decomposable = (metric == 'misclassification-loss')
+    # X_ = np.concatenate([X_c, X], axis=0)
+    # K_c_cx_ = np.concatenate([K_c_c, K_c_x], axis=1)
+    # K_e_cx_ = np.concatenate([K_e_c, K_e_x], axis=1)
+    # sample_weight_ = np.concatenate([np.ones(len(X_c)), sample_weight])
 
     for i_org_cand_idx, org_cand_idx in enumerate(cand_idx_set):
         org_cand_idx = list(org_cand_idx)
         if gain_mode == 'nonmyopic':
-            cand_idx_subsets = [org_cand_idx[:(i+1)] for i in range(len(
-                org_cand_idx))]
+            cand_idx_subsets = \
+                [org_cand_idx[:(i+1)] for i in range(len(org_cand_idx))]
         elif gain_mode == 'batch':
             cand_idx_subsets = [org_cand_idx]
 
         for i_cand_idx, cand_idx in enumerate(cand_idx_subsets):
-            idx_new = append_lbld(cand_idx)
-            X_new = X_[idx_new]
+            # TODO include pre_sel_cand_idx
+
+            idx_new = pre_sel_cand_idx + cand_idx + train_idx
+            X_new = X[idx_new]
             if X_eval is None:
-                K_new = K_e_cx_[cand_idx,:][:, idx_new]
+                sim_eval_new = sim_eval[all_cand_idx,:][:, idx_new]
             else:
-                K_new = K_e_cx_[:, idx_new]
-            sample_weight_new = sample_weight_[idx_new]
+                sim_eval_new = sim_eval[:, idx_new]
+            sample_weight_new = sample_weight[idx_new]
 
             y_sim_list = y_sim_lists[len(cand_idx)-1]
 
-            if nonmyopic_independence:
+            if gain_mode == 'batch' or nonmyopic_independence:
                 prob_cand_y = prob_cand_X[cand_idx, :]
-                prob_y_sim = np.prod(prob_cand_y[range(len(cand_idx)),
-                                                 y_sim_list], axis=1)
+                prob_y_sim = \
+                    np.prod(prob_cand_y[range(len(cand_idx)), y_sim_list],
+                            axis=1)
             else:
-                prob_y_sim = dependent_cand_prob(X_c, cand_idx, y_sim_list,
-                                            X, y, sample_weight,
-                                            prob_estimator_cand, K_c_x, K_c_c,
-                                            nonmyopic_independence)
+                prob_y_sim = dependent_cand_prob(cand_idx, train_idx,
+                                                 y_sim_list,
+                                                 X, y, sample_weight,
+                                                 cand_prob_est, sim_cand)
 
 
-            tmp_utilities[i_org_cand_idx, i_cand_idx] = 0
+            utilities[i_org_cand_idx, i_cand_idx] = 0
             for i_y_sim, y_sim in enumerate(y_sim_list):
-                y_new = np.concatenate([y_sim, y], axis=0)
+                # TODO pre_sel_cand
+                y_new = np.concatenate([y_sim, y[train_idx]], axis=0)
 
-                prob_estimator_eval.fit(X_new, y_new, sample_weight_new)
-                prob_eval = prob_estimator_eval.predict_proba(K_new)
+                eval_prob_est.fit(X_new, y_new, sample_weight_new)
+                prob_eval = eval_prob_est.predict_proba(sim_eval_new)
 
                 new_clf = clf.fit(X_new, y_new, sample_weight_new)
                 if X_eval is None:
-                    pred_new = new_clf.predict(X_c[cand_idx])
+                    pred_new = new_clf.predict(X[cand_idx])
                     pred_old = pred_old_cand[cand_idx]
                 else:
                     pred_new = new_clf.predict(X_eval)
                     pred_old = pred_old_cand
 
-                tmp_utilities[i_org_cand_idx, i_cand_idx] += \
+                utilities[i_org_cand_idx, i_cand_idx] += \
                     _dperf(prob_eval, pred_old, pred_new,
                            decomposable=decomposable, cost_matrix=cost_matrix,
                            perf_func=perf_func) \
                     * prob_y_sim[i_y_sim]
 
-        if gain_mode == 'nonmyopic':
-            tmp_utilities /= np.arange(1, tmp_utilities.shape[1] + 1).reshape(
-                1,-1)
-    return tmp_utilities
+    if gain_mode == 'nonmyopic':
+        utilities = utilities / np.arange(1, utilities.shape[1] + 1).reshape(
+            1,-1)
+    return utilities
 
-def dependent_cand_prob(X_c, cand_idx, y_sim_list,
-                       X, y, sample_weight,
-                       prob_estimator, K_c_x, K_c_c,):
-    # TODO: Speed Up (eg concatenate) - besser große kernelmatrix und
-    #  dann indizieren
+def dependent_cand_prob(cand_idx, train_idx, y_sim_list,
+                        X, y, sample_weight,
+                        prob_est, sim_cand):
+    # TODO: incorporate pre_sel_instances
     prob_y_sim = np.ones(len(y_sim_list))
     for i_y_sim, y_sim in enumerate(y_sim_list):
         for i_y in range(len(y_sim)):
-            X_new = np.concatenate([X, X_c[cand_idx[0:i_y]]],
-                                   axis=0)
-            y_new = np.concatenate([y, y_sim[0:i_y]], axis=0)
-            sample_weight_new = np.concatenate([sample_weight, np.ones(
-                i_y)], axis=0)
-            prob_estimator.fit(X_new, y_new, sample_weight_new)
+            cand_idx_new = cand_idx[0:i_y]
+            X_new = X[cand_idx_new + train_idx]
+            y_new = np.concatenate([y_sim[0:i_y], y[train_idx]], axis=0)
+            sample_weight_new = sample_weight[cand_idx_new + train_idx]
+            prob_est.fit(X_new, y_new, sample_weight_new)
 
-            K_c_cx = np.concatenate([K_c_x[cand_idx[i_y:i_y + 1], :],
-                                     K_c_c[cand_idx[i_y:i_y + 1], :]
-                                          [:, cand_idx[0:i_y]]
-                                    ],
-                                    axis=1)
-            prob_cand_y = prob_estimator.predict_proba(K_c_cx)
+            sim_new = \
+                sim_cand[cand_idx[i_y:i_y + 1],:][:, cand_idx_new + train_idx]
+            prob_cand_y = prob_est.predict_proba(sim_new)
             prob_y_sim[i_y_sim] *= prob_cand_y[0][y_sim[i_y]]
     return prob_y_sim
 
