@@ -86,10 +86,10 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a budget_manager is set
-        self._validate_budget_manager()
         # check if a random state is set
         self._validate_random_state()
+        # check if a budget_manager is set
+        self._validate_budget_manager()
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
@@ -215,10 +215,10 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a budget_manager is set
-        self._validate_budget_manager()
         # check if a random state is set
         self._validate_random_state()
+        # check if a budget_manager is set
+        self._validate_budget_manager()
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
@@ -269,16 +269,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        if not hasattr(self, "theta_"):
-            self.theta_ = self.theta
         self.budget_manager_.update(sampled)
-        budget_left = kwargs.get('budget_left', None)
-        for i, s in enumerate(sampled):
-            if budget_left is None:
-                if sampled[-1]:
-                    self.theta_ *= (1-self.s)
-                else:
-                    self.theta_ *= (1+self.s)
         return self
 
 
@@ -351,10 +342,10 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         """
         # check the shape of data
         X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a budget_manager is set
-        self._validate_budget_manager()
         # check if a random state is set
         self._validate_random_state()
+        # check if a budget_manager is set
+        self._validate_budget_manager()
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
@@ -410,17 +401,5 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         # check if a random state is set
         self._validate_random_state()
 
-        use_random_sampler = self.random_state_.choice([0, 1], X_cand.shape[0],
-                                                       p=[(1-self.v), self.v])
-
-        for x, s, use_rand in zip(X_cand, sampled, use_random_sampler):
-            if use_rand:
-                self.random_sampler_.update(
-                    x.reshape([1, -1]),
-                    np.array([s]))
-            else:
-                self.variable_uncertainty_.update(
-                    x.reshape([1, -1]),
-                    np.array([s]))
         self.budget_manager_.update(sampled)
         return self

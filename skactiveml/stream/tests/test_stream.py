@@ -115,6 +115,7 @@ class TestStream(unittest.TestCase):
                 X=X_train,
                 y=y_train,
                 return_utilities=True)
+
             sampled_indices_2, utilities_2 = query_strategy_2.query(
                 x_t.reshape([1, -1]),
                 X=X_train,
@@ -128,11 +129,14 @@ class TestStream(unittest.TestCase):
                 X=X_train,
                 y=y_train)
 
-            if (len(sampled_indices_1) != len(sampled_indices_2)
-               or utilities_1[0] != utilities_2[0]):
+            if ((len(sampled_indices_1) != len(sampled_indices_2))
+               or (utilities_1[0] != utilities_2[0])):
+                print('query_strategy_class', query_strategy_class)
                 print('t', t)
+                
                 print('sampled_indices_1', sampled_indices_1)
                 print('utilities_1', utilities_1)
+
                 print('sampled_indices_2', sampled_indices_2)
                 print('utilities_2', utilities_2)
             self.assertEqual(utilities_1[0], utilities_2[0])
