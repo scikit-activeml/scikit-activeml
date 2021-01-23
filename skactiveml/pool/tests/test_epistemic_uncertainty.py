@@ -208,6 +208,23 @@ class TestEpistemicUncertainty(unittest.TestCase):
         self.assertTrue(np.isnan(_theta(func2, alpha, x0, A)).all())
 
     def test_epistemic_uncertainty_logreg(self):
+        clf = SklearnClassifier(
+            LogisticRegression(), classes=[0, 1, 2],
+            random_state=self.random_state
+        )
+        self.assertRaises(ValueError, _epistemic_uncertainty_logreg,
+                          **self.kwargs, clf=clf)
+
+        clf = SklearnClassifier(
+            DecisionTreeClassifier(), classes=[0, 1],
+            random_state=self.random_state
+        )
+        self.assertRaises(TypeError, _epistemic_uncertainty_logreg,
+                          **self.kwargs, clf=clf)
+
+        self.assertRaises(TypeError, _epistemic_uncertainty_logreg,
+                          **self.kwargs, clf=self.clf)
+
         probas = np.array([[0.5, 0.5]])
         X = np.array([[0]])
         X_cand = np.array([[3]])
@@ -257,7 +274,6 @@ class TestEpistemicUncertainty(unittest.TestCase):
 
         best_indices, utilities = selector.query(**self.kwargs,
                                                  return_utilities=True)
-        print(utilities)
         self.assertEqual(utilities.shape, (1, len(self.X_cand)))
         self.assertEqual(best_indices.shape, (1,))
 
