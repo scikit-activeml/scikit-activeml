@@ -5,8 +5,6 @@ from skactiveml.utils import check_random_state
 
 
 class EstimatedBudget(BudgetManager):
-    # TODO add classes estimadetBudget for split var and Fixed. Return to
-    # standard
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is sampled, when the utility is
     higher than the specified budget.
@@ -80,11 +78,12 @@ class FixedUncertaintyBudget(EstimatedBudget):
     
     """
     # num_classes in init
-    def __init__(self,  budget=None, w=100):
+    def __init__(self,  budget=None, w=100, num_classes=2):
         super().__init__(budget, w)
+        self.num_classes = num_classes
         
         
-    def sample(self, utilities, num_classes, return_budget_left=False,
+    def sample(self, utilities, return_budget_left=False,
                simulate=False, **kwargs):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
@@ -117,34 +116,34 @@ class FixedUncertaintyBudget(EstimatedBudget):
         """
         # check if budget has been set
         self._validate_budget(get_default_budget())
-        # check if theta exists
-        if not hasattr(self, "theta_"):
-            self.theta_ = 0.0
-        # check if theta is set
-        if not isinstance(self.theta_, float):
-            raise TypeError("{} is not a valid type for theta")
-        # check if num_classes is set
-        if not hasattr(self, "num_classes_"):
-            self.num_classes_ = 0.0
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, 'u_t_'):
             self.u_t_ = 0
-        
-        
-
-        # intialise return parameters
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError("The value of w is incorrect." +
+                                 " w must be greater than 0")
+        # check if num_classes is set
+        if not isinstance(self.num_classes, int):
+            raise TypeError("{} is not a valid type for num_classes")
+        if self.num_classes <= 0:
+            raise ValueError("The value of num_classes is incorrect." +
+                                 " num_classes must be greater than 0")
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError("{} is not a valid type for utilities")
+        # intialize return parameters
         sampled_indices = []
         budget_left = []
         # calculate theta with num_classes
-        self.num_classes_ = num_classes
-        self.theta_ = 1/self.num_classes_ + self.budget_ * (1-1/self.num_classes_)
+        self.theta_ = 1/self.num_classes + self.budget_ * (1-1/self.num_classes)
         
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
-        #tmp_theta raus
-        tmp_theta = self.theta_
         
-        samples = np.array(utilities <= tmp_theta)
+        samples = np.array(utilities <= self.theta_)
         # check for each sample separately if budget is left and the utility is
         # high enough
         for i , d in enumerate(samples) :
@@ -159,8 +158,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         
         # set the internal state to the previous values
         if not simulate:
-            self.u_t_ = tmp_u_t
-            self.theta_ = tmp_theta
+            tmp_u_t = self.u_t_
         
         # check if budget_left should be returned
         if return_budget_left:
@@ -226,8 +224,17 @@ class VarUncertaintyBudget(EstimatedBudget):
             if self.s <= 0 or self.s > 1.0:
                 raise ValueError("The value of s is incorrect." +
                                  " s must be defined in range (0,1]")
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError("The value of w is incorrect." +
+                                 " w must be greater than 0")
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError("{} is not a valid type for utilities")
         
-        # intialise return parameters
+        # intialize return parameters
         sampled_indices = []
         budget_left = []
         # keep the internal state to reset it later if simulate is true
@@ -337,8 +344,14 @@ class SplitBudget(EstimatedBudget):
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, 'u_t_'):
             self.u_t_ = 0
-        #
+        
         self._validate_random_state()
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError("The value of w is incorrect." +
+                                 " w must be greater than 0")
         # ckeck if s a float and in range (0,1]
         if self.s is not None:
             if not isinstance(self.s, float):
@@ -352,6 +365,10 @@ class SplitBudget(EstimatedBudget):
         if self.v <= 0 or self.v >= 1:
             raise ValueError("The value of v is incorrect." +
                              " v must be defined in range (0,1)")
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError("{} is not a valid type for utilities")
+            
         # intialise return parameters
         sampled_indices = []
         budget_left = []

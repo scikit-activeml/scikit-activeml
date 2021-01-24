@@ -40,8 +40,6 @@ class TestUncertainty (unittest.TestCase):
         # init param test
         self._test_init_param_clf(VariableUncertainty)
         self._test_init_param_budget_manager(VariableUncertainty)
-        self._test_init_param_theta(VariableUncertainty)
-        self._test_init_param_s(VariableUncertainty)
         
         # query param test
         self._test_query_param_X_cand(VariableUncertainty)
@@ -52,10 +50,6 @@ class TestUncertainty (unittest.TestCase):
         # init param test
         self._test_init_param_clf(Split)
         self._test_init_param_budget_manager(Split)
-        self._test_init_param_theta(Split)
-        self._test_init_param_s(Split)
-        self._test_init_param_v(Split)
-        
         
         # query param test
         self._test_query_param_X_cand(Split)
@@ -79,33 +73,6 @@ class TestUncertainty (unittest.TestCase):
         query_strategy = query_strategy_name(clf=self.clf, 
                                              budget_manager=1)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        
-    def _test_init_param_theta(self, query_strategy_name):
-        # theta must be defined as a float
-        query_strategy = query_strategy_name(clf=self.clf, theta="string")
-        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-    
-    def _test_init_param_s(self, query_strategy_name):
-        # s must be defined as a float with a range of: 0 < s <= 1
-        query_strategy = query_strategy_name(clf=self.clf, s="string")
-        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, s=1.1)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, s=0.0)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, s=-1.0)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        
-    def _test_init_param_v(self, query_strategy_name):
-        # v must be defined as an float with a range of: 0 < v < 1
-        query_strategy = query_strategy_name(clf=self.clf, v="string")
-        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, v=1.1)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, v=0.0)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, v=-1.0)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         
     def _test_query_param_X_cand (self, query_strategy_name):
         # X_cand must be defined as a two dimensinal array 
