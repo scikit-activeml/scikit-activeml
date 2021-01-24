@@ -12,7 +12,7 @@ from ._random import RandomSampler
 
 import copy
 
-from .budget_manager import EstimatedBudget, FixedUncertaintyBudget, VarUncertaintyBudget, SplitBudget
+from .budget_manager import FixedUncertaintyBudget, VarUncertaintyBudget, SplitBudget
 
 
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -111,7 +111,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         utilities = np.max(predict_proba, axis=1)
         num_classes = predict_proba.shape[1]
         
-        sampled_indices = self.budget_manager_.sample(utilities, num_classes,
+        sampled_indices = self.budget_manager_.sample(utilities, 
                                                       simulate=simulate)
 
         if return_utilities:
