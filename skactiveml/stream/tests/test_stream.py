@@ -129,6 +129,7 @@ class TestStream(unittest.TestCase):
                 X=X_train,
                 y=y_train)
 
+
             if ((len(sampled_indices_1) != len(sampled_indices_2))
                or (utilities_1[0] != utilities_2[0])):
                 print('query_strategy_class', query_strategy_class)

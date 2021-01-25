@@ -138,15 +138,15 @@ class FixedUncertaintyBudget(EstimatedBudget):
         sampled_indices = []
         budget_left = []
         # calculate theta with num_classes
-        self.theta_ = 1/self.num_classes + self.budget_ * (1-1/self.num_classes)
-        
+        theta = 1/self.num_classes + self.budget_ * (1-1/self.num_classes)
+
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
         
-        samples = np.array(utilities <= self.theta_)
+        samples = np.array(utilities) <= theta
         # check for each sample separately if budget is left and the utility is
         # high enough
-        for i , d in enumerate(samples) :
+        for i, d in enumerate(samples):
             budget_left.append(tmp_u_t/self.w < self.budget_)
             if not budget_left[-1]:
                 d = False
@@ -158,7 +158,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         
         # set the internal state to the previous values
         if not simulate:
-            tmp_u_t = self.u_t_
+            self.u_t_ = tmp_u_t
         
         # check if budget_left should be returned
         if return_budget_left:

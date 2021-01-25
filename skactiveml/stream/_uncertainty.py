@@ -355,7 +355,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
                 clf = clone(self.clf)
             else:
                 raise TypeError("clf is not a classifier. Please refer to " +
-                                 "sklearn.base.is_classifier")
+                                "sklearn.base.is_classifier")
             clf.fit(X, y)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
