@@ -195,7 +195,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                  pre_sim_labels_equal=False,
                  cand_sim_labels_equal=True,
                  nonmyopic_look_ahead=1, nonmyopic_neighbors='nearest',
-                 nonmyopic_independence=True,
+                 independent_probs=True,
                  random_state=None):
         """ XPAL
         The cost-sensitive expected probabilistic active learning (CsXPAL) strategy is a generalization of the
@@ -261,7 +261,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self.cand_sim_labels_equal = cand_sim_labels_equal
         self.nonmyopic_look_ahead = nonmyopic_look_ahead
         self.nonmyopic_neighbors = nonmyopic_neighbors
-        self.nonmyopic_independence = nonmyopic_independence #TODO not only for non-myopic
+        self.independent_probs = independent_probs #TODO not only for non-myopic
 
     def _validate_input(self, X_cand, X, y, X_eval, batch_size, sample_weight,
                         return_utilities):
@@ -298,9 +298,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             self.sample_weight_ = sample_weight
         # TODO: check if return_utilities is bool
 
-    def query(self, X_cand, X, y, X_eval, batch_size=1,
+    def query(self, X_cand, X, y, X_eval=None, batch_size=1,
               sample_weight_cand=None, sample_weight=None,
-              sample_weight_eval=None, return_utilities=False, **kwargs):
+              return_utilities=False, **kwargs):
         """
 
         Attributes
@@ -328,8 +328,6 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             sample_weight_cand = np.ones(len(X_cand))
         if sample_weight is None:
             sample_weight = np.ones(len(X))
-        if sample_weight_eval is None:
-            sample_weight_eval = np.ones(len(X_eval))
 
         ### TEST init parameters
         # CHECK self.clf
@@ -375,33 +373,46 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         # TODO self.nonmyopic_neighbors
         # TODO self.nonmyopic_independence
 
-        ### CODE
+        """
+        CODE
+        """
+        # MERGING INSTANCES FOR FASTER PROCESSING
+        X_ = np.concatenate([X_cand, X], axis=0)
+        y_ = np.concatenate([np.full(len(X_cand), missing_label), y], axis=0)
+        sample_weight_ = np.concatenate([sample_weight_cand, sample_weight])
+
+        idx_cand = list(range(len(X_cand)))
+        idx_train = list(range(len(X_cand), len(X_cand)+len(X)))
+        idx_lbld = np.where(is_labeled(y_, missing_label))[0]
 
         K = lambda X1, X2: pairwise_kernels(X1, X2,
                                             metric=self.estimator_metric,
                                             **estimator_metric_dict)
 
-        # filter out mostly all unlabeled for Bayesian Local Learner
-        mask_lbld = is_labeled(y, missing_label)
-        if np.sum(mask_lbld) == 0:
-            mask_lbld[0] = True
+        # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
+        # similarities candidates * candidates + X
+        sim_cand = np.full([len(X_cand), len(X_)], -1, float)
+        if batch_size > 1 or (self.nonmyopic_look_ahead > 1 and
+                              self.nonmyopic_neighbors == 'nearest'):
+            sim_cand[:, idx_cand] = K(X_[idx_cand], X_[idx_cand])
+        if len(idx_lbld) > 0:
+            sim_cand[:, idx_lbld] = K(X_[idx_cand], X_[idx_lbld])
 
-        # TODO ALL
-        X_ = X[mask_lbld]
-        y_ = y[mask_lbld]
-        sample_weight_ = sample_weight[mask_lbld]
-        sim_c_x = K(X_cand, X_)
-        if X_eval is None: # opal like
-            sim_e_x = sim_c_x
-            sim_e_c = K(X_cand, X_cand)
+        # similarities eval * candidates + X resp. cand * cand
+        if not X_eval is None:
+            sim_eval = np.full([len(X_eval), len(X_)], -1, float)
+            sim_eval[:, idx_cand] = K(X_eval, X_[idx_cand])
+            if len(idx_lbld) > 0:
+                sim_eval[:, idx_lbld] = K(X_eval, X_[idx_lbld])
         else:
-            sim_e_x = K(X_eval, X_)
-            sim_e_c = K(X_eval, X_cand)
-        if batch_size > 1 or self.nonmyopic_look_ahead > 1:
-            sim_c_c = K(X_cand, X_cand)
-        else:
-            sim_c_c = np.full([len(X_cand), len(X_cand)], np.nan)
+            sim_eval = np.full([len(X_cand), len(X_)], -1, float)
+            sim_eval[:, idx_cand] = np.eye(len(X_cand), dtype=float)
+            # TODO opal mode not working yet. needs rechecking
 
+        np.set_printoptions(precision=1, suppress=True)
+        print(sim_cand.T)
+        print(sim_eval.T)
+        # INITIALIZE PROB ESTIMATION
         cand_prob_est = PWC(metric="precomputed", classes=classes,
                             missing_label=missing_label,
                             class_prior=self._prior_cand,
@@ -411,14 +422,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                             class_prior=self._prior_eval,
                             random_state=random_state)
 
-        # concatenating
-        X_cx = np.concatenate([X_cand, X_], axis=0)
-        y_cx = np.concatenate([np.full(len(X_cand), missing_label), y_], axis=0)
-        sim_c_cx = np.concatenate([sim_c_c, sim_c_x], axis=1)
-        sim_e_cx = np.concatenate([sim_e_c, sim_e_x], axis=1)
-        sample_weight_cx = np.concatenate([sample_weight_cand, sample_weight])
-        train_idx = list(range(len(X_cand), len(X_cand)+len(X_)))
-
+        # CODE
         utilities = np.full([batch_size, len(X_cand)], np.nan,
                             dtype=float)
         best_indices = np.empty([batch_size], int)
@@ -432,23 +436,22 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
             batch_utilities = nonmyopic_gain(
                 clf=self.clf,
-                X=X_cx,
-                y=y_cx,
-                sample_weight=sample_weight_cx,
+                X=X_,
+                y=y_,
+                sample_weight=sample_weight_,
                 cand_idx_set=cand_idx_set,
                 pre_sel_cand_idx=[],
-                train_idx=train_idx,
+                train_idx=idx_train,
                 cand_prob_est=cand_prob_est,
-                sim_cand=sim_c_cx,
+                sim_cand=sim_cand,
                 eval_prob_est=eval_prob_est,
-                sim_eval=sim_e_cx,
+                sim_eval=sim_eval,
                 X_eval=X_eval,
-                sample_weight_eval=sample_weight_eval,
                 metric=scoring,
                 cost_matrix=cost_matrix,
                 perf_func=perf_func,
                 gain_mode='batch',
-                nonmyopic_independence=self.nonmyopic_independence,
+                independent_probs=self.independent_probs,
                 pre_sim_labels_equal=self.pre_sim_labels_equal,
                 cand_sim_labels_equal=self.cand_sim_labels_equal
             )
@@ -468,29 +471,28 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 cand_idx_set = _get_nonmyopic_cand_set(
                     neighbors=self.nonmyopic_neighbors,
                     cand_idx=unlabeled_cand_idx,
-                    sim_cand=sim_c_c,
+                    sim_cand=sim_cand[:, idx_cand],
                     M=self.nonmyopic_look_ahead)
 
                 # TODO: sample_weight_*  missing
                 tmp_utilities = nonmyopic_gain(
                     clf=self.clf,
-                    X=X_cx,
-                    y=y_cx,
-                    sample_weight=sample_weight_cx,
+                    X=X_,
+                    y=y_,
+                    sample_weight=sample_weight_,
                     cand_idx_set=cand_idx_set,
                     pre_sel_cand_idx=list(best_indices[:i_greedy]),
-                    train_idx=train_idx,
+                    train_idx=idx_train,
                     cand_prob_est=cand_prob_est,
-                    sim_cand=sim_c_cx,
+                    sim_cand=sim_cand,
                     eval_prob_est=eval_prob_est,
-                    sim_eval=sim_e_cx,
+                    sim_eval=sim_eval,
                     X_eval=X_eval,
-                    sample_weight_eval=sample_weight_eval,
                     metric=scoring,
                     cost_matrix=cost_matrix,
                     perf_func=perf_func,
                     gain_mode='nonmyopic',
-                    nonmyopic_independence=self.nonmyopic_independence,
+                    independent_probs=self.independent_probs,
                     pre_sim_labels_equal=self.pre_sim_labels_equal,
                     cand_sim_labels_equal=self.cand_sim_labels_equal
                 )
@@ -541,10 +543,10 @@ def nonmyopic_gain(clf, X, y, sample_weight,
                    cand_idx_set, pre_sel_cand_idx, train_idx,
                    cand_prob_est, sim_cand,
                    eval_prob_est, sim_eval,
-                   X_eval, sample_weight_eval,
+                   X_eval,
                    metric, cost_matrix, perf_func,
                    gain_mode='nonmyopic',
-                   nonmyopic_independence=False,
+                   independent_probs=False,
                    pre_sim_labels_equal=False,
                    cand_sim_labels_equal=True):
 
@@ -610,7 +612,7 @@ def nonmyopic_gain(clf, X, y, sample_weight,
 
         # TODO Label encoder for y_sim_list
 
-        if nonmyopic_independence:
+        if independent_probs:
             prob_y_sim = \
                 np.prod(prob_cand_X[pre_sel_cand_idx + cand_idx,
                                     [a+b for a,b in y_sim_list]], axis=1)
@@ -620,7 +622,7 @@ def nonmyopic_gain(clf, X, y, sample_weight,
                                               y_sim_list,
                                               X, y, sample_weight, prob_cand_X,
                                               cand_prob_est, sim_cand,
-                                              pre_independence=nonmyopic_independence)
+                                              pre_independence=independent_probs)
 
 
         utilities[i_cand_idx] = 0
