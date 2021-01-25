@@ -8,11 +8,11 @@ from ..base import SingleAnnotStreamBasedQueryStrategy
 
 from ..classifier import PWC
 
-from ._random import RandomSampler
-
-import copy
-
-from .budget_manager import FixedUncertaintyBudget, VarUncertaintyBudget, SplitBudget
+from .budget_manager import (
+    FixedUncertaintyBudget,
+    VarUncertaintyBudget,
+    SplitBudget,
+)
 
 
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -43,14 +43,21 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=FixedUncertaintyBudget(),
-                 random_state=None):
-        super().__init__(budget_manager=budget_manager,
-                         random_state=random_state)
+
+    def __init__(
+        self,
+        clf=None,
+        budget_manager=FixedUncertaintyBudget(),
+        random_state=None,
+    ):
+        super().__init__(
+            budget_manager=budget_manager, random_state=random_state
+        )
         self.clf = clf
 
-    def query(self, X_cand, X, y, return_utilities=False, simulate=False,
-              **kwargs):
+    def query(
+        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+    ):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -93,13 +100,14 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
-                clf = PWC(
-                    random_state=self.random_state_.randint(2**31-1))
+                clf = PWC(random_state=self.random_state_.randint(2 ** 31 - 1))
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
-                raise TypeError("clf is not a classifier. Please refer to " +
-                                 "sklearn.base.is_classifier")
+                raise TypeError(
+                    "clf is not a classifier. Please refer to "
+                    + "sklearn.base.is_classifier"
+                )
             clf.fit(X, y)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
@@ -109,10 +117,10 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             clf = self.clf
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
-        num_classes = predict_proba.shape[1]
-        
-        sampled_indices = self.budget_manager_.sample(utilities, 
-                                                      simulate=simulate)
+
+        sampled_indices = self.budget_manager_.sample(
+            utilities, simulate=simulate
+        )
 
         if return_utilities:
             return sampled_indices, utilities
@@ -172,14 +180,21 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, budget_manager=VarUncertaintyBudget(),
-                 random_state=None):
-        super().__init__(budget_manager=budget_manager,
-                         random_state=random_state)
+
+    def __init__(
+        self,
+        clf=None,
+        budget_manager=VarUncertaintyBudget(),
+        random_state=None,
+    ):
+        super().__init__(
+            budget_manager=budget_manager, random_state=random_state
+        )
         self.clf = clf
-    
-    def query(self, X_cand, X, y, return_utilities=False, simulate=False,
-              **kwargs):
+
+    def query(
+        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+    ):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -222,13 +237,14 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
-                clf = PWC(
-                    random_state=self.random_state_.randint(2**31-1))
+                clf = PWC(random_state=self.random_state_.randint(2 ** 31 - 1))
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
-                raise TypeError("clf is not a classifier. Please refer to " +
-                                 "sklearn.base.is_classifier")
+                raise TypeError(
+                    "clf is not a classifier. Please refer to "
+                    + "sklearn.base.is_classifier"
+                )
             clf.fit(X, y)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
@@ -238,11 +254,12 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             clf = self.clf
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
-        
+
         sampled_indices = []
-        
-        sampled_indices = self.budget_manager_.sample(utilities,
-                                                      simulate=simulate)
+
+        sampled_indices = self.budget_manager_.sample(
+            utilities, simulate=simulate
+        )
 
         if return_utilities:
             return sampled_indices, utilities
@@ -298,15 +315,18 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
 
     """
-    def __init__(self, clf=None, 
-                 budget_manager=SplitBudget(),
-                 random_state=None):
-        super().__init__(budget_manager=budget_manager,
-                         random_state=random_state)
+
+    def __init__(
+        self, clf=None, budget_manager=SplitBudget(), random_state=None
+    ):
+        super().__init__(
+            budget_manager=budget_manager, random_state=random_state
+        )
         self.clf = clf
-    
-    def query(self, X_cand, X, y, return_utilities=False, simulate=False,
-              **kwargs):
+
+    def query(
+        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+    ):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -349,13 +369,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
-                clf = PWC(
-                    random_state=self.random_state_.randint(2**31-1))
+                clf = PWC(random_state=self.random_state_.randint(2 ** 31 - 1))
             elif is_classifier(self.clf):
                 clf = clone(self.clf)
             else:
-                raise TypeError("clf is not a classifier. Please refer to " +
-                                "sklearn.base.is_classifier")
+                raise TypeError(
+                    "clf is not a classifier. Please refer to "
+                    + "sklearn.base.is_classifier"
+                )
             clf.fit(X, y)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
@@ -367,9 +388,10 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
         sampled_indices = []
-        
-        sampled_indices = self.budget_manager_.sample(utilities, 
-                                                      simulate=simulate)
+
+        sampled_indices = self.budget_manager_.sample(
+            utilities, simulate=simulate
+        )
 
         if return_utilities:
             return sampled_indices, utilities

@@ -26,9 +26,11 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
+
     def __init__(self, budget_manager=FixedBudget(), random_state=None):
-        super().__init__(budget_manager=budget_manager,
-                         random_state=random_state)
+        super().__init__(
+            budget_manager=budget_manager, random_state=random_state
+        )
 
     def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -78,8 +80,9 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
-        sampled_indices = self.budget_manager_.sample(utilities,
-                                                      simulate=simulate)
+        sampled_indices = self.budget_manager_.sample(
+            utilities, simulate=simulate
+        )
 
         if simulate:
             self.random_state_.set_state(prior_random_state_state)
@@ -139,9 +142,11 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
+
     def __init__(self, budget_manager=FixedBudget(), random_state=None):
-        super().__init__(budget_manager=budget_manager,
-                         random_state=random_state)
+        super().__init__(
+            budget_manager=budget_manager, random_state=random_state
+        )
 
     def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -191,14 +196,15 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             self.queried_instances_ = 0
 
         utilities = np.zeros(X_cand.shape[0])
-        budget = getattr(self.budget_manager_, 'budget_', 0)
+        budget = getattr(self.budget_manager_, "budget_", 0)
 
         tmp_observed_instances = self.observed_instances_
         tmp_queried_instances = self.queried_instances_
         for i, x in enumerate(X_cand):
             tmp_observed_instances += 1
-            remaining_budget = (tmp_observed_instances * budget -
-                                tmp_queried_instances)
+            remaining_budget = (
+                tmp_observed_instances * budget - tmp_queried_instances
+            )
             # print(remaining_budget >= 1)
             if remaining_budget >= 1:
                 utilities[i] = 1
@@ -214,8 +220,9 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         if not simulate:
             self.observed_instances_ = tmp_observed_instances
             self.queried_instances_ = tmp_queried_instances
-        sampled_indices = self.budget_manager_.sample(utilities,
-                                                      simulate=simulate)
+        sampled_indices = self.budget_manager_.sample(
+            utilities, simulate=simulate
+        )
         # print("sampled_indices", sampled_indices)
 
         if return_utilities:

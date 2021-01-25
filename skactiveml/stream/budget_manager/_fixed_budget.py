@@ -18,6 +18,7 @@ class FixedBudget(BudgetManager):
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
     """
+
     def __init__(self, budget=None):
         super().__init__(budget)
 
@@ -35,12 +36,14 @@ class FixedBudget(BudgetManager):
             True, if there is a utility which leads to sampling another
             instance.
         """
-        available_budget = (self.observed_instances_ * self.budget_
-                            - self.queried_instances_)
+        available_budget = (
+            self.observed_instances_ * self.budget_ - self.queried_instances_
+        )
         return available_budget >= 1
 
-    def sample(self, utilities, simulate=False, return_budget_left=False,
-               **kwargs):
+    def sample(
+        self, utilities, simulate=False, return_budget_left=False, **kwargs
+    ):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
         Parameters
@@ -84,8 +87,9 @@ class FixedBudget(BudgetManager):
         # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_instances += 1
-            budget_left[i] = (tmp_observed_instances * self.budget_
-                              - tmp_queried_instances)
+            budget_left[i] = (
+                tmp_observed_instances * self.budget_ - tmp_queried_instances
+            )
             sampled[i] = budget_left[i] and (utility >= 1 - self.budget_)
             tmp_queried_instances += sampled[i]
 

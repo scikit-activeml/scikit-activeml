@@ -16,6 +16,7 @@ class BudgetManager(ABC, BaseEstimator):
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
     """
+
     def __init__(self, budget):
         self.budget = budget
 
@@ -37,8 +38,9 @@ class BudgetManager(ABC, BaseEstimator):
         return NotImplemented
 
     @abstractmethod
-    def sample(self, utilities, return_budget_left=True, simulate=False,
-               **kwargs):
+    def sample(
+        self, utilities, return_budget_left=True, simulate=False, **kwargs
+    ):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
        
@@ -99,8 +101,9 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = self.budget
         else:
             self.budget_ = default
-        check_scalar(self.budget_, 'budget',
-                     np.float, min_val=0.0, max_val=1.0)
+        check_scalar(
+            self.budget_, "budget", np.float, min_val=0.0, max_val=1.0
+        )
 
 
 def get_default_budget():
