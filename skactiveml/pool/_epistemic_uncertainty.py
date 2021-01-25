@@ -387,7 +387,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
                     pi0[i], np.minimum(_pi_h(theta=theta_n, L_ml=L_ml, X=X,
                                              y=y, sample_weight=sample_weight,
                                              gamma=gamma),
-                                       1 - 2 * alpha_n)
+                                       1 - 2 * alpha_p)
                 )
             Qn, Qp = np.delete(Qn, 0), np.delete(Qp, -1)
 
