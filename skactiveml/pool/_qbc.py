@@ -6,6 +6,7 @@ query by committee strategies
 
 import numpy as np
 import warnings
+import inspect
 
 from sklearn import clone
 
@@ -23,26 +24,25 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
     The Query-By-Committee (QBC) algorithm minimizes the version space, which
     is the set of hypotheses that are consistent with the current labeled
-    training data. This class implement the query-by-bagging method, which uses
-    the bagging in sklearn to construct the committee. So your model should be
-    a sklearn model.
+    training data.
 
     Parameters
     ----------
-    clf : sklearn classifier | ensamble
-        If clf is an ensemble, it will used as committee. If clf is a
+    clf : SkactivemlClassifier
+        If clf is an wrapped ensemble, it will used as committee. If clf is a
         classifier, it will used for ensemble construction with the specified
         ensemble or with BaggigngClassifier, if ensemble is None. clf must
         implementing the methods 'fit', 'predict'(for vote entropy) and
         'predict_proba'(for KL divergence).
-    ensemble : sklearn.ensemble, default=None
-        sklear.ensemble used as committee. If None, baggingClassifier is used.
+    ensemble : BaseEnsemble, default=None
+        wrapped sklear.ensemble used as committee. If None, baggingClassifier
+        is used.
     method : string, default='KL_divergence'
         The method to calculate the disagreement.
         'vote_entropy' or 'KL_divergence' are possible.
     random_state : numeric | np.random.RandomState
         Random state to use.
-    ensemble_dict :
+    ensemble_dict : dictionary
         will be passed on to the ensemble.
 
     Attributes
@@ -108,7 +108,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         self._clf = clone(self.clf)
 
         if self.ensemble_dict is None:
-            self.ensemble_dict = dict()
+            ensemble_dict = dict()
+        else:
+            ensemble_dict = self.ensemble_dict
 
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
@@ -147,6 +149,18 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                 "'clf' must implement the methods 'fit' and 'predict_proba'")
 
         # build a ensemble if necessary
+        if isinstance(self._clf, SklearnClassifier) and \
+                not isinstance(self._clf.estimator, BaseEnsemble):
+            clf_dict = dict()
+            clf_class = type(self._clf.estimator)
+            parameters = inspect.signature(clf_class.__init__).parameters
+            for i in inspect.getmembers(self._clf):
+                if not i[0].startswith('_') and not i[0].endswith('_') and \
+                        not inspect.ismethod(i[1]) and i[0] in parameters:
+                    clf_dict[i[0]] = i[1]
+
+            self._clf = clf_class(**clf_dict)
+
         if not isinstance(self._clf, SklearnClassifier) or \
                 not isinstance(self._clf.estimator, BaseEnsemble):
             if self.ensemble is None:
@@ -161,14 +175,13 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                                 "'self.ensemble'.".format(type(self.ensemble)))
             else:
                 ensemble = self.ensemble
-            parameters = ensemble.__init__.__code__.co_varnames
-            if not isinstance(self.ensemble_dict, dict):
+            parameters = inspect.signature(ensemble.__init__).parameters
+            if not isinstance(ensemble_dict, dict):
                 raise TypeError("ensemble_dict is not a dictionary.")
-            ensemble_dict = self.ensemble_dict
             if 'base_estimator' in parameters:
                 ensemble_dict['base_estimator'] = self._clf
             self._clf = SklearnClassifier(
-                ensemble(random_state=random_state, **ensemble_dict),
+                ensemble(**ensemble_dict, random_state=random_state),
                 classes=classes
             )
 
@@ -176,13 +189,13 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         self._clf.fit(X, y, sample_weight=sample_weight)
 
         # choose the disagreement method and calculate the utilities
-        if hasattr(self._clf, 'estimators_'):
+        if hasattr(self._clf, 'estimators_') and self._clf.is_fitted_:
             est_arr = self._clf.estimators_
         else:
             est_arr = [self._clf] * self._clf.n_estimators
         if self.method == 'KL_divergence':
-            P = [est.predict_proba(X_cand) for est in est_arr]
-            utilities = average_kl_divergence(P)
+            probas = [est.predict_proba(X_cand) for est in est_arr]
+            utilities = average_kl_divergence(probas)
         elif self.method == 'vote_entropy':
             votes = [est.predict(X_cand) for est in est_arr]
             utilities = vote_entropy(votes, classes)
