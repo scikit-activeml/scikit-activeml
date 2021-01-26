@@ -129,8 +129,9 @@ class TestGeneral(unittest.TestCase):
                     'skactiveml.pool.tests.test' + class_file_name)
                 test_class_name = 'Test' + qs_class.__name__
                 self.assertTrue(hasattr(mod, test_class_name),
-                                msg='{} has no test called {}' +
-                                    ''.format(qs_name, test_class_name))
+                                msg='{} has no test called {}'.format(
+                                    qs_name, test_class_name)
+                                )
                 test_obj = getattr(mod, test_class_name)
 
                 # check init params
@@ -138,7 +139,7 @@ class TestGeneral(unittest.TestCase):
                     test_func_name = 'test_init_param_' + param
                     self.assertTrue(
                         hasattr(test_obj, test_func_name),
-                        msg="'{}()' missing for parameter '{}' of  "
+                        msg="'{}()' missing for parameter '{}' of "
                             "__init__()".format(test_func_name, param))
 
                 # check query params
