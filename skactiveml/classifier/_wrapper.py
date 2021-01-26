@@ -5,13 +5,16 @@ from multiple annotators.
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
-import numpy as np
 
+import warnings
 from copy import deepcopy
+
+import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import check_is_fitted, check_array, \
     has_fit_parameter
+
 from ..base import SkactivemlClassifier
 from ..utils import rand_argmin, MISSING_LABEL
 
@@ -143,8 +146,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         except Exception:
             p = self.predict_proba([X[0]])[0]
             y_pred = self._random_state.choice(np.arange(len(self.classes_)),
-                                              len(X),
-                                              replace=True, p=p)
+                                               len(X),
+                                               replace=True, p=p)
         y_pred = self._le.inverse_transform(y_pred)
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
@@ -192,8 +195,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Check whether estimator is a valid classifier.
         if not is_classifier(estimator=self.estimator):
-            raise TypeError( "'{}' must be a scikit-learn "
-                             "classifier.".format(self.estimator))
+            raise TypeError("'{}' must be a scikit-learn "
+                            "classifier.".format(self.estimator))
 
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(self.estimator,
@@ -206,8 +209,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self._check_n_features(X, reset=False)
         if not has_fit_parameter(self.estimator, 'sample_weight') \
                 and sample_weight is not None:
-            raise ValueError(
-                "{} does not support 'sample_weight'.".format(self.estimator))
+            warnings.warn(
+                "{} does not support 'sample_weight'. "
+                "Therefore, they will be ignored.".format(self.estimator))
         self.estimator_ = deepcopy(self.estimator)
         # Transform in case of 2-dimensional array of class labels.
         if y.ndim == 2:
@@ -217,7 +221,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 sample_weight = sample_weight.ravel()
         is_lbld = ~np.isnan(y)
         try:
-            if sample_weight is None:
+            if not has_fit_parameter(self.estimator,
+                                     'sample_weight') or sample_weight is None:
                 if fit_function == 'partial_fit':
                     classes = self._le.transform(self.classes_)
                     self.estimator_.partial_fit(X=X[is_lbld], y=y[is_lbld],

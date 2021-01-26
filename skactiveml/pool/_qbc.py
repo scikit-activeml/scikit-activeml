@@ -148,19 +148,6 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError(
                 "'clf' must implement the methods 'fit' and 'predict_proba'")
 
-        # build a ensemble if necessary
-        if isinstance(self._clf, SklearnClassifier) and \
-                not isinstance(self._clf.estimator, BaseEnsemble):
-            clf_dict = dict()
-            clf_class = type(self._clf.estimator)
-            parameters = inspect.signature(clf_class.__init__).parameters
-            for i in inspect.getmembers(self._clf):
-                if not i[0].startswith('_') and not i[0].endswith('_') and \
-                        not inspect.ismethod(i[1]) and i[0] in parameters:
-                    clf_dict[i[0]] = i[1]
-
-            self._clf = clf_class(**clf_dict)
-
         if not isinstance(self._clf, SklearnClassifier) or \
                 not isinstance(self._clf.estimator, BaseEnsemble):
             if self.ensemble is None:
