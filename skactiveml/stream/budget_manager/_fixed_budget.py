@@ -7,19 +7,18 @@ class FixedBudget(BudgetManager):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is sampled, when the utility is
     higher than the specified budget.
-
     This budget manager counts the number of already observed instances and
     compares that to the number of sampled instances. If the ratio is smaller
     than the specified budget, i.e.,
     n_observed_instances * budget - n_sampled_instances >= 1 , the budget
     manager samples an instance when its utility is higher than the budget.
-
     Parameters
     ----------
     budget : float
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1.
     """
+
     def __init__(self, budget=None):
         super().__init__(budget)
 
@@ -31,44 +30,40 @@ class FixedBudget(BudgetManager):
         utility is not sufficient, or the budgeting constraint was simply
         exhausted. For this budget manager this function returns True, when
         n_observed_instances * budget  - n_sampled_instances >= 1.
-
         Returns
         -------
         budget_left : bool
             True, if there is a utility which leads to sampling another
             instance.
         """
-        available_budget = (self.observed_instances_ * self.budget_
-                            - self.queried_instances_)
+        available_budget = (
+            self.observed_instances_ * self.budget_ - self.queried_instances_
+        )
         return available_budget >= 1
 
-    def sample(self, utilities, simulate=False, return_budget_left=False,
-               **kwargs):
+    def sample(
+        self, utilities, simulate=False, return_budget_left=False, **kwargs
+    ):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
-
         Parameters
         ----------
         utilities : ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-
         return_utilities : bool, optional
             If true, also return whether there was budget left for each
             assessed utility. The default is False.
-
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
             the query is the same. This should only be used to prevent the
             budget manager from adapting itself. The default is False.
-
         Returns
         -------
         sampled_indices : ndarray of shape (n_sampled_instances,)
             The indices of instances represented by utilities which should be
             sampled, with 0 <= n_sampled_instances <= n_samples.
-
         budget_left: ndarray of shape (n_samples,), optional
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
@@ -80,6 +75,9 @@ class FixedBudget(BudgetManager):
             self.observed_instances_ = 0
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray) or utilities.dtype != float:
+            raise TypeError("{} is not a valid type for utilities")
         # keep record if the instance is sampled and if there was budget left,
         # when assessing the corresponding utilities
         sampled = np.full(len(utilities), False)
@@ -92,8 +90,9 @@ class FixedBudget(BudgetManager):
         # high enough
         for i, utility in enumerate(utilities):
             tmp_observed_instances += 1
-            budget_left[i] = (tmp_observed_instances * self.budget_
-                              - tmp_queried_instances)
+            budget_left[i] = (
+                tmp_observed_instances * self.budget_ - tmp_queried_instances
+            )
             sampled[i] = budget_left[i] and (utility >= 1 - self.budget_)
             tmp_queried_instances += sampled[i]
 
@@ -113,12 +112,10 @@ class FixedBudget(BudgetManager):
 
     def update(self, sampled, **kwargs):
         """Updates the budget manager.
-
         Parameters
         ----------
         sampled : array-like
             Indicates which instances from X_cand have been sampled.
-
         Returns
         -------
         self : FixedBudget
