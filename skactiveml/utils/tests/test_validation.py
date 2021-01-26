@@ -1,6 +1,6 @@
 import unittest
-
 import numpy as np
+import warnings
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_missing_label, check_scalar, check_X_y
@@ -32,11 +32,21 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_cost_matrix,
                           cost_matrix=[[0, 1], [2, 0]], n_classes=2.5)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=2)
+                          cost_matrix=[[2, 1], [2, 2]], n_classes=2,
+                          diagonal_is_zero=True)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[0, 1], [0, -1]], n_classes=2)
+                          cost_matrix=[[0, 1], [-1, 0]], n_classes=2,
+                          only_non_negative=True)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[0, 0], [0, 0]], n_classes=2)
+                          cost_matrix=[[0, 0], [0, 0]], n_classes=2,
+                          contains_non_zero=True)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            check_cost_matrix(cost_matrix=[[1, 1], [2, 0]], n_classes=2)
+            check_cost_matrix(cost_matrix=[[0, 1], [-1, 0]], n_classes=2)
+            check_cost_matrix(cost_matrix=[[0, 0], [0, 0]], n_classes=2)
+            assert len(w) == 3
+
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
