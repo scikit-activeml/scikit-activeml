@@ -1,8 +1,8 @@
-import numpy as np
-import sklearn
-
 from collections.abc import Iterable
 
+import numpy as np
+import sklearn
+import warnings
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
@@ -144,7 +144,8 @@ def check_classes(classes):
                 types))
 
 
-def check_cost_matrix(cost_matrix, n_classes):
+def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
+                      contains_non_zero=False, diagonal_is_zero=False):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
 
     Parameters
@@ -153,6 +154,15 @@ def check_cost_matrix(cost_matrix, n_classes):
         Cost matrix.
     n_classes : int
         Number of classes.
+    only_non_negative : bool, optional (default=True)
+        This parameter determines whether the matrix must contain only non
+        negative cost entries.
+    contains_non_zero : bool, optional (default=True)
+        This parameter determines whether the matrix must contain at least on
+        non-zero cost entry.
+    diagonal_is_zero : bool, optional (default=True)
+        This parameter determines whether the diagonal cost entries must be
+        zero.
 
     Returns
     -------
@@ -166,6 +176,35 @@ def check_cost_matrix(cost_matrix, n_classes):
         raise ValueError(
             "'cost_matrix' must have shape ({}, {}). "
             "Got {}.".format(n_classes, n_classes, cost_matrix_new.shape))
+    if np.sum(cost_matrix_new < 0) > 0:
+        if only_non_negative:
+            raise ValueError(
+                "'cost_matrix' must contain only non-negative cost entries."
+            )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains negative cost entries."
+            )
+    if n_classes != 1 and np.sum(cost_matrix_new != 0) == 0:
+        if contains_non_zero:
+            raise ValueError(
+                    "'cost_matrix' must contain at least one non-zero cost "
+                    "entry."
+                )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains contains no non-zero cost entry."
+            )
+    if np.sum(np.diag(cost_matrix_new) != 0) > 0:
+        if diagonal_is_zero:
+            raise ValueError(
+                "'cost_matrix' must contain only cost entries being zero on "
+                "its diagonal."
+            )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains non-zero cost entries on its diagonal."
+            )
     return cost_matrix_new
 
 

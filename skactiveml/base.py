@@ -1,11 +1,12 @@
-import numpy as np
 import warnings
-
 from abc import ABC, abstractmethod
+
+import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
+from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length, column_or_1d
 from sklearn.utils.multiclass import type_of_target
-from sklearn.metrics import accuracy_score
+
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
     is_labeled, check_scalar
@@ -435,8 +436,8 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         # Update cost matrix.
         self.cost_matrix_ = 1 - np.eye(len(self.classes_)) \
             if self.cost_matrix is None else self.cost_matrix
-        self.cost_matrix_ = np.array(check_cost_matrix(self.cost_matrix_,
-                                                       len(self.classes_)))
+        self.cost_matrix_ = check_cost_matrix(self.cost_matrix_,
+                                              len(self.classes_))
         if self.classes is not None:
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
