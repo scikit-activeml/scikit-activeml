@@ -138,7 +138,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
                 + " num_classes must be greater than 0"
             )
         # check if utilities is set
-        if not isinstance(utilities, np.ndarray):
+        if not isinstance(utilities, np.ndarray) or utilities.dtype != float:
             raise TypeError("{} is not a valid type for utilities")
         # intialize return parameters
         sampled_indices = []

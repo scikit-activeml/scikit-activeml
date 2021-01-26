@@ -75,6 +75,9 @@ class FixedBudget(BudgetManager):
             self.observed_instances_ = 0
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray) or utilities.dtype != float:
+            raise TypeError("{} is not a valid type for utilities")
         # keep record if the instance is sampled and if there was budget left,
         # when assessing the corresponding utilities
         sampled = np.full(len(utilities), False)

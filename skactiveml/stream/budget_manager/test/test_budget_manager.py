@@ -126,7 +126,7 @@ class TestBudgetManager(unittest.TestCase):
         budget_manager = budget_manager_name()
         self.assertRaises(TypeError, budget_manager.sample, utilities="string")
         self.assertRaises(TypeError, budget_manager.sample, utilities=None)
-        # self.assertRaises(TypeError, budget_manager.sample, utilities=[10, 10])
+        self.assertRaises(TypeError, budget_manager.sample, utilities=[10, 10])
 
 
 #     def _test_sampled_utilities(self, budget_manager_name):
@@ -138,7 +138,7 @@ class TestBudgetManager(unittest.TestCase):
 #         stream_length = 10000
 #         training_size = 1000
 
-#         X, y = sklearn.datasets.make_classification(n_samples=init_train_length + stream_length, random_state=get_randomseed(random_state), shuffle=True)
+#         X, y = sklearn.datasets.make_classification(n_samples=init_train_length + stream_length, random_state=, shuffle=True)
 #         X_init = X[:init_train_length, :]
 #         y_init = y[:init_train_length]
 #         X_stream = X[init_train_length:, :]
