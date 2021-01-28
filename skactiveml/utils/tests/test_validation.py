@@ -81,6 +81,10 @@ class TestValidation(unittest.TestCase):
         new_seed = random_state.get_state()[1][0]
         self.assertEqual(new_seed, seed * multiplier)
 
+        ra = check_random_state(None)
+        rb = check_random_state(None)
+        self.assertTrue(ra.rand() != rb.rand())
+
 
 if __name__ == '__main__':
     unittest.main()

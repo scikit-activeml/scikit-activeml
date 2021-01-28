@@ -399,6 +399,12 @@ def check_random_state(random_state, seed_multiplier=1):
     # Check given random state
     random_state = sklearn.utils.check_random_state(random_state)
 
+    # Check if random_state was initialized with None
+    bit_generator = random_state._bit_generator
+    if isinstance(bit_generator, np.random._mt19937.MT19937) \
+            and bit_generator._seed_seq is not None:
+        return random_state
+
     # Check multiplier
     check_scalar(seed_multiplier, 'seed_multiplier', int, min_val=1)
 
