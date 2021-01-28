@@ -192,26 +192,24 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                  prior_cand=1.e-3, prior_eval=1.e-3,
                  estimator_metric='rbf', estimator_metric_dict=None,
                  batch_mode='greedy',
-                 pre_sim_labels_equal=False,
-                 cand_sim_labels_equal=True,
+                 batch_labels_equal=False,
                  nonmyopic_look_ahead=1, nonmyopic_neighbors='nearest',
+                 nonmyopic_labels_equal=True,
                  independent_probs=True,
                  random_state=None):
         """ XPAL
-        The cost-sensitive expected probabilistic active learning (CsXPAL) strategy is a generalization of the
-        multi-class probabilistic active learning (McPAL) [1], the optimised probabilistic active learning (OPAL) [2]
-        strategy, and the cost-sensitive probabilistic active learning (CsPAL) strategy due to consideration of a cost
-        matrix for multi-class classification problems and the computation of the expected error on an evaluation set.
+        The expected probabilistic active learning (XPAL)
+        strategy is a generalization of the multi-class probabilistic active
+        learning (McPAL) [1], the optimised probabilistic active learning
+        (OPAL) [2] strategy, and the cost-sensitive probabilistic active
+        learning (CsPAL) strategy due to consideration of a cost matrix for
+        multi-class classification problems and the computation of the expected
+        error on an evaluation set.
 
         Attributes
         ----------
-        prob_estimator: BaseEstimator
-            The method that estimates the ground truth. The method should be
-            Bayesian, e.g. local learning with Bayesian Prior.
-        prob_estimator_eval: BaseEstimator
-            Similar to prob_estimator but used for calculating the
-            probabilities of evaluation instances. The default is to use the
-            prob_estimator if not given.
+        clf: SkactivemlClassifier
+            Deterministic classifier to be used.
         scoring: string
             "error"
                 equivalent to accuracy
@@ -223,23 +221,73 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             "macro-accuracy"
                 optional: TODO: prior_class_probability
             "f1-score"
-
-        cost_matrix: array-like (n_classes, n_classes)
         cost_vector: array-like (n_classes)
-
-        mode: string
-            The mode to select candidates:
-                "default" (default)
-                    Instances are selected sequentially using the non-myopic
-                    selection with max_nonmyopic_size into a batch.
-                "density-qpprox"
-                    no X_eval needed, but weights
-
-        max_nonmyopic_size: int
-
-        random_state
-
-        missing_label
+            Vector denoting the misclassification cost of each class. Only
+            used if scoring='cost-vector'.
+        cost_matrix: array-like (n_classes, n_classes)
+            Matrix denoting the misclassification cost. The element
+            cost_matrix[i,j] denotes the cost of an instance with true class i
+            that is predicted as class j.
+            Only used if scoring='misclassification-loss'.
+        custom_perf_func: callable
+            Function measuring the performance of a given confusion matrix.
+            Maps an (n_classes, n_classes) confusion matrix to a performance.
+            Only used if scoring='custom'.
+        prior_cand: float | array-like (n_classes)
+            Prior of the probability distribution of the label of the candidate
+            instance. If it is a float, it is multiplied with the optimal prior
+            vector that is calculated dependent on the cost matrix.
+        prior_eval: float | array-like (n_classes)
+            Prior of the probability distribution of the label of the
+            evaluation instance. If it is a float, it is multiplied with the
+            optimal prior vector that is calculated dependent on the cost
+            matrix.
+        estimator_metric: string | callable
+            The metric to use when estimating probabilities of simulated
+            labels for candidates, candidate sets or evaluation instances.
+            If metric is a string, it must be one of the metrics
+            in sklearn.pairwise.PAIRWISE_KERNEL_FUNCTIONS.
+            Alternatively, if metric is a callable function, it is called on
+            each pair of instances (rows) and the resulting value recorded. The
+            callable should take two rows from X as input and return the
+            corresponding kernel value as a single number. This means that
+            callables from :mod:`sklearn.metrics.pairwise` are not allowed, as
+            they operate on matrices, not single samples. Use the string
+            identifying the kernel instead.
+        estimator_metric_dict: dict
+            Dictionary with additional parameters for the probability estimator
+            defined by estimator_metric.
+        batch_mode: string
+            Set the batch mode for the candidate selection. Must be one of the
+            following:
+            "greedy": Greedily select the candidates for the batch
+            "full": Check all combinations of candidates with a given batch
+            size
+        batch_labels_equal: bool
+            If True, all labels of the instances in one (greedy/full) batch are
+            simulated to be equal. Otherwise, all label combinations are
+            simulated.
+        nonmyopic_look_ahead: int
+            If the value is 1, the method is myopic. If it is greater than 1,
+            multiple instances at the same/similar locations are simulated. If
+            nonmyopic_look_ahead is too low, the utilities might be zero when
+            lots of instances are already labeled. If it is too large, the
+            execution time is increased.
+        nonmyopic_neighbors: str
+            Determine which candidates are used for non-myopic simulation.
+            Must be one of the following:
+            "same":    Simulate all candidates at the same location
+            "nearest": Consider the instances that are nearest to the selected
+                       candidate
+       nonmyopic_labels_equal: bool
+            If True, all labels of the instances in the non-myopic look-ahead
+            set are simulated to be equal. Otherwise, all label combinations
+            are simulated.
+        independent_probs: bool
+            If True, the label probabilities within on batch or one look-ahead
+            set are assumed to be independent to reduce computational cost.
+        random_state : numeric | np.random.RandomState
+            Random state to use.
 
         References
         ----------
@@ -257,8 +305,8 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self.estimator_metric = estimator_metric
         self.estimator_metric_dict = estimator_metric_dict
         self.batch_mode = batch_mode
-        self.pre_sim_labels_equal = pre_sim_labels_equal
-        self.cand_sim_labels_equal = cand_sim_labels_equal
+        self.pre_sim_labels_equal = batch_labels_equal
+        self.cand_sim_labels_equal = nonmyopic_labels_equal
         self.nonmyopic_look_ahead = nonmyopic_look_ahead
         self.nonmyopic_neighbors = nonmyopic_neighbors
         self.independent_probs = independent_probs #TODO not only for non-myopic
@@ -544,6 +592,7 @@ def to_int_labels(est, X, y):
     est.classes = classes.astype(int)
     return est, y
 
+
 def nonmyopic_gain(clf, X, y, sample_weight,
                    cand_idx_set, pre_sel_cand_idx, train_idx,
                    cand_prob_est, sim_cand,
@@ -737,6 +786,7 @@ def _get_y_sim_list(classes, n_instances, labels_equal=True):
 
 
 def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
+    # TODO warning if matrix/vector is given but not used?
     if metric == 'error':
         metric = 'misclassification-loss'
         cost_matrix = 1 - np.eye(n_classes)
