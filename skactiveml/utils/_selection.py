@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from sklearn.utils import check_random_state
-
+#from sklearn.utils import check_random_state
+from skactiveml.utils import check_random_state
 
 def rand_argmin(a, random_state=None, **argmin_kwargs):
     """Returns index of minimum value. In case of ties, a randomly selected

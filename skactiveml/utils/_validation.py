@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Iterable
 
 import numpy as np
@@ -396,6 +397,11 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
 
 
 def check_random_state(random_state, seed_multiplier=1):
+
+    if random_state is None:
+        print('None')
+        return np.random.RandomState(None)
+
     # Check given random state
     random_state = sklearn.utils.check_random_state(random_state)
 
@@ -403,11 +409,13 @@ def check_random_state(random_state, seed_multiplier=1):
     bit_generator = random_state._bit_generator
     if isinstance(bit_generator, np.random._mt19937.MT19937) \
             and bit_generator._seed_seq is not None:
-        return random_state
+        print('check')
+        #return random_state
+        pass
 
     # Check multiplier
     check_scalar(seed_multiplier, 'seed_multiplier', int, min_val=1)
 
     seed = random_state.get_state()[1][0]
-
+    #return random_state
     return np.random.RandomState((seed * seed_multiplier) % (2 ** 32))
