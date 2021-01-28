@@ -358,6 +358,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self._prior_eval = self.prior_eval * opt_prior
 
         #self.estimator_metric, self.estimator_metric_dict
+        # TODO: DO NOT SET SELF
         if self.estimator_metric_dict is None:
             self.estimator_metric_dict = {}
         else:
@@ -394,6 +395,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
         # similarities candidates * candidates + X
+        # TODO why -1?
         sim_cand = np.full([len(X_cand), len(X_)], -1, float)
         if batch_size > 1 or (self.nonmyopic_look_ahead > 1 and
                               self.nonmyopic_neighbors == 'nearest'):
@@ -433,7 +435,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                                           "combined with "
                                           "nonmyopic_look_ahead = 1")
             cand_idx_set = \
-                list(itertools.combinations(range(len(X_cand)), batch_size))
+                list(itertools.combinations(idx_cand, batch_size))
 
             batch_utilities = nonmyopic_gain(
                 clf=self.clf,
@@ -467,7 +469,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         elif self.batch_mode == 'greedy':
 
             for i_greedy in range(batch_size):
-                unlabeled_cand_idx = np.setdiff1d(np.arange(len(X_cand)),
+                unlabeled_cand_idx = np.setdiff1d(idx_cand,
                                                   best_indices)
                 # TODO: non_myopic modes: full, nearest, same
                 cand_idx_set = _get_nonmyopic_cand_set(
