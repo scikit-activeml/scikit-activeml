@@ -1,7 +1,7 @@
 import numpy as np
 import unittest
 
-from skactiveml.pool import McPAL
+from skactiveml.pool import McPAL, XPAL
 from skactiveml.classifier import PWC
 from skactiveml.utils import MISSING_LABEL
 
@@ -129,6 +129,141 @@ class TestMcPAL(unittest.TestCase):
         best_indices = mcpal.query(X_cand=[[0], [1], [2]], X=[[0], [2]],
                                    y=[0, 1])
         np.testing.assert_array_equal(best_indices, [1])
+
+
+class TestXPAL(unittest.TestCase):
+
+    def setUp(self):
+        self.random_state = 1
+        self.X_cand = np.array([[8, 1], [9, 1], [5, 1]])
+        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        self.y = np.array([0, 0, 1, 1])
+        self.classes = np.array([0, 1])
+        self.clf = PWC()
+        self.kwargs = dict(X_cand=self.X_cand, X=self.X, y=self.y)
+
+
+    def test_init_param_clf(self):
+        # TODO
+        pass
+
+    def test_init_param_scoring(self):
+        # TODO
+        pass
+
+    def test_init_param_cost_vector(self):
+        # TODO
+        pass
+
+    def test_init_param_cost_matrix(self):
+        # TODO
+        pass
+
+    def test_init_param_custom_perf_func(self):
+        # TODO
+        pass
+
+    def test_init_param_prior_cand(self):
+        # TODO
+        pass
+
+    def test_init_param_prior_eval(self):
+        # TODO
+        pass
+
+    def test_init_param_estimator_metric(self):
+        # TODO
+        pass
+
+    def test_init_param_estimator_metric_dict(self):
+        # TODO
+        pass
+
+    def test_init_param_batch_mode(self):
+        # TODO
+        pass
+
+    def test_init_param_batch_labels_equal(self):
+        # TODO
+        pass
+
+    def test_init_param_nonmyopic_look_ahead(self):
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=0)
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=1.5)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=-5)
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead='string')
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=None)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+    def test_init_param_nonmyopic_neighbors(self):
+        # TODO
+        # nonmyopic_look_ahead = 2 (nonmyopic method)
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=1,
+                        nonmyopic_neighbors="string")
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=1,
+                        nonmyopic_neighbors=None)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        self.assertTrue(hasattr(selector, 'nonmyopic_labels_equal'))
+
+    def test_init_param_nonmyopic_labels_equal(self):
+        # TODO
+        # nonmyopic_look_ahead = 2 (nonmyopic method)
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=2,
+                        nonmyopic_labels_equal=None)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        self.assertTrue(hasattr(selector, 'nonmyopic_labels_equal'))
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=2,
+                        nonmyopic_labels_equal=[])
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=2,
+                        nonmyopic_labels_equal=0)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=2,
+                        nonmyopic_labels_equal='string')
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+    def test_init_param_independent_probs(self):
+        # nonmyopic_look_ahead = 2 (nonmyopic method)
+        selector = XPAL(clf=self.clf,  nonmyopic_look_ahead=2,
+                        independent_probs=0)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        self.assertTrue(hasattr(selector, 'independent_probs'))
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=2,
+                        independent_probs=None)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf, nonmyopic_look_ahead=2,
+                        independent_probs=[])
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = XPAL(clf=self.clf,  nonmyopic_look_ahead=2,
+                        independent_probs='string')
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        # TODO
+
+    def test_init_param_random_state(self):
+        selector = XPAL(clf=self.clf, random_state='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+        self.assertTrue(hasattr(selector, 'random_state'))
 
 
 if __name__ == '__main__':
