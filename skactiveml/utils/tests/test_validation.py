@@ -73,13 +73,24 @@ class TestValidation(unittest.TestCase):
 
     def test_check_random_state(self):
         seed = 12
-        multiplier = 3
         self.assertRaises(ValueError, check_random_state, 'string')
         self.assertRaises(TypeError, check_random_state, seed, 'string')
 
-        random_state = check_random_state(seed, seed_multiplier=multiplier)
-        new_seed = random_state.get_state()[1][0]
-        self.assertEqual(new_seed, seed * multiplier)
+        random_state = np.random.RandomState(seed)
+        ra = check_random_state(random_state, 3)
+        rb = check_random_state(random_state, 3)
+        self.assertTrue(ra.rand() == rb.rand())
+
+        ra = check_random_state(42, 3)
+        rb = check_random_state(42, 3)
+        self.assertTrue(ra.rand() == rb.rand())
+
+        ra = check_random_state(None)
+        rb = check_random_state(None)
+        self.assertTrue(ra.rand() != rb.rand())
+        ra = check_random_state(np.random.RandomState(None))
+        rb = check_random_state(np.random.RandomState(None))
+        self.assertTrue(ra.rand() != rb.rand())
 
 
 if __name__ == '__main__':
