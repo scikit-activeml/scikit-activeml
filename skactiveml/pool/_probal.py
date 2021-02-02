@@ -120,70 +120,6 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         return X_cand, return_utilities, batch_size, utility_weight, \
             random_state
 
-class BayesianPriorLearner(PWC):
-    # TODO: commment
-    def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
-                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
-                 prior=None, random_state=None):
-        super().__init__(n_neighbors=n_neighbors, metric=metric,
-                         metric_dict=metric_dict, classes=classes,
-                         missing_label=missing_label, cost_matrix=cost_matrix,
-                         random_state=random_state)
-        self.prior = prior
-
-    def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
-
-        Parameters
-        ----------
-        X : matrix-like, shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_outputs)
-            It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
-        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels.
-            It must have the same shape as y.
-
-        Returns
-        -------
-        # TODO
-        self: PWC,
-            The PWC is fitted on the training data.
-        """
-        super().fit(X=X, y=y, sample_weight=sample_weight)
-        n_classes = len(self.classes_)
-        if self.prior is None:
-            self.prior_ = np.zeros([1, n_classes])
-        else:
-            self.prior_ = np.array(self.prior)
-            if self.prior_.shape != (n_classes,):
-                raise ValueError(
-                    "Shape mismatch for 'prior': It is '{}' instead of '({"
-                    "})'".format(self.prior_.shape, n_classes)
-                )
-            else:
-                self.prior_ = self.prior_.reshape(1, -1)
-
-    def predict_freq(self, X):
-        """Return class frequency estimates for the input samples 'X'.
-
-        Parameters
-        ----------
-        X: array-like, shape (n_samples, n_features) or shape
-        (n_samples, m_samples) if metric == 'precomputed'
-            Input samples.
-
-        Returns
-        -------
-        # TODO
-        F: array-like, shape (n_samples, classes)
-            The class frequency estimates of the input samples. Classes are
-            ordered according to classes_.
-        """
-        return super().predict_freq(X) + self.prior_
-
 
 class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
@@ -193,9 +129,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                  estimator_metric='rbf', estimator_metric_dict=None,
                  batch_mode='greedy',
                  batch_labels_equal=False,
-                 nonmyopic_look_ahead=1, nonmyopic_neighbors='nearest',
+                 nonmyopic_max_cand=1, nonmyopic_neighbors='nearest',
                  nonmyopic_labels_equal=True,
-                 independent_probs=True,
+                 nonmyopic_independent_probs=True,
                  random_state=None):
         """ XPAL
         The expected probabilistic active learning (XPAL)
@@ -267,7 +203,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             If True, all labels of the instances in one (greedy/full) batch are
             simulated to be equal. Otherwise, all label combinations are
             simulated.
-        nonmyopic_look_ahead: int
+        nonmyopic_max_cand: int
             If the value is 1, the method is myopic. If it is greater than 1,
             multiple instances at the same/similar locations are simulated. If
             nonmyopic_look_ahead is too low, the utilities might be zero when
@@ -279,13 +215,13 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             "same":    Simulate all candidates at the same location
             "nearest": Consider the instances that are nearest to the selected
                        candidate
-       nonmyopic_labels_equal: bool
+        nonmyopic_labels_equal: bool
             If True, all labels of the instances in the non-myopic look-ahead
             set are simulated to be equal. Otherwise, all label combinations
             are simulated.
-        independent_probs: bool
-            If True, the label probabilities within on batch or one look-ahead
-            set are assumed to be independent to reduce computational cost.
+        nonmyopic_independent_probs: bool
+            If True, the label probabilities within one nonmyopic set are
+            assumed to be independent to reduce computational cost.
         random_state : numeric | np.random.RandomState
             Random state to use.
 
@@ -305,11 +241,11 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self.estimator_metric = estimator_metric
         self.estimator_metric_dict = estimator_metric_dict
         self.batch_mode = batch_mode
-        self.pre_sim_labels_equal = batch_labels_equal
-        self.cand_sim_labels_equal = nonmyopic_labels_equal
-        self.nonmyopic_look_ahead = nonmyopic_look_ahead
+        self.batch_labels_equal = batch_labels_equal
+        self.nonmyopic_max_cand = nonmyopic_max_cand
         self.nonmyopic_neighbors = nonmyopic_neighbors
-        self.independent_probs = independent_probs #TODO not only for non-myopic
+        self.nonmyopic_labels_equal = nonmyopic_labels_equal
+        self.nonmyopic_independent_probs = nonmyopic_independent_probs
 
     def _validate_input(self, X_cand, X, y, X_eval, batch_size, sample_weight,
                         return_utilities):
@@ -349,7 +285,6 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
     def query(self, X_cand, X, y, X_eval=None, batch_size=1,
               sample_weight_cand=None, sample_weight=None,
               sample_weight_eval=None, return_utilities=False, **kwargs):
-        # TODO: add density weights
         """
 
         Attributes
@@ -378,6 +313,11 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             sample_weight_cand = np.ones(len(X_cand))
         if sample_weight is None:
             sample_weight = np.ones(len(X))
+        if sample_weight_eval is None:
+            if X_eval is None:
+                sample_weight_eval = np.ones(len(X_cand))
+            else:
+                sample_weight_eval = np.ones(len(X_eval))
 
         ### TEST init parameters
         # CHECK self.clf
@@ -406,14 +346,13 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self._prior_eval = self.prior_eval * opt_prior
 
         #self.estimator_metric, self.estimator_metric_dict
-        # TODO: DO NOT SET SELF
         if self.estimator_metric_dict is None:
-            self.estimator_metric_dict = {}
+            estimator_metric_dict = {}
         else:
             estimator_metric_dict = self.estimator_metric_dict
 
         if self.estimator_metric == 'rbf' and \
-                self.estimator_metric_dict is None:
+                estimator_metric_dict is None:
             # TODO: include std, citations, check gamma-bandwidth transformation
             bandwidth = estimate_bandwidth(X.shape[0], X.shape[1])
             estimator_metric_dict = {'gamma': 1/bandwidth}
@@ -425,6 +364,11 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         # TODO self.nonmyopic_neighbors
         # TODO self.nonmyopic_independence
 
+
+        if self.batch_mode == 'full' and self.nonmyopic_max_cand > 1:
+            raise NotImplementedError("batch_mode = 'full' can only be "
+                                      "combined with nonmyopic_max_cand = 1")
+
         """
         CODE
         """
@@ -432,36 +376,33 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         X_ = np.concatenate([X_cand, X], axis=0)
         y_ = np.concatenate([np.full(len(X_cand), missing_label), y], axis=0)
         sample_weight_ = np.concatenate([sample_weight_cand, sample_weight])
+        if X_eval is None:
+            sample_weight_eval_ = np.concatenate([sample_weight_eval,
+                                                  np.full(len(X), 0)])
 
-        idx_cand = list(range(len(X_cand)))
-        idx_train = list(range(len(X_cand), len(X_cand)+len(X)))
-        idx_lbld = np.where(is_labeled(y_, missing_label))[0]
+        idx_X_cand = list(range(len(X_cand)))
+        idx_X = list(range(len(X_cand), len(X_cand)+len(X)))
+        idx_X_lbld = np.where(is_labeled(y_, missing_label))[0]
 
         K = lambda X1, X2: pairwise_kernels(X1, X2,
                                             metric=self.estimator_metric,
                                             **estimator_metric_dict)
 
-        # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
-        # similarities candidates * candidates + X
-        # TODO why -1?
-        sim_cand = np.full([len(X_cand), len(X_)], -1, float)
-        if batch_size > 1 or (self.nonmyopic_look_ahead > 1 and
-                              self.nonmyopic_neighbors == 'nearest'):
-            sim_cand[:, idx_cand] = K(X_[idx_cand], X_[idx_cand])
-        if len(idx_lbld) > 0:
-            sim_cand[:, idx_lbld] = K(X_[idx_cand], X_[idx_lbld])
 
-        # similarities eval * candidates + X resp. cand * cand
-        if not X_eval is None:
-            sim_eval = np.full([len(X_eval), len(X_)], -1, float)
-            sim_eval[:, idx_cand] = K(X_eval, X_[idx_cand])
-            if len(idx_lbld) > 0:
-                sim_eval[:, idx_lbld] = K(X_eval, X_[idx_lbld])
+        # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
+        calc_cand_cand_sim = (self.nonmyopic_max_cand > 1 and
+                              self.nonmyopic_neighbors == 'nearest') \
+                             or batch_size > 1
+        sim_cand = _calc_sim(K, X_cand, X_cand, X_,
+                             idx_Y1=None if calc_cand_cand_sim else [],
+                             idx_Y2=idx_X_lbld)
+
+        if X_eval is not None:
+            sim_eval = _calc_sim(K, X_eval, X_cand, X_, idx_Y2=idx_X_lbld)
         else:
-            sim_eval = np.full([len(X_), len(X_)], -1, float)
-            sim_eval[np.ix_(idx_cand, idx_cand)] = np.eye(len(X_cand), dtype=float)
-            sim_eval[np.ix_(idx_cand, idx_lbld)] = sim_cand[:, idx_lbld]
-            # TODO sim_eval must have |X_| x |X_| shape
+            sim_eval = np.concatenate([
+                _calc_sim(K, X_cand, X_cand, X_, idx_Y2=idx_X_lbld),
+                _calc_sim(K, X_, X_cand, X_, idx_Y1=[], idx_Y2=[])], axis=0)
 
         # INITIALIZE PROB ESTIMATION
         cand_prob_est = PWC(metric="precomputed", classes=classes,
@@ -474,96 +415,236 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                             random_state=random_state)
 
         # CODE
-        utilities = np.full([batch_size, len(X_cand)], np.nan,
-                            dtype=float)
+        utilities = np.full([batch_size, len(X_cand)], np.nan, dtype=float)
         best_indices = np.empty([batch_size], int)
-        if self.batch_mode == 'full':
-            if self.nonmyopic_look_ahead > 1:
-                raise NotImplementedError("batch_mode = 'full' can only be "
-                                          "combined with "
-                                          "nonmyopic_look_ahead = 1")
-            cand_idx_set = \
-                list(itertools.combinations(idx_cand, batch_size))
 
-            batch_utilities = nonmyopic_gain(
+        n_iter = 1 if self.batch_mode == 'full' else batch_size
+
+        for i_iter in range(n_iter):
+            idx_preselected = best_indices[:i_iter]
+            idx_remaining = np.setdiff1d(idx_X_cand, idx_preselected)
+
+            if self.batch_mode == 'full':
+                idx_candlist_set = \
+                    list(itertools.combinations(idx_remaining, batch_size))
+            elif self.batch_mode == 'greedy':
+                idx_candlist_set = _get_nonmyopic_cand_set(
+                    neighbors=self.nonmyopic_neighbors,
+                    cand_idx=idx_remaining,
+                    sim_cand=sim_cand[:, idx_X_cand],
+                    M=self.nonmyopic_max_cand)
+            else:
+                raise ValueError("batch_mode must either be 'greedy' or 'full'")
+
+            iter_utilities = probabilistic_gain(
                 clf=self.clf,
                 X=X_,
                 y=y_,
+                X_eval=X_eval,
                 sample_weight=sample_weight_,
-                cand_idx_set=cand_idx_set,
-                pre_sel_cand_idx=[],
-                train_idx=idx_train,
+                sample_weight_eval=sample_weight_eval,
+                idx_candlist_set=idx_candlist_set,
+                idx_preselected=list(idx_preselected),
+                idx_train=idx_X,
                 cand_prob_est=cand_prob_est,
                 sim_cand=sim_cand,
                 eval_prob_est=eval_prob_est,
                 sim_eval=sim_eval,
-                X_eval=X_eval,
-                sample_weight_eval = sample_weight_eval,
                 scoring_decomposable=scoring_decomposable,
                 scoring_cost_matrix=cost_matrix,
                 scoring_perf_func=perf_func,
-                gain_mode='batch',
-                independent_probs=self.independent_probs,
-                pre_sim_labels_equal=self.pre_sim_labels_equal,
-                cand_sim_labels_equal=self.cand_sim_labels_equal
+                batch_labels_equal=self.batch_labels_equal,
+                nonmyopic_independent_probs=self.nonmyopic_independent_probs,
+                nonmyopic_labels_equal=self.nonmyopic_labels_equal
             )
 
-            # TODO: get utilities for each individual instance by maximizing all
-            #  utilities where the instance is contined
-            cur_best_idx = rand_argmax([batch_utilities], axis=1,
+            if self.batch_mode == 'greedy':
+                # calculate mean gain for non-myopic gains
+                M = self.nonmyopic_max_cand
+                iter_utilities = iter_utilities.reshape(-1, M)
+                iter_utilities /= np.arange(1, M + 1).reshape(-1, M)
+                iter_utilities = np.nanmax(iter_utilities, axis=1)
+
+                utilities[i_iter, idx_remaining] = iter_utilities
+
+                cur_best_idx = rand_argmax(iter_utilities,
                                            random_state=random_state)
-            best_indices[:] = cand_idx_set[cur_best_idx[0]]
-
-        elif self.batch_mode == 'greedy':
-
-            for i_greedy in range(batch_size):
-                unlabeled_cand_idx = np.setdiff1d(idx_cand,
-                                                  best_indices)
-                # TODO: non_myopic modes: full, nearest, same
-                cand_idx_set = _get_nonmyopic_cand_set(
-                    neighbors=self.nonmyopic_neighbors,
-                    cand_idx=unlabeled_cand_idx,
-                    sim_cand=sim_cand[:, idx_cand],
-                    M=self.nonmyopic_look_ahead)
-
-                # TODO: sample_weight_*  missing
-                tmp_utilities = nonmyopic_gain(
-                    clf=self.clf,
-                    X=X_,
-                    y=y_,
-                    sample_weight=sample_weight_,
-                    cand_idx_set=cand_idx_set,
-                    pre_sel_cand_idx=list(best_indices[:i_greedy]),
-                    train_idx=idx_train,
-                    cand_prob_est=cand_prob_est,
-                    sim_cand=sim_cand,
-                    eval_prob_est=eval_prob_est,
-                    sim_eval=sim_eval,
-                    X_eval=X_eval,
-                    sample_weight_eval = sample_weight_eval,
-                    scoring_decomposable=scoring_decomposable,
-                    scoring_cost_matrix=cost_matrix,
-                    scoring_perf_func=perf_func,
-                    gain_mode='nonmyopic',
-                    independent_probs=self.independent_probs,
-                    pre_sim_labels_equal=self.pre_sim_labels_equal,
-                    cand_sim_labels_equal=self.cand_sim_labels_equal
-                )
-                tmp_utilities = tmp_utilities.reshape(-1, self.nonmyopic_look_ahead)
-                tmp_utilities = np.nanmax(tmp_utilities, axis=1)
-                cur_best_idx = rand_argmax([tmp_utilities], axis=1,
+                best_indices[i_iter] = idx_remaining[cur_best_idx]
+            elif self.batch_mode == 'full':
+                # TODO: get utilities for each individual instance by maximizing all
+                #  utilities where the instance is contined
+                cur_best_idx = rand_argmax([iter_utilities], axis=1,
                                            random_state=random_state)
+                best_indices[:] = idx_candlist_set[cur_best_idx[0]]
 
-                best_indices[i_greedy] = unlabeled_cand_idx[cur_best_idx]
-                utilities[i_greedy, unlabeled_cand_idx] = tmp_utilities
-
-        else:
-            raise ValueError('batch_mode unknown')
 
         if return_utilities:
             return best_indices, utilities
         else:
             return best_indices
+
+
+def probabilistic_gain(clf, X, y, X_eval,
+                       sample_weight, sample_weight_eval,
+                       idx_candlist_set, idx_preselected, idx_train,
+                       cand_prob_est, sim_cand,
+                       eval_prob_est, sim_eval,
+                       scoring_decomposable,
+                       scoring_cost_matrix, scoring_perf_func,
+                       batch_labels_equal=False,
+                       nonmyopic_independent_probs=False,
+                       nonmyopic_labels_equal=True):
+
+
+    # TODO: check sim shapes and values for training data, candidates etc
+    # np.set_printoptions(precision=1, suppress=True)
+    # print(sim_cand.T)
+    # print(sim_eval.T)
+
+    idx_cand_unique = \
+        np.unique(list(itertools.chain(*idx_candlist_set))).tolist()
+    idx_train = list(idx_train)
+    idx_preselected = list(idx_preselected)
+
+    # TODO check if estimator have same label encoder as clf
+    y = np.array(y)
+    cand_prob_est, _ = to_int_labels(cand_prob_est, X[idx_train], y[idx_train])
+    eval_prob_est, _ = to_int_labels(eval_prob_est, X[idx_train], y[idx_train])
+    clf, y = to_int_labels(clf, X, y)
+
+    clf.fit(X[idx_train], y[idx_train], sample_weight[idx_train])
+    if X_eval is None:
+        pred_old_cand = np.full_like(y, clf.missing_label)
+        pred_old_cand[idx_cand_unique] = clf.predict(X[idx_cand_unique])
+    else:
+        pred_old_cand = clf.predict(X_eval)
+
+    label_encoder = ExtLabelEncoder(missing_label=clf.missing_label,
+                                    classes=clf.classes).fit(y)
+    classes = label_encoder.transform(label_encoder.classes_)
+
+
+
+    prob_cand_X = np.full([len(X), len(classes)], np.nan, float)
+    cand_prob_est.fit(X[idx_train], y[idx_train], sample_weight[idx_train])
+    prob_cand_X[idx_cand_unique + idx_preselected] = \
+        cand_prob_est.predict_proba(sim_cand[idx_cand_unique + idx_preselected, :][:, idx_train])
+
+    # TODO cand_idx_set filtern bei indpendent (reihenfolge ignorieren)
+    # TODO bei independent funktioniert gleichheit nicht (exp gezeigt)
+    size_set = len(set([tuple(sorted(x)) for x in idx_candlist_set]))
+    print('Einsparpotenzial',
+          len(idx_candlist_set) - size_set, len(idx_candlist_set))
+
+    if nonmyopic_independent_probs:
+        sm_cand_idx_set = []
+        map_cand_to_sm = np.zeros(len(idx_candlist_set), int)
+        for c_idx, c in enumerate(idx_candlist_set):
+            c = sorted(c)
+            try:
+                sm_idx = sm_cand_idx_set.index(c)
+                map_cand_to_sm[c_idx] = sm_idx
+            except:
+                map_cand_to_sm[c_idx] = len(sm_cand_idx_set)
+                sm_cand_idx_set.append(c)
+    else:
+        sm_cand_idx_set = idx_candlist_set
+        map_cand_to_sm = np.arange(len(idx_candlist_set))
+
+    # include pre_sel_cand
+    length_cand_idx_set = np.asarray([len(c) for c in sm_cand_idx_set], int)
+    y_sim_lists_pre = _get_y_sim_list(classes=classes,
+                                      n_instances=len(idx_preselected),
+                                      labels_equal=batch_labels_equal)
+    y_sim_lists_cand = [_get_y_sim_list(classes=classes, n_instances=n,
+                                        labels_equal=nonmyopic_labels_equal)
+                        for n in range(np.max(length_cand_idx_set)+1)]
+    y_sim_lists = [list(itertools.product(y_sim_lists_pre, y_sim_list_cand))
+                   for y_sim_list_cand in y_sim_lists_cand]
+
+    utilities = np.full(len(idx_candlist_set), np.nan, float)
+    sm_utilities = np.full(len(sm_cand_idx_set), np.nan, float)
+
+    for i_cand_idx, cand_idx in enumerate(sm_cand_idx_set):
+        # TODO include pre_sel_cand_idx
+        cand_idx = list(cand_idx)
+
+        idx_new = idx_preselected + cand_idx + idx_train
+        X_new = X[idx_new]
+        sim_eval_new = sim_eval[:, idx_new]
+        sample_weight_new = sample_weight[idx_new]
+
+        y_sim_list = y_sim_lists[len(cand_idx)]
+
+        # TODO Label encoder for y_sim_list
+        # TODO not only for non-myopic?
+        if nonmyopic_independent_probs:
+            prob_y_sim = \
+                np.prod(prob_cand_X[idx_preselected + cand_idx,
+                                    [a+b for a,b in y_sim_list]], axis=1)
+        else:
+            prob_y_sim = _dependent_cand_prob(cand_idx, idx_preselected,
+                                              idx_train,
+                                              y_sim_list,
+                                              X, y, sample_weight, prob_cand_X,
+                                              cand_prob_est, sim_cand,
+                                              pre_independence=nonmyopic_independent_probs)
+
+
+        sm_utilities[i_cand_idx] = 0
+        for i_y_sim, (y_sim_pre, y_sim_cand) in enumerate(y_sim_list):
+            # TODO pre_sel_cand
+            y_new = np.concatenate([y_sim_pre, y_sim_cand, y[idx_train]], axis=0)
+
+            eval_prob_est.fit(X_new, y_new, sample_weight_new)
+
+            new_clf = clf.fit(X_new, y_new, sample_weight_new)
+            if X_eval is None:
+                # TODO: sim_eval_new must correspond to indices in X
+                prob_eval = eval_prob_est.predict_proba(sim_eval_new[cand_idx])
+                pred_new = new_clf.predict(X[cand_idx])
+                pred_old = pred_old_cand[cand_idx]
+                sample_weight_eval_new = sample_weight_eval[cand_idx]
+                # TODO: check density weights
+            else:
+                prob_eval = eval_prob_est.predict_proba(sim_eval_new)
+                pred_new = new_clf.predict(X_eval)
+                pred_old = pred_old_cand
+                sample_weight_eval_new = sample_weight_eval
+
+            sm_utilities[i_cand_idx] += \
+                _dperf(prob_eval, pred_old, pred_new,
+                       sample_weight_eval=sample_weight_eval_new,
+                       decomposable=scoring_decomposable,
+                       cost_matrix=scoring_cost_matrix,
+                       perf_func=scoring_perf_func) \
+                * prob_y_sim[i_y_sim]
+
+
+
+    utilities = sm_utilities[map_cand_to_sm]
+    return utilities
+
+
+def _calc_sim(K, X, Y1, Y2, idx_Y1=None, idx_Y2=None, default=np.nan):
+    if idx_Y1 is None:
+        sim_1 = K(X, Y1)
+    else:
+        sim_1 = np.full([len(X), len(Y1)], default, float)
+        if len(idx_Y1) > 0:
+            sim_1[:, idx_Y1] = K(X, Y1[idx_Y1])
+
+
+    if idx_Y1 is None:
+        sim_2 = K(X, Y2)
+    else:
+        sim_2 = np.full([len(X), len(Y2)], default, float)
+        if len(idx_Y2) > 0:
+            sim_2[:, idx_Y2] = K(X, Y2[idx_Y2])
+
+    return np.concatenate([sim_1, sim_2], axis=1)
+
+
 
 def _get_nonmyopic_cand_set(neighbors, cand_idx, sim_cand, M):
     if neighbors == 'same':
@@ -592,155 +673,6 @@ def to_int_labels(est, X, y):
     est.classes = classes.astype(int)
     return est, y
 
-
-def nonmyopic_gain(clf, X, y, sample_weight,
-                   cand_idx_set, pre_sel_cand_idx, train_idx,
-                   cand_prob_est, sim_cand,
-                   eval_prob_est, sim_eval,
-                   X_eval,
-                   sample_weight_eval,
-                   scoring_decomposable, scoring_cost_matrix, scoring_perf_func,
-                   gain_mode='nonmyopic',
-                   independent_probs=False,
-                   pre_sim_labels_equal=False,
-                   cand_sim_labels_equal=True):
-
-    if sample_weight_eval is None:
-        if not X_eval is None:
-            sample_weight_eval = np.ones(len(X_eval))
-        else:
-            sample_weight_eval = np.ones(len(X))
-
-    all_cand_idx = np.unique(list(itertools.chain(*cand_idx_set))).tolist()
-    # TODO: if X_eval == None: sim_eval must have shape |X| x |X|
-
-    # TODO: check sim shapes and values for training data, candidates etc
-    # np.set_printoptions(precision=1, suppress=True)
-    # print(sim_cand.T)
-    # print(sim_eval.T)
-
-    train_idx = list(train_idx)
-    pre_sel_cand_idx = list(pre_sel_cand_idx)
-
-    # TODO check if estimator have same label encoder as clf
-    y = np.array(y)
-    cand_prob_est, _ = to_int_labels(cand_prob_est, X[train_idx], y[train_idx])
-    eval_prob_est, _ = to_int_labels(eval_prob_est, X[train_idx], y[train_idx])
-    clf, y = to_int_labels(clf, X, y)
-
-    clf.fit(X[train_idx], y[train_idx], sample_weight[train_idx])
-    if X_eval is None:
-        pred_old_cand = np.full_like(y, clf.missing_label)
-        pred_old_cand[all_cand_idx] = clf.predict(X[all_cand_idx])
-    else:
-        pred_old_cand = clf.predict(X_eval)
-
-    label_encoder = ExtLabelEncoder(missing_label=clf.missing_label,
-                                    classes=clf.classes).fit(y)
-    classes = label_encoder.transform(label_encoder.classes_)
-
-
-
-    prob_cand_X = np.full([len(X), len(classes)], np.nan, float)
-    cand_prob_est.fit(X[train_idx], y[train_idx], sample_weight[train_idx])
-    prob_cand_X[all_cand_idx+pre_sel_cand_idx] = \
-        cand_prob_est.predict_proba(sim_cand[all_cand_idx+pre_sel_cand_idx,:][:,train_idx])
-
-    # TODO cand_idx_set filtern bei indpendent (reihenfolge ignorieren)
-    # TODO bei independent funktioniert gleichheit nicht (exp gezeigt)
-    size_set = len(set([tuple(sorted(x)) for x in cand_idx_set]))
-    print('Einsparpotenzial',
-          len(cand_idx_set)-size_set, len(cand_idx_set))
-
-    if independent_probs:
-        sm_cand_idx_set = []
-        map_cand_to_sm = np.zeros(len(cand_idx_set), int)
-        for c_idx, c in enumerate(cand_idx_set):
-            c = sorted(c)
-            try:
-                sm_idx = sm_cand_idx_set.index(c)
-                map_cand_to_sm[c_idx] = sm_idx
-            except:
-                map_cand_to_sm[c_idx] = len(sm_cand_idx_set)
-                sm_cand_idx_set.append(c)
-    else:
-        sm_cand_idx_set = cand_idx_set
-        map_cand_to_sm = np.arange(len(cand_idx_set))
-
-    # include pre_sel_cand
-    length_cand_idx_set = np.asarray([len(c) for c in sm_cand_idx_set], int)
-    y_sim_lists_pre = _get_y_sim_list(classes=classes,
-                                      n_instances=len(pre_sel_cand_idx),
-                                      labels_equal=pre_sim_labels_equal)
-    y_sim_lists_cand = [_get_y_sim_list(classes=classes, n_instances=n,
-                                        labels_equal=cand_sim_labels_equal)
-                        for n in range(np.max(length_cand_idx_set)+1)]
-    y_sim_lists = [list(itertools.product(y_sim_lists_pre, y_sim_list_cand))
-                   for y_sim_list_cand in y_sim_lists_cand]
-
-    utilities = np.full(len(cand_idx_set), np.nan, float)
-    sm_utilities = np.full(len(sm_cand_idx_set), np.nan, float)
-
-    for i_cand_idx, cand_idx in enumerate(sm_cand_idx_set):
-        # TODO include pre_sel_cand_idx
-        cand_idx = list(cand_idx)
-
-        idx_new = pre_sel_cand_idx + cand_idx + train_idx
-        X_new = X[idx_new]
-        sim_eval_new = sim_eval[:, idx_new]
-        sample_weight_new = sample_weight[idx_new]
-
-        y_sim_list = y_sim_lists[len(cand_idx)]
-
-        # TODO Label encoder for y_sim_list
-
-        if independent_probs:
-            prob_y_sim = \
-                np.prod(prob_cand_X[pre_sel_cand_idx + cand_idx,
-                                    [a+b for a,b in y_sim_list]], axis=1)
-        else:
-            prob_y_sim = _dependent_cand_prob(cand_idx, pre_sel_cand_idx,
-                                              train_idx,
-                                              y_sim_list,
-                                              X, y, sample_weight, prob_cand_X,
-                                              cand_prob_est, sim_cand,
-                                              pre_independence=independent_probs)
-
-
-        sm_utilities[i_cand_idx] = 0
-        for i_y_sim, (y_sim_pre, y_sim_cand) in enumerate(y_sim_list):
-            # TODO pre_sel_cand
-            y_new = np.concatenate([y_sim_pre, y_sim_cand, y[train_idx]], axis=0)
-
-            eval_prob_est.fit(X_new, y_new, sample_weight_new)
-
-            new_clf = clf.fit(X_new, y_new, sample_weight_new)
-            if X_eval is None:
-                # TODO: sim_eval_new must correspond to indices in X
-                prob_eval = eval_prob_est.predict_proba(sim_eval_new[cand_idx])
-                pred_new = new_clf.predict(X[cand_idx])
-                pred_old = pred_old_cand[cand_idx]
-                sample_weight_eval_new = sample_weight_eval[cand_idx]
-            else:
-                prob_eval = eval_prob_est.predict_proba(sim_eval_new)
-                pred_new = new_clf.predict(X_eval)
-                pred_old = pred_old_cand
-                sample_weight_eval_new = sample_weight_eval
-
-            sm_utilities[i_cand_idx] += \
-                _dperf(prob_eval, pred_old, pred_new,
-                       sample_weight_eval=sample_weight_eval_new,
-                       decomposable=scoring_decomposable,
-                       cost_matrix=scoring_cost_matrix,
-                       perf_func=scoring_perf_func) \
-                * prob_y_sim[i_y_sim]
-
-
-    if gain_mode == 'nonmyopic':
-        sm_utilities /= length_cand_idx_set
-
-    utilities = sm_utilities[map_cand_to_sm]
-    return utilities
 
 def _dependent_cand_prob(cand_idx, pre_sel_cand_idx, train_idx, y_sim_list,
                          X, y, sample_weight,prob_cand_X,
