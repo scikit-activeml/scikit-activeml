@@ -352,7 +352,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             estimator_metric_dict = self.estimator_metric_dict
 
         if self.estimator_metric == 'rbf' and \
-                estimator_metric_dict is None:
+                len(estimator_metric_dict) == 0:
             # TODO: include std, citations, check gamma-bandwidth transformation
             bandwidth = estimate_bandwidth(X.shape[0], X.shape[1])
             estimator_metric_dict = {'gamma': 1/bandwidth}

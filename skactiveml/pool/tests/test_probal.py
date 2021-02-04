@@ -1,5 +1,6 @@
 import numpy as np
 import unittest
+from itertools import product
 
 from skactiveml.pool import McPAL, XPAL, RandomSampler
 from skactiveml.classifier import PWC
@@ -416,6 +417,70 @@ class TestXPAL(unittest.TestCase):
         self.assertRaises(ValueError, selector.query, **self.kwargs)
 
         self.assertTrue(hasattr(selector, 'random_state'))
+
+    def test_general_query(self):
+        random_state = np.random.RandomState(1)
+        X = random_state.rand(5, 2)
+        y_oracle = random_state.randint(2, 4, [5])
+        y = np.full(y_oracle.shape, MISSING_LABEL)
+        y[2:3] = y_oracle[2:3]
+
+        X_cand = X
+        sample_weight_cand = None
+        sample_weight = None
+        sample_weight_eval = None
+
+        clf = PWC(classes=np.unique(y_oracle))
+        prior_cand = 1.e-3
+        prior_eval = 1.e-3
+        estimator_metric = 'rbf'
+        estimator_metric_dict = None
+
+        scorings = ['error', 'macro-accuracy']
+        X_evals = [None, X_cand]
+        batch_labels_equals = [True, False]
+        batch_sizes = [1, 2]
+        batch_modes = ['full', 'greedy']
+        nonmyopic_max_cands = [1, 2]  # full only 1,
+        nonmyopic_independent_probss = [True, False]
+        nonmyopic_neighborss = ['same', 'nearest']
+        nonmyopic_labels_equals = [True, False]
+
+        params = list(
+            product(scorings, X_evals, batch_labels_equals, batch_sizes,
+                    batch_modes, [1],
+                    [False], ['same'], [True]))
+        params += list(
+            product(scorings, X_evals, batch_labels_equals, batch_sizes,
+                    ['greedy'], [2],
+                    nonmyopic_independent_probss, nonmyopic_neighborss,
+                    nonmyopic_labels_equals))
+
+        for (scoring, X_eval, batch_labels_equal, batch_size, batch_mode,
+             nonmyopic_max_cand, nonmyopic_independent_probs,
+             nonmyopic_neighbors,
+             nonmyopic_labels_equal) in params:
+            with self.subTest(msg="xPAL", params=params):
+                selector = XPAL(clf, scoring=scoring, cost_vector=None,
+                                cost_matrix=None,
+                                custom_perf_func=None,
+                                prior_cand=prior_cand, prior_eval=prior_eval,
+                                estimator_metric=estimator_metric,
+                                estimator_metric_dict=estimator_metric_dict,
+                                batch_mode=batch_mode,
+                                batch_labels_equal=batch_labels_equal,
+                                nonmyopic_max_cand=nonmyopic_max_cand,
+                                nonmyopic_neighbors=nonmyopic_neighbors,
+                                nonmyopic_labels_equal=nonmyopic_labels_equal,
+                                nonmyopic_independent_probs=
+                                nonmyopic_independent_probs)
+
+                selector.query(X_cand, X, y, X_eval=X_eval,
+                               batch_size=batch_size,
+                               sample_weight_cand=sample_weight_cand,
+                               sample_weight=sample_weight,
+                               sample_weight_eval=sample_weight_eval,
+                               return_utilities=True)
 
 
 if __name__ == '__main__':
