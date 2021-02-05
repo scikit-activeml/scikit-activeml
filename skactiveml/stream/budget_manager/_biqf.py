@@ -1,17 +1,19 @@
 import numpy as np
 
 from .base import BudgetManager, get_default_budget
-# from sortedcontainers import SortedList
 from collections import deque
 
 
 class BIQF(BudgetManager):
     """
     """
-    def __init__(self, w, w_tol, budget=None):
+    def __init__(self, w=100, w_tol=50, budget=None):
         super().__init__(budget)
         self.w = w
         self.w_tol = w_tol
+
+    def is_budget_left(self):
+        pass
 
     def sample(
         self, utilities, return_budget_left=False, simulate=False, **kwargs
@@ -23,32 +25,54 @@ class BIQF(BudgetManager):
             self.observed_instances_ = 0
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
-        if not hasattr(self, "theta_"):
-            self.theta_ = 0.0
-        if not hasattr(self, "theta_bal_"):
-            self.theta_bal_ = 0.0
-        if not hasattr(self, "history_sorted"):
-            self.history_sorted = deque(maxlen=self.w)
+        if not hasattr(self, "history_sorted_"):
+            self.history_sorted_ = deque(maxlen=self.w)
         
         # intialize return parameters
         sampled_indices = []
 
         for i, u in enumerate(utilities):
             self.observed_instances_ += 1
-            self.history_sorted.append(u)
-            self.theta_ = np.quantile(self.history_sorted, (1 - self.budget_))
+            self.history_sorted_.append(u)
+            theta = np.quantile(self.history_sorted_, (1 - self.budget_))
 
-            range_ranking = np.max(self.historyArr) - (
-                np.min(self.historyArr)) + 1e-6
-            acq_left = self.budget * self.observed_instances_ - (
-                self.queried_instances_)
-            self.theta_bal = self.theta_ - range_ranking * acq_left / (
-                self.w_tol)
+            range_ranking = (np.max(self.history_sorted_) 
+                             - np.min(self.history_sorted_))
+            acq_left = (self.budget_ * self.observed_instances_ 
+                        - self.queried_instances_)
+            theta_bal = (theta - range_ranking * acq_left 
+                         / self.w_tol)
             
-            sample = u >= self.theta_bal
+            sample = u >= theta_bal
             
             if sample:
                 self.queried_instances_ += 1
             sampled_indices.append(sample)
 
         return sampled_indices
+
+    def update(self, sampled, **kwargs):
+        """Updates the budget manager.
+
+        Parameters
+        ----------
+        sampled : array-like
+            Indicates which instances from X_cand have been sampled.
+
+        Returns
+        -------
+        self : EstimatedBudget
+            The EstimatedBudget returns itself, after it is updated.
+        """
+        # check if budget has been set
+        self._validate_budget(get_default_budget())
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
+        self.observed_instances_ += sampled.shape[0]
+        self.queried_instances_ += np.sum(sampled)
+        return self
+
+        return self
