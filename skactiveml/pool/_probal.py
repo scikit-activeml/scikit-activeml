@@ -621,7 +621,7 @@ def _reduce_candlist_set(candidate_sets, reduce=False):
 
     Returns
     -------
-    reduced_candidate_sets: np.ndarray
+    reduced_candidate_sets: list
         Reduced array containing the unique candidate sets.
     index_mapping: np.ndarray, shape (n_candidate_sets)
         Maps old candidate indices to the indices in the new
@@ -639,9 +639,9 @@ def _reduce_candlist_set(candidate_sets, reduce=False):
                 index_mapping[c_idx] = len(reduced_candidate_sets)
                 reduced_candidate_sets.append(c)
     else:
-        reduced_candidate_sets = candidate_sets
+        reduced_candidate_sets = list(candidate_sets)
         index_mapping = np.arange(len(candidate_sets))
-    return np.array(reduced_candidate_sets), index_mapping
+    return reduced_candidate_sets, index_mapping
 
 
 def _calc_sim(K, X, Y1, Y2, idx_Y1=None, idx_Y2=None, default=np.nan):
