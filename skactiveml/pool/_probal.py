@@ -606,22 +606,43 @@ def probabilistic_gain(clf, X, y, X_eval,
     return utilities
 
 
-def _reduce_candlist_set(idx_candlist_set, reduce=False):
+def _reduce_candlist_set(candidate_sets, reduce=False):
+    """Reduce the given list of candidate sets by deleting all redundant
+    candidate sets (i.e., candidate sets that are contained multiple times in
+    different order).
+
+    Parameters
+    ----------
+    candidate_sets: array-like, shape (n_candidate_sets, n_candidates)
+        Array containing tuples of candidates.
+    reduce: bool, optional (default=False)
+        If true, the candidate sets are reduced.
+        Otherwise, they are not changed.
+
+    Returns
+    -------
+    reduced_candidate_sets: np.ndarray
+        Reduced array containing the unique candidate sets.
+    index_mapping: np.ndarray, shape (n_candidate_sets)
+        Maps old candidate indices to the indices in the new
+        reduced_candidate_sets. If reduce=False, the mapping is the identity.
+    """
     if reduce:
-        idx_candlist_set_red = []
-        map_full2red = np.zeros(len(idx_candlist_set), int)
-        for c_idx, c in enumerate(idx_candlist_set):
+        reduced_candidate_sets = []
+        index_mapping = np.zeros(len(candidate_sets), int)
+        for c_idx, c in enumerate(candidate_sets):
             c = sorted(c)
             try:
-                sm_idx = idx_candlist_set_red.index(c)
-                map_full2red[c_idx] = sm_idx
-            except:
-                map_full2red[c_idx] = len(idx_candlist_set_red)
-                idx_candlist_set_red.append(c)
+                sm_idx = reduced_candidate_sets.index(c)
+                index_mapping[c_idx] = sm_idx
+            except ValueError:
+                index_mapping[c_idx] = len(reduced_candidate_sets)
+                reduced_candidate_sets.append(c)
     else:
-        idx_candlist_set_red = idx_candlist_set
-        map_full2red = np.arange(len(idx_candlist_set))
-    return idx_candlist_set_red, map_full2red
+        reduced_candidate_sets = candidate_sets
+        index_mapping = np.arange(len(candidate_sets))
+    return np.array(reduced_candidate_sets), index_mapping
+
 
 def _calc_sim(K, X, Y1, Y2, idx_Y1=None, idx_Y2=None, default=np.nan):
     if idx_Y1 is None:

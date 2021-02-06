@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import unittest
 from itertools import product
@@ -481,6 +483,33 @@ class TestXPAL(unittest.TestCase):
                                sample_weight=sample_weight,
                                sample_weight_eval=sample_weight_eval,
                                return_utilities=True)
+
+    def test_reduce_candlist_set(self):
+        from skactiveml.pool._probal import _reduce_candlist_set
+        candidate_sets = [(0,), (1,)]
+        reduced_candidate_sets, _ = \
+            _reduce_candlist_set(candidate_sets, reduce=True)
+        np.testing.assert_equal(type(reduced_candidate_sets), np.ndarray)
+        np.testing.assert_array_equal(candidate_sets, reduced_candidate_sets)
+
+        candidate_sets = [(0,), (1,), (1,)]
+        reduced_candidate_sets, _ = \
+            _reduce_candlist_set(candidate_sets, reduce=True)
+        np.testing.assert_equal(type(reduced_candidate_sets), np.ndarray)
+        np.testing.assert_array_equal(reduced_candidate_sets, [[0], [1]])
+
+        candidate_sets = [(0, 1), (1, 1), (1, 0), (1, 2), (0, 1)]
+        reduced_candidate_sets, mapping = \
+            _reduce_candlist_set(candidate_sets, reduce=True)
+        np.testing.assert_array_equal(reduced_candidate_sets,
+                                      [(0, 1), (1, 1), (1, 2)])
+        np.testing.assert_array_equal(mapping, [0, 1, 0, 2, 0])
+
+        permutations = list(itertools.permutations(np.arange(10), 3))
+        combinations = list(itertools.combinations(np.arange(10), 3))
+        reduced_permutations, _ = \
+            _reduce_candlist_set(permutations, reduce=True)
+        np.testing.assert_equal(len(reduced_permutations), len(combinations))
 
 
 if __name__ == '__main__':
