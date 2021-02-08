@@ -39,7 +39,8 @@ class BIQF(BudgetManager):
             raise TypeError("{} is not a valid type for w_tol")
         if self.w_tol <= 0:
             raise ValueError(
-                "The value of w_tol is incorrect." + " w_tol must be greater than 0"
+                "The value of w_tol is incorrect." 
+                + " w_tol must be greater than 0"
             )
         # check if utilities is set
         if not isinstance(utilities, np.ndarray):

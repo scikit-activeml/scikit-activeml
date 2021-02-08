@@ -13,7 +13,7 @@ from .budget_manager import BIQF
 
 class PAL(SingleAnnotStreamBasedQueryStrategy):
     def __init__(self, clf=None, budget_manager=BIQF(),
-                 random_state=None, prior=None, m_max=None):
+                 random_state=None, prior=1.e-3, m_max=2):
         self.clf = clf
         self.budget_manager = budget_manager
         self.random_state = random_state
@@ -66,12 +66,12 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         else:
             clf = self.clf
 
-        k_vec = self.clf.predict_freq(X_cand)
+        k_vec = clf.predict_freq(X_cand)
         # n = np.sum(k_vec)
-        utilities = probal._cost_reduction(k_vec)
-        sampled_indices = self.budget_manager_.sample(
-            utilities, prior=self.prior, m_max=self.m_max
+        utilities = probal._cost_reduction(
+            k_vec, prior=self.prior, m_max=self.m_max
         )
+        sampled_indices = self.budget_manager_.sample(utilities)
 
         if return_utilities:
             return sampled_indices, utilities
