@@ -489,13 +489,13 @@ class TestXPAL(unittest.TestCase):
         candidate_sets = [(0,), (1,)]
         reduced_candidate_sets, _ = \
             _reduce_candlist_set(candidate_sets, reduce=True)
-        np.testing.assert_equal(type(reduced_candidate_sets), np.ndarray)
+        np.testing.assert_equal(type(reduced_candidate_sets), list)
         np.testing.assert_array_equal(candidate_sets, reduced_candidate_sets)
 
         candidate_sets = [(0,), (1,), (1,)]
         reduced_candidate_sets, _ = \
             _reduce_candlist_set(candidate_sets, reduce=True)
-        np.testing.assert_equal(type(reduced_candidate_sets), np.ndarray)
+        np.testing.assert_equal(type(reduced_candidate_sets), list)
         np.testing.assert_array_equal(reduced_candidate_sets, [[0], [1]])
 
         candidate_sets = [(0, 1), (1, 1), (1, 0), (1, 2), (0, 1)]
