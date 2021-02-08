@@ -7,6 +7,7 @@ from collections import deque
 class BIQF(BudgetManager):
     """
     """
+
     def __init__(self, w=100, w_tol=50, budget=None):
         super().__init__(budget)
         self.w = w
@@ -27,7 +28,7 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
-        
+
         # intialize return parameters
         sampled_indices = []
 
@@ -36,15 +37,18 @@ class BIQF(BudgetManager):
             self.history_sorted_.append(u)
             theta = np.quantile(self.history_sorted_, (1 - self.budget_))
 
-            range_ranking = (np.max(self.history_sorted_) 
-                             - np.min(self.history_sorted_))
-            acq_left = (self.budget_ * self.observed_instances_ 
-                        - self.queried_instances_)
-            theta_bal = (theta - range_ranking * acq_left 
-                         / self.w_tol)
-            
+            min_ranking = np.min(self.history_sorted_)
+            max_ranking = np.max(self.history_sorted_)
+            range_ranking = max_ranking - min_ranking
+
+            acq_left = (
+                self.budget_ * self.observed_instances_
+                - self.queried_instances_
+            )
+            theta_bal = theta - range_ranking * acq_left / self.w_tol
+
             sample = u >= theta_bal
-            
+
             if sample:
                 self.queried_instances_ += 1
             sampled_indices.append(sample)
