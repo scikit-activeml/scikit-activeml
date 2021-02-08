@@ -35,6 +35,24 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self._validate_random_state()
         # check if a budget_manager is set
         self._validate_budget_manager()
+        # check if prior is set
+        if self.prior is not None:
+            if not isinstance(self.prior, float) and not None:
+                raise TypeError("{} is not a valid type for prior")
+            if self.prior <= 0 or self.prior >= 1.0:
+                raise ValueError(
+                    "The value of prior is incorrect." 
+                    + " prior must be in range (0.1]"
+                )
+        # check if m_max is set
+        if self.m_max is not None:
+            if not isinstance(self.m_max, int):
+                raise TypeError("{} is not a valid type for m_max")
+            if self.m_max <= 0:
+                raise ValueError(
+                    "The value of m_max is incorrect." 
+                    + " m_max must be greater than 0"
+                )
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:

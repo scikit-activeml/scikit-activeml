@@ -7,12 +7,22 @@ from .._estimated_budget import (
     SplitBudget,
 )
 from .._fixed_budget import FixedBudget
+from .._biqf import BIQF
 
 
 class TestBudgetManager(unittest.TestCase):
     def setUp(self):
         # initialise var for sampled var tests
         self.utilities = np.array([True, False])
+
+    def test_biqf(self):
+        # init param test
+        self._test_init_param_budget(BIQF)
+        self._test_init_param_w(BIQF)
+        self._test_init_param_w_tol(BIQF)
+
+        # sample param test
+        self._test_sampled_param_utilities(BIQF)
 
     def test_fixed_budget(self):
         # init param test
@@ -119,6 +129,19 @@ class TestBudgetManager(unittest.TestCase):
         budget_manager = budget_manager_name(v=0.0)
         self.assertRaises(ValueError, budget_manager.sample, self.utilities)
         budget_manager = budget_manager_name(v=-1.0)
+        self.assertRaises(ValueError, budget_manager.sample, self.utilities)
+
+    def _test_init_param_w_tol(self, budget_manager_name):
+        # w must be defined as an int with a range of w_tol > 0
+        budget_manager = budget_manager_name(w="string")
+        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
+        budget_manager = budget_manager_name(w=None)
+        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
+        budget_manager = budget_manager_name(w=1.1)
+        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
+        budget_manager = budget_manager_name(w=0)
+        self.assertRaises(ValueError, budget_manager.sample, self.utilities)
+        budget_manager = budget_manager_name(w=-1)
         self.assertRaises(ValueError, budget_manager.sample, self.utilities)
 
     def _test_sampled_param_utilities(self, budget_manager_name):

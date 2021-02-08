@@ -28,6 +28,23 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError(
+                "The value of w is incorrect." + " w must be greater than 0"
+            )
+        # check if w_tol is set
+        if not isinstance(self.w_tol, int):
+            raise TypeError("{} is not a valid type for w_tol")
+        if self.w_tol <= 0:
+            raise ValueError(
+                "The value of w_tol is incorrect." + " w_tol must be greater than 0"
+            )
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError("{} is not a valid type for utilities")
 
         # intialize return parameters
         sampled_indices = []
