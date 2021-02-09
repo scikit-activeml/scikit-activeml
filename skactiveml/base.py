@@ -274,6 +274,51 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         if not hasattr(self, 'budget_manager_'):
             self.budget_manager_ = clone(self.budget_manager)
 
+    def _validate_data(self, X_cand, return_utilities, reset=True,
+                       **check_X_cand_params):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, 'return_utilities', bool)
+
+        # Check random state.
+        self._validate_random_state()
+
+        # Check budget_manager.
+        self._validate_budget_manager()
+
+        return X_cand, return_utilities
+
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
     """SkactivemlClassifier
