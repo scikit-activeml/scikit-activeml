@@ -35,7 +35,7 @@ class BIQF(BudgetManager):
                 "The value of w is incorrect." + " w must be greater than 0"
             )
         # check if w_tol is set
-        if not isinstance(self.w_tol, int):
+        if not (isinstance(self.w_tol, int) or isinstance(self.w_tol, float)):
             raise TypeError("{} is not a valid type for w_tol")
         if self.w_tol <= 0:
             raise ValueError(

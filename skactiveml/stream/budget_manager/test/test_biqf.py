@@ -46,8 +46,6 @@ class TestBIQF(unittest.TestCase):
         self.assertRaises(TypeError, budget_manager.sample, self.utilities)
         budget_manager = budget_manager_name(w=None)
         self.assertRaises(TypeError, budget_manager.sample, self.utilities)
-        budget_manager = budget_manager_name(w=1.1)
-        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
         budget_manager = budget_manager_name(w=0)
         self.assertRaises(ValueError, budget_manager.sample, self.utilities)
         budget_manager = budget_manager_name(w=-1)
@@ -58,4 +56,3 @@ class TestBIQF(unittest.TestCase):
         budget_manager = budget_manager_name()
         self.assertRaises(TypeError, budget_manager.sample, utilities="string")
         self.assertRaises(TypeError, budget_manager.sample, utilities=None)
-        self.assertRaises(TypeError, budget_manager.sample, utilities=[10, 10])

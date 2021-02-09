@@ -55,19 +55,19 @@ class TestPAL(unittest.TestCase):
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def _test_init_param_prior(self, query_strategy_name):
-        # prior must be defined as a float with a range of: 0 < prior <= 1
+        # prior must be defined as a float with a range of: 0 < prior
         query_strategy = query_strategy_name(self.clf, prior="string")
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(self.clf, prior=0.0)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(self.clf, prior=-1.0)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(self.clf, prior=1.1)
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def _test_init_param_m_max(self, query_strategy_name):
         # m_max must be defined as a integer greater than 0
         query_strategy = query_strategy_name(self.clf, m_max="string")
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = query_strategy_name(self.clf, m_max=0.1)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = query_strategy_name(self.clf, m_max=0)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
