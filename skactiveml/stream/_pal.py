@@ -12,14 +12,8 @@ from .budget_manager import BIQF
 
 
 class PAL(SingleAnnotStreamBasedQueryStrategy):
-    def __init__(
-        self,
-        clf=None,
-        budget_manager=BIQF(),
-        random_state=None,
-        m_max=2,
-        prior=1.e-3
-    ):
+    def __init__(self, clf=None, budget_manager=BIQF(),
+                 random_state=None, prior=1.e-3, m_max=2):
         self.clf = clf
         self.budget_manager = budget_manager
         self.random_state = random_state
@@ -36,23 +30,21 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         # check if a budget_manager is set
         self._validate_budget_manager()
         # check if prior is set
-        if self.prior is not None:
-            if not isinstance(self.prior, float) and not None:
-                raise TypeError("{} is not a valid type for prior")
-            if self.prior <= 0 or self.prior >= 1.0:
-                raise ValueError(
-                    "The value of prior is incorrect." 
-                    + " prior must be in range (0.1]"
-                )
+        if not isinstance(self.prior, float) and not None:
+            raise TypeError("{} is not a valid type for prior")
+        if self.prior <= 0:
+            raise ValueError(
+                "The value of prior is incorrect." 
+                + " prior must be greater than 0"
+            )
         # check if m_max is set
-        if self.m_max is not None:
-            if not isinstance(self.m_max, int):
-                raise TypeError("{} is not a valid type for m_max")
-            if self.m_max <= 0:
-                raise ValueError(
-                    "The value of m_max is incorrect." 
-                    + " m_max must be greater than 0"
-                )
+        if not isinstance(self.m_max, int):
+            raise TypeError("{} is not a valid type for m_max")
+        if self.m_max <= 0:
+            raise ValueError(
+                "The value of m_max is incorrect." 
+                + " m_max must be greater than 0"
+            )
         # check if clf is a classifier
         if X is not None and y is not None:
             if self.clf is None:
@@ -72,7 +64,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         else:
             clf = self.clf
 
-        k_vec = self.clf.predict_freq(X_cand)
+        k_vec = clf.predict_freq(X_cand)
         # n = np.sum(k_vec)
         utilities = probal._cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max

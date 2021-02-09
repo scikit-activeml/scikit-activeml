@@ -6,33 +6,12 @@ from .._estimated_budget import (
     VarUncertaintyBudget,
     SplitBudget,
 )
-from .._fixed_budget import FixedBudget
-from .._biqf import BIQF
 
 
-class TestBudgetManager(unittest.TestCase):
+class TestEstimatedBudget(unittest.TestCase):
     def setUp(self):
         # initialise var for sampled var tests
         self.utilities = np.array([True, False])
-
-    def test_biqf(self):
-        # init param test
-        self._test_init_param_budget(BIQF)
-        self._test_init_param_w(BIQF)
-        self._test_init_param_w_tol(BIQF)
-
-        # sample param test
-        self._test_sampled_param_utilities(BIQF)
-
-    def test_fixed_budget(self):
-        # init param test
-        self._test_init_param_budget(FixedBudget)
-
-        # sampled param test
-        self._test_sampled_param_utilities(FixedBudget)
-
-        # functinality test
-        # self._test_sampled_utilities(FixedBudget)
 
     def test_estimated_budget_FixedUncertaintyBudget(self):
         # init param test
@@ -131,26 +110,12 @@ class TestBudgetManager(unittest.TestCase):
         budget_manager = budget_manager_name(v=-1.0)
         self.assertRaises(ValueError, budget_manager.sample, self.utilities)
 
-    def _test_init_param_w_tol(self, budget_manager_name):
-        # w must be defined as an int with a range of w_tol > 0
-        budget_manager = budget_manager_name(w="string")
-        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
-        budget_manager = budget_manager_name(w=None)
-        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
-        budget_manager = budget_manager_name(w=1.1)
-        self.assertRaises(TypeError, budget_manager.sample, self.utilities)
-        budget_manager = budget_manager_name(w=0)
-        self.assertRaises(ValueError, budget_manager.sample, self.utilities)
-        budget_manager = budget_manager_name(w=-1)
-        self.assertRaises(ValueError, budget_manager.sample, self.utilities)
-
     def _test_sampled_param_utilities(self, budget_manager_name):
         # s must be defined as a float ndarray
         budget_manager = budget_manager_name()
         self.assertRaises(TypeError, budget_manager.sample, utilities="string")
         self.assertRaises(TypeError, budget_manager.sample, utilities=None)
         self.assertRaises(TypeError, budget_manager.sample, utilities=[10, 10])
-
 
 #     def _test_sampled_utilities(self, budget_manager_name):
 #         # only budget% +/- theta of utilities can be purchased
@@ -161,13 +126,19 @@ class TestBudgetManager(unittest.TestCase):
 #         stream_length = 10000
 #         training_size = 1000
 
-#         X, y = sklearn.datasets.make_classification(n_samples=init_train_length + stream_length, random_state=, shuffle=True)
+#         X, y = sklearn.datasets.make_classification(
+#               n_samples=init_train_length + stream_length, 
+#               random_state=, shuffle=True
+#         )
 #         X_init = X[:init_train_length, :]
 #         y_init = y[:init_train_length]
 #         X_stream = X[init_train_length:, :]
 #         y_stream = y[init_train_length:]
 #         clf = PWC()
-#         query_strategy = FixedUncertainty(clf=clf, random_state=get_randomseed(random_state), budget_manager=budget_manager_name())
+#         query_strategy = FixedUncertainty(
+#               clf=clf, random_state=get_randomseed(random_state),
+#               budget_manager=budget_manager_name()
+#         )
 
 #         # vars to count bought samples
 #         max_utilities = stream_length * 0.1
@@ -181,7 +152,9 @@ class TestBudgetManager(unittest.TestCase):
 #         y_train.extend(y_init)
 #         self.clf.fit(X_train, y_train)
 #         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
-#             sampled_indices = query_strategy.query(x_t.reshape([1, -1]), X=None, y=None)
+#             sampled_indices = query_strategy.query(
+#                   x_t.reshape([1, -1]), X=None, y=None
+#             )
 #             if len(sampled_indices):
 #                 X_train.append(x_t)
 #                 y_train.append(y_t)
@@ -190,4 +163,3 @@ class TestBudgetManager(unittest.TestCase):
 
 #         self.assertTrue(count_bought * (1 + theta) >= max_utilities)
 #         self.assertTrue(count_bought * (1 - theta) <= max_utilities)
-
