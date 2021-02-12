@@ -3,7 +3,7 @@ import numpy as np
 import skactiveml.pool._probal as probal
 
 from sklearn.base import is_classifier, clone
-from sklearn.utils import check_array
+from skactiveml.utils import check_random_state
 
 from ..base import SingleAnnotStreamBasedQueryStrategy
 from ..classifier import PWC
@@ -29,10 +29,42 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
     def query(
         self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
     ):
+        """Ask the query strategy which instances in X_cand to acquire.
+
+        Please note that, when the decisions from this function may differ from
+        the final sampling, simulate=True can set, so that the query strategy
+        can be updated later with update(...) with the final sampling. This is
+        especially helpful, when developing wrapper query strategies.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+
+        Returns
+        -------
+        sampled_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances in X_cand which should be sampled, with
+            0 <= n_sampled_instances <= n_samples.
+
+        utilities: ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy. Only provided if
+            return_utilities is True.
+        """
         self._validate_data(X_cand, return_utilities, X, y)
 
         k_vec = self.clf_.predict_freq(X_cand)
-        # n = np.sum(k_vec)
         utilities = probal._cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max
         )
@@ -71,8 +103,6 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         -------
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
@@ -85,6 +115,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self._validate_clf(X, y)
         self._validate_prior()
         self._validate_m_max()
+        self._validate_random_state
 
         return X_cand, return_utilities, X, y
 
@@ -129,3 +160,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
                 "The value of m_max is incorrect."
                 + " m_max must be greater than 0"
             )
+    
+    def _validate_random_state(self):
+        if not hasattr(self, "random_state_"):
+            self.random_state_ = self.random_state
+        self.random_state_ = check_random_state(self.random_state_)

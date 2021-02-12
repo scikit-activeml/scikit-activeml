@@ -140,7 +140,7 @@ class BudgetManager(ABC, BaseEstimator):
         # Check return_utilities.
         check_scalar(simulate, 'simulate', bool)
 
-        self._validate_budget()
+        self._validate_budget(get_default_budget())
         return utilities, return_budget_left, simulate
 
 
