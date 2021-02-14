@@ -426,10 +426,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                     list(itertools.combinations(idx_remaining, batch_size))
             elif self.batch_mode == 'greedy':
                 idx_candlist_set = _get_nonmyopic_cand_set(
-                    neighbors=self.nonmyopic_neighbors,
-                    cand_idx=idx_remaining,
-                    sim_cand=sim_cand[:, idx_X_cand],
-                    M=self.nonmyopic_max_cand)
+                    neighbors=self.nonmyopic_neighbors, cand_idx=idx_remaining,
+                    M=self.nonmyopic_max_cand,
+                    similarity=sim_cand[:, idx_X_cand])
             else:
                 raise ValueError("batch_mode must either be 'greedy' or 'full'")
 
@@ -662,19 +661,46 @@ def _calc_sim(K, X, Y1, Y2, idx_Y1=None, idx_Y2=None, default=np.nan):
 
     return np.concatenate([sim_1, sim_2], axis=1)
 
-def _get_nonmyopic_cand_set(neighbors, cand_idx, sim_cand, M):
+
+def _get_nonmyopic_cand_set(neighbors, cand_idx, M, similarity=None):
+    """Calculate the lookahead sets for each candidate with up to M instances.
+
+    Parameters
+    ----------
+    neighbors: str
+        Can be 'same' or 'nearest'. If neighbors='same', all labels are
+        simulated at the same position. Otherwise, we search the
+    cand_idx: array-like, shape (n_candidates)
+        Array of the candidates
+    similarity: array-like, shape (n_candidates, n_candidates),
+                            optional (default=None)
+        Similarities between the candidates. Only used if neighbors='nearest'.
+    M: int
+        Number of simulated instances.
+
+    Returns
+    -------
+    nonmyopic_candidate_sets: list
+        List of lookahead sets for each candidate.
+
+    """
     if neighbors == 'same':
         cand_idx_set = np.tile(cand_idx, [M, 1]).T.tolist()
     elif neighbors == 'nearest':
-        # TODO check correctness
-        cand_idx_set = (-sim_cand[cand_idx][:,cand_idx]).argsort(axis=1)[:,:M].tolist()
+        if similarity is None:
+            raise ValueError("If neighbors='nearest', similarity must be "
+                             "specified.")
+        cand_similarities = similarity[cand_idx][:, cand_idx]
+        cand_idx_set = (-cand_similarities).argsort(axis=1)[:, :M].tolist()
     else:
         raise ValueError('neighbor_mode unknown')
-    res = []
-    for ca in cand_idx_set:
-        for i in range(len(ca)):
-            res.append(ca[:i+1])
-    return res
+
+    nonmyopic_candidate_sets = []
+    for candidate_set in cand_idx_set:
+        for i in range(len(candidate_set)):
+            nonmyopic_candidate_sets.append(candidate_set[:i+1])
+    return nonmyopic_candidate_sets
+
 
 def to_int_labels(est, X, y):
     est = clone(est)

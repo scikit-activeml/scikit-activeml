@@ -3,8 +3,9 @@ import itertools
 import numpy as np
 import unittest
 from itertools import product
+from sklearn.metrics import pairwise_kernels
 
-from skactiveml.pool import McPAL, XPAL, RandomSampler
+from skactiveml.pool import McPAL, XPAL
 from skactiveml.classifier import PWC
 from skactiveml.utils import MISSING_LABEL
 
@@ -510,6 +511,36 @@ class TestXPAL(unittest.TestCase):
         reduced_permutations, _ = \
             _reduce_candlist_set(permutations, reduce=True)
         np.testing.assert_equal(len(reduced_permutations), len(combinations))
+
+    def test_get_nonmyopic_cand_set(self):
+        from skactiveml.pool._probal import _get_nonmyopic_cand_set
+        cand_idx = np.arange(5)
+        M = 2
+        nonmyopic_candidate_sets = _get_nonmyopic_cand_set('same', cand_idx, M)
+        correct_array = [[x] for x in cand_idx] + [[x, x] for x in cand_idx]
+
+        x = np.array(sorted(nonmyopic_candidate_sets), dtype=object)
+        y = np.array(sorted(correct_array), dtype=object)
+        np.testing.assert_array_equal(x, y)
+
+        self.assertRaises(ValueError, _get_nonmyopic_cand_set, 'wrong',
+                          cand_idx=[0, 1], similarity=np.eye(2), M=2)
+
+        self.assertRaises(ValueError, _get_nonmyopic_cand_set, 'nearest',
+                          cand_idx=[0, 1], M=2)
+
+        neighbors = 'nearest'
+        cand_idx = np.arange(5)
+        similarity = np.random.random((5, 5))
+        similarity = (similarity + similarity.T) / 2
+        np.fill_diagonal(similarity, 1)
+        M = 3
+        nonmyopic_candidate_sets = _get_nonmyopic_cand_set(neighbors, cand_idx,
+                                                           M, similarity)
+        for i, x in enumerate(cand_idx):
+            for m in range(1, M+1):
+                similarity_x = np.argsort(-similarity[i])
+                self.assertIn(list(similarity_x[:m]), nonmyopic_candidate_sets)
 
 
 if __name__ == '__main__':
