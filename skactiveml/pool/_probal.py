@@ -643,23 +643,41 @@ def _reduce_candlist_set(candidate_sets, reduce=False):
     return reduced_candidate_sets, index_mapping
 
 
-def _calc_sim(K, X, Y1, Y2, idx_Y1=None, idx_Y2=None, default=np.nan):
-    if idx_Y1 is None:
-        sim_1 = K(X, Y1)
-    else:
-        sim_1 = np.full([len(X), len(Y1)], default, float)
-        if len(idx_Y1) > 0:
-            sim_1[:, idx_Y1] = K(X, Y1[idx_Y1])
+def _calc_sim(K, X, Y, idx_X=None, idx_Y=None, default=np.nan):
+    """Calculate the similarity between X and Y.
+    If the indices are not None, the similarity is only calculated between the
+    given indices. The remaining entries in the similarity matrix are set to
+    the given default value.
 
+    Parameters
+    ----------
+    K: callable
+        Kernel denoting the similarity of instances.
+    X: array-like, shape (n_instances_x, n_features)
+        First array to be compared.
+    Y: array-like, shape (n_instances_y, n_features)
+        First array to be compared.
+    idx_X: array-like
+        Indices in the first array (X).
+    idx_Y: array-like
+        Indices in the second array (Y).
+    default: float, optional (default=np.nan)
+        Default value for similarities that are not calculated.
 
-    if idx_Y1 is None:
-        sim_2 = K(X, Y2)
-    else:
-        sim_2 = np.full([len(X), len(Y2)], default, float)
-        if len(idx_Y2) > 0:
-            sim_2[:, idx_Y2] = K(X, Y2[idx_Y2])
+    Returns
+    -------
+    similarity: np.array, shape (n_instances_x, n_instances_y)
+        The similarities between instances in X and Y.
+    """
+    if idx_X is None:
+        idx_X = np.arange(len(X))
+    if idx_Y is None:
+        idx_Y = np.arange(len(Y))
 
-    return np.concatenate([sim_1, sim_2], axis=1)
+    similarity = np.full([len(X), len(Y)], default, float)
+
+    similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
+    return similarity
 
 
 def _get_nonmyopic_cand_set(neighbors, cand_idx, M, similarity=None):

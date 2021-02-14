@@ -512,6 +512,32 @@ class TestXPAL(unittest.TestCase):
             _reduce_candlist_set(permutations, reduce=True)
         np.testing.assert_equal(len(reduced_permutations), len(combinations))
 
+    def test_calc_sim(self):
+        from skactiveml.pool._probal import _calc_sim
+        K = lambda X1, X2: pairwise_kernels(X1, X2)
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        Y = np.array([[1, 2], [5, 3], [4, 3], [2, 9], [7, 4]])
+        idx_X = [0, 2, 3]
+        idx_Y = [1, 3]
+        kernel = K(X, Y)
+
+        similarity = _calc_sim(K, X, Y)
+        self.assertEqual(similarity.shape, (X.shape[0], Y.shape[0]))
+        np.testing.assert_array_almost_equal(similarity, kernel)
+
+        similarity = _calc_sim(K, X, Y, idx_X, idx_Y)
+
+        self.assertEqual(similarity.shape, (X.shape[0], Y.shape[0]))
+        self.assertEqual(np.count_nonzero(~np.isnan(similarity)),
+                         len(idx_X) * len(idx_Y))
+
+        for i in range(len(X)):
+            for j in range(len(Y)):
+                if i in idx_X and j in idx_Y:
+                    np.testing.assert_equal(kernel[i, j], similarity[i, j])
+                else:
+                    np.testing.assert_equal(np.nan, similarity[i, j])
+
     def test_get_nonmyopic_cand_set(self):
         from skactiveml.pool._probal import _get_nonmyopic_cand_set
         cand_idx = np.arange(5)
