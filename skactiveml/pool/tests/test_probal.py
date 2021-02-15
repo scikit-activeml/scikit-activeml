@@ -140,32 +140,33 @@ class TestXPAL(unittest.TestCase):
     def setUp(self):
         self.random_state = 1
         self.X_cand = np.array([[8, 1], [9, 1], [5, 1]])
+        self.X_eval = np.array([[5, 2], [3, 7]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 0, 1, 1])
         self.classes = np.array([0, 1])
         self.clf = PWC(classes=self.classes)
-        self.kwargs = dict(X_cand=self.X_cand, X=self.X, y=self.y)
+        self.args = dict(X_cand=self.X_cand, X=self.X, y=self.y)
 
     def test_init_param_clf(self):
         # TODO
         selector = XPAL(clf=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf='string')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'clf'))
 
     def test_init_param_scoring(self):
         # TODO
         selector = XPAL(clf=self.clf, scoring=None)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring=2)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='String')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'scoring'))
 
@@ -173,15 +174,15 @@ class TestXPAL(unittest.TestCase):
         # TODO
         selector = XPAL(clf=self.clf, scoring='cost-vector',
                         cost_vector='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='cost-vector',
                         cost_vector=[3, 2, 1])  # clf.n_classes=2
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='cost-vector',
                         cost_vector=None)  # clf.n_classes=2
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'cost_vector'))
 
@@ -189,29 +190,29 @@ class TestXPAL(unittest.TestCase):
         # TODO
         selector = XPAL(clf=self.clf, scoring='misclassification-loss',
                         cost_matrix=None)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='macro-accuracy',
                         cost_matrix=None)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='f1-score',
                         cost_matrix=None)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, cost_matrix=np.ones((2, 3)))
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, cost_matrix='string')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, cost_matrix=np.ones((3, 3)))
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         # TODO cost_vector and cost_matrix together?
         selector = XPAL(clf=self.clf, cost_matrix=np.ones((2, 2)),
                         cost_vector=[1, 1])
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'cost_matrix'))
 
@@ -219,20 +220,20 @@ class TestXPAL(unittest.TestCase):
         # TODO
         selector = XPAL(clf=self.clf, scoring='custom',
                         custom_perf_func='string')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='custom',
                         custom_perf_func=42)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, scoring='custom')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         def func(a):
             return 0
         selector = XPAL(clf=self.clf, scoring='error',
                         custom_perf_func=func)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'custom_perf_func'))
 
@@ -240,16 +241,16 @@ class TestXPAL(unittest.TestCase):
         # TODO
         selector = XPAL(clf=self.clf, prior_cand='string')
         self.assertRaises(np.core._exceptions.UFuncTypeError,
-                          selector.query, **self.kwargs)
+                          selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_cand=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_cand=[[1, 2], [1, 2]])
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_cand=[1, 2, 3])  # clf.n_classes=2
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'prior_cand'))
 
@@ -257,108 +258,108 @@ class TestXPAL(unittest.TestCase):
         # TODO
         selector = XPAL(clf=self.clf, prior_eval='string')
         self.assertRaises(np.core._exceptions.UFuncTypeError,
-                          selector.query, **self.kwargs)
+                          selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_eval=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_eval=[[1, 2], [1, 2]])
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_eval=[1, 2, 3])  # clf.n_classes=2
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'prior_eval'))
 
     def test_init_param_estimator_metric(self):
         # TODO
         selector = XPAL(clf=self.clf, estimator_metric=False)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, estimator_metric='String')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, estimator_metric=None)
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, estimator_metric='precomputed')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'estimator_metric'))
 
     def test_init_param_estimator_metric_dict(self):
         # TODO
         selector = XPAL(clf=self.clf, estimator_metric_dict='String')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, estimator_metric_dict=2)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, estimator_metric_dict=True)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         def func(X1, X2):
             return 0
 
         selector = XPAL(clf=self.clf, estimator_metric=func,
                         estimator_metric_dict={'arg': 'arg'})
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'estimator_metric_dict'))
 
     def test_init_param_batch_mode(self):
         # TODO
         selector = XPAL(clf=self.clf, batch_mode='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, batch_mode=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, batch_mode=False)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'batch_mode'))
 
     def test_init_param_batch_labels_equal(self):
         # TODO
         selector = XPAL(clf=self.clf, batch_labels_equal="string")
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, batch_labels_equal=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, batch_labels_equal=[])
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, batch_labels_equal=2)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'nonmyopic_labels_equal'))
 
     def test_init_param_nonmyopic_max_cand(self):
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         batch_mode='full')
-        self.assertRaises(NotImplementedError, selector.query, **self.kwargs)
+        self.assertRaises(NotImplementedError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=0,
                         batch_mode='greedy')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=1.5,
                         batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=-5,
                         batch_mode='greedy')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand='string',
                         batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=None,
                         batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'nonmyopic_max_cand'))
 
@@ -366,11 +367,11 @@ class TestXPAL(unittest.TestCase):
         # nonmyopic_max_cand = 2 (nonmyopic method)
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_neighbors="string", batch_mode='greedy')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_neighbors=None, batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'nonmyopic_labels_equal'))
 
@@ -378,48 +379,200 @@ class TestXPAL(unittest.TestCase):
         # nonmyopic_max_cand = 2 (nonmyopic method)
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_labels_equal=None, batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'nonmyopic_labels_equal'))
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_labels_equal=[], batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_labels_equal=0, batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_labels_equal='string', batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
     def test_init_param_nonmyopic_independent_probs(self):
         # nonmyopic_max_cand = 2 (nonmyopic method)
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_independent_probs=0, batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'nonmyopic_independent_probs'))
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_independent_probs=None, batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_independent_probs=[], batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, nonmyopic_max_cand=2,
                         nonmyopic_independent_probs='string',
                         batch_mode='greedy')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        self.assertRaises(TypeError, selector.query, **self.args)
 
     def test_init_param_random_state(self):
         selector = XPAL(clf=self.clf, random_state='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        self.assertRaises(ValueError, selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'random_state'))
+
+    def test_param_query_X_cand(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(ValueError, selector.query, X_cand=[], X=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=None, X=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=np.nan, X=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=5, X=self.X,
+                          y=self.y)
+
+    def test_param_query_X(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+                          X=None, y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+                          X='string', y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+                          X=[], y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+                          X=self.X[0:-1], y=self.y)
+
+    def test_param_query_y(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+                          X=self.X, y=None)
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+                          X=self.X, y='string')
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+                          X=self.X, y=[])
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y[0:-1])
+
+    def test_param_query_X_eval(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=[])
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=None)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=np.nan)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=5)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval='string')
+
+    def test_param_query_batch_size(self):
+        # TODO
+        selector = XPAL(clf=self.clf, batch_mode='greedy')
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          batch_size=1.2)
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          batch_size='string')
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          batch_size=0)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          batch_size=-10)
+
+        selector = XPAL(clf=self.clf, batch_mode='full')
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          batch_size=1.2)
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          batch_size='string')
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          batch_size=0)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          batch_size=-10)
+
+    def test_param_query_sample_weight_cand(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight_cand='string',
+                          sample_weight=np.ones(len(self.X)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight_cand=self.X_cand,
+                          sample_weight=np.ones(len(self.X)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight_cand=np.empty((len(self.X_cand) - 1)),
+                          sample_weight=np.ones(len(self.X)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight_cand=np.empty((len(self.X_cand) + 1)),
+                          sample_weight=np.ones(len(self.X)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight_cand=np.empty((len(self.X_cand) + 1)),
+                          sample_weight=None)
+
+    def test_param_query_sample_weight(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight='string',
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight=self.X,
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight=np.empty((len(self.X) - 1)),
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight=np.empty((len(self.X) + 1)),
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          sample_weight=np.empty((len(self.X) + 1)),
+                          sample_weight_cand=None)
+
+    def test_param_query_sample_weight_eval(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=self.X_eval,
+                          sample_weight_eval='string',
+                          sample_weight=np.ones(len(self.X)),
+                          sample_weight_cand=np.ones(len(self.X)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=self.X_eval,
+                          sample_weight_eval=self.X,
+                          sample_weight=np.ones(len(self.X)),
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=self.X_eval,
+                          sample_weight_eval=np.empty((len(self.X_eval) - 1)),
+                          sample_weight=np.ones(len(self.X)),
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=self.X_eval,
+                          sample_weight_eval=np.empty((len(self.X_eval) + 1)),
+                          sample_weight=np.ones(len(self.X)),
+                          sample_weight_cand=np.ones(len(self.X_cand)))
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=self.X_eval,
+                          sample_weight_eval=np.ones(len(self.X_eval)),
+                          sample_weight=None,
+                          sample_weight_cand=None)
+        self.assertRaises(ValueError, selector.query, **self.args,
+                          X_eval=None,
+                          sample_weight_eval=np.ones(len(self.X_eval)))
+
+    def test_param_query_return_utilities(self):
+        # TODO
+        selector = XPAL(clf=self.clf)
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          return_utilities=None)
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          return_utilities=[])
+        self.assertRaises(TypeError, selector.query, **self.args,
+                          return_utilities=0)
 
     def test_general_query(self):
         random_state = np.random.RandomState(1)
