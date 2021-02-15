@@ -390,6 +390,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
 
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
+        # TODO: sim_cand should have shape |X_| x |X_|
         sim_cand = _calc_sim(K, X_cand, X_cand, X_,
                              idx_Y1=None,
                              idx_Y2=idx_X_lbld)
