@@ -1,8 +1,11 @@
+import itertools
+
 import numpy as np
 import unittest
 from itertools import product
+from sklearn.metrics import pairwise_kernels
 
-from skactiveml.pool import McPAL, XPAL, RandomSampler
+from skactiveml.pool import McPAL, XPAL
 from skactiveml.classifier import PWC
 from skactiveml.utils import MISSING_LABEL
 
@@ -481,6 +484,89 @@ class TestXPAL(unittest.TestCase):
                                sample_weight=sample_weight,
                                sample_weight_eval=sample_weight_eval,
                                return_utilities=True)
+
+    def test_reduce_candlist_set(self):
+        from skactiveml.pool._probal import _reduce_candlist_set
+        candidate_sets = [(0,), (1,)]
+        reduced_candidate_sets, _ = \
+            _reduce_candlist_set(candidate_sets, reduce=True)
+        np.testing.assert_equal(type(reduced_candidate_sets), list)
+        np.testing.assert_array_equal(candidate_sets, reduced_candidate_sets)
+
+        candidate_sets = [(0,), (1,), (1,)]
+        reduced_candidate_sets, _ = \
+            _reduce_candlist_set(candidate_sets, reduce=True)
+        np.testing.assert_equal(type(reduced_candidate_sets), list)
+        np.testing.assert_array_equal(reduced_candidate_sets, [[0], [1]])
+
+        candidate_sets = [(0, 1), (1, 1), (1, 0), (1, 2), (0, 1)]
+        reduced_candidate_sets, mapping = \
+            _reduce_candlist_set(candidate_sets, reduce=True)
+        np.testing.assert_array_equal(reduced_candidate_sets,
+                                      [(0, 1), (1, 1), (1, 2)])
+        np.testing.assert_array_equal(mapping, [0, 1, 0, 2, 0])
+
+        permutations = list(itertools.permutations(np.arange(10), 3))
+        combinations = list(itertools.combinations(np.arange(10), 3))
+        reduced_permutations, _ = \
+            _reduce_candlist_set(permutations, reduce=True)
+        np.testing.assert_equal(len(reduced_permutations), len(combinations))
+
+    def test_calc_sim(self):
+        from skactiveml.pool._probal import _calc_sim
+        K = lambda X1, X2: pairwise_kernels(X1, X2)
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        Y = np.array([[1, 2], [5, 3], [4, 3], [2, 9], [7, 4]])
+        idx_X = [0, 2, 3]
+        idx_Y = [1, 3]
+        kernel = K(X, Y)
+
+        similarity = _calc_sim(K, X, Y)
+        self.assertEqual(similarity.shape, (X.shape[0], Y.shape[0]))
+        np.testing.assert_array_almost_equal(similarity, kernel)
+
+        similarity = _calc_sim(K, X, Y, idx_X, idx_Y)
+
+        self.assertEqual(similarity.shape, (X.shape[0], Y.shape[0]))
+        self.assertEqual(np.count_nonzero(~np.isnan(similarity)),
+                         len(idx_X) * len(idx_Y))
+
+        for i in range(len(X)):
+            for j in range(len(Y)):
+                if i in idx_X and j in idx_Y:
+                    np.testing.assert_equal(kernel[i, j], similarity[i, j])
+                else:
+                    np.testing.assert_equal(np.nan, similarity[i, j])
+
+    def test_get_nonmyopic_cand_set(self):
+        from skactiveml.pool._probal import _get_nonmyopic_cand_set
+        cand_idx = np.arange(5)
+        M = 2
+        nonmyopic_candidate_sets = _get_nonmyopic_cand_set('same', cand_idx, M)
+        correct_array = [[x] for x in cand_idx] + [[x, x] for x in cand_idx]
+
+        x = np.array(sorted(nonmyopic_candidate_sets), dtype=object)
+        y = np.array(sorted(correct_array), dtype=object)
+        np.testing.assert_array_equal(x, y)
+
+        self.assertRaises(ValueError, _get_nonmyopic_cand_set, 'wrong',
+                          cand_idx=[0, 1], similarity=np.eye(2), M=2)
+
+        self.assertRaises(ValueError, _get_nonmyopic_cand_set, 'nearest',
+                          cand_idx=[0, 1], M=2)
+
+        neighbors = 'nearest'
+        cand_idx = np.arange(5)
+        similarity = np.random.random((5, 5))
+        similarity = (similarity + similarity.T) / 2
+        np.fill_diagonal(similarity, 1)
+        M = 3
+        nonmyopic_candidate_sets = _get_nonmyopic_cand_set(neighbors, cand_idx,
+                                                           M, similarity)
+        for i, x in enumerate(cand_idx):
+            for m in range(1, M+1):
+                similarity_x = np.argsort(-similarity[i])
+                self.assertIn(list(similarity_x[:m]), nonmyopic_candidate_sets)
 
 
 if __name__ == '__main__':

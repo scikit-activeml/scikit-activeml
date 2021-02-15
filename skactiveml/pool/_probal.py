@@ -427,10 +427,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                     list(itertools.combinations(idx_remaining, batch_size))
             elif self.batch_mode == 'greedy':
                 idx_candlist_set = _get_nonmyopic_cand_set(
-                    neighbors=self.nonmyopic_neighbors,
-                    cand_idx=idx_remaining,
-                    sim_cand=sim_cand[:, idx_X_cand],
-                    M=self.nonmyopic_max_cand)
+                    neighbors=self.nonmyopic_neighbors, cand_idx=idx_remaining,
+                    M=self.nonmyopic_max_cand,
+                    similarity=sim_cand[:, idx_X_cand])
             else:
                 raise ValueError("batch_mode must either be 'greedy' or 'full'")
 
@@ -607,54 +606,120 @@ def probabilistic_gain(clf, X, y, X_eval,
     return utilities
 
 
-def _reduce_candlist_set(idx_candlist_set, reduce=False):
+def _reduce_candlist_set(candidate_sets, reduce=False):
+    """Reduce the given list of candidate sets by deleting all redundant
+    candidate sets (i.e., candidate sets that are contained multiple times in
+    different order).
+
+    Parameters
+    ----------
+    candidate_sets: array-like, shape (n_candidate_sets, n_candidates)
+        Array containing tuples of candidates.
+    reduce: bool, optional (default=False)
+        If true, the candidate sets are reduced.
+        Otherwise, they are not changed.
+
+    Returns
+    -------
+    reduced_candidate_sets: list
+        Reduced array containing the unique candidate sets.
+    index_mapping: np.ndarray, shape (n_candidate_sets)
+        Maps old candidate indices to the indices in the new
+        reduced_candidate_sets. If reduce=False, the mapping is the identity.
+    """
     if reduce:
-        idx_candlist_set_red = []
-        map_full2red = np.zeros(len(idx_candlist_set), int)
-        for c_idx, c in enumerate(idx_candlist_set):
+        reduced_candidate_sets = []
+        index_mapping = np.zeros(len(candidate_sets), int)
+        for c_idx, c in enumerate(candidate_sets):
             c = sorted(c)
             try:
-                sm_idx = idx_candlist_set_red.index(c)
-                map_full2red[c_idx] = sm_idx
-            except:
-                map_full2red[c_idx] = len(idx_candlist_set_red)
-                idx_candlist_set_red.append(c)
+                sm_idx = reduced_candidate_sets.index(c)
+                index_mapping[c_idx] = sm_idx
+            except ValueError:
+                index_mapping[c_idx] = len(reduced_candidate_sets)
+                reduced_candidate_sets.append(c)
     else:
-        idx_candlist_set_red = idx_candlist_set
-        map_full2red = np.arange(len(idx_candlist_set))
-    return idx_candlist_set_red, map_full2red
-
-def _calc_sim(K, X, Y1, Y2, idx_Y1=None, idx_Y2=None, default=np.nan):
-    if idx_Y1 is None:
-        sim_1 = K(X, Y1)
-    else:
-        sim_1 = np.full([len(X), len(Y1)], default, float)
-        if len(idx_Y1) > 0:
-            sim_1[:, idx_Y1] = K(X, Y1[idx_Y1])
+        reduced_candidate_sets = list(candidate_sets)
+        index_mapping = np.arange(len(candidate_sets))
+    return reduced_candidate_sets, index_mapping
 
 
-    if idx_Y1 is None:
-        sim_2 = K(X, Y2)
-    else:
-        sim_2 = np.full([len(X), len(Y2)], default, float)
-        if len(idx_Y2) > 0:
-            sim_2[:, idx_Y2] = K(X, Y2[idx_Y2])
+def _calc_sim(K, X, Y, idx_X=None, idx_Y=None, default=np.nan):
+    """Calculate the similarity between X and Y.
+    If the indices are not None, the similarity is only calculated between the
+    given indices. The remaining entries in the similarity matrix are set to
+    the given default value.
 
-    return np.concatenate([sim_1, sim_2], axis=1)
+    Parameters
+    ----------
+    K: callable
+        Kernel denoting the similarity of instances.
+    X: array-like, shape (n_instances_x, n_features)
+        First array to be compared.
+    Y: array-like, shape (n_instances_y, n_features)
+        First array to be compared.
+    idx_X: array-like
+        Indices in the first array (X).
+    idx_Y: array-like
+        Indices in the second array (Y).
+    default: float, optional (default=np.nan)
+        Default value for similarities that are not calculated.
 
-def _get_nonmyopic_cand_set(neighbors, cand_idx, sim_cand, M):
+    Returns
+    -------
+    similarity: np.array, shape (n_instances_x, n_instances_y)
+        The similarities between instances in X and Y.
+    """
+    if idx_X is None:
+        idx_X = np.arange(len(X))
+    if idx_Y is None:
+        idx_Y = np.arange(len(Y))
+
+    similarity = np.full([len(X), len(Y)], default, float)
+
+    similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
+    return similarity
+
+
+def _get_nonmyopic_cand_set(neighbors, cand_idx, M, similarity=None):
+    """Calculate the lookahead sets for each candidate with up to M instances.
+
+    Parameters
+    ----------
+    neighbors: str
+        Can be 'same' or 'nearest'. If neighbors='same', all labels are
+        simulated at the same position. Otherwise, we search the
+    cand_idx: array-like, shape (n_candidates)
+        Array of the candidates
+    similarity: array-like, shape (n_candidates, n_candidates),
+                            optional (default=None)
+        Similarities between the candidates. Only used if neighbors='nearest'.
+    M: int
+        Number of simulated instances.
+
+    Returns
+    -------
+    nonmyopic_candidate_sets: list
+        List of lookahead sets for each candidate.
+
+    """
     if neighbors == 'same':
         cand_idx_set = np.tile(cand_idx, [M, 1]).T.tolist()
     elif neighbors == 'nearest':
-        # TODO check correctness
-        cand_idx_set = (-sim_cand[cand_idx][:,cand_idx]).argsort(axis=1)[:,:M].tolist()
+        if similarity is None:
+            raise ValueError("If neighbors='nearest', similarity must be "
+                             "specified.")
+        cand_similarities = similarity[cand_idx][:, cand_idx]
+        cand_idx_set = (-cand_similarities).argsort(axis=1)[:, :M].tolist()
     else:
         raise ValueError('neighbor_mode unknown')
-    res = []
-    for ca in cand_idx_set:
-        for i in range(len(ca)):
-            res.append(ca[:i+1])
-    return res
+
+    nonmyopic_candidate_sets = []
+    for candidate_set in cand_idx_set:
+        for i in range(len(candidate_set)):
+            nonmyopic_candidate_sets.append(candidate_set[:i+1])
+    return nonmyopic_candidate_sets
+
 
 def to_int_labels(est, X, y):
     est = clone(est)
