@@ -285,18 +285,45 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
     def query(self, X_cand, X, y, X_eval=None, batch_size=1,
               sample_weight_cand=None, sample_weight=None,
               sample_weight_eval=None, return_utilities=False, **kwargs):
-        """
+        """Query the next instance to be labeled.
 
-        Attributes
+        Parameters
         ----------
-        X: array-like (n_training_samples, n_features)
-            Labeled samples
-        y: array-like (n_training_samples)
-            Labels of labeled samples
-        X_cand: array-like (n_samples, n_features)
-            Unlabeled candidate samples
-        X_eval: array-like (n_samples, n_features) or string
-            Unlabeled evaluation samples
+        X_cand: array-like of shape (n_candidates, n_features)
+            The unlabeled pool from which to choose.
+        X: array-like of shape (n_samples, n_features)
+            The complete data set.
+        y: array-like of shape (n_samples)
+            The labels for the set X.
+        X_eval: array-like of shape (n_samples_eval, n_features),
+                optional (default=X_cand)
+            An unlabeled evaluation set used to estimate the performance of
+            the classifier. If it is 'None', the candidate set X_cand will be
+            used.
+        batch_size: int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        sample_weight_cand: array-like, shape (n_candidates),
+                            optional (default=None)
+            Weights for the candidate samples. Optional but necessary if
+            sample_weight is given.
+        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Weights for the labeled set X. Optional but necessary if
+            sample_weight_cand is given.
+        sample_weight_eval: array-like, shape (n_samples_eval),
+                            optional (default=None)
+            Weights for the evaluation set. Will be set to np.ones if it is
+            None.
+        return_utilities: bool, optional (default=False)
+            If True, the utilities are additionally returned.
+        kwargs: unused
+
+        Returns
+        -------
+        query_indices: np.ndarray, shape (batch_size)
+            The index of the queried instance.
+        utilities: np.ndarray, shape (batch_size, n_candidates)
+            The utilities of all instances in X_cand
+            (only returned if return_utilities is True).
         """
 
         ### TEST query parameters
