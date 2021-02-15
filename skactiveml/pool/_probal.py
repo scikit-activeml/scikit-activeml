@@ -404,12 +404,12 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         y_ = np.concatenate([np.full(len(X_cand), missing_label), y], axis=0)
         sample_weight_ = np.concatenate([sample_weight_cand, sample_weight])
         if X_eval is None:
-            sample_weight_eval_ = np.concatenate([sample_weight_eval,
-                                                  np.full(len(X), 0)])
+            sample_weight_eval = np.concatenate([sample_weight_eval,
+                                                 np.full(len(X), 0)])
 
         idx_X_cand = list(range(len(X_cand)))
         idx_X = list(range(len(X_cand), len(X_cand)+len(X)))
-        idx_X_lbld = np.where(is_labeled(y_, missing_label))[0]
+        idx_X_lbld = list(np.where(is_labeled(y_, missing_label))[0])
 
         K = lambda X1, X2: pairwise_kernels(X1, X2,
                                             metric=self.estimator_metric,
@@ -417,16 +417,23 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
 
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
-        sim_cand = _calc_sim(K, X_cand, X_cand, X_,
-                             idx_Y1=None,
-                             idx_Y2=idx_X_lbld)
-
-        if X_eval is not None:
-            sim_eval = _calc_sim(K, X_eval, X_cand, X_, idx_Y2=idx_X_lbld)
+        # TODO: sim_cand should have shape |X_| x |X_|
+        if self.nonmyopic_independent_probs:
+            sim_cand = _calc_sim(K, X_, X_,
+                                 idx_X=idx_X_cand,
+                                 idx_Y=idx_X_lbld, default=-1e10)
         else:
-            sim_eval = np.concatenate([
-                _calc_sim(K, X_cand, X_cand, X_, idx_Y2=idx_X_lbld),
-                _calc_sim(K, X_, X_cand, X_, idx_Y1=[], idx_Y2=[])], axis=0)
+            sim_cand = _calc_sim(K, X_, X_,
+                                 idx_X=idx_X_cand,
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
+
+        if X_eval is None:
+            sim_eval = _calc_sim(K, X_, X_,
+                                 idx_X=idx_X_cand,
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
+        else:
+            sim_eval = _calc_sim(K, X_eval, X_,
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
 
         # INITIALIZE PROB ESTIMATION
         cand_prob_est = PWC(metric="precomputed", classes=classes,
@@ -554,6 +561,7 @@ def probabilistic_gain(clf, X, y, X_eval,
                                     classes=clf.classes).fit(y)
     classes = label_encoder.transform(label_encoder.classes_)
 
+    idx_lbld = list(np.where(is_labeled(y, clf.missing_label))[0])
     prob_cand_X = np.full([len(X), len(classes)], np.nan, float)
     cand_prob_est.fit(X[idx_train], y[idx_train], sample_weight[idx_train])
     prob_cand_X[idx_cand_unique+idx_preselected] = \
