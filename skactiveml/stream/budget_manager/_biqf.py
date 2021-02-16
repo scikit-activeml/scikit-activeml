@@ -112,8 +112,6 @@ class BIQF(BudgetManager):
         self.history_sorted_.append(sampled)
         return self
 
-        return self
-
     def validate_data(self, utilities, return_budget_left, simulate):
         """Validate input data and set or check the `n_features_in_` attribute.
 
