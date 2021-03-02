@@ -74,10 +74,10 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs, **kwargs):
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled, **kwargs)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
 
     def _validate_data(
