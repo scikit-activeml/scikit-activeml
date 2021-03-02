@@ -6,6 +6,7 @@ learning settings.
 
 from .base import BudgetManager
 from ._fixed_budget import FixedBudget
+from ._biqf import BIQF
 from ._estimated_budget import (
     EstimatedBudget,
     FixedUncertaintyBudget,
@@ -20,4 +21,5 @@ __all__ = [
     "FixedUncertaintyBudget",
     "VarUncertaintyBudget",
     "SplitBudget",
+    "BIQF",
 ]

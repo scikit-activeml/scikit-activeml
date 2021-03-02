@@ -105,6 +105,44 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_, "budget", np.float, min_val=0.0, max_val=1.0
         )
 
+    def _validate_data(self, utilities, return_budget_left, simulate):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        # check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError("{} is not a valid type for utilities")
+        # Check return_utilities.
+        check_scalar(return_budget_left, 'return_budget_left', bool)
+        # Check return_utilities.
+        check_scalar(simulate, 'simulate', bool)
+
+        self._validate_budget(get_default_budget())
+        return utilities, return_budget_left, simulate
+
 
 def get_default_budget():
     return 0.1
