@@ -2,19 +2,21 @@ import numpy as np
 
 from .base import BudgetManager, get_default_budget
 from collections import deque
+from copy import copy
 
 
 class BIQF(BudgetManager):
     """
     """
 
-    def __init__(self, w=100, w_tol=50, budget=None,):
+    def __init__(self, w=100, w_tol=50, budget=None, save_utilities=True):
         super().__init__(budget)
         self.w = w
         self.w_tol = w_tol
+        self.save_utilities = save_utilities
 
     def is_budget_left(self):
-        pass
+        return True
 
     def sample(
         self, utilities, return_budget_left=False, simulate=False, **kwargs
@@ -62,30 +64,42 @@ class BIQF(BudgetManager):
         # intialize return parameters
         sampled_indices = []
 
-        for i, u in enumerate(utilities):
-            self.observed_instances_ += 1
-            self.history_sorted_.append(u)
-            theta = np.quantile(self.history_sorted_, (1 - self.budget_))
+        tmp_queried_instances_ = self.queried_instances_
+        tmp_observed_instances_ = self.observed_instances_
+        tmp_history_sorted_ = copy(self.history_sorted_)
+        tmp_utility_queue_ = copy(self.utility_queue_)
 
-            min_ranking = np.min(self.history_sorted_)
-            max_ranking = np.max(self.history_sorted_)
+        for i, u in enumerate(utilities):
+            tmp_observed_instances_ += 1
+            tmp_history_sorted_.append(u)
+            tmp_utility_queue_.append(u)
+            theta = np.quantile(tmp_history_sorted_, (1 - self.budget_))
+
+            min_ranking = np.min(tmp_history_sorted_)
+            max_ranking = np.max(tmp_history_sorted_)
             range_ranking = max_ranking - min_ranking
 
             acq_left = (
-                self.budget_ * self.observed_instances_
-                - self.queried_instances_
+                self.budget_ * tmp_observed_instances_
+                - tmp_queried_instances_
             )
             theta_bal = theta - range_ranking * acq_left / self.w_tol
 
             sample = u >= theta_bal
 
             if sample:
-                self.queried_instances_ += 1
+                tmp_queried_instances_ += 1
             sampled_indices.append(sample)
+
+        if not simulate:
+            self.queried_instances_ = tmp_queried_instances_
+            self.observed_instances_ = tmp_observed_instances_
+            self.history_sorted_ = tmp_history_sorted_
+            self.utility_queue_ = tmp_utility_queue_
 
         return sampled_indices
 
-    def update(self, sampled, **kwargs):
+    def update(self, sampled, utilities=None, **kwargs):
         """Updates the budget manager.
 
         Parameters
@@ -109,7 +123,18 @@ class BIQF(BudgetManager):
             self.history_sorted_ = deque(maxlen=self.w)
         self.observed_instances_ += sampled.shape[0]
         self.queried_instances_ += np.sum(sampled)
-        self.history_sorted_.append(sampled)
+        if utilities is not None:
+            self.history_sorted_.append(utilities)
+        else:
+            if self.save_utilities:
+                utilities = [self.utility_queue_.popleft() for _ in sampled]
+                self.history_sorted_.append(np.array(utilities))
+            else:
+                raise ValueError(
+                    "The save_utilities variable has to be set to true, when" +
+                    " no utilities are passed to update"
+                )
+
         return self
 
     def validate_data(self, utilities, return_budget_left, simulate):
@@ -140,9 +165,10 @@ class BIQF(BudgetManager):
             )
         self._validate_w()
         self._validate_w_tol()
+        self._validate_save_utilities()
 
         return utilities, return_budget_left, simulate
-        
+
     def _validate_w_tol(self):
         # check if w_tol is set
         if not (isinstance(self.w_tol, int) or isinstance(
@@ -151,10 +177,10 @@ class BIQF(BudgetManager):
             raise TypeError("{} is not a valid type for w_tol")
         if self.w_tol <= 0:
             raise ValueError(
-                "The value of w_tol is incorrect." 
+                "The value of w_tol is incorrect."
                 + " w_tol must be greater than 0"
             )
-    
+
     def _validate_w(self):
         # check if w is set
         if not isinstance(self.w, int):
@@ -162,4 +188,14 @@ class BIQF(BudgetManager):
         if self.w <= 0:
             raise ValueError(
                 "The value of w is incorrect." + " w must be greater than 0"
+            )
+
+    def _validate_save_utilities(self):
+        # check if clf is a classifier
+        if isinstance(self.save_utilities, bool):
+            if not hasattr(self, "utility_queue_"):
+                self.utility_queue_ = deque()
+        else:
+            raise TypeError(
+                "save_utilities is not a boolean."
             )

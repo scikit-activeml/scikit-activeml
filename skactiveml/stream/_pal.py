@@ -1,10 +1,9 @@
 import numpy as np
 
-import skactiveml.pool._probal as probal
-
 from sklearn.base import is_classifier, clone
 from skactiveml.utils import check_random_state
 
+import skactiveml.pool._probal as probal
 from ..base import SingleAnnotStreamBasedQueryStrategy
 from ..classifier import PWC
 
@@ -78,7 +77,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
     def update(self, X_cand, sampled, **kwargs):
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **kwargs)
         return self
 
     def _validate_data(
@@ -115,7 +114,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self._validate_clf(X, y)
         self._validate_prior()
         self._validate_m_max()
-        self._validate_random_state
+        self._validate_random_state()
 
         return X_cand, return_utilities, X, y
 
@@ -160,7 +159,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
                 "The value of m_max is incorrect."
                 + " m_max must be greater than 0"
             )
-    
+
     def _validate_random_state(self):
         if not hasattr(self, "random_state_"):
             self.random_state_ = self.random_state
