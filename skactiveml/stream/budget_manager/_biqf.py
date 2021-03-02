@@ -95,7 +95,8 @@ class BIQF(BudgetManager):
             self.queried_instances_ = tmp_queried_instances_
             self.observed_instances_ = tmp_observed_instances_
             self.history_sorted_ = tmp_history_sorted_
-            self.utility_queue_ = tmp_utility_queue_
+            if self.save_utilities:
+                self.utility_queue_ = tmp_utility_queue_
 
         return sampled_indices
 
@@ -124,11 +125,11 @@ class BIQF(BudgetManager):
         self.observed_instances_ += sampled.shape[0]
         self.queried_instances_ += np.sum(sampled)
         if utilities is not None:
-            self.history_sorted_.append(utilities)
+            self.history_sorted_.extend(utilities)
         else:
             if self.save_utilities:
                 utilities = [self.utility_queue_.popleft() for _ in sampled]
-                self.history_sorted_.append(np.array(utilities))
+                self.history_sorted_.extend(utilities)
             else:
                 raise ValueError(
                     "The save_utilities variable has to be set to true, when" +
@@ -193,7 +194,7 @@ class BIQF(BudgetManager):
     def _validate_save_utilities(self):
         # check if clf is a classifier
         if isinstance(self.save_utilities, bool):
-            if not hasattr(self, "utility_queue_"):
+            if self.save_utilities and not hasattr(self, "utility_queue_"):
                 self.utility_queue_ = deque()
         else:
             raise TypeError(
