@@ -66,14 +66,14 @@ class TestExpectedErrorReduction(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         eer = EER(self.clf)
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight='string')
         self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight=np.ones(3))
 
     def test_query_param_sample_weight_cand(self):
         eer = EER(self.clf)
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight_cand='string')
         self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight_cand=np.ones(3))

@@ -1,8 +1,9 @@
-import numpy as np
 import unittest
 
-from sklearn.utils.validation import NotFittedError, check_is_fitted
+import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.utils.validation import NotFittedError, check_is_fitted
+
 from skactiveml.classifier import PWC
 
 
@@ -18,7 +19,7 @@ class TestPWC(unittest.TestCase):
         pwc = PWC(missing_label=-1)
         self.assertEqual(pwc.missing_label, -1)
         self.assertEqual(pwc.classes, None)
-        self.assertEqual(pwc.metric_dict, {})
+        self.assertEqual(pwc.metric_dict, None)
         self.assertEqual(pwc.random_state, None)
         self.assertEqual(pwc.cost_matrix, None)
         self.assertEqual(pwc.class_prior, 0)

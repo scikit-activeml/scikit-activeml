@@ -1,7 +1,6 @@
 import unittest
 
 import numpy as np
-import scipy
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 
@@ -100,7 +99,7 @@ class TestEpistemicUncertainty(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         selector = EpistemicUncertainty(clf=LogisticRegression())
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=self.X_cand)
