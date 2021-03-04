@@ -135,7 +135,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)
-        try:
+        if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
             else:
@@ -143,7 +143,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(costs, random_state=self._random_state,
                                      axis=1)
-        except Exception:
+        else:
             p = self.predict_proba([X[0]])[0]
             y_pred = self._random_state.choice(np.arange(len(self.classes_)),
                                                len(X),
@@ -173,7 +173,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)
-        try:
+        if self.is_fitted_:
             P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
             if len(self.estimator_.classes_) != len(self.classes_):
                 P_ext = np.zeros((len(X), len(self.classes_)))
@@ -181,7 +181,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 P_ext[:, class_indices] = P
                 P = P_ext
             return P
-        except Exception:
+        else:
+            warnings.warn("Since the 'base_estimator' could not be fitted when"
+                          " calling the `fit` method, the class label "
+                          "distribution`_label_counts={}` is used to make "
+                          "the predictions."
+                          .format(self._label_counts))
             if sum(self._label_counts) == 0:
                 return np.ones([len(X), len(self.classes_)]) / len(
                     self.classes_)
@@ -244,10 +249,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                                         sample_weight=sample_weight[is_lbld],
                                         **fit_kwargs)
             self.is_fitted_ = True
-        except Exception:
+        except Exception as e:
             self.is_fitted_ = False
             self._label_counts = [np.sum(y[is_lbld] == c) for c in
                                   range(len(self._le.classes_))]
+            warnings.warn("The 'base_estimator' could not be fitted because of"
+                          " '{}'. Therefore, the class labels of the samples "
+                          "are counted and will be used to make predictions. "
+                          "The class label distribution is `_label_counts={}`."
+                          .format(e, self._label_counts))
         return self
 
     def __getattr__(self, item):

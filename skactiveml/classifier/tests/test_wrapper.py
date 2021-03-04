@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 import numpy as np
 from sklearn.datasets import load_breast_cancer
@@ -65,7 +66,10 @@ class TestClassifierWrapper(unittest.TestCase):
         np.testing.assert_array_equal(clf.classes_, ['new york', 'paris',
                                                      'tokyo'])
         self.assertEqual(clf.missing_label, 'nan')
-        clf.fit(self.X, self.y2)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            clf.fit(self.X, self.y2)
+            self.assertEqual(len(w), 1)
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertFalse(hasattr(clf, 'partial_fit'))
@@ -107,7 +111,10 @@ class TestClassifierWrapper(unittest.TestCase):
         np.testing.assert_array_equal(P_exp, P)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
         clf.fit(X=self.X, y=self.y2)
-        P = clf.predict_proba(X=self.X)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            P = clf.predict_proba(X=self.X)
+            self.assertEqual(len(w), 1)
         P_exp = np.ones((len(self.X), 1))
         np.testing.assert_array_equal(P_exp, P)
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
@@ -135,7 +142,10 @@ class TestClassifierWrapper(unittest.TestCase):
         np.testing.assert_array_equal(y, y_exp)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
         clf.fit(X=self.X, y=self.y2)
-        y = clf.predict(X=self.X)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            y = clf.predict(X=self.X)
+            self.assertEqual(len(w), 1)
         y_exp = ['tokyo'] * len(self.X)
         np.testing.assert_array_equal(y_exp, y)
 
