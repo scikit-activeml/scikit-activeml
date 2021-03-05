@@ -117,29 +117,13 @@ class FixedUncertaintyBudget(EstimatedBudget):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        # check if budget has been set
-        self._validate_budget(get_default_budget())
+        utilities, return_budget_left, simulate = self.validate_data(
+                utilities, return_budget_left, simulate
+            )
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
-        # check if w is set
-        if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
-        if self.w <= 0:
-            raise ValueError(
-                "The value of w is incorrect." + " w must be greater than 0"
-            )
-        # check if num_classes is set
-        if not isinstance(self.num_classes, int):
-            raise TypeError("{} is not a valid type for num_classes")
-        if self.num_classes <= 0:
-            raise ValueError(
-                "The value of num_classes is incorrect."
-                + " num_classes must be greater than 0"
-            )
-        # check if utilities is set
-        if not isinstance(utilities, np.ndarray) or utilities.dtype != float:
-            raise TypeError("{} is not a valid type for utilities")
+        
         # intialize return parameters
         sampled_indices = []
         budget_left = []
@@ -173,6 +157,56 @@ class FixedUncertaintyBudget(EstimatedBudget):
             return sampled_indices, budget_left
         else:
             return sampled_indices
+
+    def validate_data(self, utilities, return_budget_left, simulate):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            candidate samples
+        return_budget_left : bool,
+            If true, also return the budget based on the query strategy.
+        simulate : bool,
+            If True, the internal state of the budget manager before and after
+            the query is the same.
+
+        Returns
+        -------
+        utilities : ndarray of shape (n_samples,)
+            Checked candidate samples
+        return_budget_left : bool,
+            Checked boolean value of `return_budget_left`.
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
+
+        utilities, return_budget_left, simulate = super()._validate_data(
+                utilities, return_budget_left, simulate
+            )
+        self._validate_w()
+        self.validate_num_classes()
+
+        return utilities, return_budget_left, simulate
+
+    def validate_num_classes(self):
+        # check if num_classes is set
+        if not isinstance(self.num_classes, int):
+            raise TypeError("{} is not a valid type for num_classes")
+        if self.num_classes <= 0:
+            raise ValueError(
+                "The value of num_classes is incorrect."
+                + " num_classes must be greater than 0"
+            )
+
+    def _validate_w(self):
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError(
+                "The value of w is incorrect." + " w must be greater than 0"
+            )
 
 
 class VarUncertaintyBudget(EstimatedBudget):
@@ -217,36 +251,15 @@ class VarUncertaintyBudget(EstimatedBudget):
         """
 
         """
-        # check if budget has been set
-        self._validate_budget(get_default_budget())
+        utilities, return_budget_left, simulate = self.validate_data(
+                utilities, return_budget_left, simulate
+            )
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-        # check if theta is set
-        if not isinstance(self.theta_, float):
-            raise TypeError("{} is not a valid type for theta")
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
-        # ckeck if s a float and in range (0,1]
-        if self.s is not None:
-            if not isinstance(self.s, float):
-                raise TypeError("{} is not a valid type for s")
-            if self.s <= 0 or self.s > 1.0:
-                raise ValueError(
-                    "The value of s is incorrect."
-                    + " s must be defined in range (0,1]"
-                )
-        # check if w is set
-        if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
-        if self.w <= 0:
-            raise ValueError(
-                "The value of w is incorrect." + " w must be greater than 0"
-            )
-        # check if utilities is set
-        if not isinstance(utilities, np.ndarray):
-            raise TypeError("{} is not a valid type for utilities")
 
         # intialize return parameters
         sampled_indices = []
@@ -306,6 +319,63 @@ class VarUncertaintyBudget(EstimatedBudget):
             super().update([s])
         return self
 
+    def validate_data(self, utilities, return_budget_left, simulate):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            candidate samples
+        return_budget_left : bool,
+            If true, also return the budget based on the query strategy.
+        simulate : bool,
+            If True, the internal state of the budget manager before and after
+            the query is the same.
+
+        Returns
+        -------
+        utilities : ndarray of shape (n_samples,)
+            Checked candidate samples
+        return_budget_left : bool,
+            Checked boolean value of `return_budget_left`.
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
+
+        utilities, return_budget_left, simulate = super()._validate_data(
+                utilities, return_budget_left, simulate
+            )
+        self._validate_w()
+        self.validate_theta()
+        self.validate_s()
+
+        return utilities, return_budget_left, simulate
+
+    def validate_theta(self):
+        # check if theta is set
+        if not isinstance(self.theta, float):
+            raise TypeError("{} is not a valid type for theta")
+
+    def validate_s(self):
+        # ckeck if s a float and in range (0,1]
+        if self.s is not None:
+            if not isinstance(self.s, float):
+                raise TypeError("{} is not a valid type for s")
+            if self.s <= 0 or self.s > 1.0:
+                raise ValueError(
+                    "The value of s is incorrect."
+                    + " s must be defined in range (0,1]"
+                )
+
+    def _validate_w(self):
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError(
+                "The value of w is incorrect." + " w must be greater than 0"
+            )
+
 
 class SplitBudget(EstimatedBudget):
     """
@@ -352,46 +422,15 @@ class SplitBudget(EstimatedBudget):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        # check if budget has been set
-        self._validate_budget(get_default_budget())
+        utilities, return_budget_left, simulate = self.validate_data(
+                utilities, return_budget_left, simulate
+            )
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-        # check if theta is set
-        if not isinstance(self.theta_, float):
-            raise TypeError("{} is not a valid type for theta")
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
-
-        self._validate_random_state()
-        # check if w is set
-        if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
-        if self.w <= 0:
-            raise ValueError(
-                "The value of w is incorrect." + " w must be greater than 0"
-            )
-        # ckeck if s a float and in range (0,1]
-        if self.s is not None:
-            if not isinstance(self.s, float):
-                raise TypeError("{} is not a valid type for s")
-            if self.s <= 0 or self.s > 1.0:
-                raise ValueError(
-                    "The value of s is incorrect."
-                    + " s must be defined in range (0,1]"
-                )
-        # ckeck if v is a float and in range (0,1]
-        if not isinstance(self.v, float):
-            raise TypeError("{} is not a valid type for v")
-        if self.v <= 0 or self.v >= 1:
-            raise ValueError(
-                "The value of v is incorrect."
-                + " v must be defined in range (0,1)"
-            )
-        # check if utilities is set
-        if not isinstance(utilities, np.ndarray):
-            raise TypeError("{} is not a valid type for utilities")
 
         # intialise return parameters
         sampled_indices = []
@@ -467,3 +506,72 @@ class SplitBudget(EstimatedBudget):
                         self.theta_ *= 1 + self.s
             super().update([s])
         return self
+
+    def validate_data(self, utilities, return_budget_left, simulate):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            candidate samples
+        return_budget_left : bool,
+            If true, also return the budget based on the query strategy.
+        simulate : bool,
+            If True, the internal state of the budget manager before and after
+            the query is the same.
+
+        Returns
+        -------
+        utilities : ndarray of shape (n_samples,)
+            Checked candidate samples
+        return_budget_left : bool,
+            Checked boolean value of `return_budget_left`.
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
+
+        utilities, return_budget_left, simulate = super()._validate_data(
+                utilities, return_budget_left, simulate
+            )
+        self._validate_w()
+        self.validate_theta()
+        self.validate_s()
+        self.validate_v()
+        self._validate_random_state()
+
+        return utilities, return_budget_left, simulate
+
+    def validate_theta(self):
+        # check if theta is set
+        if not isinstance(self.theta, float):
+            raise TypeError("{} is not a valid type for theta")
+
+    def validate_s(self):
+        # ckeck if s a float and in range (0,1]
+        if self.s is not None:
+            if not isinstance(self.s, float):
+                raise TypeError("{} is not a valid type for s")
+            if self.s <= 0 or self.s > 1.0:
+                raise ValueError(
+                    "The value of s is incorrect."
+                    + " s must be defined in range (0,1]"
+                )
+    
+    def validate_v(self):
+        # ckeck if v is a float and in range (0,1]
+        if not isinstance(self.v, float):
+            raise TypeError("{} is not a valid type for v")
+        if self.v <= 0 or self.v >= 1:
+            raise ValueError(
+                "The value of v is incorrect."
+                + " v must be defined in range (0,1)"
+            )
+
+    def _validate_w(self):
+        # check if w is set
+        if not isinstance(self.w, int):
+            raise TypeError("{} is not a valid type for w")
+        if self.w <= 0:
+            raise ValueError(
+                "The value of w is incorrect." + " w must be greater than 0"
+            )
