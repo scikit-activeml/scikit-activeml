@@ -3,8 +3,8 @@
 .. |Doc| image:: https://img.shields.io/badge/readthedocs.io--green
 .. _Doc: https://scikit-activeml.readthedocs.io/en/latest/
 
-.. |Codecov| image:: https://codecov.io/github/scikit-learn/scikit-learn/badge.svg?branch=main&service=github
-.. _Codecov: https://codecov.io/github/scikit-learn/scikit-learn?branch=main
+.. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
+.. _Codecov: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
 .. |PythonVersion| image:: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
 .. _PythonVersion: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
