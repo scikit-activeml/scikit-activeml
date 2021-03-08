@@ -53,7 +53,7 @@ class TestALCE(unittest.TestCase):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     sample_weight='string')
         self.assertTrue(hasattr(alce, 'sample_weight'))
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
 
     def test_init_param_missing_label(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
