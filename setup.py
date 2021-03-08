@@ -7,7 +7,7 @@ def readme():
 
 
 setuptools.setup(name='scikit-activeml',
-                 version='0.0.1',
+                 version='0.0.0',
                  description='The package scikit-activeml is a library of '
                              'that covers the most relevant query strategies '
                              'in active learning and implements tools to work '
@@ -19,9 +19,9 @@ setuptools.setup(name='scikit-activeml',
                      'Intended Audience :: Developers',
                      'License :: OSI Approved :: BSD License',
                      'Programming Language :: Python :: 3',
-                     'Programming Language :: Python :: 3.6',
                      'Programming Language :: Python :: 3.7',
                      'Programming Language :: Python :: 3.8',
+                     'Programming Language :: Python :: 3.9',
                      'Operating System :: OS Independent',
                  ],
                  keywords=['active learning', 'machine learning',
@@ -40,7 +40,7 @@ setuptools.setup(name='scikit-activeml',
                      'matplotlib~=3.3.4',
                      'iteration-utilities~=0.11.0'
                  ],
-                 test_suite='nose.collector',
-                 tests_require=['nose'],
+                 setup_requires=['pytest-runner'],
+                 tests_require=['pytest'],
                  include_package_data=True,
                  zip_safe=False)
