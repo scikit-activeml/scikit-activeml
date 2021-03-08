@@ -105,7 +105,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -125,7 +125,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
 
     def _validate_data(
@@ -286,7 +286,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -306,7 +306,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
 
     def _validate_data(
@@ -459,7 +459,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, X, y, **kwargs):
+    def update(
+            self, X_cand, sampled, X, y, budget_manager_kwargs={}, **kwargs
+    ):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -484,7 +486,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         # check if a random state is set
         self._validate_random_state()
 
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
 
     def _validate_data(

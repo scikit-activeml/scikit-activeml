@@ -79,8 +79,6 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
     """
 
-    # num_classes in init
-
     def __init__(self, budget=None, w=100, num_classes=2):
         super().__init__(budget, w)
         self.num_classes = num_classes
@@ -117,7 +115,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        utilities, return_budget_left, simulate = self.validate_data(
+        utilities, return_budget_left, simulate = self._validate_data(
                 utilities, return_budget_left, simulate
             )
         # check if calculation of estimate bought/true lables has begun
@@ -158,7 +156,24 @@ class FixedUncertaintyBudget(EstimatedBudget):
         else:
             return sampled_indices
 
-    def validate_data(self, utilities, return_budget_left, simulate):
+    def update(self, sampled, **kwargs):
+        """Updates the budget manager.
+
+        Parameters
+        ----------
+        sampled : array-like
+            Indicates which instances from X_cand have been sampled.
+
+        Returns
+        -------
+        self : EstimatedBudget
+            The EstimatedBudget returns itself, after it is updated.
+        """
+        
+        super().update(sampled)
+        return self
+
+    def _validate_data(self, utilities, return_budget_left, simulate):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -185,11 +200,11 @@ class FixedUncertaintyBudget(EstimatedBudget):
                 utilities, return_budget_left, simulate
             )
         self._validate_w()
-        self.validate_num_classes()
+        self._validate_num_classes()
 
         return utilities, return_budget_left, simulate
 
-    def validate_num_classes(self):
+    def _validate_num_classes(self):
         # check if num_classes is set
         if not isinstance(self.num_classes, int):
             raise TypeError("{} is not a valid type for num_classes")
@@ -248,10 +263,36 @@ class VarUncertaintyBudget(EstimatedBudget):
     def sample(
         self, utilities, return_budget_left=False, simulate=False, **kwargs
     ):
-        """
+        """Ask the budget manager which utilities are sufficient to sample the
+        corresponding instance.
 
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy, which are used to determine whether sampling an instance
+            is worth it given the budgeting constraint.
+
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
+
+        simulate : bool, optional
+            If True, the internal state of the budget manager before and after
+            the query is the same. This should only be used to prevent the
+            budget manager from adapting itself. The default is False.
+
+        Returns
+        -------
+        sampled_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances represented by utilities which should be
+            sampled, with 0 <= n_sampled_instances <= n_samples.
+
+        budget_left: ndarray of shape (n_samples,), optional
+            Shows whether there was budget left for each assessed utility. Only
+            provided if return_utilities is True.
         """
-        utilities, return_budget_left, simulate = self.validate_data(
+        utilities, return_budget_left, simulate = self._validate_data(
                 utilities, return_budget_left, simulate
             )
         # check if theta exists
@@ -319,7 +360,7 @@ class VarUncertaintyBudget(EstimatedBudget):
             super().update([s])
         return self
 
-    def validate_data(self, utilities, return_budget_left, simulate):
+    def _validate_data(self, utilities, return_budget_left, simulate):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -346,17 +387,17 @@ class VarUncertaintyBudget(EstimatedBudget):
                 utilities, return_budget_left, simulate
             )
         self._validate_w()
-        self.validate_theta()
-        self.validate_s()
+        self._validate_theta()
+        self._validate_s()
 
         return utilities, return_budget_left, simulate
 
-    def validate_theta(self):
+    def _validate_theta(self):
         # check if theta is set
         if not isinstance(self.theta, float):
             raise TypeError("{} is not a valid type for theta")
 
-    def validate_s(self):
+    def _validate_s(self):
         # ckeck if s a float and in range (0,1]
         if self.s is not None:
             if not isinstance(self.s, float):
@@ -422,7 +463,7 @@ class SplitBudget(EstimatedBudget):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        utilities, return_budget_left, simulate = self.validate_data(
+        utilities, return_budget_left, simulate = self._validate_data(
                 utilities, return_budget_left, simulate
             )
         # check if theta exists
@@ -507,7 +548,7 @@ class SplitBudget(EstimatedBudget):
             super().update([s])
         return self
 
-    def validate_data(self, utilities, return_budget_left, simulate):
+    def _validate_data(self, utilities, return_budget_left, simulate):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -534,19 +575,19 @@ class SplitBudget(EstimatedBudget):
                 utilities, return_budget_left, simulate
             )
         self._validate_w()
-        self.validate_theta()
-        self.validate_s()
-        self.validate_v()
+        self._validate_theta()
+        self._validate_s()
+        self._validate_v()
         self._validate_random_state()
 
         return utilities, return_budget_left, simulate
 
-    def validate_theta(self):
+    def _validate_theta(self):
         # check if theta is set
         if not isinstance(self.theta, float):
             raise TypeError("{} is not a valid type for theta")
 
-    def validate_s(self):
+    def _validate_s(self):
         # ckeck if s a float and in range (0,1]
         if self.s is not None:
             if not isinstance(self.s, float):
@@ -557,7 +598,7 @@ class SplitBudget(EstimatedBudget):
                     + " s must be defined in range (0,1]"
                 )
     
-    def validate_v(self):
+    def _validate_v(self):
         # ckeck if v is a float and in range (0,1]
         if not isinstance(self.v, float):
             raise TypeError("{} is not a valid type for v")

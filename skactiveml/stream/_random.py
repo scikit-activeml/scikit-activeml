@@ -261,7 +261,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -287,7 +287,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         self.observed_instances_ += X_cand.shape[0]
         self.queried_instances_ += np.sum(sampled > 0)
         # print("queried_instances_", self.queried_instances_)
