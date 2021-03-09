@@ -68,16 +68,12 @@ class FixedBudget(BudgetManager):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        # check if budget has been set
-        self._validate_budget(get_default_budget())
+        self._validate_data(utilities, return_budget_left, simulate)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
-        # check if utilities is set
-        if not isinstance(utilities, np.ndarray) or utilities.dtype != float:
-            raise TypeError("{} is not a valid type for utilities")
         # keep record if the instance is sampled and if there was budget left,
         # when assessing the corresponding utilities
         sampled = np.full(len(utilities), False)

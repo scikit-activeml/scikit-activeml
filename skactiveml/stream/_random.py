@@ -1,7 +1,5 @@
 import numpy as np
 
-from sklearn.utils import check_array
-
 from ..base import SingleAnnotStreamBasedQueryStrategy
 
 from .budget_manager import FixedBudget
@@ -69,14 +67,9 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # check the shape of data
-        X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a random state is set
-        self._validate_random_state()
+        self._validate_data(X_cand, return_utilities)
         # copy random state in case of simulating the query
         prior_random_state_state = self.random_state_.get_state()
-        # check if a budget_manager is set
-        self._validate_budget_manager()
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
@@ -119,6 +112,47 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         self.random_state_.random_sample(len(sampled))
         self.budget_manager_.update(sampled)
         return self
+
+    def _validate_data(
+        self, X_cand, return_utilities, reset=True, **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        )
+
+        self._validate_random_state()
+
+        return X_cand, return_utilities
 
 
 class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
@@ -185,10 +219,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # check the shape of data
-        X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a budget_manager is set
-        self._validate_budget_manager()
+        self._validate_data(X_cand, return_utilities)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
@@ -230,7 +261,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -256,8 +287,49 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         self.observed_instances_ += X_cand.shape[0]
         self.queried_instances_ += np.sum(sampled > 0)
         # print("queried_instances_", self.queried_instances_)
         return self
+
+    def _validate_data(
+        self, X_cand, return_utilities, reset=True, **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        )
+
+        self._validate_random_state()
+
+        return X_cand, return_utilities

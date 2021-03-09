@@ -91,31 +91,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # check the shape of data
-        X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a random state is set
-        self._validate_random_state()
-        # check if a budget_manager is set
-        self._validate_budget_manager()
-        # check if clf is a classifier
-        if X is not None and y is not None:
-            if self.clf is None:
-                clf = PWC(random_state=self.random_state_.randint(2 ** 31 - 1))
-            elif is_classifier(self.clf):
-                clf = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            clf.fit(X, y)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
-        else:
-            clf = self.clf
-        predict_proba = clf.predict_proba(X_cand)
+        self._validate_data(X_cand, return_utilities, X, y)
+
+        predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
         sampled_indices = self.budget_manager_.sample(
@@ -127,7 +105,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -147,8 +125,72 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
+
+    def _validate_data(
+        self, X_cand, return_utilities, X, y, reset=True, **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        )
+
+        self._validate_clf(X, y)
+        self._validate_random_state()
+
+        return X_cand, return_utilities, X, y
+
+    def _validate_clf(self, X, y):
+        # check if clf is a classifier
+        if X is not None and y is not None:
+            if self.clf is None:
+                self.clf_ = PWC(
+                    random_state=self.random_state_.randint(2 ** 31 - 1)
+                )
+            elif is_classifier(self.clf):
+                self.clf_ = clone(self.clf)
+            else:
+                raise TypeError(
+                    "clf is not a classifier. Please refer to "
+                    + "sklearn.base.is_classifier"
+                )
+            self.clf_.fit(X, y)
+            # check if y is not multi dimensinal
+            if isinstance(y, np.ndarray):
+                if y.ndim > 1:
+                    raise ValueError("{} is not a valid Value for y")
+        else:
+            self.clf_ = self.clf
 
 
 class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -228,31 +270,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # check the shape of data
-        X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a random state is set
-        self._validate_random_state()
-        # check if a budget_manager is set
-        self._validate_budget_manager()
-        # check if clf is a classifier
-        if X is not None and y is not None:
-            if self.clf is None:
-                clf = PWC(random_state=self.random_state_.randint(2 ** 31 - 1))
-            elif is_classifier(self.clf):
-                clf = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            clf.fit(X, y)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
-        else:
-            clf = self.clf
-        predict_proba = clf.predict_proba(X_cand)
+        self._validate_data(X_cand, return_utilities, X, y)
+
+        predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
         sampled_indices = []
@@ -266,7 +286,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -286,8 +306,72 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
+
+    def _validate_data(
+        self, X_cand, return_utilities, X, y, reset=True, **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        )
+
+        self._validate_clf(X, y)
+        self._validate_random_state()
+
+        return X_cand, return_utilities, X, y
+
+    def _validate_clf(self, X, y):
+        # check if clf is a classifier
+        if X is not None and y is not None:
+            if self.clf is None:
+                self.clf_ = PWC(
+                    random_state=self.random_state_.randint(2 ** 31 - 1)
+                )
+            elif is_classifier(self.clf):
+                self.clf_ = clone(self.clf)
+            else:
+                raise TypeError(
+                    "clf is not a classifier. Please refer to "
+                    + "sklearn.base.is_classifier"
+                )
+            self.clf_.fit(X, y)
+            # check if y is not multi dimensinal
+            if isinstance(y, np.ndarray):
+                if y.ndim > 1:
+                    raise ValueError("{} is not a valid Value for y")
+        else:
+            self.clf_ = self.clf
 
 
 class Split(SingleAnnotStreamBasedQueryStrategy):
@@ -360,32 +444,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        # check the shape of data
-        X_cand = check_array(X_cand, force_all_finite=False)
-        # check if a random state is set
-        self._validate_random_state()
-        # check if a budget_manager is set
-        self._validate_budget_manager()
-        # check if clf is a classifier
-        if X is not None and y is not None:
-            if self.clf is None:
-                clf = PWC(random_state=self.random_state_.randint(2 ** 31 - 1))
-            elif is_classifier(self.clf):
-                clf = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            clf.fit(X, y)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y.")
-        else:
-            clf = self.clf
+        self._validate_data(X_cand, return_utilities, X, y)
 
-        predict_proba = clf.predict_proba(X_cand)
+        predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
         sampled_indices = []
 
@@ -398,7 +459,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, X, y, **kwargs):
+    def update(
+            self, X_cand, sampled, X, y, budget_manager_kwargs={}, **kwargs
+    ):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -423,5 +486,70 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         # check if a random state is set
         self._validate_random_state()
 
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
+
+    def _validate_data(
+        self, X_cand, return_utilities, X, y, reset=True, **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        )
+
+        self._validate_clf(X, y)
+        self._validate_random_state()
+        self._validate_budget_manager()
+
+        return X_cand, return_utilities, X, y
+
+    def _validate_clf(self, X, y):
+        # check if clf is a classifier
+        if X is not None and y is not None:
+            if self.clf is None:
+                self.clf_ = PWC(
+                    random_state=self.random_state_.randint(2 ** 31 - 1)
+                )
+            elif is_classifier(self.clf):
+                self.clf_ = clone(self.clf)
+            else:
+                raise TypeError(
+                    "clf is not a classifier. Please refer to "
+                    + "sklearn.base.is_classifier"
+                )
+            self.clf_.fit(X, y)
+            # check if y is not multi dimensinal
+            if isinstance(y, np.ndarray):
+                if y.ndim > 1:
+                    raise ValueError("{} is not a valid Value for y")
+        else:
+            self.clf_ = self.clf
