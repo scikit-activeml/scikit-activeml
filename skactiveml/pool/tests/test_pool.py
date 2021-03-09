@@ -39,7 +39,7 @@ class TestGeneral(unittest.TestCase):
             with self.subTest(msg="Random State", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
                 qs = call_func(
-                    self.query_strategies[qs_name], only_mandatory=True,
+                    self.query_strategies[qs_name], only_mandatory=False,
                     clf=clf, classes=np.unique(self.y_true),
                     random_state=np.random.RandomState(0))
 
@@ -129,8 +129,9 @@ class TestGeneral(unittest.TestCase):
                     'skactiveml.pool.tests.test' + class_file_name)
                 test_class_name = 'Test' + qs_class.__name__
                 self.assertTrue(hasattr(mod, test_class_name),
-                                msg='{} has no test called {}' +
-                                    ''.format(qs_name, test_class_name))
+                                msg='{} has no test called {}'.format(
+                                    qs_name, test_class_name)
+                                )
                 test_obj = getattr(mod, test_class_name)
 
                 # check init params
@@ -138,7 +139,7 @@ class TestGeneral(unittest.TestCase):
                     test_func_name = 'test_init_param_' + param
                     self.assertTrue(
                         hasattr(test_obj, test_func_name),
-                        msg="'{}()' missing for parameter '{}' of  "
+                        msg="'{}()' missing for parameter '{}' of "
                             "__init__()".format(test_func_name, param))
 
                 # check query params
