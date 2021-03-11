@@ -5,13 +5,12 @@ Parzen Window Classifier
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
-
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted, check_scalar
 
-from ..utils import MISSING_LABEL, compute_vote_vectors
 from ..base import ClassFrequencyEstimator
+from ..utils import MISSING_LABEL, compute_vote_vectors
 
 
 class PWC(ClassFrequencyEstimator):
@@ -81,7 +80,7 @@ class PWC(ClassFrequencyEstimator):
         self.class_prior = class_prior
         self.metric = metric
         self.n_neighbors = n_neighbors
-        self.metric_dict = metric_dict if metric_dict is not None else {}
+        self.metric_dict = metric_dict
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -117,7 +116,8 @@ class PWC(ClassFrequencyEstimator):
                          target_type=int)
 
         # Ensure that metric_dict is a Python dictionary.
-        if not isinstance(self.metric_dict, dict):
+        self.metric_dict_ = self.metric_dict if self.metric_dict is not None else {}
+        if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
         self._check_n_features(X, reset=True)
@@ -159,7 +159,7 @@ class PWC(ClassFrequencyEstimator):
         else:
             self._check_n_features(X, reset=False)
             K = pairwise_kernels(X, self.X_, metric=self.metric,
-                                 **self.metric_dict)
+                                 **self.metric_dict_)
 
         # computing class frequency estimates
         if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:
