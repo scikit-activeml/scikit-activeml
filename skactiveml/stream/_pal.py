@@ -61,7 +61,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, X, y)
+        self._validate_data(X_cand, return_utilities, X, y, simulate)
 
         k_vec = self.clf_.predict_freq(X_cand)
         utilities = probal._cost_reduction(
@@ -81,7 +81,14 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         return self
 
     def _validate_data(
-        self, X_cand, return_utilities, X, y, reset=True, **check_X_cand_params
+        self,
+        X_cand,
+        return_utilities,
+        X,
+        y,
+        simulate,
+        reset=True,
+        **check_X_cand_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -107,8 +114,12 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         random_state : np.random.RandomState,
             Checked random state to use.
         """
-        X_cand, return_utilities = super()._validate_data(
-            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        X_cand, return_utilities, simulate = super()._validate_data(
+            X_cand,
+            return_utilities,
+            simulate,
+            reset=reset,
+            **check_X_cand_params
         )
 
         self._validate_clf(X, y)
@@ -116,7 +127,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self._validate_m_max()
         self._validate_random_state()
 
-        return X_cand, return_utilities, X, y
+        return X_cand, return_utilities, X, y, simulate
 
     def _validate_clf(self, X, y):
         # check if clf is a classifier

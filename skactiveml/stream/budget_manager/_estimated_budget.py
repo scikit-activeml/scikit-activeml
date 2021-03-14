@@ -75,8 +75,31 @@ class EstimatedBudget(BudgetManager):
 
 
 class FixedUncertaintyBudget(EstimatedBudget):
-    """
+    """Budget manager which is optimized for FixedUncertainty and checks,
+    whether the specified budget has been exhausted already. If not, an 
+    instance is sampled, when the utility is higher than the specified budget
+    and the probability of the most likely class exceeds a threshold
+    calculated based on the budget and the number of classes.
 
+    This budget manager calculates the estimated budget spent in the last
+    w steps and compares that to the budget. If the ratio is smaller
+    than the specified budget, i.e.,
+    budget - u_t / w > 0 , the budget
+    manager samples an instance when its utility is higher than the budget.
+    u is the estimate of how many true lables were queried within the last
+    w steps. The recursive funktion,
+    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+
+    Parameters
+    ----------
+    budget : float
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1.
+    w : int
+        Specifies the size of the memory window. Controlles the budget in the
+        last w steps taken. Default = 100
+    num_classes : int
+        Specifies the number of classes. Default = 2
     """
 
     def __init__(self, budget=None, w=100, num_classes=2):
@@ -116,12 +139,12 @@ class FixedUncertaintyBudget(EstimatedBudget):
             provided if return_utilities is True.
         """
         utilities, return_budget_left, simulate = self._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
-        
+
         # intialize return parameters
         sampled_indices = []
         budget_left = []
@@ -169,17 +192,18 @@ class FixedUncertaintyBudget(EstimatedBudget):
         self : EstimatedBudget
             The EstimatedBudget returns itself, after it is updated.
         """
-        
+
         super().update(sampled)
         return self
 
     def _validate_data(self, utilities, return_budget_left, simulate):
-        """Validate input data and set or check the `n_features_in_` attribute.
+        """Validate input data.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
-            candidate samples
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
         return_budget_left : bool,
             If true, also return the budget based on the query strategy.
         simulate : bool,
@@ -189,7 +213,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
-            Checked candidate samples
+            Checked utilities
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         simulate : bool,
@@ -197,15 +221,16 @@ class FixedUncertaintyBudget(EstimatedBudget):
         """
 
         utilities, return_budget_left, simulate = super()._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
         self._validate_w()
         self._validate_num_classes()
 
         return utilities, return_budget_left, simulate
 
     def _validate_num_classes(self):
-        # check if num_classes is set
+        """Validate if num_classes an integer and greather than 0.
+        """
         if not isinstance(self.num_classes, int):
             raise TypeError("{} is not a valid type for num_classes")
         if self.num_classes <= 0:
@@ -215,7 +240,8 @@ class FixedUncertaintyBudget(EstimatedBudget):
             )
 
     def _validate_w(self):
-        # check if w is set
+        """Validate if w an integer and greather than 0.
+        """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
         if self.w <= 0:
@@ -225,34 +251,36 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
 
 class VarUncertaintyBudget(EstimatedBudget):
-    """Ask the budget manager which utilities are sufficient to sample the
-        corresponding instance.
+    """Budget manager which checks, whether the specified budget has been
+    exhausted already. If not, an instance is sampled, when the utility is
+    higher than the specified budget and when the probability of
+    the most likely class exceeds a time-dependent threshold calculated based
+    on the budget, the number of classes and the number of observed and
+    acquired samples.
 
-        Parameters
-        ----------
-        utilities : ndarray of shape (n_samples,)
-            The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
-            is worth it given the budgeting constraint.
+    This budget manager calculates the estimated budget spent in the last
+    w steps and compares that to the budget. If the ratio is smaller
+    than the specified budget, i.e.,
+    budget - u_t / w > 0 , the budget
+    manager samples an instance when its utility is higher than the budget.
+    u is the estimate of how many true lables were queried within the last
+    w steps. The recursive funktion,
+    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
 
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
-
-        simulate : bool, optional
-            If True, the internal state of the budget manager before and after
-            the query is the same. This should only be used to prevent the
-            budget manager from adapting itself. The default is False.
-
-        Returns
-        -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances represented by utilities which should be
-            sampled, with 0 <= n_sampled_instances <= n_samples.
-
-        budget_left: ndarray of shape (n_samples,), optional
-            Shows whether there was budget left for each assessed utility. Only
-            provided if return_utilities is True.
+    Parameters
+    ----------
+    budget : float
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1.
+    w : int
+        Specifies the size of the memory window. Controlles the budget in the
+        last w steps taken. Default = 100
+    theta : float
+        Specifies the starting threshold in wich instances are purchased. This 
+        value of theta will recalculated after each instance. Default = 1
+    s : float
+        Specifies the value in wich theta is decresed or increased based on the 
+        purchase of the given label. Default = 0.01
     """
 
     def __init__(self, budget=None, w=100, theta=1.0, s=0.01):
@@ -293,8 +321,8 @@ class VarUncertaintyBudget(EstimatedBudget):
             provided if return_utilities is True.
         """
         utilities, return_budget_left, simulate = self._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
@@ -361,12 +389,13 @@ class VarUncertaintyBudget(EstimatedBudget):
         return self
 
     def _validate_data(self, utilities, return_budget_left, simulate):
-        """Validate input data and set or check the `n_features_in_` attribute.
+        """Validate input data.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
-            candidate samples
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
         return_budget_left : bool,
             If true, also return the budget based on the query strategy.
         simulate : bool,
@@ -376,7 +405,7 @@ class VarUncertaintyBudget(EstimatedBudget):
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
-            Checked candidate samples
+            Checked utilities
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         simulate : bool,
@@ -384,21 +413,26 @@ class VarUncertaintyBudget(EstimatedBudget):
         """
 
         utilities, return_budget_left, simulate = super()._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
+        # Check w
         self._validate_w()
+        # Check theta
         self._validate_theta()
+        # Chack s
         self._validate_s()
 
         return utilities, return_budget_left, simulate
 
     def _validate_theta(self):
-        # check if theta is set
+        """Validate if theta is set as a float.
+        """
         if not isinstance(self.theta, float):
             raise TypeError("{} is not a valid type for theta")
 
     def _validate_s(self):
-        # ckeck if s a float and in range (0,1]
+        """Validate if s a float and in range (0,1]
+        """
         if self.s is not None:
             if not isinstance(self.s, float):
                 raise TypeError("{} is not a valid type for s")
@@ -409,7 +443,8 @@ class VarUncertaintyBudget(EstimatedBudget):
                 )
 
     def _validate_w(self):
-        # check if w is set
+        """Validate if w an integer and greather than 0.
+        """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
         if self.w <= 0:
@@ -419,7 +454,37 @@ class VarUncertaintyBudget(EstimatedBudget):
 
 
 class SplitBudget(EstimatedBudget):
-    """
+    """Budget manager which checks, whether the specified budget has been
+    exhausted already. If not, an instance is sampled, when the utility is
+    higher than the specified budget. 100*v% of instances will be sampled 
+    randomly and in 100*(1-v)% of will be sampled cases according 
+    to VarUncertainty
+
+    This budget manager calculates the estimated budget spent in the last
+    w steps and compares that to the budget. If the ratio is smaller
+    than the specified budget, i.e.,
+    budget - u_t / w > 0 , the budget
+    manager samples an instance when its utility is higher than the budget.
+    u is the estimate of how many true lables were queried within the last
+    w steps. The recursive funktion,
+    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+
+    Parameters
+    ----------
+    budget : float
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1.
+    w : int
+        Specifies the size of the memory window. Controlles the budget in the
+        last w steps taken. Default = 100
+    theta : float
+        Specifies the starting threshold in wich instances are purchased. This 
+        value of theta will recalculated after each instance. Default = 1
+    s : float
+        Specifies the value in wich theta is decresed or increased based on the 
+        purchase of the given label. Default = 0.01
+    v : float
+        Specifies the percent value of instances sampled randomly. 
     """
 
     def __init__(
@@ -464,8 +529,8 @@ class SplitBudget(EstimatedBudget):
             provided if return_utilities is True.
         """
         utilities, return_budget_left, simulate = self._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
@@ -517,11 +582,6 @@ class SplitBudget(EstimatedBudget):
         else:
             return sampled_indices
 
-    def _validate_random_state(self):
-        if not hasattr(self, "random_state_"):
-            self.random_state_ = self.random_state
-        self.random_state_ = check_random_state(self.random_state_)
-
     def update(self, sampled, **kwargs):
         """Updates the budget manager.
 
@@ -549,12 +609,13 @@ class SplitBudget(EstimatedBudget):
         return self
 
     def _validate_data(self, utilities, return_budget_left, simulate):
-        """Validate input data and set or check the `n_features_in_` attribute.
+        """Validate input data.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
-            candidate samples
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
         return_budget_left : bool,
             If true, also return the budget based on the query strategy.
         simulate : bool,
@@ -564,7 +625,7 @@ class SplitBudget(EstimatedBudget):
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
-            Checked candidate samples
+            Checked utilities
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         simulate : bool,
@@ -572,23 +633,30 @@ class SplitBudget(EstimatedBudget):
         """
 
         utilities, return_budget_left, simulate = super()._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
+        # Check w
         self._validate_w()
+        # Check theta
         self._validate_theta()
+        # Check s
         self._validate_s()
+        # Check v
         self._validate_v()
+        # Check random_state
         self._validate_random_state()
 
         return utilities, return_budget_left, simulate
 
     def _validate_theta(self):
-        # check if theta is set
+        """Validate if theta is set as a float.
+        """
         if not isinstance(self.theta, float):
             raise TypeError("{} is not a valid type for theta")
 
     def _validate_s(self):
-        # ckeck if s a float and in range (0,1]
+        """Validate if s a float and in range (0,1]
+        """
         if self.s is not None:
             if not isinstance(self.s, float):
                 raise TypeError("{} is not a valid type for s")
@@ -597,9 +665,10 @@ class SplitBudget(EstimatedBudget):
                     "The value of s is incorrect."
                     + " s must be defined in range (0,1]"
                 )
-    
+
     def _validate_v(self):
-        # ckeck if v is a float and in range (0,1]
+        """Validate if v is a float and in range (0,1]
+        """
         if not isinstance(self.v, float):
             raise TypeError("{} is not a valid type for v")
         if self.v <= 0 or self.v >= 1:
@@ -609,10 +678,18 @@ class SplitBudget(EstimatedBudget):
             )
 
     def _validate_w(self):
-        # check if w is set
+        """Validate if w an integer and greather than 0.
+        """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
         if self.w <= 0:
             raise ValueError(
                 "The value of w is incorrect." + " w must be greater than 0"
             )
+
+    def _validate_random_state(self):
+        """Validate random state.
+        """
+        if not hasattr(self, "random_state_"):
+            self.random_state_ = self.random_state
+        self.random_state_ = check_random_state(self.random_state_)

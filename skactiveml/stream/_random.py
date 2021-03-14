@@ -67,7 +67,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities)
+        self._validate_data(X_cand, return_utilities, simulate)
         # copy random state in case of simulating the query
         prior_random_state_state = self.random_state_.get_state()
 
@@ -114,7 +114,12 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         return self
 
     def _validate_data(
-        self, X_cand, return_utilities, reset=True, **check_X_cand_params
+        self,
+        X_cand,
+        return_utilities,
+        simulate,
+        reset=True,
+        **check_X_cand_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -122,12 +127,11 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         ----------
         X_cand: array-like, shape (n_candidates, n_features)
             Candidate samples.
-        batch_size : int,
-            The number of samples to be selected in one AL cycle.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        random_state : numeric | np.random.RandomState, optional
-            The random state to use.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -139,15 +143,17 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         -------
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
+        simulate : bool,
+            Checked boolean value of `simulate`.  
         """
-        X_cand, return_utilities = super()._validate_data(
-            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        X_cand, return_utilities, simulate = super()._validate_data(
+            X_cand,
+            return_utilities,
+            simulate,
+            reset=reset,
+            **check_X_cand_params
         )
 
         self._validate_random_state()
@@ -219,7 +225,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities)
+        self._validate_data(X_cand, return_utilities, simulate)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
@@ -274,6 +280,9 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         sampled : array-like
             Indicates which instances from X_cand have been sampled.
 
+        budget_manager_kwargs : kwargs
+            optional data-dependent parameters for budget_manager
+
         Returns
         -------
         self : PeriodicSampler
@@ -294,7 +303,12 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         return self
 
     def _validate_data(
-        self, X_cand, return_utilities, reset=True, **check_X_cand_params
+        self,
+        X_cand,
+        return_utilities,
+        simulate,
+        reset=True,
+        **check_X_cand_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -302,12 +316,11 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         ----------
         X_cand: array-like, shape (n_candidates, n_features)
             Candidate samples.
-        batch_size : int,
-            The number of samples to be selected in one AL cycle.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        random_state : numeric | np.random.RandomState, optional
-            The random state to use.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -323,11 +336,15 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
+        simulate : bool,
+            Checked boolean value of `simulate`.
         """
-        X_cand, return_utilities = super()._validate_data(
-            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        X_cand, return_utilities, simulate = super()._validate_data(
+            X_cand,
+            return_utilities,
+            simulate,
+            reset=reset,
+            **check_X_cand_params
         )
 
         self._validate_random_state()

@@ -106,40 +106,37 @@ class BudgetManager(ABC, BaseEstimator):
         )
 
     def _validate_data(self, utilities, return_budget_left, simulate):
-        """Validate input data and set or check the `n_features_in_` attribute.
+        """Validate input data.
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
-            Candidate samples.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        **check_X_cand_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array`.
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
+        return_budget_left : bool,
+            If true, also return whether there was budget left for each
+            assessed utility.
+        simulate : bool,
+            If True, the internal state of the budget manager before and after
+            the query is the same.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
+        utilities: ndarray of shape (n_samples,)
+            Checked utilities
+        return_budget_left : bool,
+            Checked boolean value of `return_budget_left`.
+        simulate : bool,
+            Checked boolean value of `simulate`.
         """
-        # check if utilities is set
+        # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
             raise TypeError("{} is not a valid type for utilities")
         # Check return_utilities.
         check_scalar(return_budget_left, 'return_budget_left', bool)
         # Check return_utilities.
         check_scalar(simulate, 'simulate', bool)
-
+        # Check budget
         self._validate_budget(get_default_budget())
         return utilities, return_budget_left, simulate
 

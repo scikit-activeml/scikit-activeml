@@ -267,15 +267,19 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return NotImplemented
 
     def _validate_random_state(self):
+        """Validate random state.
+        """
         if not hasattr(self, 'random_state_'):
             self.random_state_ = self.random_state
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget_manager(self):
+        """Validate if budget manager is a budget_manager class.
+        """
         if not hasattr(self, 'budget_manager_'):
             self.budget_manager_ = clone(self.budget_manager)
 
-    def _validate_data(self, X_cand, return_utilities, reset=True,
+    def _validate_data(self, X_cand, return_utilities, simulate, reset=True,
                        **check_X_cand_params):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -291,6 +295,9 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             provided when reset was last True.
         **check_X_cand_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
+        simulate : bool,
+            If True, the internal state of the query strategy before and after
+            the query is the same.
 
         Returns
         -------
@@ -302,6 +309,8 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
             Checked random state to use.
+        simulate : bool,
+            Checked boolean value of `simulate`.
         """
         # Check candidate instances.
         X_cand = check_array(X_cand, **check_X_cand_params)
@@ -312,13 +321,16 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         # Check return_utilities.
         check_scalar(return_utilities, 'return_utilities', bool)
 
+        # Check simulate.
+        check_scalar(simulate, 'simulate', bool)
+
         # Check random state.
         self._validate_random_state()
 
         # Check budget_manager.
         self._validate_budget_manager()
 
-        return X_cand, return_utilities
+        return X_cand, return_utilities, simulate
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
