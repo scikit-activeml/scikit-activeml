@@ -789,15 +789,34 @@ def _dependent_cand_prob(cand_idx, idx_train, idx_preselected,
             prob_y_sim[i_y_sim] *= prob_cand_y[0][y_sim_cand[i_y]]
     return prob_y_sim
 
+
 def _get_y_sim_list(classes, n_instances, labels_equal=True):
+    """Generate label combinations for the simulation.
+
+    Parameters
+    ----------
+    classes: array-like, shape (n_classes)
+        Array of all classes.
+    n_instances: int
+        Number of simulated instances
+    labels_equal: bool
+        If true, all simulated labels are equal. Otherwise, all possible
+        combinations are generated.
+
+    Returns
+    -------
+    labels: list
+        Possible label combinations.
+    """
     if n_instances == 0:
         return [[]]
+    classes = np.asarray(classes, int)
+    if labels_equal:
+        labels = np.tile(np.asarray(classes), [n_instances, 1]).T.tolist()
     else:
-        classes = np.asarray(classes, int)
-        if labels_equal:
-            return (np.tile(np.asarray(classes), [n_instances, 1]).T).tolist()
-        else:
-            return [list(x) for x in itertools.product(classes, repeat=n_instances)]
+        product = itertools.product(classes, repeat=n_instances)
+        labels = [list(x) for x in product]
+    return labels
 
 
 def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):

@@ -721,6 +721,22 @@ class TestXPAL(unittest.TestCase):
                 similarity_x = np.argsort(-similarity[i])
                 self.assertIn(list(similarity_x[:m]), nonmyopic_candidate_sets)
 
+    def test_get_y_sim_list(self):
+        from skactiveml.pool._probal import _get_y_sim_list
+        label_combinations = _get_y_sim_list([0, 1], 3, labels_equal=False)
+        correct = [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1],
+                   [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]
+        np.testing.assert_array_equal(label_combinations, correct)
+
+        label_combinations = _get_y_sim_list([0, 1, 2], 2, labels_equal=False)
+        correct = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0],
+                   [2, 1], [2, 2]]
+        np.testing.assert_array_equal(label_combinations, correct)
+
+        label_combinations = _get_y_sim_list([0, 1, 2], 3, labels_equal=True)
+        correct = [[0, 0, 0], [1, 1, 1], [2, 2, 2]]
+        np.testing.assert_array_equal(label_combinations, correct)
+
 
 if __name__ == '__main__':
     unittest.main()
