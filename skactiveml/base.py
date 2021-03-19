@@ -2,6 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 
 import numpy as np
+from copy import deepcopy
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length, column_or_1d
@@ -270,7 +271,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         """Validate random state.
         """
         if not hasattr(self, 'random_state_'):
-            self.random_state_ = self.random_state
+            self.random_state_ = deepcopy(self.random_state)
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget_manager(self):

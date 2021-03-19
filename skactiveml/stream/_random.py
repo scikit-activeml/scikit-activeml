@@ -125,7 +125,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
+        X_cand: array-like of shape (n_candidates, n_features)
             Candidate samples.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
@@ -146,7 +146,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         simulate : bool,
-            Checked boolean value of `simulate`.  
+            Checked boolean value of `simulate`.
         """
         X_cand, return_utilities, simulate = super()._validate_data(
             X_cand,
@@ -314,7 +314,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
+        X_cand: array-like of shape (n_candidates, n_features)
             Candidate samples.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.

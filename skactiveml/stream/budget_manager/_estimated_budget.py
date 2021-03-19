@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 
 from .base import BudgetManager, get_default_budget
 from skactiveml.utils import check_random_state
@@ -11,12 +12,11 @@ class EstimatedBudget(BudgetManager):
 
     This budget manager calculates the estimated budget spent in the last
     w steps and compares that to the budget. If the ratio is smaller
-    than the specified budget, i.e.,
-    budget - u_t / w > 0 , the budget
+    than the specified budget, i.e., budget - u_t / w > 0, the budget
     manager samples an instance when its utility is higher than the budget.
     u is the estimate of how many true lables were queried within the last
-    w steps. The recursive funktion,
-    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    w steps. The incremental funktion, u_t = u_t-1 * (w-1) / w + labeling_t, 
+    is used to calculate u at time t.
 
     Parameters
     ----------
@@ -39,7 +39,7 @@ class EstimatedBudget(BudgetManager):
         This function is useful to determine, whether a provided
         utility is not sufficient, or the budgeting constraint was simply
         exhausted. For this budget manager this function returns True, when
-        budget > estimated_spending
+        budget > estimated_spending.
 
         Returns
         -------
@@ -76,19 +76,11 @@ class EstimatedBudget(BudgetManager):
 
 class FixedUncertaintyBudget(EstimatedBudget):
     """Budget manager which is optimized for FixedUncertainty and checks,
-    whether the specified budget has been exhausted already. If not, an 
+    whether the specified budget has been exhausted already. If not, an
     instance is sampled, when the utility is higher than the specified budget
     and the probability of the most likely class exceeds a threshold
-    calculated based on the budget and the number of classes.
-
-    This budget manager calculates the estimated budget spent in the last
-    w steps and compares that to the budget. If the ratio is smaller
-    than the specified budget, i.e.,
-    budget - u_t / w > 0 , the budget
-    manager samples an instance when its utility is higher than the budget.
-    u is the estimate of how many true lables were queried within the last
-    w steps. The recursive funktion,
-    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    calculated based on the budget and the number of classes. 
+    See also :class:`.EstimatedBudget`
 
     Parameters
     ----------
@@ -229,7 +221,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         return utilities, return_budget_left, simulate
 
     def _validate_num_classes(self):
-        """Validate if num_classes an integer and greather than 0.
+        """Validate if num_classes is an integer and greater than 0.
         """
         if not isinstance(self.num_classes, int):
             raise TypeError("{} is not a valid type for num_classes")
@@ -240,7 +232,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
             )
 
     def _validate_w(self):
-        """Validate if w an integer and greather than 0.
+        """Validate if w is an integer and greater than 0.
         """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
@@ -431,7 +423,7 @@ class VarUncertaintyBudget(EstimatedBudget):
             raise TypeError("{} is not a valid type for theta")
 
     def _validate_s(self):
-        """Validate if s a float and in range (0,1]
+        """Validate if s a float and in range (0,1].
         """
         if self.s is not None:
             if not isinstance(self.s, float):
@@ -443,7 +435,7 @@ class VarUncertaintyBudget(EstimatedBudget):
                 )
 
     def _validate_w(self):
-        """Validate if w an integer and greather than 0.
+        """Validate if w is an integer and greater than 0.
         """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
@@ -456,8 +448,8 @@ class VarUncertaintyBudget(EstimatedBudget):
 class SplitBudget(EstimatedBudget):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is sampled, when the utility is
-    higher than the specified budget. 100*v% of instances will be sampled 
-    randomly and in 100*(1-v)% of will be sampled cases according 
+    higher than the specified budget. 100*v% of instances will be sampled
+    randomly and in 100*(1-v)% of will be sampled cases according
     to VarUncertainty
 
     This budget manager calculates the estimated budget spent in the last
@@ -478,13 +470,13 @@ class SplitBudget(EstimatedBudget):
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
     theta : float
-        Specifies the starting threshold in wich instances are purchased. This 
+        Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
     s : float
-        Specifies the value in wich theta is decresed or increased based on the 
+        Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
     v : float
-        Specifies the percent value of instances sampled randomly. 
+        Specifies the percent value of instances sampled randomly.
     """
 
     def __init__(
@@ -655,7 +647,7 @@ class SplitBudget(EstimatedBudget):
             raise TypeError("{} is not a valid type for theta")
 
     def _validate_s(self):
-        """Validate if s a float and in range (0,1]
+        """Validate if s a float and in range (0,1].
         """
         if self.s is not None:
             if not isinstance(self.s, float):
@@ -667,7 +659,7 @@ class SplitBudget(EstimatedBudget):
                 )
 
     def _validate_v(self):
-        """Validate if v is a float and in range (0,1]
+        """Validate if v is a float and in range (0,1].
         """
         if not isinstance(self.v, float):
             raise TypeError("{} is not a valid type for v")
@@ -678,7 +670,7 @@ class SplitBudget(EstimatedBudget):
             )
 
     def _validate_w(self):
-        """Validate if w an integer and greather than 0.
+        """Validate if w an integer and greater than 0.
         """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
@@ -691,5 +683,5 @@ class SplitBudget(EstimatedBudget):
         """Validate random state.
         """
         if not hasattr(self, "random_state_"):
-            self.random_state_ = self.random_state
+            self.random_state_ = deepcopy(self.random_state)
         self.random_state_ = check_random_state(self.random_state_)

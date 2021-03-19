@@ -142,4 +142,12 @@ class BudgetManager(ABC, BaseEstimator):
 
 
 def get_default_budget():
+    """This function defines the default budget which should be used when no
+    budget is provided by the user.
+
+        Returns
+        -------
+        default_budget: float
+            The default budget used by the user.
+        """
     return 0.1
