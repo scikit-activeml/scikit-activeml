@@ -548,15 +548,17 @@ class SplitBudget(EstimatedBudget):
                 # changed self.v < self.rand_.random_sample()
                 random_val = self.random_state_.random_sample()
                 if self.v > random_val:
-                    sample = self.random_state_.random_sample() <= self.budget_
+                    new_u = self.random_state_.random_sample()
+                    sample = new_u <= self.budget_
                 else:
                     sample = u < tmp_theta
                     # get the indices instances that should be sampled
                     if sample:
                         tmp_theta *= 1 - self.s
-                        sampled_indices.append(i)
                     else:
                         tmp_theta *= 1 + self.s
+                if sample:
+                    sampled_indices.append(i)
 
             # u_t = u_t-1 * (w-1)/w + labeling_t
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + sample
@@ -591,7 +593,7 @@ class SplitBudget(EstimatedBudget):
         for s in sampled:
             if self.u_t_ / self.w < self.budget_:  # self.is_budget_left():
                 if self.v > self.random_state_.random_sample():
-                    self.random_state_.random_sample()
+                    _ = self.random_state_.random_sample()
                 else:
                     if s:
                         self.theta_ *= 1 - self.s

@@ -147,9 +147,8 @@ class TestStream(unittest.TestCase):
                 x_t.reshape([1, -1]), sampled, X=X_train, y=y_train
             )
 
-            if (len(sampled_indices_1) != len(sampled_indices_2)) or (
-                utilities_1[0] != utilities_2[0]
-            ):
+            if ((len(sampled_indices_1) != len(sampled_indices_2))
+               or (utilities_1[0] != utilities_2[0])):
                 print("query_strategy_class", query_strategy_class)
                 print("t", t)
 
