@@ -85,7 +85,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(self, X_cand, sampled, **kwargs):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -95,8 +95,11 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The instances which could be sampled. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
+
+        budget_manager_kwargs : kwargs
+            Optional kwargs for budget_manager.
 
         Returns
         -------
@@ -110,7 +113,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         # update the random state assuming, that query(..., simulate=True) was
         # used
         self.random_state_.random_sample(len(sampled))
-        self.budget_manager_.update(sampled)
+        self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
 
     def _validate_data(
@@ -126,7 +129,8 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            Candidate samples.
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         simulate : bool, optional
@@ -141,8 +145,8 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+        X_cand: np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         simulate : bool,
@@ -277,11 +281,11 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The instances which could be sampled. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         budget_manager_kwargs : kwargs
-            optional data-dependent parameters for budget_manager
+            Optional kwargs for budget_manager.
 
         Returns
         -------
@@ -315,7 +319,8 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            Candidate samples.
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         simulate : bool, optional
@@ -330,8 +335,8 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+        X_cand: np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,

@@ -268,17 +268,22 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return NotImplemented
 
     def _validate_random_state(self):
-        """Validate random state.
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
         """
         if not hasattr(self, 'random_state_'):
             self.random_state_ = deepcopy(self.random_state)
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget_manager(self):
-        """Validate if budget manager is a budget_manager class.
+        """Validate if budget manager is a budget_manager class and create a
+        copy 'budget_manager_'.
         """
         if not hasattr(self, 'budget_manager_'):
             self.budget_manager_ = clone(self.budget_manager)
+        if isinstance(self.budget_manager, np.ndarray):
+            raise TypeError("{} is not a valid Type for budget_manager")
 
     def _validate_data(self, X_cand, return_utilities, simulate, reset=True,
                        **check_X_cand_params):
@@ -286,19 +291,20 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
-            Candidate samples.
+        X_cand: array-like of shape (n_candidates, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
+        simulate : bool,
+            If True, the internal state of the query strategy before and after
+            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
         **check_X_cand_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same.
 
         Returns
         -------

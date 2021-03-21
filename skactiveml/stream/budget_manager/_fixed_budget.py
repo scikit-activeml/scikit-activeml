@@ -110,7 +110,7 @@ class FixedBudget(BudgetManager):
         """Updates the budget manager.
         Parameters
         ----------
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
         Returns
         -------

@@ -15,7 +15,7 @@ class EstimatedBudget(BudgetManager):
     than the specified budget, i.e., budget - u_t / w > 0, the budget
     manager samples an instance when its utility is higher than the budget.
     u is the estimate of how many true lables were queried within the last
-    w steps. The incremental funktion, u_t = u_t-1 * (w-1) / w + labeling_t, 
+    w steps. The incremental funktion, u_t = u_t-1 * (w-1) / w + labeling_t,
     is used to calculate u at time t.
 
     Parameters
@@ -54,7 +54,7 @@ class EstimatedBudget(BudgetManager):
 
         Parameters
         ----------
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         Returns
@@ -79,7 +79,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
     whether the specified budget has been exhausted already. If not, an
     instance is sampled, when the utility is higher than the specified budget
     and the probability of the most likely class exceeds a threshold
-    calculated based on the budget and the number of classes. 
+    calculated based on the budget and the number of classes.
     See also :class:`.EstimatedBudget`
 
     Parameters
@@ -176,7 +176,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
         Parameters
         ----------
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         Returns
@@ -205,7 +205,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
-            Checked utilities
+            Checked utilities.
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         simulate : bool,
@@ -268,10 +268,10 @@ class VarUncertaintyBudget(EstimatedBudget):
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
     theta : float
-        Specifies the starting threshold in wich instances are purchased. This 
+        Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
     s : float
-        Specifies the value in wich theta is decresed or increased based on the 
+        Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
     """
 
@@ -362,7 +362,7 @@ class VarUncertaintyBudget(EstimatedBudget):
 
         Parameters
         ----------
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         Returns
@@ -397,7 +397,7 @@ class VarUncertaintyBudget(EstimatedBudget):
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
-            Checked utilities
+            Checked utilities.
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         simulate : bool,
@@ -581,7 +581,7 @@ class SplitBudget(EstimatedBudget):
 
         Parameters
         ----------
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         Returns
@@ -619,7 +619,7 @@ class SplitBudget(EstimatedBudget):
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
-            Checked utilities
+            Checked utilities.
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         simulate : bool,
@@ -682,7 +682,9 @@ class SplitBudget(EstimatedBudget):
             )
 
     def _validate_random_state(self):
-        """Validate random state.
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
         """
         if not hasattr(self, "random_state_"):
             self.random_state_ = deepcopy(self.random_state)

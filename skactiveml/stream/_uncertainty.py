@@ -117,7 +117,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The instances which could be sampled. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of (n_samples,)
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         budget_manager_kwargs : kwargs
@@ -148,7 +148,8 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            Candidate samples.
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         X : array-like of shape (n_samples, n_features)
@@ -167,8 +168,8 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+        X_cand: np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         X : array-like of shape (n_samples, n_features)
@@ -332,8 +333,8 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which could be sampled. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-    
-        sampled : array-like
+
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
 
         budget_manager_kwargs : kwargs
@@ -364,33 +365,34 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            Candidate samples.
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+        simulate : bool,
+            If True, the internal state of the query strategy before and after
+            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
         **check_X_cand_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+        X_cand: np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         X : array-like of shape (n_samples, n_features)
             Checked Input samples.
         y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'.  
+            Checked Labels of the input samples 'X'.
         simulate : bool,
             Checked boolean value of `simulate`.
         """
@@ -416,7 +418,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             Input samples used to fit the classifier.
 
         y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels. 
+            Labels of the input samples 'X'. There may be missing labels.
         """
         # check if clf is a classifier
         if X is not None and y is not None:
@@ -490,15 +492,15 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The instances which may be sampled. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
-
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
 
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
 
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
@@ -549,9 +551,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
 
-        sampled : array-like
+        sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
-        
+
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
 
@@ -585,35 +587,36 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            Candidate samples.
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+        simulate : bool,
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
         **check_X_cand_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+        X_cand: np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         X : array-like of shape (n_samples, n_features)
             Checked Input samples.
         y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'.  
+            Checked Labels of the input samples 'X'.
         simulate : bool,
             Checked boolean value of `simulate`.
         """
@@ -640,7 +643,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             Input samples used to fit the classifier.
 
         y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels. 
+            Labels of the input samples 'X'. There may be missing labels.
         """
         # check if clf is a classifier
         if X is not None and y is not None:
