@@ -84,6 +84,14 @@ class TestPWC(unittest.TestCase):
         self.assertRaises(ValueError, pwc.predict_freq, X=[[1], [0]])
         F = pwc.predict_freq(X=[[1, 0]])
         np.testing.assert_array_equal([[0, 1, 2]], F)
+        rbf_kernel = lambda x, y, gamma: np.exp(-gamma * np.sum((x - y) ** 2))
+        pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',
+                  random_state=0, metric=rbf_kernel, metric_dict={'gamma': 2})
+        F_call = pwc.fit(X=self.X, y=self.y).predict_freq(np.ones_like(self.X))
+        pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',
+                  metric='rbf', metric_dict={'gamma': 2}, random_state=0)
+        F_rbf = pwc.fit(X=self.X, y=self.y).predict_freq(np.ones_like(self.X))
+        np.testing.assert_array_equal(F_call, F_rbf)
 
     def test_predict_proba(self):
         pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan')
