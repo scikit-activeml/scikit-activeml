@@ -114,7 +114,8 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
                 signs = np.sign(batch_utilities)
                 if not ((signs >= 0).all() or (signs <= 0).all()):
-                    warnings.warn("There exist positive and negative utilities")
+                    pass
+                    # TODO warnings.warn("There exist positive and negative utilities")
 
             batch_utilities /= np.arange(1, self.nonmyopic_look_ahead + 1).\
                 reshape(1, -1)

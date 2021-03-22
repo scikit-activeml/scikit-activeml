@@ -106,7 +106,7 @@ class PWC(ClassFrequencyEstimator):
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         # Check whether metric is available.
-        if self.metric not in PWC.METRICS:
+        if self.metric not in PWC.METRICS and not callable(self.metric):
             raise ValueError("The parameter 'metric' must be "
                              "in {}".format(KERNEL_PARAMS.keys()))
 

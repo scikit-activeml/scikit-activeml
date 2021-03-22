@@ -684,7 +684,8 @@ def _calc_sim(K, X, Y, idx_X=None, idx_Y=None, default=np.nan):
 
     similarity = np.full([len(X), len(Y)], default, float)
 
-    similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
+    if len(idx_X) > 0 and len(idx_Y) > 0: #TODO
+        similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
     return similarity
 
 
