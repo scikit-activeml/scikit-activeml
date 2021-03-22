@@ -29,7 +29,7 @@ def plot_2d_dataset(X, y, y_oracle, clf, selector, res=21):
     plt.ylim(min(X[:, 1]), max(X[:, 1]))
     plt.xlabel(r'$x_1$')
     plt.ylabel(r'$x_2$')
-    plt.title('Decision boundry after acquring {} labels'.format(np.sum(~np.isnan(y))))
+    plt.title('Decision boundry after acquring {} labels'.format(len(labeled_indices)))
     cmap = plt.get_cmap('coolwarm')
 
     plt.scatter(X[labeled_indices, 0], X[labeled_indices, 1], c=[[.2, .2, .2]], s=90, marker='o', zorder=3.8)
