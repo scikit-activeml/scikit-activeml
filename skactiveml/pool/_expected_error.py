@@ -1,7 +1,8 @@
 import numpy as np
 from sklearn.base import clone
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, \
+    SkactivemlClassifier
 from skactiveml.base import ClassFrequencyEstimator
 from skactiveml.utils import check_classifier_params, \
     check_X_y, is_labeled, simple_batch
@@ -131,11 +132,12 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
     utilities: np.ndarray, shape (n_unlabeled_samples)
         The utilities of all unlabeled instances.
     """
-    # Check if the classifier and its arguments are valid
-    if not isinstance(clf, ClassFrequencyEstimator):
-        raise TypeError("'clf' must implement methods according to "
-                        "'ClassFrequencyEstimator'.")
-    check_classifier_params(clf.classes, clf.missing_label, C)
+    # Check if the attribute clf is valid
+    if not isinstance(clf, SkactivemlClassifier):
+        raise TypeError('clf as to be from type SkactivemlClassifier. The #'
+                        'given type is {}. Use the wrapper in '
+                        'skactiveml.classifier to use a sklearn '
+                        'classifier/ensemble.'.format(type(clf)))
 
     # Check the given data
     X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
