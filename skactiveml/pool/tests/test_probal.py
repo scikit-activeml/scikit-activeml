@@ -7,6 +7,7 @@ from sklearn.metrics import pairwise_kernels
 
 from skactiveml.pool import McPAL, XPAL
 from skactiveml.classifier import PWC
+from skactiveml.pool._probal import to_int_labels
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -690,6 +691,8 @@ class TestXPAL(unittest.TestCase):
                     np.testing.assert_equal(kernel[i, j], similarity[i, j])
                 else:
                     np.testing.assert_equal(np.nan, similarity[i, j])
+
+        # TODO test with 0 instances
 
     def test_get_nonmyopic_cand_set(self):
         from skactiveml.pool._probal import _get_nonmyopic_cand_set

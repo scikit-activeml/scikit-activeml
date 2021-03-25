@@ -415,7 +415,6 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                                             metric=self.estimator_metric,
                                             **estimator_metric_dict)
 
-
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
         # TODO: sim_cand should have shape |X_| x |X_|
         if self.nonmyopic_independent_probs:
@@ -710,8 +709,8 @@ def _calc_sim(K, X, Y, idx_X=None, idx_Y=None, default=np.nan):
         idx_Y = np.arange(len(Y))
 
     similarity = np.full([len(X), len(Y)], default, float)
-
-    similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
+    if len(idx_X) > 0 and len(idx_Y) > 0:
+        similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
     return similarity
 
 
@@ -859,7 +858,7 @@ def _get_y_sim_list(classes, n_instances, labels_equal=True):
     classes: array-like, shape (n_classes)
         Array of all classes.
     n_instances: int
-        Number of simulated instances
+        Number of simulated instances.
     labels_equal: bool
         If true, all simulated labels are equal. Otherwise, all possible
         combinations are generated.
