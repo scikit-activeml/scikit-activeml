@@ -247,40 +247,48 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self.nonmyopic_labels_equal = nonmyopic_labels_equal
         self.nonmyopic_independent_probs = nonmyopic_independent_probs
 
-    def _validate_input(self, X_cand, X, y, X_eval, batch_size, sample_weight,
-                        return_utilities):
+    def _validate_data(self, X, y, X_cand, X_eval, sample_weight,
+                       sample_weight_cand, sample_weight_eval, batch_size,
+                       return_utilities):
 
+        X_cand, return_utilities, batch_size, random_state = \
+            super()._validate_data(X_cand, return_utilities, batch_size,
+                                   self.random_state, reset=True)
         # init parameters
         # TODO: implement and adapt, what happens if X_eval=self
-        # random_state = check_random_state(self.random_state, len(X_cand),
-        #                                   len(X_eval))
-        self._random_state = check_random_state(self.random_state)
 
-        check_classifier_params(self._classes, self._missing_label,
-                                self.cost_matrix)
+        # check_classifier_params(self._classes, self._missing_label,
+        #                        self.cost_matrix)
         check_scalar(self.prior_cand, target_type=float, name='prior_cand',
                      min_val=0, min_inclusive=False)
         check_scalar(self.prior_eval, target_type=float, name='prior_eval',
                      min_val=0, min_inclusive=False)
 
-        self._batch_size = batch_size
-        check_scalar(self._batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        if len(X_cand) < self._batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    self._batch_size, len(X_cand)))
-            self._batch_size = len(X_cand)
-
         # TODO: check if X_cand, X, X_eval have similar num_features
-        # TODO: check if X, y match
-        # TODO: check if weight match with X_cand
-        if sample_weight is None:
-            self.sample_weight_ = np.ones(len(X))
-        else:
-            self.sample_weight_ = sample_weight
-        # TODO: check if return_utilities is bool
+
+        # TODO warning if sample_weight_eval is given but X_eval not?
+        check_scalar(self.batch_labels_equal,
+                     name='batch_labels_equal', target_type=bool)
+        check_scalar(self.nonmyopic_independent_probs,
+                     name='nonmyopic_independent_probs', target_type=bool)
+        check_scalar(self.nonmyopic_labels_equal,
+                     name='nonmyopic_labels_equal', target_type=bool)
+
+        if self.cost_matrix is not None and \
+                self.cost_matrix.shape != (self.clf.classes, self.clf.classes):
+            raise ValueError('The given cost matrix does not '
+                             'fit to the given classes.')
+
+        X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
+            X, y, X_cand, sample_weight=sample_weight,
+            sample_weight_cand=sample_weight_cand, set_sample_weight=True)
+        if X_eval is not None:
+            X_eval, _, sample_weight_eval = check_X_y(
+                X_eval, np.ones(len(X_eval)), sample_weight=sample_weight_eval,
+                set_sample_weight=False)
+
+        return X, y, X_cand, X_eval, sample_weight, sample_weight_cand,\
+               sample_weight_eval, batch_size, return_utilities, random_state
 
     def query(self, X_cand, X, y, X_eval=None, batch_size=1,
               sample_weight_cand=None, sample_weight=None,
@@ -327,19 +335,18 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         """
 
         ### TEST query parameters
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
+        X, y, X_cand, X_eval, sample_weight, sample_weight_cand,\
+        sample_weight_eval, batch_size, return_utilities, random_state = \
+            self._validate_data(
+                X, y, X_cand, X_eval, sample_weight, sample_weight_cand,
+                sample_weight_eval, batch_size, return_utilities
+            )
 
         # TODO X, y will be tested by clf when is fitted; X_cand, X equal num features
         # CHECK X_eval will be tested by clf when predicted
 
-        # TODO sample_weight, sample_weight_cand, sample_weight_eval should have correct size
         # TODO what about classifiers that do not support sample_weight?
-        if sample_weight_cand is None:
-            sample_weight_cand = np.ones(len(X_cand))
-        if sample_weight is None:
-            sample_weight = np.ones(len(X))
+
         if sample_weight_eval is None:
             if X_eval is None:
                 sample_weight_eval = np.ones(len(X_cand))
@@ -821,6 +828,7 @@ def _get_y_sim_list(classes, n_instances, labels_equal=True):
 
 def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
     # TODO warning if matrix/vector is given but not used?
+    # TODO warning if perf_func is given but not used?
     if metric == 'error':
         metric = 'misclassification-loss'
         cost_matrix = 1 - np.eye(n_classes)
@@ -889,6 +897,8 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
         return perf_func(conf_mat_new) - perf_func(conf_mat_old)
 
 def estimate_bandwidth(n_samples, n_features):
+    check_scalar(n_samples, name='n_samples', target_type=int, min_val=0)
+    check_scalar(n_features, name='n_features', target_type=int, min_val=1)
     nominator = 2 * n_samples * n_features
     denominator = (n_samples - 1) * np.log((n_samples - 1) / ((np.sqrt(2) * 10 ** -6) ** 2))
     bandwidth = np.sqrt(nominator / denominator)
