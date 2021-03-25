@@ -721,6 +721,40 @@ class TestXPAL(unittest.TestCase):
                 similarity_x = np.argsort(-similarity[i])
                 self.assertIn(list(similarity_x[:m]), nonmyopic_candidate_sets)
 
+    def test_dependent_cand_prob(self):
+        from skactiveml.pool._probal import _dependent_cand_prob
+
+        X = [[0, 1], [3, 2], [1, 2], [5, 2], [3, 1], [4, 7], [1, 9]]
+        sample_weight = [1, 1, 1, 1, 1, 1, 1]
+        sim_cand = pairwise_kernels(X, X, metric='rbf')
+        prob_est = PWC(metric="precomputed", classes=[0, 1],
+                       missing_label=np.nan, class_prior=1,
+                       random_state=14)
+
+        # Standard test
+        y = [np.nan, 1, np.nan, np.nan, np.nan, 1, 1]
+        cand_idx = [3]
+        idx_train = [1, 5, 6]
+        idx_preselected = [2]
+        label_simulations = [([0], [0]), ([0], [1]), ([1], [0]), ([1], [1])]
+        prob_preselected = [0.5, 0.5, 0.5, 0.5]
+        P = _dependent_cand_prob(cand_idx, idx_train, idx_preselected, X, y,
+                                 sample_weight, label_simulations,
+                                 prob_preselected, prob_est, sim_cand)
+        np.testing.assert_equal(np.argmax(P), 3)
+
+        # No training instances
+        y = [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
+        cand_idx = [0, 1]
+        idx_train = []
+        idx_preselected = []
+        label_simulations = [([], [0, 0]), ([], [1, 1])]
+        prob_preselected = [1, 1]
+        P = _dependent_cand_prob(cand_idx, idx_train, idx_preselected, X, y,
+                                 sample_weight, label_simulations,
+                                 prob_preselected, prob_est, sim_cand)
+        np.testing.assert_array_equal(P, [0.5, 0.5])
+
     def test_get_y_sim_list(self):
         from skactiveml.pool._probal import _get_y_sim_list
         label_combinations = _get_y_sim_list([0, 1], 3, labels_equal=False)

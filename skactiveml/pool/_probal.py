@@ -768,26 +768,87 @@ def to_int_labels(est, X, y):
     est.classes = classes.astype(int)
     return est, y
 
-def _dependent_cand_prob(cand_idx, idx_train, idx_preselected,
+
+def _dependent_cand_prob(cand_idx, train_idx, preselected_idx,
                          X, y, sample_weight,
-                         y_sim_list, prob_y_sim_pre,
+                         label_simulations, prob_preselected,
                          prob_est, sim_cand):
-    prob_y_sim = prob_y_sim_pre
-    for i_y_sim, (y_sim_pre, y_sim_cand) in enumerate(y_sim_list):
+    """Calculate the probabilities for all given simulated label combinations.
+
+    Parameters
+    ----------
+    cand_idx: array-like, shape (n_candidates)
+        Indices of the candidates in X.
+    train_idx: array-like, shape (n_train_instances)
+        Indices of the training instances in X.
+    preselected_idx: array-like, shape (n_preselected)
+        Indices of the preselected instances in X.
+    X: array-like, shape (n_instances, n_features)
+        Array containing all instances.
+    y: array-like, shape (n_instances)
+        Array containing the the known labels of X.
+    sample_weight: array-like, shape (n_instances)
+        Sample weights for the instances in X.
+    label_simulations: array-like, shape (n_simulations)
+        List containing the simulated labels of the preselected instances and
+        the simulated candidates. Each entry is a tuple with shape
+        (n_preselected, n_candidates).
+    prob_preselected: array-like, shape (n_simulations)
+        Label probability of the preselected instances in each simulation in
+        y_sim_list.
+    prob_est: ClassFrequencyEstimator
+        Model implementing the methods 'fit' and and 'predict_proba'.
+    sim_cand: array-like, shape (n_instances, n_instances)
+        Similarities between the candidates, only has to be specified at the
+        indices [cand_idx, cand_idx].
+
+    Returns
+    -------
+    simulation_probability: np.ndarray, shape (n_simulations)
+        The probability for every simulation in label_simulations.
+
+    """
+    X = np.array(X)
+    y = np.array(y)
+    sample_weight = np.array(sample_weight)
+    preselected_idx = list(preselected_idx)
+    cand_idx = list(cand_idx)
+    train_idx = list(train_idx)
+
+    n_simulations = len(label_simulations)
+    if len(prob_preselected) != n_simulations:
+        raise ValueError(f"'n_simulations' is {n_simulations}, but "
+                         f"'prob_preselected' has length "
+                         f"{len(prob_preselected)}.")
+    n_candidates = len(cand_idx)
+    if len(label_simulations[0][1]) != n_candidates:
+        raise ValueError(f"'n_candidates' is {n_candidates}, but "
+                         f"the label simulations have "
+                         f"{len(label_simulations[0][1])} candidate(s).")
+
+    simulation_probability = np.array(prob_preselected, dtype=float)
+    for i_y_sim, (y_sim_pre, y_sim_cand) in enumerate(label_simulations):
 
         for i_y in range(len(y_sim_cand)):
-            idx_new = idx_preselected + cand_idx[:i_y] + idx_train
+            # Calculate the probability of y_sim_cand[i_y] given the training
+            # data, the preselected instances and the labels y_sim_cand[:i_y]
+            idx_new = preselected_idx + cand_idx[:i_y] + train_idx
             X_new = X[idx_new]
-            y_new = np.concatenate([y_sim_pre, y_sim_cand[:i_y], y[idx_train]],
+            y_new = np.concatenate([y_sim_pre, y_sim_cand[:i_y], y[train_idx]],
                                    axis=0)
             sample_weight_new = sample_weight[idx_new]
+            if len(idx_new) == 0:
+                continue
             prob_est.fit(X_new, y_new, sample_weight_new)
 
-            sim_new = \
-                sim_cand[cand_idx[i_y:i_y + 1],:][:, idx_new]
+            sim_new = sim_cand[cand_idx[i_y:i_y + 1], :][:, idx_new]
             prob_cand_y = prob_est.predict_proba(sim_new)
-            prob_y_sim[i_y_sim] *= prob_cand_y[0][y_sim_cand[i_y]]
-    return prob_y_sim
+            simulation_probability[i_y_sim] *= prob_cand_y[0][y_sim_cand[i_y]]
+    # Normalize array (necessary if there are no preselected instances and no
+    # training instances)
+    normalization = sum(simulation_probability)
+    simulation_probability = simulation_probability / normalization
+    return simulation_probability
 
 
 def _get_y_sim_list(classes, n_instances, labels_equal=True):
