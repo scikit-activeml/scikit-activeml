@@ -1048,6 +1048,40 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
             conf_mat_new[:, y_pred] = np.sum(probs[pred_new == y_pred], axis=0)
         return perf_func(conf_mat_new) - perf_func(conf_mat_old)
 
+
+def estimate_bandwidth(n_samples, n_features):
+    check_scalar(n_samples, name='n_samples', target_type=int, min_val=0)
+    check_scalar(n_features, name='n_features', target_type=int, min_val=1)
+    nominator = 2 * n_samples * n_features
+    denominator = (n_samples - 1) * np.log((n_samples - 1) / ((np.sqrt(2) * 10 ** -6) ** 2))
+    bandwidth = np.sqrt(nominator / denominator)
+    return bandwidth
+
+
+def score_recall(conf_matrix):
+    return conf_matrix[-1, -1] / conf_matrix[-1, :].sum()
+
+
+def macro_accuracy_func(conf_matrix):
+    return np.mean(conf_matrix.diagonal() / conf_matrix.sum(axis=1))
+
+
+def score_accuracy(conf_matrix):
+    return conf_matrix.diagonal().sum() / conf_matrix.sum()
+
+
+def score_precision(conf_matrix):
+    pos_pred = conf_matrix[:, -1].sum()
+    return conf_matrix[-1, -1] / pos_pred if pos_pred > 0 else 0
+
+
+def f1_score_func(conf_matrix):
+    recall = score_recall(conf_matrix)
+    precision = score_precision(conf_matrix)
+    norm = recall + precision
+    return 2 * recall * precision / norm if norm > 0 else 0
+
+
 def calculate_optimal_prior(n_classes, cost_matrix=None):
     if cost_matrix is None:
         return np.full([n_classes], 1. / n_classes)
