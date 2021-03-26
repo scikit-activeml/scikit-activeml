@@ -774,6 +774,78 @@ class TestXPAL(unittest.TestCase):
         correct = [[0, 0, 0], [1, 1, 1], [2, 2, 2]]
         np.testing.assert_array_equal(label_combinations, correct)
 
+    def test_transform_scoring(self):
+        from skactiveml.pool._probal import _transform_scoring
+
+        cost_matrix = np.array([[0, 1, 2], [2, 0, 1], [1, 1, 0]])
+
+        self.assertRaises(ValueError, _transform_scoring, 'wrong-string')
+
+        # error
+        np.testing.assert_raises(ValueError, _transform_scoring, 'error')
+        _, cost_matrix, _ = _transform_scoring('error', n_classes=3)
+        correct = [[0, 1, 1], [1, 0, 1], [1, 1, 0]]
+        np.testing.assert_array_equal(cost_matrix, correct)
+
+        # cost vector
+        np.testing.assert_raises(ValueError, _transform_scoring, 'cost-vector')
+        np.testing.assert_raises(ValueError, _transform_scoring, 'cost-vector',
+                                 n_classes=3)
+        np.testing.assert_raises(ValueError, _transform_scoring, 'cost-vector',
+                                 n_classes=3, cost_vector=np.array([0, 1]))
+        _, cost_matrix, _ = _transform_scoring('cost-vector', n_classes=3,
+                                               cost_vector=np.array([0, 2, 1]))
+        correct = [[0, 0, 0], [2, 0, 2], [1, 1, 0]]
+        np.testing.assert_array_equal(cost_matrix, correct)
+
+        # misclassification loss
+        np.testing.assert_raises(ValueError, _transform_scoring,
+                                 'misclassification-loss')
+        np.testing.assert_raises(ValueError, _transform_scoring,
+                                 'misclassification-loss', n_classes=3)
+        np.testing.assert_raises(ValueError, _transform_scoring,
+                                 'misclassification-loss', n_classes=3,
+                                 cost_matrix=np.array(([0, 1], [1, 0])))
+        inp_cost_matrix = np.array([[0, 2, 1], [1, 0, 3], [1, 1, 0]])
+        _, cost_matrix, _ = _transform_scoring('misclassification-loss',
+                                               n_classes=3,
+                                               cost_matrix=inp_cost_matrix)
+        np.testing.assert_array_equal(cost_matrix, inp_cost_matrix)
+
+        # mean absolute error
+        np.testing.assert_raises(ValueError, _transform_scoring,
+                                 'mean-abs-error')
+        _, cost_matrix, _ = _transform_scoring('mean-abs-error', n_classes=3)
+        for i in range(3):
+            for j in range(3):
+                np.testing.assert_equal(cost_matrix[i, j], np.abs(i - j))
+
+        # macro accuracy
+        _, _, perf_func = _transform_scoring('macro-accuracy')
+        self.assertIsNotNone(perf_func)
+
+        # f1-score
+        _, _, perf_func = _transform_scoring('f1-score')
+        self.assertIsNotNone(perf_func)
+
+        # cohens kappa
+        self.assertRaises(ValueError, _transform_scoring, 'cohens-kappa')
+        perf = lambda x: x
+        _, _, perf_func = _transform_scoring('cohens-kappa', perf_func=perf)
+        self.assertIsNotNone(perf_func)
+
+    def test_dperf(self):
+        from skactiveml.pool._probal import _dperf
+
+        probs = np.array([[9.99623988e-01, 3.76012465e-04]])
+        pred_old = np.array([0])
+        pred_new = np.array([1])
+        sample_weight_eval = np.array([1])
+        decomposable = True
+        cost_matrix = np.array([[0, 1], [1, 0]])
+        print(_dperf(probs, pred_old, pred_new, sample_weight_eval,
+                     decomposable, cost_matrix))
+
 
 if __name__ == '__main__':
     unittest.main()

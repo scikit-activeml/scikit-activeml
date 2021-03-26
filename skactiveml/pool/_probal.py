@@ -879,31 +879,82 @@ def _get_y_sim_list(classes, n_instances, labels_equal=True):
     return labels
 
 
-def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
+def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
+                       perf_func=None, n_classes=None):
+    """Transform the scoring for evaluating classifiers.
+
+    Parameters
+    ----------
+    metric: str
+        The metric used. Possible metrics are 'error', 'cost-vector',
+        'misclassification-loss', 'mean-abs-error', 'macro-accuracy',
+        'f1-score' and 'cohens-kappa'.
+    cost_matrix: array-like, shape (n_classes, n_classes),
+                 optional (default=None)
+        The cost matrix. Only used if metric='misclassification-loss'.
+    cost_vector: array-like, shape (n_classes), optional (default=None)
+        The cost vector. Only used if metric='cost-vector'.
+    perf_func: callable, optional (default=None)
+        Custom performance function measuring the performance of a classifier.
+        Only used if metric='cohens-kappa'.
+    n_classes: int, optional (default=None)
+        Number of classes.
+
+    Returns
+    -------
+    metric: str
+        Name of the metric.
+    cost_matrix: np.ndarray
+        Cost matrix according to the given metric.
+    perf_func: callable
+        Performance function measuring the performance of a classifier.
+    """
     # TODO warning if matrix/vector is given but not used?
     if metric == 'error':
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
         metric = 'misclassification-loss'
         cost_matrix = 1 - np.eye(n_classes)
         perf_func = None
     elif metric == 'cost-vector':
-        if cost_vector is None or cost_vector.shape != (n_classes):
-            raise ValueError("For metric='cost-vector', the argument "
-                             "'cost_vector' must be given when initialized and "
-                             "must have shape (n_classes)")
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
+        if cost_vector is None:
+            raise ValueError(
+                f"For metric='{metric}', 'cost_vector' must be given."
+            )
+        cost_vector = np.array(cost_vector)
+        if cost_vector.shape != (n_classes,):
+            raise ValueError(
+                "The cost vector must have shape (n_classes,)."
+            )
         metric = 'misclassification-loss'
         cost_matrix = cost_vector.reshape(-1, 1) \
                       @ np.ones([1, n_classes])
         np.fill_diagonal(cost_matrix, 0)
         perf_func = None
     elif metric == 'misclassification-loss':
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
         if cost_matrix is None:
-            raise ValueError("'cost_matrix' cannot be None for "
-                             "metric='misclasification-loss'")
+            raise ValueError(
+                f"For metric='{metric}', 'cost_matrix' must be given."
+            )
         check_cost_matrix(cost_matrix, n_classes)
         metric = 'misclassification-loss'
         cost_matrix = cost_matrix
         perf_func = None
     elif metric == 'mean-abs-error':
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
         metric = 'misclassification-loss'
         row_matrix = np.arange(n_classes).reshape(-1, 1) \
                      @ np.ones([1, n_classes])
@@ -918,14 +969,19 @@ def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
         perf_func = f1_score_func
         cost_matrix = None
     elif metric == 'cohens-kappa':
-        # TODO: implement
+        # TODO: implement ?
+        if perf_func is None:
+            raise ValueError(
+                f"For metric='{metric}', 'perf_func' must be given."
+            )
         metric = 'custom'
         perf_func = perf_func
         cost_matrix = None
     else:
-        raise ValueError("Metric '{}' not implemented. Use "
-                         "metric='custom' instead.".format(metric))
+        raise ValueError(f"Metric '{metric}' not implemented. Use "
+                         "metric='custom' instead.")
     return metric, cost_matrix, perf_func
+
 
 def _dperf(probs, pred_old, pred_new, sample_weight_eval,
            decomposable, cost_matrix=None, perf_func=None):
