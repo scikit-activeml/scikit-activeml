@@ -1,8 +1,11 @@
 import numpy as np
 from sklearn.utils import check_random_state
 
-from skactiveml.base import QueryStrategy, MultiAnnotPoolBasedQueryStrategy, \
-    SingleAnnotStreamBasedQueryStrategy, SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
+     SingleAnnotPoolBasedQueryStrategy
+
+# Author: Lukas Luehrs <uk073949@student.uni-kassel.de>
+from skactiveml.utils import compute_vote_vectors
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -44,6 +47,10 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             while `A_cand[i,j] = False` indicates that annotator `j` cannot be
             selected for annotating sample `X_cand[i]`. If A_cand=None, each
             annotator is assumed to be available for labeling each sample.
+        args : if (X, y) is contained by args. y can be a matrix or a vector
+            of assigned values. If y is a matrix the entries are interpreted
+            as follows: y[i,j] = k indicates that for the i-th sample the
+            j-th candidate annotator annotated the value k.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -66,11 +73,27 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         # check strategy
 
         if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
-            raise ValueError(
+            raise TypeError(
                 "The given Strategy must be a SingleAnnotStreamBasedQueryStrategy"
             )
 
-        # check
+        # check number of annotators can be determined
+
+        if A_cand is None:
+            X, y = args[0], args[1]
+            if not(isinstance(y, np.ndarray) and isinstance(y, np.ndarray)):
+                raise ValueError(
+                    "Number of annotators can not be determined. To fix this error"
+                    "pass an annotator-matrix as A_cand."
+                )
+            if y.ndim != 2:
+                raise ValueError(
+                    "Number of annotators can not be determined. To fix this error"
+                    "pass an annotator-matrix as A_cand."
+                )
+            A_cand = np.ones((X_cand.shape[0], y.shape[1]), dtype=bool)
+
+        # check X-Values are assignable
 
         if not np.all(np.sum(A_cand, axis=1) > 0):
             raise ValueError(
@@ -81,9 +104,32 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         random_state = check_random_state(self.random_state)
 
+        # check if X_cand fits A_cand
+
+        if X_cand.shape[0] != A_cand.shape[0]:
+            raise ValueError(
+                "X_cands number of labels does not fit A_cands number of labels."
+            )
+
+        # check and fit if necessary pool label pair
+
+        if len(args) > 1:
+            X, y = args[0], args[1]
+            if isinstance(y, np.ndarray) and isinstance(y, np.ndarray):
+                if y.ndim > 2:
+                    raise ValueError(
+                        "The entries of args[0] and args[1] are interpreted as a pool"
+                        "label pair, args[1] can be of dimension 1 or 2."
+                    )
+                if y.ndim == 2:
+                    args_list = list(args)
+                    vote_matrix = compute_vote_vectors(y)
+                    vote_vector = vote_matrix.argmax(axis=1)
+                    args_list[1] = vote_vector
+                    args = tuple(args_list)
+
         # perform query
 
-        n_samples = X_cand.shape[0]
         n_annotators = A_cand.shape[1]
 
         if return_utilities:
@@ -98,28 +144,16 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         cand_off_indices = np.repeat(np.arange(1, n_annotators + 1)
                                      .reshape(1, n_annotators), batch_size, axis=0)
 
-        print("cand_off_indices", cand_off_indices)
-        print("A_cand", A_cand)
-        print("single_query_indices", single_query_indices)
-
         avail_cand_off_indices = A_cand[single_query_indices] * cand_off_indices
-        print("avail_cand_off_indices", avail_cand_off_indices)
         sorted_avail_cand_off_indices = -np.sort(-avail_cand_off_indices)
-        print("sorted_avail_cand_off_indices", sorted_avail_cand_off_indices)
         num_avail_cand = np.sum(A_cand[single_query_indices], axis=1)
-        print("len_array", num_avail_cand)
         distribution = num_avail_cand * random_state.rand(batch_size)
-        print("dist_array", distribution)
         choose_array = distribution.astype(int)
-        print("choose_array", choose_array)
         query_cand_off_indices = sorted_avail_cand_off_indices[np.arange(batch_size), choose_array]
-        print("query_cand_off_indices", query_cand_off_indices)
         query_cand_indices = query_cand_off_indices - 1
 
         query_indices = np.concatenate((single_query_indices.reshape(batch_size, 1),
                                         query_cand_indices.reshape(batch_size, 1)), axis=0)
-
-        print("query_indices", query_indices)
 
         if return_utilities:
             return query_indices, utilities
