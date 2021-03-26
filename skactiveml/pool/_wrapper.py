@@ -91,7 +91,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                     "Number of annotators can not be determined. To fix this error"
                     "pass an annotator-matrix as A_cand."
                 )
-            A_cand = np.ones((X_cand.shape[0], y.shape[1]), dtype=bool)
+            A_cand = np.full((X_cand.shape[0], y.shape[1]), True, dtype=bool)
 
         # check X-Values are assignable
 
