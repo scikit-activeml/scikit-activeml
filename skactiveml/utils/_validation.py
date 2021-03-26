@@ -144,6 +144,37 @@ def check_classes(classes):
                 types))
 
 
+def check_class_prior(class_prior, n_classes):
+    """Check if the class_prior is a valid prior.
+
+    Parameters
+    ----------
+    class_prior : numeric | array_like, shape (n_classes)
+        A class prior.
+    n_classes : int
+        The number of classes.
+
+    Returns
+    -------
+    class_prior : np.ndarray, shape (1, n_classes)
+        Numpy array as prior.
+    """
+    check_scalar(n_classes, name='n_classes', target_type=int, min_val=1)
+    if np.isscalar(class_prior):
+        check_scalar(class_prior, name='class_prior',
+                     target_type=(int, float), min_val=0)
+        class_prior = np.array([class_prior] * n_classes)
+    else:
+        class_prior = check_array(class_prior, ensure_2d=False)
+        class_prior = column_or_1d(class_prior)
+        is_negative = np.sum(class_prior < 0)
+        if len(class_prior) != n_classes or is_negative:
+            raise ValueError("`class_prior` must be either a non-negative"
+                             "float or a list of `n_classes` non-negative "
+                             "floats.")
+    return class_prior.reshape(1, -1)
+
+
 def check_cost_matrix(cost_matrix, n_classes):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
 

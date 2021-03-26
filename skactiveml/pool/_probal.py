@@ -15,6 +15,7 @@ from skactiveml.utils import check_classifier_params, check_X_y, \
     ExtLabelEncoder, simple_batch, check_random_state
 from skactiveml.utils import rand_argmax, MISSING_LABEL, check_cost_matrix, \
     check_scalar, is_labeled
+from skactiveml.utils._validation import check_class_prior
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -148,15 +149,15 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             Deterministic classifier to be used.
         scoring: string
             "error"
-                equivalent to accuracy
             "cost-vector"
                 requires cost-vector
             "misclassification-loss"
                 requires cost-matrix
             "mean-abs-error"
             "macro-accuracy"
-                optional: TODO: prior_class_probability
             "f1-score"
+            "custom"
+                requires custom_perf_func
         cost_vector: array-like (n_classes)
             Vector denoting the misclassification cost of each class. Only
             used if scoring='cost-vector'.
@@ -227,7 +228,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         References
         ----------
-        [1] TODO: xpal arxiv, diss
+        D. Kottke, M. Herde, C. Sandrock, D. Huseljic, G. Krempl and B. Sick,
+        Toward Optimal Probabilistic Active Learning Using a Bayesian Approach,
+        arXiv:2006.01732 [cs.LG], 2020.
         """
         super().__init__(random_state=random_state)
 
@@ -254,15 +257,6 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         X_cand, return_utilities, batch_size, random_state = \
             super()._validate_data(X_cand, return_utilities, batch_size,
                                    self.random_state, reset=True)
-        # init parameters
-        # TODO: implement and adapt, what happens if X_eval=self
-
-        # check_classifier_params(self._classes, self._missing_label,
-        #                        self.cost_matrix)
-        check_scalar(self.prior_cand, target_type=float, name='prior_cand',
-                     min_val=0, min_inclusive=False)
-        check_scalar(self.prior_eval, target_type=float, name='prior_eval',
-                     min_val=0, min_inclusive=False)
 
         # TODO: check if X_cand, X, X_eval have similar num_features
 
@@ -334,13 +328,17 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             (only returned if return_utilities is True).
         """
 
-        ### TEST query parameters
+        # validate query parameters
         X, y, X_cand, X_eval, sample_weight, sample_weight_cand,\
         sample_weight_eval, batch_size, return_utilities, random_state = \
             self._validate_data(
                 X, y, X_cand, X_eval, sample_weight, sample_weight_cand,
                 sample_weight_eval, batch_size, return_utilities
             )
+
+        # check class priors
+        prior_cand = check_class_prior(self.prior_cand)
+        prior_eval = check_class_prior(self.prior_eval)
 
         # TODO X, y will be tested by clf when is fitted; X_cand, X equal num features
         # CHECK X_eval will be tested by clf when predicted
@@ -369,10 +367,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # TODO self.metric, self.cost_vector, self.cost_matrix, self.custom_perf_func will be checked in _transform_metric
         # TODO: maybe return dperf function instead of 3 variables
-        scoring, cost_matrix, perf_func = \
+        scoring_decomposable, cost_matrix, perf_func = \
             _transform_scoring(self.scoring, self.cost_vector, self.cost_matrix,
                                self.custom_perf_func, n_classes=n_classes)
-        scoring_decomposable = (scoring == 'misclassification-loss')
 
         # TODO self.prior_cand, self.prior_eval, if prior is vector, use the vector instead
         opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
@@ -388,6 +385,18 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         if self.estimator_metric == 'rbf' and \
                 len(estimator_metric_dict) == 0:
             # TODO: include std, citations, check gamma-bandwidth transformation
+
+            def estimate_bandwidth(n_samples, n_features):
+                check_scalar(n_samples, name='n_samples', target_type=int,
+                             min_val=0)
+                check_scalar(n_features, name='n_features', target_type=int,
+                             min_val=1)
+                nominator = 2 * n_samples * n_features
+                denominator = (n_samples - 1) * np.log(
+                    (n_samples - 1) / ((np.sqrt(2) * 10 ** -6) ** 2))
+                bandwidth = np.sqrt(nominator / denominator)
+                return bandwidth
+
             bandwidth = estimate_bandwidth(X.shape[0], X.shape[1])
             estimator_metric_dict = {'gamma': 1/bandwidth}
 
@@ -895,7 +904,7 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
     metric: str
         The metric used. Possible metrics are 'error', 'cost-vector',
         'misclassification-loss', 'mean-abs-error', 'macro-accuracy',
-        'f1-score' and 'cohens-kappa'.
+        'f1-score' and 'custom'.
     cost_matrix: array-like, shape (n_classes, n_classes),
                  optional (default=None)
         The cost matrix. Only used if metric='misclassification-loss'.
@@ -918,15 +927,17 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
     """
     # TODO warning if matrix/vector is given but not used?
     # TODO warning if perf_func is given but not used?
+    cost_matrix = None
+    perf_func = None
     if metric == 'error':
+        scoring_decomposable = True
         if n_classes is None:
             raise ValueError(
                 f"For metric='{metric}', 'n_classes' must be given."
             )
-        metric = 'misclassification-loss'
         cost_matrix = 1 - np.eye(n_classes)
-        perf_func = None
     elif metric == 'cost-vector':
+        scoring_decomposable = True
         if n_classes is None:
             raise ValueError(
                 f"For metric='{metric}', 'n_classes' must be given."
@@ -940,12 +951,11 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
             raise ValueError(
                 "The cost vector must have shape (n_classes,)."
             )
-        metric = 'misclassification-loss'
         cost_matrix = cost_vector.reshape(-1, 1) \
                       @ np.ones([1, n_classes])
         np.fill_diagonal(cost_matrix, 0)
-        perf_func = None
     elif metric == 'misclassification-loss':
+        scoring_decomposable = True
         if n_classes is None:
             raise ValueError(
                 f"For metric='{metric}', 'n_classes' must be given."
@@ -954,41 +964,38 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
             raise ValueError(
                 f"For metric='{metric}', 'cost_matrix' must be given."
             )
-        check_cost_matrix(cost_matrix, n_classes)
-        metric = 'misclassification-loss'
-        cost_matrix = cost_matrix
-        perf_func = None
+        cost_matrix = check_cost_matrix(cost_matrix, n_classes)
     elif metric == 'mean-abs-error':
+        scoring_decomposable = True
         if n_classes is None:
             raise ValueError(
                 f"For metric='{metric}', 'n_classes' must be given."
             )
-        metric = 'misclassification-loss'
         row_matrix = np.arange(n_classes).reshape(-1, 1) \
                      @ np.ones([1, n_classes])
         cost_matrix = abs(row_matrix - row_matrix.T)
-        perf_func = None
     elif metric == 'macro-accuracy':
-        metric = 'custom'
-        perf_func = macro_accuracy_func
-        cost_matrix = None
+        scoring_decomposable = False
+        def perf_func(conf_matrix):
+            return np.mean(conf_matrix.diagonal() / conf_matrix.sum(axis=1))
     elif metric == 'f1-score':
-        metric = 'custom'
-        perf_func = f1_score_func
-        cost_matrix = None
-    elif metric == 'cohens-kappa':
-        # TODO: implement ?
+        scoring_decomposable = False
+        def perf_func(conf_matrix):
+            pos_pred = conf_matrix[:, -1].sum()
+            recall = conf_matrix[-1, -1] / conf_matrix[-1, :].sum()
+            precision = conf_matrix[-1, -1] / pos_pred if pos_pred > 0 else 0
+            norm = recall + precision
+            return (2 * recall * precision / norm) if norm > 0 else 0
+    elif metric == 'custom':
+        scoring_decomposable = False
         if perf_func is None:
             raise ValueError(
                 f"For metric='{metric}', 'perf_func' must be given."
             )
-        metric = 'custom'
-        perf_func = perf_func
-        cost_matrix = None
     else:
         raise ValueError(f"Metric '{metric}' not implemented. Use "
                          "metric='custom' instead.")
-    return metric, cost_matrix, perf_func
+    return scoring_decomposable, cost_matrix, perf_func
 
 
 def _dperf(probs, pred_old, pred_new, sample_weight_eval,
@@ -1011,38 +1018,6 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
             conf_mat_old[:, y_pred] += np.sum(probs[pred_old == y_pred], axis=0)
             conf_mat_new[:, y_pred] += np.sum(probs[pred_new == y_pred], axis=0)
         return perf_func(conf_mat_new) - perf_func(conf_mat_old)
-
-def estimate_bandwidth(n_samples, n_features):
-    check_scalar(n_samples, name='n_samples', target_type=int, min_val=0)
-    check_scalar(n_features, name='n_features', target_type=int, min_val=1)
-    nominator = 2 * n_samples * n_features
-    denominator = (n_samples - 1) * np.log((n_samples - 1) / ((np.sqrt(2) * 10 ** -6) ** 2))
-    bandwidth = np.sqrt(nominator / denominator)
-    return bandwidth
-
-def score_recall(conf_matrix):
-    return conf_matrix[-1, -1] / conf_matrix[-1, :].sum()
-
-
-def macro_accuracy_func(conf_matrix):
-    return np.mean(conf_matrix.diagonal() / conf_matrix.sum(axis=1))
-
-
-def score_accuracy(conf_matrix):
-    return conf_matrix.diagonal().sum() / conf_matrix.sum()
-
-
-def score_precision(conf_matrix):
-    pos_pred = conf_matrix[:, -1].sum()
-    return conf_matrix[-1, -1] / pos_pred if pos_pred > 0 else 0
-
-
-def f1_score_func(conf_matrix):
-    recall = score_recall(conf_matrix)
-    precision = score_precision(conf_matrix)
-    norm = recall + precision
-    return 2 * recall * precision / norm if norm > 0 else 0
-
 
 def calculate_optimal_prior(n_classes, cost_matrix=None):
     if cost_matrix is None:

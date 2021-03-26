@@ -1,5 +1,4 @@
 import itertools
-import sys
 
 import numpy as np
 import unittest
@@ -587,11 +586,11 @@ class TestXPAL(unittest.TestCase):
                     nonmyopic_independent_probss, nonmyopic_neighborss,
                     nonmyopic_labels_equals))
 
-        for (scoring, X_eval, batch_labels_equal, batch_size, batch_mode,
+        for param in params:
+            (scoring, X_eval, batch_labels_equal, batch_size, batch_mode,
              nonmyopic_max_cand, nonmyopic_independent_probs,
-             nonmyopic_neighbors,
-             nonmyopic_labels_equal) in params:
-            with self.subTest(msg="xPAL", params=params):
+             nonmyopic_neighbors, nonmyopic_labels_equal) = param
+            with self.subTest(msg="xPAL", params=param):
                 selector = XPAL(clf, scoring=scoring, cost_vector=None,
                                 cost_matrix=None,
                                 custom_perf_func=None,
