@@ -129,7 +129,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                  estimator_metric='rbf', estimator_metric_dict=None,
                  batch_mode='greedy',
                  batch_labels_equal=False,
-                 nonmyopic_max_cand=1, nonmyopic_neighbors='nearest',
+                 nonmyopic_max_cand=3, nonmyopic_neighbors='nearest',
                  nonmyopic_labels_equal=True,
                  nonmyopic_independent_probs=True,
                  random_state=None):
@@ -391,22 +391,23 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
         # TODO: sim_cand should have shape |X_| x |X_|
-        if self.nonmyopic_independent_probs:
+        if not self.nonmyopic_independent_probs or \
+                self.nonmyopic_neighbors == 'nearest':
             sim_cand = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_lbld, default=-1e10)
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1.e10)
         else:
             sim_cand = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
+                                 idx_Y=idx_X_lbld, default=-1.e10)
 
         if X_eval is None:
             sim_eval = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1.e10)
         else:
             sim_eval = _calc_sim(K, X_eval, X_,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1.e10)
 
         # INITIALIZE PROB ESTIMATION
         cand_prob_est = PWC(metric="precomputed", classes=classes,
@@ -511,6 +512,8 @@ def probabilistic_gain(clf, X, y, X_eval,
     # np.set_printoptions(precision=1, suppress=True)
     # print(sim_cand.T)
     # print(sim_eval.T)
+
+    clf = clone(clf, safe=False) # Todo clone was missing, safe is necessary such that parameters are not necessarily refitted
 
     idx_cand_unique = \
         np.unique(list(itertools.chain(*idx_candlist_set))).tolist()

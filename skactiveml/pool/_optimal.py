@@ -1,6 +1,7 @@
 import warnings
 
 import itertools
+from copy import deepcopy
 
 import numpy as np
 from sklearn import clone
@@ -43,7 +44,7 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
 
-        clf = clone(self.clf)
+        clf = clone(self.clf, safe=False)
 
         if sample_weight is None:
             sample_weight = np.ones(len(X))
@@ -70,9 +71,6 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
             cand_idx_set = np.array(list(itertools.permutations(range(len(
                 X_cand)), self.nonmyopic_look_ahead)))
 
-            batch_utilities = np.empty([len(cand_idx_set),
-                                        self.nonmyopic_look_ahead])
-
             X_ = np.concatenate([X_cand, X_cand[best_idx[:i_batch]], X], axis=0)
             y_ = np.concatenate([y_cand, y_cand[best_idx[:i_batch]], y], axis=0)
             sample_weight_ = np.concatenate([sample_weight_cand,
@@ -91,6 +89,34 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
             old_perf = self.score(y_eval, pred_eval)  # TODO, sample_weight_eval)
 
+            batch_utilities = np.full([len(X_cand), self.nonmyopic_look_ahead],
+                                      np.nan)
+            for m in range(1, self.nonmyopic_look_ahead+1):
+                cand_idx_set = list(itertools.combinations(range(len(
+                    X_cand)), m))
+
+                for i_cand_idx, cand_idx in enumerate(cand_idx_set):
+                    idx_new = append_lbld(cand_idx)
+                    X_new = X_[idx_new]
+                    y_new = y_[idx_new]
+                    sample_weight_new = sample_weight_[idx_new]
+
+                    clf_new = clf.fit(X_new, y_new, sample_weight_new)
+
+                    pred_eval_new = clf_new.predict(X_eval)
+
+                    dperf = (self.score(y_eval, pred_eval_new) - old_perf) / m
+                    if not self.maximize_score:
+                        dperf *= -1
+                    # TODO, sample_weight_eval)
+                    batch_utilities[cand_idx, m-1] = \
+                        np.nanmax([batch_utilities[cand_idx, m-1],
+                                   np.full(m, dperf)],
+                                  axis=0)
+
+
+            """
+            # old
             for i_full_cand_idx, full_cand_idx in enumerate(cand_idx_set):
                 full_cand_idx = list(full_cand_idx)
                 cand_idx_subsets = [full_cand_idx[:(i + 1)] for i in
@@ -104,18 +130,16 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
                     clf_new = clf.fit(X_new, y_new, sample_weight_new)
 
-                    pred_eval = clf_new.predict(X_eval)
+                    pred_eval_new = clf_new.predict(X_eval)
 
                     batch_utilities[i_full_cand_idx, i_cand_idx] = \
-                        self.score(y_eval, pred_eval) - old_perf# TODO, sample_weight_eval)
+                        self.score(y_eval, pred_eval_new) - old_perf# TODO, sample_weight_eval)
 
-                if not self.maximize_score:
-                    batch_utilities *= -1
-
-                signs = np.sign(batch_utilities)
-                if not ((signs >= 0).all() or (signs <= 0).all()):
-                    pass
-                    # TODO warnings.warn("There exist positive and negative utilities")
+            if not self.maximize_score:
+                batch_utilities *= -1
+            signs = np.sign(batch_utilities)
+            if (signs < 0).any():
+                warnings.warn("There exist positive and negative utilities")
 
             batch_utilities /= np.arange(1, self.nonmyopic_look_ahead + 1).\
                 reshape(1, -1)
@@ -132,6 +156,12 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
             for c_idx in unlbld_cand_idx:
                 subset = (cand_idx_set[:,0] == c_idx)
                 utilities[i_batch, c_idx] = np.max(batch_utilities_[subset])
+
+            """
+            utilities = np.nanmax(batch_utilities, axis=1).reshape(1,-1)
+            best_idxs = np.where(utilities == np.max(utilities))[1]
+            best_idx = best_idxs[rand_argmax(batch_utilities[best_idxs, 0],
+                                             axis=0, random_state=random_state)]
 
         if return_utilities:
             return best_idx, utilities
