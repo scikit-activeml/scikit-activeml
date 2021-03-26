@@ -1286,14 +1286,23 @@ class TestXPAL(unittest.TestCase):
     def test_dperf(self):
         from skactiveml.pool._probal import _dperf
 
-        probs = np.array([[9.99623988e-01, 3.76012465e-04]])
-        pred_old = np.array([0])
-        pred_new = np.array([1])
-        sample_weight_eval = np.array([1])
-        decomposable = True
-        cost_matrix = np.array([[0, 1], [1, 0]])
-        print(_dperf(probs, pred_old, pred_new, sample_weight_eval,
-                     decomposable, cost_matrix))
+        dperf = _dperf(probs=np.array([[0.2, 0.8], [0.6, 0.4]]),
+                       pred_old=np.array([0, 0]),
+                       pred_new=np.array([1, 0]),
+                       sample_weight_eval=np.array([1, 1]),
+                       decomposable=True,
+                       cost_matrix=np.array([[0, 1], [1, 0]]))
+        self.assertAlmostEqual(dperf, (0.8 - 0.2) / 2)
+
+        def perf_func(matrix):
+            return 1
+        dperf = _dperf(probs=np.array([[0.2, 0.8], [0.6, 0.4]]),
+                       pred_old=np.array([0, 0]),
+                       pred_new=np.array([1, 0]),
+                       sample_weight_eval=np.array([1, 1]),
+                       decomposable=False,
+                       perf_func=perf_func)
+        self.assertEqual(dperf, 0)
 
 
 if __name__ == '__main__':

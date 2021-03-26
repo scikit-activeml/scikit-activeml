@@ -656,6 +656,7 @@ def probabilistic_gain(clf, X, y, X_eval,
 
 
 def _reduce_candlist_set(candidate_sets, reduce=False):
+    # TODO rename, idx_
     """Reduce the given list of candidate sets by deleting all redundant
     candidate sets (i.e., candidate sets that are contained multiple times in
     different order).
@@ -1000,14 +1001,41 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
 
 def _dperf(probs, pred_old, pred_new, sample_weight_eval,
            decomposable, cost_matrix=None, perf_func=None):
+    """Calculate the performance difference between the old and new prediction.
+
+    Parameters
+    ----------
+    probs: np.ndarray, shape (n_predictions, n_classes)
+        Label probabilities for each predicted sample.
+    pred_old: np.ndarray, shape (n_predictions)
+        Old predictions.
+    pred_new: np.ndarray, shape (n_predictions)
+        New predictions.
+    sample_weight_eval: np.ndarray, shape (n_predictions)
+        Weight for the predictions.
+    decomposable: bool
+        If true, use the cost matrix to determine the difference. Otherwise,
+        use the perf_func.
+    cost_matrix: array-like, shape (n_classes, n_classes),
+                 optional (default=None)
+        The cost matrix. Only used if decomposable=True.
+    perf_func: callable
+        Function measuring the performance of predictions. Maps a cost matrix
+
+    Returns
+    -------
+    performance_difference: float
+        Performance difference between the old and new predictions.
+    """
     if decomposable:
-        # TODO: check if cost_matrix is correct
+        check_cost_matrix(cost_matrix, len(cost_matrix))
         pred_changed = (pred_new != pred_old)
-        return np.sum(sample_weight_eval[pred_changed, np.newaxis] *
-                      probs[pred_changed, :] *
-                      (cost_matrix.T[pred_old[pred_changed]] -
-                       cost_matrix.T[pred_new[pred_changed]])) / \
-               len(probs)
+        w = sample_weight_eval[pred_changed, np.newaxis]
+        p = probs[pred_changed, :]
+        C_old = cost_matrix.T[pred_old[pred_changed]]
+        C_new = cost_matrix.T[pred_new[pred_changed]]
+        performance_difference = np.sum(w * p * (C_old - C_new)) / len(probs)
+        return performance_difference
     else:
         # TODO: check if perf_func is correct
         n_classes = probs.shape[1]
@@ -1015,8 +1043,9 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
         conf_mat_new = np.zeros([n_classes, n_classes])
         probs = probs * sample_weight_eval[:, np.newaxis]
         for y_pred in range(n_classes):
-            conf_mat_old[:, y_pred] += np.sum(probs[pred_old == y_pred], axis=0)
-            conf_mat_new[:, y_pred] += np.sum(probs[pred_new == y_pred], axis=0)
+            # TODO += ?
+            conf_mat_old[:, y_pred] = np.sum(probs[pred_old == y_pred], axis=0)
+            conf_mat_new[:, y_pred] = np.sum(probs[pred_new == y_pred], axis=0)
         return perf_func(conf_mat_new) - perf_func(conf_mat_old)
 
 def calculate_optimal_prior(n_classes, cost_matrix=None):
