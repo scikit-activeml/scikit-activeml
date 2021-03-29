@@ -10,6 +10,7 @@ from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 
 from sklearn.metrics import accuracy_score, pairwise_kernels
 
+from skactiveml.classifier import PWC
 from skactiveml.utils import check_random_state, ExtLabelEncoder, rand_argmax
 
 
@@ -65,17 +66,18 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
         for i_batch in range(batch_size):
             unlbld_cand_idx = np.setdiff1d(np.arange(len(X_cand)), best_idx)
 
-            sim_unlbld_cand = sim_cand[unlbld_cand_idx][:, unlbld_cand_idx]
-            # cand_idx_set = (-sim_unlbld_cand).argsort(axis=1)[:, :self.nonmyopic_look_ahead]
-
-            cand_idx_set = np.array(list(itertools.permutations(range(len(
-                X_cand)), self.nonmyopic_look_ahead)))
-
             X_ = np.concatenate([X_cand, X_cand[best_idx[:i_batch]], X], axis=0)
             y_ = np.concatenate([y_cand, y_cand[best_idx[:i_batch]], y], axis=0)
             sample_weight_ = np.concatenate([sample_weight_cand,
                                              sample_weight_cand[best_idx[:i_batch]],
                                              sample_weight])
+
+            if isinstance(clf, PWC):
+                K = pairwise_kernels(X_eval, X_,
+                                          metric=clf.metric,
+                                          **clf.metric_dict)
+                clf.metric = 'precomputed'
+                clf.metric_dict = {}
 
             lbld_idx_ = list(range(len(X_cand), len(X_)))
             append_lbld = lambda x: list(x) + lbld_idx_
@@ -85,15 +87,18 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
             y_new = y_[idx_new]
             sample_weight_new = sample_weight_[idx_new]
             clf_new = clf.fit(X_new, y_new, sample_weight_new)
-            pred_eval = clf_new.predict(X_eval)
+            if isinstance(clf, PWC):
+                pred_eval = clf_new.predict(K[:, idx_new])
+            else:
+                pred_eval = clf_new.predict(X_eval)
+
 
             old_perf = self.score(y_eval, pred_eval)  # TODO, sample_weight_eval)
 
             batch_utilities = np.full([len(X_cand), self.nonmyopic_look_ahead],
                                       np.nan)
             for m in range(1, self.nonmyopic_look_ahead+1):
-                cand_idx_set = list(itertools.combinations(range(len(
-                    X_cand)), m))
+                cand_idx_set = list(itertools.combinations(unlbld_cand_idx, m))
 
                 for i_cand_idx, cand_idx in enumerate(cand_idx_set):
                     idx_new = append_lbld(cand_idx)
@@ -103,7 +108,10 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
 
                     clf_new = clf.fit(X_new, y_new, sample_weight_new)
 
-                    pred_eval_new = clf_new.predict(X_eval)
+                    if isinstance(clf, PWC):
+                        pred_eval_new = clf_new.predict(K[:, idx_new])
+                    else:
+                        pred_eval_new = clf_new.predict(X_eval)
 
                     dperf = (self.score(y_eval, pred_eval_new) - old_perf) / m
                     if not self.maximize_score:
@@ -114,54 +122,12 @@ class Optimal(SingleAnnotPoolBasedQueryStrategy):
                                    np.full(m, dperf)],
                                   axis=0)
 
+            max_batch_utilities = np.nanmax(batch_utilities, axis=1)
+            best_idxs = np.where(max_batch_utilities == np.max(max_batch_utilities))[0]
 
-            """
-            # old
-            for i_full_cand_idx, full_cand_idx in enumerate(cand_idx_set):
-                full_cand_idx = list(full_cand_idx)
-                cand_idx_subsets = [full_cand_idx[:(i + 1)] for i in
-                                    range(len(full_cand_idx))]
-
-                for i_cand_idx, cand_idx in enumerate(cand_idx_subsets):
-                    idx_new = append_lbld(cand_idx)
-                    X_new = X_[idx_new]
-                    y_new = y_[idx_new]
-                    sample_weight_new = sample_weight_[idx_new]
-
-                    clf_new = clf.fit(X_new, y_new, sample_weight_new)
-
-                    pred_eval_new = clf_new.predict(X_eval)
-
-                    batch_utilities[i_full_cand_idx, i_cand_idx] = \
-                        self.score(y_eval, pred_eval_new) - old_perf# TODO, sample_weight_eval)
-
-            if not self.maximize_score:
-                batch_utilities *= -1
-            signs = np.sign(batch_utilities)
-            if (signs < 0).any():
-                warnings.warn("There exist positive and negative utilities")
-
-            batch_utilities /= np.arange(1, self.nonmyopic_look_ahead + 1).\
-                reshape(1, -1)
-
-            look_ahead_maximums = np.nanmax(batch_utilities, axis=0)
-            opt_look_ahead = np.argmax(look_ahead_maximums)
-
-            cur_best_idx = rand_argmax([batch_utilities[:, opt_look_ahead]],
-                                       axis=1, random_state=random_state)
-
-            best_idx[i_batch] = cand_idx_set[cur_best_idx, 0]
-
-            batch_utilities_ = np.nanmax(batch_utilities, axis=1)
-            for c_idx in unlbld_cand_idx:
-                subset = (cand_idx_set[:,0] == c_idx)
-                utilities[i_batch, c_idx] = np.max(batch_utilities_[subset])
-
-            """
-            utilities = np.nanmax(batch_utilities, axis=1).reshape(1,-1)
-            best_idxs = np.where(utilities == np.max(utilities))[1]
-            best_idx = best_idxs[rand_argmax(batch_utilities[best_idxs, 0],
+            best_idx[i_batch] = best_idxs[rand_argmax(batch_utilities[best_idxs, 0],
                                              axis=0, random_state=random_state)]
+            utilities[i_batch, :] = max_batch_utilities
 
         if return_utilities:
             return best_idx, utilities

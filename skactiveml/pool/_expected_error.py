@@ -1,9 +1,11 @@
 import numpy as np
 from sklearn.base import clone
+from sklearn.metrics import pairwise_kernels
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier
 from skactiveml.base import ClassFrequencyEstimator
+from skactiveml.classifier import PWC
 from skactiveml.utils import check_classifier_params, \
     check_X_y, is_labeled, simple_batch
 
@@ -145,9 +147,8 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
         force_all_finite=False, missing_label=clf.missing_label
     )
 
-    clf = clone(clf)
+    clf = clone(clf, safe=False)
     clf.fit(X, y, sample_weight)
-
     n_classes = len(clf.classes)
     P = clf.predict_proba(X_cand)
     C = 1 - np.eye(np.size(P, axis=1)) if C is None else C

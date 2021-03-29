@@ -526,12 +526,31 @@ def probabilistic_gain(clf, X, y, X_eval,
     eval_prob_est, _ = to_int_labels(eval_prob_est, X[idx_train], y[idx_train])
     clf, y = to_int_labels(clf, X, y)
 
+    if isinstance(clf, PWC):
+        if X_eval is not None:
+            K = pairwise_kernels(X_eval, X,
+                                 metric=clf.metric,
+                                 **clf.metric_dict)
+        else:
+            K = pairwise_kernels(X, X,
+                                 metric=clf.metric,
+                                 **clf.metric_dict)
+        clf.metric = 'precomputed'
+        clf.metric_dict = {}
+
     clf.fit(X[idx_train], y[idx_train], sample_weight[idx_train])
     if X_eval is None:
         pred_old_cand = np.full_like(y, clf.missing_label)
-        pred_old_cand[idx_cand_unique] = clf.predict(X[idx_cand_unique])
+        if isinstance(clf, PWC):
+            pred_old_cand[idx_cand_unique] = \
+                clf.predict(K[idx_cand_unique][:, idx_train])
+        else:
+            pred_old_cand[idx_cand_unique] = clf.predict(X[idx_cand_unique])
     else:
-        pred_old_cand = clf.predict(X_eval)
+        if isinstance(clf, PWC):
+            pred_old_cand = clf.predict(K[:, idx_train])
+        else:
+            pred_old_cand = clf.predict(X_eval)
 
     label_encoder = ExtLabelEncoder(missing_label=clf.missing_label,
                                     classes=clf.classes).fit(y)
@@ -594,12 +613,18 @@ def probabilistic_gain(clf, X, y, X_eval,
                 if X_eval is None:
                     prob_eval = \
                         eval_prob_est.predict_proba(sim_eval_new[cand_idx])
-                    pred_new = new_clf.predict(X[cand_idx])
+                    if isinstance(new_clf, PWC):
+                        pred_new = new_clf.predict(K[cand_idx][:, idx_new])
+                    else:
+                        pred_new = new_clf.predict(X[cand_idx])
                     pred_old = pred_old_cand[cand_idx]
                     sample_weight_eval_new = sample_weight_eval[cand_idx]
                 else:
                     prob_eval = eval_prob_est.predict_proba(sim_eval_new)
-                    pred_new = new_clf.predict(X_eval)
+                    if isinstance(new_clf, PWC):
+                        pred_new = new_clf.predict(K[:, idx_new])
+                    else:
+                        pred_new = new_clf.predict(X_eval)
                     pred_old = pred_old_cand
                     sample_weight_eval_new = sample_weight_eval
 
