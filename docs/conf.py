@@ -90,6 +90,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
+# sphinx-autogen docs/index.rst
+autosummary_generate = True
+
 
 # -- Options for HTML output -------------------------------------------------
 
