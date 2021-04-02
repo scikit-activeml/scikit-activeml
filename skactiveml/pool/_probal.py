@@ -433,14 +433,15 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
         # TODO: sim_cand should have shape |X_| x |X_|
-        if self.nonmyopic_independent_probs:
+        if not self.nonmyopic_independent_probs or \
+                self.nonmyopic_neighbors == 'nearest':
             sim_cand = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_lbld, default=-1e10)
+                                 idx_Y=idx_X_cand + idx_X_lbld, default=-1e10)
         else:
             sim_cand = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
+                                 idx_Y=idx_X_lbld, default=-1e10)
 
         if X_eval is None:
             sim_eval = _calc_sim(K, X_, X_,
@@ -1005,13 +1006,13 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
 
     Parameters
     ----------
-    probs: np.ndarray, shape (n_predictions, n_classes)
+    probs: np.ndarray, shape (n_evaluations, n_classes)
         Label probabilities for each predicted sample.
-    pred_old: np.ndarray, shape (n_predictions)
+    pred_old: np.ndarray, shape (n_evaluations)
         Old predictions.
-    pred_new: np.ndarray, shape (n_predictions)
+    pred_new: np.ndarray, shape (n_evaluations)
         New predictions.
-    sample_weight_eval: np.ndarray, shape (n_predictions)
+    sample_weight_eval: np.ndarray, shape (n_evaluations)
         Weight for the predictions.
     decomposable: bool
         If true, use the cost matrix to determine the difference. Otherwise,
@@ -1034,16 +1035,15 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
         p = probs[pred_changed, :]
         C_old = cost_matrix.T[pred_old[pred_changed]]
         C_new = cost_matrix.T[pred_new[pred_changed]]
-        performance_difference = np.sum(w * p * (C_old - C_new)) / len(probs)
+        normalize = sum(sample_weight_eval)
+        performance_difference = np.sum(w * p * (C_old - C_new)) / normalize
         return performance_difference
     else:
-        # TODO: check if perf_func is correct
         n_classes = probs.shape[1]
         conf_mat_old = np.zeros([n_classes, n_classes])
         conf_mat_new = np.zeros([n_classes, n_classes])
         probs = probs * sample_weight_eval[:, np.newaxis]
         for y_pred in range(n_classes):
-            # TODO += ?
             conf_mat_old[:, y_pred] = np.sum(probs[pred_old == y_pred], axis=0)
             conf_mat_new[:, y_pred] = np.sum(probs[pred_new == y_pred], axis=0)
         return perf_func(conf_mat_new) - perf_func(conf_mat_old)

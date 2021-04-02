@@ -1222,11 +1222,8 @@ class TestXPAL(unittest.TestCase):
         self.assertRaises(LinAlgError, calculate_optimal_prior,
                           n_classes=2, cost_matrix=np.ones((2, 2, 2)))
 
-
     def test_transform_scoring(self):
         from skactiveml.pool._probal import _transform_scoring
-
-        cost_matrix = np.array([[0, 1, 2], [2, 0, 1], [1, 1, 0]])
 
         self.assertRaises(ValueError, _transform_scoring, 'wrong-string')
 
