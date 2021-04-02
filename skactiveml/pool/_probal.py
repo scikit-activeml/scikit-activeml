@@ -920,17 +920,28 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
 
     Returns
     -------
-    metric: str
-        Name of the metric.
+    scoring_decomposable: bool
+        Denote if the scoring is decomposable.
     cost_matrix: np.ndarray
         Cost matrix according to the given metric.
     perf_func: callable
         Performance function measuring the performance of a classifier.
     """
-    # TODO warning if matrix/vector is given but not used?
-    # TODO warning if perf_func is given but not used?
-    cost_matrix = None
-    perf_func = None
+    if metric != 'misclassification-loss' and cost_matrix is not None:
+        cost_matrix = None
+        warnings.warn(
+            "'cost_matrix' is only used if metric='misclassification-loss'."
+        )
+    if metric != 'cost-vectors' and cost_vector is not None:
+        warnings.warn(
+            "'cost_vector' is only used if metric='cost_vector'."
+        )
+    if metric != 'custom' and perf_func is not None:
+        perf_func = None
+        warnings.warn(
+            "'perf_func' is only used if metric='custom'."
+        )
+
     if metric == 'error':
         scoring_decomposable = True
         if n_classes is None:
