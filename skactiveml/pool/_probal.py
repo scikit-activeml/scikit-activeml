@@ -914,7 +914,7 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
         The cost vector. Only used if metric='cost-vector'.
     perf_func: callable, optional (default=None)
         Custom performance function measuring the performance of a classifier.
-        Only used if metric='cohens-kappa'.
+        Only used if metric='custom'.
     n_classes: int, optional (default=None)
         Number of classes.
 
@@ -932,7 +932,7 @@ def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
         warnings.warn(
             "'cost_matrix' is only used if metric='misclassification-loss'."
         )
-    if metric != 'cost-vectors' and cost_vector is not None:
+    if metric != 'cost-vector' and cost_vector is not None:
         warnings.warn(
             "'cost_vector' is only used if metric='cost_vector'."
         )

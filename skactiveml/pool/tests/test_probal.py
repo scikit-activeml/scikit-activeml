@@ -1274,10 +1274,10 @@ class TestXPAL(unittest.TestCase):
         _, _, perf_func = _transform_scoring('f1-score')
         self.assertIsNotNone(perf_func)
 
-        # cohens kappa
-        self.assertRaises(ValueError, _transform_scoring, 'cohens-kappa')
-        perf = lambda x: x
-        _, _, perf_func = _transform_scoring('cohens-kappa', perf_func=perf)
+        # custom
+        self.assertRaises(ValueError, _transform_scoring, 'custom')
+        def perf(x): return x
+        _, _, perf_func = _transform_scoring('custom', perf_func=perf)
         self.assertIsNotNone(perf_func)
 
     def test_dperf(self):
