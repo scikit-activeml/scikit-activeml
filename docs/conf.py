@@ -154,3 +154,10 @@ intersphinx_mapping = {'https://docs.python.org/3/': None}
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+# -- Generate rst files ------------------------------------------------------
+from docs.generate import generate_stratagy_summary_rst,\
+    generate_api_reference_rst, generate_examples
+generate_api_reference_rst(os.path.abspath('api_reference.rst'))
+generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'))
+generate_examples(os.path.abspath(''))

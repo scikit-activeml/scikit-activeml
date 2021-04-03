@@ -7,9 +7,8 @@ Contents:
    :maxdepth: 2
 
    developers_guide
+   api_reference
    strategy_summary
-   another_page
-   api/api
 
 Indices and tables
 ==================
