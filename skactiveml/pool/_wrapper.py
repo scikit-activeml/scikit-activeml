@@ -1,10 +1,11 @@
+import warnings
+
 import numpy as np
 from sklearn.utils import check_random_state
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
-     SingleAnnotPoolBasedQueryStrategy
+    SingleAnnotPoolBasedQueryStrategy
 
-# Author: Lukas Luehrs <uk073949@student.uni-kassel.de>
 from skactiveml.utils import compute_vote_vectors
 
 
@@ -34,7 +35,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
               return_utilities=False, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator. The sample is chosen by the given strategy as if one
-        unspecified annotator where to annotate the sample.
+        unspecified annotator where to annotate the sample and the
+        annotators are chosen at random.
 
         Parameters
         ----------
@@ -77,22 +79,6 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 "The given Strategy must be a SingleAnnotStreamBasedQueryStrategy"
             )
 
-        # check number of annotators can be determined
-
-        if A_cand is None:
-            X, y = args[0], args[1]
-            if not(isinstance(y, np.ndarray) and isinstance(y, np.ndarray)):
-                raise ValueError(
-                    "Number of annotators can not be determined. To fix this error"
-                    "pass an annotator-matrix as A_cand."
-                )
-            if y.ndim != 2:
-                raise ValueError(
-                    "Number of annotators can not be determined. To fix this error"
-                    "pass an annotator-matrix as A_cand."
-                )
-            A_cand = np.full((X_cand.shape[0], y.shape[1]), True, dtype=bool)
-
         # check X-Values are assignable
 
         if not np.all(np.sum(A_cand, axis=1) > 0):
@@ -104,33 +90,45 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         random_state = check_random_state(self.random_state)
 
-        # check if X_cand fits A_cand
+        # perform query
 
-        if X_cand.shape[0] != A_cand.shape[0]:
-            raise ValueError(
-                "X_cands number of labels does not fit A_cands number of labels."
+        n_samples = X_cand.shape[0]
+
+        # check if batch size is smaller than candidate matrix
+
+        if n_samples < batch_size:
+            warnings.warn(
+                "batch_size was greater than number of samples"
+                "batch_size is reduced to number of samples"
             )
+            batch_size = n_samples
 
-        # check and fit if necessary pool label pair
+        # check args
 
         if len(args) > 1:
             X, y = args[0], args[1]
+
             if isinstance(y, np.ndarray) and isinstance(y, np.ndarray):
                 if y.ndim > 2:
                     raise ValueError(
-                        "The entries of args[0] and args[1] are interpreted as a pool"
-                        "label pair, args[1] can be of dimension 1 or 2."
+                        "The entries of args[0] and args[1] are interpreted as follows:"
+                        "args[0] is the labeling pool and args[1] is either the labels-vector"
+                        "of the labeling pool or the labels-annotator-matrix, where the"
+                        "entry at the i-th row and the j-th column, says that, the j-th"
+                        "annotator labeled the i-th data point with the given entry."
                     )
                 if y.ndim == 2:
-                    args_list = list(args)
-                    vote_matrix = compute_vote_vectors(y)
-                    vote_vector = vote_matrix.argmax(axis=1)
-                    args_list[1] = vote_vector
-                    args = tuple(args_list)
-
-        # perform query
-
-        n_annotators = A_cand.shape[1]
+                    if y.shape[1] != A_cand.shape[1]:
+                        warnings.warn(
+                            "The number of input annotators does not match"
+                            "the number of output annotators."
+                        )
+                    else:
+                        args_list = list(args)
+                        vote_matrix = compute_vote_vectors(y)
+                        vote_vector = vote_matrix.argmax(axis=1)
+                        args_list[1] = vote_vector
+                        args = tuple(args_list)
 
         if return_utilities:
             single_query_indices, utilities = self.strategy.query(X_cand, *args, batch_size,
@@ -140,6 +138,21 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                                                        return_utilities, **kwargs)
 
         # get available random query annotators
+
+        query_indices = self._query_available_annotators(A_cand, batch_size,
+                                                         single_query_indices, random_state)
+
+        if return_utilities:
+            return query_indices, utilities
+
+        else:
+            return query_indices
+
+    @staticmethod
+    def _query_available_annotators(A_cand, batch_size, single_query_indices,
+                                    random_state):
+
+        n_annotators = A_cand.shape[1]
 
         cand_off_indices = np.repeat(np.arange(1, n_annotators + 1)
                                      .reshape(1, n_annotators), batch_size, axis=0)
@@ -153,11 +166,6 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         query_cand_indices = query_cand_off_indices - 1
 
         query_indices = np.concatenate((single_query_indices.reshape(batch_size, 1),
-                                        query_cand_indices.reshape(batch_size, 1)), axis=0)
+                                        query_cand_indices.reshape(batch_size, 1)), axis=1)
 
-        if return_utilities:
-            return query_indices, utilities
-
-        else:
-            return query_indices
-
+        return query_indices
