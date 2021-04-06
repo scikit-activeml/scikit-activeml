@@ -1,8 +1,10 @@
-import numpy as np
 import unittest
+import numpy as np
+import warnings
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_missing_label, check_scalar, check_X_y
+from skactiveml.utils._validation import check_random_state
 
 
 class TestValidation(unittest.TestCase):
@@ -24,11 +26,27 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(ValueError, check_cost_matrix,
                           cost_matrix=[['2', '5'], ['a', '5']], n_classes=2)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=3)
+                          cost_matrix=[[0, 1], [2, 0]], n_classes=3)
         self.assertRaises(ValueError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=-1)
+                          cost_matrix=[[0, 1], [2, 0]], n_classes=-1)
         self.assertRaises(TypeError, check_cost_matrix,
-                          cost_matrix=[[2, 1], [2, 2]], n_classes=2.5)
+                          cost_matrix=[[0, 1], [2, 0]], n_classes=2.5)
+        self.assertRaises(ValueError, check_cost_matrix,
+                          cost_matrix=[[2, 1], [2, 2]], n_classes=2,
+                          diagonal_is_zero=True)
+        self.assertRaises(ValueError, check_cost_matrix,
+                          cost_matrix=[[0, 1], [-1, 0]], n_classes=2,
+                          only_non_negative=True)
+        self.assertRaises(ValueError, check_cost_matrix,
+                          cost_matrix=[[0, 0], [0, 0]], n_classes=2,
+                          contains_non_zero=True)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            check_cost_matrix(cost_matrix=[[1, 1], [2, 0]], n_classes=2)
+            check_cost_matrix(cost_matrix=[[0, 1], [-1, 0]], n_classes=2)
+            check_cost_matrix(cost_matrix=[[0, 0], [0, 0]], n_classes=2)
+            assert len(w) == 3
+
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
@@ -52,6 +70,28 @@ class TestValidation(unittest.TestCase):
         X_cand = [[5, 6]]
         sample_weight = [0.4, 0.6]
         check_X_y(X, y, X_cand, sample_weight)
+
+    def test_check_random_state(self):
+        seed = 12
+        self.assertRaises(ValueError, check_random_state, 'string')
+        self.assertRaises(TypeError, check_random_state, seed, 'string')
+
+        random_state = np.random.RandomState(seed)
+        ra = check_random_state(random_state, 3)
+        rb = check_random_state(random_state, 3)
+        self.assertTrue(ra.rand() == rb.rand())
+
+        ra = check_random_state(42, 3)
+        rb = check_random_state(42, 3)
+        self.assertTrue(ra.rand() == rb.rand())
+
+        ra = check_random_state(None)
+        rb = check_random_state(None)
+        self.assertTrue(ra.rand() != rb.rand())
+        ra = check_random_state(np.random.RandomState(None))
+        rb = check_random_state(np.random.RandomState(None))
+        self.assertTrue(ra.rand() != rb.rand())
+
 
 if __name__ == '__main__':
     unittest.main()

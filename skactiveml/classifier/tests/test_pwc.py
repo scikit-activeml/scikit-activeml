@@ -1,8 +1,9 @@
-import numpy as np
 import unittest
 
-from sklearn.utils.validation import NotFittedError, check_is_fitted
+import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.utils.validation import NotFittedError, check_is_fitted
+
 from skactiveml.classifier import PWC
 
 
@@ -18,9 +19,10 @@ class TestPWC(unittest.TestCase):
         pwc = PWC(missing_label=-1)
         self.assertEqual(pwc.missing_label, -1)
         self.assertEqual(pwc.classes, None)
-        self.assertEqual(pwc.metric_dict, {})
+        self.assertEqual(pwc.metric_dict, None)
         self.assertEqual(pwc.random_state, None)
         self.assertEqual(pwc.cost_matrix, None)
+        self.assertEqual(pwc.class_prior, 0)
 
     def test_fit(self):
         pwc = PWC(missing_label='nan', metric="Test")
@@ -28,6 +30,12 @@ class TestPWC(unittest.TestCase):
         pwc = PWC(missing_label='nan', n_neighbors=-1)
         self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
         pwc = PWC(missing_label='nan', n_neighbors=1.0)
+        self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', class_prior=-1.0)
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', class_prior=['test'])
+        self.assertRaises(ValueError, pwc.fit, X=self.X, y=self.y)
+        pwc = PWC(missing_label='nan', class_prior='test')
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
         pwc = PWC(missing_label='nan', metric_dict=['gamma'])
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
@@ -76,6 +84,14 @@ class TestPWC(unittest.TestCase):
         self.assertRaises(ValueError, pwc.predict_freq, X=[[1], [0]])
         F = pwc.predict_freq(X=[[1, 0]])
         np.testing.assert_array_equal([[0, 1, 2]], F)
+        rbf_kernel = lambda x, y, gamma: np.exp(-gamma * np.sum((x - y) ** 2))
+        pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',
+                  random_state=0, metric=rbf_kernel, metric_dict={'gamma': 2})
+        F_call = pwc.fit(X=self.X, y=self.y).predict_freq(np.ones_like(self.X))
+        pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',
+                  metric='rbf', metric_dict={'gamma': 2}, random_state=0)
+        F_rbf = pwc.fit(X=self.X, y=self.y).predict_freq(np.ones_like(self.X))
+        np.testing.assert_array_equal(F_call, F_rbf)
 
     def test_predict_proba(self):
         pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan')
@@ -86,6 +102,16 @@ class TestPWC(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
         P = pwc.predict_proba(X=[self.X[0]])
         np.testing.assert_array_equal([[1 / 4, 3 / 4]], P)
+        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
+                  n_neighbors=1, metric='precomputed', class_prior=1)
+        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = pwc.predict_proba(X=[[1, 0]])
+        np.testing.assert_array_equal([[1/6, 2/6, 3/6]], P)
+        pwc = PWC(classes=['tokyo', 'paris', 'new york'], missing_label='nan',
+                  n_neighbors=1, metric='precomputed', class_prior=[0, 0, 1])
+        pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
+        P = pwc.predict_proba(X=[[1, 0]])
+        np.testing.assert_array_equal([[0, 1/4, 3/4]], P)
 
     def test_predict(self):
         pwc = PWC(classes=['tokyo', 'paris'], missing_label='nan',

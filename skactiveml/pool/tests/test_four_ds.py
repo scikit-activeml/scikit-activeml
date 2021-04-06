@@ -2,7 +2,7 @@ import numpy as np
 import unittest
 
 from skactiveml.pool import FourDS
-from skactiveml.classifier import CMM
+from skactiveml.classifier import CMM, SklearnClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.datasets import load_breast_cancer
@@ -19,28 +19,74 @@ class TestFourDS(unittest.TestCase):
         mixture_model.fit(self.X)
         self.CMM = CMM(mixture_model=mixture_model)
 
-    def test_fit(self):
-        al4ds = FourDS(clf=CMM(), random_state=self.random_state)
-        self.assertTrue(isinstance(al4ds.clf, CMM))
-        self.assertEqual(al4ds.lmbda, None)
-        self.assertEqual(al4ds.random_state, self.random_state)
-
-    def test_query(self):
-        al4ds = FourDS(clf=GaussianProcessClassifier())
+    def test_init_param_clf(self):
+        al4ds = FourDS(clf=None)
         self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
                           y=self.y)
-        al4ds = FourDS(clf=CMM())
+        clf = SklearnClassifier(GaussianProcessClassifier())
+        al4ds = FourDS(clf=clf)
         self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
-                          y=self.y, batch_size=1.2)
-        al4ds = FourDS(clf=CMM())
-        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, X=self.X,
-                          y=self.y, batch_size=0)
+                          y=self.y)
+
+    def test_init_param_lmbda(self):
         al4ds = FourDS(clf=CMM(), lmbda=True)
         self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
                           y=self.y)
         al4ds = FourDS(clf=CMM(), lmbda=1.1)
         self.assertRaises(ValueError, al4ds.query, X_cand=self.X, X=self.X,
                           y=self.y)
+
+    def test_init_param_random_state(self):
+        al4ds = FourDS(clf=CMM(), random_state='tests')
+        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y)
+
+    def test_query_param_batch_size(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y, batch_size=1.2)
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y, batch_size=0)
+
+    def test_query_param_return_utilities(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, X=self.X,
+                          y=self.y, return_utilities='test')
+
+    def test_query_param_X_cand(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(ValueError, al4ds.query, X_cand=None, X=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, al4ds.query, X_cand=np.ones(5), X=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, al4ds.query, X_cand=np.ones((5, 1)),
+                          X=self.X, y=self.y)
+
+    def test_query_param_X(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(ValueError, al4ds.query, X=None, X_cand=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, al4ds.query, X=np.ones(5), X_cand=self.X,
+                          y=self.y)
+        self.assertRaises(ValueError, al4ds.query, X=np.ones((5, 1)),
+                          X_cand=self.X, y=self.y)
+
+    def test_query_param_y(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
+                          y=None)
+        self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
+                          y=np.zeros((len(self.y), 2)))
+
+    def test_query_param_sample_weight(self):
+        al4ds = FourDS(clf=CMM())
+        self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
+                          y=self.y, sample_weight=np.ones(1))
+        self.assertRaises(TypeError, al4ds.query, X=self.X, X_cand=self.X,
+                          y=self.y, sample_weight='test')
+
+    def test_query(self):
         al4ds = FourDS(clf=self.CMM, random_state=self.random_state)
         query_indices = al4ds.query(X_cand=self.X, X=self.X, y=self.y)
         self.assertEqual((1,), query_indices.shape)

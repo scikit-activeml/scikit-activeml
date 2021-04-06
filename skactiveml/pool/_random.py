@@ -1,7 +1,5 @@
-import numpy as np
-
-from sklearn.utils import check_array, check_scalar
 from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils import simple_batch
 
 
 class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
@@ -18,7 +16,7 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
     def __init__(self, random_state=None):
         super().__init__(random_state=random_state)
 
-    def query(self, X_cand, batch_size=1, return_utilities=False, **kwargs):
+    def query(self, X_cand, batch_size=1, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
@@ -38,17 +36,13 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
             The utilities of all instances in X_cand
             (only returned if return_utilities is True).
         """
-        # Check the given data
-        X_cand = check_array(X_cand, force_all_finite=False)
+        # Validate input parameters.
+        X_cand, return_utilities, batch_size, random_state = \
+            self._validate_data(X_cand, return_utilities, batch_size,
+                                self.random_state, reset=True)
 
-        # Check 'batch_size'
-        check_scalar(batch_size, 'batch_size', int, min_val=1)
+        utilities = random_state.random_sample(len(X_cand))
 
-        utilities = self.random_state.random_sample(len(X_cand))
-
-        best_indices = utilities.argsort()[-batch_size:][::-1]
-
-        if return_utilities:
-            return best_indices, np.array([utilities])
-        else:
-            return best_indices
+        return simple_batch(utilities, random_state,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)

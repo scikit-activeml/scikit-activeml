@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from sklearn.utils import check_random_state
+from skactiveml.utils import check_random_state
 
 
 def rand_argmin(a, random_state=None, **argmin_kwargs):

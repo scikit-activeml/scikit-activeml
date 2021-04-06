@@ -1,85 +1,71 @@
-==============
-scikit-example
-==============
+|Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_
 
-This is a simple scikit. The main intent is to serve as a template for new
-scikits.
+.. |Doc| image:: https://img.shields.io/badge/readthedocs.io-latest-green
+.. _Doc: https://scikit-activeml.readthedocs.io/en/latest/
+
+.. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
+.. _Codecov: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
+
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
+.. _PythonVersion: https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9-blue
+
+.. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
+.. _PyPi: https://badge.fury.io/py/scikit-activeml
+
+.. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue
+.. _Paper: https://www.preprints.org/manuscript/202103.0194/v1
 
 
-Installation from sources
-=========================
+scikit-activeml
+===============
 
-In the root directory of the package, just do::
+*scikit-activeml* is a Python module for active learning on top of SciPy and scikit-learn. It is distributed under the 3-Clause BSD licence.
 
-    python setup.py install
+The project was initiated in 2020 by the Intelligent Embedded Systems Group at University Kassel.
 
-
-Distribution
+Installation
 ============
 
-A scikit is a standard Python package, which can be distributed by a number of
-different means:
+The easiest way of installing scikit-activeml is using ``pip``   ::
 
-Source distribution
--------------------
-
-To prepare a source distribution of the package::
-
-    python setup.py sdist
-
-Eggs
-----
-
-Eggs are a format for easy distribution of pre-built packages. It is
-cross-platform for packages without any C code, and platform specific
-otherwise. To build an egg::
-
-    python setup.py bdist_egg
-
-Binary installers
------------------
-
-Binary installers are platform specific. On Windows, you can do::
-
-    python setup.py bdist_wininst
-
-On Mac OS X (this requires an extension, bdist_mpkg, available on Pypi)::
-
-    python setup.py bdist_mpkg
+    pip install -U scikit-activeml
 
 
-Registration onto PyPi
-======================
+Example
+=======
 
-A Scikit should be registered to PyPi, the Python package index.
-This will make it easier for people to find and download the package,
-and moreover it will list the package in the Scikits index:
-http://scikits.appspot.com/scikits
+The following code implements an Active Learning Cycle with 20 iterations using a Logistic Regression Classifier and Uncertainty Sampling. To use other classifiers, you can simply wrap classifiers from ``scikit-learn`` or use classifiers provided by ``scikit-activeml``. Note that the main difficulty using active learning with ``scikit-learn`` is the ability to handle unlabeled data which we denote as a specific value (``MISSING_LABEL``) in the label vector ``y_true``. More query strategies can be found in the documentation.     ::
 
-For more information, see the `PyPi tutorial
-<https://python-packaging-user-guide.readthedocs.io>`__
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.datasets import make_classification
+    from skactiveml.pool import UncertaintySampling
+    from skactiveml.utils import is_unlabeled, MISSING_LABEL
+    from skactiveml.classifier import SklearnClassifier 
 
-To register a package on PyPi and upload the sources at the same time::
+    X, y_true = make_classification(random_state=0)
+    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
-    python setup.py register sdist upload
+    clf = SklearnClassifier(LogisticRegression(),
+                            classes=np.unique(y_true))
+    qs = UncertaintySampling(clf, method='entropy')
 
-You can also upload the files manually using the forms on the PyPi web page:
-https://pypi.python.org/
+    n_cycles = 20
+    for c in range(n_cycles):
+         unlbld_idx = np.where(is_unlabeled(y))[0]
+         X_cand = X[unlbld_idx]
+         query_idx = unlbld_idx[qs.query(X_cand=X_cand, X=X, y=y)]
+         y[query_idx] = y_true[query_idx]
+         clf.fit(X, y)
 
-Binary distributions as eggs can also be uploaded to pypi. For example::
+Development
+===========
 
-    python setup.py bdist_egg upload
+More information are available in the `Developer's Guide
+<https://scikit-activeml.readthedocs.io/en/latest/developers_guide.html>`_.
 
-Once a source or binary distribution is uploaded to PyPi, people can simply
-install it with either with pip or with easy_install::
+Documentation
+=============
 
-    pip scikit-example
-    easy_install scikit-example
-
-If you don't want to install as an egg, but from the sources::
-
-    easy_install -eNb example scikit-example
-
-Will download the most recent sources, and extract them into the example
-directory.
-
+The doumentation is available here:
+https://scikit-activeml.readthedocs.io

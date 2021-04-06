@@ -1,14 +1,13 @@
 import unittest
-import numpy as np
-
 from copy import deepcopy
+
+import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils.estimator_checks import check_estimator
 
 from skactiveml import classifier
-from skactiveml.utils import initialize_class_with_kwargs
+from skactiveml.utils import call_func
 
 
 class TestClassifier(unittest.TestCase):
@@ -25,10 +24,10 @@ class TestClassifier(unittest.TestCase):
         self.y[200:, 1] = self.missing_label
         self.y_missing_label = np.full_like(self.y, self.missing_label)
         self.estimator = GaussianNB()
-        pwc = classifier.CMM(missing_label=self.missing_label, random_state=0)
+        cmm = classifier.CMM(missing_label=self.missing_label, random_state=0)
         gnb = classifier.SklearnClassifier(GaussianNB(),
                                            missing_label=self.missing_label)
-        self.estimators = [('PWC', pwc), ('GaussianNB', gnb)]
+        self.estimators = [('CMM', cmm), ('GaussianNB', gnb)]
 
         # Build dictionary of attributes.
         self.classifiers = {}
@@ -42,19 +41,17 @@ class TestClassifier(unittest.TestCase):
 
     def _test_classifier(self, clf):
         # Test classifier without fitting.
-        clf_mdl = initialize_class_with_kwargs(self.classifiers[clf],
-                                               estimator=self.estimator,
-                                               estimators=self.estimators,
-                                               classes=self.classes,
-                                               missing_label=
-                                               self.missing_label,
-                                               voting='soft',
-                                               random_state=0)
+        clf_mdl = call_func(self.classifiers[clf],
+                            estimator=self.estimator,
+                            estimators=self.estimators,
+                            classes=self.classes,
+                            missing_label=self.missing_label,
+                            voting='soft',
+                            random_state=0)
         clf_mdl_copy = deepcopy(clf_mdl)
         clf_mdl_copy.classes = None
         if isinstance(clf_mdl_copy, classifier.MultiAnnotClassifier):
             clf_mdl_copy.estimators = [clf_mdl_copy.estimators[1]]
-        check_estimator(clf_mdl_copy)
         self.assertRaises(ValueError, clf_mdl.fit, X=[], y=[])
         clf_mdl.fit(X=self.X, y=self.y_missing_label)
         score = clf_mdl.score(self.X, self.y_true)
@@ -81,13 +78,12 @@ class TestClassifier(unittest.TestCase):
             self.assertTrue(np.sum(F) > 0)
 
         # Training on data with only missing labels.
-        clf_mdl = initialize_class_with_kwargs(self.classifiers[clf],
-                                               estimator=self.estimator,
-                                               estimators=self.estimators,
-                                               classes=self.classes,
-                                               missing_label=
-                                               self.missing_label,
-                                               voting='soft',
-                                               random_state=0)
+        clf_mdl = call_func(self.classifiers[clf],
+                            estimator=self.estimator,
+                            estimators=self.estimators,
+                            classes=self.classes,
+                            missing_label=self.missing_label,
+                            voting='soft',
+                            random_state=0)
         clf_mdl.fit(X=self.X, y=self.y_missing_label)
         self.assertEqual(clf_mdl.score(self.X, self.y_true), score)

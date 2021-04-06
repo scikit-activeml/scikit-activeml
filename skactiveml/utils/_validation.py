@@ -1,12 +1,14 @@
-import numpy as np
-
+import copy
 from collections.abc import Iterable
+
+import numpy as np
+import sklearn
+import warnings
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
 # Define constant for missing label used throughout the package.
 MISSING_LABEL = np.nan
-
 
 
 def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
@@ -108,7 +110,7 @@ def check_missing_label(missing_label, target_type=None, name=None):
             "'missing_label' has type '{}', but must be a either a number, "
             "a string, np.nan, or None.".format(type(missing_label)))
     if target_type is not None:
-        is_object_type = np.issubdtype(target_type, np.object)
+        is_object_type = np.issubdtype(target_type, np.object_)
         is_character_type = np.issubdtype(target_type, np.character)
         is_number_type = np.issubdtype(target_type, np.number)
         if (is_character_type and is_number) or (
@@ -143,7 +145,8 @@ def check_classes(classes):
                 types))
 
 
-def check_cost_matrix(cost_matrix, n_classes):
+def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
+                      contains_non_zero=False, diagonal_is_zero=False):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
 
     Parameters
@@ -152,6 +155,15 @@ def check_cost_matrix(cost_matrix, n_classes):
         Cost matrix.
     n_classes : int
         Number of classes.
+    only_non_negative : bool, optional (default=True)
+        This parameter determines whether the matrix must contain only non
+        negative cost entries.
+    contains_non_zero : bool, optional (default=True)
+        This parameter determines whether the matrix must contain at least on
+        non-zero cost entry.
+    diagonal_is_zero : bool, optional (default=True)
+        This parameter determines whether the diagonal cost entries must be
+        zero.
 
     Returns
     -------
@@ -165,10 +177,40 @@ def check_cost_matrix(cost_matrix, n_classes):
         raise ValueError(
             "'cost_matrix' must have shape ({}, {}). "
             "Got {}.".format(n_classes, n_classes, cost_matrix_new.shape))
+    if np.sum(cost_matrix_new < 0) > 0:
+        if only_non_negative:
+            raise ValueError(
+                "'cost_matrix' must contain only non-negative cost entries."
+            )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains negative cost entries."
+            )
+    if n_classes != 1 and np.sum(cost_matrix_new != 0) == 0:
+        if contains_non_zero:
+            raise ValueError(
+                    "'cost_matrix' must contain at least one non-zero cost "
+                    "entry."
+                )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains contains no non-zero cost entry."
+            )
+    if np.sum(np.diag(cost_matrix_new) != 0) > 0:
+        if diagonal_is_zero:
+            raise ValueError(
+                "'cost_matrix' must contain only cost entries being zero on "
+                "its diagonal."
+            )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains non-zero cost entries on its diagonal."
+            )
     return cost_matrix_new
 
 
-def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, accept_large_sparse=True,
+def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
+              accept_sparse=False, *, accept_large_sparse=True,
               dtype="numeric", order=None, copy=False, force_all_finite=True,
               ensure_2d=True, allow_nd=False, multi_output=False,
               allow_nan=None, ensure_min_samples=1, ensure_min_features=1,
@@ -195,6 +237,9 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
 
     sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights.
+
+    sample_weight_cand : array-like of shape (n_candidates,) (default=None)
+            Sample weights of the candidates.
 
     accept_sparse : string, boolean or list of string (default=False)
         String[s] representing allowed sparse matrix formats, such as 'csc',
@@ -282,6 +327,17 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
 
     y_converted : object
         The converted and validated y.
+
+    X_cand : object
+        The converted and validated X_cand
+        Only returned if X_cand is not None.
+
+    sample_weight : np.ndarray
+        The converted and validated sample_weight.
+
+    sample_weight_cand : np.ndarray
+        The converted and validated sample_weight_cand.
+        Only returned if X_cand is not None.
     """
     if y is None:
         raise ValueError("y cannot be None")
@@ -320,17 +376,55 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, accept_sparse=False, *, acc
             raise ValueError("The number of features of X_cand does not match"
                              "the number of features of X")
 
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-        check_consistent_length(y, sample_weight)
-        if y.ndim > 1 and y.shape[1] > 1 or \
-                sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
-            check_consistent_length(y.T, sample_weight.T)
+        if sample_weight_cand is None:
+            sample_weight_cand = np.ones(len(X_cand))
+        sample_weight_cand = check_array(sample_weight_cand, ensure_2d=False)
+        check_consistent_length(X_cand, sample_weight_cand)
 
-    if sample_weight is not None and X_cand is None:
+    if sample_weight is None:
+        sample_weight = np.ones(y.shape)
+
+    sample_weight = check_array(sample_weight, ensure_2d=False)
+    check_consistent_length(y, sample_weight)
+    if y.ndim > 1 and y.shape[1] > 1 or \
+            sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
+        check_consistent_length(y.T, sample_weight.T)
+
+    if X_cand is None:
         return X, y, sample_weight
-    if sample_weight is None and X_cand is not None:
-        return X, y, X_cand
-    if sample_weight is not None and X_cand is not None:
-        return X, y, X_cand, sample_weight
-    return X, y
+    else:
+        return X, y, X_cand, sample_weight, sample_weight_cand
+
+
+def check_random_state(random_state, seed_multiplier=None):
+    """Checks validity of random state and creates a new random state for
+    a given seed multiplier.
+
+    Parameters
+    ----------
+    random_state : None | int | instance of RandomState
+        If random_state is None, return the RandomState singleton used by
+        np.random.
+        If seed is an int, return a new RandomState.
+        If seed is already a RandomState instance, return it.
+        Otherwise raise ValueError.
+    seed_multiplier : None | int, optional (default=None)
+        If the random_state and seed_multiplier are not None, the seed
+        multiplier is multiplied with the seed of the random_state.
+
+    Returns
+    -------
+    random_state: instance of RandomState
+        The validated random state.
+    """
+    if random_state is None or seed_multiplier is None:
+        return sklearn.utils.check_random_state(random_state)
+
+    check_scalar(seed_multiplier, name='seed_multiplier', target_type=int,
+                 min_val=1)
+    random_state = copy.deepcopy(random_state)
+    random_state = sklearn.utils.check_random_state(random_state)
+
+    seed = (random_state.randint(2**31)*seed_multiplier) % (2**31)
+    return np.random.RandomState(seed)
+

@@ -5,13 +5,12 @@ Parzen Window Classifier
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
-
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted, check_scalar
 
-from ..utils import MISSING_LABEL, compute_vote_vectors
 from ..base import ClassFrequencyEstimator
+from ..utils import MISSING_LABEL, compute_vote_vectors
 
 
 class PWC(ClassFrequencyEstimator):
@@ -29,12 +28,18 @@ class PWC(ClassFrequencyEstimator):
     missing_label : {scalar, string, np.nan, None}, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] indicating cost of predicting class
-        classes[j]  for a sample of class classes[i]. Can be only set, if
+        Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
+        `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
         classes is not none.
-    metric : str,
+    class_prior : float | array-like, shape (n_classes), optional (default=0)
+        Prior observations of the class frequency estimates. If `class_prior`
+        is an array, the entry `class_prior[i]` indicates the non-negative
+        prior number of samples belonging to class `classes_[i]`. If
+        `class_prior` is a float, `class_prior` indicates the non-negative
+        prior number of samples per class.
+    metric : str | callable,
         The metric must a be a valid kernel defined by the function 
-        sklearn.metrics.pairwise.pairwise_kernels.
+        `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int,
         Number of nearest neighbours. Default is None, which means all 
         available samples are considered.
@@ -45,32 +50,37 @@ class PWC(ClassFrequencyEstimator):
     ----------
     classes_ : array-like, shape (n_classes)
         Holds the label for each class after fitting.
-    cost_matrix_ : array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix_[i,j] indicating cost of predicting class
-        classes_[j] for a sample of class classes_[i].
+    class_prior : np.ndarray, shape (n_classes)
+        Prior observations of the class frequency estimates. The entry
+        `class_prior_[i]` indicates the non-negative prior number of samples
+        belonging to class `classes_[i]`.
+    cost_matrix_ : np.ndarray, shape (classes, classes)
+        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+        class `classes_[j]` for a sample of class `classes_[i]`.
     X_ : array-like, shape (n_samples, n_features)
         The sample matrix X is the feature matrix representing the samples.
     V_ : array-like, shape (n_samples, classes)
-        The class labels are represented by counting vectors. An entry V[i,j] 
+        The class labels are represented by counting vectors. An entry `V[i,j]`
         indicates how many class labels of class j were provided for training 
-        sample i.
+        sample `X_[i]`.
 
     References
     ----------
-    O. Chapelle, "Active Learning for Parzen Window Classifier",
-    Proceedings of the Tenth International Workshop Artificial Intelligence and
-    Statistics, 2005.
+    [1] O. Chapelle, "Active Learning for Parzen Window Classifier",
+        Proceedings of the Tenth International Workshop Artificial Intelligence
+        and Statistics, 2005.
     """
     METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
     def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
-                 classes=None, missing_label=MISSING_LABEL,  cost_matrix=None,
-                 random_state=None):
+                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
+                 class_prior=0.0, random_state=None):
         super().__init__(classes=classes, missing_label=missing_label,
                          cost_matrix=cost_matrix, random_state=random_state)
+        self.class_prior = class_prior
         self.metric = metric
         self.n_neighbors = n_neighbors
-        self.metric_dict = metric_dict if metric_dict is not None else {}
+        self.metric_dict = metric_dict
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -93,11 +103,11 @@ class PWC(ClassFrequencyEstimator):
             The PWC is fitted on the training data.
         """
         # Check input parameters.
-        X, y, sample_weight = self._validate_input(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         # Check whether metric is available.
-        if self.metric not in PWC.METRICS:
-            raise ValueError("The parameter 'metric' must be "
+        if self.metric not in PWC.METRICS and not callable(self.metric):
+            raise ValueError("The parameter 'metric' must be callable or "
                              "in {}".format(KERNEL_PARAMS.keys()))
 
         # Check number of neighbors which must be a positive integer.
@@ -106,7 +116,9 @@ class PWC(ClassFrequencyEstimator):
                          target_type=int)
 
         # Ensure that metric_dict is a Python dictionary.
-        if not isinstance(self.metric_dict, dict):
+        self.metric_dict_ = self.metric_dict if self.metric_dict is not None \
+            else {}
+        if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
         self._check_n_features(X, reset=True)
@@ -148,7 +160,7 @@ class PWC(ClassFrequencyEstimator):
         else:
             self._check_n_features(X, reset=False)
             K = pairwise_kernels(X, self.X_, metric=self.metric,
-                                 **self.metric_dict)
+                                 **self.metric_dict_)
 
         # computing class frequency estimates
         if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:
