@@ -76,7 +76,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
             raise TypeError(
-                "The given Strategy must be a SingleAnnotStreamBasedQueryStrategy"
+                "The given Strategy must be a "
+                "SingleAnnotStreamBasedQueryStrategy"
             )
 
         # check X-Values are assignable
@@ -84,6 +85,15 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         if not np.all(np.sum(A_cand, axis=1) > 0):
             raise ValueError(
                 "Some X-Values are not assignable to an annotator"
+            )
+
+        # check if A_cand number of samples equals X_cand number of samples
+
+        if A_cand.shape[0] != X_cand.shape[0]:
+            raise ValueError(
+                "A_cand.shape[0] has to equal X_cand.shape[0]"
+                "A_cand.shape[0] equals: " + A_cand.shape[0] +
+                "X_cand.shpae[0] equals: " + X_cand.shape[0]
             )
 
         # check random state
@@ -98,8 +108,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         if n_samples < batch_size:
             warnings.warn(
-                "batch_size was greater than number of samples"
-                "batch_size is reduced to number of samples"
+                "batch_size was greater than number of samples."
+                "batch_size: " + batch_size + "samples: " + n_samples +
+                "batch_size is reduced to number of samples."
             )
             batch_size = n_samples
 
@@ -111,11 +122,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             if isinstance(y, np.ndarray) and isinstance(y, np.ndarray):
                 if y.ndim > 2:
                     raise ValueError(
-                        "The entries of args[0] and args[1] are interpreted as follows:"
-                        "args[0] is the labeling pool and args[1] is either the labels-vector"
-                        "of the labeling pool or the labels-annotator-matrix, where the"
-                        "entry at the i-th row and the j-th column, says that, the j-th"
-                        "annotator labeled the i-th data point with the given entry."
+                        "The entries of args[0] and args[1] are interpreted as "
+                        "follows: args[0] is the labeling pool and args[1] is "
+                        "either the labels-vector of the labeling pool or the "
+                        "labels-annotator-matrix, where the entry at the i-th "
+                        "row and the j-th column, says that, the j-th "
+                        "annotator labeled the i-th data point with the given "
+                        "entry. Thereby the dimension of y has to be smaller "
+                        "or equal than 2."
                     )
                 if y.ndim == 2:
                     if y.shape[1] != A_cand.shape[1]:
@@ -130,42 +144,49 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                         args_list[1] = vote_vector
                         args = tuple(args_list)
 
-        if return_utilities:
-            single_query_indices, utilities = self.strategy.query(X_cand, *args, batch_size,
-                                                                  return_utilities, **kwargs)
-        else:
-            single_query_indices = self.strategy.query(X_cand, *args, batch_size,
-                                                       return_utilities, **kwargs)
+        re_val = self.strategy.query(X_cand, *args, batch_size=batch_size,
+                                     return_utilities=True, **kwargs)
+        single_query_indices, utilities = re_val
 
-        # get available random query annotators
+        return self._query_available_annotators(A_cand, batch_size, utilities,
+                                                single_query_indices,
+                                                return_utilities)
 
-        query_indices = self._query_available_annotators(A_cand, batch_size,
-                                                         single_query_indices, random_state)
+    def _query_available_annotators(self, A_cand, batch_size,
+                                    candidate_utilities, single_query_indices,
+                                    return_utilities):
 
-        if return_utilities:
-            return query_indices, utilities
-
-        else:
-            return query_indices
-
-    @staticmethod
-    def _query_available_annotators(A_cand, batch_size, single_query_indices,
-                                    random_state):
+        random_state = check_random_state(self.random_state)
 
         n_annotators = A_cand.shape[1]
+        n_samples = A_cand.shape[0]
 
-        cand_off_indices = np.repeat(np.arange(1, n_annotators + 1)
-                                     .reshape(1, n_annotators), batch_size, axis=0)
+        # prepare candidate_utilities
+        candidate_utilities = candidate_utilities\
+            .reshape((batch_size, n_samples, 1)).repeat(n_annotators, axis=2)
 
-        avail_cand_off_indices = A_cand[single_query_indices] * cand_off_indices
-        sorted_avail_cand_off_indices = -np.sort(-avail_cand_off_indices)
-        num_avail_cand = np.sum(A_cand[single_query_indices], axis=1)
-        distribution = num_avail_cand * random_state.rand(batch_size)
-        choose_array = distribution.astype(int)
-        query_cand_off_indices = sorted_avail_cand_off_indices[np.arange(batch_size), choose_array]
-        query_cand_indices = query_cand_off_indices - 1
+        # prepare annotator_utilities and get annotator indices
+        annotator_utilities = random_state.rand(batch_size, n_annotators)
+        u_a_indices = np.where(np.logical_not(A_cand[single_query_indices]))
+        annotator_utilities[u_a_indices] = -1
 
-        query_indices = np.concatenate((single_query_indices.reshape(batch_size, 1),
-                                        query_cand_indices.reshape(batch_size, 1)), axis=1)
+        query_annotator_indices = annotator_utilities.argmax(axis=1)
 
-        return query_indices
+        annotator_utilities[np.where(annotator_utilities < 0)] = np.nan
+        annotator_utilities = annotator_utilities\
+            .reshape(batch_size, 1, n_annotators).repeat(n_samples, axis=1)
+
+        # combine utilities by multiplication
+        utilties = candidate_utilities * annotator_utilities
+
+        # get candidate annotator pair indices
+        query_indices = np.concatenate((single_query_indices
+                                        .reshape(batch_size, 1),
+                                        query_annotator_indices
+                                        .reshape(batch_size, 1)),
+                                       axis=1)
+
+        if return_utilities:
+            return query_indices, utilties
+        else:
+            return query_indices
