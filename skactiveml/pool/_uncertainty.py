@@ -11,6 +11,7 @@ from sklearn.utils import check_array
 
 from ..base import SingleAnnotPoolBasedQueryStrategy,\
     SkactivemlClassifier
+from ..classifier import PWC
 from ..utils import check_cost_matrix, simple_batch, check_classes, \
     ExtLabelEncoder
 
@@ -59,6 +60,10 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
     _methods = ['margin_sampling', 'least_confident', 'entropy']
+    _examples = {'params_init':{'clf':PWC(), 'method':'margin_sampling', 'cost_matrix':None,
+                 'random_state':None},'params_query':{}}
+
+
 
     def __init__(self, clf, method='margin_sampling', cost_matrix=None,
                  random_state=None):

@@ -9,6 +9,8 @@ Contents:
    developers_guide
    api_reference
    strategy_summary
+   generate_examples
+   generate_examples.rstUncertaintySampling.rst
 
 Indices and tables
 ==================

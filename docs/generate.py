@@ -1,6 +1,16 @@
 import numpy as np
 
 from skactiveml import pool, classifier, utils#, stream TODO uncomment for stream
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LogisticRegression
+from sklearn.datasets import make_classification
+from skactiveml.pool import UncertaintySampling
+from skactiveml.utils import is_unlabeled, MISSING_LABEL, plot_2d_dataset
+from skactiveml.classifier import SklearnClassifier
+from sklearn.metrics import accuracy_score
+import warnings
+warnings.filterwarnings("ignore")
+
 
 
 def generate_api_reference_rst(path):
@@ -128,9 +138,48 @@ def get_table_data(package):
     return data
 
 
-def generate_examples(path):
-    pass
+def generate_examples(path,package):
+    query_strategies = {}
+    for qs_name in package.__all__:
+        query_strategies[qs_name] = getattr(package, qs_name)
+    for qs_name, strat in query_strategies.items():
+        if hasattr(strat, '_examples'):
+            params_init = strat._examples['params_init']
+            params_query = strat._examples['params_query']
+            title = qs_name
+            path += '\\'+qs_name+'.rst'
+            print(path)
+            generate_example_rst(path,params_init,params_query,qs_name,title=title)
 
 
-def generate_example_rst(params, str):
-    pass
+
+
+
+
+
+def generate_example_rst(path,params_init,params_query,qs_name,title='Examplery Cycles'):
+    with open(path, 'w') as file:
+        file.write('{}\n'.format(title))
+        file.write('=====================================================\n')
+        file.write('\n')
+        file.write('.. toctree::\n')
+        file.write('\n')
+        file.write('The examplery cycles for different strategies are explained here.\n')
+        file.write('\n')
+        file.write('.. code-block:: python\n')
+        file.write('\n')
+        file.write('    X, y_true = make_classification(n_features=2, n_redundant=0, random_state=0)\n')
+        file.write('    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
+        file.write('    clf = SklearnClassifier(LogisticRegression(),  classes=np.unique(y_true))\n')
+        file.write('    qs = {}({})\n'.format(qs_name,params_init))
+        file.write('    n_cycles = 20\n')
+        file.write('    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
+        file.write('    for c in range(n_cycles):\n')
+        file.write('            unlbld_idx = np.where(is_unlabeled(y))[0]\n')
+        file.write('            X_cand = X[unlbld_idx]\n')
+        file.write('            query_idx = unlbld_idx[qs.query(X_cand, X, y, {})]\n'.format(params_query))
+        file.write('            y[query_idx] = y_true[query_idx]\n')
+        file.write('            clf.fit(X, y)\n')
+        file.write('            X_cand = X[unlbld_idx]\n')
+
+
