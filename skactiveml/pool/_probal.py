@@ -337,8 +337,8 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             )
 
         # check class priors
-        prior_cand = check_class_prior(self.prior_cand)
-        prior_eval = check_class_prior(self.prior_eval)
+        prior_cand = check_class_prior(self.prior_cand, len(self.clf.classes))
+        prior_eval = check_class_prior(self.prior_eval, len(self.clf.classes))
 
         # TODO X, y will be tested by clf when is fitted; X_cand, X equal num features
         # CHECK X_eval will be tested by clf when predicted
