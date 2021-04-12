@@ -1291,8 +1291,7 @@ class TestXPAL(unittest.TestCase):
                        cost_matrix=np.array([[0, 1], [1, 0]]))
         self.assertAlmostEqual(dperf, (0.8 - 0.2) / 2)
 
-        def perf_func(matrix):
-            return 1
+        def perf_func(matrix): return 1
         dperf = _dperf(probs=np.array([[0.2, 0.8], [0.6, 0.4]]),
                        pred_old=np.array([0, 0]),
                        pred_new=np.array([1, 0]),
@@ -1300,6 +1299,36 @@ class TestXPAL(unittest.TestCase):
                        decomposable=False,
                        perf_func=perf_func)
         self.assertEqual(dperf, 0)
+
+        probs = np.array([[0.2, 0.8], [0.6, 0.4], [0.7, 0.3]])
+        pred_old = np.array([1, 1, 1])
+        pred_new = np.array([1, 0, 0])
+        n_classes = probs.shape[1]
+        conf_mat_old = np.zeros([n_classes, n_classes])
+        conf_mat_new = np.zeros([n_classes, n_classes])
+
+        def perf_func(confusion_matrix):
+            performance = 0
+            for a in range(n_classes):
+                for b in range(n_classes):
+                    if a != b:
+                        performance += confusion_matrix[a, b]
+            return performance
+
+        dperf = _dperf(probs=probs,
+                       pred_old=pred_old,
+                       pred_new=pred_new,
+                       sample_weight_eval=np.ones(len(probs)),
+                       decomposable=False,
+                       perf_func=perf_func)
+
+        for i, probability in enumerate(probs):
+            for y in range(n_classes):
+                conf_mat_old[y, pred_old[i]] += probability[y]
+                conf_mat_new[y, pred_new[i]] += probability[y]
+        difference = perf_func(conf_mat_new) - perf_func(conf_mat_old)
+
+        self.assertEqual(dperf, difference)
 
 
 if __name__ == '__main__':
