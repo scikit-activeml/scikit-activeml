@@ -336,10 +336,6 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                 sample_weight_eval, batch_size, return_utilities
             )
 
-        # check class priors
-        prior_cand = check_class_prior(self.prior_cand, len(self.clf.classes))
-        prior_eval = check_class_prior(self.prior_eval, len(self.clf.classes))
-
         # TODO X, y will be tested by clf when is fitted; X_cand, X equal num features
         # CHECK X_eval will be tested by clf when predicted
 
@@ -371,10 +367,20 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             _transform_scoring(self.scoring, self.cost_vector, self.cost_matrix,
                                self.custom_perf_func, n_classes=n_classes)
 
-        # TODO self.prior_cand, self.prior_eval, if prior is vector, use the vector instead
-        opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
-        self._prior_cand = self.prior_cand * opt_prior
-        self._prior_eval = self.prior_eval * opt_prior
+        # check class priors
+        if np.isscalar(self.prior_cand):
+            opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
+            prior_cand = self.prior_cand * opt_prior
+        else:
+            prior_cand = self.prior_cand
+        self.prior_cand_ = check_class_prior(prior_cand, n_classes)
+
+        if np.isscalar(self.prior_eval):
+            opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
+            prior_eval = self.prior_eval * opt_prior
+        else:
+            prior_eval = self.prior_eval
+        self.prior_eval_ = check_class_prior(prior_eval, n_classes)
 
         #self.estimator_metric, self.estimator_metric_dict
         if self.estimator_metric_dict is None:
@@ -454,11 +460,11 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         # INITIALIZE PROB ESTIMATION
         cand_prob_est = PWC(metric="precomputed", classes=classes,
                             missing_label=missing_label,
-                            class_prior=self._prior_cand,
+                            class_prior=self.prior_cand_,
                             random_state=random_state)
         eval_prob_est = PWC(metric="precomputed", classes=classes,
                             missing_label=missing_label,
-                            class_prior=self._prior_eval,
+                            class_prior=self.prior_eval_,
                             random_state=random_state)
 
         # CODE

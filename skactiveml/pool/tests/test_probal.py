@@ -232,13 +232,13 @@ class TestXPAL(unittest.TestCase):
         self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_cand=None)
-        self.assertRaises(TypeError, selector.query, **self.args)
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_cand=[[1, 2], [1, 2]])
-        self.assertRaises(TypeError, selector.query, **self.args)
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_cand=[1, 2, 3])  # clf.n_classes=2
-        self.assertRaises(TypeError, selector.query, **self.args)
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'prior_cand'))
 
@@ -247,13 +247,13 @@ class TestXPAL(unittest.TestCase):
         self.assertRaises(TypeError, selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_eval=None)
-        self.assertRaises(TypeError, selector.query, **self.args)
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_eval=[[1, 2], [1, 2]])
-        self.assertRaises(TypeError, selector.query, **self.args)
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args)
 
         selector = XPAL(clf=self.clf, prior_eval=[1, 2, 3])  # clf.n_classes=2
-        self.assertRaises(TypeError, selector.query, **self.args)
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args)
 
         self.assertTrue(hasattr(selector, 'prior_eval'))
 
@@ -476,7 +476,7 @@ class TestXPAL(unittest.TestCase):
 
     def test_query_param_sample_weight_cand(self):
         selector = XPAL(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.args,
+        self.assertRaises((TypeError, ValueError), selector.query, **self.args,
                           sample_weight_cand='string',
                           sample_weight=np.ones(len(self.X)))
         self.assertRaises(ValueError, selector.query, **self.args,
@@ -494,7 +494,7 @@ class TestXPAL(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         selector = XPAL(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.args,
+        self.assertRaises(ValueError, selector.query, **self.args,
                           sample_weight='string',
                           sample_weight_cand=np.ones(len(self.X_cand)))
         self.assertRaises(ValueError, selector.query, **self.args,
