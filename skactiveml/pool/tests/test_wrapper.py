@@ -17,8 +17,8 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 0, 1, 1])
         self.classes = np.array([0, 1])
-        self.A_cand = np.array([[True, True],
-                                [False, True],
+        self.A_cand = np.array([[False, True],
+                                [True, True],
                                 [True, False]])
 
     def test_query(self):

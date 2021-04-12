@@ -109,7 +109,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         if n_samples < batch_size:
             warnings.warn(
                 "batch_size was greater than number of samples."
-                "batch_size: " + batch_size + "samples: " + n_samples +
+                "batch_size: "+str(batch_size)+" samples: "+str(n_samples) +
                 "batch_size is reduced to number of samples."
             )
             batch_size = n_samples
@@ -166,18 +166,18 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             .reshape((batch_size, n_samples, 1)).repeat(n_annotators, axis=2)
 
         # prepare annotator_utilities and get annotator indices
-        annotator_utilities = random_state.rand(batch_size, n_annotators)
-        u_a_indices = np.where(np.logical_not(A_cand[single_query_indices]))
-        annotator_utilities[u_a_indices] = -1
+        annotator_utilities = random_state.rand(n_samples, n_annotators)
+        annotator_utilities[np.where(np.logical_not(A_cand))] = -1
 
-        query_annotator_indices = annotator_utilities.argmax(axis=1)
+        query_annotator_indices = annotator_utilities[single_query_indices, :]\
+            .argmax(axis=1)
 
-        annotator_utilities[np.where(annotator_utilities < 0)] = np.nan
+        annotator_utilities[np.where(np.logical_not(A_cand))] = np.nan
         annotator_utilities = annotator_utilities\
-            .reshape(batch_size, 1, n_annotators).repeat(n_samples, axis=1)
+            .reshape(1, n_samples, n_annotators).repeat(batch_size, axis=0)
 
         # combine utilities by multiplication
-        utilties = candidate_utilities * annotator_utilities
+        utilities = candidate_utilities * annotator_utilities
 
         # get candidate annotator pair indices
         query_indices = np.concatenate((single_query_indices
@@ -187,6 +187,6 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                                        axis=1)
 
         if return_utilities:
-            return query_indices, utilties
+            return query_indices, utilities
         else:
             return query_indices
