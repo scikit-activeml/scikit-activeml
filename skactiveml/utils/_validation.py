@@ -397,20 +397,20 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
 
 
 def check_random_state(random_state, seed_multiplier=None):
-    """Checks validity of random state and creates a new random state for
-    a given seed multiplier.
+    """Check validity of the given random state.
 
     Parameters
     ----------
     random_state : None | int | instance of RandomState
         If random_state is None, return the RandomState singleton used by
         np.random.
-        If seed is an int, return a new RandomState.
-        If seed is already a RandomState instance, return it.
+        If random_state is an int, return a new RandomState.
+        If random_state is already a RandomState instance, return it.
         Otherwise raise ValueError.
     seed_multiplier : None | int, optional (default=None)
-        If the random_state and seed_multiplier are not None, the seed
-        multiplier is multiplied with the seed of the random_state.
+        If the random_state and seed_multiplier are not None, draw a new int
+        from the random state, multiply it with the multiplier, and use the
+        product as the seed of a new random state.
 
     Returns
     -------
@@ -425,6 +425,6 @@ def check_random_state(random_state, seed_multiplier=None):
     random_state = copy.deepcopy(random_state)
     random_state = sklearn.utils.check_random_state(random_state)
 
-    seed = (random_state.randint(2**31)*seed_multiplier) % (2**31)
+    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
     return np.random.RandomState(seed)
 
