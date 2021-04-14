@@ -180,6 +180,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 class_indices = np.asarray(self.estimator_.classes_, dtype=int)
                 P_ext[:, class_indices] = P
                 P = P_ext
+            if np.any(np.isnan(P)):
+                raise ValueError
             return P
         except Exception:
             if sum(self._label_counts) == 0:
@@ -220,6 +222,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if sample_weight is not None:
                 sample_weight = sample_weight.ravel()
         is_lbld = ~np.isnan(y)
+        self._label_counts = [np.sum(y[is_lbld] == c) for c in
+                              range(len(self._le.classes_))]
         try:
             if not has_fit_parameter(self.estimator,
                                      'sample_weight') or sample_weight is None:
@@ -246,8 +250,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.is_fitted_ = True
         except Exception:
             self.is_fitted_ = False
-            self._label_counts = [np.sum(y[is_lbld] == c) for c in
-                                  range(len(self._le.classes_))]
         return self
 
     def __getattr__(self, item):
