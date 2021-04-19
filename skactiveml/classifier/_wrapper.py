@@ -180,19 +180,20 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 class_indices = np.asarray(self.estimator_.classes_, dtype=int)
                 P_ext[:, class_indices] = P
                 P = P_ext
-            return P
+            if not np.any(np.isnan(P)):
+                return P
+
+        warnings.warn("Since the 'base_estimator' could not be fitted when"
+                      " calling the `fit` method, the class label "
+                      "distribution`_label_counts={}` is used to make "
+                      "the predictions."
+                      .format(self._label_counts))
+        if sum(self._label_counts) == 0:
+            return np.ones([len(X), len(self.classes_)]) / len(
+                self.classes_)
         else:
-            warnings.warn("Since the 'base_estimator' could not be fitted when"
-                          " calling the `fit` method, the class label "
-                          "distribution`_label_counts={}` is used to make "
-                          "the predictions."
-                          .format(self._label_counts))
-            if sum(self._label_counts) == 0:
-                return np.ones([len(X), len(self.classes_)]) / len(
-                    self.classes_)
-            else:
-                return np.tile(self._label_counts / np.sum(self._label_counts),
-                               [len(X), 1])
+            return np.tile(self._label_counts / np.sum(self._label_counts),
+                           [len(X), 1])
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
@@ -225,6 +226,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if sample_weight is not None:
                 sample_weight = sample_weight.ravel()
         is_lbld = ~np.isnan(y)
+        self._label_counts = [np.sum(y[is_lbld] == c) for c in
+                              range(len(self._le.classes_))]
         try:
             if not has_fit_parameter(self.estimator,
                                      'sample_weight') or sample_weight is None:
@@ -251,8 +254,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.is_fitted_ = True
         except Exception as e:
             self.is_fitted_ = False
-            self._label_counts = [np.sum(y[is_lbld] == c) for c in
-                                  range(len(self._le.classes_))]
             warnings.warn("The 'base_estimator' could not be fitted because of"
                           " '{}'. Therefore, the class labels of the samples "
                           "are counted and will be used to make predictions. "
