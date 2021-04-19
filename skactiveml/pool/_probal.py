@@ -363,9 +363,10 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # TODO self.metric, self.cost_vector, self.cost_matrix, self.custom_perf_func will be checked in _transform_metric
         # TODO: maybe return dperf function instead of 3 variables
-        scoring_decomposable, cost_matrix, perf_func = \
-            _transform_scoring(self.scoring, self.cost_vector, self.cost_matrix,
-                               self.custom_perf_func, n_classes=n_classes)
+        scoring_decomposable, cost_matrix, perf_func = _transform_scoring(
+            self.scoring, self.cost_matrix, self.cost_vector,
+            self.custom_perf_func, n_classes=n_classes
+        )
 
         # check class priors
         if np.isscalar(self.prior_cand):
