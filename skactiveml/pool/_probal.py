@@ -15,6 +15,7 @@ from skactiveml.utils import check_classifier_params, check_X_y, \
     ExtLabelEncoder, simple_batch, check_random_state
 from skactiveml.utils import rand_argmax, MISSING_LABEL, check_cost_matrix, \
     check_scalar, is_labeled
+from skactiveml.utils._validation import check_class_prior
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -148,15 +149,15 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             Deterministic classifier to be used.
         scoring: string
             "error"
-                equivalent to accuracy
             "cost-vector"
                 requires cost-vector
             "misclassification-loss"
                 requires cost-matrix
             "mean-abs-error"
             "macro-accuracy"
-                optional: TODO: prior_class_probability
             "f1-score"
+            "custom"
+                requires custom_perf_func
         cost_vector: array-like (n_classes)
             Vector denoting the misclassification cost of each class. Only
             used if scoring='cost-vector'.
@@ -227,7 +228,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         References
         ----------
-        [1] TODO: xpal arxiv, diss
+        D. Kottke, M. Herde, C. Sandrock, D. Huseljic, G. Krempl and B. Sick,
+        Toward Optimal Probabilistic Active Learning Using a Bayesian Approach,
+        arXiv:2006.01732 [cs.LG], 2020.
         """
         super().__init__(random_state=random_state)
 
@@ -247,72 +250,98 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self.nonmyopic_labels_equal = nonmyopic_labels_equal
         self.nonmyopic_independent_probs = nonmyopic_independent_probs
 
-    def _validate_input(self, X_cand, X, y, X_eval, batch_size, sample_weight,
-                        return_utilities):
+    def _validate_data(self, X, y, X_cand, X_eval, sample_weight,
+                       sample_weight_cand, sample_weight_eval, batch_size,
+                       return_utilities):
 
-        # init parameters
-        # TODO: implement and adapt, what happens if X_eval=self
-        # random_state = check_random_state(self.random_state, len(X_cand),
-        #                                   len(X_eval))
-        self._random_state = check_random_state(self.random_state)
-
-        check_classifier_params(self._classes, self._missing_label,
-                                self.cost_matrix)
-        check_scalar(self.prior_cand, target_type=float, name='prior_cand',
-                     min_val=0, min_inclusive=False)
-        check_scalar(self.prior_eval, target_type=float, name='prior_eval',
-                     min_val=0, min_inclusive=False)
-
-        self._batch_size = batch_size
-        check_scalar(self._batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        if len(X_cand) < self._batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    self._batch_size, len(X_cand)))
-            self._batch_size = len(X_cand)
+        X_cand, return_utilities, batch_size, random_state = \
+            super()._validate_data(X_cand, return_utilities, batch_size,
+                                   self.random_state, reset=True)
 
         # TODO: check if X_cand, X, X_eval have similar num_features
-        # TODO: check if X, y match
-        # TODO: check if weight match with X_cand
-        if sample_weight is None:
-            self.sample_weight_ = np.ones(len(X))
-        else:
-            self.sample_weight_ = sample_weight
-        # TODO: check if return_utilities is bool
+
+        # TODO warning if sample_weight_eval is given but X_eval not?
+        check_scalar(self.batch_labels_equal,
+                     name='batch_labels_equal', target_type=bool)
+        check_scalar(self.nonmyopic_independent_probs,
+                     name='nonmyopic_independent_probs', target_type=bool)
+        check_scalar(self.nonmyopic_labels_equal,
+                     name='nonmyopic_labels_equal', target_type=bool)
+
+        if self.cost_matrix is not None and \
+                self.cost_matrix.shape != (self.clf.classes, self.clf.classes):
+            # TODO: should be len(self.clf.classes) ?
+            raise ValueError('The given cost matrix does not '
+                             'fit to the given classes.')
+
+        X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
+            X, y, X_cand, sample_weight=sample_weight,
+            sample_weight_cand=sample_weight_cand, set_sample_weight=True)
+        if X_eval is not None:
+            X_eval, _, sample_weight_eval = check_X_y(
+                X_eval, np.ones(len(X_eval)), sample_weight=sample_weight_eval,
+                set_sample_weight=False)
+
+        return X, y, X_cand, X_eval, sample_weight, sample_weight_cand,\
+               sample_weight_eval, batch_size, return_utilities, random_state
 
     def query(self, X_cand, X, y, X_eval=None, batch_size=1,
               sample_weight_cand=None, sample_weight=None,
               sample_weight_eval=None, return_utilities=False, **kwargs):
-        """
+        """Query the next instance to be labeled.
 
-        Attributes
+        Parameters
         ----------
-        X: array-like (n_training_samples, n_features)
-            Labeled samples
-        y: array-like (n_training_samples)
-            Labels of labeled samples
-        X_cand: array-like (n_samples, n_features)
-            Unlabeled candidate samples
-        X_eval: array-like (n_samples, n_features) or string
-            Unlabeled evaluation samples
+        X_cand: array-like of shape (n_candidates, n_features)
+            The unlabeled pool from which to choose.
+        X: array-like of shape (n_samples, n_features)
+            The complete data set.
+        y: array-like of shape (n_samples)
+            The labels for the set X.
+        X_eval: array-like of shape (n_samples_eval, n_features),
+                optional (default=X_cand)
+            An unlabeled evaluation set used to estimate the performance of
+            the classifier. If it is 'None', the candidate set X_cand will be
+            used.
+        batch_size: int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        sample_weight_cand: array-like, shape (n_candidates),
+                            optional (default=None)
+            Weights for the candidate samples. Optional but necessary if
+            sample_weight is given.
+        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Weights for the labeled set X. Optional but necessary if
+            sample_weight_cand is given.
+        sample_weight_eval: array-like, shape (n_samples_eval),
+                            optional (default=None)
+            Weights for the evaluation set. Will be set to np.ones if it is
+            None.
+        return_utilities: bool, optional (default=False)
+            If True, the utilities are additionally returned.
+        kwargs: unused
+
+        Returns
+        -------
+        query_indices: np.ndarray, shape (batch_size)
+            The index of the queried instance.
+        utilities: np.ndarray, shape (batch_size, n_candidates)
+            The utilities of all instances in X_cand
+            (only returned if return_utilities is True).
         """
 
-        ### TEST query parameters
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
+        # validate query parameters
+        X, y, X_cand, X_eval, sample_weight, sample_weight_cand,\
+        sample_weight_eval, batch_size, return_utilities, random_state = \
+            self._validate_data(
+                X, y, X_cand, X_eval, sample_weight, sample_weight_cand,
+                sample_weight_eval, batch_size, return_utilities
+            )
 
         # TODO X, y will be tested by clf when is fitted; X_cand, X equal num features
         # CHECK X_eval will be tested by clf when predicted
 
-        # TODO sample_weight, sample_weight_cand, sample_weight_eval should have correct size
         # TODO what about classifiers that do not support sample_weight?
-        if sample_weight_cand is None:
-            sample_weight_cand = np.ones(len(X_cand))
-        if sample_weight is None:
-            sample_weight = np.ones(len(X))
+
         if sample_weight_eval is None:
             if X_eval is None:
                 sample_weight_eval = np.ones(len(X_cand))
@@ -335,15 +364,25 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
         # TODO self.metric, self.cost_vector, self.cost_matrix, self.custom_perf_func will be checked in _transform_metric
         # TODO: maybe return dperf function instead of 3 variables
-        scoring, cost_matrix, perf_func = \
-            _transform_scoring(self.scoring, self.cost_vector, self.cost_matrix,
-                               self.custom_perf_func, n_classes=n_classes)
-        scoring_decomposable = (scoring == 'misclassification-loss')
+        scoring_decomposable, cost_matrix, perf_func = _transform_scoring(
+            self.scoring, self.cost_matrix, self.cost_vector,
+            self.custom_perf_func, n_classes=n_classes
+        )
 
-        # TODO self.prior_cand, self.prior_eval, if prior is vector, use the vector instead
-        opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
-        self._prior_cand = self.prior_cand * opt_prior
-        self._prior_eval = self.prior_eval * opt_prior
+        # check class priors
+        if np.isscalar(self.prior_cand):
+            opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
+            prior_cand = self.prior_cand * opt_prior
+        else:
+            prior_cand = self.prior_cand
+        self.prior_cand_ = check_class_prior(prior_cand, n_classes)
+
+        if np.isscalar(self.prior_eval):
+            opt_prior = calculate_optimal_prior(n_classes, cost_matrix)
+            prior_eval = self.prior_eval * opt_prior
+        else:
+            prior_eval = self.prior_eval
+        self.prior_eval_ = check_class_prior(prior_eval, n_classes)
 
         #self.estimator_metric, self.estimator_metric_dict
         if self.estimator_metric_dict is None:
@@ -354,6 +393,18 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         if self.estimator_metric == 'rbf' and \
                 len(estimator_metric_dict) == 0:
             # TODO: include std, citations, check gamma-bandwidth transformation
+
+            def estimate_bandwidth(n_samples, n_features):
+                check_scalar(n_samples, name='n_samples', target_type=int,
+                             min_val=0)
+                check_scalar(n_features, name='n_features', target_type=int,
+                             min_val=1)
+                nominator = 2 * n_samples * n_features
+                denominator = (n_samples - 1) * np.log(
+                    (n_samples - 1) / ((np.sqrt(2) * 10 ** -6) ** 2))
+                bandwidth = np.sqrt(nominator / denominator)
+                return bandwidth
+
             bandwidth = estimate_bandwidth(X.shape[0], X.shape[1])
             estimator_metric_dict = {'gamma': 1/bandwidth}
 
@@ -388,35 +439,34 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                                             metric=self.estimator_metric,
                                             **estimator_metric_dict)
 
-
         # CALCULATING PRE-COMPUTED KERNELS FOR PROB ESTIMATION
         # TODO: sim_cand should have shape |X_| x |X_|
         if not self.nonmyopic_independent_probs or \
                 self.nonmyopic_neighbors == 'nearest':
             sim_cand = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1.e10)
+                                 idx_Y=idx_X_cand + idx_X_lbld, default=-1e10)
         else:
             sim_cand = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_lbld, default=-1.e10)
+                                 idx_Y=idx_X_lbld, default=-1e10)
 
         if X_eval is None:
             sim_eval = _calc_sim(K, X_, X_,
                                  idx_X=idx_X_cand,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1.e10)
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
         else:
             sim_eval = _calc_sim(K, X_eval, X_,
-                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1.e10)
+                                 idx_Y=idx_X_cand+idx_X_lbld, default=-1e10)
 
         # INITIALIZE PROB ESTIMATION
         cand_prob_est = PWC(metric="precomputed", classes=classes,
                             missing_label=missing_label,
-                            class_prior=self._prior_cand,
+                            class_prior=self.prior_cand_,
                             random_state=random_state)
         eval_prob_est = PWC(metric="precomputed", classes=classes,
                             missing_label=missing_label,
-                            class_prior=self._prior_eval,
+                            class_prior=self.prior_eval_,
                             random_state=random_state)
 
         # CODE
@@ -468,9 +518,9 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
             if self.batch_mode == 'greedy':
                 # calculate mean gain for non-myopic gains
-                M = min(self.nonmyopic_max_cand, len(X_cand))
-                iter_utilities = iter_utilities.reshape(-1, M)
-                iter_utilities /= np.arange(1, M + 1).reshape(-1, M)
+                M = min(self.nonmyopic_max_cand, len(idx_remaining))
+                iter_utilities = iter_utilities.reshape(len(idx_remaining), M)
+                iter_utilities /= np.arange(1, M + 1).reshape(1, M)
                 iter_utilities = np.nanmax(iter_utilities, axis=1)
 
                 utilities[i_iter, idx_remaining] = iter_utilities
@@ -513,7 +563,7 @@ def probabilistic_gain(clf, X, y, X_eval,
     # print(sim_cand.T)
     # print(sim_eval.T)
 
-    clf = clone(clf, safe=False) # Todo clone was missing, safe is necessary such that parameters are not necessarily refitted
+    clf = clone(clf, safe=False) # TODO: safe is necessary such that parameters are not necessarily refitted
 
     idx_cand_unique = \
         np.unique(list(itertools.chain(*idx_candlist_set))).tolist()
@@ -642,6 +692,7 @@ def probabilistic_gain(clf, X, y, X_eval,
 
 
 def _reduce_candlist_set(candidate_sets, reduce=False):
+    # TODO rename, idx_
     """Reduce the given list of candidate sets by deleting all redundant
     candidate sets (i.e., candidate sets that are contained multiple times in
     different order).
@@ -711,8 +762,7 @@ def _calc_sim(K, X, Y, idx_X=None, idx_Y=None, default=np.nan):
         idx_Y = np.arange(len(Y))
 
     similarity = np.full([len(X), len(Y)], default, float)
-
-    if len(idx_X) > 0 and len(idx_Y) > 0: #TODO
+    if len(idx_X) > 0 and len(idx_Y) > 0:
         similarity[np.ix_(idx_X, idx_Y)] = K(X[idx_X], Y[idx_Y])
     return similarity
 
@@ -770,112 +820,289 @@ def to_int_labels(est, X, y):
     est.classes = classes.astype(int)
     return est, y
 
-def _dependent_cand_prob(cand_idx, idx_train, idx_preselected,
+
+def _dependent_cand_prob(cand_idx, train_idx, preselected_idx,
                          X, y, sample_weight,
-                         y_sim_list, prob_y_sim_pre,
+                         label_simulations, prob_preselected,
                          prob_est, sim_cand):
-    prob_y_sim = prob_y_sim_pre
-    for i_y_sim, (y_sim_pre, y_sim_cand) in enumerate(y_sim_list):
+    """Calculate the probabilities for all given simulated label combinations.
+
+    Parameters
+    ----------
+    cand_idx: array-like, shape (n_candidates)
+        Indices of the candidates in X.
+    train_idx: array-like, shape (n_train_instances)
+        Indices of the training instances in X.
+    preselected_idx: array-like, shape (n_preselected)
+        Indices of the preselected instances in X.
+    X: array-like, shape (n_instances, n_features)
+        Array containing all instances.
+    y: array-like, shape (n_instances)
+        Array containing the the known labels of X.
+    sample_weight: array-like, shape (n_instances)
+        Sample weights for the instances in X.
+    label_simulations: array-like, shape (n_simulations)
+        List containing the simulated labels of the preselected instances and
+        the simulated candidates. Each entry is a tuple with shape
+        (n_preselected, n_candidates).
+    prob_preselected: array-like, shape (n_simulations)
+        Label probability of the preselected instances in each simulation in
+        y_sim_list.
+    prob_est: ClassFrequencyEstimator
+        Model implementing the methods 'fit' and and 'predict_proba'.
+    sim_cand: array-like, shape (n_instances, n_instances)
+        Similarities between the candidates, only has to be specified at the
+        indices [cand_idx, cand_idx].
+
+    Returns
+    -------
+    simulation_probability: np.ndarray, shape (n_simulations)
+        The probability for every simulation in label_simulations.
+
+    """
+    X = np.array(X)
+    y = np.array(y)
+    sample_weight = np.array(sample_weight)
+    preselected_idx = list(preselected_idx)
+    cand_idx = list(cand_idx)
+    train_idx = list(train_idx)
+
+    n_simulations = len(label_simulations)
+    if len(prob_preselected) != n_simulations:
+        raise ValueError(f"'n_simulations' is {n_simulations}, but "
+                         f"'prob_preselected' has length "
+                         f"{len(prob_preselected)}.")
+    n_candidates = len(cand_idx)
+    if len(label_simulations[0][1]) != n_candidates:
+        raise ValueError(f"'n_candidates' is {n_candidates}, but "
+                         f"the label simulations have "
+                         f"{len(label_simulations[0][1])} candidate(s).")
+
+    simulation_probability = np.array(prob_preselected, dtype=float)
+    for i_y_sim, (y_sim_pre, y_sim_cand) in enumerate(label_simulations):
 
         for i_y in range(len(y_sim_cand)):
-            idx_new = idx_preselected + cand_idx[:i_y] + idx_train
+            # Calculate the probability of y_sim_cand[i_y] given the training
+            # data, the preselected instances and the labels y_sim_cand[:i_y]
+            idx_new = preselected_idx + cand_idx[:i_y] + train_idx
             X_new = X[idx_new]
-            y_new = np.concatenate([y_sim_pre, y_sim_cand[:i_y], y[idx_train]],
+            y_new = np.concatenate([y_sim_pre, y_sim_cand[:i_y], y[train_idx]],
                                    axis=0)
             sample_weight_new = sample_weight[idx_new]
+            if len(idx_new) == 0:
+                continue
             prob_est.fit(X_new, y_new, sample_weight_new)
 
-            sim_new = \
-                sim_cand[cand_idx[i_y:i_y + 1],:][:, idx_new]
+            sim_new = sim_cand[cand_idx[i_y:i_y + 1], :][:, idx_new]
             prob_cand_y = prob_est.predict_proba(sim_new)
-            prob_y_sim[i_y_sim] *= prob_cand_y[0][y_sim_cand[i_y]]
-    return prob_y_sim
+            simulation_probability[i_y_sim] *= prob_cand_y[0][y_sim_cand[i_y]]
+    # Normalize array (necessary if there are no preselected instances and no
+    # training instances)
+    normalization = sum(simulation_probability)
+    simulation_probability = simulation_probability / normalization
+    return simulation_probability
+
 
 def _get_y_sim_list(classes, n_instances, labels_equal=True):
+    """Generate label combinations for the simulation.
+
+    Parameters
+    ----------
+    classes: array-like, shape (n_classes)
+        Array of all classes.
+    n_instances: int
+        Number of simulated instances.
+    labels_equal: bool
+        If true, all simulated labels are equal. Otherwise, all possible
+        combinations are generated.
+
+    Returns
+    -------
+    labels: list
+        Possible label combinations.
+    """
     if n_instances == 0:
         return [[]]
+    classes = np.asarray(classes, int)
+    if labels_equal:
+        labels = np.tile(np.asarray(classes), [n_instances, 1]).T.tolist()
     else:
-        classes = np.asarray(classes, int)
-        if labels_equal:
-            return (np.tile(np.asarray(classes), [n_instances, 1]).T).tolist()
-        else:
-            return [list(x) for x in itertools.product(classes, repeat=n_instances)]
+        product = itertools.product(classes, repeat=n_instances)
+        labels = [list(x) for x in product]
+    return labels
 
 
-def _transform_scoring(metric, cost_matrix, cost_vector, perf_func, n_classes):
-    # TODO warning if matrix/vector is given but not used?
-    if metric == 'error':
-        metric = 'misclassification-loss'
-        cost_matrix = 1 - np.eye(n_classes)
+def _transform_scoring(metric, cost_matrix=None, cost_vector=None,
+                       perf_func=None, n_classes=None):
+    """Transform the scoring for evaluating classifiers.
+
+    Parameters
+    ----------
+    metric: str
+        The metric used. Possible metrics are 'error', 'cost-vector',
+        'misclassification-loss', 'mean-abs-error', 'macro-accuracy',
+        'f1-score' and 'custom'.
+    cost_matrix: array-like, shape (n_classes, n_classes),
+                 optional (default=None)
+        The cost matrix. Only used if metric='misclassification-loss'.
+    cost_vector: array-like, shape (n_classes), optional (default=None)
+        The cost vector. Only used if metric='cost-vector'.
+    perf_func: callable, optional (default=None)
+        Custom performance function measuring the performance of a classifier.
+        Only used if metric='custom'.
+    n_classes: int, optional (default=None)
+        Number of classes.
+
+    Returns
+    -------
+    scoring_decomposable: bool
+        Denote if the scoring is decomposable.
+    cost_matrix: np.ndarray
+        Cost matrix according to the given metric.
+    perf_func: callable
+        Performance function measuring the performance of a classifier.
+    """
+    if metric != 'misclassification-loss' and cost_matrix is not None:
+        cost_matrix = None
+        warnings.warn(
+            "'cost_matrix' is only used if metric='misclassification-loss'."
+        )
+    if metric != 'cost-vector' and cost_vector is not None:
+        warnings.warn(
+            "'cost_vector' is only used if metric='cost_vector'."
+        )
+    if metric != 'custom' and perf_func is not None:
         perf_func = None
+        warnings.warn(
+            "'perf_func' is only used if metric='custom'."
+        )
+
+    if metric == 'error':
+        scoring_decomposable = True
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
+        cost_matrix = 1 - np.eye(n_classes)
     elif metric == 'cost-vector':
-        if cost_vector is None or cost_vector.shape != (n_classes):
-            raise ValueError("For metric='cost-vector', the argument "
-                             "'cost_vector' must be given when initialized and "
-                             "must have shape (n_classes)")
-        metric = 'misclassification-loss'
+        scoring_decomposable = True
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
+        if cost_vector is None:
+            raise ValueError(
+                f"For metric='{metric}', 'cost_vector' must be given."
+            )
+        cost_vector = np.array(cost_vector)
+        if cost_vector.shape != (n_classes,):
+            raise ValueError(
+                "The cost vector must have shape (n_classes,)."
+            )
         cost_matrix = cost_vector.reshape(-1, 1) \
                       @ np.ones([1, n_classes])
         np.fill_diagonal(cost_matrix, 0)
-        perf_func = None
     elif metric == 'misclassification-loss':
+        scoring_decomposable = True
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
         if cost_matrix is None:
-            raise ValueError("'cost_matrix' cannot be None for "
-                             "metric='misclasification-loss'")
-        check_cost_matrix(cost_matrix, n_classes)
-        metric = 'misclassification-loss'
-        cost_matrix = cost_matrix
-        perf_func = None
+            raise ValueError(
+                f"For metric='{metric}', 'cost_matrix' must be given."
+            )
+        cost_matrix = check_cost_matrix(cost_matrix, n_classes)
     elif metric == 'mean-abs-error':
-        metric = 'misclassification-loss'
+        scoring_decomposable = True
+        if n_classes is None:
+            raise ValueError(
+                f"For metric='{metric}', 'n_classes' must be given."
+            )
         row_matrix = np.arange(n_classes).reshape(-1, 1) \
                      @ np.ones([1, n_classes])
         cost_matrix = abs(row_matrix - row_matrix.T)
-        perf_func = None
     elif metric == 'macro-accuracy':
-        metric = 'custom'
-        perf_func = macro_accuracy_func
-        cost_matrix = None
+        scoring_decomposable = False
+        def perf_func(conf_matrix):
+            return np.mean(conf_matrix.diagonal() / conf_matrix.sum(axis=1))
     elif metric == 'f1-score':
-        metric = 'custom'
-        perf_func = f1_score_func
-        cost_matrix = None
-    elif metric == 'cohens-kappa':
-        # TODO: implement
-        metric = 'custom'
-        perf_func = perf_func
-        cost_matrix = None
+        scoring_decomposable = False
+        def perf_func(conf_matrix):
+            pos_pred = conf_matrix[:, -1].sum()
+            recall = conf_matrix[-1, -1] / conf_matrix[-1, :].sum()
+            precision = conf_matrix[-1, -1] / pos_pred if pos_pred > 0 else 0
+            norm = recall + precision
+            return (2 * recall * precision / norm) if norm > 0 else 0
+    elif metric == 'custom':
+        scoring_decomposable = False
+        if perf_func is None:
+            raise ValueError(
+                f"For metric='{metric}', 'perf_func' must be given."
+            )
     else:
-        raise ValueError("Metric '{}' not implemented. Use "
-                         "metric='custom' instead.".format(metric))
-    return metric, cost_matrix, perf_func
+        raise ValueError(f"Metric '{metric}' not implemented. Use "
+                         "metric='custom' instead.")
+    return scoring_decomposable, cost_matrix, perf_func
+
 
 def _dperf(probs, pred_old, pred_new, sample_weight_eval,
            decomposable, cost_matrix=None, perf_func=None):
+    """Calculate the performance difference between the old and new prediction.
+
+    Parameters
+    ----------
+    probs: np.ndarray, shape (n_evaluations, n_classes)
+        Label probabilities for each predicted sample.
+    pred_old: np.ndarray, shape (n_evaluations)
+        Old predictions.
+    pred_new: np.ndarray, shape (n_evaluations)
+        New predictions.
+    sample_weight_eval: np.ndarray, shape (n_evaluations)
+        Weight for the predictions.
+    decomposable: bool
+        If true, use the cost matrix to determine the difference. Otherwise,
+        use the perf_func.
+    cost_matrix: array-like, shape (n_classes, n_classes),
+                 optional (default=None)
+        The cost matrix. Only used if decomposable=True.
+    perf_func: callable
+        Function measuring the performance of predictions. Maps a cost matrix
+
+    Returns
+    -------
+    performance_difference: float
+        Performance difference between the old and new predictions.
+    """
     if decomposable:
-        # TODO: check if cost_matrix is correct
+        check_cost_matrix(cost_matrix, len(cost_matrix))
         pred_changed = (pred_new != pred_old)
-        return np.sum(sample_weight_eval[pred_changed, np.newaxis] *
-                      probs[pred_changed, :] *
-                      (cost_matrix.T[pred_old[pred_changed]] -
-                       cost_matrix.T[pred_new[pred_changed]])) / \
-               len(probs)
+        w = sample_weight_eval[pred_changed, np.newaxis]
+        p = probs[pred_changed, :]
+        C_old = cost_matrix.T[pred_old[pred_changed]]
+        C_new = cost_matrix.T[pred_new[pred_changed]]
+        normalize = sum(sample_weight_eval)
+        performance_difference = np.sum(w * p * (C_old - C_new)) / normalize
+        return performance_difference
     else:
-        # TODO: check if perf_func is correct
         n_classes = probs.shape[1]
         conf_mat_old = np.zeros([n_classes, n_classes])
         conf_mat_new = np.zeros([n_classes, n_classes])
         probs = probs * sample_weight_eval[:, np.newaxis]
         for y_pred in range(n_classes):
-            conf_mat_old[:, y_pred] += np.sum(probs[pred_old == y_pred], axis=0)
-            conf_mat_new[:, y_pred] += np.sum(probs[pred_new == y_pred], axis=0)
+            conf_mat_old[:, y_pred] = np.sum(probs[pred_old == y_pred], axis=0)
+            conf_mat_new[:, y_pred] = np.sum(probs[pred_new == y_pred], axis=0)
         return perf_func(conf_mat_new) - perf_func(conf_mat_old)
 
+
 def estimate_bandwidth(n_samples, n_features):
+    check_scalar(n_samples, name='n_samples', target_type=int, min_val=0)
+    check_scalar(n_features, name='n_features', target_type=int, min_val=1)
     nominator = 2 * n_samples * n_features
     denominator = (n_samples - 1) * np.log((n_samples - 1) / ((np.sqrt(2) * 10 ** -6) ** 2))
     bandwidth = np.sqrt(nominator / denominator)
     return bandwidth
+
 
 def score_recall(conf_matrix):
     return conf_matrix[-1, -1] / conf_matrix[-1, :].sum()
