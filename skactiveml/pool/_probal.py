@@ -268,9 +268,8 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         check_scalar(self.nonmyopic_labels_equal,
                      name='nonmyopic_labels_equal', target_type=bool)
 
-        if self.cost_matrix is not None and \
-                self.cost_matrix.shape != (self.clf.classes, self.clf.classes):
-            # TODO: should be len(self.clf.classes) ?
+        if self.cost_matrix is not None and self.cost_matrix.shape != \
+                (len(self.clf.classes), len(self.clf.classes)):
             raise ValueError('The given cost matrix does not '
                              'fit to the given classes.')
 
