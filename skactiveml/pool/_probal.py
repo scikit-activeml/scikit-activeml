@@ -468,7 +468,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
 
             if self.batch_mode == 'greedy':
                 # calculate mean gain for non-myopic gains
-                M = self.nonmyopic_max_cand
+                M = min(self.nonmyopic_max_cand, len(X_cand))
                 iter_utilities = iter_utilities.reshape(-1, M)
                 iter_utilities /= np.arange(1, M + 1).reshape(-1, M)
                 iter_utilities = np.nanmax(iter_utilities, axis=1)
