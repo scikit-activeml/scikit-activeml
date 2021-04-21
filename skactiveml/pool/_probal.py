@@ -575,9 +575,9 @@ def probabilistic_gain(clf, X, y, X_eval,
     eval_prob_est, _ = to_int_labels(eval_prob_est, X[idx_train], y[idx_train])
     clf, y = to_int_labels(clf, X, y)
 
-    if clf.metric_dict is None:
-        clf.metric_dict = dict()
     if isinstance(clf, PWC):
+        if clf.metric_dict is None:
+            clf.metric_dict = dict()
         if X_eval is not None:
             K = pairwise_kernels(X_eval, X,
                                  metric=clf.metric,
