@@ -148,7 +148,7 @@ man_pages = [
 # -- Extension configuration -------------------------------------------------
 
 # -- Options for bibtex extension ---------------------------------------
-bibtex_bibfiles = []
+bibtex_bibfiles = ['refs.bib']
 
 # -- Options for intersphinx extension ---------------------------------------
 

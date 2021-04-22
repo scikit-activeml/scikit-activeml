@@ -59,11 +59,6 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
-    _methods = ['margin_sampling', 'least_confident', 'entropy']
-    _examples = {'params_init':{'clf':PWC(), 'method':'margin_sampling', 'cost_matrix':None,
-                 'random_state':None},'params_query':{}}
-
-
 
     def __init__(self, clf, method='margin_sampling', cost_matrix=None,
                  random_state=None):
