@@ -19,7 +19,7 @@
     "class" : "RandomSampler",
     "title" : "Example 2",
     "tags" : ["pool", "random"],
-    "refs" : [],
+    "refs" : ["settles2009active", "wang2018uncertainty"],
     "blocks": ["title", "text_0", "code_0", "example", "plot", "refs"],
     "text_0" : "This is a example for the RandomSampler.",
     "code_0" : "from skactiveml.pool import RandomSampler\nfrom numpy.random import RandomState",

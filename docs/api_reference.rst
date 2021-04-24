@@ -12,7 +12,7 @@ Pool:
 
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: generated/api/
    :template: class.rst
 
    pool.RandomSampler
@@ -29,7 +29,7 @@ Classifier:
 
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: generated/api/
    :template: class.rst
 
    classifier.PWC
@@ -43,7 +43,7 @@ Utils:
 
 .. autosummary::
    :nosignatures:
-   :toctree: generated/
+   :toctree: generated/api/
    :template: class.rst
 
    utils.rand_argmax

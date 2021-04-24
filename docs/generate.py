@@ -1,5 +1,6 @@
 import json
 import os
+import string
 
 import numpy as np
 
@@ -193,20 +194,33 @@ def generate_example_rst(path, data):
 
 
 def format_title(title):  # TODO Atal
-    block_str = title + "\n" + "========================\n"
+    block_str = title + "\n" + "=".ljust(len(title),"=") + "\n"
     return block_str
 
 def format_text(text):  # TODO Atal
-    block_str = text + "\n"
+    block_str = text + "\n" + "\n"
     return block_str
 
 
 def format_code(code):  # TODO Atal
-    block_str = ""
+    block_str = ".. code-block:: python\n" + "\n" + code + "\n"
     return block_str
 
 
+
+
 def format_example(init_params, query_params):
+    """
+
+    Parameters
+    ----------
+    init_params
+    query_params
+
+    Returns
+    -------
+
+    """
     block_str = ""
     return block_str
 
@@ -217,7 +231,9 @@ def format_plot(code_blocks, init_params, query_params):
 
 
 def format_refs(ref):  # TODO Atal
-    block_str = ""
+    block_str = ":cite:p:`settles2009active`\n" + \
+                "\n" + \
+                ".. bibliography::\n"
     return block_str
 
 

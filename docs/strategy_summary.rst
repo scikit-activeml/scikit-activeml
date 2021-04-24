@@ -16,54 +16,37 @@ Pool Strategies:
      - Methods
      - Examples
      - Reference
-   * - :doc:`RandomSampler </generated/skactiveml.pool.RandomSampler>`
+   * - :doc:`RandomSampler </generated/api/skactiveml.pool.RandomSampler>`
      - 
      - Example RandomSampler
      - Reference RandomSampler
-   * - :doc:`McPAL </generated/skactiveml.pool.McPAL>`
+   * - :doc:`McPAL </generated/api/skactiveml.pool.McPAL>`
      - 
      - Example McPAL
      - Reference McPAL
-   * - :doc:`UncertaintySampling </generated/skactiveml.pool.UncertaintySampling>`
-     - margin_sampling, least_confident, entropy
+   * - :doc:`UncertaintySampling </generated/api/skactiveml.pool.UncertaintySampling>`
+     - 
      - Example UncertaintySampling
      - Reference UncertaintySampling
-   * - :doc:`EpistemicUncertainty </generated/skactiveml.pool.EpistemicUncertainty>`
+   * - :doc:`EpistemicUncertainty </generated/api/skactiveml.pool.EpistemicUncertainty>`
      - 
      - Example EpistemicUncertainty
      - Reference EpistemicUncertainty
-   * - :doc:`ExpectedErrorReduction </generated/skactiveml.pool.ExpectedErrorReduction>`
+   * - :doc:`ExpectedErrorReduction </generated/api/skactiveml.pool.ExpectedErrorReduction>`
      - 
      - Example ExpectedErrorReduction
      - Reference ExpectedErrorReduction
-   * - :doc:`QBC </generated/skactiveml.pool.QBC>`
+   * - :doc:`QBC </generated/api/skactiveml.pool.QBC>`
      - 
      - Example QBC
      - Reference QBC
-   * - :doc:`FourDS </generated/skactiveml.pool.FourDS>`
+   * - :doc:`FourDS </generated/api/skactiveml.pool.FourDS>`
      - 
      - Example FourDS
      - Reference FourDS
-   * - :doc:`ALCE </generated/skactiveml.pool.ALCE>`
+   * - :doc:`ALCE </generated/api/skactiveml.pool.ALCE>`
      - 
      - Example ALCE
      - Reference ALCE
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
