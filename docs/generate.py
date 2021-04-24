@@ -226,7 +226,9 @@ def format_example(init_params, query_params):
 
 
 def format_plot(code_blocks, init_params, query_params):
-    block_str = ""
+    block_str = ".. plot:: pyplots/ellipses.py\n"
+    block_str += "   :include - source:\n"
+    block_str += "\n"
     return block_str
 
 
@@ -237,7 +239,33 @@ def format_refs(ref):  # TODO Atal
     return block_str
 
 
-def dict_to_str(dict_, idx):
-    dict_str = ""
-    return dict_str
+def dict_to_str(d, idx=None):
+    """Converts a dictionary into a string.
+    Parameters
+    ----------
+    d : dict
+        The dictionary to be converted.
+        Shape: {key1:value1,...} or {key1:[value1, value2,...],...} or a
+        combination of both.
+    idx: : dict, optional
+        If a key has multiple values, idx[key] chooses the used value for the
+        specific key. If idx is not given, the first value in the list is
+        always used. It is not necessary to specify all keys from d.
+        shape: {key1:int1,...}
+
+    Returns
+    -------
+    String : dict_ as String. Shape: 'key1=value[idx[key1], key2...' or
+             'key1=value1, key2=value2...' or a combination of both.
+    """
+    dd_str = ""
+    for key, value in d.items():
+        if not isinstance(value, list):
+            value = [value]
+        if idx is not None and key in idx.keys():
+            value = value[idx[key]]
+        else:
+            value = value[0]
+        dd_str += str(key) + "=" + value + ", "
+    return dd_str[0:-2]
 
