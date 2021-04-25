@@ -9,7 +9,7 @@ Contents:
    developers_guide
    api_reference
    strategy_summary
-   examples
+   examples 
 
 
 Indices and tables

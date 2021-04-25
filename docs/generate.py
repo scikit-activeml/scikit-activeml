@@ -187,7 +187,7 @@ def generate_example_rst(path, data):
         file.write('    for c in range(n_cycles):\n')
         file.write('            unlbld_idx = np.where(is_unlabeled(y))[0]\n')
         file.write('            X_cand = X[unlbld_idx]\n')
-        file.write('            query_idx = unlbld_idx[qs.query(X_cand, X, y, {})]\n'.format(params_query))
+        file.write('            query_idx = unlbld_idx[qs.query(X_cand, X, y, {})]\n'.format(dict_to_str(query_params)))
         file.write('            y[query_idx] = y_true[query_idx]\n')
         file.write('            clf.fit(X, y)\n')
         file.write('            X_cand = X[unlbld_idx]\n')
@@ -203,13 +203,18 @@ def format_text(text):  # TODO Atal
 
 
 def format_code(code):  # TODO Atal
-    block_str = ".. code-block:: python\n" + "\n" + code + "\n"
+    code = code.splitlines()
+    new_len = len(code[0])+ 3
+    new_len2 = len(code[1]) + 3
+    block_str = ".. code-block:: python\n" + "\n" + code[0].rjust(new_len) + \
+                "\n" + code[1].rjust(new_len2) + "\n" + "\n"
     return block_str
 
 
 
 
-def format_example(init_params, query_params):
+def format_example(init_params, query_params): # TODO Atal
+
     """
 
     Parameters
@@ -219,9 +224,24 @@ def format_example(init_params, query_params):
 
     Returns
     -------
-
     """
     block_str = ""
+    block_str += ".. code-block:: python\n"
+    block_str += "\n"
+    block_str += "    X, y_true = make_classification(n_features=2, n_redundant=0, random_state=0)\n"
+    block_str += "    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n"
+    block_str += "    clf = SklearnClassifier(LogisticRegression(),  classes=np.unique(y_true))\n"
+    block_str += "    qs = ({})\n".format(dict_to_str(init_params))
+    block_str += "    n_cycles = 20\n"
+    block_str += "    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n"
+    block_str += "    for c in range(n_cycles):\n"
+    block_str += "            unlbld_idx = np.where(is_unlabeled(y))[0]\n"
+    block_str += "            X_cand = X[unlbld_idx]\n"
+    block_str += "            query_idx = unlbld_idx[qs.query(X_cand, X, y, {})]\n".format(dict_to_str(query_params))
+    block_str += "            y[query_idx] = y_true[query_idx]\n"
+    block_str += "            clf.fit(X, y)\n"
+    block_str += "            X_cand = X[unlbld_idx]\n"
+
     return block_str
 
 
@@ -233,9 +253,10 @@ def format_plot(code_blocks, init_params, query_params):
 
 
 def format_refs(ref):  # TODO Atal
-    block_str = ":cite:p:`settles2009active`\n" + \
+    block_str = ".. code-block:: python\n" + "\n"\
+                "   :cite:p:`settles2009active`\n" + \
                 "\n" + \
-                ".. bibliography::\n"
+                "   .. bibliography::\n"
     return block_str
 
 
