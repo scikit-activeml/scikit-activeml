@@ -61,7 +61,8 @@ def simple_batch(
 
     """
     # validation
-    utilities = check_array(utilities, ensure_2d=False, dtype=float)
+    utilities = check_array(utilities, ensure_2d=False, dtype=float,
+                            force_all_finite='allow-nan')
     if batch_size == 'adaptive':
         batch_size = 1
     check_scalar(batch_size, target_type=int, name='batch_size',

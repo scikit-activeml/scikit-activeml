@@ -48,7 +48,6 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         re_val = wrapper.query(self.X_cand, self.X, self.y,
                                A_cand=self.A_cand, return_utilities=True)
         best_cand_indices, utilities = re_val
-
         self.check_availability(best_cand_indices)
 
         # test functionality with random sampler and larger batch size
@@ -59,7 +58,6 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         best_cand_indices = wrapper.query(self.X_cand, A_cand=self.A_cand,
                                           batch_size=3,
                                           return_utilities=False)
-
         self.check_availability(best_cand_indices)
 
     def check_availability(self, best_cand_indices):

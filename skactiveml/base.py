@@ -139,11 +139,12 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
-    def __init__(self, random_state=None):
+    def __init__(self, random_state=None, n_annotators=None):
         super().__init__(random_state=random_state)
+        self.n_annotators = n_annotators
 
     @abstractmethod
-    def query(self, X_cand, *args, A_cand=None, batch_size=1,
+    def query(self, X_cand, *args, A_cand=None, n_annotators=None, batch_size=1,
               return_utilities=False, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator.
@@ -152,7 +153,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         ----------
         X_cand : array-like, shape (n_samples, n_features)
             Candidate samples from which the strategy can select.
-        A_cand : array-like, shape (n_samples, n_features), optional
+        A_cand : array-like, shape (n_samples, n_annotators), optional
         (default=None)
             Boolean matrix where `A_cand[i,j] = True` indicates that
             annotator `j` can be selected for annotating sample `X_cand[i]`,
@@ -178,6 +179,79 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             the first sample-annotator pair (with indices `query_indices[0]`).
         """
         return NotImplemented
+
+    def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
+                       random_state, reset=True, **check_X_cand_params):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check annotator instances.
+        if A_cand is None:
+            A_cand = np.full(True, X_cand.shape)
+        else:
+            A_cand = check_array(A_cand)
+
+        # check if A_cand number of samples equals X_cand number of samples
+        if A_cand.shape[0] != X_cand.shape[0]:
+            raise ValueError(
+                "A_cand.shape[0] has to equal X_cand.shape[0]"
+                "A_cand.shape[0] equals: " + A_cand.shape[0] +
+                "X_cand.shpae[0] equals: " + X_cand.shape[0]
+            )
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, 'return_utilities', bool)
+
+        # Check batch size.
+        check_scalar(batch_size, target_type=int, name='batch_size',
+                     min_val=1)
+        batch_size = batch_size
+        n_queries = np.sum(A_cand)
+        if n_queries < batch_size:
+            warnings.warn(
+                "'batch_size={}' is larger than number of candidate queries "
+                "in 'A_cand'. Instead, 'batch_size={}' was set ".format(
+                    batch_size, n_queries))
+            batch_size = n_queries
+
+        # Check random state.
+        random_state = check_random_state(random_state=self.random_state,
+                                          seed_multiplier=len(X_cand))
+
+        return X_cand, return_utilities, batch_size, random_state
 
 
 class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
