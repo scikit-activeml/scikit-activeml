@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.datasets import make_classification
 from skactiveml.pool import UncertaintySampling
-from skactiveml.utils import is_unlabeled, MISSING_LABEL, plot_2d_dataset
+from skactiveml.utils import is_unlabeled, MISSING_LABEL, plot_2d_dataset, \
+    call_func, is_labeled
 from skactiveml.classifier import SklearnClassifier
 from sklearn.metrics import accuracy_score
 import warnings
 warnings.filterwarnings("ignore")
-
 
 
 def generate_api_reference_rst(path):
@@ -92,7 +92,6 @@ def generate_stratagy_summary_rst(path):
         file.write('\n')
 
 
-
 def table_from_array(a, title, wights, header_rows=1):
     a = np.asarray(a)
     table = '.. list-table:: {}\n   :widths: {}\n   :header-rows: {}\n\n' \
@@ -144,7 +143,6 @@ def generate_examples(path, package):
         pass
 
 
-
 def generate_example_rst(path, data):
     with open(path, 'w') as file:
         code_blocks = []
@@ -160,42 +158,27 @@ def generate_example_rst(path, data):
                 block_str = format_example(data["init_params"],
                                            data["query_params"])
             elif block.startswith("plot"):
-                block_str = format_plot(code_blocks,
+                rel_path = \
+                    "generated/examples/plot/plot_" + data["class"] + ".py"
+                block_str = format_plot(code_blocks, data["class"],
                                         data["init_params"],
-                                        data["query_params"])
+                                        data["query_params"],
+                                        rel_path)
             elif block.startswith("refs"):
                 block_str = format_refs(data[block])
 
             file.write(block_str)
 
+        file.write("\n")
+
         return
-        file.write('{}\n'.format(title))
-        file.write('=====================================================\n')
-        file.write('\n')
-        file.write('.. toctree::\n')
-        file.write('\n')
-        file.write('The examplery cycles for different strategies are explained here.\n')
-        file.write('\n')
-        file.write('.. code-block:: python\n')
-        file.write('\n')
-        file.write('    X, y_true = make_classification(n_features=2, n_redundant=0, random_state=0)\n')
-        file.write('    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
-        file.write('    clf = SklearnClassifier(LogisticRegression(),  classes=np.unique(y_true))\n')
-        file.write('    qs = {}({})\n'.format(qs_name, params_init))
-        file.write('    n_cycles = 20\n')
-        file.write('    y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
-        file.write('    for c in range(n_cycles):\n')
-        file.write('            unlbld_idx = np.where(is_unlabeled(y))[0]\n')
-        file.write('            X_cand = X[unlbld_idx]\n')
-        file.write('            query_idx = unlbld_idx[qs.query(X_cand, X, y, {})]\n'.format(params_query))
-        file.write('            y[query_idx] = y_true[query_idx]\n')
-        file.write('            clf.fit(X, y)\n')
-        file.write('            X_cand = X[unlbld_idx]\n')
 
 
 def format_title(title):  # TODO Atal
-    block_str = title + "\n" + "=".ljust(len(title),"=") + "\n"
+    block_str = title + "\n"
+    block_str += "".ljust(len(title), "-") + "\n"
     return block_str
+
 
 def format_text(text):  # TODO Atal
     block_str = text + "\n" + "\n"
@@ -203,10 +186,13 @@ def format_text(text):  # TODO Atal
 
 
 def format_code(code):  # TODO Atal
-    block_str = ".. code-block:: python\n" + "\n" + code + "\n"
+    block_str = ".. code-block:: python\n" + "\n"
+    code = code.split("\n")
+    for line in code:
+        block_str += "   " + line + "\n"
+
+    block_str += "\n"
     return block_str
-
-
 
 
 def format_example(init_params, query_params):
@@ -225,17 +211,56 @@ def format_example(init_params, query_params):
     return block_str
 
 
-def format_plot(code_blocks, init_params, query_params):
-    block_str = ".. plot:: pyplots/ellipses.py\n"
-    block_str += "   :include - source:\n"
+def format_plot(code_blocks, qs_name, init_params, query_params, rel_path):
+    with open(os.path.abspath(rel_path), "w") as file:
+        file.write("import numpy as np\n")
+        file.write("from matplotlib import pyplot as plt, animation\n")
+        file.write("from sklearn.datasets import make_classification\n")
+        file.write("from skactiveml.classifier import SklearnClassifier\n")
+        file.write("from skactiveml.utils import MISSING_LABEL, is_unlabeled, plot_2d_dataset\n")
+        file.write("from sklearn.linear_model import LogisticRegression\n")
+        file.write("\n")
+        for cb in code_blocks:
+            file.write(cb + "\n")
+        file.write('fig, ax = plt.subplots()\n')
+        file.write('artists = []\n')
+        file.write('X, y_true = make_classification(n_features=2, n_redundant=0, random_state=0)\n')
+        file.write('y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
+        file.write('clf = SklearnClassifier(LogisticRegression())\n')
+        file.write('qs = {}({})\n'.format(qs_name, dict_to_str(init_params)))
+        file.write('n_cycles = 20\n')
+        file.write('for c in range(n_cycles):\n')
+        file.write('    unlbld_idx = np.where(is_unlabeled(y))[0]\n')
+        file.write('    X_cand = X[unlbld_idx]\n')
+        query_params_str = ""
+        if query_params_str != "":
+            query_params_str = ", " + dict_to_str(query_params)
+        file.write('    query_idx = unlbld_idx[qs.query(X_cand, X, y{})]\n'.format(query_params_str))
+        file.write('    if c in [1]:\n')
+        file.write('        artists.append([plot_2d_dataset(X, y, y_true, clf, qs)])\n'.format(query_params_str))
+        file.write('    y[query_idx] = y_true[query_idx]\n')
+        file.write('    clf.fit(X, y)\n')
+        file.write('\n')
+        file.write('ani = animation.ArtistAnimation(fig, artists, blit=True)\n')
+        #file.write('plt.show()\n')
+
+    block_str = ".. plot:: " + rel_path + "\n"
+    block_str += "   :include-source:\n"
     block_str += "\n"
     return block_str
 
 
-def format_refs(ref):  # TODO Atal
-    block_str = ":cite:p:`settles2009active`\n" + \
-                "\n" + \
-                ".. bibliography::\n"
+def format_refs(refs):  # TODO Atal
+    if not refs:
+        return ""
+    block_str = "References:\n" \
+                "===========\n" \
+                ".. bibliography::\n" \
+                "   :filter: key in {"
+    for ref in refs:
+        block_str += "'{}', ".format(ref.lower())
+
+    block_str = block_str[0:-2] + "}"
     return block_str
 
 

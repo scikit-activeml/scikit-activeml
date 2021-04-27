@@ -17,8 +17,11 @@ import os
 import sys
 
 from skactiveml import pool
+import matplotlib
 
 sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('..\\venv\\Lib\\matplotlib\\sphinxext'))
+
 
 # -- Project information -----------------------------------------------------
 
@@ -52,6 +55,8 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx_gallery.gen_gallery',
+    'matplotlib.sphinxext.plot_directive',
     'sphinxcontrib.bibtex',
     'nbsphinx',
     'numpydoc'
@@ -97,6 +102,12 @@ pygments_style = 'sphinx'
 
 # sphinx-autogen docs/index.rst
 autosummary_generate = True
+
+# Set the paths for the sphinx_gallery extension:
+sphinx_gallery_conf = {
+     'examples_dirs': 'generated\\examples',   # path to your example scripts
+     'gallery_dirs': 'auto_examples',  # path to where to save gallery generated output
+}
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -149,6 +160,7 @@ man_pages = [
 
 # -- Options for bibtex extension ---------------------------------------
 bibtex_bibfiles = ['refs.bib']
+#bibtex_encoding = 'latin'
 
 # -- Options for intersphinx extension ---------------------------------------
 
