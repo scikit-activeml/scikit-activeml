@@ -2,24 +2,24 @@
   {
     "class" : "UncertaintySampling",
     "tags" : ["pool", "uncertainty"],
-    "title" : "Example example",
-    "refs" : ["settles2009active0", "wang2018uncertainty"],
-    "blocks" : ["title", "text_0", "code_0", "example", "text_1", "plot", "text_2", "refs"],
+    "title" : "Example UncertaintySampling",
+    "refs" : ["settles2009active", "wang2018uncertainty"],
+    "blocks" : ["title", "text_0", "code_0", "text_1", "plot", "text_2", "refs"],
     "text_0" : "This is a simple example for the example pages.",
     "text_1" : "Here you can see the import section.",
     "text_2" : "This is a simple example for the example pages.",
-    "code_0" : "from skactiveml.pool import UncertaintySampling\nfrom skactiveml.classifier import PWC\n",
+    "code_0" : "from skactiveml.pool import UncertaintySampling\nfrom skactiveml.classifier import PWC\nfrom sklearn.linear_model import LogisticRegression\n",
     "init_params" : {
-      "clf" : ["PWC()"],
-      "method" : ["margin_sampling", "least_confident", "entropy"]
+      "clf" : ["PWC(classes=[0, 1])"],
+      "method" : ["'margin_sampling'", "'least_confident'", "'entropy'"]
     },
     "query_params" : {}
   },
   {
     "class" : "RandomSampler",
-    "title" : "Example 2",
+    "title" : "Example RandomSampler",
     "tags" : ["pool", "random"],
-    "refs" : ["settles2009active", "wang2018uncertainty"],
+    "refs" : [],
     "blocks": ["title", "text_0", "code_0", "example", "plot", "refs"],
     "text_0" : "This is a example for the RandomSampler.",
     "code_0" : "from skactiveml.pool import RandomSampler\nfrom numpy.random import RandomState",

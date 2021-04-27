@@ -9,8 +9,9 @@ Contents:
    developers_guide
    api_reference
    strategy_summary
-   examples 
-
+   examples
+   test
+   auto_examples/index
 
 Indices and tables
 ==================
