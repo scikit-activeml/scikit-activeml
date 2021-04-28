@@ -4,7 +4,7 @@ import warnings
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_missing_label, check_scalar, check_X_y
-from skactiveml.utils._validation import check_random_state
+from skactiveml.utils._validation import check_random_state, check_class_prior
 
 
 class TestValidation(unittest.TestCase):
@@ -47,11 +47,19 @@ class TestValidation(unittest.TestCase):
             check_cost_matrix(cost_matrix=[[0, 0], [0, 0]], n_classes=2)
             assert len(w) == 3
 
-
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=['2', 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
+
+    def test_check_class_prior(self):
+        self.assertRaises(TypeError, check_class_prior, None, 1)
+        self.assertRaises(TypeError, check_class_prior, 1, None)
+        self.assertRaises(ValueError, check_class_prior, 1, 0)
+        self.assertRaises(ValueError, check_class_prior, -2, 2)
+        self.assertRaises(ValueError, check_class_prior, [0, 1, -1], 3)
+        self.assertRaises(ValueError, check_class_prior, [1, 2, 3], 2)
+        np.testing.assert_array_equal(check_class_prior(1, 3), [1, 1, 1])
 
     def test_check_missing_label(self):
         self.assertRaises(TypeError, check_missing_label, missing_label=[2])
