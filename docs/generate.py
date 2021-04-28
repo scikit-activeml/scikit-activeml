@@ -1,3 +1,4 @@
+import errno
 import json
 import os
 import string
@@ -212,6 +213,12 @@ def format_example(init_params, query_params):
 
 
 def format_plot(code_blocks, qs_name, init_params, query_params, rel_path):
+    directory, _ = os.path.split(rel_path)
+    try:
+        os.makedirs(os.path.abspath(directory))
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
     with open(os.path.abspath(rel_path), "w") as file:
         file.write("import numpy as np\n")
         file.write("from matplotlib import pyplot as plt, animation\n")
