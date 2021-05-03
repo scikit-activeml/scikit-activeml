@@ -40,5 +40,6 @@ jobs:
         fail_ci_if_error: true
     - name: Create documentation with sphinx
       run: |
+        pip install jupyter
         cd docs
         make html
