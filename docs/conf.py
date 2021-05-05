@@ -55,7 +55,7 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'sphinx_gallery.gen_gallery',
+    #'sphinx_gallery.gen_gallery',
     'matplotlib.sphinxext.plot_directive',
     'sphinxcontrib.bibtex',
     'nbsphinx',
@@ -178,4 +178,4 @@ from docs.generate import generate_stratagy_summary_rst, \
 
 generate_api_reference_rst(os.path.abspath('api_reference.rst'))
 generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'))
-generate_examples(os.path.abspath('generated/examples'), package=pool)
+generate_examples(os.path.abspath('generated/examples'), package=pool, json_path=os.path.abspath('examples/pool'))

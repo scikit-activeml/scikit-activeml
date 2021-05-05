@@ -125,17 +125,13 @@ def get_table_data(package):
 
     return data
 
-
-def generate_examples(path, package):
-    json_path = "{}\\examples.json".format(os.path.dirname(package.__file__))
-    with open(json_path) as json_file:
-        json_data = json.load(json_file)
-
-    for data in json_data:
-        example_path = path + '\\' +\
-                       package.__name__ + "." + data["class"] + '.rst'
-        generate_example_rst(example_path, data)
-
+def generate_examples(example_path, package, json_path):
+    for filename in os.listdir(json_path):
+        with open(json_path +"\\"+ filename) as file:
+            json_data = json.load(file)
+            dir_path = example_path + '\\' +\
+                package.__name__.split('.')[1] + "\\"
+            generate_example_rst(json_data["class"] + '.rst', dir_path, json_data)
     return
     query_strategies = {}
     for qs_name in package.__all__:
@@ -144,8 +140,14 @@ def generate_examples(path, package):
         pass
 
 
-def generate_example_rst(path, data):
-    with open(path, 'w') as file:
+
+def generate_example_rst(filename,dir_path, data):
+    try:
+        os.makedirs(dir_path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    with open(dir_path + filename, 'w') as file:
         code_blocks = []
         for block in data["blocks"]:
             if block.startswith("title"):
