@@ -145,6 +145,38 @@ def check_classes(classes):
                 types))
 
 
+def check_class_prior(class_prior, n_classes):
+    """Check if the class_prior is a valid prior.
+
+    Parameters
+    ----------
+    class_prior : numeric | array_like, shape (n_classes)
+        A class prior.
+    n_classes : int
+        The number of classes.
+
+    Returns
+    -------
+    class_prior : np.ndarray, shape (n_classes)
+        Numpy array as prior.
+    """
+    if class_prior is None:
+        raise TypeError("'class_prior' must not be None.")
+    check_scalar(n_classes, name='n_classes', target_type=int, min_val=1)
+    if np.isscalar(class_prior):
+        check_scalar(class_prior, name='class_prior',
+                     target_type=(int, float), min_val=0)
+        class_prior = np.array([class_prior] * n_classes)
+    else:
+        class_prior = check_array(class_prior, ensure_2d=False)
+        is_negative = np.sum(class_prior < 0)
+        if class_prior.shape != (n_classes,) or is_negative:
+            raise ValueError("`class_prior` must be either a non-negative"
+                             "float or a list of `n_classes` non-negative "
+                             "floats.")
+    return class_prior.reshape(-1)
+
+
 def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
                       contains_non_zero=False, diagonal_is_zero=False):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
@@ -397,20 +429,20 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
 
 
 def check_random_state(random_state, seed_multiplier=None):
-    """Checks validity of random state and creates a new random state for
-    a given seed multiplier.
+    """Check validity of the given random state.
 
     Parameters
     ----------
     random_state : None | int | instance of RandomState
         If random_state is None, return the RandomState singleton used by
         np.random.
-        If seed is an int, return a new RandomState.
-        If seed is already a RandomState instance, return it.
+        If random_state is an int, return a new RandomState.
+        If random_state is already a RandomState instance, return it.
         Otherwise raise ValueError.
     seed_multiplier : None | int, optional (default=None)
-        If the random_state and seed_multiplier are not None, the seed
-        multiplier is multiplied with the seed of the random_state.
+        If the random_state and seed_multiplier are not None, draw a new int
+        from the random state, multiply it with the multiplier, and use the
+        product as the seed of a new random state.
 
     Returns
     -------
@@ -425,6 +457,6 @@ def check_random_state(random_state, seed_multiplier=None):
     random_state = copy.deepcopy(random_state)
     random_state = sklearn.utils.check_random_state(random_state)
 
-    seed = (random_state.randint(2**31)*seed_multiplier) % (2**31)
+    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
     return np.random.RandomState(seed)
 
