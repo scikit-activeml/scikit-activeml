@@ -5,7 +5,7 @@ import string
 
 import numpy as np
 
-from skactiveml import pool, classifier, utils#, stream TODO uncomment for stream
+from skactiveml import pool, classifier, utils  # , stream TODO uncomment for stream
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.datasets import make_classification
@@ -15,6 +15,7 @@ from skactiveml.utils import is_unlabeled, MISSING_LABEL, plot_2d_dataset, \
 from skactiveml.classifier import SklearnClassifier
 from sklearn.metrics import accuracy_score
 import warnings
+
 warnings.filterwarnings("ignore")
 
 
@@ -126,16 +127,13 @@ def get_table_data(package):
     return data
 
 
-def generate_examples(path, package):
-    json_path = "{}\\examples.json".format(os.path.dirname(package.__file__))
-    with open(json_path) as json_file:
-        json_data = json.load(json_file)
-
-    for data in json_data:
-        example_path = path + '\\' +\
-                       "plot_" + package.__name__ + "." + data["class"] + '.py'
-        generate_example_rst(example_path, data)
-
+def generate_examples(example_path, package, json_path):
+    for filename in os.listdir(json_path):
+        with open(json_path + "\\" + filename) as file:
+            json_data = json.load(file)
+            dir_path = example_path + '\\' + \
+                       package.__name__.split('.')[1] + "\\"
+            generate_example_rst(json_data["class"] + '.rst', dir_path, json_data)
     return
     query_strategies = {}
     for qs_name in package.__all__:
@@ -144,9 +142,14 @@ def generate_examples(path, package):
         pass
 
 
-def generate_example_rst(path, data):
+def generate_example_rst(filename, dir_path, data):
+    try:
+        os.makedirs(dir_path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
     first_title = True
-    with open(path, 'w') as file:
+    with open(dir_path + filename, 'w') as file:
         code_blocks = []
         for block in data["blocks"]:
             if block.startswith("title"):
@@ -218,7 +221,7 @@ def format_example(init_params, query_params):
     return block_str
 
 
-def format_plot(code_blocks, qs_name, init_params, query_params):
+def format_plot(qs_name, init_params, query_params):
 
     block_str = ('import numpy as np\n')
     block_str += ('from matplotlib import pyplot as plt, animation\n')
@@ -295,4 +298,3 @@ def dict_to_str(d, idx=None):
             value = value[0]
         dd_str += str(key) + "=" + value + ", "
     return dd_str[0:-2]
-
