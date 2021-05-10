@@ -10,7 +10,7 @@ Contents:
    api_reference
    strategy_summary
    examples
-   test
+   test/test
    auto_examples/index
 
 Indices and tables

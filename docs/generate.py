@@ -133,7 +133,7 @@ def generate_examples(path, package):
 
     for data in json_data:
         example_path = path + '\\' +\
-                       package.__name__ + "." + data["class"] + '.rst'
+                       "plot_" + package.__name__ + "." + data["class"] + '.py'
         generate_example_rst(example_path, data)
 
     return
@@ -145,11 +145,13 @@ def generate_examples(path, package):
 
 
 def generate_example_rst(path, data):
+    first_title = True
     with open(path, 'w') as file:
         code_blocks = []
         for block in data["blocks"]:
             if block.startswith("title"):
-                block_str = format_title(data[block])
+                block_str = format_title(data[block], first_title)
+                first_title = False
             elif block.startswith("text"):
                 block_str = format_text(data[block])
             elif block.startswith("code"):
@@ -159,12 +161,9 @@ def generate_example_rst(path, data):
                 block_str = format_example(data["init_params"],
                                            data["query_params"])
             elif block.startswith("plot"):
-                rel_path = \
-                    "generated/examples/plot/plot_" + data["class"] + ".py"
                 block_str = format_plot(code_blocks, data["class"],
                                         data["init_params"],
-                                        data["query_params"],
-                                        rel_path)
+                                        data["query_params"])
             elif block.startswith("refs"):
                 block_str = format_refs(data[block])
 
@@ -175,25 +174,32 @@ def generate_example_rst(path, data):
         return
 
 
-def format_title(title):  # TODO Atal
-    block_str = title + "\n"
-    block_str += "".ljust(len(title), "-") + "\n"
+def format_title(title, first_title=False):
+    if first_title:
+        block_str = '"""\n' \
+                    '' + title + '\n' \
+                    ''.ljust(len(title)+1, '=') + '\n' \
+                    '"""\n' \
+                    '\n'
+    else:
+        block_str = '# %%\n'\
+                    '# ' + title + '\n'
+        block_str += '# '.ljust(len(title)+1, '=') + '\n\n'
     return block_str
 
 
 def format_text(text):  # TODO Atal
-    block_str = text + "\n" + "\n"
-    return block_str
+    block_str = '# %%\n'
+    for line in text.split('\n'):
+        block_str += '# ' + line + '\n'
+    return block_str + '\n'
 
 
 def format_code(code):  # TODO Atal
-    block_str = ".. code-block:: python\n" + "\n"
-    code = code.split("\n")
-    for line in code:
-        block_str += "   " + line + "\n"
-
-    block_str += "\n"
-    return block_str
+    block_str = ''
+    for line in code.split('\n'):
+        block_str += line + '\n'
+    return block_str + '\n'
 
 
 def format_example(init_params, query_params):
@@ -212,63 +218,52 @@ def format_example(init_params, query_params):
     return block_str
 
 
-def format_plot(code_blocks, qs_name, init_params, query_params, rel_path):
-    directory, _ = os.path.split(rel_path)
-    try:
-        os.makedirs(os.path.abspath(directory))
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-    with open(os.path.abspath(rel_path), "w") as file:
-        file.write("import numpy as np\n")
-        file.write("from matplotlib import pyplot as plt, animation\n")
-        file.write("from sklearn.datasets import make_classification\n")
-        file.write("from skactiveml.classifier import SklearnClassifier\n")
-        file.write("from skactiveml.utils import MISSING_LABEL, is_unlabeled, plot_2d_dataset\n")
-        file.write("from sklearn.linear_model import LogisticRegression\n")
-        file.write("\n")
-        for cb in code_blocks:
-            file.write(cb + "\n")
-        file.write('fig, ax = plt.subplots()\n')
-        file.write('artists = []\n')
-        file.write('X, y_true = make_classification(n_features=2, n_redundant=0, random_state=0)\n')
-        file.write('y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
-        file.write('clf = SklearnClassifier(LogisticRegression())\n')
-        file.write('qs = {}({})\n'.format(qs_name, dict_to_str(init_params)))
-        file.write('n_cycles = 20\n')
-        file.write('for c in range(n_cycles):\n')
-        file.write('    unlbld_idx = np.where(is_unlabeled(y))[0]\n')
-        file.write('    X_cand = X[unlbld_idx]\n')
-        query_params_str = ""
-        if query_params_str != "":
-            query_params_str = ", " + dict_to_str(query_params)
-        file.write('    query_idx = unlbld_idx[qs.query(X_cand, X, y{})]\n'.format(query_params_str))
-        file.write('    if c in [1]:\n')
-        file.write('        artists.append([plot_2d_dataset(X, y, y_true, clf, qs)])\n'.format(query_params_str))
-        file.write('    y[query_idx] = y_true[query_idx]\n')
-        file.write('    clf.fit(X, y)\n')
-        file.write('\n')
-        file.write('ani = animation.ArtistAnimation(fig, artists, blit=True)\n')
-        #file.write('plt.show()\n')
+def format_plot(code_blocks, qs_name, init_params, query_params):
 
-    block_str = ".. plot:: " + rel_path + "\n"
-    block_str += "   :include-source:\n"
-    block_str += "\n"
-    return block_str
+    block_str = ('import numpy as np\n')
+    block_str += ('from matplotlib import pyplot as plt, animation\n')
+    block_str += ('from sklearn.datasets import make_classification\n')
+    block_str += ('from skactiveml.classifier import SklearnClassifier\n')
+    block_str += ('from skactiveml.utils import MISSING_LABEL, is_unlabeled, plot_2d_dataset\n')
+    block_str += ('from sklearn.linear_model import LogisticRegression\n')
+    block_str += ('\n')
+    block_str += ('fig, ax = plt.subplots()\n')
+    block_str += ('artists = []\n')
+    block_str += ('X, y_true = make_classification(n_features=2, n_redundant=0, random_state=0)\n')
+    block_str += ('y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n')
+    block_str += ('clf = SklearnClassifier(LogisticRegression())\n')
+    block_str += ('qs = {}({})\n'.format(qs_name, dict_to_str(init_params)))
+    block_str += ('n_cycles = 20\n')
+    block_str += ('for c in range(n_cycles):\n')
+    block_str += ('    unlbld_idx = np.where(is_unlabeled(y))[0]\n')
+    block_str += ('    X_cand = X[unlbld_idx]\n')
+    query_params_str = ""
+    if query_params_str != '':
+        query_params_str = ', ' + dict_to_str(query_params)
+    block_str += ('    query_idx = unlbld_idx[qs.query(X_cand, X, y{})]\n'.format(query_params_str))
+    block_str += ('    if c in [1]:\n')
+    block_str += ('        artists.append([plot_2d_dataset(X, y, y_true, clf, qs)])\n'.format(query_params_str))
+    block_str += ('    y[query_idx] = y_true[query_idx]\n')
+    block_str += ('    clf.fit(X, y)\n')
+    block_str += ('\n')
+    block_str += ('ani = animation.ArtistAnimation(fig, artists, blit=True)\n')
+
+    return block_str + '\n'
 
 
 def format_refs(refs):  # TODO Atal
     if not refs:
-        return ""
-    block_str = "References:\n" \
-                "===========\n" \
-                ".. bibliography::\n" \
-                "   :filter: key in {"
+        return ''
+    block_str = '# %%\n' \
+                '# References:\n' \
+                '# ===========\n' \
+                '# .. bibliography::\n' \
+                '#    :filter: key in {'
     for ref in refs:
-        block_str += "'{}', ".format(ref.lower())
+        block_str += '"{}", '.format(ref.lower())
+    block_str = block_str[0:-2] + '}\n'
 
-    block_str = block_str[0:-2] + "}"
-    return block_str
+    return block_str + '\n'
 
 
 def dict_to_str(d, idx=None):

@@ -105,8 +105,9 @@ autosummary_generate = True
 
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
-     'examples_dirs': 'generated\\examples',   # path to your example scripts
-     'gallery_dirs': 'auto_examples',  # path to where to save gallery generated output
+    'examples_dirs': 'generated/examples',   # path to your example scripts
+    'gallery_dirs': 'auto_examples',  # path to where to save gallery generated output
+    'matplotlib_animations': True,
 }
 
 
@@ -176,6 +177,6 @@ todo_include_todos = True
 from docs.generate import generate_stratagy_summary_rst, \
     generate_api_reference_rst, generate_examples, generate_example_rst
 
-generate_api_reference_rst(os.path.abspath('api_reference.rst'))
-generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'))
+#generate_api_reference_rst(os.path.abspath('api_reference.rst'))
+#generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'))
 generate_examples(os.path.abspath('generated/examples'), package=pool)
