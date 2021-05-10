@@ -5,7 +5,7 @@ import string
 
 import numpy as np
 
-from skactiveml import pool, classifier, utils#, stream TODO uncomment for stream
+from skactiveml import pool, classifier, utils  # , stream TODO uncomment for stream
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.datasets import make_classification
@@ -15,6 +15,7 @@ from skactiveml.utils import is_unlabeled, MISSING_LABEL, plot_2d_dataset, \
 from skactiveml.classifier import SklearnClassifier
 from sklearn.metrics import accuracy_score
 import warnings
+
 warnings.filterwarnings("ignore")
 
 
@@ -125,12 +126,13 @@ def get_table_data(package):
 
     return data
 
+
 def generate_examples(example_path, package, json_path):
     for filename in os.listdir(json_path):
-        with open(json_path +"\\"+ filename) as file:
+        with open(json_path + "\\" + filename) as file:
             json_data = json.load(file)
-            dir_path = example_path + '\\' +\
-                package.__name__.split('.')[1] + "\\"
+            dir_path = example_path + '\\' + \
+                       package.__name__.split('.')[1] + "\\"
             generate_example_rst(json_data["class"] + '.rst', dir_path, json_data)
     return
     query_strategies = {}
@@ -140,8 +142,7 @@ def generate_examples(example_path, package, json_path):
         pass
 
 
-
-def generate_example_rst(filename,dir_path, data):
+def generate_example_rst(filename, dir_path, data):
     try:
         os.makedirs(dir_path)
     except OSError as e:
@@ -251,7 +252,7 @@ def format_plot(code_blocks, qs_name, init_params, query_params, rel_path):
         file.write('    clf.fit(X, y)\n')
         file.write('\n')
         file.write('ani = animation.ArtistAnimation(fig, artists, blit=True)\n')
-        #file.write('plt.show()\n')
+        # file.write('plt.show()\n')
 
     block_str = ".. plot:: " + rel_path + "\n"
     block_str += "   :include-source:\n"
@@ -302,4 +303,3 @@ def dict_to_str(d, idx=None):
             value = value[0]
         dd_str += str(key) + "=" + value + ", "
     return dd_str[0:-2]
-
