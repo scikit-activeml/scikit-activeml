@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from sklearn.utils import check_random_state
+from sklearn.utils import check_random_state, check_array
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
@@ -35,7 +35,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         self.strategy = strategy
 
     def query(self, X_cand, *args, A_cand=None, batch_size=1,
-              return_utilities=False, method='one_per_sample', **kwargs):
+              return_utilities=False, pref_annotators_per_sample=1, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator. The sample is chosen by the given strategy as if one
         unspecified annotator where to annotate the sample and the
@@ -60,9 +60,20 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
-        method : {'one_per_sample', 'ra', 'entropy'},
-            optional (default='one_per_sample')
+            If true, also returns the utilities based on the query strategy.
+        pref_annotators_per_sample : int, optional (default=1)
+                                  or array-like, shape (k), k <= n_samples
+            If pref_annotators_per_sample is an int, the value indicates
+            the number of annotators that are preferably assigned to a candidate
+            sample, if annotators can still be assigned to the given candidate
+            sample.
+            If pref_annotators_per_sample is an int array, the values of the
+            array are interpreted as follows. The value at the i-th index
+            determines the preferred number of annotators for the candidate
+            sample at the i-th index in the ranking of the batch. The last index
+            of the pref_annotators_per_sample array (k-1) indicates the
+            preferred number of annotators for all candidate sample at an index
+            greater of equal than k-1.
 
         Returns
         -------
@@ -80,25 +91,17 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
                                self.random_state, reset=True)
 
+        n_annotators = A_cand.shape[0]
+
         # check strategy
+
         if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
             raise TypeError(
                 f"The given strategy is of the type `{type(self.strategy)}`, "
                 "but it must be a `SingleAnnotStreamBasedQueryStrategy`."
             )
 
-        # check X-Values are assignable
-        # if np.all(np.sum(A_cand, axis=1) == 0):
-        #     raise ValueError(
-        #         "Some X-Values are not assignable to an annotator"
-        #     )
-
-        # perform query
-
-        n_samples = X_cand.shape[0]
-
         # check args
-
         if len(args) > 1:
             X, y = args[0], args[1]
 
@@ -127,109 +130,63 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                         args_list[1] = vote_vector
                         args = tuple(args_list)
 
+        pref_n_annotators = pref_annotators_per_sample
+
         re_val = self.strategy.query(X_cand, *args, batch_size=batch_size,
                                      return_utilities=True, **kwargs)
+
         single_query_indices, utilities = re_val
 
-        return self._query_one_annotator_per_sample(A_cand, batch_size,
-                                                    utilities, return_utilities)
+        return self._query_annotators(A_cand, batch_size, utilities,
+                                      return_utilities,
+                                      pref_n_annotators)
 
-    def _query_max_annotators_per_sample(self, A_cand, batch_size,
-                                         candidate_utilities, return_utilities):
+    def _query_annotators(self, A_cand, batch_size, candidate_utilities,
+                          return_utilities, pref_n_annotators):
 
         random_state = check_random_state(self.random_state)
 
         n_annotators = A_cand.shape[1]
         n_samples = A_cand.shape[0]
 
-        n_av_annotatos = np.sum(A_cand, axis=1)
+        re_val = self._get_order_preserving_s_query(A_cand, candidate_utilities,
+                                                    batch_size)
 
-        s_utilities = self._get_order_preserving_utilities(A_cand,
-                                                           candidate_utilities,
-                                                           batch_size)
+        s_indices, s_utilities = re_val
+
+        n_as_annotators = self._n_to_assign_annotators(batch_size, A_cand,
+                                                       s_indices,
+                                                       pref_n_annotators)
 
         utilities = np.zeros((batch_size, n_samples, n_annotators))
         query_indices = np.zeros((batch_size, 2), dtype=int)
 
-        b = 0  # actual batch index
-        v = 0  # current annotators per sample
-        a = 0  # sample batch index
-        while b < batch_size:
-            utilities[b] = s_utilities[a]
-            query_indices[b] = rand_argmax(utilities[b],
-                                           random_state=random_state)
-            s_utilities[a, query_indices[b, 0], query_indices[b, 1]] = np.nan
-            b += 1
-            v += 1
-            if v >= n_av_annotatos[a]:
-                a += 1
-                v = 0
+        batch_index = 0  # actual batch index
+        annotator_ps = 0  # current annotators per sample
+        sample_index = 0  # sample batch index
+
+        while batch_index < batch_size:
+            utilities[batch_index] = s_utilities[sample_index]
+            query_indices[batch_index] = rand_argmax(utilities[batch_index],
+                                                     random_state=random_state)
+
+            s_utilities[sample_index,
+                        query_indices[batch_index, 0],
+                        query_indices[batch_index, 1]] = np.nan
+
+            batch_index += 1
+            annotator_ps += 1
+            if annotator_ps >= n_as_annotators[sample_index]:
+                sample_index += 1
+                annotator_ps = 0
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
 
-    def _query_annotator_sample_pairs(self, A_cand, batch_size,
-                                      candidate_utilities, return_utilities):
-
-        random_state = check_random_state(self.random_state)
-
-        n_annotators = A_cand.shape[1]
-        n_samples = A_cand.shape[0]
-
-        candidate_utilities = candidate_utilities[0, :] \
-            .reshape((n_samples, 1)) \
-            .repeat(n_annotators, axis=1)
-        annotator_utilities = random_state.rand(n_annotators) \
-            .reshape((n_samples, n_annotators))
-
-        utilities = candidate_utilities * annotator_utilities
-        utilities[np.where(np.logical_not(A_cand))] = np.nan
-
-        flat_utilities = utilities.flatten()
-
-        flat_indices, flat_utilities = simple_batch(flat_utilities,
-                                                    random_state,
-                                                    batch_size=batch_size,
-                                                    return_utilities=True)
-        flat_indices_0 = flat_indices // n_annotators
-        flat_indices_1 = flat_indices % n_annotators
-
-        query_indices = np.concatenate((flat_indices_0.reshape(batch_size, 1),
-                                        flat_indices_1.reshape(batch_size, 1)),
-                                       axis=1)
-
-        query_utilities = flat_utilities.reshape((batch_size, n_samples,
-                                                  n_annotators))
-
-        if return_utilities:
-            return query_indices, query_utilities
-        else:
-            return query_indices
-
-    def _query_one_annotator_per_sample(self, A_cand, batch_size,
-                                        candidate_utilities, return_utilities):
-
-        random_state = check_random_state(self.random_state)
-
-        utilities = self._get_order_preserving_utilities(A_cand,
-                                                         candidate_utilities,
-                                                         batch_size)
-
-        # get candidate annotator pair indices
-        query_indices = np.zeros((batch_size, 2), dtype=int)
-        for b in range(batch_size):
-            query_indices[b] = rand_argmax(utilities[b],
-                                           random_state=random_state)
-
-        if return_utilities:
-            return query_indices, utilities
-        else:
-            return query_indices
-
-    def _get_order_preserving_utilities(self, A_cand, candidate_utilities,
-                                        batch_size):
+    def _get_order_preserving_s_query(self, A_cand, candidate_utilities,
+                                      batch_size):
 
         random_state = check_random_state(self.random_state)
 
@@ -244,6 +201,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         candidate_utilities = rankdata(candidate_utilities, method='dense',
                                        axis=1).astype(float)
 
+        # calculate indices of maximum sample
+        indices = np.argmax(candidate_utilities, axis=1)
+
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = np.nan
 
         # prepare annotator_utilities and get annotator indices
@@ -255,5 +215,19 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         # combine utilities by addition
         utilities = candidate_utilities[:, :, np.newaxis] + annotator_utilities
 
-        return utilities
+        return indices, utilities
+
+    @staticmethod
+    def _n_to_assign_annotators(batch_size, A_cand, s_indices,
+                                pref_n_annotators):
+
+        n_max_annotators = np.sum(A_cand, axis=1)
+        annot_per_sample = np.minimum(n_max_annotators[s_indices], pref_n_annotators)
+
+        total_annotators = np.sum(annot_per_sample)
+
+        if total_annotators < batch_size:
+            annot_per_sample = n_max_annotators[s_indices]
+
+        return annot_per_sample
 

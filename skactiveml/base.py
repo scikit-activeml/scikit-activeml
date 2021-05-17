@@ -139,12 +139,11 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
-    def __init__(self, random_state=None, n_annotators=None):
+    def __init__(self, random_state=None):
         super().__init__(random_state=random_state)
-        self.n_annotators = n_annotators
 
     @abstractmethod
-    def query(self, X_cand, *args, A_cand=None, n_annotators=None, batch_size=1,
+    def query(self, X_cand, *args, A_cand=None, batch_size=1,
               return_utilities=False, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator.
@@ -188,6 +187,13 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         ----------
         X_cand: array-like, shape (n_candidates, n_features)
             Candidate samples.
+         A_cand : array-like, shape (n_samples, n_annotators), optional
+        (default=None)
+            Boolean matrix where `A_cand[i,j] = True` indicates that
+            annotator `j` can be selected for annotating sample `X_cand[i]`,
+            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
+            selected for annotating sample `X_cand[i]`. If A_cand=None, each
+            annotator is assumed to be available for labeling each sample.
         batch_size : int,
             The number of samples to be selected in one AL cycle.
         return_utilities : bool,
@@ -212,12 +218,13 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         random_state : np.random.RandomState,
             Checked random state to use.
         """
+
         # Check candidate instances.
         X_cand = check_array(X_cand, **check_X_cand_params)
 
         # Check annotator instances.
         if A_cand is None:
-            A_cand = np.full(True, X_cand.shape)
+            A_cand = np.full(True, ())
         else:
             A_cand = check_array(A_cand)
 
