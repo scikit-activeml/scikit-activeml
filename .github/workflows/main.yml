@@ -41,5 +41,5 @@ jobs:
     - name: Create documentation with sphinx
       run: |
         pip install jupyter
-        cd docs
-        make html
+        pip install sphinx
+        sphinx-build -b html docs docs/_build
