@@ -17,3 +17,5 @@ __all__ = ['rand_argmax', 'rand_argmin', 'compute_vote_vectors',
            'check_classifier_params', 'check_X_y', 'check_random_state',
            'MISSING_LABEL', 'call_func', 'simple_batch',
            'ext_confusion_matrix', 'plot_2d_dataset']
+
+
