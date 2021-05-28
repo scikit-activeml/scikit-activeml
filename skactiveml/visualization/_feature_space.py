@@ -4,6 +4,9 @@ import pylab as plt
 from skactiveml.utils import call_func, is_unlabeled, is_labeled
 
 def plot_decision_boundary(X, y, y_oracle, clf, selector, res=21):
+
+
+
     # create mesh for plotting
     x_1_vec = np.linspace(min(X[:, 0]), max(X[:, 0]), res)
     x_2_vec = np.linspace(min(X[:, 1]), max(X[:, 1]), res)

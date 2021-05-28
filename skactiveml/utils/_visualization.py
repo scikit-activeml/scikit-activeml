@@ -1,9 +1,45 @@
 import numpy as np
 import pylab as plt
+from sklearn.utils.multiclass import type_of_target
 
-from skactiveml.utils import call_func, is_unlabeled, is_labeled
+from skactiveml.utils import call_func, is_unlabeled, is_labeled, ExtLabelEncoder
+from sklearn.utils import check_array, check_consistent_length, column_or_1d
+from skactiveml.classifier import SklearnClassifier
 
-def plot_2d_dataset(X, y, y_oracle, clf, selector, res=21):
+
+
+def plot_2d_dataset(self, X, y, y_oracle, clf, selector, res=21):
+
+    # Validatet input parameters
+    X = check_array(X)
+    y = np.array(y)
+    check_consistent_length(X, y)
+    check_consistent_length(X, y_oracle)
+    is_lbdl = is_labeled(y, self.missing_label)
+    if len(y[is_lbdl]) > 0:
+        y_type = type_of_target(y[is_lbdl])
+        if y_type not in ['binary', 'multiclass', 'multiclass-multioutput',
+                          'multilabel-indicator', 'multilabel-sequences',
+                          'unknown']:
+            raise ValueError("Unknown label type: %r" % y_type)
+    self._le = ExtLabelEncoder(classes=self.classes,
+                               missing_label=self.missing_label)
+    y = self._le.fit_transform(y)
+    if len(self._le.classes_) == 0:
+        raise ValueError("No class label is known because 'y' contains no "
+                         "actual class labels and 'classes' is not "
+                         "defined. Change at least on of both to overcome "
+                         "this error.")
+
+    # Restrictions for clf
+    if clf not in SklearnClassifier:
+        raise TypeError("It only supports SklearnClassifiers")
+
+
+
+
+
+
     # create mesh for plotting
     x_1_vec = np.linspace(min(X[:, 0]), max(X[:, 0]), res)
     x_2_vec = np.linspace(min(X[:, 1]), max(X[:, 1]), res)
