@@ -139,8 +139,9 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
-    def __init__(self, random_state=None):
+    def __init__(self, random_state=None, n_annotators=None):
         super().__init__(random_state=random_state)
+        self.n_annotators = n_annotators
 
     @abstractmethod
     def query(self, X_cand, *args, A_cand=None, batch_size=1,
@@ -224,9 +225,20 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
 
         # Check annotator instances.
         if A_cand is None:
-            A_cand = np.full(True, ())
+            if self.n_annotators is None:
+                raise ValueError(
+                    "The number of annotators can not be determined. "
+                    "Pass n_annotators in the Initialization or pass "
+                    "A_cand as the annotators matrix."
+                )
+            else:
+                A_cand = np.full(True, (X_cand.shape[0], self.n_annotators))
         else:
             A_cand = check_array(A_cand)
+            if np.prod(np.sum(A_cand, axis=1)) <= 0:
+                raise ValueError(
+                    "Some values can not be assigned to an annotator."
+                )
 
         # check if A_cand number of samples equals X_cand number of samples
         if A_cand.shape[0] != X_cand.shape[0]:
