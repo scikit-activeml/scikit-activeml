@@ -1,8 +1,7 @@
 import unittest
 
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessRegressor, \
-    GaussianProcessClassifier
+from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.classifier import SklearnClassifier, CMM
 from skactiveml.pool import UncertaintySampling, RandomSampler
@@ -107,6 +106,19 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                                           pref_annotators_per_sample=3,
                                           return_utilities=False)
         self.check_availability(best_cand_indices, A_cand)
+
+    def test_query_varying_annotators_per_sample_batch_size_five(self):
+        random = RandomSampler(self.random_state)
+
+        wrapper = MultiAnnotWrapper(random, self.random_state)
+
+        pref = np.array([3, 2])
+
+        best_cand_indices = wrapper.query(self.X_cand, A_cand=self.A_cand,
+                                          batch_size=5,
+                                          pref_annotators_per_sample=pref,
+                                          return_utilities=False)
+        self.check_availability(best_cand_indices, self.A_cand)
 
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]

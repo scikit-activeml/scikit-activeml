@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from sklearn.utils import check_random_state
+from sklearn.utils import check_random_state, check_array
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
@@ -61,8 +61,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
-        pref_annotators_per_sample : int, optional (default=1)
-                                  or array-like, shape (k), k <= n_samples
+        pref_annotators_per_sample : int, array-like, optional (default=1)
+                                     array-like, shape (k), k <= n_samples
             If pref_annotators_per_sample is an int, the value indicates
             the number of annotators that are preferably assigned to a candidate
             sample, if annotators can still be assigned to the given candidate
@@ -129,7 +129,28 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         batch_size_sq = min(batch_size, X_cand.shape[0])
 
-        pref_n_annotators = pref_annotators_per_sample * np.ones(batch_size_sq)
+        if type(pref_annotators_per_sample) in [int, np.int_]:
+            pref_n_annotators = pref_annotators_per_sample * \
+                                np.ones(batch_size_sq)
+        else:
+            pref_n_annotators = check_array(pref_annotators_per_sample,
+                                            ensure_2d=False)
+
+            if pref_n_annotators.ndim != 1:
+                raise ValueError(
+                    "pref_annotators_per_sample, if an array, must be of dim"
+                    f"1 but, it is of dim {pref_n_annotators.dim}"
+                )
+            else:
+                pref_length = pref_n_annotators.shape[0]
+                if pref_length > batch_size_sq:
+                    pref_n_annotators = pref_n_annotators[:batch_size_sq]
+
+                if pref_length < batch_size_sq:
+                    appended = pref_n_annotators[-1] * \
+                        np.ones(batch_size_sq - pref_length)
+
+                    pref_n_annotators = np.append(pref_n_annotators, appended)
 
         val = self.strategy.query(X_cand, *args, batch_size=batch_size_sq,
                                   return_utilities=True, **kwargs)
@@ -235,4 +256,3 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             total_annotators = np.sum(annot_per_sample)
 
         return annot_per_sample
-

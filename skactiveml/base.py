@@ -243,9 +243,9 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         # check if A_cand number of samples equals X_cand number of samples
         if A_cand.shape[0] != X_cand.shape[0]:
             raise ValueError(
-                "A_cand.shape[0] has to equal X_cand.shape[0]"
-                "A_cand.shape[0] equals: " + A_cand.shape[0] +
-                "X_cand.shpae[0] equals: " + X_cand.shape[0]
+                "A_cand.shape[0] has to equal X_cand.shape[0]. "
+                "A_cand.shape[0] equals: {}, X_cand.shpae[0] equals: {}"
+                    .format(A_cand.shape[0], X_cand.shape[0])
             )
 
         # Check number of features.
@@ -262,8 +262,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         if n_queries < batch_size:
             warnings.warn(
                 "'batch_size={}' is larger than number of candidate queries "
-                "in 'A_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, n_queries))
+                "in 'A_cand'. Instead, 'batch_size={}' was set "
+                    .format(batch_size, n_queries))
             batch_size = n_queries
 
         # Check random state.
