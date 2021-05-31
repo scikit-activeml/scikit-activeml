@@ -138,6 +138,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     ----------
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
+    n_annotators : int,
+        Sets the number of annotators if no A_cand is None
     """
     def __init__(self, random_state=None, n_annotators=None):
         super().__init__(random_state=random_state)
@@ -188,7 +190,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         ----------
         X_cand: array-like, shape (n_candidates, n_features)
             Candidate samples.
-         A_cand : array-like, shape (n_samples, n_annotators), optional
+        A_cand : array-like, shape (n_candidates, n_annotators), optional
         (default=None)
             Boolean matrix where `A_cand[i,j] = True` indicates that
             annotator `j` can be selected for annotating sample `X_cand[i]`,
@@ -212,6 +214,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         -------
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
+        A_cand: np.ndarray, shape (n_candidates, n_annotators)
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
@@ -226,26 +229,20 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         # Check annotator instances.
         if A_cand is None:
             if self.n_annotators is None:
-                raise ValueError(
+                raise TypeError(
                     "The number of annotators can not be determined. "
                     "Pass n_annotators in the Initialization or pass "
                     "A_cand as the annotators matrix."
                 )
             else:
-                A_cand = np.full(True, (X_cand.shape[0], self.n_annotators))
-        else:
-            A_cand = check_array(A_cand)
-            if np.prod(np.sum(A_cand, axis=1)) <= 0:
-                raise ValueError(
-                    "Some values can not be assigned to an annotator."
-                )
+                A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
 
         # check if A_cand number of samples equals X_cand number of samples
         if A_cand.shape[0] != X_cand.shape[0]:
             raise ValueError(
                 "A_cand.shape[0] has to equal X_cand.shape[0]. "
                 "A_cand.shape[0] equals: {}, X_cand.shpae[0] equals: {}"
-                    .format(A_cand.shape[0], X_cand.shape[0])
+                .format(A_cand.shape[0], X_cand.shape[0])
             )
 
         # Check number of features.
@@ -270,7 +267,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         random_state = check_random_state(random_state=self.random_state,
                                           seed_multiplier=len(X_cand))
 
-        return X_cand, return_utilities, batch_size, random_state
+        return X_cand, A_cand, return_utilities, batch_size, random_state
 
 
 class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):

@@ -1,7 +1,8 @@
 import warnings
 
 import numpy as np
-from sklearn.utils import check_random_state, check_array
+from sklearn.utils import check_random_state, check_array, check_scalar
+from sklearn.utils.validation import _is_arraylike
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
@@ -10,7 +11,7 @@ from skactiveml.utils import compute_vote_vectors
 
 from scipy.stats import rankdata
 
-from ..utils import rand_argmax
+from skactiveml.utils import rand_argmax
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -28,11 +29,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         An active learning strategy for a single annotator.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
+    n_annotators : int,
+        Sets the number of annotators if no A_cand is None
     """
 
-    def __init__(self, strategy, random_state=None):
+    def __init__(self, strategy, random_state=None, n_annotators=None):
         super().__init__(random_state=random_state)
         self.strategy = strategy
+        self.n_annotators = n_annotators
 
     def query(self, X_cand, *args, A_cand=None, batch_size=1,
               return_utilities=False, pref_annotators_per_sample=1, **kwargs):
@@ -88,8 +92,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             `utilities[i, j, k]` indicates the utilities of
             the i-th batch regarding the j-th sample and the k-th annotator.
         """
-        super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
-                               self.random_state, reset=True)
+        X_cand, A_cand, return_utilities, batch_size, random_state = \
+            super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
+                                   self.random_state, reset=True)
 
         # check strategy
         if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
@@ -127,12 +132,21 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                         args_list[1] = vote_vector
                         args = tuple(args_list)
 
-        batch_size_sq = min(batch_size, X_cand.shape[0])
+        a_indices = np.argwhere(np.any(A_cand, axis=1)).flatten()
+
+        n_samples = X_cand.shape[0]
+
+        X_cand_sq = X_cand[a_indices]
+
+        batch_size_sq = min(batch_size, X_cand_sq.shape[0])
 
         if type(pref_annotators_per_sample) in [int, np.int_]:
+            check_scalar(pref_annotators_per_sample,
+                         name='pref_annotators_per_sample',
+                         target_type=int, min_val=1)
             pref_n_annotators = pref_annotators_per_sample * \
-                                np.ones(batch_size_sq)
-        else:
+                np.ones(batch_size_sq)
+        elif _is_arraylike(pref_annotators_per_sample):
             pref_n_annotators = check_array(pref_annotators_per_sample,
                                             ensure_2d=False)
 
@@ -151,19 +165,26 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                         np.ones(batch_size_sq - pref_length)
 
                     pref_n_annotators = np.append(pref_n_annotators, appended)
+        else:
+            raise TypeError("pref_annotators_per_sample must be array like"
+                            "or an integer")
 
-        val = self.strategy.query(X_cand, *args, batch_size=batch_size_sq,
+        val = self.strategy.query(X_cand_sq, *args, batch_size=batch_size_sq,
                                   return_utilities=True, **kwargs)
 
-        single_query_indices, utilities = val
+        single_query_indices, w_utilities = val
+
+        utilities = np.nan * np.ones((batch_size_sq, n_samples))
+
+        utilities[:, a_indices] = w_utilities
 
         return self._query_annotators(A_cand, batch_size, utilities,
                                       return_utilities, pref_n_annotators,
-                                      batch_size_sq)
+                                      batch_size_sq, a_indices)
 
     def _query_annotators(self, A_cand, batch_size, candidate_utilities,
                           return_utilities, pref_n_annotators,
-                          batch_size_sq):
+                          batch_size_sq, a_indices):
 
         random_state = check_random_state(self.random_state)
 
