@@ -34,8 +34,6 @@ def plot_decision_boundary(self, X, y, y_oracle, clf, selector, res=21):
     if clf not in SklearnClassifier:
         raise TypeError("It only supports SklearnClassifiers")
 
-
-
     # create mesh for plotting
     x_1_vec = np.linspace(min(X[:, 0]), max(X[:, 0]), res)
     x_2_vec = np.linspace(min(X[:, 1]), max(X[:, 1]), res)
