@@ -1,7 +1,7 @@
 import numpy as np
 from copy import deepcopy
 
-from .base import BudgetManager, get_default_budget
+from skactiveml.base import BudgetManager
 from skactiveml.utils import check_random_state
 
 
@@ -63,7 +63,7 @@ class EstimatedBudget(BudgetManager):
             The EstimatedBudget returns itself, after it is updated.
         """
         # check if budget has been set
-        self._validate_budget(get_default_budget())
+        self._validate_budget()
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
