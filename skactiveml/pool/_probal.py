@@ -133,6 +133,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                  nonmyopic_max_cand=3, nonmyopic_neighbors='nearest',
                  nonmyopic_labels_equal=True,
                  nonmyopic_independent_probs=True,
+                 transductive=False,
                  random_state=None):
         """ XPAL
         The expected probabilistic active learning (XPAL)
@@ -223,6 +224,8 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         nonmyopic_independent_probs: bool
             If True, the label probabilities within one nonmyopic set are
             assumed to be independent to reduce computational cost.
+        transductive: bool
+            TODO
         random_state : numeric | np.random.RandomState
             Random state to use.
 
@@ -249,6 +252,7 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
         self.nonmyopic_neighbors = nonmyopic_neighbors
         self.nonmyopic_labels_equal = nonmyopic_labels_equal
         self.nonmyopic_independent_probs = nonmyopic_independent_probs
+        self.transductive = transductive
 
     def _validate_data(self, X, y, X_cand, X_eval, sample_weight,
                        sample_weight_cand, sample_weight_eval, batch_size,
@@ -419,6 +423,16 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
             raise NotImplementedError("batch_mode = 'full' can only be "
                                       "combined with nonmyopic_max_cand = 1")
 
+        if self.transductive:
+            if not np.array_equal(X_cand, X_eval):
+                raise ValueError("In transductive mode, X_eval and X_cand "
+                                 "need to be equal")
+            if not scoring_decomposable:
+                raise NotImplementedError("In transductive mode, so far only "
+                                          "decomposable score fuctions are "
+                                          "mplemented")
+
+
         """
         CODE
         """
@@ -512,7 +526,8 @@ class XPAL(SingleAnnotPoolBasedQueryStrategy):
                     else self.nonmyopic_independent_probs,
                 cand_labels_equal=
                     self.batch_labels_equal if self.batch_mode == 'full'
-                    else self.nonmyopic_labels_equal
+                    else self.nonmyopic_labels_equal,
+                transductive=self.transductive
             )
 
             if self.batch_mode == 'greedy':
@@ -554,8 +569,11 @@ def probabilistic_gain(clf, X, y, X_eval,
                        scoring_cost_matrix, scoring_perf_func,
                        preselected_labels_equal,
                        cand_independent_probs,
-                       cand_labels_equal):
+                       cand_labels_equal,
+                       transductive):
 
+    # TODO: checks for transductive mode are more complicated. how to ensure
+    #       that X_cand, X_eval are equal?
 
     # TODO: check sim shapes and values for training data, candidates etc
     # np.set_printoptions(precision=1, suppress=True)
@@ -676,6 +694,9 @@ def probabilistic_gain(clf, X, y, X_eval,
                         pred_new = new_clf.predict(K[:, idx_new])
                     else:
                         pred_new = new_clf.predict(X_eval)
+                    if transductive:
+                        pred_new[cand_idx] = -1  # TODO maybe not the best choice
+                        # TODO probably correct for nearest neighbors but not for equal look-ahead window instances
                     pred_old = pred_old_cand
                     sample_weight_eval_new = sample_weight_eval
 
@@ -1082,6 +1103,11 @@ def _dperf(probs, pred_old, pred_new, sample_weight_eval,
         p = probs[pred_changed, :]
         C_old = cost_matrix.T[pred_old[pred_changed]]
         C_new = cost_matrix.T[pred_new[pred_changed]]
+
+        # transduction
+        transductive_idx = (pred_new[pred_changed] == -1)
+        if np.sum(transductive_idx) > 0:
+            C_new[transductive_idx,:] = 0
         normalize = sum(sample_weight_eval)
         performance_difference = np.sum(w * p * (C_old - C_new)) / normalize
         return performance_difference
