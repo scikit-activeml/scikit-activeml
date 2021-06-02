@@ -246,7 +246,8 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
               dtype="numeric", order=None, copy=False, force_all_finite=True,
               ensure_2d=True, allow_nd=False, multi_output=False,
               allow_nan=None, ensure_min_samples=1, ensure_min_features=1,
-              y_numeric=False, estimator=None, missing_label=MISSING_LABEL):
+              y_numeric=False, estimator=None, missing_label=MISSING_LABEL,
+              set_sample_weight=True):
     """Input validation for standard estimators.
 
     Checks X and y for consistent length, enforces X to be 2D and y 1D. By
@@ -352,6 +353,10 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
     missing_label : {scalar, string, np.nan, None}, (default=np.nan)
         Value to represent a missing label.
 
+    set_sample_weight : boolean (default=True)
+        If true, sample_weight/sample_weight_cand will be set to np.ones,
+        if sample_weight/sample_weight_cand is not given.
+
     Returns
     -------
     X_converted : object
@@ -408,19 +413,21 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
             raise ValueError("The number of features of X_cand does not match"
                              "the number of features of X")
 
-        if sample_weight_cand is None:
+        if sample_weight_cand is None and set_sample_weight:
             sample_weight_cand = np.ones(len(X_cand))
-        sample_weight_cand = check_array(sample_weight_cand, ensure_2d=False)
-        check_consistent_length(X_cand, sample_weight_cand)
+        if sample_weight_cand is not None:
+            sample_weight_cand = check_array(sample_weight_cand,
+                                             ensure_2d=False)
+            check_consistent_length(X_cand, sample_weight_cand)
 
-    if sample_weight is None:
+    if sample_weight is None and set_sample_weight:
         sample_weight = np.ones(y.shape)
-
-    sample_weight = check_array(sample_weight, ensure_2d=False)
-    check_consistent_length(y, sample_weight)
-    if y.ndim > 1 and y.shape[1] > 1 or \
-            sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
-        check_consistent_length(y.T, sample_weight.T)
+    if sample_weight is not None:
+        sample_weight = check_array(sample_weight, ensure_2d=False)
+        check_consistent_length(y, sample_weight)
+        if y.ndim > 1 and y.shape[1] > 1 or \
+                sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
+            check_consistent_length(y.T, sample_weight.T)
 
     if X_cand is None:
         return X, y, sample_weight
