@@ -165,7 +165,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
 
         return X_cand, return_utilities, X, y, simulate
 
-    def _validate_clf(self, X, y):
+    def _validate_clf(self, X, y, sample_weight=None):
         """Validate if clf is a classifier or create a new clf and fit X and y.
 
         Parameters
