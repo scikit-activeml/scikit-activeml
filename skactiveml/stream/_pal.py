@@ -26,7 +26,14 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self.m_max = m_max
 
     def query(
-        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+        self,
+        X_cand,
+        X,
+        y,
+        return_utilities=False,
+        simulate=False,
+        sample_weight=None,
+        **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -61,13 +68,21 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, X, y)
+        self._validate_data(
+            X_cand,
+            return_utilities,
+            X,
+            y,
+            simulate,
+            sample_weight=sample_weight
+        )
 
         k_vec = self.clf_.predict_freq(X_cand)
         utilities = probal._cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max
         )
-        sampled_indices = self.budget_manager_.sample(utilities)
+        sampled_indices = self.budget_manager_.sample(utilities,
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities
@@ -75,13 +90,40 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             return sampled_indices
 
     def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        sampled : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been sampled.
+
+        budget_manager_kwargs : kwargs
+            Optional kwargs for budget_manager.
+
+        Returns
+        -------
+        self : PAL
+            PAL returns itself, after it is updated.
+        """
         # check if a budget_manager is set
         self._validate_budget_manager()
         self.budget_manager_.update(sampled, **budget_manager_kwargs)
         return self
 
     def _validate_data(
-        self, X_cand, return_utilities, X, y, reset=True, **check_X_cand_params
+        self,
+        X_cand,
+        return_utilities,
+        X,
+        y,
+        simulate,
+        sample_weight,
+        reset=True,
+        **check_X_cand_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -91,6 +133,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             Candidate samples.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -107,19 +151,32 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         random_state : np.random.RandomState,
             Checked random state to use.
         """
-        X_cand, return_utilities = super()._validate_data(
-            X_cand, return_utilities, reset=reset, **check_X_cand_params
+        X_cand, return_utilities, simulate = super()._validate_data(
+            X_cand,
+            return_utilities,
+            simulate,
+            reset=reset,
+            **check_X_cand_params
         )
 
-        self._validate_clf(X, y)
+        self._validate_clf(X, y, sample_weight)
         self._validate_prior()
         self._validate_m_max()
         self._validate_random_state()
 
-        return X_cand, return_utilities, X, y
+        return X_cand, return_utilities, X, y, simulate
 
-    def _validate_clf(self, X, y):
-        # check if clf is a classifier
+    def _validate_clf(self, X, y, sample_weight=None):
+        """Validate if clf is a classifier or create a new clf and fit X and y.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        """
         if X is not None and y is not None:
             if self.clf is None:
                 self.clf_ = PWC(
@@ -132,7 +189,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
                     "clf is not a classifier. Please refer to "
                     + "sklearn.base.is_classifier"
                 )
-            self.clf_.fit(X, y)
+            self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
@@ -141,7 +198,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             self.clf_ = self.clf
 
     def _validate_prior(self):
-        # check if prior is set
+        """Validate if the prior is a float and greater than 0.
+        """
         if not isinstance(self.prior, float) and not None:
             raise TypeError("{} is not a valid type for prior")
         if self.prior <= 0:
@@ -151,6 +209,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             )
 
     def _validate_m_max(self):
+        """Validate if the m_max is an integer and greater than 0.
+        """
         # check if m_max is set
         if not isinstance(self.m_max, int):
             raise TypeError("{} is not a valid type for m_max")
@@ -161,6 +221,10 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             )
 
     def _validate_random_state(self):
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
+        """
         if not hasattr(self, "random_state_"):
             self.random_state_ = self.random_state
         self.random_state_ = check_random_state(self.random_state_)

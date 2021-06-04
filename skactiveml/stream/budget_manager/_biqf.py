@@ -1,6 +1,6 @@
 import numpy as np
 
-from .base import BudgetManager, get_default_budget
+from skactiveml.base import BudgetManager
 from collections import deque
 from copy import copy
 
@@ -14,7 +14,7 @@ class BIQF(BudgetManager):
         self.w = w
         self.w_tol = w_tol
         self.save_utilities = save_utilities
-
+        
     def is_budget_left(self):
         return True
 
@@ -61,6 +61,8 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
+        if not hasattr(self, "utility_queue_"):
+            self.utility_queue_ = deque(maxlen=self.w)
         # intialize return parameters
         sampled_indices = []
 
@@ -83,20 +85,19 @@ class BIQF(BudgetManager):
                 self.budget_ * tmp_observed_instances_
                 - tmp_queried_instances_
             )
-            theta_bal = theta - range_ranking * acq_left / self.w_tol
-
+            theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
             sample = u >= theta_bal
 
             if sample:
                 tmp_queried_instances_ += 1
-            sampled_indices.append(sample)
+                sampled_indices.append(i)
 
         if not simulate:
             self.queried_instances_ = tmp_queried_instances_
             self.observed_instances_ = tmp_observed_instances_
             self.history_sorted_ = tmp_history_sorted_
-            if self.save_utilities:
-                self.utility_queue_ = tmp_utility_queue_
+        else:
+            self.utility_queue_ = tmp_utility_queue_
 
         return sampled_indices
 
@@ -108,13 +109,16 @@ class BIQF(BudgetManager):
         sampled : array-like
             Indicates which instances from X_cand have been sampled.
 
+        utilities : ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy.
+
         Returns
         -------
         self : EstimatedBudget
             The EstimatedBudget returns itself, after it is updated.
         """
         # check if budget has been set
-        self._validate_budget(get_default_budget())
+        self._validate_budget()
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
@@ -122,7 +126,7 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
-        self.observed_instances_ += sampled.shape[0]
+        self.observed_instances_ += len(sampled)
         self.queried_instances_ += np.sum(sampled)
         if utilities is not None:
             self.history_sorted_.extend(utilities)
@@ -171,7 +175,8 @@ class BIQF(BudgetManager):
         return utilities, return_budget_left, simulate
 
     def _validate_w_tol(self):
-        # check if w_tol is set
+        """Validate if w_tol is set as an int and greater than 0.
+        """
         if not (isinstance(self.w_tol, int) or isinstance(
             self.w_tol, float)
         ):
@@ -183,7 +188,8 @@ class BIQF(BudgetManager):
             )
 
     def _validate_w(self):
-        # check if w is set
+        """Validate if w is set as an int and greater than 0.
+        """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
         if self.w <= 0:
@@ -192,10 +198,12 @@ class BIQF(BudgetManager):
             )
 
     def _validate_save_utilities(self):
-        # check if clf is a classifier
+        """Validate if save_utilities is set as a bool and initialize
+        self.utility_queue_ accordingly.
+        """
         if isinstance(self.save_utilities, bool):
             if self.save_utilities and not hasattr(self, "utility_queue_"):
-                self.utility_queue_ = deque()
+                self.utility_queue_ = deque(maxlen=self.w)
         else:
             raise TypeError(
                 "save_utilities is not a boolean."
