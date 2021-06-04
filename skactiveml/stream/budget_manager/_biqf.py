@@ -1,6 +1,6 @@
 import numpy as np
 
-from .base import BudgetManager, get_default_budget
+from skactiveml.base import BudgetManager
 from collections import deque
 from copy import copy
 
@@ -83,13 +83,12 @@ class BIQF(BudgetManager):
                 self.budget_ * tmp_observed_instances_
                 - tmp_queried_instances_
             )
-            theta_bal = theta - range_ranking * acq_left / self.w_tol
-
+            theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
             sample = u >= theta_bal
 
             if sample:
                 tmp_queried_instances_ += 1
-            sampled_indices.append(sample)
+                sampled_indices.append(i)
 
         if not simulate:
             self.queried_instances_ = tmp_queried_instances_
@@ -117,7 +116,7 @@ class BIQF(BudgetManager):
             The EstimatedBudget returns itself, after it is updated.
         """
         # check if budget has been set
-        self._validate_budget(get_default_budget())
+        self._validate_budget()
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0

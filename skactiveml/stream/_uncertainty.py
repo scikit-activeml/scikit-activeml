@@ -56,7 +56,14 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         self.clf = clf
 
     def query(
-        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+        self,
+        X_cand,
+        X,
+        y,
+        return_utilities=False,
+        simulate=False,
+        sample_weight=None,
+        **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -82,6 +89,8 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
 
         Returns
         -------
@@ -93,7 +102,14 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, X, y, simulate)
+        self._validate_data(
+            X_cand,
+            return_utilities,
+            X,
+            y,
+            simulate,
+            sample_weight=sample_weight,
+        )
 
         predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -140,6 +156,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         simulate,
+        sample_weight,
         reset=True,
         **check_X_cand_params
     ):
@@ -159,6 +176,8 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         simulate : bool,
             If True, the internal state of the query strategy before and after
             the query is the same.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -187,12 +206,12 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             **check_X_cand_params
         )
 
-        self._validate_clf(X, y)
+        self._validate_clf(X, y, sample_weight)
         self._validate_random_state()
 
         return X_cand, return_utilities, X, y, simulate
 
-    def _validate_clf(self, X, y):
+    def _validate_clf(self, X, y, sample_weight):
         """Validate if clf is a classifier or create a new clf and fit X and y.
 
         Parameters
@@ -202,6 +221,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         """
         # check if clf is a classifier
         if X is not None and y is not None:
@@ -216,7 +238,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
                     "clf is not a classifier. Please refer to "
                     + "sklearn.base.is_classifier"
                 )
-            self.clf_.fit(X, y)
+            self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
@@ -267,7 +289,14 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         self.clf = clf
 
     def query(
-        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+        self,
+        X_cand,
+        X,
+        y,
+        return_utilities=False,
+        simulate=False,
+        sample_weight=None,
+        **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -298,6 +327,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
 
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
         Returns
         -------
         sampled_indices : ndarray of shape (n_sampled_instances,)
@@ -308,7 +340,14 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, X, y, simulate)
+        self._validate_data(
+            X_cand,
+            return_utilities,
+            X,
+            y,
+            simulate,
+            sample_weight=sample_weight,
+        )
 
         predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -357,6 +396,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         simulate,
+        sample_weight,
         reset=True,
         **check_X_cand_params
     ):
@@ -376,6 +416,8 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         simulate : bool,
             If True, the internal state of the query strategy before and after
             the query is the same.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -404,12 +446,12 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             **check_X_cand_params
         )
 
-        self._validate_clf(X, y)
+        self._validate_clf(X, y, sample_weight=sample_weight)
         self._validate_random_state()
 
         return X_cand, return_utilities, X, y, simulate
 
-    def _validate_clf(self, X, y):
+    def _validate_clf(self, X, y, sample_weight):
         """Validate if clf is a classifier or create a new clf and fit X and y.
 
         Parameters
@@ -419,6 +461,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         """
         # check if clf is a classifier
         if X is not None and y is not None:
@@ -433,7 +478,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
                     "clf is not a classifier. Please refer to "
                     + "sklearn.base.is_classifier"
                 )
-            self.clf_.fit(X, y)
+            self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
@@ -477,7 +522,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         self.clf = clf
 
     def query(
-        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+        self,
+        X_cand,
+        X,
+        y,
+        return_utilities=False,
+        simulate=False,
+        sample_weight=None,
+        **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -508,6 +560,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
 
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
         Returns
         -------
         sampled_indices : ndarray of shape (n_sampled_instances,)
@@ -518,7 +573,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, X, y, simulate)
+        self._validate_data(
+            X_cand,
+            return_utilities,
+            X,
+            y,
+            simulate,
+            sample_weight=sample_weight,
+        )
 
         predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -533,9 +595,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         else:
             return sampled_indices
 
-    def update(
-        self, X_cand, sampled, X, y, budget_manager_kwargs={}, **kwargs
-    ):
+    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager and the count for seen and sampled
         instances
 
@@ -544,12 +604,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which could be sampled. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
 
         sampled : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been sampled.
@@ -579,6 +633,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         simulate,
+        sample_weight,
         reset=True,
         **check_X_cand_params
     ):
@@ -600,6 +655,8 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -628,13 +685,13 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             **check_X_cand_params
         )
 
-        self._validate_clf(X, y)
+        self._validate_clf(X, y, sample_weight)
         self._validate_random_state()
         self._validate_budget_manager()
 
         return X_cand, return_utilities, X, y, simulate
 
-    def _validate_clf(self, X, y):
+    def _validate_clf(self, X, y, sample_weight):
         """Validate if clf is a classifier or create a new clf and fit X and y.
 
         Parameters
@@ -644,6 +701,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         """
         # check if clf is a classifier
         if X is not None and y is not None:
@@ -658,7 +718,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
                     "clf is not a classifier. Please refer to "
                     + "sklearn.base.is_classifier"
                 )
-            self.clf_.fit(X, y)
+            self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:

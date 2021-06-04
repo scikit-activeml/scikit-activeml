@@ -1,6 +1,6 @@
 import numpy as np
 
-from .base import BudgetManager, get_default_budget
+from skactiveml.base import BudgetManager
 
 
 class FixedBudget(BudgetManager):
@@ -118,7 +118,7 @@ class FixedBudget(BudgetManager):
             The FixedBudget returns itself, after it is updated.
         """
         # check if budget has been set
-        self._validate_budget(get_default_budget())
+        self._validate_budget()
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0

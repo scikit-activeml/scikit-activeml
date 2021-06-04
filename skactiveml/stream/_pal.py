@@ -26,7 +26,14 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self.m_max = m_max
 
     def query(
-        self, X_cand, X, y, return_utilities=False, simulate=False, **kwargs
+        self,
+        X_cand,
+        X,
+        y,
+        return_utilities=False,
+        simulate=False,
+        sample_weight=None,
+        **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -61,7 +68,14 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, X, y, simulate)
+        self._validate_data(
+            X_cand,
+            return_utilities,
+            X,
+            y,
+            simulate,
+            sample_weight=sample_weight
+        )
 
         k_vec = self.clf_.predict_freq(X_cand)
         utilities = probal._cost_reduction(
@@ -106,6 +120,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         simulate,
+        sample_weight,
         reset=True,
         **check_X_cand_params
     ):
@@ -117,6 +132,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             Candidate samples.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -141,7 +158,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             **check_X_cand_params
         )
 
-        self._validate_clf(X, y)
+        self._validate_clf(X, y, sample_weight)
         self._validate_prior()
         self._validate_m_max()
         self._validate_random_state()
@@ -171,7 +188,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
                     "clf is not a classifier. Please refer to "
                     + "sklearn.base.is_classifier"
                 )
-            self.clf_.fit(X, y)
+            self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
