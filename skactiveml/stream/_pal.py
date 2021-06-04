@@ -75,6 +75,25 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             return sampled_indices
 
     def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        sampled : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been sampled.
+
+        budget_manager_kwargs : kwargs
+            Optional kwargs for budget_manager.
+
+        Returns
+        -------
+        self : PAL
+            PAL returns itself, after it is updated.
+        """
         # check if a budget_manager is set
         self._validate_budget_manager()
         self.budget_manager_.update(sampled, **budget_manager_kwargs)
@@ -130,7 +149,16 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         return X_cand, return_utilities, X, y, simulate
 
     def _validate_clf(self, X, y):
-        # check if clf is a classifier
+        """Validate if clf is a classifier or create a new clf and fit X and y.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        """
         if X is not None and y is not None:
             if self.clf is None:
                 self.clf_ = PWC(
@@ -152,7 +180,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             self.clf_ = self.clf
 
     def _validate_prior(self):
-        # check if prior is set
+        """Validate if the prior is a float and greater than 0.
+        """
         if not isinstance(self.prior, float) and not None:
             raise TypeError("{} is not a valid type for prior")
         if self.prior <= 0:
@@ -162,6 +191,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             )
 
     def _validate_m_max(self):
+        """Validate if the m_max is an integer and greater than 0.
+        """
         # check if m_max is set
         if not isinstance(self.m_max, int):
             raise TypeError("{} is not a valid type for m_max")
@@ -172,6 +203,10 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             )
 
     def _validate_random_state(self):
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
+        """
         if not hasattr(self, "random_state_"):
             self.random_state_ = self.random_state
         self.random_state_ = check_random_state(self.random_state_)

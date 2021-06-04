@@ -108,6 +108,9 @@ class BIQF(BudgetManager):
         sampled : array-like
             Indicates which instances from X_cand have been sampled.
 
+        utilities : ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy.
+
         Returns
         -------
         self : EstimatedBudget
