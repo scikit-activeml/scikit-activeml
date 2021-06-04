@@ -15,9 +15,6 @@ class BIQF(BudgetManager):
         self.w_tol = w_tol
         self.save_utilities = save_utilities
 
-    def is_budget_left(self):
-        return True
-
     def sample(
         self, utilities, return_budget_left=False, simulate=False, **kwargs
     ):
@@ -175,7 +172,8 @@ class BIQF(BudgetManager):
         return utilities, return_budget_left, simulate
 
     def _validate_w_tol(self):
-        # check if w_tol is set
+        """Validate if w_tol is set as an int and greater than 0.
+        """
         if not (isinstance(self.w_tol, int) or isinstance(
             self.w_tol, float)
         ):
@@ -187,7 +185,8 @@ class BIQF(BudgetManager):
             )
 
     def _validate_w(self):
-        # check if w is set
+        """Validate if w is set as an int and greater than 0.
+        """
         if not isinstance(self.w, int):
             raise TypeError("{} is not a valid type for w")
         if self.w <= 0:
@@ -196,7 +195,9 @@ class BIQF(BudgetManager):
             )
 
     def _validate_save_utilities(self):
-        # check if clf is a classifier
+        """Validate if save_utilities is set as a bool and initialize
+        self.utility_queue_ accordingly.
+        """
         if isinstance(self.save_utilities, bool):
             if self.save_utilities and not hasattr(self, "utility_queue_"):
                 self.utility_queue_ = deque(maxlen=self.w)
