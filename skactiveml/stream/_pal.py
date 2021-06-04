@@ -81,7 +81,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         utilities = probal._cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max
         )
-        sampled_indices = self.budget_manager_.sample(utilities)
+        sampled_indices = self.budget_manager_.sample(utilities,
+                                                      simulate=simulate)
 
         if return_utilities:
             return sampled_indices, utilities

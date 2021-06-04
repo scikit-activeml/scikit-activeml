@@ -61,6 +61,8 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
+        if not hasattr(self, "utility_queue_"):
+            self.utility_queue_ = deque(maxlen=self.w)
         # intialize return parameters
         sampled_indices = []
 
@@ -94,8 +96,8 @@ class BIQF(BudgetManager):
             self.queried_instances_ = tmp_queried_instances_
             self.observed_instances_ = tmp_observed_instances_
             self.history_sorted_ = tmp_history_sorted_
-            if self.save_utilities:
-                self.utility_queue_ = tmp_utility_queue_
+        else:
+            self.utility_queue_ = tmp_utility_queue_
 
         return sampled_indices
 
@@ -124,7 +126,7 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
-        self.observed_instances_ += sampled.shape[0]
+        self.observed_instances_ += len(sampled)
         self.queried_instances_ += np.sum(sampled)
         if utilities is not None:
             self.history_sorted_.extend(utilities)
@@ -197,7 +199,7 @@ class BIQF(BudgetManager):
         # check if clf is a classifier
         if isinstance(self.save_utilities, bool):
             if self.save_utilities and not hasattr(self, "utility_queue_"):
-                self.utility_queue_ = deque()
+                self.utility_queue_ = deque(maxlen=self.w)
         else:
             raise TypeError(
                 "save_utilities is not a boolean."
