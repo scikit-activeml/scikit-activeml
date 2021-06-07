@@ -1,9 +1,8 @@
-import numpy as np
 import unittest
 
-from sklearn.utils.validation import NotFittedError, check_is_fitted
-from sklearn.datasets import make_blobs
-from sklearn.preprocessing import StandardScaler
+import numpy as np
+from sklearn.utils.validation import check_is_fitted
+
 from skactiveml.classifier._logistic_regression import LogisticRegressionRY
 
 
@@ -12,52 +11,86 @@ class TestLogisticRegressionRY(unittest.TestCase):
     def setUp(self):
         self.X = np.zeros((2, 1))
         self.y_nan = [['nan', 'nan', 'nan'], ['nan', 'nan', 'nan']]
-        self.y = [['tokyo', 'nan', 'paris'], ['tokyo', 'nan', 'nan']]
-        self.w = [[2, np.nan, 1], [1, 1, 1]]
+        self.y = np.array([['tokyo', 'nan', 'paris'], ['tokyo', 'nan', 'nan']])
+        self.w = np.array([[2, np.nan, 1], [1, 1, 1]])
 
-    def test_init(self):
-        lr = LogisticRegressionRY(tol=1.e-10, solver='CG', annot_prior_full=2,
-                                  solver_dict={'disp': True}, random_state=0,
-                                  annot_prior_diag=1,
-                                  cost_matrix=1 - np.eye(2),
-                                  classes=['tokyo', 'paris'],
-                                  missing_label='nan', fit_intercept=False)
+    def test_init_param_tol(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.tol, 1.e-2)
+        lr = LogisticRegressionRY(tol=1.e-10)
         self.assertEqual(lr.tol, 1.e-10)
-        self.assertEqual(lr.solver, 'CG')
-        self.assertEqual(lr.solver_dict, {'disp': True})
-        self.assertEqual(lr.random_state, 0)
-        self.assertEqual(lr.annot_prior_full, 2)
-        self.assertEqual(lr.annot_prior_diag, 1)
-        self.assertEqual(lr.missing_label, 'nan')
-        self.assertFalse(lr.fit_intercept)
-        np.testing.assert_array_equal(lr.classes, ['tokyo', 'paris'])
-        self.assertRaises(NotFittedError, check_is_fitted, estimator=lr)
-
-    def test_fit(self):
         lr = LogisticRegressionRY(tol=[0.1], missing_label='nan')
         self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
         lr = LogisticRegressionRY(tol=0.0, missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_solver(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.solver, 'Newton-CG')
+        lr = LogisticRegressionRY(solver='CG')
+        self.assertEqual(lr.solver, 'CG')
+        lr = LogisticRegressionRY(missing_label='nan', solver='Test')
+        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_solver_dict(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.solver_dict, None)
+        lr = LogisticRegressionRY(solver_dict={'verbose': 0})
+        self.assertTrue(isinstance(lr.solver_dict, dict))
+        lr = LogisticRegressionRY(missing_label='nan', solver_dict='Test')
+        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_fit_intercept(self):
+        lr = LogisticRegressionRY()
+        self.assertTrue(lr.fit_intercept)
+        lr = LogisticRegressionRY(fit_intercept=False)
+        self.assertFalse(lr.fit_intercept)
+        lr = LogisticRegressionRY(missing_label='nan', fit_intercept='Test')
+        self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_max_iter(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.max_iter, 100)
+        lr = LogisticRegressionRY(max_iter=10)
+        self.assertEqual(lr.max_iter, 10)
         lr = LogisticRegressionRY(max_iter=[1], missing_label='nan')
         self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
         lr = LogisticRegressionRY(max_iter=0, missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
-        lr = LogisticRegressionRY(fit_intercept='Test', missing_label='nan')
-        self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_annot_prior_full(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.annot_prior_full, 1)
+        lr = LogisticRegressionRY(annot_prior_full=2)
+        self.assertEqual(lr.annot_prior_full, 2)
         lr = LogisticRegressionRY(annot_prior_full=0, missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
         lr = LogisticRegressionRY(annot_prior_full=[1, 1],
                                   missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_annot_prior_diag(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.annot_prior_diag, 0)
+        lr = LogisticRegressionRY(annot_prior_diag=2)
+        self.assertEqual(lr.annot_prior_diag, 2)
         lr = LogisticRegressionRY(annot_prior_diag=-0.1, missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
         lr = LogisticRegressionRY(annot_prior_diag=[0, 0, -0.1],
                                   missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+
+    def test_init_param_weights_prior(self):
+        lr = LogisticRegressionRY()
+        self.assertEqual(lr.weights_prior, 1)
+        lr = LogisticRegressionRY(weights_prior=0)
+        self.assertEqual(lr.annot_prior_diag, 0)
         lr = LogisticRegressionRY(weights_prior=[0, 1], missing_label='nan')
         self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
         lr = LogisticRegressionRY(weights_prior=-0.1, missing_label='nan')
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
+
+    def test_fit(self):
         lr = LogisticRegressionRY(random_state=0, missing_label='nan',
                                   classes=['tokyo', 'paris'],
                                   solver='Nelder-Mead')
@@ -70,6 +103,8 @@ class TestLogisticRegressionRY(unittest.TestCase):
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
         self.assertTrue(np.abs(lr.Alpha_ - Alpha_exp).sum() > 0)
         self.assertTrue(np.abs(lr.W_ - W_exp).sum() > 0)
+        lr.fit(X=self.X, y=self.y[:, 0], sample_weight=self.w[:, 0])
+        self.assertEqual(len(lr.Alpha_), 1)
 
     def test_predict_proba(self):
         lr = LogisticRegressionRY(random_state=0, missing_label='nan',
@@ -80,6 +115,16 @@ class TestLogisticRegressionRY(unittest.TestCase):
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
         np.testing.assert_array_equal(np.sum(P, axis=1), np.ones(len(P)))
 
+    def test_predict(self):
+        lr = LogisticRegressionRY(random_state=0, missing_label='nan',
+                                  classes=['tokyo', 'paris'])
+        lr.fit(X=self.X, y=self.y_nan)
+        y_pred = lr.predict(X=self.X)
+        np.testing.assert_array_equal(y_pred, ['tokyo', 'paris'])
+        lr.fit(X=self.X, y=self.y, sample_weight=self.w)
+        y_pred = lr.predict(X=self.X)
+        np.testing.assert_array_equal(y_pred, ['tokyo', 'tokyo'])
+
     def test_predict_annot_proba(self):
         lr = LogisticRegressionRY(random_state=0, missing_label='nan',
                                   classes=['tokyo', 'paris'])
@@ -89,22 +134,3 @@ class TestLogisticRegressionRY(unittest.TestCase):
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
         self.assertTrue((P_annot <= 1).all())
         self.assertTrue((P_annot >= 0).all())
-
-    def test_on_data_set(self):
-        X, y_true = make_blobs(n_samples=300, random_state=0)
-        X = StandardScaler().fit_transform(X)
-        lr = LogisticRegressionRY(random_state=0, classes=[0, 1, 2])
-        y = np.array([y_true, y_true, y_true, y_true], dtype=float).T
-        y[0:100, 0] = 0
-        y[100:150, 0] = np.nan
-        y[90:150, 1] = 1
-        y[:, 1] = np.nan
-        w = np.ones_like(y)
-        w[:, 1] = -1000
-        lr.fit(X, y, w)
-        self.assertTrue(lr.score(X, y_true) > 0.8)
-        y = np.full_like(y, fill_value=np.nan)
-        lr.fit(X, y)
-        self.assertTrue(lr.score(X, y_true) > 0.2)
-        lr.fit(X, y_true)
-        self.assertTrue(lr.score(X, y_true) > 0.8)

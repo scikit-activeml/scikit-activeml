@@ -127,8 +127,12 @@ class PWC(ClassFrequencyEstimator):
         self.X_ = X.copy()
 
         # Convert labels to count vectors.
-        self.V_ = compute_vote_vectors(y=y, w=sample_weight,
-                                       classes=np.arange(len(self.classes_)))
+        if self.n_features_in_ is None:
+            self.V_ = 0
+        else:
+            self.V_ = compute_vote_vectors(
+                y=y, w=sample_weight, classes=np.arange(len(self.classes_))
+            )
 
         return self
 
@@ -149,6 +153,10 @@ class PWC(ClassFrequencyEstimator):
         """
         check_is_fitted(self)
         X = check_array(X)
+
+        # Predict zeros because of missing training data.
+        if np.sum(self.V_) == 0:
+            return np.zeros((len(X), len(self.classes_)))
 
         # Compute kernel (metric) matrix.
         if self.metric == 'precomputed':

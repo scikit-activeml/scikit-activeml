@@ -4,15 +4,16 @@ Classifier based on a Gaussian Mixture Model
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
-import numpy as np
-
 from copy import deepcopy
+
+import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
 from sklearn.utils.validation import check_array, \
     check_is_fitted, NotFittedError
-from ..utils import MISSING_LABEL, compute_vote_vectors
+
 from ..base import ClassFrequencyEstimator
+from ..utils import MISSING_LABEL, compute_vote_vectors
 
 
 class CMM(ClassFrequencyEstimator):
@@ -30,7 +31,8 @@ class CMM(ClassFrequencyEstimator):
         will be refitted in each call of the 'fit' method. If None,
         mixture_model=BayesianMixtureModel(n_components=n_classes) will be
         used.
-    weight_mode : {'responsibilities', 'similarities'}
+    weight_mode : {'responsibilities', 'similarities'},
+        default='responsibilities'
         Determines whether the responsibilities outputted by the
         `mixture_model` or the exponentials of the Mahalanobis distances as
         similarities are used to compute the class frequency estimates.
@@ -125,21 +127,24 @@ class CMM(ClassFrequencyEstimator):
                              "or `similarities`, got {} instead."
                              .format(self.weight_mode))
 
-        # Refit model if desired.
-        try:
-            check_is_fitted(self.mixture_model_)
-        except NotFittedError:
-            self.mixture_model_ = self.mixture_model_.fit(X)
+        if self.n_features_in_ is None:
+            self.F_components_ = 0
+        else:
+            # Refit model if desired.
+            try:
+                check_is_fitted(self.mixture_model_)
+            except NotFittedError:
+                self.mixture_model_ = self.mixture_model_.fit(X)
 
-        # Counts number of votes per class label for each sample.
-        V = compute_vote_vectors(y=y, w=sample_weight,
-                                 classes=np.arange(len(self.classes_)))
+            # Counts number of votes per class label for each sample.
+            V = compute_vote_vectors(y=y, w=sample_weight,
+                                     classes=np.arange(len(self.classes_)))
 
-        # Stores responsibility for every given sample of training set.
-        R = self.mixture_model_.predict_proba(X)
+            # Stores responsibility for every given sample of training set.
+            R = self.mixture_model_.predict_proba(X)
 
-        # Stores class frequency estimates per component.
-        self.F_components_ = R.T @ V
+            # Stores class frequency estimates per component.
+            self.F_components_ = R.T @ V
 
         return self
 
