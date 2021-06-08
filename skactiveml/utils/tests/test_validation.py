@@ -1,10 +1,11 @@
 import unittest
-import numpy as np
 import warnings
+
+import numpy as np
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_missing_label, check_scalar, check_X_y
-from skactiveml.utils._validation import check_random_state, check_class_prior
+from skactiveml.utils import check_random_state, check_class_prior
 
 
 class TestValidation(unittest.TestCase):

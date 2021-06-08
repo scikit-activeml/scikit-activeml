@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.utils.validation import check_is_fitted
 
-from skactiveml.classifier._logistic_regression import LogisticRegressionRY
+from skactiveml.classifier import LogisticRegressionRY
 
 
 class TestLogisticRegressionRY(unittest.TestCase):

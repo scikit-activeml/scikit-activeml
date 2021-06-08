@@ -2,9 +2,10 @@ import inspect
 import warnings
 
 import numpy as np
+from sklearn.utils.validation import check_array
 
-from skactiveml.utils._selection import rand_argmax
-from skactiveml.utils._validation import check_scalar, check_array
+from ._selection import rand_argmax
+from ._validation import check_scalar
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
