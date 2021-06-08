@@ -35,6 +35,7 @@ def call_func(f_callable, only_mandatory=False, **kwargs):
 
     return f_callable(**vars)
 
+
 def simple_batch(
         utilities, random_state, batch_size=1, return_utilities=False):
     """Generates a batch by selecting the highest values in the 'utilities'.

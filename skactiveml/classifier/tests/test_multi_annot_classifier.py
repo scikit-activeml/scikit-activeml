@@ -82,8 +82,8 @@ class TestMultiAnnotClassifier(unittest.TestCase):
         np.testing.assert_allclose(np.ones(len(P)), P.sum(axis=1))
 
     def test_predict(self):
-        pwc = PWC()
-        gnb = SklearnClassifier(GaussianNB())
+        pwc = PWC(random_state=0)
+        gnb = SklearnClassifier(GaussianNB(), random_state=0)
         clf = MultiAnnotClassifier(estimators=[('PWC', pwc), ('GNB', gnb)],
                                    voting='soft')
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
