@@ -14,8 +14,8 @@ from skactiveml.utils import MISSING_LABEL
 class TestMultiAnnotClassifier(unittest.TestCase):
 
     def setUp(self):
-        self.X, self.y = make_blobs(n_samples=300, random_state=0)
-        self.y = np.array([self.y, self.y], dtype=float).T
+        self.X, self.y_true = make_blobs(n_samples=300, random_state=0)
+        self.y = np.array([self.y_true, self.y_true], dtype=float).T
         self.y[:100, 0] = MISSING_LABEL
 
     def test_init_param_estimators(self):
@@ -85,15 +85,17 @@ class TestMultiAnnotClassifier(unittest.TestCase):
         pwc = PWC(random_state=0)
         gnb = SklearnClassifier(GaussianNB(), random_state=0)
         clf = MultiAnnotClassifier(estimators=[('PWC', pwc), ('GNB', gnb)],
-                                   voting='soft')
+                                   voting='soft', random_state=0)
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(X=self.X, y=self.y)
         y_pred_soft = clf.predict(X=self.X)
         self.assertEqual(len(y_pred_soft), len(self.X))
+        self.assertTrue(clf.score(self.X, self.y_true), 0.8)
         clf.voting = 'hard'
         clf.fit(X=self.X, y=self.y)
         y_pred_hard = clf.predict(X=self.X)
-        self.assertTrue((y_pred_hard != y_pred_soft).sum() > 0)
+        self.assertEqual(len(y_pred_hard), len(self.X))
+        self.assertTrue(clf.score(self.X, self.y_true), 0.8)
 
 
 if __name__ == '__main__':
