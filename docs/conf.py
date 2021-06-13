@@ -13,6 +13,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import errno
 import os
 import sys
 
@@ -56,6 +57,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'sphinx_gallery.gen_gallery',
+    'sphinx_togglebutton',
     'matplotlib.sphinxext.plot_directive',
     'sphinxcontrib.bibtex',
     'nbsphinx',
@@ -105,11 +107,15 @@ autosummary_generate = True
 
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
-    'examples_dirs': 'generated/examples',   # path to your example scripts
-    'gallery_dirs': 'auto_examples',  # path to where to save gallery generated output
+    'examples_dirs': 'generated\\examples',   # path to your example scripts
+    'gallery_dirs': 'generated\\sphinx_gallery_examples',  # path to where to save gallery generated output
     'matplotlib_animations': True,
 }
-
+try:
+    os.makedirs(os.path.abspath(sphinx_gallery_conf['gallery_dirs']))
+except OSError as e:
+    if e.errno != errno.EEXIST:
+        raise
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -175,9 +181,9 @@ todo_include_todos = True
 
 # -- Generate rst files ------------------------------------------------------
 from docs.generate import generate_stratagy_summary_rst, \
-    generate_api_reference_rst, generate_examples, generate_example_rst
+    generate_api_reference_rst, generate_examples, generate_example_script
 
 #generate_api_reference_rst(os.path.abspath('api_reference.rst'))
-#generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'))
-generate_examples(os.path.abspath('generated/examples'), package=pool,
-                  json_path=os.path.abspath('examples/pool'))
+methods, refs = generate_examples(os.path.abspath('generated/examples'), package=pool,
+                            json_path=os.path.abspath('examples/pool'))
+generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'), methods, refs)
