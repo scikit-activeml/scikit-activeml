@@ -44,14 +44,14 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         The method to calculate the uncertainty. Only entropy, least_confident,
         margin_sampling and expected_average_precisionare.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        Cost matrix with C[i, j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
     References
-    ---------
+    ----------
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
         http://www.burrsettles.com/pub/settles.activelearning.pdf
