@@ -1,6 +1,5 @@
 import numpy as np
 
-from collections import deque
 from abc import abstractmethod
 from copy import deepcopy
 from ..base import SingleAnnotStreamBasedQueryStrategy
@@ -409,42 +408,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
                     + " w_train must be positive"
                 )
 
-    def _validate_clf(self, X, y, sample_weight):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        """
-        # check if clf is a classifier
-        if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if np.array(y).ndim > 1:
-                raise ValueError(
-                    "{} is not a valid Value for y".format(type(self.y))
-                )
-        else:
-            self.clf_ = self.clf
-
 
 class BaggingDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
@@ -715,9 +678,10 @@ class BaggingDelaySimulationWrapper(
                 )
             self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+            if np.array(y).ndim > 1:
+                raise ValueError(
+                    "{} is not a valid Value for y".format(type(y))
+                )
         else:
             self.clf_ = self.clf
 
@@ -989,8 +953,9 @@ class FuzzyDelaySimulationWrapper(
                 )
             self.clf_.fit(X, y, sample_weight=sample_weight)
             # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+            if np.array(y).ndim > 1:
+                raise ValueError(
+                    "{} is not a valid Value for y".format(type(y))
+                )
         else:
             self.clf_ = self.clf
