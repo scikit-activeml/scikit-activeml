@@ -5,14 +5,13 @@ Logistic Regression for Multiple Annotators
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 #         Timo Sturm <timo.sturm@student.uni-kassel.de>
 
-import numpy as np
 import warnings
 
+import numpy as np
 from scipy.optimize import minimize
 from scipy.special import softmax
-from scipy.stats import multivariate_normal as multi_normal
 from scipy.stats import dirichlet
-
+from scipy.stats import multivariate_normal as multi_normal
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
@@ -151,8 +150,9 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
             The LogisticRegressionRY is fitted on the training data.
         """
         # Check input data.
-        X, y, sample_weight = self._validate_data(X=X, y=y,
-                                                   sample_weight=sample_weight)
+        X, y, sample_weight = self._validate_data(
+            X=X, y=y, sample_weight=sample_weight
+        )
         self._check_n_features(X, reset=True)
 
         # Ensure value of 'tol' to be positive.
@@ -170,15 +170,28 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
             raise ValueError('`max_iter`= {}, must be an integer >= 1.'
                              .format(self.tol))
 
-        # Insert bias, if 'fit_intercept' is set to 'True'.
         if not isinstance(self.fit_intercept, bool):
             raise TypeError("'fit_intercept' must be of type 'bool', got {}"
                             .format(type(self.fit_intercept)))
-        if self.fit_intercept:
-            X = np.insert(X, 0, values=1, axis=1)
 
         solver_dict = {'maxiter': 5} if self.solver_dict is None \
             else self.solver_dict
+
+        # Check weights prior.
+        if not isinstance(self.weights_prior, (int, float)):
+            raise TypeError("'weights_prior' must be of a positive 'int' or "
+                            "'float', got {}".format(type(self.weights_prior)))
+        if self.weights_prior < 0:
+            raise ValueError("'weights_prior' must be of a positive 'int' or "
+                             "'float', got {}".format(self.weights_prior))
+
+        # Check for empty training data.
+        if len(X) == 0:
+            return self
+
+        # Insert bias, if 'fit_intercept' is set to 'True'.
+        if self.fit_intercept:
+            X = np.insert(X, 0, values=1, axis=1)
 
         # Ensure class labels to form a 2d array.
         if y.ndim <= 1:
@@ -198,12 +211,6 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
         I = np.eye(n_classes)
 
         # Convert Gamma to matrix, if it is a number:
-        if not isinstance(self.weights_prior, (int, float)):
-            raise TypeError("'weights_prior' must be of a positive 'int' or "
-                            "'float', got {}".format(type(self.weights_prior)))
-        if self.weights_prior < 0:
-            raise ValueError("'weights_prior' must be of a positive 'int' or "
-                             "'float', got {}".format(self.weights_prior))
         Gamma = self.weights_prior * np.eye(n_features)
         all_zeroes = not np.any(Gamma)
         Gamma_tmp = Gamma if all_zeroes else np.linalg.inv(Gamma)
@@ -388,6 +395,10 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
         X = check_array(X)
         self._check_n_features(X, reset=False)
 
+        # Prediction without training data.
+        if self.n_features_in_ is None:
+            return np.ones((len(X), len(self.classes_))) / len(self.classes_)
+
         # Check whether a bias feature is missing.
         if self.fit_intercept:
             X = np.insert(X, 0, values=1, axis=1)
@@ -413,9 +424,18 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
             P_annot[i,l] is the probability, that annotator l provides the
             correct class label for sample X[i].
         """
+        # Prediction without training data.
+        if self.n_features_in_ is None:
+            return np.ones((len(X), 1)) / len(self.classes_)
+
+        # Compute class probabilities.
         P = self.predict_proba(X)
+
+        # Get correctness probabilities for each annotator per class.
         diag_Alpha = np.array([np.diagonal(self._Alpha[j]) for j in
                                range(self._Alpha.shape[0])])
+
+        # Compute correctness probabilities for each annotator per sample.
         P_annot = P @ diag_Alpha.T
         return P_annot
 
