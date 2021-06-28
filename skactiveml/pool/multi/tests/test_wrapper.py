@@ -98,6 +98,11 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
                           pref_annotators_per_sample=None)
+        pref_annotators_per_sample = np.array([[0, 1], [0, 2]])
+        self.assertRaises(ValueError, wrapper.query, self.X_cand,
+                          A_cand=self.A_cand, batch_size=5,
+                          return_utilities=False,
+                          pref_annotators_per_sample=pref_annotators_per_sample)
 
     def test_query_one_annotator_per_sample_batch_size_one(self):
         # test functionality with uncertainty sampling
@@ -108,8 +113,12 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         wrapper = MultiAnnotWrapper(uncertainty, self.random_state)
 
-        re_val = wrapper.query(self.X_cand, self.X, self.y,
-                               A_cand=self.A_cand, return_utilities=True)
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3, 4]])
+        y = np.array([[1, 0], [0, 1], [1, 1], [0, 0], [0, 1]])
+
+        re_val = wrapper.query(self.X_cand, X, y, A_cand=self.A_cand,
+                               return_utilities=True)
+
         best_cand_indices, utilities = re_val
         self.assertEqual((1, 2), best_cand_indices.shape)
         self.assertEqual((1, 5, 3), utilities.shape)
@@ -203,6 +212,22 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertEqual(best_cand_indices[3, 0], best_cand_indices[4, 0])
         self.assertEqual((5, 5, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
+
+    def test_query_per_sample_too_large(self):
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, self.random_state, n_annotators=3)
+
+        pref = np.array([3, 2, 1, 1, 1, 1])
+
+        re_val = wrapper.query(self.X_cand, A_cand=None,
+                               batch_size=1, pref_annotators_per_sample=pref,
+                               return_utilities=True)
+
+        best_cand_indices, utilities = re_val
+        self.assertEqual((1, 2), best_cand_indices.shape)
+        self.assertEqual((1, 5, 3), utilities.shape)
+        self.check_max(best_cand_indices, utilities)
+        self.check_availability(best_cand_indices, self.A_cand)
 
     def test_query_unavailable_annotators(self):
         random = RandomSampler(self.random_state)

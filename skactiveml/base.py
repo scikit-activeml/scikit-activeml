@@ -183,7 +183,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         return NotImplemented
 
     def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
-                       random_state, reset=True, **check_X_cand_params):
+                       random_state, reset=True, adaptive=False,
+                       **check_X_cand_params):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -197,8 +198,10 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             while `A_cand[i,j] = False` indicates that annotator `j` cannot be
             selected for annotating sample `X_cand[i]`. If A_cand=None, each
             annotator is assumed to be available for labeling each sample.
-        batch_size : int,
-            The number of samples to be selected in one AL cycle.
+        batch_size : 'adaptive'|int,
+            The number of samples to be selected in one AL cycle. If 'adaptive'
+            is set, the `batch_size` is determined by the query strategy or set
+            to one by default.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         random_state : numeric | np.random.RandomState, optional
@@ -207,6 +210,10 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
+        adaptive : bool, default=False
+            Whether the query strategy implements an adaptive batch size or not.
+            If False and batch_size is set to adaptive, the batch_size will be
+            set to one.
         **check_X_cand_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
@@ -236,14 +243,10 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
                 )
             else:
                 A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
+        else:
+            A_cand = check_array(A_cand, dtype=bool)
 
-        # check if A_cand number of samples equals X_cand number of samples
-        if A_cand.shape[0] != X_cand.shape[0]:
-            raise ValueError(
-                "A_cand.shape[0] has to equal X_cand.shape[0]. "
-                "A_cand.shape[0] equals: {}, X_cand.shpae[0] equals: {}"
-                .format(A_cand.shape[0], X_cand.shape[0])
-            )
+        check_consistent_length(X_cand, A_cand)
 
         # Check number of features.
         self._check_n_features(X_cand, reset=reset)
@@ -252,16 +255,26 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         check_scalar(return_utilities, 'return_utilities', bool)
 
         # Check batch size.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
-        batch_size = batch_size
-        n_queries = np.sum(A_cand)
-        if n_queries < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate queries "
-                "in 'A_cand'. Instead, 'batch_size={}' was set "
-                    .format(batch_size, n_queries))
-            batch_size = n_queries
+        if isinstance(batch_size, str):
+            if batch_size != 'adaptive':
+                raise ValueError('If `batch_size` is a string, it '
+                                 'must be set to `adaptive`.')
+            elif not adaptive:
+                batch_size = 1
+        elif isinstance(batch_size, int):
+            check_scalar(batch_size, target_type=int, name='batch_size',
+                         min_val=1)
+
+            n_queries = np.sum(A_cand)
+            if n_queries < batch_size:
+                warnings.warn(
+                    "'batch_size={}' is larger than number of candidate queries "
+                    "in 'A_cand'. Instead, 'batch_size={}' was set "
+                        .format(batch_size, n_queries))
+                batch_size = int(n_queries)
+        else:
+            raise TypeError('`batch_size` must be either a string or an '
+                            'integer.')
 
         # Check random state.
         random_state = check_random_state(random_state=self.random_state,

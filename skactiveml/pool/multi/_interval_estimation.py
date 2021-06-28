@@ -14,6 +14,7 @@ from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
 from skactiveml.utils import rand_argmax, check_scalar, compute_vote_vectors, \
     MISSING_LABEL, ExtLabelEncoder, is_labeled
 from skactiveml.pool._uncertainty import uncertainty_scores
+from skactiveml.utils._functions import simple_batch
 
 
 class IEAnnotModel(BaseEstimator, AnnotModelMixing):
@@ -58,6 +59,7 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixing):
         sampling." 15th ACM SIGKDD International Conference on Knowledge
         Discovery and Data Mining, pp. 259-268. 2009.
     """
+
     def __init__(self, classes=None, missing_label=MISSING_LABEL, alpha=0.05,
                  mode='upper', random_state=None):
         self.classes = classes
@@ -81,6 +83,7 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixing):
         self : IEAnnotModel object
             The fitted annotator model.
         """
+
         # Check whether alpha is float in (0, 1).
         check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
                      max_val=1, min_inclusive=False, max_inclusive=False)
@@ -125,7 +128,7 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixing):
 
         return self
 
-    def predict_annot_perf(self, X):
+    def predict_annot_proba(self, X):
         """Calculates the probability that an annotator provides the true label
         for a given sample.
 
@@ -183,6 +186,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         sampling." 15th ACM SIGKDD International Conference on Knowledge
         Discovery and Data Mining, pp. 259-268. 2009.
     """
+
     def __init__(self, clf, epsilon=0.9, alpha=0.05, random_state=None):
         super().__init__(random_state=random_state)
         self.clf = clf
@@ -234,10 +238,16 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator pair (with indices `query_indices[0]`).
         """
+        # base check
+        X_cand, A_cand, return_utilities, batch_size, random_state = \
+            super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
+                                   self.random_state, reset=True, adaptive=True)
+
         # Check classifier type.
         if not isinstance(self.clf, SkactivemlClassifier):
             raise TypeError("`clf` must be of the type "
                             "`skactiveml._base.SkactivemlClassifier`.")
+
         self.clf_ = deepcopy(self.clf)
 
         # Check whether epsilon is float in [0, 1].
@@ -248,72 +258,17 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
                      max_val=1, min_inclusive=False, max_inclusive=False)
 
-        # Set and check random state.
-        random_state = check_random_state(self.random_state)
-
-        # Check candidate samples.
-        X_cand = check_array(X_cand)
-        n_cand_samples = len(X_cand)
-
         # Check training data.
         X = check_array(X)
         y = check_array(y, force_all_finite=False)
-        check_consistent_length(X, y)
-        check_consistent_length(X.T, X_cand.T)
+        check_consistent_length(y.T, A_cand.T)
 
-        # Check boolean matrix.
-        A_cand = check_array(A_cand, dtype=bool)
         n_annotators = A_cand.shape[1]
-        check_consistent_length(X_cand, A_cand)
-        sample_is_labeled = np.sum(A_cand, axis=1) < n_annotators
-
-        # Check whether y and A_cand have the same shape.
-        if y.shape[1] != A_cand.shape[1]:
-            raise ValueError("The 2d arrays `y` and `A_cand` must have the "
-                             "the same number of columns; got instead "
-                             "`y.shape[1]={}` and `A_cand[1].shape={}`"
-                             .format(y.shape[1], A_cand.shape[1]))
-
-        # Check batch_size.
-        if isinstance(batch_size, str):
-            if batch_size != 'adaptive':
-                raise ValueError('If `batch_size` is a string, it '
-                                 'must be set to `adaptive`.')
-        elif isinstance(batch_size, int):
-            check_scalar(batch_size, target_type=int, name='batch_size',
-                         min_val=1)
-            batch_size = batch_size
-            batch_size_max = np.sum(~sample_is_labeled) * n_annotators
-            if batch_size_max < batch_size:
-                warnings.warn("'batch_size={}' is larger than number of "
-                              "candidate samples in 'X_cand'. Instead, "
-                              "'batch_size={}' was set ".format(
-                    batch_size, np.sum(A_cand)))
-                batch_size = batch_size_max
-        else:
-            raise TypeError('`batch_size` must be either a string or an '
-                            'integer.')
-
-        # Check return utilities.
-        check_scalar(return_utilities, target_type=bool,
-                     name='return_utilties')
 
         # Fit classifier and compute uncertainties on candidate samples.
         self.clf_.fit(X, y, sample_weight=sample_weight)
         P = self.clf_.predict_proba(X_cand)
-        uncertainties = uncertainty_scores(P=P, method='least_confident')
-
-        # Check whether there exists a sample with no annotation at all.
-        if np.sum(~sample_is_labeled) == 0:
-            warnings.warn(
-                "'X_cand' contains no sample being fully unlabeled, i.e., "
-                "in each row of `A_cand` is at least one zero/False entry. "
-                "Therefor, no further sample-annotator pairs are selected."
-            )
-            if return_utilities:
-                return np.array([]), np.array([])
-            else:
-                return np.array([])
+        uncertainties = uncertainty_scores(probas=P, method='least_confident')
 
         # Fit annotator model and compute performance estimates.
         self.ie_model_ = IEAnnotModel(classes=self.clf_.classes_,
@@ -323,36 +278,33 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         A_perf = self.ie_model_.A_perf_
 
         # Compute utilities.
+
+        # combine the values of A_perf and uncertainties
         A_perf = A_perf[:, 2] + 1
         A_perf = A_perf[np.newaxis]
-        uncertainties[sample_is_labeled] = np.nan
-        ranks = rankdata(uncertainties[~sample_is_labeled],
-                         method='ordinal') * 5
-        uncertainties[~sample_is_labeled] = ranks
+        max_range = np.max(A_perf) + 1
+        uncertainties = rankdata(uncertainties, method='ordinal') * max_range
         uncertainties = np.tile(uncertainties, (n_annotators, 1)).T
         init_utilities = uncertainties + A_perf
+
+        # include the amount of available annotators into the utilities for
+        # the samples
+        annotators_per_sample = np.sum(A_cand, axis=1)
+        max_uncertainty = np.max(init_utilities) + 1
+        annotators_per_sample_ranks = rankdata(annotators_per_sample,
+                                               method='dense') \
+                                      * max_uncertainty - max_uncertainty
+        init_utilities = init_utilities + annotators_per_sample_ranks[:, np.newaxis]
+        init_utilities[~A_cand] = np.nan
 
         # Determine actual batch size.
         if batch_size == 'adaptive':
             required_perf = self.epsilon * np.max(A_perf)
-            actual_batch_size = np.sum(A_perf >= required_perf)
+            actual_batch_size = int(np.sum(A_perf >= required_perf))
         else:
             actual_batch_size = batch_size
 
         # Perform selection based on previously computed utilities.
-        query_indices = np.zeros((actual_batch_size, 2), dtype=int)
-        utilities = np.empty((actual_batch_size, n_cand_samples, n_annotators))
-        utilities[0] = init_utilities
-        for b in range(actual_batch_size):
-            query_indices[b] = rand_argmax(utilities[b],
-                                           random_state=random_state)
-            if b < actual_batch_size - 1:
-                init_utilities[query_indices[b, 0], query_indices[b, 1]] \
-                    = np.nan
-                utilities[b+1] = init_utilities
-
-        # Check whether utilities are to be returned.
-        if return_utilities:
-            return query_indices, utilities
-        else:
-            return query_indices
+        return simple_batch(init_utilities, random_state,
+                            batch_size=actual_batch_size,
+                            return_utilities=return_utilities)

@@ -2,7 +2,7 @@ import warnings
 
 import numpy as np
 from sklearn.utils import check_random_state, check_array, check_scalar
-from sklearn.utils.validation import _is_arraylike
+from sklearn.utils.validation import _is_arraylike, check_consistent_length
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
@@ -92,6 +92,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             `utilities[i, j, k]` indicates the utilities of
             the i-th batch regarding the j-th sample and the k-th annotator.
         """
+
         X_cand, A_cand, return_utilities, batch_size, random_state = \
             super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
                                    self.random_state, reset=True)
@@ -107,7 +108,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         if len(args) > 1:
             X, y = args[0], args[1]
 
-            if isinstance(y, np.ndarray) and isinstance(y, np.ndarray):
+            if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
                 if y.ndim > 2:
                     raise ValueError(
                         "The entries of args[0] and args[1] are interpreted as "
@@ -121,16 +122,13 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                     )
                 if y.ndim == 2:
                     if y.shape[1] != A_cand.shape[1]:
-                        warnings.warn(
-                            "The number of input annotators does not match"
-                            "the number of output annotators."
-                        )
-                    else:
-                        args_list = list(args)
-                        vote_matrix = compute_vote_vectors(y)
-                        vote_vector = vote_matrix.argmax(axis=1)
-                        args_list[1] = vote_vector
-                        args = tuple(args_list)
+                        warnings.warn(f"y.shape[1] = {y.shape[1]} != "
+                                      f"A_cand.shape[1] = {A_cand.shape[1]}")
+                    args_list = list(args)
+                    vote_matrix = compute_vote_vectors(y)
+                    vote_vector = vote_matrix.argmax(axis=1)
+                    args_list[1] = vote_vector
+                    args = tuple(args_list)
 
         a_indices = np.argwhere(np.any(A_cand, axis=1)).flatten()
 
@@ -153,7 +151,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             if pref_n_annotators.ndim != 1:
                 raise ValueError(
                     "pref_annotators_per_sample, if an array, must be of dim"
-                    f"1 but, it is of dim {pref_n_annotators.dim}"
+                    f"1 but, it is of dim {pref_n_annotators.ndim}"
                 )
             else:
                 pref_length = pref_n_annotators.shape[0]
