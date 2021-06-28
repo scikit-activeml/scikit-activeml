@@ -61,8 +61,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             of assigned values. If y is a matrix the entries are interpreted
             as follows: y[i,j] = k indicates that for the i-th sample the
             j-th candidate annotator annotated the value k.
-        batch_size : int, optional (default=1)
-            The number of samples to be selected in one AL cycle.
+        batch_size : 'adaptive'|int, optional (default=1)
+            The number of samples to be selected in one AL cycle. If 'adaptive'
+            is set, the `batch_size` is set to 1.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
         pref_annotators_per_sample : int, array-like, optional (default=1)

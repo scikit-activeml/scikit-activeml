@@ -201,7 +201,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         batch_size : 'adaptive'|int,
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is determined by the query strategy or set
-            to one by default.
+            to 1 by default.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         random_state : numeric | np.random.RandomState, optional
