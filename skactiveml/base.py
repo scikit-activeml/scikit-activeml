@@ -306,7 +306,7 @@ class BudgetManager(ABC, BaseEstimator):
                 default = get_default_stream_budget()
             self.budget_ = default
         check_scalar(
-            self.budget_, "budget", np.float, min_val=0.0, max_val=1.0
+            self.budget_, "budget", float, min_val=0.0, max_val=1.0
         )
 
     def _validate_data(self, utilities, return_budget_left, simulate):
@@ -706,11 +706,11 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         # Check simulate.
         check_scalar(simulate, "simulate", bool)
 
-        # Check base_query_strategy.
-        self._validate_base_query_strategy()
-
         # Check random state.
         self._validate_random_state()
+
+        # Check base_query_strategy.
+        self._validate_base_query_strategy()
 
         return X_cand, return_utilities, simulate
 

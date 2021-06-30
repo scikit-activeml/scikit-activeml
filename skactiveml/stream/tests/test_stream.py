@@ -20,12 +20,21 @@ class TestStream(unittest.TestCase):
             random_state=rand.randint(2 ** 31 - 1),
             shuffle=True,
         )
+        tX = np.array(range(len(X)))
+        ty = tX + 20
+
+        tX_init = tX[:train_init_size]
+        ty_init = ty[:train_init_size]
 
         X_init = X[:train_init_size, :]
         y_init = y[:train_init_size]
 
+        tX_stream = tX[train_init_size:]
+        ty_stream = ty[train_init_size:]
+
         X_stream = X[train_init_size:, :]
         y_stream = y[train_init_size:]
+
 
         # Build dictionary of attributes.
         query_strategy_classes = {}
@@ -42,6 +51,10 @@ class TestStream(unittest.TestCase):
                 X_stream,
                 y_stream,
                 training_size,
+                tX_init,
+                ty_init,
+                tX_stream,
+                ty_stream,
             )
 
     def _test_selection_strategy(
@@ -53,6 +66,10 @@ class TestStream(unittest.TestCase):
         X_stream,
         y_stream,
         training_size,
+        tX_init,
+        ty_init,
+        tX_stream,
+        ty_stream,
     ):
         rand = check_random_state(rand_seed)
         query_strategy = query_strategy_class(
@@ -63,14 +80,27 @@ class TestStream(unittest.TestCase):
         X_train.extend(X_init)
         y_train = deque(maxlen=training_size)
         y_train.extend(y_init)
+        acquisitions = deque(maxlen=training_size)
+        acquisitions.extend(np.full(len(y_train),True))
+        tX_train = deque(maxlen=training_size)
+        tX_train.extend(tX_init)
+        ty_train = deque(maxlen=training_size)
+        ty_train.extend(ty_init)
 
-        for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
+        for t, (X_cand, y_cand, tX_cand, ty_cand) in enumerate(zip(X_stream, y_stream, tX_stream, ty_stream)):
             sampled_indices = query_strategy.query(
-                x_t.reshape([1, -1]), X=X_train, y=y_train
+                X_cand.reshape([1, -1]), X=X_train, y=y_train, tX=tX_train,
+                tX_cand=np.array([tX_cand]),
+                ty=ty_train,
+                ty_cand=np.array([ty_cand]),
+                acquisitions=acquisitions,
             )
             if len(sampled_indices):
-                X_train.append(x_t)
-                y_train.append(y_t)
+                X_train.append(X_cand)
+                y_train.append(y_cand)
+                tX_train.append(tX_cand)
+                ty_train.append(ty_cand)
+                acquisitions.append(True)
                 # clf.fit(X_train, y_train)
 
     def test_query_update(self):
@@ -84,9 +114,17 @@ class TestStream(unittest.TestCase):
             random_state=rand.randint(2 ** 31 - 1),
             shuffle=True,
         )
+        tX = np.array(range(len(X)))
+        ty = tX + 20
+
+        tX_init = tX[:train_init_size]
+        ty_init = ty[:train_init_size]
 
         X_init = X[:train_init_size, :]
         y_init = y[:train_init_size]
+
+        tX_stream = tX[train_init_size:]
+        ty_stream = ty[train_init_size:]
 
         X_stream = X[train_init_size:, :]
         y_stream = y[train_init_size:]
@@ -105,6 +143,10 @@ class TestStream(unittest.TestCase):
                 X_stream,
                 y_stream,
                 training_size,
+                tX_init,
+                ty_init,
+                tX_stream,
+                ty_stream,
             )
 
     def _test_query_update(
@@ -116,35 +158,54 @@ class TestStream(unittest.TestCase):
         X_stream,
         y_stream,
         training_size,
+        tX_init,
+        ty_init,
+        tX_stream,
+        ty_stream,
     ):
         rand = check_random_state(rand_seed)
         qs_rand_seed = rand.randint(2 ** 31 - 1)
         query_strategy_1 = query_strategy_class(random_state=qs_rand_seed)
         query_strategy_2 = query_strategy_class(random_state=qs_rand_seed)
-
         X_train = deque(maxlen=training_size)
         X_train.extend(X_init)
         y_train = deque(maxlen=training_size)
         y_train.extend(y_init)
+        acquisitions = deque(maxlen=training_size)
+        acquisitions.extend(np.full(len(y_train),True))
+        tX_train = deque(maxlen=training_size)
+        tX_train.extend(tX_init)
+        ty_train = deque(maxlen=training_size)
+        ty_train.extend(ty_init)
 
-        for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
+        for t, (X_cand, y_cand, tX_cand, ty_cand) in enumerate(zip(X_stream, y_stream, tX_stream, ty_stream)):
             sampled_indices_1, utilities_1 = query_strategy_1.query(
-                x_t.reshape([1, -1]),
+                X_cand.reshape([1, -1]),
                 X=X_train,
                 y=y_train,
+                tX=tX_train,
+                tX_cand=np.array([tX_cand]),
+                ty=ty_train,
+                ty_cand=np.array([ty_cand]),
+                acquisitions=acquisitions,
                 return_utilities=True,
             )
 
             sampled_indices_2, utilities_2 = query_strategy_2.query(
-                x_t.reshape([1, -1]),
+                X_cand.reshape([1, -1]),
                 X=X_train,
                 y=y_train,
+                tX=tX_train,
+                tX_cand=np.array([tX_cand]),
+                ty=ty_train,
+                ty_cand=np.array([ty_cand]),
+                acquisitions=acquisitions,
                 simulate=True,
                 return_utilities=True,
             )
             sampled = np.array([len(sampled_indices_2) > 0])
             query_strategy_2.update(
-                x_t.reshape([1, -1]), sampled, X=X_train, y=y_train
+                X_cand.reshape([1, -1]), sampled, X=X_train, y=y_train
             )
 
             if ((len(sampled_indices_1) != len(sampled_indices_2))
@@ -161,5 +222,8 @@ class TestStream(unittest.TestCase):
             self.assertEqual(len(sampled_indices_1), len(sampled_indices_2))
 
             if len(sampled_indices_1):
-                X_train.append(x_t)
-                y_train.append(y_t)
+                X_train.append(X_cand)
+                y_train.append(y_cand)
+                tX_train.append(tX_cand)
+                ty_train.append(ty_cand)
+                acquisitions.append(True)

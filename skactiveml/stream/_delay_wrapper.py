@@ -5,8 +5,10 @@ from copy import deepcopy
 from ..base import SingleAnnotStreamBasedQueryStrategy
 from sklearn.base import is_classifier, clone
 from ..classifier import PWC
+# TODO import split and initialize in validate data
 from sklearn.utils import check_array, check_scalar, check_consistent_length
 from skactiveml.base import SingleAnnotStreamBasedQueryStrategyWrapper
+from ._uncertainty import Split
 
 from skactiveml.utils import check_random_state
 
@@ -115,8 +117,12 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         """Validate if query strategy is a query_strategy class and create a
         copy 'base_query_strategy_'.
         """
+        
         if not hasattr(self, "base_query_strategy_"):
-            self.base_query_strategy_ = clone(self.base_query_strategy)
+            if self.base_query_strategy is None:
+                self.base_query_strategy_ = Split()
+            else:
+                self.base_query_strategy_ = clone(self.base_query_strategy)
         if not (
             isinstance(
                 self.base_query_strategy_, SingleAnnotStreamBasedQueryStrategy
@@ -211,6 +217,7 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         simulate : bool,
             Checked boolean value of `simulate`.
         """
+        self._validate_base_query_strategy()
         X_cand, return_utilities, simulate = super()._validate_data(
             X_cand,
             return_utilities,
@@ -241,7 +248,7 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
 
 class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
-    def __init__(self, base_query_strategy, w_train, random_state=None):
+    def __init__(self, base_query_strategy=None, w_train=500, random_state=None):
         super().__init__(base_query_strategy, random_state)
         self.w_train = w_train
 
@@ -412,7 +419,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
 class BaggingDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
-    def __init__(self, random_state, base_query_strategy, K, delay_prior, clf):
+    def __init__(self, random_state=None, base_query_strategy=None, K=2, delay_prior=0.001, clf=None):
         super().__init__(base_query_strategy, random_state)
         self.K = K
         self.delay_prior = delay_prior
@@ -689,7 +696,7 @@ class BaggingDelaySimulationWrapper(
 class FuzzyDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
-    def __init__(self, random_state, base_query_strategy, delay_prior, clf):
+    def __init__(self, random_state=None, base_query_strategy=None, delay_prior=0.001, clf=None):
         super().__init__(base_query_strategy, random_state)
         self.delay_prior = delay_prior
         self.clf = clf
