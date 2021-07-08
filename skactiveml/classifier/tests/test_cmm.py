@@ -1,9 +1,10 @@
-import numpy as np
 import unittest
 
-from sklearn.utils.validation import NotFittedError, check_is_fitted
-from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
+import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
+from sklearn.utils.validation import NotFittedError, check_is_fitted
+
 from skactiveml.classifier import CMM
 
 
@@ -15,26 +16,19 @@ class TestCMM(unittest.TestCase):
         self.y_nan = [['nan', 'nan', 'nan'], ['nan', 'nan', 'nan']]
         self.w = [[2, np.nan, 1], [1, 1, 1]]
 
-    def test_init(self):
+    def test_init_param_mixture_model(self):
         cmm = CMM(missing_label=-1)
-        self.assertEqual(cmm.missing_label, -1)
-        self.assertEqual(cmm.classes, None)
         self.assertEqual(cmm.mixture_model, None)
-        self.assertEqual(cmm.random_state, None)
-        self.assertEqual(cmm.cost_matrix, None)
-        self.assertEqual(cmm.class_prior, 0)
+        cmm = CMM(missing_label='nan', mixture_model='Test')
+        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
+
+    def test_init_param_weight_mode(self):
+        cmm = CMM(missing_label=-1)
+        self.assertEqual(cmm.weight_mode, 'responsibilities')
+        cmm = CMM(missing_label='nan', weight_mode='Test')
+        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
 
     def test_fit(self):
-        cmm = CMM(missing_label='nan', mixture_model="Test")
-        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
-        cmm = CMM(missing_label='nan', weight_mode="Test")
-        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
-        cmm = CMM(missing_label='nan', class_prior=-1.0)
-        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
-        cmm = CMM(missing_label='nan', class_prior=['test'])
-        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
-        cmm = CMM(missing_label='nan', class_prior='test')
-        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
         mixture = GaussianMixture(random_state=0, n_components=4)
         cmm = CMM(missing_label='nan', mixture_model=mixture, classes=[1, 2],
                   cost_matrix=1 - np.eye(3))
@@ -52,8 +46,6 @@ class TestCMM(unittest.TestCase):
         self.assertEqual(cmm.mixture_model, None)
         np.testing.assert_array_equal(['tokyo', 'paris'], cmm.classes)
         mixture = BayesianGaussianMixture(n_components=1).fit(X=self.X)
-        cmm = CMM(mixture_model=mixture)
-        self.assertRaises(ValueError, cmm.fit, X=[], y=[])
         cmm = CMM(mixture_model=mixture,
                   classes=['tokyo', 'paris', 'new york'], missing_label='nan')
         self.assertEqual(None, cmm.cost_matrix)
@@ -81,6 +73,19 @@ class TestCMM(unittest.TestCase):
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         F = cmm.predict_freq(X=[self.X[0]])
         np.testing.assert_array_equal([[0, 1, 3]], F)
+        X, y = make_blobs(n_samples=200, centers=2)
+        y_nan = np.full_like(y, np.nan, dtype=float)
+        mixture = BayesianGaussianMixture(n_components=5)
+        cmm = CMM(mixture_model=mixture, classes=[0, 1],
+                  weight_mode='similarities')
+        self.assertRaises(NotFittedError, cmm.predict_freq, X=self.X)
+        cmm.fit(X=X, y=y_nan)
+        F = cmm.predict_freq(X=X)
+        np.testing.assert_array_equal(F.shape, [200, 2])
+        self.assertEqual(F.sum(), 0)
+        cmm.fit(X=X, y=y)
+        F = cmm.predict_freq(X=X)
+        self.assertTrue(F.sum() > 0)
 
     def test_predict_proba(self):
         mixture = BayesianGaussianMixture(n_components=1).fit(X=self.X)
@@ -131,11 +136,6 @@ class TestCMM(unittest.TestCase):
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         y = cmm.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
-
-    def test_on_data_set(self):
-        X, y = make_blobs(n_samples=300, random_state=0)
-        pwc = CMM(weight_mode='similarities', random_state=0).fit(X, y)
-        self.assertTrue(pwc.score(X, y) > 0.5)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from skactiveml.utils import check_random_state
+from ._validation import check_random_state
 
 
 def rand_argmin(a, random_state=None, **argmin_kwargs):

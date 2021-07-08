@@ -37,7 +37,7 @@ class PWC(ClassFrequencyEstimator):
         prior number of samples belonging to class `classes_[i]`. If
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
-    metric : str,
+    metric : str | callable,
         The metric must a be a valid kernel defined by the function 
         `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int,
@@ -73,7 +73,7 @@ class PWC(ClassFrequencyEstimator):
     METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
     def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
-                 classes=None, missing_label=MISSING_LABEL,  cost_matrix=None,
+                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
                  class_prior=0.0, random_state=None):
         super().__init__(classes=classes, missing_label=missing_label,
                          cost_matrix=cost_matrix, random_state=random_state)
@@ -107,8 +107,8 @@ class PWC(ClassFrequencyEstimator):
 
         self._vali
         # Check whether metric is available.
-        if self.metric not in PWC.METRICS:
-            raise ValueError("The parameter 'metric' must be "
+        if self.metric not in PWC.METRICS and not callable(self.metric):
+            raise ValueError("The parameter 'metric' must be callable or "
                              "in {}".format(KERNEL_PARAMS.keys()))
 
         # Check number of neighbors which must be a positive integer.
@@ -117,7 +117,8 @@ class PWC(ClassFrequencyEstimator):
                          target_type=int)
 
         # Ensure that metric_dict is a Python dictionary.
-        self.metric_dict_ = self.metric_dict if self.metric_dict is not None else {}
+        self.metric_dict_ = self.metric_dict if self.metric_dict is not None \
+            else {}
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
@@ -127,8 +128,12 @@ class PWC(ClassFrequencyEstimator):
         self.X_ = X.copy()
 
         # Convert labels to count vectors.
-        self.V_ = compute_vote_vectors(y=y, w=sample_weight,
-                                       classes=np.arange(len(self.classes_)))
+        if self.n_features_in_ is None:
+            self.V_ = 0
+        else:
+            self.V_ = compute_vote_vectors(
+                y=y, w=sample_weight, classes=np.arange(len(self.classes_))
+            )
 
         return self
 
@@ -149,6 +154,10 @@ class PWC(ClassFrequencyEstimator):
         """
         check_is_fitted(self)
         X = check_array(X)
+
+        # Predict zeros because of missing training data.
+        if np.sum(self.V_) == 0:
+            return np.zeros((len(X), len(self.classes_)))
 
         # Compute kernel (metric) matrix.
         if self.metric == 'precomputed':
