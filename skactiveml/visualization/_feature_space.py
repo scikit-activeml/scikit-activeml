@@ -30,6 +30,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None):
     if not isinstance(clf, SklearnClassifier):
         raise TypeError("'clf' must be an SklearnClassifier.")
     # TODO check bound (?), res, ax
+    # TODO ax = plt.gca()
 
     x_min, x_max, y_min, y_max = bound
 
@@ -75,14 +76,18 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None):
     X_mesh = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
 
     if X_cand is None:
-        _, utilities = qs.query(X_mesh, qs_dict)
+        _, utilities = qs.query(X_mesh, **qs_dict)
         utilities = utilities.reshape(X_mesh.shape)
         plt.contourf(X_mesh, Y_mesh, utilities, cmap='Greens', alpha=.75)
     else:
-        _, utilities = qs.query(X_cand, qs_dict)
+        _, utilities = qs.query(X_cand, **qs_dict)
         nn = NearestNeighbors(n_neighbors=1).fit(X_cand)
         neighbors = nn.kneighbors(X_mesh, return_distance=False)
-        # TODO continue
+        # TODO continue, regressor (chat)
+        # TODO (daniel) Add to notebook
+
+        # TODO test: https://matplotlib.org/stable/api/testing_api.html
+        # export image , matplotlib compare
 
 
 
