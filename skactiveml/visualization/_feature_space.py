@@ -1,12 +1,92 @@
 import numpy as np
 import pylab as plt
+from sklearn.neighbors import NearestNeighbors
 
+from skactiveml.base import QueryStrategy
 from skactiveml.utils import call_func, is_unlabeled, is_labeled
 from sklearn.utils.multiclass import type_of_target
 
 from skactiveml.utils import call_func, is_unlabeled, is_labeled, ExtLabelEncoder
 from sklearn.utils import check_array, check_consistent_length, column_or_1d
 from skactiveml.classifier import SklearnClassifier
+
+
+def plot_decision_boundary(clf, bound, res=21, ax=None):
+    """Plot the decision boundary of the given classifier.
+
+    Parameters
+    ----------
+    clf: sklearn classifier # TODO correct?
+        The classifier whose decision boundary is plotted.
+    bound: array-like, (x_min, x_max, y_min, y_max)
+        Determines the area in which the boundary is plotted.
+    res: int
+        The resolution of the plot.
+    ax: matplotlib.axes.Axes, optional (default=None)
+        The axis on which the boundary is plotted.
+    """
+    # TODO Use ax or get current axis
+    # TODO which bound format sklearn
+    if not isinstance(clf, SklearnClassifier):
+        raise TypeError("'clf' must be an SklearnClassifier.")
+    # TODO check bound (?), res, ax
+
+    x_min, x_max, y_min, y_max = bound
+
+    # Create mesh for plotting
+    x_vec = np.linspace(x_min, x_max, res)
+    y_vec = np.linspace(y_min, y_max, res)
+    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
+    X_mesh = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+
+    posteriors = clf.predict_proba(X_mesh)[:, 0].reshape(X_mesh.shape)
+
+    plt.contour(X_mesh, Y_mesh, posteriors, [.5], colors='k',
+                linewidths=[2], zorder=1)
+    plt.contour(X_mesh, Y_mesh, posteriors, [.25, .75], cmap='coolwarm_r',
+                linewidths=[2, 2], zorder=1, linestyles='--', alpha=.9,
+                vmin=.2, vmax=.8)
+
+
+def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None):
+    if not isinstance(qs, QueryStrategy):
+        raise TypeError("'qs' must be a query strategy.")
+    if not isinstance(qs_dict, dict):
+        raise TypeError("'qs_dict' must be a dictionary.")
+    if 'X_cand' in qs_dict.keys():
+        raise ValueError("'X_cand' must be given as separate argument.")
+
+    if bound is not None:
+        x_min, x_max, y_min, y_max = bound
+    elif X_cand is not None:
+        x_min = min(X_cand[:, 0])
+        x_max = max(X_cand[:, 0])
+        y_min = min(X_cand[:, 1])
+        y_max = max(X_cand[:, 1])
+    else:
+        raise TypeError("If 'X_cand' is None, 'bound' must be given.")
+
+    # TODO check bound, res, ax
+    # TODO use ax or get current axis
+
+    x_vec = np.linspace(x_min, x_max, res)
+    y_vec = np.linspace(y_min, y_max, res)
+    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
+    X_mesh = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+
+    if X_cand is None:
+        _, utilities = qs.query(X_mesh, qs_dict)
+        utilities = utilities.reshape(X_mesh.shape)
+        plt.contourf(X_mesh, Y_mesh, utilities, cmap='Greens', alpha=.75)
+    else:
+        _, utilities = qs.query(X_cand, qs_dict)
+        nn = NearestNeighbors(n_neighbors=1).fit(X_cand)
+        neighbors = nn.kneighbors(X_mesh, return_distance=False)
+        # TODO continue
+
+
+
+
 
 def plot_decision_boundary(self, X, y, y_oracle, clf, selector, res=21):
     # Validatet input parameters
