@@ -103,7 +103,3 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images('visualization_with_candidates.pdf',
                                     'test_result_cand.pdf', tol=0)
         self.assertIsNone(comparison)
-
-
-if __name__ == '__main__':
-    unittest.main()
