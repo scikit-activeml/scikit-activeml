@@ -2,9 +2,10 @@ import inspect
 import warnings
 
 import numpy as np
+from sklearn.utils.validation import check_array
 
-from skactiveml.utils._selection import rand_argmax
-from skactiveml.utils._validation import check_scalar, check_array
+from ._selection import rand_argmax
+from ._validation import check_scalar
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
@@ -33,6 +34,7 @@ def call_func(f_callable, only_mandatory=False, **kwargs):
     vars = dict(filter(lambda e: e[0] in param_keys, kwargs.items()))
 
     return f_callable(**vars)
+
 
 def simple_batch(
         utilities, random_state, batch_size=1, return_utilities=False):

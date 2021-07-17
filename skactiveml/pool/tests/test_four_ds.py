@@ -1,12 +1,13 @@
-import numpy as np
 import unittest
 
-from skactiveml.pool import FourDS
-from skactiveml.classifier import CMM, SklearnClassifier
+import numpy as np
+from sklearn.datasets import load_breast_cancer
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.mixture import BayesianGaussianMixture
-from sklearn.datasets import load_breast_cancer
 from sklearn.preprocessing import StandardScaler
+
+from skactiveml.classifier import CMM, SklearnClassifier
+from skactiveml.pool import FourDS
 
 
 class TestFourDS(unittest.TestCase):
@@ -83,7 +84,7 @@ class TestFourDS(unittest.TestCase):
         al4ds = FourDS(clf=CMM())
         self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
                           y=self.y, sample_weight=np.ones(1))
-        self.assertRaises(TypeError, al4ds.query, X=self.X, X_cand=self.X,
+        self.assertRaises(ValueError, al4ds.query, X=self.X, X_cand=self.X,
                           y=self.y, sample_weight='test')
 
     def test_query(self):
