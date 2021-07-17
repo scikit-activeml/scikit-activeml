@@ -98,9 +98,10 @@ autosummary_generate = True
 
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
-    'examples_dirs': 'generated\\examples',  # path to your example scripts
-    'gallery_dirs': 'generated\\sphinx_gallery_examples',
+    # path to your example scripts
+    'examples_dirs': os.path.normpath('generated/examples'),
     # the path where to save gallery generated output
+    'gallery_dirs': os.path.normpath('generated/sphinx_gallery_examples'),
     'matplotlib_animations': True,
 }
 os.makedirs(os.path.abspath(sphinx_gallery_conf['gallery_dirs']),
