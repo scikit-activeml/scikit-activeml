@@ -1,0 +1,61 @@
+[
+  {
+    "class" : "UncertaintySampling",
+    "method" : "margin_sampling",
+    "categories" : {
+      "Settles" : "Uncertainty",
+      "Yifan Fu" : "Category B",
+      "Punit Kumar" : "Category A",
+      "Setareh Cohan" : "Category 5"
+    },
+    "tags" : ["pool", "uncertainty"],
+    "title" : "Example UncertaintySampling",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "doc", "text_0", "code_0", "text_1", "plot", "refs"],
+    "text_0" : "This is a simple example for the example pages.",
+    "text_1" : "Here you can see the import section.",
+    "code_0" : "from skactiveml.pool import UncertaintySampling\nfrom skactiveml.classifier import PWC\nfrom sklearn.linear_model import LogisticRegression\n",
+    "init_params" : {
+      "method" : "'margin_sampling'"
+    },
+    "query_params" : {}
+  },
+  {
+    "class" : "UncertaintySampling",
+    "categories" : {
+      "Settles" : "Uncertainty",
+      "Yifan Fu" : "Category A",
+      "Punit Kumar" : "Category 2",
+      "Setareh Cohan" : "Category 3"
+    },
+    "method" : "least_confident",
+    "tags" : ["pool", "uncertainty"],
+    "title" : "Example UncertaintySampling",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "doc", "text_0", "code_0", "text_1", "plot", "refs"],
+    "text_0" : "This is a simple example for the example pages.",
+    "text_1" : "Here you can see the import section.",
+    "code_0" : "from skactiveml.pool import UncertaintySampling\nfrom skactiveml.classifier import PWC\nfrom sklearn.linear_model import LogisticRegression\n",
+    "init_params" : {
+      "clf" : "PWC(classes=[0, 1])",
+      "method" : "'least_confident'"
+    },
+    "query_params" : {}
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "entropy",
+    "tags" : ["pool", "uncertainty"],
+    "title" : "Example UncertaintySampling",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "doc", "text_0", "code_0", "text_1", "plot", "refs"],
+    "text_0" : "This is a simple example for the example pages.",
+    "text_1" : "Here you can see the import section.",
+    "code_0" : "from skactiveml.pool import UncertaintySampling\n",
+    "clf" : "PWC(classes=[0, 1], random_state=5)",
+    "init_params" : {
+      "method" : "'entropy'"
+    },
+    "query_params" : {}
+  }
+]

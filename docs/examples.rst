@@ -8,7 +8,7 @@ Pool
    :maxdepth: 1
    :glob:
 
-   generated/examples/skactiveml.pool.*
+   generated/sphinx_gallery_examples/pool/plot_*
 
 Stream
 ------
@@ -17,6 +17,6 @@ Stream
    :maxdepth: 1
    :glob:
 
-   generated/examples/skactiveml.stream.*
+   generated/sphinx_gallery_examples/stream/plot_*
 
 

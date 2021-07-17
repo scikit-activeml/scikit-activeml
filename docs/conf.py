@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 #
 # Configuration file for the Sphinx documentation builder.
@@ -10,31 +9,26 @@
 # -- Path setup --------------------------------------------------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
+# add these directories to sys.gen_path here. If the directory is relative to the
+# documentation root, use os.gen_path.abspath to make it absolute, like shown here.
 #
-import errno
 import os
 import sys
 
 from skactiveml import pool
-import matplotlib
 
 sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('..\\venv\\Lib\\matplotlib\\sphinxext'))
-
 
 # -- Project information -----------------------------------------------------
 
 project = 'scikit-activeml'
 copyright = '2020'
-author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergardt, Christoph Sandrock'
+author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergard, Christoph Sandrock'
 
 # The short X.Y version
 version = '1.0'
 # The full version, including alpha/beta/rc tags
 release = '1.0'
-
 
 # -- General configuration ---------------------------------------------------
 
@@ -57,14 +51,12 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
     'sphinx_gallery.gen_gallery',
-    'sphinx_togglebutton',
-    'matplotlib.sphinxext.plot_directive',
     'sphinxcontrib.bibtex',
     'nbsphinx',
     'numpydoc'
 ]
 
-#nbsphinx_execute = 'always'
+# nbsphinx_execute = 'always'
 
 # Napoleon settings
 napoleon_numpy_docstring = True
@@ -107,15 +99,14 @@ autosummary_generate = True
 
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
-    'examples_dirs': 'generated\\examples',   # path to your example scripts
-    'gallery_dirs': 'generated\\sphinx_gallery_examples',  # path to where to save gallery generated output
+    'examples_dirs': 'generated\\examples',  # path to your example scripts
+    'gallery_dirs': 'generated\\sphinx_gallery_examples',
+    # the path where to save gallery generated output
     'matplotlib_animations': True,
 }
-try:
-    os.makedirs(os.path.abspath(sphinx_gallery_conf['gallery_dirs']))
-except OSError as e:
-    if e.errno != errno.EEXIST:
-        raise
+os.makedirs(os.path.abspath(sphinx_gallery_conf['gallery_dirs']),
+            exist_ok=True)
+
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -153,7 +144,6 @@ html_static_path = []
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'scikit-activeml-guide'
 
-
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
@@ -167,7 +157,7 @@ man_pages = [
 
 # -- Options for bibtex extension ---------------------------------------
 bibtex_bibfiles = ['refs.bib']
-#bibtex_encoding = 'latin'
+# bibtex_encoding = 'latin'
 
 # -- Options for intersphinx extension ---------------------------------------
 
@@ -180,10 +170,20 @@ intersphinx_mapping = {'https://docs.python.org/3/': None}
 todo_include_todos = True
 
 # -- Generate rst files ------------------------------------------------------
-from docs.generate import generate_stratagy_summary_rst, \
-    generate_api_reference_rst, generate_examples, generate_example_script
+from docs.generate import generate_strategy_summary_rst, \
+    generate_api_reference_rst, generate_examples
 
-#generate_api_reference_rst(os.path.abspath('api_reference.rst'))
-methods, refs = generate_examples(os.path.abspath('generated/examples'), package=pool,
-                            json_path=os.path.abspath('examples/pool'))
-generate_stratagy_summary_rst(os.path.abspath('strategy_summary.rst'), methods, refs)
+generate_api_reference_rst(
+    os.path.abspath('api_reference.rst'),
+    gen_path=os.path.abspath('generated')
+)
+
+examples_data = generate_examples(
+    os.path.abspath('generated'),
+    package=pool,
+    json_path=os.path.abspath('examples/pool'))
+
+generate_strategy_summary_rst(
+    gen_path=os.path.abspath('generated'),
+    examples_data=examples_data
+)
