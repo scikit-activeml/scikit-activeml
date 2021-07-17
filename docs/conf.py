@@ -15,9 +15,9 @@
 import os
 import sys
 
-from skactiveml import pool
+sys.path.insert(0, os.path.abspath('..\\skactiveml'))
 
-sys.path.insert(0, os.path.abspath('..'))
+from skactiveml import pool
 
 # -- Project information -----------------------------------------------------
 
