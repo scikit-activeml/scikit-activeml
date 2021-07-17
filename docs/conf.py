@@ -15,9 +15,7 @@
 import os
 import sys
 
-#del sys.path[2]
 sys.path.insert(0, os.path.abspath('..'))
-print(sys.path)
 from skactiveml import pool
 
 # -- Project information -----------------------------------------------------

@@ -21,7 +21,7 @@ def generate_api_reference_rst(path, gen_path):
         The path of the main directory in which all generated files should be
         created.
     """
-    gen_path = gen_path.split('\\')[-1] + '/api'
+    gen_path = os.path.join(os.path.basename(gen_path), 'api')
     # TODO has to be fixed
     with open(path, 'w') as file:
         file.write('API Reference\n')
@@ -93,14 +93,15 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
     """
     # Generate an array which contains the data for the tables. TODO stream
     data = get_table_data(pool, examples_data,
-                          gen_path.split('\\')[-1] + '/api')
+                          os.path.join(os.path.basename(gen_path), 'api'))
 
     # create directory if it does not exist.
-    os.makedirs(gen_path + '\\strategy_summary', exist_ok=True)
+    os.makedirs(os.path.join(gen_path, 'strategy_summary'), exist_ok=True)
 
     # Generate file
-    with open(gen_path + '\\strategy_summary\\strategy_summary.rst',
-              'w') as file:
+    with open(
+            os.path.join(gen_path, 'strategy_summary', 'strategy_summary.rst'),
+            'w') as file:
         file.write('Strategy Summary\n')
         file.write('================\n')
         file.write('\n')
@@ -118,7 +119,9 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
     for tab, cats in data.items():
         tab_space = tab.replace('_', ' ')
         tab_ul = tab.replace(' ', '_')
-        path = gen_path + f'\\strategy_summary\\strategy_summary-{tab_ul}.rst'
+        path = os.path.join(gen_path,
+                            'strategy_summary',
+                            f'strategy_summary-{tab_ul}.rst')
         with open(path, 'w') as file:
             title = f'Strategy Summary according to {tab_space}\n'
             file.write(title)
@@ -311,17 +314,18 @@ def generate_examples(gen_path, package, json_path):
         ...
         }
     """
-    dir_path_package = gen_path + '/examples/' + \
-                       package.__name__.split('.')[1] + "/"
+    dir_path_package = os.path.join(gen_path,
+                                    'examples', package.__name__.split('.')[1],
+                                    '')
 
     # create directory if it does not exist.
     os.makedirs(dir_path_package, exist_ok=True)
 
     # create README.rst files needed for 'sphinx-gallery'
-    with open(gen_path + '/examples/README.rst', 'w') as file:
+    with open(os.path.join(gen_path, 'examples', 'README.rst'), 'w') as file:
         file.write('Example Gallery\n')
         file.write('===============')
-    with open(dir_path_package + '/README.rst', 'w') as file:
+    with open(os.path.join(dir_path_package, 'README.rst'), 'w') as file:
         title = f'{package.__name__.split(".")[1]} Example Gallery'.title()
         file.write(title + '\n')
         file.write(''.ljust(len(title), '='))
@@ -329,7 +333,7 @@ def generate_examples(gen_path, package, json_path):
     additional_data = {}
     # iterate over jason example files
     for filename in os.listdir(json_path):
-        with open(json_path + '\\' + filename) as file:
+        with open(os.path.join(json_path, filename)) as file:
             # iterate over the examples in the json file
             for data in json.load(file):
                 plot_filename = 'plot_' + data["class"]
@@ -380,7 +384,7 @@ def generate_example_script(filename, dir_path, data, package):
 
     first_title = True
     # Create the file.
-    with open(dir_path + filename, 'w') as file:
+    with open(os.path.join(dir_path, filename), 'w') as file:
         code_blocks = []
         # Iterate over the 'blocks' and generate the corresponding strings
         # expected from sphinx-gallery.
@@ -587,8 +591,6 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'    unlbld_idx = np.where(is_unlabeled(y))[0]\n'
     block_str += f'    X_cand = X[unlbld_idx]\n'
     query_params_str = ''
-    print(qs.__name__)
-    print(inspect.signature(qs.query).parameters)
     if 'X' in inspect.signature(qs.query).parameters:
         query_params_str += ', X'
     if 'y' in inspect.signature(qs.query).parameters:
