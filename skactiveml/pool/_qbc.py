@@ -35,15 +35,15 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         implementing the methods 'fit', 'predict'(for vote entropy) and
         'predict_proba'(for KL divergence).
     ensemble : BaseEnsemble, default=None
-        wrapped sklear.ensemble used as committee. If None, baggingClassifier
-        is used.
+        sklearn.ensemble used to construct the committee. If None,
+        baggingClassifier is used.
     method : string, default='KL_divergence'
         The method to calculate the disagreement.
         'vote_entropy' or 'KL_divergence' are possible.
     random_state : numeric | np.random.RandomState
         Random state to use.
     ensemble_dict : dictionary
-        will be passed on to the ensemble.
+        Will be passed on to the ensemble.
 
     Attributes
     ----------
@@ -119,7 +119,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
         # Check if the attribute clf is valid
         if not isinstance(self._clf, SkactivemlClassifier):
-            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
+            raise TypeError('clf as to be from type SkactivemlClassifier. The '
                             'given type is {}. Use the wrapper in '
                             'skactiveml.classifier to use a sklearn '
                             'classifier/ensemble.'.format(type(self.clf)))
@@ -137,19 +137,16 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             raise ValueError(
                 "The given method {} is not valid. Supported methods are "
                 "'KL_divergence' and 'vote_entropy'".format(self.method))
-        if self.method == 'vote_entropy' and \
-                ((getattr(self._clf, 'fit', None) is None or
-                  getattr(self._clf, 'predict', None) is None)):
-            raise TypeError(
-                "'clf' must implement the methods 'fit' and 'predict'")
-        elif self.method == 'KL_divergence' and \
-                ((getattr(self._clf, 'fit', None) is None or
-                  getattr(self._clf, 'predict_proba', None) is None)):
-            raise TypeError(
-                "'clf' must implement the methods 'fit' and 'predict_proba'")
 
+        if self.method == 'KL_divergence' and \
+                getattr(self._clf, 'predict_proba', None) is None:
+            raise TypeError(
+                "'clf' must implement the method 'predict_proba'")
+
+        # Build ensemble if necessary.
         if not isinstance(self._clf, SklearnClassifier) or \
                 not isinstance(self._clf.estimator, BaseEnsemble):
+            # Validate 'ensemble'.
             if self.ensemble is None:
                 warnings.warn('\'ensemble\' is not specified, '
                               '\'BaggingClassifier\' will be used.')
@@ -162,6 +159,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
                                 "'self.ensemble'.".format(type(self.ensemble)))
             else:
                 ensemble = self.ensemble
+            # Build ensemble.
             parameters = inspect.signature(ensemble.__init__).parameters
             if not isinstance(ensemble_dict, dict):
                 raise TypeError("ensemble_dict is not a dictionary.")

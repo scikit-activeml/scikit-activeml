@@ -30,6 +30,8 @@ class TestQBC(unittest.TestCase):
 
         selector = QBC(clf=GaussianProcessClassifier())
         self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = QBC(clf=SklearnClassifier(GaussianProcessRegressor()))
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf='string')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf=None)
@@ -42,6 +44,9 @@ class TestQBC(unittest.TestCase):
         self.assertTrue(hasattr(selector, 'ensemble'))
 
         selector = QBC(clf=self.clf, ensemble='String')
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = QBC(clf=self.clf, ensemble=PWC)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
     def test_init_param_method(self):
