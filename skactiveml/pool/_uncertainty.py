@@ -81,7 +81,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         y : np.array
             The labels of the labeled pool X.
         sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights.
+            Sample weights for X, used to fit the clf.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool (default=False)
@@ -104,8 +104,8 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
         # Check if the attribute clf is valid
         if not isinstance(self._clf, SkactivemlClassifier):
-            raise TypeError('clf as to be from type SkactivemlClassifier. The #'
-                            'given type is {}. Use the wrapper in '
+            raise TypeError('clf has to be from type SkactivemlClassifier. '
+                            'The given type is {}. Use the wrapper in '
                             'skactiveml.classifier to use a sklearn '
                             'classifier/ensemble.'.format(type(self._clf)))
 
@@ -188,9 +188,10 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
             allow_nd=False, ensure_min_samples=1,
             ensure_min_features=1, estimator=None)
 
-    if (np.sum(probas, axis=1) - 1).all():
-        raise ValueError('probas are invalid. The sum over axis 1 must be '
-                         'one.')
+    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.e-14):
+        raise ValueError(
+            "'probas' are invalid. The sum over axis 1 must be one."
+        )
 
     n_classes = probas.shape[1]
 

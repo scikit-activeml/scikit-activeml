@@ -1,9 +1,9 @@
 import numpy as np
-
 from iteration_utilities import deepflatten
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_is_fitted, check_array
 from sklearn.preprocessing import LabelEncoder
+from sklearn.utils.validation import check_is_fitted, check_array
+
 from ..utils._validation import check_classifier_params, check_missing_label, \
     MISSING_LABEL
 
@@ -33,7 +33,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
         is_number = False
         is_character = False
         for t in types:
-            t = np.object if t == 'NoneType' else t
+            t = object if t == 'NoneType' else t
             is_character = True \
                 if np.issubdtype(t, np.character) else is_character
             is_number = True if np.issubdtype(t, np.number) else is_number

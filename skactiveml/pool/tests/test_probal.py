@@ -1,8 +1,9 @@
-import numpy as np
 import unittest
 
-from skactiveml.pool import McPAL
+import numpy as np
+
 from skactiveml.classifier import PWC
+from skactiveml.pool import McPAL
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -64,14 +65,14 @@ class TestMcPAL(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         pal = McPAL(self.clf)
-        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight='string')
         self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight=np.ones(3))
 
     def test_query_param_utility_weight(self):
         pal = McPAL(self.clf)
-        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, utility_weight='string')
         self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, utility_weight=np.ones(3))

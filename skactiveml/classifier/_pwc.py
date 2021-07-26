@@ -5,13 +5,12 @@ Parzen Window Classifier
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
-
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted, check_scalar
 
-from ..utils import MISSING_LABEL, compute_vote_vectors
 from ..base import ClassFrequencyEstimator
+from ..utils import MISSING_LABEL, compute_vote_vectors
 
 
 class PWC(ClassFrequencyEstimator):
@@ -38,7 +37,7 @@ class PWC(ClassFrequencyEstimator):
         prior number of samples belonging to class `classes_[i]`. If
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
-    metric : str,
+    metric : str | callable,
         The metric must a be a valid kernel defined by the function 
         `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int,
@@ -74,14 +73,14 @@ class PWC(ClassFrequencyEstimator):
     METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
     def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
-                 classes=None, missing_label=MISSING_LABEL,  cost_matrix=None,
+                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
                  class_prior=0.0, random_state=None):
         super().__init__(classes=classes, missing_label=missing_label,
                          cost_matrix=cost_matrix, random_state=random_state)
         self.class_prior = class_prior
         self.metric = metric
         self.n_neighbors = n_neighbors
-        self.metric_dict = metric_dict if metric_dict is not None else {}
+        self.metric_dict = metric_dict
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -107,8 +106,8 @@ class PWC(ClassFrequencyEstimator):
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         # Check whether metric is available.
-        if self.metric not in PWC.METRICS:
-            raise ValueError("The parameter 'metric' must be "
+        if self.metric not in PWC.METRICS and not callable(self.metric):
+            raise ValueError("The parameter 'metric' must be callable or "
                              "in {}".format(KERNEL_PARAMS.keys()))
 
         # Check number of neighbors which must be a positive integer.
@@ -117,7 +116,9 @@ class PWC(ClassFrequencyEstimator):
                          target_type=int)
 
         # Ensure that metric_dict is a Python dictionary.
-        if not isinstance(self.metric_dict, dict):
+        self.metric_dict_ = self.metric_dict if self.metric_dict is not None \
+            else {}
+        if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
         self._check_n_features(X, reset=True)
@@ -126,8 +127,12 @@ class PWC(ClassFrequencyEstimator):
         self.X_ = X.copy()
 
         # Convert labels to count vectors.
-        self.V_ = compute_vote_vectors(y=y, w=sample_weight,
-                                       classes=np.arange(len(self.classes_)))
+        if self.n_features_in_ is None:
+            self.V_ = 0
+        else:
+            self.V_ = compute_vote_vectors(
+                y=y, w=sample_weight, classes=np.arange(len(self.classes_))
+            )
 
         return self
 
@@ -149,6 +154,10 @@ class PWC(ClassFrequencyEstimator):
         check_is_fitted(self)
         X = check_array(X)
 
+        # Predict zeros because of missing training data.
+        if np.sum(self.V_) == 0:
+            return np.zeros((len(X), len(self.classes_)))
+
         # Compute kernel (metric) matrix.
         if self.metric == 'precomputed':
             K = np.asarray(X)
@@ -159,7 +168,7 @@ class PWC(ClassFrequencyEstimator):
         else:
             self._check_n_features(X, reset=False)
             K = pairwise_kernels(X, self.X_, metric=self.metric,
-                                 **self.metric_dict)
+                                 **self.metric_dict_)
 
         # computing class frequency estimates
         if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:

@@ -1,12 +1,12 @@
-import numpy as np
 import unittest
 
+import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
 
-from skactiveml.pool._uncertainty import uncertainty_scores
-from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import SklearnClassifier, PWC
 from skactiveml.pool import UncertaintySampling, expected_average_precision
+from skactiveml.pool._uncertainty import uncertainty_scores
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestUncertaintySampling(unittest.TestCase):
@@ -78,9 +78,9 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_X(self):
         selector = UncertaintySampling(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=None, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X='string', y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=[], y=self.y)
@@ -100,7 +100,7 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         selector = UncertaintySampling(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=self.X_cand)
@@ -210,7 +210,7 @@ class TestExpectedAveragePrecision(unittest.TestCase):
         np.testing.assert_array_equal(scores, self.scores_val)
 
 
-class TestUncertaintyScoresn(unittest.TestCase):
+class TestUncertaintyScores(unittest.TestCase):
     def setUp(self):
         self.probas = np.array([[0.2, 0.5, 0.3], [0.1, 0.7, 0.2]])
         self.classes = np.array([0, 1, 2])

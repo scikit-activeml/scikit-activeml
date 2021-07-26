@@ -1,8 +1,9 @@
-import numpy as np
-import sklearn
-
+import copy
 from collections.abc import Iterable
 
+import numpy as np
+import sklearn
+import warnings
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
@@ -144,7 +145,40 @@ def check_classes(classes):
                 types))
 
 
-def check_cost_matrix(cost_matrix, n_classes):
+def check_class_prior(class_prior, n_classes):
+    """Check if the class_prior is a valid prior.
+
+    Parameters
+    ----------
+    class_prior : numeric | array_like, shape (n_classes)
+        A class prior.
+    n_classes : int
+        The number of classes.
+
+    Returns
+    -------
+    class_prior : np.ndarray, shape (n_classes)
+        Numpy array as prior.
+    """
+    if class_prior is None:
+        raise TypeError("'class_prior' must not be None.")
+    check_scalar(n_classes, name='n_classes', target_type=int, min_val=1)
+    if np.isscalar(class_prior):
+        check_scalar(class_prior, name='class_prior',
+                     target_type=(int, float), min_val=0)
+        class_prior = np.array([class_prior] * n_classes)
+    else:
+        class_prior = check_array(class_prior, ensure_2d=False)
+        is_negative = np.sum(class_prior < 0)
+        if class_prior.shape != (n_classes,) or is_negative:
+            raise ValueError("`class_prior` must be either a non-negative"
+                             "float or a list of `n_classes` non-negative "
+                             "floats.")
+    return class_prior.reshape(-1)
+
+
+def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
+                      contains_non_zero=False, diagonal_is_zero=False):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
 
     Parameters
@@ -153,6 +187,15 @@ def check_cost_matrix(cost_matrix, n_classes):
         Cost matrix.
     n_classes : int
         Number of classes.
+    only_non_negative : bool, optional (default=True)
+        This parameter determines whether the matrix must contain only non
+        negative cost entries.
+    contains_non_zero : bool, optional (default=True)
+        This parameter determines whether the matrix must contain at least on
+        non-zero cost entry.
+    diagonal_is_zero : bool, optional (default=True)
+        This parameter determines whether the diagonal cost entries must be
+        zero.
 
     Returns
     -------
@@ -166,6 +209,35 @@ def check_cost_matrix(cost_matrix, n_classes):
         raise ValueError(
             "'cost_matrix' must have shape ({}, {}). "
             "Got {}.".format(n_classes, n_classes, cost_matrix_new.shape))
+    if np.sum(cost_matrix_new < 0) > 0:
+        if only_non_negative:
+            raise ValueError(
+                "'cost_matrix' must contain only non-negative cost entries."
+            )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains negative cost entries."
+            )
+    if n_classes != 1 and np.sum(cost_matrix_new != 0) == 0:
+        if contains_non_zero:
+            raise ValueError(
+                    "'cost_matrix' must contain at least one non-zero cost "
+                    "entry."
+                )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains contains no non-zero cost entry."
+            )
+    if np.sum(np.diag(cost_matrix_new) != 0) > 0:
+        if diagonal_is_zero:
+            raise ValueError(
+                "'cost_matrix' must contain only cost entries being zero on "
+                "its diagonal."
+            )
+        else:
+            warnings.warn(
+                "'cost_matrix' contains non-zero cost entries on its diagonal."
+            )
     return cost_matrix_new
 
 
@@ -356,13 +428,35 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
         return X, y, X_cand, sample_weight, sample_weight_cand
 
 
-def check_random_state(random_state, seed_multiplier=1):
-    # Check given random state
+def check_random_state(random_state, seed_multiplier=None):
+    """Check validity of the given random state.
+
+    Parameters
+    ----------
+    random_state : None | int | instance of RandomState
+        If random_state is None, return the RandomState singleton used by
+        np.random.
+        If random_state is an int, return a new RandomState.
+        If random_state is already a RandomState instance, return it.
+        Otherwise raise ValueError.
+    seed_multiplier : None | int, optional (default=None)
+        If the random_state and seed_multiplier are not None, draw a new int
+        from the random state, multiply it with the multiplier, and use the
+        product as the seed of a new random state.
+
+    Returns
+    -------
+    random_state: instance of RandomState
+        The validated random state.
+    """
+    if random_state is None or seed_multiplier is None:
+        return sklearn.utils.check_random_state(random_state)
+
+    check_scalar(seed_multiplier, name='seed_multiplier', target_type=int,
+                 min_val=1)
+    random_state = copy.deepcopy(random_state)
     random_state = sklearn.utils.check_random_state(random_state)
 
-    # Check multiplier
-    check_scalar(seed_multiplier, 'seed_multiplier', int, min_val=1)
+    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
+    return np.random.RandomState(seed)
 
-    seed = random_state.get_state()[1][0]
-
-    return np.random.RandomState((seed * seed_multiplier) % (2 ** 32))

@@ -39,7 +39,7 @@ class TestGeneral(unittest.TestCase):
             with self.subTest(msg="Random State", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
                 qs = call_func(
-                    self.query_strategies[qs_name], only_mandatory=True,
+                    self.query_strategies[qs_name], only_mandatory=False,
                     clf=clf, classes=np.unique(self.y_true),
                     random_state=np.random.RandomState(0))
 
