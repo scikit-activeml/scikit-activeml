@@ -173,6 +173,12 @@ todo_include_todos = True
 from docs.generate import generate_strategy_summary_rst, \
     generate_api_reference_rst, generate_examples
 
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': True,
+    'show-inheritance': True
+}
+
 generate_api_reference_rst(
     os.path.abspath('api_reference.rst'),
     gen_path=os.path.abspath('generated')

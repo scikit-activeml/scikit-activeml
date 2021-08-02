@@ -22,7 +22,6 @@ def generate_api_reference_rst(path, gen_path):
         created.
     """
     gen_path = os.path.join(os.path.basename(gen_path), 'api')
-    # TODO has to be fixed
     with open(path, 'w') as file:
         file.write('API Reference\n')
         file.write('=============\n')
@@ -255,7 +254,7 @@ def get_table_data(package, additional_data, rel_api_path):
 
                 methods_text = \
                     f':doc:`{method} </generated/sphinx_gallery_examples/' \
-                    f'{package_name}/plot_{qs_name}_{method}>`'  # TODO path
+                    f'{package_name}/plot_{qs_name}_{method}>`'
                 for ref in refs:
                     ref_text += f':footcite:t:`{ref}`, '
                 ref_text = ref_text[0:-2]
