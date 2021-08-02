@@ -102,13 +102,13 @@ class TestCMM(unittest.TestCase):
                   classes=['tokyo', 'paris', 'new york'], class_prior=1)
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         P = cmm.predict_proba(X=[self.X[0]])
-        np.testing.assert_array_equal([[1/7, 2/7, 4/7]], P)
+        np.testing.assert_array_equal([[1 / 7, 2 / 7, 4 / 7]], P)
         cmm = CMM(mixture_model=mixture, missing_label='nan',
                   classes=['tokyo', 'paris', 'new york'],
                   class_prior=[0, 0, 1])
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         P = cmm.predict_proba(X=[self.X[0]])
-        np.testing.assert_array_equal([[0, 1/5, 4/5]], P)
+        np.testing.assert_array_equal([[0, 1 / 5, 4 / 5]], P)
 
     def test_predict(self):
         mixture = BayesianGaussianMixture(n_components=1, random_state=0)
@@ -136,7 +136,3 @@ class TestCMM(unittest.TestCase):
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)
         y = cmm.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
-
-
-if __name__ == '__main__':
-    unittest.main()
