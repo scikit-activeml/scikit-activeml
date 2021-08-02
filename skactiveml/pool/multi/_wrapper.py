@@ -39,11 +39,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         self.n_annotators = n_annotators
 
     def query(self, X_cand, *args, A_cand=None, batch_size=1,
-              return_utilities=False, pref_annotators_per_sample=1, **kwargs):
+              return_utilities=False, pref_annotators_per_sample=1,
+              annotator_ranking="random",
+              A_perfs=None, **kwargs):
         """Determines which candidate sample is to be annotated by which
-        annotator. The sample is chosen by the given strategy as if one
-        unspecified annotator where to annotate the sample and the
-        annotators are chosen at random.
+        annotator. The samples are first and primarily ranked by the given
+        strategy as if one unspecified annotator where to annotate the sample.
+        Then for each sample the sample-annotator pairs are ranked based either
+        on previously set preferences or at random.
 
         Parameters
         ----------
@@ -59,26 +62,39 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         args : list
             If (X, y) is contained by args. y can be a matrix or a vector
             of assigned values. If y is a matrix the entries are interpreted
-            as follows: y[i,j] = k indicates that for the i-th sample the
+            as follows: `y[i,j] = k` indicates that for the i-th sample the
             j-th candidate annotator annotated the value k.
         batch_size : 'adaptive'|int, optional (default=1)
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is set to 1.
+        A_perfs : array-like, shape (n_samples, n_annotators) or
+        (n_annotators,) optional (default=None)
+            The preferred ranking of each annotator.
+            1.) If `A_perfs` is of shape (n_samples, n_annotators) for each sample
+            `i` the value-annotators pair `(i, j)` is preferably picked
+             over the pair `(i, k)` if `A_perfs[i, j]` is greater or
+             equal to `A_perfs[i, k]`.
+            2.) If `A_perfs` is of shape (1, n_annotators) for each sample
+            `i` the value-annotators pair `(i, j)` is preferentially picked
+             over the pair `(i, k)` if `A_perfs[j]` is greater or
+             equal to `A_perfs[k]`.
+            3.) If `A_perfs` is None, the annotators are chosen at random, with
+             a different distribution for each sample.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
         pref_annotators_per_sample : int, array-like, optional (default=1)
-                                     array-like, shape (k), k <= n_samples
-            If pref_annotators_per_sample is an int, the value indicates
+        array-like, shape (k), k <= n_samples
+            If `pref_annotators_per_sample` is an int, the value indicates
             the number of annotators that are preferably assigned to a candidate
             sample, if annotators can still be assigned to the given candidate
             sample.
-            If pref_annotators_per_sample is an int array, the values of the
+            If `pref_annotators_per_sample` is an int array, the values of the
             array are interpreted as follows. The value at the i-th index
             determines the preferred number of annotators for the candidate
             sample at the i-th index in the ranking of the batch. The last index
             of the pref_annotators_per_sample array (k-1) indicates the
             preferred number of annotators for all candidate sample at an index
-            greater of equal than k-1.
+            greater of equal to k-1.
 
         Returns
         -------
@@ -144,7 +160,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                          name='pref_annotators_per_sample',
                          target_type=int, min_val=1)
             pref_n_annotators = pref_annotators_per_sample * \
-                np.ones(batch_size_sq)
+                                np.ones(batch_size_sq)
         elif _is_arraylike(pref_annotators_per_sample):
             pref_n_annotators = check_array(pref_annotators_per_sample,
                                             ensure_2d=False)
@@ -161,7 +177,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
                 if pref_length < batch_size_sq:
                     appended = pref_n_annotators[-1] * \
-                        np.ones(batch_size_sq - pref_length)
+                               np.ones(batch_size_sq - pref_length)
 
                     pref_n_annotators = np.append(pref_n_annotators, appended)
         else:

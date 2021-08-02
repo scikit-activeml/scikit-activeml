@@ -256,6 +256,29 @@ class TestIEThresh(unittest.TestCase):
                                         y=self.y, A_cand=A_cand)
         self.assertEqual(len(query_indices), 0)
 
+    def test_query_with_variant_available_annotators(self):
+
+        ie_thresh = IEThresh(clf=PWC(), epsilon=1.0)
+        A_cand = np.array([[True, True, True, True],
+                           [True, False, False, False],
+                           [True, True, True, False]])
+
+        available_annotators = np.sum(A_cand, axis=1)
+
+        X_cand = np.array([[0.0, 1.0],
+                           [1.0, 1.0],
+                           [1.0, 0.0]])
+
+        query_indices, utilities = ie_thresh.query(X_cand=X_cand, X=self.X,
+                                                   y=self.y,
+                                                   A_cand=A_cand,
+                                                   return_utilities=True,
+                                                   batch_size=7)
+
+        for index in range(len(query_indices)-1):
+            self.assertGreaterEqual(available_annotators[query_indices[index, 0]],
+                                    available_annotators[query_indices[index+1, 0]])
+
 
 if __name__ == '__main__':
     unittest.main()

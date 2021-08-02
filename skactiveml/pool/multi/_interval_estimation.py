@@ -165,6 +165,10 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
     selected based on 'Uncertainty Sampling' (US). The selected samples are
     labeled by the annotators whose estimated annotation performances are equal
     or greater than an adaptive threshold.
+    The strategy assumes all annotators to be available and is not defined
+    otherwise. To deal with this case non the less value-annotator pairs are
+    first ranked according to the amount of annotators available for the given
+    value in X_cand and are than ranked according to IEThresh"
 
     Parameters
     ----------
@@ -238,6 +242,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator pair (with indices `query_indices[0]`).
         """
+
         # base check
         X_cand, A_cand, return_utilities, batch_size, random_state = \
             super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
@@ -265,6 +270,16 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
 
         n_annotators = A_cand.shape[1]
 
+        # Check whether unlabeled data exists
+        if not np.all(A_cand):
+            warnings.warn("Not all annotators are available for all values in "
+                          "X_cand. The IEThresh strategy assumes this to be "
+                          "the case and is not defined otherwise. "
+                          "To deal with this case non the less value-annotator "
+                          "pairs are first ranked according to the amount of "
+                          "annotators available for the given value in X_cand "
+                          "and are than ranked according to IEThresh")
+
         # Fit classifier and compute uncertainties on candidate samples.
         self.clf_.fit(X, y, sample_weight=sample_weight)
         P = self.clf_.predict_proba(X_cand)
@@ -274,6 +289,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         self.ie_model_ = IEAnnotModel(classes=self.clf_.classes_,
                                       missing_label=self.clf_.missing_label,
                                       alpha=self.alpha, mode='upper')
+
         self.ie_model_.fit(y=y, sample_weight=sample_weight)
         A_perf = self.ie_model_.A_perf_
 
@@ -295,6 +311,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
                                                method='dense') \
                                       * max_uncertainty - max_uncertainty
         init_utilities = init_utilities + annotators_per_sample_ranks[:, np.newaxis]
+
+        # exclude not available annotators
         init_utilities[~A_cand] = np.nan
 
         # Determine actual batch size.
