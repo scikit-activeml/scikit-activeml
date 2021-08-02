@@ -119,7 +119,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
         # Check if the attribute clf is valid
         if not isinstance(self._clf, SkactivemlClassifier):
-            raise TypeError('clf as to be from type SkactivemlClassifier. The '
+            raise TypeError('clf has to be from type SkactivemlClassifier. The '
                             'given type is {}. Use the wrapper in '
                             'skactiveml.classifier to use a sklearn '
                             'classifier/ensemble.'.format(type(self.clf)))
