@@ -92,8 +92,8 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
         }
     """
     # Generate an array which contains the data for the tables. TODO stream
-    data = get_table_data(pool, examples_data,
-                          os.path.join(os.path.basename(gen_path), 'api'))
+    api_path = os.path.join(os.path.basename(gen_path), 'api').replace('\\', '/')
+    data = get_table_data(pool, examples_data, api_path)
 
     # create directory if it does not exist.
     os.makedirs(os.path.join(gen_path, 'strategy_summary'), exist_ok=True)
