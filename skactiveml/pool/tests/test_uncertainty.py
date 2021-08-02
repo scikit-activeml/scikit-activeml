@@ -1,7 +1,8 @@
 import unittest
 
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.gaussian_process import GaussianProcessClassifier, \
+    GaussianProcessRegressor
 
 from skactiveml.classifier import SklearnClassifier, PWC
 from skactiveml.pool import UncertaintySampling, expected_average_precision
@@ -34,6 +35,12 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(clf=None)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = UncertaintySampling(clf=1)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = UncertaintySampling(clf=GaussianProcessClassifier())
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = UncertaintySampling(
+            clf=SklearnClassifier(GaussianProcessRegressor())
+        )
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
     def test_init_param_method(self):
@@ -161,6 +168,14 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(clf=clf, method='least_confident')
         selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
         compare_list.append(selector.query(**self.kwargs))
+
+        selector = UncertaintySampling(clf=clf, method='margin_sampling',
+                                       cost_matrix=[[0, 1], [1, 0]])
+        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
+
+        selector = UncertaintySampling(clf=clf, method='least_confident',
+                                       cost_matrix=[[0, 1], [1, 0]])
+        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
         for x in compare_list:
             self.assertEqual(compare_list[0], x)
