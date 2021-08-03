@@ -104,6 +104,18 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                           return_utilities=False,
                           pref_annotators_per_sample=pref_annotators_per_sample)
 
+    def test_query_param_A_perfs(self):
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, self.random_state)
+        self.assertRaises(TypeError, wrapper.query, self.X_cand,
+                          A_cand=self.A_cand, batch_size=5,
+                          return_utilities=False,
+                          A_perfs=3)
+        self.assertRaises(ValueError, wrapper.query, self.X_cand,
+                          A_cand=self.A_cand, batch_size=5,
+                          return_utilities=False,
+                          A_perfs=np.array([[0, ], ]))
+
     def test_query_one_annotator_per_sample_batch_size_one(self):
         # test functionality with uncertainty sampling
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
@@ -249,6 +261,55 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertEqual((5, 4, 4), utilities.shape)
         self.check_max(best_cand_indices, utilities)
         self.check_availability(best_cand_indices, A_cand)
+
+    def test_query_custom_annotator_special_preference(self):
+        random = RandomSampler(self.random_state)
+
+        wrapper = MultiAnnotWrapper(random, self.random_state,
+                                    n_annotators=3)
+
+        X_cand = np.array([[7, 1], [9, 1]])
+
+        A_perfs = np.array([[1, 2, 3],
+                            [3, 2, 1]])
+
+        re_val = wrapper.query(X_cand=X_cand, batch_size=6,
+                               pref_annotators_per_sample=3,
+                               A_perfs=A_perfs,
+                               return_utilities=True)
+
+        best_cand_indices, utilities = re_val
+        # assert the utilities fit A_perfs
+        self.assertFalse(np.any(utilities[:, 0, 2] < utilities[:, 0, 1]))
+        self.assertFalse(np.any(utilities[:, 0, 1] < utilities[:, 0, 0]))
+
+        self.assertFalse(np.any(utilities[:, 1, 0] < utilities[:, 1, 1]))
+        self.assertFalse(np.any(utilities[:, 1, 1] < utilities[:, 1, 2]))
+
+        self.check_max(best_cand_indices, utilities)
+
+    def test_query_custom_annotator_general_preference(self):
+        random = RandomSampler(self.random_state)
+
+        wrapper = MultiAnnotWrapper(random, self.random_state,
+                                    n_annotators=3)
+
+        X_cand = np.array([[7, 1], [9, 1]])
+        A_perfs = np.array([1, 1, 1])
+
+        re_val = wrapper.query(X_cand=X_cand, batch_size=6,
+                               pref_annotators_per_sample=3,
+                               A_perfs=A_perfs,
+                               return_utilities=True)
+
+        best_cand_indices, utilities = re_val
+        # assert the utilities fit A_perfs
+        self.assertTrue(np.all((utilities[:, :, 2] == utilities[:, :, 1])
+                               | np.isnan(utilities[:, :, 2])
+                               | np.isnan(utilities[:, :, 1])))
+        self.assertTrue(np.all((utilities[:, :, 1] == utilities[:, :, 0])
+                               | np.isnan(utilities[:, :, 1])
+                               | np.isnan(utilities[:, :, 0])))
 
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]
