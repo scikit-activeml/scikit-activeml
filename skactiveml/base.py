@@ -269,7 +269,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             if n_queries < batch_size:
                 warnings.warn(
                     "'batch_size={}' is larger than number of candidate queries "
-                    "in 'A_cand'. Instead, 'batch_size={}' was set "
+                    "in 'A_cand'. Instead, 'batch_size={}' was set."
                         .format(batch_size, n_queries))
                 batch_size = int(n_queries)
         else:
