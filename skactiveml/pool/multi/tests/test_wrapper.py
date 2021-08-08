@@ -288,7 +288,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         self.check_max(best_cand_indices, utilities)
 
-    def test_query_custom_annotator_general_preference(self):
+    def test_query_custom_annotator_general_equal_preference(self):
         random = RandomSampler(self.random_state)
 
         wrapper = MultiAnnotWrapper(random, self.random_state,
