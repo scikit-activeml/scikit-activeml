@@ -39,7 +39,6 @@ def generate_api_reference_rst(path, gen_path):
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
         file.write(f'   :toctree: {gen_path}\n')
-        file.write('   :template: class.rst\n')
         file.write('\n')
         for qs_name in pool.__all__:
             file.write(f'   pool.{qs_name}\n')
@@ -410,7 +409,6 @@ def generate_example_script(filename, dir_path, data, package):
                                         data["query_params"], clf=clf)
             elif block.startswith("refs"):
                 block_str = format_refs(data[block])
-            # TODO tags
 
             # Write the corresponding string to the python script.
             file.write(block_str)
@@ -439,7 +437,7 @@ def format_doc(data, package):
                 f'# .. currentmodule:: {package.__name__}\n#\n' \
                 f'# .. autoclass:: {data["class"]}\n' \
                 '#    :noindex:\n' \
-                '#    :members: query\n\n'  # TODO docstrings for query
+                '#    :members: query\n\n'
 
     return block_str
 
@@ -547,48 +545,60 @@ def format_plot(qs, init_params, query_params, clf=None):
         Should include the parameters used to call the 'query' method of the
         query strategy.
     clf : string, optional (default=None)
-        An inatialization of the classifier used to initialize the query
-        strategy if no clf is specified in 'init_params'.
+        An initialisation of the classifier used to initialize the query
+        strategy, if no clf is specified in 'init_params'.
 
     Returns
     -------
     string : The formatted string for the example script.
     """
-    # TODO comments
     block_str = 'import numpy as np\n'
     block_str += 'from matplotlib import pyplot as plt, animation\n'
     block_str += 'from sklearn.datasets import make_classification\n'
-    block_str += 'from skactiveml.classifier import SklearnClassifier, PWC\n'
-    block_str += 'from skactiveml.utils import MISSING_LABEL, is_unlabeled, ' \
-                 'plot_2d_dataset\n'
-    block_str += '\n'
-    block_str += 'random_state = 0'
-    block_str += '\n'
-    block_str += 'fig, ax = plt.subplots()\n'
-    block_str += 'X, y_true = make_classification(n_features=2, ' \
-                 'n_redundant=0, random_state=random_state)\n'
-    block_str += 'y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n'
+    # Decide which classifier to use, if clf is None.
     if clf is None:
         if 'clf' not in init_params.keys():
             clf = 'PWC(classes=[0, 1], random_state=random_state)'
+            block_str += 'from skactiveml.classifier import PWC\n'
         else:
             clf = init_params['clf']
             init_params['clf'] = 'clf'
+    block_str += 'from skactiveml.utils import MISSING_LABEL, is_unlabeled, ' \
+                 'plot_2d_dataset\n'  # TODO use the new plotting function
 
+    block_str += '\n'
+    block_str += 'random_state = 0\n'
+    block_str += '\n'
+    block_str += '# Build a dataset.\n'
+    block_str += 'X, y_true = make_classification(n_features=2, ' \
+                 'n_redundant=0, random_state=random_state)\n'
+    block_str += 'y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n'
+
+    block_str += '# Initialise the classifier.\n'
     block_str += ('clf = ' + clf + '\n')
+
     if 'clf' not in init_params.keys() and 'clf' in \
             inspect.signature(qs.__init__).parameters:
         init_params['clf'] = 'clf'
+    # Set the random state if it is not set in the json file.
     if 'random_state' not in init_params.keys() and 'random_state' in \
             inspect.signature(qs.__init__).parameters:
         init_params['random_state'] = 'random_state'
+    # Initialise the query strategy.
+    block_str += f'# Initialise the query strategy.\n'
     block_str += f'qs = {qs.__name__}({dict_to_str(init_params)})\n'
     block_str += f'\n'
+    block_str += f'# Preparation for plotting.\n'
+    block_str += f'fig, ax = plt.subplots()\n'
     block_str += f'artists = []\n'
+    block_str += f'\n'
+    block_str += f'# The active learning cycle:\n'
     block_str += f'n_cycles = 20\n'
     block_str += f'for c in range(n_cycles):\n'
+    block_str += f'    # Set X_cand to the unlabeled instances.\n'
     block_str += f'    unlbld_idx = np.where(is_unlabeled(y))[0]\n'
     block_str += f'    X_cand = X[unlbld_idx]\n'
+    # Call the query method with the expected parameters.
     query_params_str = ''
     if 'X' in inspect.signature(qs.query).parameters:
         query_params_str += ', X'
@@ -598,15 +608,19 @@ def format_plot(qs, init_params, query_params, clf=None):
     if query_params_str != '' and params != '':
         query_params_str += ', '
     query_params_str += params
+    block_str += f'    # Query the next instance/s.\n'
     block_str += f'    query_idx = unlbld_idx[qs.query(X_cand' \
                  f'{query_params_str})]\n'
+    block_str += f'    # Plot the labeled data.\n'
     block_str += f'    if c in [1, 2, 3, 5, 10, 15, 19]:\n'
-    block_str += f'        temp = np.array(ax.collections)\n'
-    block_str += f'        collections = plot_2d_dataset(X, y, y_true, clf, ' \
+    block_str += f'        collections = np.array(ax.collections)\n'
+    block_str += f'        coll = plot_2d_dataset(X, y, y_true, clf, ' \
                  f'qs, ax)\n'
-    block_str += f'        artists.append([x for x in collections if (x not ' \
-                 f'in temp)])\n'
+    block_str += f'        artists.append([x for x in coll if (x not ' \
+                 f'in collections)])\n'
+    block_str += f'    # Label the queried instances.\n'
     block_str += f'    y[query_idx] = y_true[query_idx]\n'
+    block_str += f'    # Fit the classifier.\n'
     block_str += f'    clf.fit(X, y)\n'
     block_str += f'\n'
     block_str += f'ani = animation.ArtistAnimation(fig, artists, blit=True)\n '

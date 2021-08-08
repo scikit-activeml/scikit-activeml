@@ -51,7 +51,7 @@
     "sequence" : ["title", "doc", "text_0", "code_0", "text_1", "plot", "refs"],
     "text_0" : "This is a simple example for the example pages.",
     "text_1" : "Here you can see the import section.",
-    "code_0" : "from skactiveml.pool import UncertaintySampling\n",
+    "code_0" : "from skactiveml.pool import UncertaintySampling\nfrom skactiveml.classifier import PWC\n",
     "clf" : "PWC(classes=[0, 1], random_state=5)",
     "init_params" : {
       "method" : "'entropy'"
