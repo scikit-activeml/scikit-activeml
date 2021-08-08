@@ -130,7 +130,3 @@ class TestPWC(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
         y = pwc.predict(self.X)
         np.testing.assert_array_equal(['paris', 'paris'], y)
-
-
-if __name__ == '__main__':
-    unittest.main()
