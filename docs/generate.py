@@ -22,6 +22,7 @@ def generate_api_reference_rst(path, gen_path):
         created.
     """
     gen_path = os.path.join(os.path.basename(gen_path), 'api')
+    os.makedirs(os.path.abspath(gen_path), exist_ok=True)
     with open(path, 'w') as file:
         file.write('API Reference\n')
         file.write('=============\n')
@@ -40,8 +41,8 @@ def generate_api_reference_rst(path, gen_path):
         file.write('   :nosignatures:\n')
         file.write(f'   :toctree: {gen_path}\n')
         file.write('\n')
-        for qs_name in pool.__all__:
-            file.write(f'   pool.{qs_name}\n')
+        for item in pool.__all__:
+            file.write(f'   pool.{item}\n')
         file.write('\n')
         # TODO stream
 
@@ -54,8 +55,8 @@ def generate_api_reference_rst(path, gen_path):
         file.write(f'   :toctree: {gen_path}\n')
         # file.write('   :template: class.rst\n')
         file.write('\n')
-        for qs_name in classifier.__all__:
-            file.write(f'   classifier.{qs_name}\n')
+        for item in classifier.__all__:
+            file.write(f'   classifier.{item}\n')
         file.write('\n')
 
         file.write('Utils:\n')
@@ -66,9 +67,22 @@ def generate_api_reference_rst(path, gen_path):
         file.write(f'   :toctree: {gen_path}\n')
         file.write('   :template: class.rst\n')
         file.write('\n')
-        for qs_name in utils.__all__:
-            file.write(f'   utils.{qs_name}\n')
+        for item in utils.__all__:
+            if item == 'MISSING_LABEL': continue
+            file.write(f'   utils.{item}\n')
         file.write('\n')
+
+    # Overwrite the 'MISSING_LABEL' docstring.
+    ML_path = os.path.join(gen_path, 'skactiveml.utils.MISSING_LABEL.rst')
+    with open(os.path.abspath(ML_path), 'w') as file:
+        file.write('skactiveml.utils.MISSING_LABEL\n')
+        file.write('===============================\n')
+        file.write('\n')
+        file.write('.. data:: MISSING_LABEL\n')
+        file.write('   :value: np.nan\n')
+        file.write('\n')
+        file.write('   Define constant for missing label used throughout the '
+                   'package.\n')
 
 
 def generate_strategy_summary_rst(gen_path, examples_data={}):
