@@ -41,6 +41,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
     def query(self, X_cand, *args, A_cand=None, batch_size=1,
               return_utilities=False, pref_annotators_per_sample=1,
               A_perfs=None, **kwargs):
+
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
         strategy as if one unspecified annotator where to annotate the sample.
