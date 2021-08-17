@@ -72,18 +72,6 @@ def generate_api_reference_rst(path, gen_path):
             file.write(f'   utils.{item}\n')
         file.write('\n')
 
-    # Overwrite the 'MISSING_LABEL' docstring.
-    ML_path = os.path.join(gen_path, 'skactiveml.utils.MISSING_LABEL.rst')
-    with open(os.path.abspath(ML_path), 'w') as file:
-        file.write('skactiveml.utils.MISSING_LABEL\n')
-        file.write('===============================\n')
-        file.write('\n')
-        file.write('.. data:: MISSING_LABEL\n')
-        file.write('   :value: np.nan\n')
-        file.write('\n')
-        file.write('   Define constant for missing label used throughout the '
-                   'package.\n')
-
 
 def generate_strategy_summary_rst(gen_path, examples_data={}):
     """Creates the strategy_summary.rst file in the specified path.
@@ -626,11 +614,10 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'    query_idx = unlbld_idx[qs.query(X_cand' \
                  f'{query_params_str})]\n'
     block_str += f'    # Plot the labeled data.\n'
-    block_str += f'    if c in [1, 2, 3, 5, 10, 15, 19]:\n'
-    block_str += f'        collections = np.array(ax.collections)\n'
-    block_str += f'        coll = plot_2d_dataset(X, y, y_true, clf, ' \
+    block_str += f'    collections = np.array(ax.collections)\n'
+    block_str += f'    coll = plot_2d_dataset(X, y, y_true, clf, ' \
                  f'qs, ax)\n'
-    block_str += f'        artists.append([x for x in coll if (x not ' \
+    block_str += f'    artists.append([x for x in coll if (x not ' \
                  f'in collections)])\n'
     block_str += f'    # Label the queried instances.\n'
     block_str += f'    y[query_idx] = y_true[query_idx]\n'

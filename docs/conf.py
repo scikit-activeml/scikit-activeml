@@ -96,6 +96,7 @@ pygments_style = 'sphinx'
 # sphinx-autogen docs/index.rst
 autosummary_generate = True
 
+
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
     # path to your example scripts
