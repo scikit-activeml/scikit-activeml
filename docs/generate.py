@@ -394,8 +394,6 @@ def generate_example_script(filename, dir_path, data, package):
                 first_title = False
             elif block.startswith("subtitle"):
                 block_str = format_title(data[block], False)
-            elif block.startswith("doc"):
-                block_str = format_doc(data, package)
             elif block.startswith("text"):
                 block_str = format_text(data[block])
             elif block.startswith("code"):
@@ -416,32 +414,6 @@ def generate_example_script(filename, dir_path, data, package):
             file.write(block_str)
 
         file.write("\n")
-
-
-def format_doc(data, package):
-    """
-    Generates the string for the class documentation formatted for a
-    'sphinx-gallery' example script.
-
-    Parameters
-    ----------
-    data : dict
-        The data from the jason example file for the example.
-    package : module
-        The '__init__' module of the package for which the examples should be
-        created.
-
-    Returns
-    -------
-    string : The formatted string for the example script.
-    """
-    block_str = '# %%\n' \
-                f'# .. currentmodule:: {package.__name__}\n#\n' \
-                f'# .. autoclass:: {data["class"]}\n' \
-                '#    :noindex:\n' \
-                '#    :members: query\n\n'
-
-    return block_str
 
 
 def format_title(title, first_title):

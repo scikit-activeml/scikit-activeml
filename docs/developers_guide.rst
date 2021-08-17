@@ -113,7 +113,6 @@ Json example file structure
     * "code": Every key that starts with 'code' will be formatted as a python code block in the example.
     * "sequence": A list that contains the order in which the blocks are shown. Possible blocks are:
         * 'title': Shows the title.
-        * 'doc': Will include the docstring of the class.
         * 'text': Shows the specified text paragraph.
         * 'code': Shows the specified code block.
         * 'refs': Shows the references.
