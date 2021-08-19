@@ -13,7 +13,7 @@ from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, ClassFrequencyEsti
 from skactiveml.utils import is_labeled, check_scalar
 
 
-def set_up_bound(X, bound):
+def check_bound(X, bound):
     if bound is not None:
         return bound
     else:
@@ -64,12 +64,30 @@ def set_up_annotator_axis(ax, annotator_index, bound, fontsize):
     return ax
 
 
-# notebook for visualisation
+def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None, bound=None,
+                       title=None, fontsize=15, fig_size=None):
+
+    if ma_qs_arg_dict is None:
+        ma_qs_arg_dict = {"X":X, "y":y}
+
+    bound = check_bound(X, bound)
+
+    n_annotators = y.shape[1]
+    fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
+                       ma_qs_arg_dict=ma_qs_arg_dict,
+                       bound=bound, title=title, fontsize=fontsize, res=5)
+
+    plot_data_set(fig=fig, X=X, y=y, y_true=y_true)
+    plot_multi_annot_decision_boundary(n_annotators, clf, fig=fig, bound=bound)
+
+    plt.show()
+
+
 def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
                   fig_size=None):
     n_annotators = y.shape[1]
 
-    bound = set_up_bound(X, bound)
+    bound = check_bound(X, bound)
 
     labeled_indices = is_labeled(y)
     unlabeled_indices = ~labeled_indices
@@ -90,13 +108,10 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
 
         for cl, color in zip([0, 1], ['r', 'b']):
             for cl_true in [0, 1]:
-                cl_labeled = np.logical_and(
-                    y[labeled_indices[:, a], a] == cl,
-                    y_true[labeled_indices[:, a]] == cl_true)
+                cl_curr = np.logical_and(y[:, a] == cl, y_true == cl_true)
 
-                cl_unlabeled = np.logical_and(
-                    y[unlabeled_indices[:, a], a] == cl,
-                    y_true[unlabeled_indices[:, a]] == cl_true)
+                cl_labeled = np.logical_and(cl_curr, labeled_indices[:, a])
+                cl_unlabeled = np.logical_and(cl_curr, unlabeled_indices[:, a])
 
                 ax.scatter(X[cl_labeled, 0],
                            X[cl_labeled, 1],
@@ -147,7 +162,7 @@ def plot_utility(ma_qs, ma_qs_arg_dict, fig=None, fig_size=None, X_cand=None,
     else:
         n_annotators = A_cand.shape[1]
 
-    bound = set_up_bound(X_cand, bound)
+    bound = check_bound(X_cand, bound)
     x_min, x_max, y_min, y_max = bound
 
     fig = set_up_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,

@@ -1,11 +1,15 @@
 import unittest
 
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_classification
 from sklearn.gaussian_process import GaussianProcessClassifier
 
-from skactiveml.classifier import SklearnClassifier, CMM
+from skactiveml.classifier import SklearnClassifier, CMM, PWC
 from skactiveml.pool import UncertaintySampling, RandomSampler
 from skactiveml.pool.multi._wrapper import MultiAnnotWrapper
+from skactiveml.pool.multi.multi_annot_visualisation import plot_current_state
+from skactiveml.utils import is_unlabeled
 
 
 class TestMultiAnnotWrapper(unittest.TestCase):

@@ -32,7 +32,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     is_unlabeled_y = np.isnan(y)
     y[is_unlabeled_y] = 0
     y = y.astype(int)
-    n_classes = len(np.unique(y)) if n_classes is None else n_classes
+    n_classes = max(len(np.unique(y)) if n_classes is None else n_classes, 1)
     w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
                                                       force_all_finite=False,
                                                       dtype=None, copy=True)

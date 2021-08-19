@@ -144,6 +144,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                     args_list = list(args)
                     vote_matrix = compute_vote_vectors(y)
                     vote_vector = vote_matrix.argmax(axis=1)
+                    vote_vector = np.array(vote_vector, dtype=float)
+                    vote_vector[vote_matrix.sum(axis=1) == 0] = np.nan
                     args_list[1] = vote_vector
                     args = tuple(args_list)
 
@@ -189,8 +191,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         # check A_perfs and set annotator_utilities
         if A_perfs is None:
-            annotator_utilities = random_state.rand(batch_size_sq, n_samples,
-                                                    n_annotators)
+            annotator_utilities = random_state.rand(1, n_samples, n_annotators)\
+                .repeat(batch_size_sq, axis=0)
         elif _is_arraylike(A_perfs):
             A_perfs = check_array(A_perfs, ensure_2d=False)
             A_perfs = np.array(A_perfs)
