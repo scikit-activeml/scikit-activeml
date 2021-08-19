@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.metrics import accuracy_score
-from sklearn.utils import check_array, check_consistent_length, column_or_1d
+from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.multiclass import type_of_target
 
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
-    is_labeled, check_scalar
+    is_labeled, check_scalar, check_class_prior
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -507,34 +507,47 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         # Store and check random state.
         self._random_state = check_random_state(self.random_state)
 
-        # Check input parameters.
-        X = check_array(X)
-        y = np.array(y)
-        check_consistent_length(X, y)
-        is_lbdl = is_labeled(y, self.missing_label)
-        if len(y[is_lbdl]) > 0:
-            y_type = type_of_target(y[is_lbdl])
-            if y_type not in ['binary', 'multiclass', 'multiclass-multioutput',
-                              'multilabel-indicator', 'multilabel-sequences',
-                              'unknown']:
-                raise ValueError("Unknown label type: %r" % y_type)
+        # Create label encoder.
         self._le = ExtLabelEncoder(classes=self.classes,
                                    missing_label=self.missing_label)
-        y = self._le.fit_transform(y)
-        if len(self._le.classes_) == 0:
-            raise ValueError("No class label is known because 'y' contains no "
-                             "actual class labels and 'classes' is not "
-                             "defined. Change at least on of both to overcome "
-                             "this error.")
-        if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
-            check_consistent_length(y, sample_weight)
-            if y.ndim > 1 and y.shape[1] > 1 or \
-                    sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
-                check_consistent_length(y.T, sample_weight.T)
+
+        # Check input parameters.
+        X = np.array(X)
+        y = np.array(y)
+        check_consistent_length(X, y)
+        if len(X) > 0:
+            X = check_array(X)
+            is_lbdl = is_labeled(y, self.missing_label)
+            if len(y[is_lbdl]) > 0:
+                y_type = type_of_target(y[is_lbdl])
+                if y_type not in [
+                    'binary', 'multiclass', 'multiclass-multioutput',
+                    'multilabel-indicator', 'multilabel-sequences', 'unknown'
+                ]:
+                    raise ValueError("Unknown label type: %r" % y_type)
+
+            y = self._le.fit_transform(y)
+            if len(self._le.classes_) == 0:
+                raise ValueError(
+                    "No class label is known because 'y' contains no actual "
+                    "class labels and 'classes' is not defined. Change at "
+                    "least on of both to overcome this error."
+                )
+        else:
+            self._le.fit_transform(self.classes)
 
         # Update detected classes.
         self.classes_ = self._le.classes_
+
+        # Check classes.
+        if sample_weight is not None:
+            sample_weight = np.array(sample_weight)
+            if not np.array_equal(y.shape, sample_weight.shape):
+                raise ValueError(
+                    f'`y` has the shape {y.shape} and `sample_weight` has the '
+                    f'shape {sample_weight.shape}. Both need to have identical'
+                    f' shapes.'
+                )
 
         # Update cost matrix.
         self.cost_matrix_ = 1 - np.eye(len(self.classes_)) \
@@ -547,8 +560,12 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             self.cost_matrix_ = self.cost_matrix_[:, class_indices]
         return X, y, sample_weight
 
-    def _more_tags(self):
-        return {'multioutput_only': True}
+    def _check_n_features(self, X, reset):
+        if reset:
+            self.n_features_in_ = X.shape[1] if len(X) > 0 else None
+        elif not reset:
+            if self.n_features_in_ is not None:
+                super()._check_n_features(X, reset=reset)
 
 
 class ClassFrequencyEstimator(SkactivemlClassifier):
@@ -582,7 +599,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     ----------
     classes_ : np.ndarray, shape (n_classes)
         Holds the label for each class after fitting.
-    class_prior : np.ndarray, shape (n_classes)
+    class_prior_ : np.ndarray, shape (n_classes)
         Prior observations of the class frequency estimates. The entry
         `class_prior_[i]` indicates the non-negative prior number of samples
         belonging to class `classes_[i]`.
@@ -632,23 +649,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     def _validate_data(self, X, y, sample_weight):
         X, y, sample_weight = super()._validate_data(X, y, sample_weight)
         # Check class prior.
-        if np.isscalar(self.class_prior):
-            check_scalar(self.class_prior, name='class_prior',
-                         target_type=(int, float), min_val=0)
-            class_prior = np.array([self.class_prior] * len(self.classes_))
-        else:
-            class_prior = check_array(self.class_prior, ensure_2d=False)
-            class_prior = column_or_1d(class_prior)
-            if self.classes is None:
-                raise ValueError("You cannot specify 'class_prior' as an "
-                                 "array-like parameter without specifying "
-                                 "'classes'.")
-            is_negative = np.sum(class_prior < 0)
-            if len(class_prior) != len(self.classes_) or is_negative:
-                raise ValueError("`class_prior` must be either a non-negative"
-                                 "float or a list of `n_classes` non-negative "
-                                 "floats.")
-        self.class_prior_ = class_prior.reshape(1, -1)
+        self.class_prior_ = check_class_prior(self.class_prior,
+                                              len(self.classes_))
         return X, y, sample_weight
 
 

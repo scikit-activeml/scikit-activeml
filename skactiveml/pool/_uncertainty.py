@@ -188,9 +188,10 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
             allow_nd=False, ensure_min_samples=1,
             ensure_min_features=1, estimator=None)
 
-    if (np.sum(probas, axis=1) - 1).all():
-        raise ValueError('probas are invalid. The sum over axis 1 must be '
-                         'one.')
+    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.e-14):
+        raise ValueError(
+            "'probas' are invalid. The sum over axis 1 must be one."
+        )
 
     n_classes = probas.shape[1]
 

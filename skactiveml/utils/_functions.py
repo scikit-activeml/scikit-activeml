@@ -2,9 +2,10 @@ import inspect
 import warnings
 
 import numpy as np
+from sklearn.utils.validation import check_array
 
-from skactiveml.utils._selection import rand_argmax
-from skactiveml.utils._validation import check_scalar, check_array
+from ._selection import rand_argmax
+from ._validation import check_scalar
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
@@ -35,7 +36,8 @@ def call_func(f_callable, only_mandatory=False, **kwargs):
     return f_callable(**vars)
 
 
-def simple_batch(utilities, random_state, batch_size=1, return_utilities=False):
+def simple_batch(
+        utilities, random_state, batch_size=1, return_utilities=False):
     """Generates a batch by selecting the highest values in the 'utilities'.
     If utilities is an ND-array, the returned utilities will be an (N+1)D-array,
     with the shape batch_size x utilities.shape, filled the given utilities but

@@ -1,12 +1,13 @@
-import numpy as np
 import unittest
 
-from sklearn.gaussian_process import GaussianProcessClassifier
+import numpy as np
+from sklearn.gaussian_process import GaussianProcessClassifier, \
+    GaussianProcessRegressor
 
-from skactiveml.pool._uncertainty import uncertainty_scores
-from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import SklearnClassifier, PWC
 from skactiveml.pool import UncertaintySampling, expected_average_precision
+from skactiveml.pool._uncertainty import uncertainty_scores
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestUncertaintySampling(unittest.TestCase):
@@ -34,6 +35,12 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(clf=None)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = UncertaintySampling(clf=1)
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = UncertaintySampling(clf=GaussianProcessClassifier())
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = UncertaintySampling(
+            clf=SklearnClassifier(GaussianProcessRegressor())
+        )
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
     def test_init_param_method(self):
@@ -78,9 +85,9 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_X(self):
         selector = UncertaintySampling(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=None, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X='string', y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=[], y=self.y)
@@ -100,7 +107,7 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         selector = UncertaintySampling(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=self.X_cand)
@@ -161,6 +168,14 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(clf=clf, method='least_confident')
         selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
         compare_list.append(selector.query(**self.kwargs))
+
+        selector = UncertaintySampling(clf=clf, method='margin_sampling',
+                                       cost_matrix=[[0, 1], [1, 0]])
+        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
+
+        selector = UncertaintySampling(clf=clf, method='least_confident',
+                                       cost_matrix=[[0, 1], [1, 0]])
+        selector.query(X_cand=[[1]], X=[[1]], y=[MISSING_LABEL])
 
         for x in compare_list:
             self.assertEqual(compare_list[0], x)

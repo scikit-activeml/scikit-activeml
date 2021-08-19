@@ -1,16 +1,14 @@
-import numpy as np
 import unittest
 
-from sklearn.datasets import make_blobs
+import numpy as np
+from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor, \
     GaussianProcessClassifier
-from sklearn.ensemble import BaggingClassifier
 
-from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import PWC, SklearnClassifier
-from skactiveml.utils import MISSING_LABEL
 from skactiveml.pool._qbc import QBC, average_kl_divergence, vote_entropy
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestQBC(unittest.TestCase):
@@ -32,6 +30,8 @@ class TestQBC(unittest.TestCase):
 
         selector = QBC(clf=GaussianProcessClassifier())
         self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = QBC(clf=SklearnClassifier(GaussianProcessRegressor()))
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf='string')
         self.assertRaises(TypeError, selector.query, **self.kwargs)
         selector = QBC(clf=None)
@@ -44,6 +44,9 @@ class TestQBC(unittest.TestCase):
         self.assertTrue(hasattr(selector, 'ensemble'))
 
         selector = QBC(clf=self.clf, ensemble='String')
+        self.assertRaises(TypeError, selector.query, **self.kwargs)
+
+        selector = QBC(clf=self.clf, ensemble=PWC)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
     def test_init_param_method(self):
@@ -82,9 +85,9 @@ class TestQBC(unittest.TestCase):
 
     def test_query_param_X(self):
         selector = QBC(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X=None, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           X='string', y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           X=[], y=self.y)
@@ -104,7 +107,7 @@ class TestQBC(unittest.TestCase):
 
     def test_query_param_sample_weight(self):
         selector = QBC(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=self.X_cand)

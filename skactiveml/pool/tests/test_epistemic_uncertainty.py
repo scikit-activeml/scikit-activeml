@@ -175,6 +175,19 @@ class TestEpistemicUncertainty(unittest.TestCase):
         np.testing.assert_array_equal(
             val_utilities, precompute_array[:11, :11].flatten())
 
+        class Dummy_PWC(PWC):
+            def predict_freq(self, X):
+                return freq
+
+        selector = EpistemicUncertainty(
+            clf=Dummy_PWC(classes=self.classes), precompute=True)
+        _, utilities = selector.query(**self.kwargs, return_utilities=True)
+        np.testing.assert_array_equal(val_utilities, utilities[0])
+
+        selector = EpistemicUncertainty(clf=PWC(classes=[0, 1, 2]))
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
+
     # tests for epistemic logistic regression
     def test_loglike_logreg(self):
         w = np.array([0, 0])
