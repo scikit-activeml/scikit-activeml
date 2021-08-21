@@ -24,6 +24,8 @@ def generate_api_reference_rst(path, gen_path):
     gen_path = os.path.join(os.path.basename(gen_path), 'api')
     os.makedirs(os.path.abspath(gen_path), exist_ok=True)
     with open(path, 'w') as file:
+        file.write('.. _sphx_glr_api_reference:\n')
+        file.write('\n')
         file.write('API Reference\n')
         file.write('=============\n')
         file.write('\n')
@@ -40,6 +42,7 @@ def generate_api_reference_rst(path, gen_path):
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
         file.write(f'   :toctree: {gen_path}\n')
+        file.write('   :template: class.rst\n')
         file.write('\n')
         for item in pool.__all__:
             file.write(f'   pool.{item}\n')
@@ -53,7 +56,7 @@ def generate_api_reference_rst(path, gen_path):
         # file.write('   :nosignatures:\n')
         file.write('   :recursive:\n')
         file.write(f'   :toctree: {gen_path}\n')
-        # file.write('   :template: class.rst\n')
+        file.write('   :template: class.rst\n')
         file.write('\n')
         for item in classifier.__all__:
             file.write(f'   classifier.{item}\n')
@@ -65,7 +68,7 @@ def generate_api_reference_rst(path, gen_path):
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
         file.write(f'   :toctree: {gen_path}\n')
-        file.write('   :template: class.rst\n')
+        file.write('   :template: base.rst\n')
         file.write('\n')
         for item in utils.__all__:
             if item == 'MISSING_LABEL': continue

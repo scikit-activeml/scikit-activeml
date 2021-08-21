@@ -99,12 +99,28 @@ autosummary_generate = True
 
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
+    'run_stale_examples': False,
+
     # path to your example scripts
     'examples_dirs': os.path.normpath('generated/examples'),
+
     # the path where to save gallery generated output
     'gallery_dirs': os.path.normpath('generated/sphinx_gallery_examples'),
+
     'matplotlib_animations': True,
-}
+
+    # directory where function/class granular galleries are stored
+    'backreferences_dir':
+        os.path.normpath('generated/sphinx_gallery_backreferences'),
+
+    # Modules for which function/class level galleries are created.
+    'doc_module': ('skactiveml', ),
+
+    'reference_url': {
+        # The module you locally document uses None
+        'skactiveml': None
+        }
+    }
 os.makedirs(os.path.abspath(sphinx_gallery_conf['gallery_dirs']),
             exist_ok=True)
 
@@ -161,9 +177,14 @@ bibtex_bibfiles = ['refs.bib']
 # bibtex_encoding = 'latin'
 
 # -- Options for intersphinx extension ---------------------------------------
-
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/3/': None}
+intersphinx_mapping = {
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'python': ('https://docs.python.org/3/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+    "matplotlib": ("https://matplotlib.org/", None),
+    "joblib": ("https://joblib.readthedocs.io/en/latest/", None),
+    "iteration-utilities": ("https://iteration-utilities.readthedocs.io/en/latest/", None)
+}
 
 # -- Options for todo extension ----------------------------------------------
 
