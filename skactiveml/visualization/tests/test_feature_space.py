@@ -15,6 +15,7 @@ from skactiveml.visualization._feature_space import plot_decision_boundary, \
 class TestFeatureSpace(unittest.TestCase):
 
     def setUp(self):
+        self.path_prefix = 'visualization/tests/'
         np.random.seed(0)
         self.X, self.y = make_classification(n_features=2, n_redundant=0,
                                              random_state=0)
@@ -83,7 +84,8 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(self.clf, bound)
 
         plt.savefig('test_result.pdf')
-        comparison = compare_images('visualization_without_candidates.pdf',
+        comparison = compare_images(self.path_prefix +
+                                    'visualization_without_candidates.pdf',
                                     'test_result.pdf', tol=0)
         self.assertIsNone(comparison)
 
@@ -100,6 +102,7 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(self.clf, bound)
 
         plt.savefig('test_result_cand.pdf')
-        comparison = compare_images('visualization_with_candidates.pdf',
+        comparison = compare_images(self.path_prefix +
+                                    'visualization_with_candidates.pdf',
                                     'test_result_cand.pdf', tol=0)
         self.assertIsNone(comparison)
