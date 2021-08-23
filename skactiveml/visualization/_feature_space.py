@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from sklearn.neighbors import KNeighborsRegressor
 
-from skactiveml.base import QueryStrategy, ClassFrequencyEstimator
+from skactiveml.base import QueryStrategy, SkactivemlClassifier
 from skactiveml.utils import check_scalar
 
 
@@ -24,7 +24,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None):
     """
     # TODO which bound format sklearn, check bound
     # TODO predict_proba - ClassFrequencyEstimator ?
-    if not isinstance(clf, ClassFrequencyEstimator):
+    if not isinstance(clf, SkactivemlClassifier):
         raise TypeError("'clf' must be a ClassFrequencyEstimator.")
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
