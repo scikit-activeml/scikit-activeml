@@ -194,7 +194,24 @@ class TestIEThresh(unittest.TestCase):
         self.assertRaises(ValueError, ie_thresh.query,
                           X_cand=self.X, X=self.X, A_cand=self.A_cand,
                           y=self.y, sample_weight=sample_weight)
-        self.assertRaises(TypeError, ie_thresh.query,
+        self.assertRaises(ValueError, ie_thresh.query,
+                          X_cand=self.X, X=self.X, A_cand=self.A_cand,
+                          y=self.y, sample_weight='test')
+
+    def test_query_padram_sample_weight(self):
+        ie_thresh = IEThresh(clf=self.clf)
+        self.assertRaises(ValueError, ie_thresh.query, X_cand=self.X, X=self.X,
+                          y=self.y, A_cand=self.A_cand,
+                          sample_weight=np.ones(len(self.X)))
+        sample_weight = np.ones((len(self.X) + 1, self.A_cand.shape[1]))
+        self.assertRaises(ValueError, ie_thresh.query, X_cand=self.X, X=self.X,
+                          A_cand=self.A_cand, y=self.y,
+                          sample_weight=sample_weight)
+        sample_weight = np.ones((len(self.X) + 1, self.A_cand.shape[1]))
+        self.assertRaises(ValueError, ie_thresh.query,
+                          X_cand=self.X, X=self.X, A_cand=self.A_cand,
+                          y=self.y, sample_weight=sample_weight)
+        self.assertRaises(ValueError, ie_thresh.query,
                           X_cand=self.X, X=self.X, A_cand=self.A_cand,
                           y=self.y, sample_weight='test')
 

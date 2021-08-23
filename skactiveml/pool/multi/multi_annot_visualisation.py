@@ -68,7 +68,7 @@ def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None, bound=None
                        title=None, fontsize=15, fig_size=None):
 
     if ma_qs_arg_dict is None:
-        ma_qs_arg_dict = {"X":X, "y":y}
+        ma_qs_arg_dict = {"X": X, "y": y}
 
     bound = check_bound(X, bound)
 
@@ -143,8 +143,40 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
     return fig
 
 
-def plot_utility(ma_qs, ma_qs_arg_dict, fig=None, fig_size=None, X_cand=None,
-                 A_cand=None, bound=None, title=None, res=21, fontsize=15):
+def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
+                 fig_size=None, bound=None, title=None, res=21, fontsize=15):
+    """Plots the utilities for the different annotators of the given
+    multi-annotator query strategy.
+
+    Parameters
+    ----------
+    ma_qs: MultiAnnotPoolBasedQueryStrategy
+        The multi-annotator query strategy.
+    ma_qs_arg_dict: dict
+        The argument dictionary for the multiple annotator query strategy.
+    fig: matplotlib.figure.Figure, optional (default=None)
+        The figure to which axes the utilities will be plotted
+    fig_size: tuple, shape (width, height) (default=None)
+        The size of the figure in inches. If `fig_size` is None, the size
+        of the figure is set to 8 x 8 inches.
+    bound: array-like, (x_min, x_max, y_min, y_max)
+        Determines the area in which the boundary is plotted.
+    X_cand : array-like, shape (n_samples, n_features)
+        Candidate samples from which the strategy can select.
+    A_cand : array-like, shape (n_samples, n_annotators), optional
+             (default=None)
+        Boolean matrix where `A_cand[i,j] = True` indicates that
+        annotator `j` can be selected for annotating sample `X_cand[i]`,
+        while `A_cand[i,j] = False` indicates that annotator `j` cannot be
+        selected for annotating sample `X_cand[i]`. If A_cand=None, each
+        annotator is assumed to be available for labeling each sample.
+    title : str, optional
+        The title for the figure.
+    res: int
+        The resolution of the plot.
+    fontsize: int
+        The fontsize of the labels.
+    """
 
     if not isinstance(ma_qs, MultiAnnotPoolBasedQueryStrategy):
         raise TypeError("'ma_qs' must be a MultiAnnotPoolBasedQueryStrategy.")
@@ -175,7 +207,7 @@ def plot_utility(ma_qs, ma_qs_arg_dict, fig=None, fig_size=None, X_cand=None,
 
     axes = [ax for ax in fig.axes if not isinstance(ax, CbarAxes)]
     if X_cand is None:
-        _, utilities = ma_qs.query(X_cand=mesh_instances, A_cand=A_cand,
+        _, utilities = ma_qs.query(X_cand=mesh_instances,
                                    **ma_qs_arg_dict, return_utilities=True)
 
         for a, ax in enumerate(axes):

@@ -15,11 +15,11 @@ class TestMultiAnnotWrapper(unittest.TestCase):
     def setUp(self):
         self.random_state = 1
 
-    def test_plot_data_set(self):
+    def ttest_plot_data_set(self):
         X = np.array([[0, 0], [0, 1], [1, 1]])
         y = np.array([[0, 1], [1, 1], [0, 0]])
 
-    def test_plot_utility(self):
+    def ttest_plot_utility(self):
         clf = PWC()
         uncertainty = UncertaintySampling(clf=clf, method='entropy')
         wrapper = MultiAnnotWrapper(uncertainty, self.random_state,
@@ -39,7 +39,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         plt.show()
 
-    def text_plot_utility_us(self):
+    def ttext_plot_utility_us(self):
         qs = RandomSampler(self.random_state)
         wrapper = MultiAnnotWrapper(qs, self.random_state, n_annotators=2)
 
@@ -48,7 +48,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         plt.show()
 
-    def test_plot_utility_nearest_neighbour(self):
+    def ttest_plot_utility_nearest_neighbour(self):
         qs = RandomSampler(self.random_state)
 
         wrapper = MultiAnnotWrapper(qs, self.random_state,

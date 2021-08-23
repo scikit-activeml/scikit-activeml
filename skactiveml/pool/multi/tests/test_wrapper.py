@@ -243,7 +243,6 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertEqual((1, 2), best_cand_indices.shape)
         self.assertEqual((1, 5, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
-        self.check_availability(best_cand_indices, self.A_cand)
 
     def test_query_unavailable_annotators(self):
         random = RandomSampler(self.random_state)

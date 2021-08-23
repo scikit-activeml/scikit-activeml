@@ -541,7 +541,8 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         # Check classes.
         if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
+            sample_weight = check_array(sample_weight, ensure_2d=False,
+                                        force_all_finite=False)
             if not np.array_equal(y.shape, sample_weight.shape):
                 raise ValueError(
                     f'`y` has the shape {y.shape} and `sample_weight` has the '

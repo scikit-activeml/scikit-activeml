@@ -68,7 +68,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is set to 1.
         A_perfs : array-like, shape (n_samples, n_annotators) or
-        (n_annotators,) optional (default=None)
+                  (n_annotators,) optional (default=None)
             The preferred ranking of each annotator.
             1.) If `A_perfs` is of shape (n_samples, n_annotators) for each sample
             `i` the value-annotators pair `(i, j)` is preferably picked
@@ -168,7 +168,6 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         elif _is_arraylike(pref_annotators_per_sample):
             pref_n_annotators = check_array(pref_annotators_per_sample,
                                             ensure_2d=False)
-            pref_n_annotators = np.array(pref_n_annotators)
 
             if pref_n_annotators.ndim != 1:
                 raise ValueError(
@@ -195,7 +194,6 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 .repeat(batch_size_sq, axis=0)
         elif _is_arraylike(A_perfs):
             A_perfs = check_array(A_perfs, ensure_2d=False)
-            A_perfs = np.array(A_perfs)
             # ensure A_perfs lies in [0, 1)
             if A_perfs.min() != A_perfs.max():
                 A_perfs = 1/(A_perfs.max()-A_perfs.min()+1)*(A_perfs - A_perfs.min())
