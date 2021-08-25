@@ -1,12 +1,15 @@
 import unittest
 import numpy as np
+import os
 
 from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
+from matplotlib.testing.decorators import image_comparison
 from sklearn.datasets import make_classification
 
 from skactiveml.classifier import PWC
+from skactiveml import visualization
 from skactiveml.pool import UncertaintySampling
 from skactiveml.visualization._feature_space import plot_decision_boundary, \
     plot_utility
@@ -15,7 +18,8 @@ from skactiveml.visualization._feature_space import plot_decision_boundary, \
 class TestFeatureSpace(unittest.TestCase):
 
     def setUp(self):
-        self.path_prefix = 'visualization/tests/'
+        self.path_prefix = os.path.dirname(visualization.__file__) + \
+                           '/tests/images/'
         np.random.seed(0)
         self.X, self.y = make_classification(n_features=2, n_redundant=0,
                                              random_state=0)
@@ -32,7 +36,7 @@ class TestFeatureSpace(unittest.TestCase):
         x1_max = max(self.X[:, 0])
         x2_min = min(self.X[:, 1])
         x2_max = max(self.X[:, 1])
-        self.bound = (x1_min, x1_max, x2_min, x2_max)
+        self.bound = [[x1_min, x2_min], [x1_max, x2_max]]
 
         testing.set_font_settings_for_testing()
         testing.set_reproducibility_for_testing()
@@ -83,10 +87,11 @@ class TestFeatureSpace(unittest.TestCase):
                     cmap='coolwarm_r', alpha=.9, marker='.')
         plot_decision_boundary(self.clf, bound)
 
-        plt.savefig('test_result.pdf')
+        plt.savefig(self.path_prefix + 'test_result.png')
         comparison = compare_images(self.path_prefix +
-                                    'visualization_without_candidates.pdf',
-                                    'test_result.pdf', tol=0)
+                                    'visualization_without_candidates.png',
+                                    self.path_prefix + 'test_result.png',
+                                    tol=0)
         self.assertIsNone(comparison)
 
     def test_with_candidates(self):
@@ -101,8 +106,9 @@ class TestFeatureSpace(unittest.TestCase):
                     cmap='coolwarm_r', alpha=.9, marker='.')
         plot_decision_boundary(self.clf, bound)
 
-        plt.savefig('test_result_cand.pdf')
+        plt.savefig(self.path_prefix + 'test_result_cand.png')
         comparison = compare_images(self.path_prefix +
-                                    'visualization_with_candidates.pdf',
-                                    'test_result_cand.pdf', tol=0)
+                                    'visualization_with_candidates.png',
+                                    self.path_prefix + 'test_result_cand.png',
+                                    tol=0)
         self.assertIsNone(comparison)

@@ -15,7 +15,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None):
     ----------
     clf: sklearn classifier # TODO correct?
         The classifier whose decision boundary is plotted.
-    bound: array-like, (x_min, x_max, y_min, y_max)
+    bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     res: int
         The resolution of the plot.
@@ -23,19 +23,23 @@ def plot_decision_boundary(clf, bound, res=21, ax=None):
         The axis on which the boundary is plotted.
     """
     # TODO which bound format sklearn, check bound
-    # TODO predict_proba - ClassFrequencyEstimator ?
+
+    # TODO: extend to multiclass, add parameter confidence [0,1] evtl. [0,0.5], or None
+    # TODO: colors per class colormap or list of colors
+    # TODO: boundary_dict, confidence_dict
+
     if not isinstance(clf, SkactivemlClassifier):
-        raise TypeError("'clf' must be a ClassFrequencyEstimator.")
+        raise TypeError("'clf' must be a SkactivemlClassifier.")
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
         ax = plt.gca()
     if not isinstance(ax, Axes):
         raise TypeError("ax must be a matplotlib.axes.Axes.")
-    x_min, x_max, y_min, y_max = bound
+    xmin, ymin, xmax, ymax = np.ravel(bound)
 
     # Create mesh for plotting
-    x_vec = np.linspace(x_min, x_max, res)
-    y_vec = np.linspace(y_min, y_max, res)
+    x_vec = np.linspace(xmin, xmax, res)
+    y_vec = np.linspace(ymin, ymax, res)
     X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
     mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
 
@@ -49,6 +53,25 @@ def plot_decision_boundary(clf, bound, res=21, ax=None):
 
 
 def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None):
+    """
+    TODO
+
+    Parameters
+    ----------
+    qs
+    qs_dict
+    X_cand
+    bound
+    res
+    ax
+
+    Returns
+    -------
+
+    """
+
+    # TODO: dict for contourf
+
     if not isinstance(qs, QueryStrategy):
         raise TypeError("'qs' must be a query strategy.")
     if not isinstance(qs_dict, dict):
@@ -57,12 +80,12 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None):
         raise ValueError("'X_cand' must be given as separate argument.")
 
     if bound is not None:
-        x_min, x_max, y_min, y_max = bound
+        xmin, ymin, xmax, ymax = np.ravel(bound)
     elif X_cand is not None:
-        x_min = min(X_cand[:, 0])
-        x_max = max(X_cand[:, 0])
-        y_min = min(X_cand[:, 1])
-        y_max = max(X_cand[:, 1])
+        xmin = min(X_cand[:, 0])
+        xmax = max(X_cand[:, 0])
+        ymin = min(X_cand[:, 1])
+        ymax = max(X_cand[:, 1])
     else:
         raise ValueError("If 'X_cand' is None, 'bound' must be given.")
 
@@ -74,8 +97,8 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None):
 
     # TODO check bound
 
-    x_vec = np.linspace(x_min, x_max, res)
-    y_vec = np.linspace(y_min, y_max, res)
+    x_vec = np.linspace(xmin, xmax, res)
+    y_vec = np.linspace(ymin, ymax, res)
     X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
     mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
 
