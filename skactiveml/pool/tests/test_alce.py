@@ -51,12 +51,6 @@ class TestALCE(unittest.TestCase):
                     embed_dim=0)
         self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
 
-    def test_init_param_sample_weight(self):
-        alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
-                    sample_weight='string')
-        self.assertTrue(hasattr(alce, 'sample_weight'))
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
-
     def test_init_param_missing_label(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     missing_label=[1, 2, 3])
@@ -101,6 +95,11 @@ class TestALCE(unittest.TestCase):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
+
+    def test_query_param_weight(self):
+        alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix)
+        self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight='string')
 
     def test_query_param_batch_size(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)

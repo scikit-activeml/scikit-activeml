@@ -1,3 +1,9 @@
+"""
+Active Learning with Cost Embedding (ALCE)
+This module is modified from
+https://github.com/ntucllab/libact/blob/master/libact.
+Copyright (c) 2014, National Taiwan University
+"""
 import warnings
 
 import numpy as np
@@ -21,6 +27,7 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 
     Cost sensitive multi-class algorithm.
     Assume each class has at least one sample in the labeled pool.
+    This implementation is based on libact.
 
     Parameters
     ----------
@@ -37,10 +44,10 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
         Specifies the symbol that represents a missing label
     embed_dim : int, optional (default=None)
         If is None, embed_dim = n_classes
-    mds_params : dict, optional
-        http://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
-    nn_params : dict, optional
-        http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
+    mds_params : dict, optional (default=None)
+        https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
+    nn_params : dict, optional (default=None)
+        https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
 
     References
     ----------
@@ -54,7 +61,6 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
                  base_regressor=None,
                  cost_matrix=None,
                  embed_dim=None,
-                 sample_weight=None,
                  missing_label=MISSING_LABEL,
                  mds_params=None,
                  nn_params=None,
@@ -64,23 +70,25 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
         self.base_regressor = base_regressor
         self.cost_matrix = cost_matrix
         self.embed_dim = embed_dim
-        self.sample_weight = sample_weight
         self.missing_label = missing_label
         self.random_state = random_state
         self.mds_params = mds_params
         self.nn_params = nn_params
 
-    def query(self, X_cand, X, y, batch_size=1, return_utilities=False):
+    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+              return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
         ----------
         X_cand: array-like, shape (n_candidates, n_features)
-            Unlabeled candidate samples
+            Unlabeled candidate samples.
         X: array-like, shape (n_samples, n_features)
-            Complete data set
+            Complete data set.
         y: array-like, shape (n_samples)
-            Labels of the data set
+            Labels of the data set.
+        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Weights for uncertain annotators.
         batch_size: int, optional (default=1)
             The number of instances to be selected.
         return_utilities: bool, optional (default=False)
@@ -99,7 +107,7 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
             self._validate_data(X_cand, return_utilities, batch_size)
 
         utilities = _alce(X_cand, X, y, self.base_regressor, self.cost_matrix,
-                          self.classes, self.embed_dim, self.sample_weight,
+                          self.classes, self.embed_dim, sample_weight,
                           self.missing_label, self.random_state,
                           self.mds_params, self.nn_params)
 
@@ -160,6 +168,41 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 
 def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
           sample_weight, missing_label, random_state, mds_params, nn_params):
+    """Compute the alce score for the candidate instances.
+
+    Parameters
+    ----------
+    X_cand: array-like, shape (n_candidates, n_features)
+        Unlabeled candidate samples.
+    X: array-like, shape (n_samples, n_features)
+        Complete data set.
+    y: array-like, shape (n_samples)
+        Labels of the data set.
+    base_regressor: RegressorMixin
+        Regressor used for the embedding.
+    cost_matrix: array-like, shape (n_classes, n_classes)
+        Cost matrix with cost_matrix[i,j] defining the cost of predicting class
+        j for a sample with the true class i.
+    classes: array-like, shape (n_classes)
+        Array of class labels.
+    embed_dim: int
+        Dimension of the embedding.
+    sample_weight: array-like, shape (n_samples)
+        Weights for uncertain annotators.
+    missing_label: scalar | string | np.nan | None
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState
+        Random state for annotator selection.
+    mds_params : dict
+        https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
+    nn_params : dict
+        https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
+
+    Returns
+    -------
+    utilities: np.ndarray, shape (n_candidates)
+        The utilities of all candidate instances.
+    """
     # Check base regressor
     if base_regressor is None:
         base_regressor = SVR()
@@ -264,7 +307,8 @@ def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
                      init=None, max_iter=300, verbose=0, eps=1e-3,
                      random_state=None):
     """
-    Computes multidimensional scaling using SMACOF algorithm
+    Computes multidimensional scaling using SMACOF algorithm.
+
     Parameters
     ----------
     n_uq
@@ -288,6 +332,7 @@ def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
         The generator used to initialize the centers. If an integer is
         given, it fixes the seed. Defaults to the global numpy random
         number generator.
+
     Returns
     -------
     X: ndarray (n_samples, n_components), float
@@ -395,6 +440,7 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
     4. Iterate 2 and 3 until convergence.
     The nonmetric algorithm adds a monotonic regression steps before computing
     the stress.
+
     Parameters
     ----------
     similarities : symmetric ndarray, shape (n_samples, n_samples)
@@ -431,6 +477,7 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
         number generator.
     return_n_iter : bool
         Whether or not to return the number of iterations.
+
     Returns
     -------
     X : ndarray (n_samples,n_components)
@@ -441,6 +488,7 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
     n_iter : int
         The number of iterations corresponding to the best stress.
         Returned only if `return_n_iter` is set to True.
+
     Notes
     -----
     "Modern Multidimensional Scaling - Theory and Applications" Borg, I.;
@@ -498,6 +546,7 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
 
 class MDSP(BaseEstimator):
     """Multidimensional scaling
+
     Parameters
     ----------
     metric : boolean, optional, default: True
@@ -531,6 +580,7 @@ class MDSP(BaseEstimator):
     dissimilarity : string
         Which dissimilarity measure to use.
         Supported are 'euclidean' and 'precomputed'.
+
     Attributes
     ----------
     embedding_ : array-like, shape [n_components, n_samples]
@@ -538,6 +588,7 @@ class MDSP(BaseEstimator):
     stress_ : float
         The final value of the stress (sum of squared distance of the
         disparities and the distances for all constrained points)
+
     References
     ----------
     "Modern Multidimensional Scaling - Theory and Applications" Borg, I.;
@@ -562,13 +613,9 @@ class MDSP(BaseEstimator):
         self.n_jobs = n_jobs
         self.random_state = random_state
 
-    @property
-    def _pairwise(self):
-        return self.kernel == "precomputed"
-
     def fit(self, X, y=None, init=None):
-        """
-        Computes the position of the points in the embedding space
+        """ Compute the position of the points in the embedding space.
+
         Parameters
         ----------
         X : array, shape=[n_samples, n_features], or [n_samples, n_samples] \
@@ -582,8 +629,8 @@ class MDSP(BaseEstimator):
         return self
 
     def fit_transform(self, X, y=None, init=None):
-        """
-        Fit the data from X, and returns the embedded coordinates
+        """ Fit the data from X, and returns the embedded coordinates.
+
         Parameters
         ----------
         X : array, shape=[n_samples, n_features], or [n_samples, n_samples] \
