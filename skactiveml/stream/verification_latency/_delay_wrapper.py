@@ -6,7 +6,6 @@ from ...base import SingleAnnotStreamBasedQueryStrategy
 from sklearn.base import is_classifier, clone
 from ...classifier import PWC
 
-# TODO import split and initialize in validate data
 from sklearn.utils import check_array, check_scalar, check_consistent_length
 from skactiveml.base import SingleAnnotStreamBasedQueryStrategyWrapper
 from .._uncertainty import Split
@@ -22,9 +21,9 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
     Parameters
     ----------
-    budget_manager : BudgetManager
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting.
+    base_query_strategy : QuaryStrategy
+        The QuaryStrategy which evaluates the utility of given instances used
+        in the stream-based active learning setting.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -299,8 +298,8 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
 
         utilities = []
         sampled_indices = []
-        for i, (tX_cand_current, ty_cand_current) in enumerate(
-            zip(tX_cand, ty_cand)
+        for i, (tX_cand_current, ty_cand_current, X_cand_current) in enumerate(
+            zip(tX_cand, ty_cand, X_cand)
         ):
             tX_in_A_n = tX >= (ty_cand_current - self.w_train)
             A_n_X = X[tX_in_A_n, :]
@@ -312,13 +311,13 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
                 None if sample_weight is None else sample_weight[tX_in_A_n]
             )
             sample, utility = self.base_query_strategy_.query(
-                X_cand=X_cand,
+                X_cand=X_cand_current.reshape([1, -1]),
                 X=A_n_X,
                 y=A_n_y,
                 tX=A_n_tX,
                 ty=A_n_ty,
-                tX_cand=np.array(tX_cand),
-                ty_cand=np.array(ty_cand),
+                tX_cand=np.array(tX_cand_current),
+                ty_cand=np.array(ty_cand_current),
                 acquisitions=A_n_acquisitions,
                 sample_weight=A_n_sample_weight,
                 return_utilities=True,
@@ -424,11 +423,11 @@ class BaggingDelaySimulationWrapper(
 ):
     def __init__(
         self,
-        random_state=None,
         base_query_strategy=None,
         K=2,
         delay_prior=0.001,
         clf=None,
+        random_state=None,
     ):
         super().__init__(base_query_strategy, random_state)
         self.K = K
