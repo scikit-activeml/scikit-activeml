@@ -25,7 +25,7 @@ def get_bound(X, bound):
 def check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
     if fig is None:
         if fig_size is None:
-            fig_size = (8, 8)
+            fig_size = (8, 5)
         fig = plt.figure(figsize=fig_size)
         if title is not None:
             plt.title(title, fontsize=fontsize)
@@ -65,8 +65,8 @@ def set_up_annotator_axis(ax, annotator_index, bound, fontsize):
     return ax
 
 
-def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None, bound=None,
-                       title=None, fontsize=15, fig_size=None):
+def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
+                       bound=None, title=None, fontsize=15, fig_size=None):
     if ma_qs_arg_dict is None:
         ma_qs_arg_dict = {"X": X, "y": y}
 
@@ -214,6 +214,8 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
         The fontsize of the labels.
     """
 
+    # check arguments
+
     if not isinstance(ma_qs, MultiAnnotPoolBasedQueryStrategy):
         raise TypeError("'ma_qs' must be a MultiAnnotPoolBasedQueryStrategy.")
     if not isinstance(ma_qs_arg_dict, dict):
@@ -233,8 +235,10 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     bound = get_bound(X_cand, bound)
     x_min, x_max, y_min, y_max = bound
 
-    fig = check_or_get_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
-                              n_annotators=n_annotators)
+    fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
+                              fontsize=fontsize, n_annotators=n_annotators)
+
+    # plot the utilities
 
     x_vec = np.linspace(x_min, x_max, res)
     y_vec = np.linspace(y_min, y_max, res)
