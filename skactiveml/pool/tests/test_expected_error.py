@@ -121,7 +121,3 @@ class TestExpectedErrorReduction(unittest.TestCase):
 
         query_indices = eer.query([[0], [100], [200]], [[0], [200]], [0, 1])
         np.testing.assert_array_equal(query_indices, [1])
-
-
-if __name__ == '__main__':
-    unittest.main()
