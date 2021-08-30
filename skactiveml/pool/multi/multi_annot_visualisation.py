@@ -8,12 +8,13 @@ from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import AxesGrid
 from mpl_toolkits.axes_grid1.axes_grid import CbarAxes
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.utils import check_array, check_consistent_length
 
-from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
-from skactiveml.utils import is_labeled, check_scalar
+from ...base import MultiAnnotPoolBasedQueryStrategy, ClassFrequencyEstimator
+from ...utils import is_labeled, check_scalar
 
 
-def check_bound(X, bound):
+def get_bound(X, bound):
     if bound is not None:
         return bound
     else:
@@ -21,7 +22,7 @@ def check_bound(X, bound):
                 min(X[:, 1]) - 0.5, max(X[:, 1]) + 0.5)
 
 
-def set_up_figure(fig, fig_size, title, fontsize, n_annotators):
+def check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
     if fig is None:
         if fig_size is None:
             fig_size = (8, 8)
@@ -64,13 +65,12 @@ def set_up_annotator_axis(ax, annotator_index, bound, fontsize):
     return ax
 
 
-def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None, bound=None,
+def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None, bound=None,
                        title=None, fontsize=15, fig_size=None):
-
     if ma_qs_arg_dict is None:
         ma_qs_arg_dict = {"X": X, "y": y}
 
-    bound = check_bound(X, bound)
+    bound = get_bound(X, bound)
 
     n_annotators = y.shape[1]
     fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
@@ -85,15 +85,58 @@ def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None, bound=None
 
 def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
                   fig_size=None):
-    n_annotators = y.shape[1]
+    """Plots the annotations of a binary classification problem, differentiating
+    between correctly and incorrectly labeled data.
 
-    bound = check_bound(X, bound)
+    Parameters
+    ----------
+    X : matrix-like, shape (n_samples, 2)
+        The sample matrix X is the feature matrix representing the samples.
+        The feature space must be two dimensional.
+    y_true : array-like, shape (n_samples,)
+        The correct labels
+    y : array-like, shape (n_samples, n_annotators)
+        It contains the annotated values for each sample.
+        The number of class labels may be variable for the samples, where
+        missing labels are represented the attribute 'missing_label'.
+    fig: matplotlib.figure.Figure, optional (default=None)
+        The figure to which axes the utilities will be plotted
+    fig_size: tuple, shape (width, height) (default=None)
+        The size of the figure in inches. If `fig_size` is None, the size
+        of the figure is set to 8 x 8 inches.
+    bound: array-like, (x_min, x_max, y_min, y_max)
+        Determines the area in which the boundary is plotted.
+    title : str, optional
+        The title for the figure.
+    fontsize: int
+        The fontsize of the labels.
+    """
+
+    # check input values
+
+    X = check_array(X)
+    if X.shape[1] != 2:
+        raise ValueError(f"`X` along axis 1 must be of length two."
+                         f"`X` along axis 1 is of length {X.shape[1]}.")
+
+    y_true = check_array(y_true, ensure_2d=False)
+    if y_true.ndim != 1:
+        raise ValueError(f"`y_true` must be one dimensional."
+                         f"`y_true` is {y_true.ndim} dimensional.")
+    check_consistent_length(X, y_true)
+
+    y = check_array(y, force_all_finite='allow-nan')
+    check_consistent_length(y_true, y)
+
+    n_annotators = y.shape[1]
+    fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
+                              fontsize=fontsize, n_annotators=n_annotators)
+
+    bound = get_bound(X, bound)
+
+    # plot data set
 
     labeled_indices = is_labeled(y)
-    unlabeled_indices = ~labeled_indices
-
-    fig = set_up_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
-                        n_annotators=n_annotators)
 
     axes = [ax for ax in fig.axes if not isinstance(ax, CbarAxes)]
     for a, ax in enumerate(axes):
@@ -108,22 +151,15 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
 
         for cl, color in zip([0, 1], ['r', 'b']):
             for cl_true in [0, 1]:
-                cl_curr = np.logical_and(y[:, a] == cl, y_true == cl_true)
+                cl_current = np.logical_and(y[:, a] == cl, y_true == cl_true)
 
-                cl_labeled = np.logical_and(cl_curr, labeled_indices[:, a])
-                cl_unlabeled = np.logical_and(cl_curr, unlabeled_indices[:, a])
+                cl_labeled = np.logical_and(cl_current, labeled_indices[:, a])
 
                 ax.scatter(X[cl_labeled, 0],
                            X[cl_labeled, 1],
                            color=color, marker='x' if cl != cl_true else 's',
                            vmin=-0.2, vmax=1.2,
                            cmap='coolwarm', s=40, zorder=5)
-
-                ax.scatter(X[cl_unlabeled, 0],
-                           X[cl_unlabeled, 1],
-                           c=color, marker='x' if cl != cl_true else 's',
-                           vmin=-0.2, vmax=1.2,
-                           cmap='coolwarm', s=40, zorder=3)
 
     patch = Line2D([0], [0], marker='o', markerfacecolor='grey',
                    markeredgecolor='k', markersize=20, alpha=0.8, color='w')
@@ -194,11 +230,11 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     else:
         n_annotators = A_cand.shape[1]
 
-    bound = check_bound(X_cand, bound)
+    bound = get_bound(X_cand, bound)
     x_min, x_max, y_min, y_max = bound
 
-    fig = set_up_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
-                        n_annotators=n_annotators)
+    fig = check_or_get_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
+                              n_annotators=n_annotators)
 
     x_vec = np.linspace(x_min, x_max, res)
     y_vec = np.linspace(y_min, y_max, res)
@@ -239,7 +275,6 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
 def plot_multi_annot_decision_boundary(n_annotators, clf, bound, fig=None,
                                        title=None, res=21, fig_size=None,
                                        fontsize=15):
-
     def plot_decision_boundary(clf, bound, res=21, ax=None):
         """Plot the decision boundary of the given classifier.
         Parameters
@@ -279,8 +314,8 @@ def plot_multi_annot_decision_boundary(n_annotators, clf, bound, fig=None,
                    vmax=.8)
         return ax
 
-    fig = set_up_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
-                        n_annotators=n_annotators)
+    fig = check_or_get_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
+                              n_annotators=n_annotators)
 
     axes = [ax for ax in fig.axes if not isinstance(ax, CbarAxes)]
     for a, ax in enumerate(axes):

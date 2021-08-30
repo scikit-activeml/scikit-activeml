@@ -2,16 +2,13 @@ import warnings
 
 import numpy as np
 from sklearn.utils import check_random_state, check_array, check_scalar
-from sklearn.utils.validation import _is_arraylike
-
-from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
-    SingleAnnotPoolBasedQueryStrategy
-
-from skactiveml.utils import compute_vote_vectors
-
+import sklearn.utils.validation
 from scipy.stats import rankdata
 
-from skactiveml.utils import rand_argmax
+from ...base import MultiAnnotPoolBasedQueryStrategy, \
+    SingleAnnotPoolBasedQueryStrategy
+
+from ...utils import compute_vote_vectors, rand_argmax
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -70,8 +67,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         A_perfs : array-like, shape (n_samples, n_annotators) or
                   (n_annotators,) optional (default=None)
             The preferred ranking of each annotator.
-            1.) If `A_perfs` is of shape (n_samples, n_annotators) for each sample
-            `i` the value-annotators pair `(i, j)` is preferably picked
+            1.) If `A_perfs` is of shape (n_samples, n_annotators) for each
+             sample `i` the value-annotators pair `(i, j)` is preferably picked
              over the pair `(i, k)` if `A_perfs[i, j]` is greater or
              equal to `A_perfs[i, k]`.
             2.) If `A_perfs` is of shape (n_annotators,) for each sample
@@ -165,7 +162,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                          target_type=int, min_val=1)
             pref_n_annotators = pref_annotators_per_sample * \
                                 np.ones(batch_size_sq)
-        elif _is_arraylike(pref_annotators_per_sample):
+        elif sklearn.utils.validation._is_arraylike(pref_annotators_per_sample):
             pref_n_annotators = check_array(pref_annotators_per_sample,
                                             ensure_2d=False)
 
@@ -192,11 +189,12 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         if A_perfs is None:
             annotator_utilities = random_state.rand(1, n_samples, n_annotators)\
                 .repeat(batch_size_sq, axis=0)
-        elif _is_arraylike(A_perfs):
+        elif sklearn.utils.validation._is_arraylike(A_perfs):
             A_perfs = check_array(A_perfs, ensure_2d=False)
             # ensure A_perfs lies in [0, 1)
             if A_perfs.min() != A_perfs.max():
-                A_perfs = 1/(A_perfs.max()-A_perfs.min()+1)*(A_perfs - A_perfs.min())
+                A_perfs = 1/(A_perfs.max()-A_perfs.min()+1)\
+                          *(A_perfs - A_perfs.min())
             else:
                 A_perfs = np.zeros_like(A_perfs, dtype=float)
 
@@ -290,6 +288,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         candidate_utilities = rankdata(candidate_utilities, method='dense',
                                        axis=1).astype(float)
         batch_size_sq = len(single_query_indices)
+
+        # prefer selected sample of the single query strategy
         candidate_utilities[np.arange(batch_size_sq), single_query_indices] += 1
 
         # calculate indices of maximum sample

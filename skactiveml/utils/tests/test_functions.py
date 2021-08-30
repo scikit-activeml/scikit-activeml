@@ -21,9 +21,6 @@ class TestFunctions(unittest.TestCase):
                           utils, random_state=42, batch_size='invalid')
         self.assertRaises(ValueError, simple_batch,
                           utils, random_state=42, batch_size=0)
-        self.assertRaises(TypeError, simple_batch,
-                          np.array([np.nan]), random_state=42,
-                          batch_size='invalid')
         indices, batches = simple_batch(utils, random_state=42,
                                         batch_size=len(utils) + 1,
                                         return_utilities=True)

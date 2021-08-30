@@ -1,11 +1,11 @@
-import numpy as np
 import unittest
 
-from skactiveml.pool.multi import IEThresh, IEAnnotModel
-from skactiveml.classifier import PWC
-
-from sklearn.preprocessing import StandardScaler
+import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.preprocessing import StandardScaler
+
+from skactiveml.classifier import PWC
+from skactiveml.pool.multi import IEThresh, IEAnnotModel
 
 
 class TestIEAnnotModel(unittest.TestCase):
@@ -296,6 +296,3 @@ class TestIEThresh(unittest.TestCase):
             self.assertGreaterEqual(available_annotators[query_indices[index, 0]],
                                     available_annotators[query_indices[index+1, 0]])
 
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,15 +1,11 @@
 import unittest
 
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.datasets import make_classification
 from sklearn.gaussian_process import GaussianProcessClassifier
 
-from skactiveml.classifier import SklearnClassifier, CMM, PWC
+from skactiveml.classifier import SklearnClassifier, CMM
 from skactiveml.pool import UncertaintySampling, RandomSampler
 from skactiveml.pool.multi._wrapper import MultiAnnotWrapper
-from skactiveml.pool.multi.multi_annot_visualisation import plot_current_state
-from skactiveml.utils import is_unlabeled
 
 
 class TestMultiAnnotWrapper(unittest.TestCase):
@@ -20,11 +16,11 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 0, 1, 1])
         self.classes = np.array([0, 1])
-        self.A_cand = np.array([[False, True,  True],
-                                [True,  True,  False],
-                                [True,  False, False],
-                                [True,  True,  True],
-                                [True,  False, False]])
+        self.A_cand = np.array([[False, True, True],
+                                [True, True, False],
+                                [True, False, False],
+                                [True, True, True],
+                                [True, False, False]])
 
     def test_init_param_strategy(self):
         wrapper = MultiAnnotWrapper(CMM())
@@ -197,7 +193,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         X_cand = np.array([[7, 1], [9, 1]])
 
-        A_cand = np.array([[True, True,  True,  True],
+        A_cand = np.array([[True, True, True, True],
                            [True, False, False, False]])
 
         wrapper = MultiAnnotWrapper(random, self.random_state)
@@ -250,9 +246,9 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         X_cand = np.array([[7, 1], [9, 1], [3, 5], [2, 7]])
 
         A_cand = np.array([[False, False, False, False],
-                           [True,  True,  True,  True],
+                           [True, True, True, True],
                            [False, False, False, False],
-                           [True,  False, False, False]])
+                           [True, False, False, False]])
 
         wrapper = MultiAnnotWrapper(random, self.random_state)
 
