@@ -248,6 +248,22 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
 
 class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
+    """Base class for all stream-based active learning query strategies in
+       scikit-activeml.
+
+    Parameters
+    ----------
+    base_query_strategy : QuaryStrategy
+        The QuaryStrategy which evaluates the utility of given instances used
+        in the stream-based active learning setting.
+
+    w_train : int, default=500
+        Size of the forgetting window
+
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
+
     def __init__(
         self, base_query_strategy=None, w_train=500, random_state=None
     ):
@@ -270,6 +286,48 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         al_kwargs={},
         **kwargs
     ):
+        """Ask the query strategy which instances in X_cand to acquire.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        sampled_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances in X_cand which should be sampled, with
+            0 <= n_sampled_instances <= n_samples.
+
+        utilities: ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy. Only provided if
+            return_utilities is True.
+        """
         (
             X_cand,
             return_utilities,
@@ -335,7 +393,28 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             return sampled_indices
 
     def update(self, X_cand, sampled, **kwargs):
+        """Updates the budget manager and the count for seen and sampled
+        instances
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        sampled : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been sampled.
+
+        kwargs : kwargs
+            Optional kwargs for budget_manager and query_strategy.
+
+        Returns
+        -------
+        self : ForgettingWrapper
+            The ForgettingWrapper returns itself, after it is updated.
+        """
         self.base_query_strategy_.update(X_cand, sampled, **kwargs)
+        return self
 
     def _validate_data(
         self,
@@ -353,7 +432,71 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         reset=True,
         **check_X_cand_params
     ):
+        """Validate input data and set or check the `n_features_in_` attribute.
 
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        X : array-like of shape (n_samples, n_features)
+            Checked input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Checked arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Checked arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Checked arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Checked arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
         (
             X_cand,
             return_utilities,
@@ -421,6 +564,27 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
 class BaggingDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
+    """Base class for all stream-based active learning query strategies in
+       scikit-activeml.
+
+    Parameters
+    ----------
+    base_query_strategy : QuaryStrategy
+        The QuaryStrategy which evaluates the utility of given instances used
+        in the stream-based active learning setting.
+
+    K : int, default=2
+        Number of instances that will be Simulated
+
+    delay_prior : float, default=0.001
+        Value to correct the predicted frequancy
+
+    clf : BaseEstimator
+        The classifier which is trained using this query startegy.
+
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
     def __init__(
         self,
         base_query_strategy=None,
@@ -450,6 +614,48 @@ class BaggingDelaySimulationWrapper(
         al_kwargs={},
         **kwargs
     ):
+        """Ask the query strategy which instances in X_cand to acquire.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        sampled_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances in X_cand which should be sampled, with
+            0 <= n_sampled_instances <= n_samples.
+
+        utilities: ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy. Only provided if
+            return_utilities is True.
+        """
         (
             X_cand,
             return_utilities,
@@ -569,6 +775,25 @@ class BaggingDelaySimulationWrapper(
             return sampled_indices
 
     def get_class_probabilities(self, X_B_n, X, y, sample_weight):
+        """Calculate the probabilities for the simulating 'X_B_n' window.
+
+        Parameters
+        ----------
+        X_B_n : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        probabilities : ndarray of shape (n_probabilities,)
+            List of probabilities for 'X_B_n'
+        """
         pwc = self.clf_
         pwc.fit(X=X, y=y, sample_weight=sample_weight)
         frequencies = pwc.predict_freq(X_B_n)
@@ -579,7 +804,28 @@ class BaggingDelaySimulationWrapper(
         return probabilities
 
     def update(self, X_cand, sampled, **kwargs):
+        """Updates the budget manager and the count for seen and sampled
+        instances
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        sampled : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been sampled.
+
+        kwargs : kwargs
+            Optional kwargs for budget_manager and query_strategy.
+
+        Returns
+        -------
+        self : BaggingDelaySimulationWrapper
+            The BaggingDelaySimulationWrapper returns itself, after it is updated.
+        """
         self.base_query_strategy_.update(X_cand, sampled, **kwargs)
+        return self
 
     def _validate_data(
         self,
@@ -597,6 +843,71 @@ class BaggingDelaySimulationWrapper(
         reset=True,
         **check_X_cand_params
     ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        X : array-like of shape (n_samples, n_features)
+            Checked input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Checked arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Checked arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Checked arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Checked arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
         (
             X_cand,
             return_utilities,
@@ -705,12 +1016,30 @@ class BaggingDelaySimulationWrapper(
 class FuzzyDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
+    """Base class for all stream-based active learning query strategies in
+       scikit-activeml.
+
+    Parameters
+    ----------
+    base_query_strategy : QuaryStrategy
+        The QuaryStrategy which evaluates the utility of given instances used
+        in the stream-based active learning setting.
+
+    delay_prior : float, default=0.001
+        Value to correct the predicted frequancy
+
+    clf : BaseEstimator
+        The classifier which is trained using this query startegy.
+
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
     def __init__(
         self,
-        random_state=None,
         base_query_strategy=None,
         delay_prior=0.001,
         clf=None,
+        random_state=None,
     ):
         super().__init__(base_query_strategy, random_state)
         self.delay_prior = delay_prior
@@ -732,6 +1061,48 @@ class FuzzyDelaySimulationWrapper(
         al_kwargs={},
         **kwargs
     ):
+        """Ask the query strategy which instances in X_cand to acquire.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        sampled_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances in X_cand which should be sampled, with
+            0 <= n_sampled_instances <= n_samples.
+
+        utilities: ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy. Only provided if
+            return_utilities is True.
+        """
         (
             X_cand,
             return_utilities,
@@ -866,6 +1237,25 @@ class FuzzyDelaySimulationWrapper(
             return sampled_indices
 
     def get_class_probabilities(self, X_B_n, X, y, sample_weight):
+        """Calculate the probabilities for the simulating 'X_B_n' window.
+
+        Parameters
+        ----------
+        X_B_n : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        probabilities : ndarray of shape (n_probabilities,)
+            List of probabilities for 'X_B_n'
+        """
         pwc = self.clf_
         pwc.fit(X=X, y=y, sample_weight=sample_weight)
         frequencies = pwc.predict_freq(X_B_n)
@@ -876,7 +1266,28 @@ class FuzzyDelaySimulationWrapper(
         return probabilities
 
     def update(self, X_cand, sampled, **kwargs):
+        """Updates the budget manager and the count for seen and sampled
+        instances
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        sampled : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been sampled.
+
+        kwargs : kwargs
+            Optional kwargs for budget_manager and query_strategy.
+
+        Returns
+        -------
+        self : FuzzyDelaySimulationWrapper
+            The FuzzyDelaySimulationWrapper returns itself, after it is updated.
+        """
         self.base_query_strategy_.update(X_cand, sampled, **kwargs)
+        return self
 
     def _validate_data(
         self,
@@ -894,6 +1305,71 @@ class FuzzyDelaySimulationWrapper(
         reset=True,
         **check_X_cand_params
     ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be sampled. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        X : array-like of shape (n_samples, n_features)
+            Checked input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Checked arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Checked arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Checked arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Checked arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
         (
             X_cand,
             return_utilities,
