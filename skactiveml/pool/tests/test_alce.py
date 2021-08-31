@@ -96,7 +96,7 @@ class TestALCE(unittest.TestCase):
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
 
-    def test_query_param_weight(self):
+    def test_query_param_sample_weight(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
                           X=self.X, y=self.y, sample_weight='string')
