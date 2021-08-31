@@ -5,7 +5,6 @@ import os
 from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
-from matplotlib.testing.decorators import image_comparison
 from sklearn.datasets import make_classification
 
 from skactiveml.classifier import PWC
@@ -29,6 +28,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.y_train = self.y[train_indices]
         self.X_cand = self.X[cand_indices]
         self.clf = PWC()
+        self.clf.fit(self.X_train, self.y_train)
         self.qs = UncertaintySampling(clf=self.clf)
         self.qs_dict = {'X': self.X_train, 'y': self.y_train}
 
@@ -42,14 +42,42 @@ class TestFeatureSpace(unittest.TestCase):
         testing.set_reproducibility_for_testing()
         testing.setup()
 
+    # Tests for plot_decision_boundary function
     def test_decision_boundary_clf(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.qs,
                           bound=self.bound)
+
+    def test_decision_boundary_bound(self):
+        self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
+                          bound=[0, 0, 1, 1])
+
+    def test_decision_boundary_res(self):
+        self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
+                          bound=self.bound, res='string')
 
     def test_decision_boundary_ax(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           bound=self.bound, ax=3)
 
+    def test_decision_boundary_confidence(self):
+        self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
+                          bound=self.bound, confidence=0.0)
+        self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
+                          bound=self.bound, confidence='string')
+
+    def test_decision_boundary_cmap(self):
+        self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
+                          bound=self.bound, cmap=4)
+
+    def test_decision_boundary_boundary_dict(self):
+        self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
+                          bound=self.bound, boundary_dict='string')
+
+    def test_decision_boundary_confidence_dict(self):
+        self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
+                          bound=self.bound, boundary_dict='string')
+
+    # Tests for plot_utility function
     def test_utility_qs(self):
         self.assertRaises(TypeError, plot_utility, qs=self.clf,
                           qs_dict=self.qs_dict, bound=self.bound)
@@ -75,17 +103,16 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertRaises(TypeError, plot_utility, qs=self.qs,
                           qs_dict=self.qs_dict, bound=self.bound, ax=2)
 
+    # Graphical tests
     def test_no_candidates(self):
-        self.clf.fit(self.X_train, self.y_train)
-        bound = min(self.X[:, 0]), max(self.X[:, 0]), min(self.X[:, 1]), \
-            max(self.X[:, 1])
+        cmap = 'coolwarm_r'
 
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     bound=bound)
+                     bound=self.bound)
         plt.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
         plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=-self.y_train,
-                    cmap='coolwarm_r', alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, bound)
+                    cmap=cmap, alpha=.9, marker='.')
+        plot_decision_boundary(self.clf, self.bound, cmap=cmap)
 
         plt.savefig(self.path_prefix + 'test_result.png')
         comparison = compare_images(self.path_prefix +
@@ -95,16 +122,13 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_with_candidates(self):
-        self.clf.fit(self.X_train, self.y_train)
-        bound = min(self.X[:, 0]), max(self.X[:, 0]), min(self.X[:, 1]), \
-            max(self.X[:, 1])
 
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
                      X_cand=self.X_cand, res=101)
         plt.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=-self.y_train,
                     cmap='coolwarm_r', alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, bound)
+        plot_decision_boundary(self.clf, self.bound)
 
         plt.savefig(self.path_prefix + 'test_result_cand.png')
         comparison = compare_images(self.path_prefix +
