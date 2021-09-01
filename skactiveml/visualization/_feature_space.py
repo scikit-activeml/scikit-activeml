@@ -62,7 +62,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
 
     boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
     if boundary_dict is not None:
-        if type(boundary_dict) is not dict:
+        if not isinstance(boundary_dict, dict):
             raise TypeError("boundary_dict' must be a dictionary.")
         boundary_args.update(boundary_dict)
     ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
@@ -70,7 +70,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
     confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
                        'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
     if confidence_dict is not None:
-        if type(confidence_dict) is not dict:
+        if not isinstance(confidence_dict, dict):
             raise TypeError("confidence_dict' must be a dictionary.")
         confidence_args.update(confidence_dict)
     ax.contour(X_mesh, Y_mesh, posteriors, [.25, .75], cmap=cmap,
@@ -132,6 +132,8 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
 
     contour_args = {'cmap': 'Greens', 'alpha': 0.75}
     if contour_dict is not None:
+        if not isinstance(contour_dict, dict):
+            raise TypeError("contour_dict' must be a dictionary.")
         contour_args.update(contour_dict)
 
     if X_cand is None:
