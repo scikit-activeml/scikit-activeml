@@ -114,10 +114,10 @@ class TestFeatureSpace(unittest.TestCase):
                     cmap=cmap, alpha=.9, marker='.')
         plot_decision_boundary(self.clf, self.bound, cmap=cmap)
 
-        plt.savefig(self.path_prefix + 'test_result.png')
+        plt.savefig(self.path_prefix + 'dec_bound_wo_cand.pdf')
         comparison = compare_images(self.path_prefix +
-                                    'visualization_without_candidates.png',
-                                    self.path_prefix + 'test_result.png',
+                                    'dec_bound_wo_cand_base.pdf',
+                                    self.path_prefix + 'dec_bound_wo_cand.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
 
@@ -130,9 +130,9 @@ class TestFeatureSpace(unittest.TestCase):
                     cmap='coolwarm_r', alpha=.9, marker='.')
         plot_decision_boundary(self.clf, self.bound)
 
-        plt.savefig(self.path_prefix + 'test_result_cand.png')
+        plt.savefig(self.path_prefix + 'dec_bound_w_cand.pdf')
         comparison = compare_images(self.path_prefix +
-                                    'visualization_with_candidates.png',
-                                    self.path_prefix + 'test_result_cand.png',
+                                    'dec_bound_w_cand_base.pdf',
+                                    self.path_prefix + 'dec_bound_w_cand.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
