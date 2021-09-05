@@ -1,56 +1,50 @@
 [
   {
-    "class" : "UncertaintySampling",
-    "method" : "margin_sampling",
+    "class" : "ExpectedErrorReduction",
+    "method" : "emr",
     "categories" : {
       "Settles2012" : "",
       "kumar2020active" : ""
     },
     "tags" : ["pool"],
-    "title" : "UncertaintySampling Example For Method 'margin_sampling'",
+    "title" : "ExpectedErrorReduction Example For Method 'emr'",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
-    "init_params" : {
-      "method" : "'margin_sampling'"
-    },
+    "init_params" : {},
     "query_params" : {}
   },
   {
-    "class" : "UncertaintySampling",
-    "method" : "least_confident",
+    "class" : "ExpectedErrorReduction",
+    "method" : "csl",
     "categories" : {
       "Settles2012" : "",
       "kumar2020active" : ""
     },
     "tags" : ["pool"],
-    "title" : "UncertaintySampling Example For Method 'least_confident'",
-    "refs" : ["settles2009active"],
+    "title" : "ExpectedErrorReduction Example For Method 'csl'",
+    "refs" : [],
     "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
-    "init_params" : {
-      "method" : "'least_confident'"
-    },
+    "init_params" : {},
     "query_params" : {}
   },
   {
-    "class" : "UncertaintySampling",
-    "method" : "entropy",
+    "class" : "ExpectedErrorReduction",
+    "method" : "log_loss",
     "categories" : {
       "Settles2012" : "",
       "kumar2020active" : ""
     },
     "tags" : ["pool"],
-    "title" : "UncertaintySampling Example For Method 'entropy'",
-    "refs" : ["settles2009active"],
+    "title" : "ExpectedErrorReduction Example For Method 'log_loss'",
+    "refs" : [],
     "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
-    "init_params" : {
-      "method" : "'entropy'"
-    },
+    "init_params" : {},
     "query_params" : {}
   }
 ]

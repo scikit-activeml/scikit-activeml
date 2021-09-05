@@ -1,0 +1,19 @@
+[
+  {
+    "class" : "ALCE",
+    "categories" : {
+      "Settles2012" : "",
+      "kumar2020active" : ""
+    },
+    "tags" : ["pool"],
+    "title" : "ALCE Example",
+    "refs" : ["huang2016novel"],
+    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "text_0" : "",
+    "code_import" : [],
+    "init_params" : {
+      "classes" : "[0, 1]"
+    },
+    "query_params" : {}
+  }
+]

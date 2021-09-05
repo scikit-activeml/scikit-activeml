@@ -1,0 +1,20 @@
+[
+  {
+    "class" : "FourDS",
+    "categories" : {
+      "Settles2012" : "",
+      "kumar2020active" : ""
+    },
+    "tags" : ["pool"],
+    "title" : "FourDS Example",
+    "refs" : ["reitmaier2013let"],
+    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "text_0" : "",
+    "code_import" : [
+      "from skactiveml.classifier import CMM"
+    ],
+    "clf" : "CMM(classes=[0, 1])",
+    "init_params" : {},
+    "query_params" : {}
+  }
+]

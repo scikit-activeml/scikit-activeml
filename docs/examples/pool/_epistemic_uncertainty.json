@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "EpistemicUncertainty",
+    "categories" : {
+      "Settles2012" : "",
+      "kumar2020active" : ""
+    },
+    "tags" : ["pool"],
+    "title" : "EpistemicUncertainty Example",
+    "refs" : ["nguyen2019epistemic"],
+    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "text_0" : "",
+    "code_import" : [],
+    "init_params" : {},
+    "query_params" : {}
+  }
+]

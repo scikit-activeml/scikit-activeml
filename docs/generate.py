@@ -502,7 +502,7 @@ def format_code(code):
     string : The formatted string for the example script.
     """
     block_str = ''
-    for line in code.split('\n'):
+    for line in code:
         block_str += line + '\n'
     return block_str + '\n'
 
@@ -529,7 +529,8 @@ def format_plot(qs, init_params, query_params, clf=None):
     -------
     string : The formatted string for the example script.
     """
-    block_str = 'import numpy as np\n'
+    block_str = f'from skactiveml.pool import {qs.__name__}\n'
+    block_str += 'import numpy as np\n'
     block_str += 'from matplotlib import pyplot as plt, animation\n'
     block_str += 'from sklearn.datasets import make_classification\n'
     # Decide which classifier to use, if clf is None.
