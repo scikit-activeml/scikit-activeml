@@ -16,7 +16,7 @@ from skactiveml.utils import check_random_state
 class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
     SingleAnnotStreamBasedQueryStrategyWrapper
 ):
-    """Base class for all stream-based active learning query strategies in
+    """Base class for all delay stream-based active learning query strategies in
        scikit-activeml.
 
     Parameters
@@ -139,6 +139,28 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             )
 
     def _validate_X_y_sample_weight(self, X, y, sample_weight):
+        """Validate if X, y and sample_weight are numeric and of equal lenght.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        X : array-like of shape (n_samples, n_features)
+            Checked Input samples.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. Converts y to a numpy array
+        simulate : bool,
+            Checked boolean value of `simulate`.
+        """
         if sample_weight is not None:
             sample_weight = np.array(sample_weight)
             check_consistent_length(sample_weight, y)
@@ -148,6 +170,19 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         return X, y, sample_weight
 
     def _validate_acquisitions(self, acquisitions):
+        """Validate if acquisitions is an boolean and convert it into a
+        numpy array.
+
+        Parameters
+        ----------
+        acquisitions : array-like of shape (n_samples, n_features)
+            boolean array of acquired instances.
+
+        Returns
+        -------
+        acquisitions : array-like of shape (n_samples, n_features)
+            Checked boolean value of `simulate`.
+        """
         acquisitions = np.array(acquisitions)
         if not acquisitions.dtype == bool:
             raise TypeError(
@@ -158,12 +193,44 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         return acquisitions
 
     def _validate_tX_ty(self, tX, ty):
+        """Validate if tX and ty are numeric and of equal lenght.
+
+        Parameters
+        ----------
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+
+        Returns
+        -------
+        tX : array-like of shape (n_samples)
+            Checked arrival time List
+        ty : array-like of shape (n_samples)
+            Checked arrival time of the Labels List
+        """
         tX = check_array(tX, ensure_2d=False)
         ty = check_array(ty, ensure_2d=False)
         check_consistent_length(tX, ty)
         return tX, ty
 
     def _validate_tX_cand_ty_cand(self, tX_cand, ty_cand):
+        """Validate if tX_cand and ty_cand are numeric and of equal lenght.
+
+        Parameters
+        ----------
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+
+        Returns
+        -------
+        tX_cand : array-like of shape (n_samples)
+            Checked arrival time List
+        ty_cand : array-like of shape (n_samples)
+            Checked arrival time of the Labels List
+        """
         tX_cand = check_array(tX_cand, ensure_2d=False)
         ty_cand = check_array(ty_cand, ensure_2d=False)
         check_consistent_length(tX_cand, ty_cand)
@@ -248,8 +315,15 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
 
 class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
-    """Base class for all stream-based active learning query strategies in
-       scikit-activeml.
+    """The ForgettingWrapper strategy determines a sliding window with a length
+    of w_train to forget obsolete data. The window is defined by calculation
+    all instances that are within
+    ty_cand - w_train <= tX, with ty_cand referring to the arrival time of the
+    Label for the current instance and tX the arrival time of all instances used
+    that infer the classifier. Through this calculation, only instances with
+    arrived labels will be used to infer the classifier for the given query
+    strategy.
+
 
     Parameters
     ----------
@@ -286,7 +360,13 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         al_kwargs={},
         **kwargs
     ):
-        """Ask the query strategy which instances in X_cand to acquire.
+        """Preprocess the data according to the verification latency strategy
+        before asking the query strategy which instances in X_cand to acquire.
+
+        Please note that, when the decisions from this function may differ from
+        the final sampling, simulate=True can be set, so that the query strategy
+        can be updated later with update(...) with the final sampling. This is
+        especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -542,7 +622,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         )
 
     def _validate_w_train(self):
-        """Validate if w_train a float and positive.
+        """Validate if w_train is a positive float.
         """
         if self.w_train is not None:
             if not (
@@ -564,8 +644,13 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
 class BaggingDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
-    """Base class for all stream-based active learning query strategies in
-       scikit-activeml.
+    """The BaggingDelaySimulationWrapper takes already acquired instances
+    without labeling into account by simulating 1 to K number of labels each
+    time and estimating the average utility of every simulation. The instances
+    that may be simulated are in the range of instances
+    X_simulate = ty >= tX_cand and ty < ty_cand.
+    To determine the Label of the instances a categorical distribution is used
+    according to Murphy 2012.
 
     Parameters
     ----------
@@ -614,7 +699,13 @@ class BaggingDelaySimulationWrapper(
         al_kwargs={},
         **kwargs
     ):
-        """Ask the query strategy which instances in X_cand to acquire.
+        """Preprocess the data according to the verification latency strategy
+        before asking the query strategy which instances in X_cand to acquire.
+
+        Please note that, when the decisions from this function may differ from
+        the final sampling, simulate=True can be set, so that the query strategy
+        can be updated later with update(...) with the final sampling. This is
+        especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -765,9 +856,10 @@ class BaggingDelaySimulationWrapper(
         sampled = np.zeros(len(X_cand))
         sampled[sampled_indices] = 1
         kwargs = dict(utilities=avg_utilities)
-        self.base_query_strategy_.update(
-            X_cand=X_cand, sampled=sampled, budget_manager_kwargs=kwargs
-        )
+        if not simulate:
+            self.base_query_strategy_.update(
+                X_cand=X_cand, sampled=sampled, budget_manager_kwargs=kwargs
+            )
 
         if return_utilities:
             return sampled_indices, avg_utilities
@@ -1016,8 +1108,14 @@ class BaggingDelaySimulationWrapper(
 class FuzzyDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
-    """Base class for all stream-based active learning query strategies in
-       scikit-activeml.
+    """The FuzzyDelaySimulationWrapper takes already acquired instances without
+    labeling into account by simulating their label and adding a sample weight
+    to each simulated instance. The instances that will be simulated are in the
+    range of instances
+    X_simulate = ty >= tX_cand and ty < ty_cand.
+    After calculating the class probability of the X_simulate window it will be
+    added to the already existing window with the predicted class and sample
+    weight.
 
     Parameters
     ----------
@@ -1061,7 +1159,13 @@ class FuzzyDelaySimulationWrapper(
         al_kwargs={},
         **kwargs
     ):
-        """Ask the query strategy which instances in X_cand to acquire.
+        """Preprocess the data according to the verification latency strategy
+        before asking the query strategy which instances in X_cand to acquire.
+
+        Please note that, when the decisions from this function may differ from
+        the final sampling, simulate=True can be set, so that the query strategy
+        can be updated later with update(...) with the final sampling. This is
+        especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -1227,9 +1331,10 @@ class FuzzyDelaySimulationWrapper(
         sampled = np.zeros(len(X_cand))
         sampled[tmp_sampled_indices] = 1
         kwargs = dict(utilities=utilities)
-        self.base_query_strategy_.update(
-            X_cand=X_cand, sampled=sampled, budget_manager_kwargs=kwargs
-        )
+        if not simulate:
+            self.base_query_strategy_.update(
+                X_cand=X_cand, sampled=sampled, budget_manager_kwargs=kwargs
+            )
 
         if return_utilities:
             return sampled_indices, utilities
