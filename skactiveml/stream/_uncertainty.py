@@ -68,9 +68,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can set, so that the query strategy
+        the final sampling, simulate=True can be set, so that the query strategy
         can be updated later with update(...) with the final sampling. This is
-        especially helpful, when developing wrapper query strategies.
+        especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -242,7 +242,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+                    raise ValueError(
+                        "{} is not a valid Value for y".format(type(y))
+                    )
         else:
             self.clf_ = self.clf
 
@@ -301,9 +303,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can set, so that the query strategy
+        the final sampling, simulate=True can be set, so that the query strategy
         can be updated later with update(...) with the final sampling. This is
-        especially helpful, when developing wrapper query strategies.
+        especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -482,7 +484,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+                    raise ValueError(
+                        "{} is not a valid Value for y".format(type(y))
+                    )
         else:
             self.clf_ = self.clf
 
@@ -534,9 +538,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can set, so that the query strategy
+        the final sampling, simulate=True can be set, so that the query strategy
         can be updated later with update(...) with the final sampling. This is
-        especially helpful, when developing wrapper query strategies.
+        especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -722,6 +726,8 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+                    raise ValueError(
+                        "{} is not a valid Value for y".format(type(y))
+                    )
         else:
             self.clf_ = self.clf
