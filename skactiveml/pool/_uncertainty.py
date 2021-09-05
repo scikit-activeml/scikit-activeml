@@ -27,8 +27,6 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     method : string (default='margin_sampling')
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
-        Epistemic only works with Parzen Window Classifier or
-        Logistic Regression.
     cost_matrix : array-like, shape (n_classes, n_classes)
         Cost matrix with cost_matrix[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
