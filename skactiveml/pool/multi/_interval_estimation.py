@@ -22,7 +22,7 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixing):
 
     This annotator model relies on 'Interval Estimation Learning' (IELearning)
     for estimating the annotation performances, i.e., labeling accuracies,
-    of multiple annotators [1]. Therefor, it computes the mean accuracy and the
+    of multiple annotators [1]. Therefore, it computes the mean accuracy and the
     lower as well as the upper bound of the labeling accuracy per annotator.
     (Weighted) majority vote is used as as estimated ground truth.
 
