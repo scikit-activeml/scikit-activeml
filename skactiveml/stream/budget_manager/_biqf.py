@@ -62,7 +62,7 @@ class BIQF(BudgetManager):
         budget_left : bool
             True, if there is a utility which leads to sampling another
             instance.
-        """
+    """
         return True
 
     def sample(
