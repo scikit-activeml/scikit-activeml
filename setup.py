@@ -6,6 +6,13 @@ def readme():
         return f.read()
 
 
+def requirements():
+    with open('requirements.txt', 'r') as file:
+        lines = file.readlines()
+        lines = [line.rstrip() for line in lines]
+    return lines
+
+
 setuptools.setup(name='scikit-activeml',
                  version='0.0.0',
                  description='The package scikit-activeml is a library of '
@@ -32,14 +39,7 @@ setuptools.setup(name='scikit-activeml',
                  author_email='daniel.kottke@uni-kassel.de',
                  license='BSD 3-Clause License',
                  packages=setuptools.find_packages(),
-                 install_requires=[
-                     'joblib~=1.0.1',
-                     'numpy~=1.20.1',
-                     'scipy~=1.6.1',
-                     'scikit-learn~=0.24.1',
-                     'matplotlib~=3.3.4',
-                     'iteration-utilities~=0.11.0'
-                 ],
+                 install_requires=requirements(),
                  setup_requires=['pytest-runner'],
                  tests_require=['pytest'],
                  include_package_data=True,
