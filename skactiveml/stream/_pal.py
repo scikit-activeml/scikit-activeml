@@ -11,6 +11,33 @@ from .budget_manager import BIQF
 
 
 class PAL(SingleAnnotStreamBasedQueryStrategy):
+    '''Probabilistic Active Learning (PAL) in Datastreams is an extension to
+    Multi-Class Probabilistic Active Learning (see pool.McPAL). It assesses
+    MCPAL spatial to assess the spatial utility. The Balanced Incremental
+    Quantile Filter (BIQF), that is implemented within the default
+    budget_manager, is used to evaluate the temporal utility
+    (see stream.budget_manager.BIQF).
+
+    Parameters
+    ----------
+    clf : BaseEstimator
+        The classifier which is trained using this query startegy.
+
+    budget_manager : BudgetManager
+        The BudgetManager which models the budgeting constraint used in
+        the stream-based active learning setting. The budget attribute set for
+        the budget_manager will be used to determine the probability to sample
+        instances
+
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+
+    prior : float
+        The prior value that is passed onto McPAL (see pool.McPAL).
+
+    m_max : float
+        The m_max value that is passed onto McPAL (see pool.McPAL).
+    '''
     def __init__(
         self,
         clf=None,

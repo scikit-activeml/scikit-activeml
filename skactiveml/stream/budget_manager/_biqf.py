@@ -14,7 +14,7 @@ class BIQF(BudgetManager):
         self.w = w
         self.w_tol = w_tol
         self.save_utilities = save_utilities
-        
+
     def is_budget_left(self):
         return True
 
