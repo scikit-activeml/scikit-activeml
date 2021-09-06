@@ -41,8 +41,9 @@ def check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
     elif not isinstance(fig, Figure):
         raise TypeError("'fig' must be a matplotlib.figure.Figure")
     # type of axis has to equal axes_grid.Axes and must not be a subtype
-    elif len([ax for ax in fig.axes if type(ax) == axes_grid.Axes]
-             ) != n_annotators:
+    elif n_annotators is not None \
+            and len([ax for ax in fig.axes if type(ax) == axes_grid.Axes]
+            ) != n_annotators:
         raise ValueError("'fig' must contain an axes for each annotator")
     else:
         return fig
@@ -68,7 +69,9 @@ def set_up_annotator_axis(ax, annotator_index, bound, fontsize):
 
 
 def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
-                       bound=None, title=None, fontsize=15, fig_size=None):
+                       bound=None, title=None, fontsize=15, fig_size=None,
+                       plot_legend=True, legend_dict=None, contour_dict=None,
+                       boundary_dict=None, confidence_dict=None):
     """Shows the annotations from the different annotators, the decision
     boundary of the given classifier and the utilities expected of querying
     a sample from a given region based on the query strategy.
@@ -99,6 +102,17 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
     fig_size: tuple, shape (width, height) (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
+    plot_legend: bool
+        Whether to plot the legend.
+    legend_dict: dict, optional (default=None)
+        Additional parameters for the legend.
+    contour_dict: dict, optional (default=None)
+        Additional parameters for the utility contour.
+    boundary_dict: dict, optional (default=None)
+        Additional parameters for the boundary contour.
+    confidence_dict: dict, optional (default=None)
+        Additional parameters for the confidence contour. Must not contain a
+        colormap because cmap is used.
     """
 
     if ma_qs_arg_dict is None:
@@ -107,13 +121,15 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
 
     bound = get_bound(X, bound)
 
-    n_annotators = y.shape[1]
     fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
                        ma_qs_arg_dict=ma_qs_arg_dict,
-                       bound=bound, title=title, fontsize=fontsize, res=5)
-
-    plot_data_set(fig=fig, X=X, y=y, y_true=y_true)
-    plot_multi_annot_decision_boundary(n_annotators, clf, fig=fig, bound=bound)
+                       bound=bound, title=title, fontsize=fontsize, res=5,
+                       contour_dict=contour_dict)
+    plot_data_set(fig=fig, X=X, y=y, y_true=y_true,
+                  plot_legend=plot_legend, legend_dict=legend_dict)
+    plot_multi_annot_decision_boundary(clf, fig=fig, bound=bound,
+                                       boundary_dict=boundary_dict,
+                                       confidence_dict=confidence_dict)
 
     plt.show()
 
@@ -135,7 +151,7 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
         The number of class labels may be variable for the samples, where
         missing labels are represented the attribute 'missing_label'.
     fig: matplotlib.figure.Figure, optional (default=None)
-        The figure to which axes the utilities will be plotted
+        The figure to which axes the utilities will be plotted.
     fig_size: tuple, shape (width, height) (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
@@ -147,6 +163,8 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
         The fontsize of the labels.
     plot_legend: bool
         Whether to plot the legend.
+    legend_dict: dict, optional (default=None)
+        Additional parameters for the legend.
     """
 
     # check input values
@@ -332,11 +350,45 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     return fig
 
 
-def plot_multi_annot_decision_boundary(n_annotators, clf, bound, fig=None,
-                                       title=None, res=21, fig_size=None,
-                                       fontsize=15, cmap='coolwarm_r',
-                                       boundary_dict=None,
+def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
+                                       confidence=0.5, title=None, res=21,
+                                       fig_size=None, fontsize=15,
+                                       cmap='coolwarm_r', boundary_dict=None,
                                        confidence_dict=None):
+    """Plot the decision boundary of the given classifier for each annotator.
+
+    Parameters
+    ----------
+    clf: sklearn classifier # TODO correct?
+        The classifier whose decision boundary is plotted.
+    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+        Determines the area in which the boundary is plotted.
+    n_annotators: int, optional (default=None)
+        The number of annotators for which the decision boundary will be
+        plotted. `n_annotators` or `fig` have to be passed as an argument.
+    fig: matplotlib.figure.Figure, optional (default=None)
+        The figure to which axes the decision boundary will be plotted.
+        `n_annotators` or `fig` have to be passed as an argument.
+    confidence: scalar | None, optional (default=0.5)
+        The confidence interval plotted with dashed lines. It is not plotted if
+        confidence is None.
+    title : str, optional
+        The title for the figure.
+    res: int, optional (default=21)
+        The resolution of the plot.
+    fig_size: tuple, shape (width, height) (default=None)
+        The size of the figure in inches. If `fig_size` is None, the size
+        of the figure is set to 8 x 5 inches.
+    fontsize: int
+        The fontsize of the labels
+    cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
+        The colormap for the confidence levels.
+    boundary_dict: dict, optional (default=None)
+        Additional parameters for the boundary contour.
+    confidence_dict: dict, optional (default=None)
+        Additional parameters for the confidence contour. Must not contain a
+        colormap because cmap is used.
+    """
     def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
                                cmap='coolwarm_r', boundary_dict=None,
                                confidence_dict=None):
@@ -403,8 +455,18 @@ def plot_multi_annot_decision_boundary(n_annotators, clf, bound, fig=None,
         ax.contour(X_mesh, Y_mesh, posteriors, [.25, .75], cmap=cmap,
                    **confidence_args)
 
-    fig = check_or_get_figure(fig, fig_size=fig_size, title=title, fontsize=fontsize,
-                              n_annotators=n_annotators)
+    # check arguments
+    if n_annotators is None and fig is None:
+        raise TypeError("n_annotators or fig have to be passed as an argument")
+
+    if n_annotators is not None:
+        n_annotators = check_scalar(n_annotators, name='n_annotators',
+                                    target_type=int)
+
+    fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
+                              fontsize=fontsize, n_annotators=n_annotators)
+
+    # plot decision boundary
 
     # type of axis has to equal axes_grid.Axes and must not be a subtype
     axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
@@ -412,6 +474,7 @@ def plot_multi_annot_decision_boundary(n_annotators, clf, bound, fig=None,
         set_up_annotator_axis(ax, annotator_index=a, bound=bound,
                               fontsize=fontsize)
 
-        plot_decision_boundary(clf, bound, res=res, ax=ax, cmap=cmap,
+        plot_decision_boundary(clf, bound, res=res, ax=ax,
+                               confidence=confidence, cmap=cmap,
                                boundary_dict=boundary_dict,
                                confidence_dict=confidence_dict)
