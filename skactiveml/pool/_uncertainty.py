@@ -40,7 +40,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         A probabilistic sklearn classifier.
     method : string
         The method to calculate the uncertainty. Only entropy, least_confident,
-        margin_sampling and expected_average_precisionare.
+        margin_sampling and expected_average_precision.
     cost_matrix : array-like, shape (n_classes, n_classes)
         Cost matrix with C[i, j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
