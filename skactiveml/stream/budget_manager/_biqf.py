@@ -7,6 +7,39 @@ from copy import copy
 
 class BIQF(BudgetManager):
     """
+    The Balanced Incremental Quantile Filter has been proposed together with
+    Probabilistic Active Learning for Datastreams [1]. It assesses whether a given
+    spatial utility (i.e., obtained via McPAL) warrants to query the label in 
+    question. The spatial ultilities are compared against a threshold that is
+    derived from a quantile (budget) of the last w observed utilities. To 
+    balance the number of queries, w_tol is used to increase or decrease the
+    threshold based on the number of available acquisitions.
+    
+    Parameters
+    ----------
+    w : int
+        The number of observed utilities that are used to infer the threshold.
+        w should be higher than 0.
+
+    w_tol : int
+        The window in which the number of acquisitions should stay within the
+        budget. w_tol should be higher than 0.
+
+    budget : float
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1.
+
+    save_utilities : bool
+        A flag that controls whether the utilities for previous queries should
+        be saved within the object. This flag affects whether the spatial 
+        utilities should be provided when using update.
+        
+    References
+    ----------
+    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active 
+        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M. 
+        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture 
+        Notes in Computer Science, vol 9385. Springer, Cham.
     """
 
     def __init__(self, w=100, w_tol=50, budget=None, save_utilities=True):
@@ -15,7 +48,21 @@ class BIQF(BudgetManager):
         self.w_tol = w_tol
         self.save_utilities = save_utilities
 
-    def is_budget_left(self):
+    def is_budget_left(self):        
+    		"""Check whether there is any utility given to sample(...), which may
+        lead to sampling the corresponding instance, i.e., check if sampling
+        another instance is currently possible under the budgeting constraint.
+        This function is useful to determine, whether a provided
+        utility is not sufficient, or the budgeting constraint was simply
+        exhausted. For this budget manager this function returns True, when
+        budget > estimated_spending.
+
+        Returns
+        -------
+        budget_left : bool
+            True, if there is a utility which leads to sampling another
+            instance.
+        """
         return True
 
     def sample(

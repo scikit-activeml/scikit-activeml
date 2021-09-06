@@ -37,6 +37,13 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
 
     m_max : float
         The m_max value that is passed onto McPAL (see pool.McPAL).
+        
+    References
+    ----------
+    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active 
+        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M. 
+        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture 
+        Notes in Computer Science, vol 9385. Springer, Cham.
     '''
     def __init__(
         self,
