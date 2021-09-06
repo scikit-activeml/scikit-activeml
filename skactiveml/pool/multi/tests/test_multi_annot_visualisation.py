@@ -3,23 +3,34 @@ import unittest
 import numpy as np
 import matplotlib.pyplot as plt
 
-from skactiveml.classifier import SklearnClassifier, PWC
+from skactiveml.classifier import PWC
 from skactiveml.pool import UncertaintySampling, RandomSampler
 from skactiveml.pool.multi._wrapper import MultiAnnotWrapper
 from skactiveml.pool.multi.multi_annot_visualisation import plot_utility, \
-    plot_data_set, plot_multi_annot_decision_boundary
+    plot_data_set, plot_multi_annot_decision_boundary, check_or_get_bound
 
 
 class TestMultiAnnotWrapper(unittest.TestCase):
 
     def setUp(self):
         self.random_state = 1
+        self.X = np.array([[0, 0], [0, 1], [1, 1]])
+        self.y = np.array([[0, 1], [1, 1], [0, 0]])
+        self.bound = np.array([[-0.5, -0.5], [1.5, 1.5]])
 
-    
+    def test_check_or_get_bound_X(self):
+        self.assertRaises(ValueError, check_or_get_bound, X='string',
+                          bound=self.bound)
+        self.assertRaises(ValueError, check_or_get_bound,
+                          X=np.array([-0.5, 1.5]), bound=self.bound)
 
-    def ttest_plot_data_set(self):
-        X = np.array([[0, 0], [0, 1], [1, 1]])
-        y = np.array([[0, 1], [1, 1], [0, 0]])
+    def test_check_or_get_bound_bound(self):
+        self.assertRaises(ValueError, check_or_get_bound, X=self.X,
+                          bound='string')
+        self.assertRaises(ValueError, check_or_get_bound, X=self.X,
+                          bound=np.array([0, 1]))
+        self.assertWarns(Warning, check_or_get_bound, X=self.X,
+                         bound=np.array([[0.5, 0.5], [1.5, 1.5]]))
 
     def ttest_plot_utility(self):
         clf = PWC()

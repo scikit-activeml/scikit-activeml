@@ -45,8 +45,8 @@ def check_or_get_bound(X, bound):
 
     elif bound is not None and X is not None:
         x_min, y_min, x_max, y_max = np.ravel(bound)
-        if np.any(np.logical_or(x_min > X[:, 0], X[:, 0] > x_max,
-                                y_min > X[:, 1], X[:, 1] > y_max)):
+        if np.any((x_min > X[:, 0]) + (X[:, 0] > x_max) +
+                  (y_min > X[:, 1]) + (X[:, 1] > y_max)):
             warnings.warn("`X` contains values not within range of `bound`.")
         return bound
     elif bound is not None:
