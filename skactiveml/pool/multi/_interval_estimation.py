@@ -75,7 +75,8 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixing):
         ----------
         y : array-like, shape (n_samples, n_annotators)
             Class labels of annotators.
-        sample_weight : array-like, shape (n_samples, n_annotators), optional (default=None)
+        sample_weight : array-like, shape (n_samples, n_annotators),
+        optional (default=None)
             Sample weight for each label and annotator.
 
         Returns
@@ -310,7 +311,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         annotators_per_sample_ranks = rankdata(annotators_per_sample,
                                                method='dense') \
                                       * max_uncertainty - max_uncertainty
-        init_utilities = init_utilities + annotators_per_sample_ranks[:, np.newaxis]
+        init_utilities = init_utilities + \
+                         annotators_per_sample_ranks[:, np.newaxis]
 
         # exclude not available annotators
         init_utilities[~A_cand] = np.nan
