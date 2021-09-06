@@ -80,7 +80,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
         pref_annotators_per_sample : int, array-like, optional (default=1)
-        array-like, shape (k), k <= n_samples
+        array-like, shape (k,), k <= n_samples
             If `pref_annotators_per_sample` is an int, the value indicates
             the number of annotators that are preferably assigned to a candidate
             sample, if annotators can still be assigned to the given candidate
