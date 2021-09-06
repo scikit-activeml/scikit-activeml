@@ -51,8 +51,8 @@ class BIQF(BudgetManager):
             provided if return_utilities is True.
         """
         utilities, return_budget_left, simulate = self.validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
 
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
@@ -82,8 +82,7 @@ class BIQF(BudgetManager):
             range_ranking = max_ranking - min_ranking
 
             acq_left = (
-                self.budget_ * tmp_observed_instances_
-                - tmp_queried_instances_
+                self.budget_ * tmp_observed_instances_ - tmp_queried_instances_
             )
             theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
             sample = u >= theta_bal
@@ -136,8 +135,8 @@ class BIQF(BudgetManager):
                 self.history_sorted_.extend(utilities)
             else:
                 raise ValueError(
-                    "The save_utilities variable has to be set to true, when" +
-                    " no utilities are passed to update"
+                    "The save_utilities variable has to be set to true, when"
+                    + " no utilities are passed to update"
                 )
 
         return self
@@ -166,8 +165,8 @@ class BIQF(BudgetManager):
         """
 
         utilities, return_budget_left, simulate = super()._validate_data(
-                utilities, return_budget_left, simulate
-            )
+            utilities, return_budget_left, simulate
+        )
         self._validate_w()
         self._validate_w_tol()
         self._validate_save_utilities()
@@ -177,10 +176,10 @@ class BIQF(BudgetManager):
     def _validate_w_tol(self):
         """Validate if w_tol is set as an int and greater than 0.
         """
-        if not (isinstance(self.w_tol, int) or isinstance(
-            self.w_tol, float)
-        ):
-            raise TypeError("{} is not a valid type for w_tol")
+        if not (isinstance(self.w_tol, int) or isinstance(self.w_tol, float)):
+            raise TypeError(
+                "{} is not a valid type for w_tol".format(type(self.w_tol))
+            )
         if self.w_tol <= 0:
             raise ValueError(
                 "The value of w_tol is incorrect."
@@ -191,7 +190,9 @@ class BIQF(BudgetManager):
         """Validate if w is set as an int and greater than 0.
         """
         if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
+            raise TypeError(
+                "{} is not a valid type for w".format(type(self.w))
+            )
         if self.w <= 0:
             raise ValueError(
                 "The value of w is incorrect." + " w must be greater than 0"
@@ -205,6 +206,5 @@ class BIQF(BudgetManager):
             if self.save_utilities and not hasattr(self, "utility_queue_"):
                 self.utility_queue_ = deque(maxlen=self.w)
         else:
-            raise TypeError(
-                "save_utilities is not a boolean."
-            )
+            raise TypeError("save_utilities is not a boolean.")
+

@@ -220,7 +220,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+                    raise ValueError("{} is not a valid Value for y".format(type(y)))
         else:
             self.clf_ = self.clf
 
@@ -228,7 +228,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """Validate if the prior is a float and greater than 0.
         """
         if not isinstance(self.prior, float) and not None:
-            raise TypeError("{} is not a valid type for prior")
+            raise TypeError("{} is not a valid type for prior".format(type(self.prior)))
         if self.prior <= 0:
             raise ValueError(
                 "The value of prior is incorrect."
@@ -240,7 +240,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if m_max is set
         if not isinstance(self.m_max, int):
-            raise TypeError("{} is not a valid type for m_max")
+            raise TypeError("{} is not a valid type for m_max".format(type(self.m_max)))
         if self.m_max <= 0:
             raise ValueError(
                 "The value of m_max is incorrect."
