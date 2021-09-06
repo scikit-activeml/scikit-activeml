@@ -49,20 +49,20 @@ class BIQF(BudgetManager):
         self.save_utilities = save_utilities
 
     def is_budget_left(self):
-    """Check whether there is any utility given to sample(...), which may
-        lead to sampling the corresponding instance, i.e., check if sampling
-        another instance is currently possible under the budgeting constraint.
-        This function is useful to determine, whether a provided
-        utility is not sufficient, or the budgeting constraint was simply
-        exhausted. For this budget manager this function returns True, when
-        budget > estimated_spending.
+        """Check whether there is any utility given to sample(...), which may
+            lead to sampling the corresponding instance, i.e., check if sampling
+            another instance is currently possible under the budgeting constraint.
+            This function is useful to determine, whether a provided
+            utility is not sufficient, or the budgeting constraint was simply
+            exhausted. For this budget manager this function returns True, when
+            budget > estimated_spending.
 
-        Returns
-        -------
-        budget_left : bool
-            True, if there is a utility which leads to sampling another
-            instance.
-    """
+            Returns
+            -------
+            budget_left : bool
+                True, if there is a utility which leads to sampling another
+                instance.
+        """
         return True
 
     def sample(
