@@ -156,7 +156,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         batch_size_sq = min(batch_size, X_cand_sq.shape[0])
 
         # check pref_annotators_per_sample and set pref_n_annotators
-        if type(pref_annotators_per_sample) in [int, np.int_]:
+        if isinstance(pref_annotators_per_sample, (int, np.int_)):
             check_scalar(pref_annotators_per_sample,
                          name='pref_annotators_per_sample',
                          target_type=int, min_val=1)
