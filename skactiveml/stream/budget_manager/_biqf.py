@@ -9,12 +9,12 @@ class BIQF(BudgetManager):
     """
     The Balanced Incremental Quantile Filter has been proposed together with
     Probabilistic Active Learning for Datastreams [1]. It assesses whether a given
-    spatial utility (i.e., obtained via McPAL) warrants to query the label in 
+    spatial utility (i.e., obtained via McPAL) warrants to query the label in
     question. The spatial ultilities are compared against a threshold that is
-    derived from a quantile (budget) of the last w observed utilities. To 
+    derived from a quantile (budget) of the last w observed utilities. To
     balance the number of queries, w_tol is used to increase or decrease the
     threshold based on the number of available acquisitions.
-    
+
     Parameters
     ----------
     w : int
@@ -31,14 +31,14 @@ class BIQF(BudgetManager):
 
     save_utilities : bool
         A flag that controls whether the utilities for previous queries should
-        be saved within the object. This flag affects whether the spatial 
+        be saved within the object. This flag affects whether the spatial
         utilities should be provided when using update.
-        
+
     References
     ----------
-    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active 
-        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M. 
-        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture 
+    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active
+        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M.
+        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture
         Notes in Computer Science, vol 9385. Springer, Cham.
     """
 
@@ -48,8 +48,8 @@ class BIQF(BudgetManager):
         self.w_tol = w_tol
         self.save_utilities = save_utilities
 
-    def is_budget_left(self):        
-    		"""Check whether there is any utility given to sample(...), which may
+    def is_budget_left(self):
+    """Check whether there is any utility given to sample(...), which may
         lead to sampling the corresponding instance, i.e., check if sampling
         another instance is currently possible under the budgeting constraint.
         This function is useful to determine, whether a provided
