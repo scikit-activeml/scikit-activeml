@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -14,13 +16,43 @@ from ...base import MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ...utils import is_labeled, check_scalar
 
 
-def get_bound(X, bound):
+def check_or_get_bound(X, bound):
+    """ Validates bound or returns the bounds of X if bound is None.
+    `bound` or `X` must not be None.
+
+    Parameters
+    ----------
+    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+        The given bound.
+    X : matrix-like, shape (n_samples, 2)
+        The sample matrix X is the feature matrix representing the samples.
+        The feature space must be two dimensional.
+    """
+    if X is not None:
+        X = check_array(X)
+        if X.shape[1] != 2:
+            raise ValueError(f"`X` along axis 1 must be of length two."
+                             f"`X` along axis 1 is of length {X.shape[1]}.")
     if bound is not None:
         bound = check_array(bound)
-        return bound
-    else:
+        if bound.shape != (2, 2):
+            raise ValueError(f"Shape of `bound` must be (2, 2)."
+                             f"Shape of `bound` is {bound.shape}.")
+
+    if bound is None and X is not None:
         return np.array([[min(X[:, 0]) - 0.5, min(X[:, 1]) - 0.5],
                          [max(X[:, 0]) + 0.5, max(X[:, 1]) + 0.5]])
+
+    elif bound is not None and X is not None:
+        x_min, y_min, x_max, y_max = np.ravel(bound)
+        if np.any(np.logical_or(x_min > X[:, 0], X[:, 0] > x_max,
+                                y_min > X[:, 1], X[:, 1] > y_max)):
+            warnings.warn("`X` contains values not within range of `bound`.")
+        return bound
+    elif bound is not None:
+        return bound
+    else:
+        raise TypeError("`X` or `bound` must be not None.")
 
 
 def check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
@@ -119,7 +151,7 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
         ma_qs_arg_dict = {}
     ma_qs_arg_dict.update({"X": X, "y": y})
 
-    bound = get_bound(X, bound)
+    bound = check_or_get_bound(X, bound)
 
     fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
                        ma_qs_arg_dict=ma_qs_arg_dict,
@@ -187,7 +219,7 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
     fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
                               fontsize=fontsize, n_annotators=n_annotators)
 
-    bound = get_bound(X, bound)
+    bound = check_or_get_bound(X, bound)
 
     check_scalar(plot_legend, 'plot_legend', bool)
 
@@ -300,7 +332,7 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     else:
         n_annotators = A_cand.shape[1]
 
-    bound = get_bound(X_cand, bound)
+    bound = check_or_get_bound(X_cand, bound)
     x_min, y_min, x_max, y_max = np.ravel(bound)
 
     fig = check_or_get_figure(fig, fig_size=fig_size, title=title,

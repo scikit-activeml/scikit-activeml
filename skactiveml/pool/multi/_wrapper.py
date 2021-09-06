@@ -214,7 +214,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         else:
             raise TypeError(
                 f"`A_perfs` is of type {type(A_perfs)}, but must be array like"
-                f"of type None"
+                f"or of type None"
             )
 
         val = self.strategy.query(X_cand_sq, *args, batch_size=batch_size_sq,
