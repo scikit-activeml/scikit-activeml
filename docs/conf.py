@@ -202,12 +202,11 @@ autodoc_default_options = {
 }
 
 generate_api_reference_rst(
-    os.path.abspath('api_reference.rst'),
     gen_path=os.path.abspath('generated')
 )
 
 examples_data = generate_examples(
-    os.path.abspath('generated'),
+    gen_path=os.path.abspath('generated'),
     package=pool,
     json_path=os.path.abspath('examples/pool'))
 

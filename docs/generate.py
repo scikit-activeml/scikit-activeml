@@ -10,17 +10,16 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-def generate_api_reference_rst(path, gen_path):
+def generate_api_reference_rst(gen_path):
     """Creates the api_reference.rst file in the specified gen_path.
 
     Parameters
     ----------
-    path : string
-        The gen_path in which the file should be created.
     gen_path : string
         The path of the main directory in which all generated files should be
         created.
     """
+    path = os.path.join(os.path.basename(gen_path), 'api_reference.rst')
     gen_path = os.path.join(os.path.basename(gen_path), 'api')
     os.makedirs(os.path.abspath(gen_path), exist_ok=True)
     with open(path, 'w') as file:
@@ -41,7 +40,7 @@ def generate_api_reference_rst(path, gen_path):
         file.write('\n')
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
-        file.write(f'   :toctree: {gen_path}\n')
+        file.write('   :toctree: api\n')
         file.write('   :template: class.rst\n')
         file.write('\n')
         for item in pool.__all__:
@@ -55,7 +54,7 @@ def generate_api_reference_rst(path, gen_path):
         file.write('.. autosummary::\n')
         # file.write('   :nosignatures:\n')
         file.write('   :recursive:\n')
-        file.write(f'   :toctree: {gen_path}\n')
+        file.write('   :toctree: api\n')
         file.write('   :template: class.rst\n')
         file.write('\n')
         for item in classifier.__all__:
@@ -67,7 +66,7 @@ def generate_api_reference_rst(path, gen_path):
         file.write('\n')
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
-        file.write(f'   :toctree: {gen_path}\n')
+        file.write('   :toctree: api\n')
         file.write('   :template: base.rst\n')
         file.write('\n')
         for item in utils.__all__:
@@ -103,7 +102,7 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
 
     # Generate file
     with open(
-            os.path.join(gen_path, 'strategy_summary', 'strategy_summary.rst'),
+            os.path.join(gen_path, 'strategy_summary.rst'),
             'w') as file:
         file.write('Strategy Summary\n')
         file.write('================\n')
@@ -116,7 +115,7 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
         file.write('   :maxdepth: 1\n')
         file.write('\n')
         for tab in data.keys():
-            file.write(f'   strategy_summary-{tab.replace(" ", "_")}\n')
+            file.write(f'   strategy_summary/strategy_summary-{tab.replace(" ", "_")}\n')
 
     # Iterate over the tabs.
     for tab, cats in data.items():
@@ -336,6 +335,8 @@ def generate_examples(gen_path, package, json_path):
     additional_data = {}
     # iterate over jason example files
     for filename in os.listdir(json_path):
+        if filename not in ["_uncertainty.json", "_alce.json"]:
+            continue
         with open(os.path.join(json_path, filename)) as file:
             # iterate over the examples in the json file
             for data in json.load(file):
@@ -343,12 +344,14 @@ def generate_examples(gen_path, package, json_path):
                 # add the data to the 'examples_data' variable
                 # needed to create the strategy summary
                 if "method" in data.keys():
-                    plot_filename += "_" + data["method"]
                     method = data['method']
                 else:
                     method = 'default'
+                plot_filename += "_" + method
+
                 if not data['class'] in additional_data.keys():
                     additional_data[data['class']] = []
+
                 if 'categories' in data.keys():
                     additional_data[data['class']].append(
                         [method, data['refs'], data['categories']])

@@ -7,9 +7,9 @@ Contents:
    :maxdepth: 2
 
    developers_guide
-   api_reference
-   generated/strategy_summary/strategy_summary
-   examples
+   generated/api_reference
+   generated/strategy_summary
+   generated/examples/pool/README
 
 
 Indices and tables
