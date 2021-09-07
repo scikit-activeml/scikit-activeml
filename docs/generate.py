@@ -37,8 +37,8 @@ def generate_api_reference_rst(gen_path):
         file.write('.. module:: skactiveml\n')
         file.write('\n')
 
-        file.write('Pool:\n')
-        file.write('-----\n')
+        file.write('Pool\n')
+        file.write('----\n')
         file.write('\n')
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
@@ -50,8 +50,8 @@ def generate_api_reference_rst(gen_path):
         file.write('\n')
         # TODO stream
 
-        file.write('Classifier:\n')
-        file.write('-----------\n')
+        file.write('Classifier\n')
+        file.write('----------\n')
         file.write('\n')
         file.write('.. autosummary::\n')
         # file.write('   :nosignatures:\n')
@@ -63,8 +63,8 @@ def generate_api_reference_rst(gen_path):
             file.write(f'   classifier.{item}\n')
         file.write('\n')
 
-        file.write('Utils:\n')
-        file.write('------\n')
+        file.write('Utils\n')
+        file.write('-----\n')
         file.write('\n')
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
@@ -117,7 +117,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
                    'different papers.\n')
         file.write('\n')
         file.write('.. toctree::\n')
-        file.write('   :maxdepth: 1\n')
+        #file.write('   :maxdepth: 1\n')
         file.write('\n')
         for tab in data.keys():
             file.write(f'   strategy_overview/strategy_overview-{tab}\n')
@@ -129,11 +129,9 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
                             'strategy_overview',
                             f'strategy_overview-{tab}.rst')
         with open(path, 'w') as file:
-            title = f'By {author}\n'
+            title = f'Strategy Overview By {author}\n'
             file.write(title)
             file.write(''.ljust(len(title) + 1, '=') + '\n')
-            file.write('\n')
-            file.write('.. toctree::\n')
             file.write('\n')
             file.write(f'This is a overview of all implemented AL strategies. '
                        f'The strategies are categorized, according to '
@@ -148,8 +146,8 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
                                  f'<strategy_overview-{t}>`,\n'
             file.write(links_str[0:-2] + '\n')
             file.write('\n')
-            file.write('Pool Strategies:\n')
-            file.write('----------------\n')
+            file.write('Pool Strategies\n')
+            file.write('---------------\n')
             file.write('\n')
 
             # Iterate over the categories in the current tab.
@@ -333,9 +331,9 @@ def generate_examples(gen_path, package, json_path):
         file.write('Example Gallery\n')
         file.write('===============')
     with open(os.path.join(dir_path_package, 'README.rst'), 'w') as file:
-        title = f'{package.__name__.split(".")[1]} Example Gallery'.title()
+        title = f'{package.__name__.split(".")[1]} based Examples'.title()
         file.write(title + '\n')
-        file.write(''.ljust(len(title), '='))
+        file.write(''.ljust(len(title), '-'))
 
     additional_data = {}
     # iterate over jason example files

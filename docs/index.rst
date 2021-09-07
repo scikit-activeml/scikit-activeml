@@ -9,7 +9,7 @@ Contents:
    developers_guide
    generated/api_reference
    generated/strategy_overview
-   generated/examples/pool/README
+   generated/sphinx_gallery_examples/index
 
 
 Indices and tables
