@@ -8,7 +8,7 @@ Contents:
 
    developers_guide
    generated/api_reference
-   generated/strategy_summary
+   generated/strategy_overview
    generated/examples/pool/README
 
 

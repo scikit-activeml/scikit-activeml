@@ -192,7 +192,7 @@ intersphinx_mapping = {
 todo_include_todos = True
 
 # -- Generate rst files ------------------------------------------------------
-from docs.generate import generate_strategy_summary_rst, \
+from docs.generate import generate_strategy_overview_rst, \
     generate_api_reference_rst, generate_examples
 
 autodoc_default_options = {
@@ -210,7 +210,7 @@ examples_data = generate_examples(
     package=pool,
     json_path=os.path.abspath('examples/pool'))
 
-generate_strategy_summary_rst(
+generate_strategy_overview_rst(
     gen_path=os.path.abspath('generated'),
     examples_data=examples_data
 )

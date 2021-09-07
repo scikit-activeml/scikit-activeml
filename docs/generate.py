@@ -75,8 +75,8 @@ def generate_api_reference_rst(gen_path):
         file.write('\n')
 
 
-def generate_strategy_summary_rst(gen_path, examples_data={}):
-    """Creates the strategy_summary.rst file in the specified path.
+def generate_strategy_overview_rst(gen_path, examples_data={}):
+    """Creates the strategy_overview.rst file in the specified path.
     
     Parameters
     ----------
@@ -84,7 +84,7 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
         The path of the main directory in which all generated files should be
         created.
     examples_data : dict
-        The additional data, needed to create the strategy summary. Shape:
+        The additional data, needed to create the strategy overview. Shape:
         {'strategy_1' : [
             ['method_1', ['reference_1', ...], {'tab_1': 'category', ...}],
             ['method_2', ...],
@@ -98,14 +98,14 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
     data = get_table_data(pool, examples_data, api_path)
 
     # create directory if it does not exist.
-    os.makedirs(os.path.join(gen_path, 'strategy_summary'), exist_ok=True)
+    os.makedirs(os.path.join(gen_path, 'strategy_overview'), exist_ok=True)
 
     # Generate file
     with open(
-            os.path.join(gen_path, 'strategy_summary.rst'),
+            os.path.join(gen_path, 'strategy_overview.rst'),
             'w') as file:
-        file.write('Strategy Summary\n')
-        file.write('================\n')
+        file.write('Strategy Overview\n')
+        file.write('=================\n')
         file.write('\n')
         file.write('In the following you\'ll find summaries of all implemented'
                    ' "Query Strategies", based on the categorization of '
@@ -115,23 +115,23 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
         file.write('   :maxdepth: 1\n')
         file.write('\n')
         for tab in data.keys():
-            file.write(f'   strategy_summary/strategy_summary-{tab.replace(" ", "_")}\n')
+            file.write(f'   strategy_overview/strategy_overview-{tab.replace(" ", "_")}\n')
 
     # Iterate over the tabs.
     for tab, cats in data.items():
         tab_space = tab.replace('_', ' ')
         tab_ul = tab.replace(' ', '_')
         path = os.path.join(gen_path,
-                            'strategy_summary',
-                            f'strategy_summary-{tab_ul}.rst')
+                            'strategy_overview',
+                            f'strategy_overview-{tab_ul}.rst')
         with open(path, 'w') as file:
-            title = f'Strategy Summary according to {tab_space}\n'
+            title = f'By {tab_space}\n'
             file.write(title)
             file.write(''.ljust(len(title) + 1, '=') + '\n')
             file.write('\n')
             file.write('.. toctree::\n')
             file.write('\n')
-            file.write(f'This is a summary of all implemented AL strategies. '
+            file.write(f'This is a overview of all implemented AL strategies. '
                        f'The strategies are categorized, according to "'
                        f'{tab_space}". To categorize them by a different paper'
                        f', use the links below.\n')
@@ -142,7 +142,7 @@ def generate_strategy_summary_rst(gen_path, examples_data={}):
                 t_ul = t.replace(' ', '_')
                 if t != tab:
                     links_str += f':doc:`{t_space} ' \
-                                 f'<strategy_summary-{t_ul}>`,\n'
+                                 f'<strategy_overview-{t_ul}>`,\n'
             file.write(links_str[0:-2] + '\n')
             file.write('\n')
             file.write('Pool Strategies:\n')
@@ -208,14 +208,14 @@ def table_from_array(a, title='', widths=None, header_rows=0, indent=0):
 
 
 def get_table_data(package, additional_data, rel_api_path):
-    """Creates a np.array holding the data for the strategy summary.
+    """Creates a np.array holding the data for the strategy overview.
 
     Parameters
     ----------
     package : module
         The '__init__' module of the package from which to get the data.
     additional_data : dict
-        The additional data, needed to create the strategy summary. Shape:
+        The additional data, needed to create the strategy overview. Shape:
         {'strategy_1' : [
             ['method_1', ['reference_1', ...], {'tab_1': 'category', ...}],
             ['method_2', ...],
@@ -229,7 +229,7 @@ def get_table_data(package, additional_data, rel_api_path):
 
     Returns
     -------
-    np.array : Holds the data for the strategy summary, including the
+    np.array : Holds the data for the strategy overview, including the
         header row(Strategy | Method | Reference).
 
     """
@@ -267,6 +267,8 @@ def get_table_data(package, additional_data, rel_api_path):
                 for tab, cats in tabs.items():
                     if tab in additional_data[qs_name][m][2].keys():
                         cat = additional_data[qs_name][m][2][tab]
+                        if cat == '':
+                            cat = 'Others'
                         if cat not in cats.keys():
                             tabs[tab][cat] = np.array([head_line])
                     else:
@@ -291,7 +293,7 @@ def get_table_data(package, additional_data, rel_api_path):
 def generate_examples(gen_path, package, json_path):
     """
     Creates all example scripts for the specified package and returns the data
-    needed to create the strategy summary.
+    needed to create the strategy overview.
 
     Parameters
     ----------
@@ -307,7 +309,7 @@ def generate_examples(gen_path, package, json_path):
 
     Returns
     -------
-    dict : Holds the data needed to create the strategy summary. Shape:
+    dict : Holds the data needed to create the strategy overview. Shape:
         {'strategy_1' : [
             ['method_1', ['reference_1', ...], {'tab_1': 'category', ...}],
             ['method_2', ...],
@@ -342,7 +344,7 @@ def generate_examples(gen_path, package, json_path):
             for data in json.load(file):
                 plot_filename = 'plot_' + data["class"]
                 # add the data to the 'examples_data' variable
-                # needed to create the strategy summary
+                # needed to create the strategy overview
                 if "method" in data.keys():
                     method = data['method']
                 else:
