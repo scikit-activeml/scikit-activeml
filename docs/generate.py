@@ -1,6 +1,8 @@
 import inspect
 import json
 import os
+from pybtex.database import parse_file
+
 
 import numpy as np
 
@@ -93,6 +95,9 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
         ...
         }
     """
+    # Load bibtex database.
+    bib_data = parse_file('refs.bib')
+
     # Generate an array which contains the data for the tables. TODO stream
     api_path = os.path.join(os.path.basename(gen_path), 'api').replace('\\', '/')
     data = get_table_data(pool, examples_data, api_path)
@@ -115,34 +120,32 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
         file.write('   :maxdepth: 1\n')
         file.write('\n')
         for tab in data.keys():
-            file.write(f'   strategy_overview/strategy_overview-{tab.replace(" ", "_")}\n')
+            file.write(f'   strategy_overview/strategy_overview-{tab}\n')
 
     # Iterate over the tabs.
     for tab, cats in data.items():
-        tab_space = tab.replace('_', ' ')
-        tab_ul = tab.replace(' ', '_')
+        author = bib_data.entries[tab].persons["author"][0].last_names[0]
         path = os.path.join(gen_path,
                             'strategy_overview',
-                            f'strategy_overview-{tab_ul}.rst')
+                            f'strategy_overview-{tab}.rst')
         with open(path, 'w') as file:
-            title = f'By {tab_space}\n'
+            title = f'By {author}\n'
             file.write(title)
             file.write(''.ljust(len(title) + 1, '=') + '\n')
             file.write('\n')
             file.write('.. toctree::\n')
             file.write('\n')
             file.write(f'This is a overview of all implemented AL strategies. '
-                       f'The strategies are categorized, according to "'
-                       f'{tab_space}". To categorize them by a different paper'
-                       f', use the links below.\n')
+                       f'The strategies are categorized, according to '
+                       f':footcite:t:`{tab}`. To categorize them by a different'
+                       f' paper, use the links below.\n')
             file.write('\n')
             links_str = ''
             for t in data.keys():
-                t_space = t.replace('_', ' ')
-                t_ul = t.replace(' ', '_')
                 if t != tab:
-                    links_str += f':doc:`{t_space} ' \
-                                 f'<strategy_overview-{t_ul}>`,\n'
+                    a = bib_data.entries[tab].persons["author"][0].last_names[0]
+                    links_str += f':doc:`{a} ' \
+                                 f'<strategy_overview-{t}>`,\n'
             file.write(links_str[0:-2] + '\n')
             file.write('\n')
             file.write('Pool Strategies:\n')
@@ -337,7 +340,7 @@ def generate_examples(gen_path, package, json_path):
     additional_data = {}
     # iterate over jason example files
     for filename in os.listdir(json_path):
-        if filename not in ["_uncertainty.json", "_alce.json"]:
+        if filename not in ["_alce.json"]:
             continue
         with open(os.path.join(json_path, filename)) as file:
             # iterate over the examples in the json file
