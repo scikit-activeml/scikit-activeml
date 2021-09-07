@@ -338,8 +338,6 @@ def generate_examples(gen_path, package, json_path):
     additional_data = {}
     # iterate over jason example files
     for filename in os.listdir(json_path):
-        if filename not in ["_alce.json"]:
-            continue
         with open(os.path.join(json_path, filename)) as file:
             # iterate over the examples in the json file
             for data in json.load(file):
