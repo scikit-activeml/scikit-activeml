@@ -6,6 +6,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   notebooks/getting_started
    developers_guide
    generated/api_reference
    generated/strategy_overview
