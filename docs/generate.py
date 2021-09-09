@@ -6,7 +6,8 @@ from pybtex.database import parse_file
 
 import numpy as np
 
-from skactiveml import pool, classifier, utils  # , stream TODO stream
+from skactiveml import pool, classifier, utils, \
+    visualization  # , stream TODO stream
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -74,6 +75,18 @@ def generate_api_reference_rst(gen_path):
         for item in utils.__all__:
             if item == 'MISSING_LABEL': continue
             file.write(f'   utils.{item}\n')
+        file.write('\n')
+
+        file.write('Visualization\n')
+        file.write('-------------\n')
+        file.write('\n')
+        file.write('.. autosummary::\n')
+        file.write('   :nosignatures:\n')
+        file.write('   :toctree: api\n')
+        file.write('   :template: base.rst\n')
+        file.write('\n')
+        for item in visualization.__all__:
+            file.write(f'   visualization.{item}\n')
         file.write('\n')
 
 
@@ -537,6 +550,7 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += 'import numpy as np\n'
     block_str += 'from matplotlib import pyplot as plt, animation\n'
     block_str += 'from sklearn.datasets import make_classification\n'
+    block_str += 'from sklearn.exceptions import NotFittedError\n'
     # Decide which classifier to use, if clf is None.
     if clf is None:
         if 'clf' not in init_params.keys():
@@ -545,11 +559,12 @@ def format_plot(qs, init_params, query_params, clf=None):
         else:
             clf = init_params['clf']
             init_params['clf'] = 'clf'
-    block_str += 'from skactiveml.utils import MISSING_LABEL, is_unlabeled, ' \
-                 'plot_2d_dataset\n'  # TODO use the new plotting function
+    block_str += 'from skactiveml.utils import MISSING_LABEL, is_unlabeled\n'
+    block_str += 'from skactiveml.visualization import plot_utility, ' \
+                 'plot_decision_boundary\n'
 
     block_str += '\n'
-    block_str += 'random_state = 0\n'
+    block_str += 'random_state = np.random.RandomState(0)\n'
     block_str += '\n'
     block_str += '# Build a dataset.\n'
     block_str += 'X, y_true = make_classification(n_features=2, ' \
@@ -572,6 +587,11 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'\n'
     block_str += f'# Preparation for plotting.\n'
     block_str += f'fig, ax = plt.subplots()\n'
+    block_str += f'x1_min = min(X[:, 0])\n'
+    block_str += f'x1_max = max(X[:, 0])\n'
+    block_str += f'x2_min = min(X[:, 1])\n'
+    block_str += f'x2_max = max(X[:, 1])\n'
+    block_str += f'bound = [[x1_min, x2_min], [x1_max, x2_max]]\n'
     block_str += f'artists = []\n'
     block_str += f'\n'
     block_str += f'# The active learning cycle:\n'
@@ -580,6 +600,7 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'    # Set X_cand to the unlabeled instances.\n'
     block_str += f'    unlbld_idx = np.where(is_unlabeled(y))[0]\n'
     block_str += f'    X_cand = X[unlbld_idx]\n'
+    block_str += f'\n'
     # Call the query method with the expected parameters.
     query_params_str = ''
     if 'X' in inspect.signature(qs.query).parameters:
@@ -593,14 +614,33 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'    # Query the next instance/s.\n'
     block_str += f'    query_idx = unlbld_idx[qs.query(X_cand' \
                  f'{query_params_str})]\n'
+    block_str += f'\n'
     block_str += f'    # Plot the labeled data.\n'
-    block_str += f'    collections = np.array(ax.collections)\n'
-    block_str += f'    coll = plot_2d_dataset(X, y, y_true, clf, ' \
-                 f'qs, ax)\n'
-    block_str += f'    artists.append([x for x in coll if (x not ' \
-                 f'in collections)])\n'
+    block_str += f'    coll_old = list(ax.collections)\n'
+    block_str += f'    title = ax.text(\n'
+    block_str += '        0.5, 1.05, f"Decision boundry after acquring {c} ' \
+                 'labels",\n'
+    block_str += f'        size=plt.rcParams["axes.titlesize"], ha="center",\n'
+    block_str += f'        transform=ax.transAxes\n'
+    block_str += f'    )\n'
+    block_str += '    ax = plot_utility(qs, {"X": X, "y": y}, ' \
+                 'bound=bound, ax=ax)\n'
+    block_str += f'    ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", ' \
+                 f'marker=".")\n'
+    block_str += f'    ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r",' \
+                 f' alpha=.9, marker=".")\n'
+    block_str += f'    try:\n'
+    block_str += f'        ax = plot_decision_boundary(clf, bound, ax=ax)\n'
+    block_str += f'    except NotFittedError:\n'
+    block_str += f'        pass\n'
+    block_str += f'    coll_new = list(ax.collections)\n'
+    block_str += f'    coll_new.append(title)\n'
+    block_str += f'    artists.append([x for x in coll_new if ' \
+                 f'(x not in coll_old)])\n'
+    block_str += f'\n'
     block_str += f'    # Label the queried instances.\n'
     block_str += f'    y[query_idx] = y_true[query_idx]\n'
+    block_str += f'\n'
     block_str += f'    # Fit the classifier.\n'
     block_str += f'    clf.fit(X, y)\n'
     block_str += f'\n'

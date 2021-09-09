@@ -10,7 +10,6 @@ from ._validation import check_classes, check_missing_label, check_scalar, \
     check_cost_matrix, check_classifier_params, check_X_y, MISSING_LABEL, \
     check_random_state, check_class_prior
 
-from ._visualization import plot_2d_dataset  # TODO remove after merging 'docs_getting_started' branch
 
 __all__ = ['rand_argmax', 'rand_argmin', 'compute_vote_vectors',
            'is_unlabeled', 'is_labeled', 'ExtLabelEncoder', 'check_classes',

@@ -34,6 +34,10 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
     confidence_dict: dict, optional (default=None)
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
+
+    Returns
+    -------
+    matplotlib.axes.Axes: The axis on which the boundary was plotted.
     """
 
     # TODO: extend to multiclass, add parameter confidence [0,1] evtl. [0,0.5], or None
@@ -76,6 +80,8 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
     ax.contour(X_mesh, Y_mesh, posteriors, [.25, .75], cmap=cmap,
                **confidence_args)
 
+    return ax
+
 
 def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
                  contour_dict=None):
@@ -94,9 +100,13 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
     res: int, optional (default=21)
         The resolution of the plot.
     ax: matplotlib.axes.Axes, optional (default=None)
-        The axis on which the boundary is plotted.
+        The axis on which the utility is plotted.
     contour_dict: dict, optional (default=None)
         Additional parameters for the utility contour.
+
+    Returns
+    -------
+    matplotlib.axes.Axes: The axis on which the utility was plotted.
     """
 
     # TODO: dict for contourf
@@ -148,3 +158,5 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
         neighbors.fit(X_cand, utilities)
         scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
         ax.contourf(X_mesh, Y_mesh, scores, **contour_args)
+
+    return ax
