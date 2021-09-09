@@ -341,16 +341,18 @@ def generate_examples(gen_path, package, json_path):
 
     # create README.rst files needed for 'sphinx-gallery'
     with open(os.path.join(gen_path, 'examples', 'README.rst'), 'w') as file:
-        file.write('Example Gallery\n')
-        file.write('===============')
+        file.write('Examples\n')
+        file.write('========')
     with open(os.path.join(dir_path_package, 'README.rst'), 'w') as file:
-        title = f'{package.__name__.split(".")[1]} based Examples'.title()
+        title = f'{package.__name__.split(".")[1]} based'.title()
         file.write(title + '\n')
         file.write(''.ljust(len(title), '-'))
 
     additional_data = {}
     # iterate over jason example files
     for filename in os.listdir(json_path):
+        if filename not in ["_alce.json"]:
+            continue
         with open(os.path.join(json_path, filename)) as file:
             # iterate over the examples in the json file
             for data in json.load(file):
@@ -602,18 +604,18 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'    X_cand = X[unlbld_idx]\n'
     block_str += f'\n'
     # Call the query method with the expected parameters.
-    query_params_str = ''
-    if 'X' in inspect.signature(qs.query).parameters:
-        query_params_str += ', X'
-    if 'y' in inspect.signature(qs.query).parameters:
-        query_params_str += ', y'
+    if 'X' not in query_params.keys() and \
+            'X' in inspect.signature(qs.query).parameters:
+        query_params['X'] = 'X'
+    if 'y' not in query_params.keys() and \
+            'y' in inspect.signature(qs.query).parameters:
+        query_params['y'] = 'y'
     params = dict_to_str(query_params)
-    if query_params_str != '' and params != '':
-        query_params_str += ', '
-    query_params_str += params
+    if len(params) > 0:
+        params = ', ' + params
     block_str += f'    # Query the next instance/s.\n'
     block_str += f'    query_idx = unlbld_idx[qs.query(X_cand' \
-                 f'{query_params_str})]\n'
+                 f'{params})]\n'
     block_str += f'\n'
     block_str += f'    # Plot the labeled data.\n'
     block_str += f'    coll_old = list(ax.collections)\n'
@@ -623,8 +625,12 @@ def format_plot(qs, init_params, query_params, clf=None):
     block_str += f'        size=plt.rcParams["axes.titlesize"], ha="center",\n'
     block_str += f'        transform=ax.transAxes\n'
     block_str += f'    )\n'
-    block_str += '    ax = plot_utility(qs, {"X": X, "y": y}, ' \
-                 'bound=bound, ax=ax)\n'
+    t = ""
+    for k, v in query_params.items():
+        t += "'" + k + "': " + v + ", "
+    t = t[:-2]
+    block_str += f'    ax = plot_utility(qs, {{{t}}}, ' \
+                 f'bound=bound, ax=ax)\n'
     block_str += f'    ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", ' \
                  f'marker=".")\n'
     block_str += f'    ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r",' \

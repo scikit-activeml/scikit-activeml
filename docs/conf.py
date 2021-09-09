@@ -100,6 +100,7 @@ autosummary_generate = True
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
     'run_stale_examples': False,
+    'line_numbers': True,
 
     # path to your example scripts
     'examples_dirs': os.path.normpath('generated/examples'),
@@ -138,7 +139,17 @@ html_logo = 'logos/scikit-activeml-logo.png'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    "github_url": "https://github.com/scikit-activeml/scikit-activeml",
+    "icon_links": [
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/scikit-activeml",
+            "icon": "fas fa-box",
+        }
+    ],
+    "icon_links_label": "Quick Links"
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -198,7 +209,8 @@ from docs.generate import generate_strategy_overview_rst, \
 autodoc_default_options = {
     'members': True,
     'undoc-members': True,
-    'show-inheritance': True
+    'show-inheritance': True,
+    'inherited-members': True
 }
 
 generate_api_reference_rst(

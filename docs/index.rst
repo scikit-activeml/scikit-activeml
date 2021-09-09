@@ -7,10 +7,10 @@ Contents:
    :maxdepth: 2
 
    notebooks/getting_started
-   developers_guide
-   generated/api_reference
    generated/strategy_overview
+   generated/api_reference
    generated/sphinx_gallery_examples/index
+   developers_guide
 
 
 Indices and tables
