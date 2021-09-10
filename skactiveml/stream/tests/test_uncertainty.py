@@ -92,7 +92,7 @@ class TestUncertainty(unittest.TestCase):
         # length to y
         query_strategy = query_strategy_name(self.clf)
         self.assertRaises(
-            ValueError, query_strategy.query, X_cand=self.X_cand, X=1, y=self.y
+            TypeError, query_strategy.query, X_cand=self.X_cand, X=1, y=self.y
         )
         self.assertRaises(
             ValueError,
