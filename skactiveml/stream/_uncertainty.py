@@ -620,8 +620,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         self : VariableUncertainty
             The VariableUncertainty returns itself, after it is updated.
         """
-        # Check the shape of data
-        X_cand = check_array(X_cand, force_all_finite=False)
         # Check if a budget_manager is set
         self._validate_budget_manager()
         # Check if a random state is set

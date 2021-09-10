@@ -147,8 +147,9 @@ class TestStream(unittest.TestCase):
                 x_t.reshape([1, -1]), sampled, X=X_train, y=y_train
             )
 
-            if ((len(sampled_indices_1) != len(sampled_indices_2))
-               or (utilities_1[0] != utilities_2[0])):
+            if (len(sampled_indices_1) != len(sampled_indices_2)) or (
+                utilities_1[0] != utilities_2[0]
+            ):
                 print("query_strategy_class", query_strategy_class)
                 print("t", t)
 
@@ -163,3 +164,8 @@ class TestStream(unittest.TestCase):
             if len(sampled_indices_1):
                 X_train.append(x_t)
                 y_train.append(y_t)
+
+        query_strategy_update = query_strategy_class(random_state=qs_rand_seed)
+        query_strategy_update.update(
+            X_cand=np.array([]).reshape([0, 2]), sampled=np.array([])
+        )
