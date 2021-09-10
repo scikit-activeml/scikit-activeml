@@ -11,6 +11,40 @@ from .budget_manager import BIQF
 
 
 class PAL(SingleAnnotStreamBasedQueryStrategy):
+    '''Probabilistic Active Learning (PAL) in Datastreams is an extension to
+    Multi-Class Probabilistic Active Learning (see pool.McPAL). It assesses
+    MCPAL spatial to assess the spatial utility. The Balanced Incremental
+    Quantile Filter (BIQF), that is implemented within the default
+    budget_manager, is used to evaluate the temporal utility
+    (see stream.budget_manager.BIQF).
+
+    Parameters
+    ----------
+    clf : BaseEstimator
+        The classifier which is trained using this query startegy.
+
+    budget_manager : BudgetManager
+        The BudgetManager which models the budgeting constraint used in
+        the stream-based active learning setting. The budget attribute set for
+        the budget_manager will be used to determine the probability to sample
+        instances
+
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+
+    prior : float
+        The prior value that is passed onto McPAL (see pool.McPAL).
+
+    m_max : float
+        The m_max value that is passed onto McPAL (see pool.McPAL).
+        
+    References
+    ----------
+    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active 
+        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M. 
+        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture 
+        Notes in Computer Science, vol 9385. Springer, Cham.
+    '''
     def __init__(
         self,
         clf=None,
@@ -38,7 +72,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can set, so that the query strategy
+        the final sampling, simulate=True can be set, so that the query strategy
         can be updated later with update(...) with the final sampling. This is
         especially helpful, when developing wrapper query strategies.
 
@@ -193,7 +227,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y")
+                    raise ValueError("{} is not a valid Value for y".format(type(y)))
         else:
             self.clf_ = self.clf
 
@@ -201,7 +235,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """Validate if the prior is a float and greater than 0.
         """
         if not isinstance(self.prior, float) and not None:
-            raise TypeError("{} is not a valid type for prior")
+            raise TypeError("{} is not a valid type for prior".format(type(self.prior)))
         if self.prior <= 0:
             raise ValueError(
                 "The value of prior is incorrect."
@@ -213,7 +247,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if m_max is set
         if not isinstance(self.m_max, int):
-            raise TypeError("{} is not a valid type for m_max")
+            raise TypeError("{} is not a valid type for m_max".format(type(self.m_max)))
         if self.m_max <= 0:
             raise ValueError(
                 "The value of m_max is incorrect."

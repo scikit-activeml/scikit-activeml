@@ -224,7 +224,11 @@ class FixedUncertaintyBudget(EstimatedBudget):
         """Validate if num_classes is an integer and greater than 0.
         """
         if not isinstance(self.num_classes, int):
-            raise TypeError("{} is not a valid type for num_classes")
+            raise TypeError(
+                "{} is not a valid type for num_classes".format(
+                    type(self.num_classes)
+                )
+            )
         if self.num_classes <= 0:
             raise ValueError(
                 "The value of num_classes is incorrect."
@@ -235,7 +239,9 @@ class FixedUncertaintyBudget(EstimatedBudget):
         """Validate if w is an integer and greater than 0.
         """
         if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
+            raise TypeError(
+                "{} is not a valid type for w".format(type(self.w))
+            )
         if self.w <= 0:
             raise ValueError(
                 "The value of w is incorrect." + " w must be greater than 0"
@@ -420,14 +426,18 @@ class VarUncertaintyBudget(EstimatedBudget):
         """Validate if theta is set as a float.
         """
         if not isinstance(self.theta, float):
-            raise TypeError("{} is not a valid type for theta")
+            raise TypeError(
+                "{} is not a valid type for theta".format(type(self.theta))
+            )
 
     def _validate_s(self):
         """Validate if s a float and in range (0,1].
         """
         if self.s is not None:
             if not isinstance(self.s, float):
-                raise TypeError("{} is not a valid type for s")
+                raise TypeError(
+                    "{} is not a valid type for s".format(type(self.s))
+                )
             if self.s <= 0 or self.s > 1.0:
                 raise ValueError(
                     "The value of s is incorrect."
@@ -438,7 +448,9 @@ class VarUncertaintyBudget(EstimatedBudget):
         """Validate if w is an integer and greater than 0.
         """
         if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
+            raise TypeError(
+                "{} is not a valid type for w".format(type(self.w))
+            )
         if self.w <= 0:
             raise ValueError(
                 "The value of w is incorrect." + " w must be greater than 0"
@@ -646,14 +658,18 @@ class SplitBudget(EstimatedBudget):
         """Validate if theta is set as a float.
         """
         if not isinstance(self.theta, float):
-            raise TypeError("{} is not a valid type for theta")
+            raise TypeError(
+                "{} is not a valid type for theta".format(type(self.theta))
+            )
 
     def _validate_s(self):
         """Validate if s a float and in range (0,1].
         """
         if self.s is not None:
             if not isinstance(self.s, float):
-                raise TypeError("{} is not a valid type for s")
+                raise TypeError(
+                    "{} is not a valid type for s".format(type(self.s))
+                )
             if self.s <= 0 or self.s > 1.0:
                 raise ValueError(
                     "The value of s is incorrect."
@@ -664,7 +680,9 @@ class SplitBudget(EstimatedBudget):
         """Validate if v is a float and in range (0,1].
         """
         if not isinstance(self.v, float):
-            raise TypeError("{} is not a valid type for v")
+            raise TypeError(
+                "{} is not a valid type for v".format(type(self.v))
+            )
         if self.v <= 0 or self.v >= 1:
             raise ValueError(
                 "The value of v is incorrect."
@@ -675,7 +693,9 @@ class SplitBudget(EstimatedBudget):
         """Validate if w an integer and greater than 0.
         """
         if not isinstance(self.w, int):
-            raise TypeError("{} is not a valid type for w")
+            raise TypeError(
+                "{} is not a valid type for w".format(type(self.w))
+            )
         if self.w <= 0:
             raise ValueError(
                 "The value of w is incorrect." + " w must be greater than 0"
