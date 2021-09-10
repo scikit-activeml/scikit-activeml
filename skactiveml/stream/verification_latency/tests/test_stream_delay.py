@@ -220,17 +220,17 @@ class TestStreamDelay(unittest.TestCase):
                 x_t.reshape([1, -1]), sampled, X=X_train, y=y_train
             )
 
-            if (len(sampled_indices_1) != len(sampled_indices_2)) or (
-                utilities_1[0] != utilities_2[0]
-            ):
-                print("query_strategy_class", query_strategy_class)
-                print("t", t)
+            # if (len(sampled_indices_1) != len(sampled_indices_2)) or (
+            #     utilities_1[0] != utilities_2[0]
+            # ):
+            #     print("query_strategy_class", query_strategy_class)
+            #     print("t", t)
 
-                print("sampled_indices_1", sampled_indices_1)
-                print("utilities_1", utilities_1)
+            #     print("sampled_indices_1", sampled_indices_1)
+            #     print("utilities_1", utilities_1)
 
-                print("sampled_indices_2", sampled_indices_2)
-                print("utilities_2", utilities_2)
+            #     print("sampled_indices_2", sampled_indices_2)
+            #     print("utilities_2", utilities_2)
             self.assertEqual(utilities_1[0], utilities_2[0])
             self.assertEqual(len(sampled_indices_1), len(sampled_indices_2))
 
