@@ -30,8 +30,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     Parameters
     ----------
     estimator : sklearn.base.ClassifierMixin with 'predict_proba' method
-        annot_prior scikit-learn classifier that is to deal with missing
-        labels.
+        scikit-learn classifier that is to deal with missing labels.
     classes : array-like, shape (n_classes), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -262,9 +261,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return self
 
     def __getattr__(self, item):
-        if item in self.__dict__:
-            return getattr(self, item)
-        elif 'estimator_' in self.__dict__:
+        if 'estimator_' in self.__dict__:
             return getattr(self.estimator_, item)
         else:
             return getattr(self.estimator, item)

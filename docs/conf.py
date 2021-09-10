@@ -24,9 +24,9 @@ copyright = '2020'
 author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergardt, Christoph Sandrock'
 
 # The short X.Y version
-version = '1.0'
+version = '0.0.0'
 # The full version, including alpha/beta/rc tags
-release = '1.0'
+release = '0.0.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -98,7 +98,7 @@ pygments_style = 'sphinx'
 #
 html_theme = "sphinx_rtd_theme"
 
-# html_logo = 'ies-logo.png'
+html_logo = 'logos/scikit-activeml-logo.png'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

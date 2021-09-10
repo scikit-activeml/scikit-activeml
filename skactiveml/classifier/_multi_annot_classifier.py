@@ -4,14 +4,13 @@ Classifier Ensemble for Multiple Annotators
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
-import numpy as np
-
 from copy import deepcopy
 
-from ..base import SkactivemlClassifier
+import numpy as np
 from sklearn.ensemble._base import _BaseHeterogeneousEnsemble
-
 from sklearn.utils.validation import check_array, check_is_fitted
+
+from ..base import SkactivemlClassifier
 from ..utils import MISSING_LABEL, compute_vote_vectors, is_labeled
 
 
@@ -56,6 +55,7 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
         training data. If an estimator has been set to `'drop'`, it will not
         appear in `estimators_`.
     """
+
     def __init__(self, estimators, voting='hard', classes=None,
                  missing_label=MISSING_LABEL, cost_matrix=None,
                  random_state=None):
@@ -87,13 +87,20 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
             The MultiAnnotClassifier is fitted on the training data.
         """
         self._validate_estimators()
-        X, y, sample_weight = self._validate_data(X=X, y=y,
-                                                   sample_weight=sample_weight)
+        X, y, sample_weight = self._validate_data(
+            X=X, y=y, sample_weight=sample_weight
+        )
         if self.voting not in ('soft', 'hard'):
             raise ValueError("Voting must be 'soft' or 'hard'; got (voting={})"
                              .format(self.voting))
         self._check_n_features(X, reset=True)
         self.estimators_ = deepcopy(self.estimators)
+
+        # Check for empty training data.
+        if len(X) == 0:
+            return self
+
+        # Fit each estimator.
         for i, est in enumerate(self.estimators_):
             est[1].set_params(missing_label=np.nan)
             if self.classes is None or est[1].classes is None:
@@ -124,7 +131,9 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
         check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)
-        if self.voting == 'hard':
+        if self.n_features_in_ is None:
+            return np.ones((len(X), len(self.classes_))) / len(self.classes_)
+        elif self.voting == 'hard':
             y_pred = np.array(
                 [est.predict(X) for _, est in self.estimators_]).T
             V = compute_vote_vectors(y=y_pred, classes=self.classes_)
@@ -141,23 +150,26 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
         for name, est in self.estimators:
             if not isinstance(est, SkactivemlClassifier):
                 raise TypeError(
-                    "'{}' is not a 'SkactivemlClassifier'.".format(est))
+                    f"'{est}' is not a 'SkactivemlClassifier'."
+                )
             if self.voting == 'soft' and not hasattr(est, 'predict_proba'):
-                raise ValueError("If 'voting' is soft, each classifier must"
-                                 "implement 'predict_proba' method. However,"
-                                 "{} does not do so.".format(est))
-            error_msg = "{} of 'estimators' has 'missing_label={}' as attribute" \
-                        " being unequal to the given 'missing_label={}' as " \
-                        "parameter.".format(est, est.missing_label,
-                                            self.missing_label)
+                raise ValueError(
+                    f"If 'voting' is soft, each classifier must "
+                    f"implement 'predict_proba' method. However, "
+                    f"{est} does not do so."
+                )
+            error_msg = f"{est} of 'estimators' has 'missing_label=" \
+                        f"{est.missing_label}' as attribute being unequal " \
+                        f"to the given 'missing_label={self.missing_label}' " \
+                        f"as parameter."
             try:
                 if is_labeled([self.missing_label], est.missing_label)[0]:
-                    raise ValueError(error_msg)
+                    raise TypeError(error_msg)
             except TypeError:
-                raise ValueError(error_msg)
-            error_msg = "{} of 'estimators' has 'classes={}' as attribute " \
-                        "being unequal to the given 'classes={}' as " \
-                        "parameter.".format(est, est.classes, self.classes)
+                raise TypeError(error_msg)
+            error_msg = f"{est} of 'estimators' has 'classes={est.classes}' " \
+                        f"as attribute being unequal to the given 'classes=" \
+                        f"{self.classes}' as parameter."
             classes_none = self.classes is None
             est_classes_none = est.classes is None
             if classes_none and not est_classes_none:
@@ -167,13 +179,13 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
                 raise ValueError(error_msg)
 
     def _validate_data(self, X, y, sample_weight):
-        X, y, sample_weight = SkactivemlClassifier.\
+        X, y, sample_weight = SkactivemlClassifier. \
             _validate_data(self, X=X, y=y, sample_weight=sample_weight)
-        error_msg = "'y' must have shape (n_samples={}, n_estimators={}) but" \
-                    " has shape {}.".format(len(y), len(self.estimators),
-                                            y.shape)
-        if y.ndim <= 1 and len(self.estimators) == 1:
-            y = y.reshape(len(X), len(self.estimators))
-        if y.ndim <= 1 or y.shape[1] != len(self.estimators):
-            raise ValueError(error_msg)
+        error_msg = f"'y' must have shape (n_samples={len(y)}, n_estimators=" \
+                    f"{len(self.estimators)}) but has shape {y.shape}."
+        if len(X) > 0:
+            if y.ndim <= 1 and len(self.estimators) == 1:
+                y = y.reshape(len(X), len(self.estimators))
+            if y.ndim <= 1 or y.shape[1] != len(self.estimators):
+                raise ValueError(error_msg)
         return X, y, sample_weight
