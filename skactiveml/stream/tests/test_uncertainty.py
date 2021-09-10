@@ -66,10 +66,8 @@ class TestUncertainty(unittest.TestCase):
         # budget_manager must be defined as an object of an budget manager
         # class
         query_strategy = query_strategy_name(
-            clf=self.clf, budget_manager="string"
+            clf=self.clf, budget_manager=[]
         )
-        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(clf=self.clf, budget_manager=1)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def _test_query_param_X_cand(self, query_strategy_name):

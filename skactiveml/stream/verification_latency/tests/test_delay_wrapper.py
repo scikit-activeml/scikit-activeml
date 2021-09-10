@@ -571,27 +571,6 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
             sample_weight=self.sample_weight,
         )
 
-    # def test_FO(self):
-    #     # init param test
-    #     # self._test_init_param_base_query_strategy()
-    #     # self._test_init_param_w_train()
-    #     # self._test_init_param_random_state()
-
-    #     # query param test
-    #     self.test_query_param_X_cand()
-    #     self.test_query_param_X()
-    #     self.test_query_param_y()
-    #     self.test_query_param_tX()
-    #     self.test_query_param_ty()
-    #     self.test_query_param_tX_cand()
-    #     self.test_query_param_ty_cand()
-    #     self.test_query_param_return_utilities()
-    #     self.test_query_param_simulate()
-    #     self.test_query_param_acquisitions()
-
-    #     # test functionality
-    #     # self._test_query_FO()
-
     # query param test
     def test_query_param_X_cand(self):
         return super().test_query_param_X_cand()
@@ -623,13 +602,7 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
     # init param test
     def test_init_param_base_query_strategy(self):
         delay_wrapper = ForgettingWrapper(
-            base_query_strategy="string",
-            w_train=self.w_train,
-            random_state=self.random_state,
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
-        delay_wrapper = ForgettingWrapper(
-            base_query_strategy=1,
+            base_query_strategy=[],
             w_train=self.w_train,
             random_state=self.random_state,
         )
@@ -751,29 +724,6 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
             sample_weight=self.sample_weight,
         )
 
-    # def test_FI(self):
-    #     # init param test
-    #     # self._test_init_param_base_query_strategy()
-    #     # self._test_init_param_delay_prior()
-    #     # self._test_init_param_clf()
-    #     # self._test_init_param_random_state()
-
-    #     # query param test
-    #     self.test_query_param_X_cand()
-    #     self.test_query_param_X()
-    #     self.test_query_param_y()
-    #     self.test_query_param_tX()
-    #     self.test_query_param_ty()
-    #     self.test_query_param_tX_cand()
-    #     self.test_query_param_ty_cand()
-    #     self.test_query_param_return_utilities()
-    #     self.test_query_param_simulate()
-    #     self.test_query_param_sample_weight()
-    #     self.test_query_param_acquisitions()
-
-    #     # test functionality
-    #     # self._test_query_FI()
-
     # query param test
     def test_query_param_X_cand(self):
         return super().test_query_param_X_cand()
@@ -811,14 +761,7 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
     # init param test
     def test_init_param_base_query_strategy(self):
         delay_wrapper = FuzzyDelaySimulationWrapper(
-            base_query_strategy="string",
-            delay_prior=self.delay_prior,
-            random_state=self.random_state,
-            clf=self.clf,
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
-        delay_wrapper = FuzzyDelaySimulationWrapper(
-            base_query_strategy=1,
+            base_query_strategy=[],
             delay_prior=self.delay_prior,
             random_state=self.random_state,
             clf=self.clf,
@@ -964,30 +907,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             sample_weight=self.sample_weight,
         )
 
-    # def test_BI(self):
-    #     # init param test
-    #     # self._test_init_param_base_query_strategy()
-    #     # self._test_init_param_K()
-    #     # self._test_init_param_delay_prior()
-    #     # self._test_init_param_clf()
-    #     # self._test_init_param_random_state()
-
-    #     # query param test
-    #     self.test_query_param_X_cand()
-    #     self.test_query_param_X()
-    #     self.test_query_param_y()
-    #     self.test_query_param_tX()
-    #     self.test_query_param_ty()
-    #     self.test_query_param_tX_cand()
-    #     self.test_query_param_ty_cand()
-    #     self.test_query_param_return_utilities()
-    #     self.test_query_param_simulate()
-    #     self.test_query_param_sample_weight()
-    #     self.test_query_param_acquisitions()
-
-    #     # test functionality
-    #     # self._test_query_BI()
-
     # query param test
     def test_query_param_X_cand(self):
         return super().test_query_param_X_cand()
@@ -1025,15 +944,7 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
     # init param test
     def test_init_param_base_query_strategy(self):
         delay_wrapper = BaggingDelaySimulationWrapper(
-            base_query_strategy="string",
-            K=self.K,
-            delay_prior=self.delay_prior,
-            random_state=self.random_state,
-            clf=self.clf,
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
-        delay_wrapper = BaggingDelaySimulationWrapper(
-            base_query_strategy=1,
+            base_query_strategy=[],
             K=self.K,
             delay_prior=self.delay_prior,
             random_state=self.random_state,
