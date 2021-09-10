@@ -493,6 +493,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         self : ForgettingWrapper
             The ForgettingWrapper returns itself, after it is updated.
         """
+        self._validate_base_query_strategy()
         self.base_query_strategy_.update(X_cand, sampled, **kwargs)
         return self
 
@@ -916,6 +917,7 @@ class BaggingDelaySimulationWrapper(
         self : BaggingDelaySimulationWrapper
             The BaggingDelaySimulationWrapper returns itself, after it is updated.
         """
+        self._validate_base_query_strategy()
         self.base_query_strategy_.update(X_cand, sampled, **kwargs)
         return self
 
@@ -1391,6 +1393,7 @@ class FuzzyDelaySimulationWrapper(
         self : FuzzyDelaySimulationWrapper
             The FuzzyDelaySimulationWrapper returns itself, after it is updated.
         """
+        self._validate_base_query_strategy()
         self.base_query_strategy_.update(X_cand, sampled, **kwargs)
         return self
 

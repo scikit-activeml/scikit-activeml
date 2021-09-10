@@ -240,3 +240,8 @@ class TestStreamDelay(unittest.TestCase):
             ty_train.append(ty_t)
             X_train.append(x_t)
             y_train.append(y_t)
+
+        query_strategy_update = query_strategy_class(random_state=qs_rand_seed)
+        query_strategy_update.update(
+            X_cand=np.array([]).reshape([0, 2]), sampled=np.array([])
+        )
