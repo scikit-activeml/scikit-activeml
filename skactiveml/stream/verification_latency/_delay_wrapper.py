@@ -16,8 +16,8 @@ from skactiveml.utils import check_random_state
 class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
     SingleAnnotStreamBasedQueryStrategyWrapper
 ):
-    """Base class for all delay stream-based active learning query strategies in
-       scikit-activeml.
+    """Base class for stream-based active learning query strategies that can
+    incorparate known verification_latency in scikit-activeml.
 
     Parameters
     ----------
@@ -315,15 +315,11 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
 
 class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
-    """The ForgettingWrapper strategy determines a sliding window with a length
-    of w_train to forget obsolete data. The window is defined by calculation
-    all instances that are within
-    ty_cand - w_train <= tX, with ty_cand referring to the arrival time of the
-    Label for the current instance and tX the arrival time of all instances used
-    that infer the classifier. Through this calculation, only instances with
-    arrived labels will be used to infer the classifier for the given query
-    strategy.
-
+    """This query strategy hides instances that would be obsolete from the
+    base_query_strategy that would be unavailable once the label for X_cand
+    arrives. The ForgettingWrapper strategy assumes a sliding window with a
+    length of w_train to forget obsolete data. Each instance for which
+    ty_cand - w_train + verification_latency <= tX does not hold, are discarded.
 
     Parameters
     ----------
@@ -360,8 +356,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         al_kwargs={},
         **kwargs
     ):
-        """Preprocess the data according to the verification latency strategy
-        before asking the query strategy which instances in X_cand to acquire.
+        """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
         the final sampling, simulate=True can be set, so that the query strategy
@@ -646,12 +641,10 @@ class BaggingDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
     """The BaggingDelaySimulationWrapper takes already acquired instances
-    without labeling into account by simulating 1 to K number of labels each
-    time and estimating the average utility of every simulation. The instances
-    that may be simulated are in the range of instances
-    X_simulate = ty >= tX_cand and ty < ty_cand.
-    To determine the Label of the instances a categorical distribution is used
-    according to Murphy 2012.
+    without labeling into account by simulating 1 to K number of labels and
+    estimates the average utility over all simulations.
+    To simulate the labels we estimate the class probabilities for each label
+    using bayesian estimation.
 
     Parameters
     ----------
@@ -700,8 +693,7 @@ class BaggingDelaySimulationWrapper(
         al_kwargs={},
         **kwargs
     ):
-        """Preprocess the data according to the verification latency strategy
-        before asking the query strategy which instances in X_cand to acquire.
+        """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
         the final sampling, simulate=True can be set, so that the query strategy
@@ -1110,14 +1102,10 @@ class BaggingDelaySimulationWrapper(
 class FuzzyDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
 ):
-    """The FuzzyDelaySimulationWrapper takes already acquired instances without
-    labeling into account by simulating their label and adding a sample weight
-    to each simulated instance. The instances that will be simulated are in the
-    range of instances
-    X_simulate = ty >= tX_cand and ty < ty_cand.
-    After calculating the class probability of the X_simulate window it will be
-    added to the already existing window with the predicted class and sample
-    weight.
+    """The FuzzyDelaySimulationWrapper takes already acquired instances
+    without labeling into account. Those labels are simulated by using fuzzy
+    labels via using the sample weight. The class probabilities for each label
+    are estimated using bayesian estimation.
 
     Parameters
     ----------
@@ -1161,8 +1149,7 @@ class FuzzyDelaySimulationWrapper(
         al_kwargs={},
         **kwargs
     ):
-        """Preprocess the data according to the verification latency strategy
-        before asking the query strategy which instances in X_cand to acquire.
+        """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
         the final sampling, simulate=True can be set, so that the query strategy
