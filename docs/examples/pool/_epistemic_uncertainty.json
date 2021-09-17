@@ -8,7 +8,7 @@
     "tags" : ["pool"],
     "title" : "EpistemicUncertainty Example",
     "refs" : ["nguyen2019epistemic"],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {},

@@ -8,7 +8,7 @@
     "tags" : ["pool"],
     "title" : "McPAL Example",
     "refs" : ["kottke2016multi"],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {},

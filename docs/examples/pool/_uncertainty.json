@@ -9,7 +9,7 @@
     "tags" : ["pool"],
     "title" : "UncertaintySampling Example For Method 'margin_sampling'",
     "refs" : ["settles2009active"],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {
@@ -27,7 +27,7 @@
     "tags" : ["pool"],
     "title" : "UncertaintySampling Example For Method 'least_confident'",
     "refs" : ["settles2009active"],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {
@@ -45,7 +45,7 @@
     "tags" : ["pool"],
     "title" : "UncertaintySampling Example For Method 'entropy'",
     "refs" : ["settles2009active"],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {

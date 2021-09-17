@@ -9,7 +9,7 @@
     "tags" : ["pool"],
     "title" : "QBC Example For Method 'KL_divergence'",
     "refs" : ["seung1992query", ""],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {
@@ -27,7 +27,7 @@
     "tags" : ["pool"],
     "title" : "QBC Example For Method 'vote_entropy'",
     "refs" : [],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {

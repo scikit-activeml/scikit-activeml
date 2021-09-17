@@ -8,7 +8,7 @@
     "tags" : ["pool"],
     "title" : "FourDS Example",
     "refs" : ["reitmaier2013let"],
-    "sequence" : ["title", "text_0", "code_import", "plot", "refs"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [
       "from skactiveml.classifier import CMM"

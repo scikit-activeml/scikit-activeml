@@ -101,6 +101,7 @@ Stopping criteria
 
 Json example file structure
 ---------------------------
+* The example can be modified by modifying the template.py file
 * One json file for each module.
 * Organized in the same folder and naming structure as the packages.
 * The json file should contain a list with one entry for each example.
@@ -110,7 +111,8 @@ Json example file structure
     * "refs" (optional): A list of references to bibliographic entries in the 'refs.bib' file.
     * "title": The title of the example page.
     * "text": Every key that starts with 'text' will be formatted as a paragraph in the example.
-    * "code": Every key that starts with 'code' will be formatted as a python code block in the example.
+    * "code": Every key that starts with 'code' will be formatted as a python code block in the example. NOTE: If you define "code_import", the code is automatically added to the import section of the example.
+    * "bp": Each key that starts with 'bp' is formatted as Python code and added on a specific line in the example. You need to define the line by adding the key starting with '#_' to the appropriate line in the template.py file.
     * "sequence": A list that contains the order in which the blocks are shown. Possible blocks are:
         * 'title': Shows the title.
         * 'text': Shows the specified text paragraph.

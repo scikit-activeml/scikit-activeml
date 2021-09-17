@@ -3,7 +3,6 @@ import json
 import os
 from pybtex.database import parse_file
 
-
 import numpy as np
 
 from skactiveml import pool, classifier, utils, \
@@ -112,7 +111,8 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
     bib_data = parse_file('refs.bib')
 
     # Generate an array which contains the data for the tables. TODO stream
-    api_path = os.path.join(os.path.basename(gen_path), 'api').replace('\\', '/')
+    api_path = os.path.join(os.path.basename(gen_path), 'api').replace('\\',
+                                                                       '/')
     data = get_table_data(pool, examples_data, api_path)
 
     # create directory if it does not exist.
@@ -130,7 +130,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
                    'different papers.\n')
         file.write('\n')
         file.write('.. toctree::\n')
-        #file.write('   :maxdepth: 1\n')
+        # file.write('   :maxdepth: 1\n')
         file.write('\n')
         for tab in data.keys():
             file.write(f'   strategy_overview/strategy_overview-{tab}\n')
@@ -154,7 +154,8 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             links_str = ''
             for t in data.keys():
                 if t != tab:
-                    a = bib_data.entries[tab].persons["author"][0].last_names[0]
+                    a = bib_data.entries[tab].persons["author"][0].last_names[
+                        0]
                     links_str += f':doc:`{a} ' \
                                  f'<strategy_overview-{t}>`,\n'
             file.write(links_str[0:-2] + '\n')
@@ -332,9 +333,8 @@ def generate_examples(gen_path, package, json_path):
         ...
         }
     """
-    dir_path_package = os.path.join(gen_path,
-                                    'examples', package.__name__.split('.')[1],
-                                    '')
+    dir_path_package = os.path.join(gen_path, 'examples',
+                                    package.__name__.split('.')[1], '')
 
     # create directory if it does not exist.
     os.makedirs(dir_path_package, exist_ok=True)
@@ -376,12 +376,17 @@ def generate_examples(gen_path, package, json_path):
                         [method, data['refs'], {}])
 
                 # create the example python script
-                generate_example_script(plot_filename + '.py',
-                                        dir_path_package, data, package)
+                generate_example_script(
+                    filename=plot_filename + '.py',
+                    dir_path=dir_path_package,
+                    data=data,
+                    package=package,
+                    template_path=os.path.join(json_path, 'template.py')
+                )
     return additional_data
 
 
-def generate_example_script(filename, dir_path, data, package):
+def generate_example_script(filename, dir_path, data, package, template_path):
     """
     Generates a python example file needed, for the 'sphinx-gallery' extension.
 
@@ -396,6 +401,8 @@ def generate_example_script(filename, dir_path, data, package):
     package : module
         The '__init__' module of the package for which the examples should be
         created.
+    template_path : path-like
+        The path to the template file.
     """
     # create directory if it does not exist.
     os.makedirs(dir_path, exist_ok=True)
@@ -403,6 +410,7 @@ def generate_example_script(filename, dir_path, data, package):
     # Validation of 'data'.
     if data['class'] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
+    data["qs"] = getattr(package, data["class"])
 
     first_title = True
     # Create the file.
@@ -426,9 +434,7 @@ def generate_example_script(filename, dir_path, data, package):
                     clf = data["clf"]
                 else:
                     clf = None
-                qs = getattr(package, data["class"])
-                block_str = format_plot(qs, data["init_params"],
-                                        data["query_params"], clf=clf)
+                block_str = format_plot(data, template_path, clf=clf)
             elif block.startswith("refs"):
                 block_str = format_refs(data[block])
 
@@ -526,20 +532,17 @@ def format_code(code):
     return block_str + '\n'
 
 
-def format_plot(qs, init_params, query_params, clf=None):
+def format_plot(data, template_path, clf=None):
     """
     Generates the string for the plotting section of the example page,
     formatted for a 'sphinx-gallery' example script.
 
     Parameters
     ----------
-    qs : QueryStrategy
-        The query strategy.
-    init_params : dict
-        Should include the parameters used to initialize the query strategy.
-    query_params : dict
-        Should include the parameters used to call the 'query' method of the
-        query strategy.
+    data : dict
+        The data from the jason example file for the example.
+    template_path : path-like
+        The path to the template file.
     clf : string, optional (default=None)
         An initialisation of the classifier used to initialize the query
         strategy, if no clf is specified in 'init_params'.
@@ -548,109 +551,75 @@ def format_plot(qs, init_params, query_params, clf=None):
     -------
     string : The formatted string for the example script.
     """
-    block_str = f'from skactiveml.pool import {qs.__name__}\n'
-    block_str += 'import numpy as np\n'
-    block_str += 'from matplotlib import pyplot as plt, animation\n'
-    block_str += 'from sklearn.datasets import make_classification\n'
-    block_str += 'from sklearn.exceptions import NotFittedError\n'
-    # Decide which classifier to use, if clf is None.
-    if clf is None:
-        if 'clf' not in init_params.keys():
-            clf = 'PWC(classes=[0, 1], random_state=random_state)'
-            block_str += 'from skactiveml.classifier import PWC\n'
-        else:
-            clf = init_params['clf']
-            init_params['clf'] = 'clf'
-    block_str += 'from skactiveml.utils import MISSING_LABEL, is_unlabeled\n'
-    block_str += 'from skactiveml.visualization import plot_utility, ' \
-                 'plot_decision_boundary\n'
-
-    block_str += '\n'
-    block_str += 'random_state = np.random.RandomState(0)\n'
-    block_str += '\n'
-    block_str += '# Build a dataset.\n'
-    block_str += 'X, y_true = make_classification(n_features=2, ' \
-                 'n_redundant=0, random_state=random_state)\n'
-    block_str += 'y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)\n'
-
-    block_str += '# Initialise the classifier.\n'
-    block_str += ('clf = ' + clf + '\n')
-
-    if 'clf' not in init_params.keys() and 'clf' in \
-            inspect.signature(qs.__init__).parameters:
-        init_params['clf'] = 'clf'
+    # Set the clf if it is not set in the json file.
+    if 'clf' not in data['init_params'].keys() and 'clf' in \
+            inspect.signature(data["qs"].__init__).parameters:
+        data['init_params']['clf'] = 'clf'
     # Set the random state if it is not set in the json file.
-    if 'random_state' not in init_params.keys() and 'random_state' in \
-            inspect.signature(qs.__init__).parameters:
-        init_params['random_state'] = 'random_state'
-    # Initialise the query strategy.
-    block_str += f'# Initialise the query strategy.\n'
-    block_str += f'qs = {qs.__name__}({dict_to_str(init_params)})\n'
-    block_str += f'\n'
-    block_str += f'# Preparation for plotting.\n'
-    block_str += f'fig, ax = plt.subplots()\n'
-    block_str += f'x1_min = min(X[:, 0])\n'
-    block_str += f'x1_max = max(X[:, 0])\n'
-    block_str += f'x2_min = min(X[:, 1])\n'
-    block_str += f'x2_max = max(X[:, 1])\n'
-    block_str += f'bound = [[x1_min, x2_min], [x1_max, x2_max]]\n'
-    block_str += f'artists = []\n'
-    block_str += f'\n'
-    block_str += f'# The active learning cycle:\n'
-    block_str += f'n_cycles = 20\n'
-    block_str += f'for c in range(n_cycles):\n'
-    block_str += f'    # Set X_cand to the unlabeled instances.\n'
-    block_str += f'    unlbld_idx = np.where(is_unlabeled(y))[0]\n'
-    block_str += f'    X_cand = X[unlbld_idx]\n'
-    block_str += f'\n'
-    # Call the query method with the expected parameters.
-    if 'X' not in query_params.keys() and \
-            'X' in inspect.signature(qs.query).parameters:
-        query_params['X'] = 'X'
-    if 'y' not in query_params.keys() and \
-            'y' in inspect.signature(qs.query).parameters:
-        query_params['y'] = 'y'
-    params = dict_to_str(query_params)
-    if len(params) > 0:
-        params = ', ' + params
-    block_str += f'    # Query the next instance/s.\n'
-    block_str += f'    query_idx = unlbld_idx[qs.query(X_cand' \
-                 f'{params})]\n'
-    block_str += f'\n'
-    block_str += f'    # Plot the labeled data.\n'
-    block_str += f'    coll_old = list(ax.collections)\n'
-    block_str += f'    title = ax.text(\n'
-    block_str += '        0.5, 1.05, f"Decision boundry after acquring {c} ' \
-                 'labels",\n'
-    block_str += f'        size=plt.rcParams["axes.titlesize"], ha="center",\n'
-    block_str += f'        transform=ax.transAxes\n'
-    block_str += f'    )\n'
-    t = ""
-    for k, v in query_params.items():
-        t += "'" + k + "': " + v + ", "
-    t = t[:-2]
-    block_str += f'    ax = plot_utility(qs, {{{t}}}, ' \
-                 f'bound=bound, ax=ax)\n'
-    block_str += f'    ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", ' \
-                 f'marker=".")\n'
-    block_str += f'    ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r",' \
-                 f' alpha=.9, marker=".")\n'
-    block_str += f'    try:\n'
-    block_str += f'        ax = plot_decision_boundary(clf, bound, ax=ax)\n'
-    block_str += f'    except NotFittedError:\n'
-    block_str += f'        pass\n'
-    block_str += f'    coll_new = list(ax.collections)\n'
-    block_str += f'    coll_new.append(title)\n'
-    block_str += f'    artists.append([x for x in coll_new if ' \
-                 f'(x not in coll_old)])\n'
-    block_str += f'\n'
-    block_str += f'    # Label the queried instances.\n'
-    block_str += f'    y[query_idx] = y_true[query_idx]\n'
-    block_str += f'\n'
-    block_str += f'    # Fit the classifier.\n'
-    block_str += f'    clf.fit(X, y)\n'
-    block_str += f'\n'
-    block_str += f'ani = animation.ArtistAnimation(fig, artists, blit=True)\n '
+    if 'random_state' not in data['init_params'].keys() and 'random_state' in \
+            inspect.signature(data["qs"].__init__).parameters:
+        data['init_params']['random_state'] = 'random_state'
+    # Collect the expected parameters for the query method.
+    if 'X' not in data['query_params'].keys() and \
+            'X' in inspect.signature(data["qs"].query).parameters:
+        data['query_params']['X'] = 'X'
+    if 'y' not in data['query_params'].keys() and \
+            'y' in inspect.signature(data["qs"].query).parameters:
+        data['query_params']['y'] = 'y'
+    q_params = dict_to_str(data['query_params'])
+    if len(q_params) > 0:
+        q_params = ', ' + q_params
+
+    block_str = ''
+    with open(template_path, "r") as template:
+        for line in template:
+            if '#_' in line:
+                if 'import' in line:
+                    line = f'from skactiveml.pool import {data["qs"].__name__}\n'
+                    if clf is None and 'clf' not in data['init_params'].keys():
+                        line += 'from skactiveml.classifier import PWC\n'
+                    if 'code_import' in data.keys():
+                        if type(data['code_import']) != list:
+                            data['code_import'] = [data['code_import']]
+                        for l in data['code_import']:
+                            line += l + '\n'
+                elif 'init_clf' in line:
+                    # Decide which classifier to use, if clf is None.
+                    if clf is None:
+                        if 'clf' not in data['init_params'].keys():
+                            clf = 'PWC(classes=[0, 1], random_state=random_state)'
+                        else:
+                            clf = data['init_params']['clf']
+                            data['init_params']['clf'] = 'clf'
+                    line = ('clf = ' + clf + '\n')
+                elif 'init_qs' in line:
+                    # Initialise the query strategy.
+                    line = f'qs = {data["qs"].__name__}({dict_to_str(data["init_params"])})\n'
+                elif '{query_params}' in line:
+                    s = line.find('#_')
+                    idx = int(line[s + 2:].split(' ')[0]) - 1
+                    qp_str = ""
+                    for k, v in data['query_params'].items():
+                        qp_str += "'" + k + "': " + v + ", "
+                    qp_str = ', {' + qp_str[:-2] + '}'
+                    line = line[:idx] + qp_str + line[idx:s] + '\n'
+                elif 'query_params' in line:
+                    s = line.find('#_')
+                    idx = int(line[s + 2:].split(' ')[0]) - 1
+                    line = line[:idx] + q_params + line[idx:s] + '\n'
+                elif '#_bp' in line:
+                    try:
+                        s = line.find('#_')
+                        bp = line[s + 2:]
+                        line = line[:s]
+                        if type(data[bp[:-1]]) != list:
+                            data[bp[:-1]] = [data[bp[:-1]]]
+                        for l in data[bp[:-1]]:
+                            line += l + '\n'
+                    except KeyError:
+                        pass
+
+            block_str += line
 
     return block_str + '\n'
 
