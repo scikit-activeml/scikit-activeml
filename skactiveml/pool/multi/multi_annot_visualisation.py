@@ -16,7 +16,7 @@ from ...base import MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ...utils import is_labeled, check_scalar
 
 
-def check_or_get_bound(X, bound):
+def check_or_get_bound(X, bound, epsilon=0.5):
     """ Validates bound or returns the bounds of X if bound is None.
     `bound` or `X` must not be None.
 
@@ -27,6 +27,9 @@ def check_or_get_bound(X, bound):
     X : matrix-like, shape (n_samples, 2)
         The sample matrix X is the feature matrix representing the samples.
         The feature space must be two dimensional.
+    epsilon: float
+        The minimal distance between the returned bound and the values of `X`,
+        if `bound` is not specified.
     """
     if X is not None:
         X = check_array(X)
