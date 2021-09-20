@@ -122,6 +122,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
     with open(
             os.path.join(gen_path, 'strategy_overview.rst'),
             'w') as file:
+        file.write('=================\n')
         file.write('Strategy Overview\n')
         file.write('=================\n')
         file.write('\n')
@@ -154,8 +155,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             links_str = ''
             for t in data.keys():
                 if t != tab:
-                    a = bib_data.entries[tab].persons["author"][0].last_names[
-                        0]
+                    a = bib_data.entries[t].persons["author"][0].last_names[0]
                     links_str += f':doc:`{a} ' \
                                  f'<strategy_overview-{t}>`,\n'
             file.write(links_str[0:-2] + '\n')
@@ -168,11 +168,13 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             for cat in sorted(cats):
                 if cat != 'Others':
                     file.write(table_from_array(cats[cat], title=cat,
+                                                section_level='~',
                                                 header_rows=1, indent=0))
             if 'Others' in cats.keys():
                 # 'Others' is the fallback, if no category is specified
                 # in the json file
                 file.write(table_from_array(cats['Others'], title='Others',
+                                            section_level='~',
                                             header_rows=1, indent=0))
             file.write('.. footbibliography::')
             # TODO stream
@@ -183,7 +185,8 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             file.write('\n')
 
 
-def table_from_array(a, title='', widths=None, header_rows=0, indent=0):
+def table_from_array(a, title='', caption='', widths=None, header_rows=0,
+                     section_level='-', indent=0):
     """Generates a rst-table and returns it as a string.
 
     Parameters
@@ -192,6 +195,10 @@ def table_from_array(a, title='', widths=None, header_rows=0, indent=0):
         Contains the data for the table.
     title : string, optional (default='')
         The title of the table.
+    caption : str, optional (default='')
+        The caption of the table.
+    section_level : str, optional (default='-')
+        The rst section level of the title.
     widths : string, optional (default=None)
         A list of relative column widths separated with comma or space
         or 'auto'.
@@ -206,7 +213,9 @@ def table_from_array(a, title='', widths=None, header_rows=0, indent=0):
     """
     a = np.asarray(a)
     indents = ''.ljust(indent, ' ')
-    table = f'{indents}.. list-table:: {title}\n' \
+    table = title + '\n'
+    table += ''.ljust(len(title), section_level) + '\n'
+    table += f'{indents}.. list-table:: {caption}\n' \
             f'{indents}   :header-rows: {header_rows}\n'
     if widths is None:
         table += '\n'
