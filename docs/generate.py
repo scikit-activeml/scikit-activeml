@@ -131,7 +131,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
                    'different papers.\n')
         file.write('\n')
         file.write('.. toctree::\n')
-        # file.write('   :maxdepth: 1\n')
+        file.write('   :maxdepth: 1\n')
         file.write('\n')
         for tab in data.keys():
             file.write(f'   strategy_overview/strategy_overview-{tab}\n')
@@ -149,16 +149,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             file.write('\n')
             file.write(f'This is a overview of all implemented AL strategies. '
                        f'The strategies are categorized, according to '
-                       f':footcite:t:`{tab}`. To categorize them by a different'
-                       f' paper, use the links below.\n')
-            file.write('\n')
-            links_str = ''
-            for t in data.keys():
-                if t != tab:
-                    a = bib_data.entries[t].persons["author"][0].last_names[0]
-                    links_str += f':doc:`{a} ' \
-                                 f'<strategy_overview-{t}>`,\n'
-            file.write(links_str[0:-2] + '\n')
+                       f':footcite:t:`{tab}`.\n')
             file.write('\n')
             file.write('Pool Strategies\n')
             file.write('---------------\n')

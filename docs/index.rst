@@ -11,8 +11,9 @@ Welcome to scikit-activeml's documentation!
    generated/sphinx_gallery_examples/index
    developers_guide
 
-.. include:: ../README.rst
-
+.. include:: DESCRIPTION.rst
+   :start-after: _description_start
+   :end-before: _description_end
 
 Indices and tables
 ==================
