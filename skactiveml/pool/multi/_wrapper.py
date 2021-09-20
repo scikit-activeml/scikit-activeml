@@ -114,8 +114,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         # check strategy
         if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
             raise TypeError(
-                f"The given strategy is of the type `{type(self.strategy)}`, "
-                "but it must be a `SingleAnnotStreamBasedQueryStrategy`."
+                f"The given strategy is of type `{type(self.strategy)}`, "
+                "but it must be a of type `SingleAnnotPoolBasedQueryStrategy`."
             )
 
         # check args
