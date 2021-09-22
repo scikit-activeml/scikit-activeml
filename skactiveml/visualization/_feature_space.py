@@ -2,6 +2,7 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
+from matplotlib.colors import Colormap
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array
 
@@ -9,7 +10,7 @@ from skactiveml.base import QueryStrategy, SkactivemlClassifier
 from skactiveml.utils import check_scalar
 
 
-def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
+def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
                            cmap='coolwarm_r', boundary_dict=None,
                            confidence_dict=None):
     """Plot the decision boundary of the given classifier.
@@ -26,7 +27,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
         The axis on which the boundary is plotted.
     confidence: scalar | None, optional (default=0.5)
         The confidence interval plotted with dashed lines. It is not plotted if
-        confidence is None.
+        confidence is None. Must be in the open interval (0.5, 1).
     cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
         The colormap for the confidence levels.
     boundary_dict: dict, optional (default=None)
@@ -35,10 +36,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
     """
-
-    # TODO: extend to multiclass, add parameter confidence [0,1] evtl. [0,0.5], or None
-    # TODO: colors per class colormap or list of colors
-
+    # TODO which type?
     if not isinstance(clf, SkactivemlClassifier):
         raise TypeError("'clf' must be a SkactivemlClassifier.")
     check_scalar(res, 'res', int, min_val=1)
@@ -49,8 +47,14 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
     check_array(bound)
     xmin, ymin, xmax, ymax = np.ravel(bound)
 
+    # Check and convert the colormap
+    if isinstance(cmap, str):
+        cmap = plt.cm.get_cmap(cmap)
+    if not isinstance(cmap, Colormap):
+        raise TypeError("'cmap' must be a string or a ColorMap.")
+
     check_scalar(confidence, 'confidence', float, min_inclusive=False,
-                 max_inclusive=False, min_val=0, max_val=1)
+                 max_inclusive=False, min_val=0.5, max_val=1)
 
     # Create mesh for plotting
     x_vec = np.linspace(xmin, xmax, res)
@@ -58,23 +62,38 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
     X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
     mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
 
-    posteriors = clf.predict_proba(mesh_instances)[:, 0].reshape(X_mesh.shape)
-
+    # Update additional arguments
     boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
     if boundary_dict is not None:
         if not isinstance(boundary_dict, dict):
             raise TypeError("boundary_dict' must be a dictionary.")
         boundary_args.update(boundary_dict)
-    ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
-
     confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
                        'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
     if confidence_dict is not None:
         if not isinstance(confidence_dict, dict):
             raise TypeError("confidence_dict' must be a dictionary.")
         confidence_args.update(confidence_dict)
-    ax.contour(X_mesh, Y_mesh, posteriors, [.25, .75], cmap=cmap,
-               **confidence_args)
+
+    posterior_list = []
+    classes = np.array(range(clf.predict_proba(mesh_instances).shape[1]))
+    for y in classes:
+        posteriors = clf.predict_proba(mesh_instances)[:, y]
+        posteriors = posteriors.reshape(X_mesh.shape)
+        posterior_list.append(posteriors)
+
+    norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
+
+    for y in classes:
+        posteriors = posterior_list[y]
+        posteriors_2 = np.zeros_like(posteriors)
+        for y2 in np.setdiff1d(classes, [y]):
+            posteriors_2 = np.max([posteriors_2, posterior_list[y2]], axis=0)
+
+        posteriors = posteriors / (posteriors + posteriors_2)
+        ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
+        ax.contour(X_mesh, Y_mesh, posteriors, [.75], colors=[cmap(norm(y))],
+                   **confidence_args)
 
 
 def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,

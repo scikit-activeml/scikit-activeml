@@ -38,6 +38,8 @@ class TestFeatureSpace(unittest.TestCase):
         x2_max = max(self.X[:, 1])
         self.bound = [[x1_min, x2_min], [x1_max, x2_max]]
 
+        self.cmap = 'jet'
+
         testing.set_font_settings_for_testing()
         testing.set_reproducibility_for_testing()
         testing.setup()
@@ -66,7 +68,7 @@ class TestFeatureSpace(unittest.TestCase):
                           bound=self.bound, confidence='string')
 
     def test_decision_boundary_cmap(self):
-        self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
+        self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           bound=self.bound, cmap=4)
 
     def test_decision_boundary_boundary_dict(self):
@@ -105,16 +107,15 @@ class TestFeatureSpace(unittest.TestCase):
 
     # Graphical tests
     def test_no_candidates(self):
-        cmap = 'coolwarm_r'
-
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
                      bound=self.bound)
         plt.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
-        plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=-self.y_train,
-                    cmap=cmap, alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, self.bound, cmap=cmap)
+        plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
+                    cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap)
 
         plt.savefig(self.path_prefix + 'dec_bound_wo_cand.pdf')
+        plt.cla()
         comparison = compare_images(self.path_prefix +
                                     'dec_bound_wo_cand_base.pdf',
                                     self.path_prefix + 'dec_bound_wo_cand.pdf',
@@ -122,17 +123,44 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_with_candidates(self):
-
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     X_cand=self.X_cand, res=101)
+                     X_cand=self.X_cand)
         plt.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
-        plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=-self.y_train,
-                    cmap='coolwarm_r', alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, self.bound)
+        plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
+                    cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap)
 
         plt.savefig(self.path_prefix + 'dec_bound_w_cand.pdf')
+        plt.cla()
         comparison = compare_images(self.path_prefix +
                                     'dec_bound_w_cand_base.pdf',
                                     self.path_prefix + 'dec_bound_w_cand.pdf',
+                                    tol=0)
+        self.assertIsNone(comparison)
+
+    def test_multi_class(self):
+        X, y = make_classification(n_features=2, n_redundant=0, random_state=0,
+                                   n_classes=3, n_clusters_per_class=1)
+        train_indices = np.random.randint(0, len(X), size=20)
+        cand_indices = np.setdiff1d(np.arange(len(X)), train_indices)
+        X_train = X[train_indices]
+        y_train = y[train_indices]
+        X_cand = X[cand_indices]
+        clf = PWC()
+        clf.fit(X_train, y_train)
+        qs = UncertaintySampling(clf=clf)
+        bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
+
+        plot_utility(qs, {'X': X_train, 'y': y_train}, bound=bound)
+        plt.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
+        plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
+                    cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(clf, bound=bound, cmap=self.cmap, res=101)
+        plt.savefig(self.path_prefix + 'dec_bound_multiclass.pdf')
+        plt.cla()
+        comparison = compare_images(self.path_prefix +
+                                    'dec_bound_multiclass_base.pdf',
+                                    self.path_prefix +
+                                    'dec_bound_multiclass.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
