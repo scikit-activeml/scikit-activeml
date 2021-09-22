@@ -27,7 +27,8 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
         The axis on which the boundary is plotted.
     confidence: scalar | None, optional (default=0.5)
         The confidence interval plotted with dashed lines. It is not plotted if
-        confidence is None. Must be in the open interval (0.5, 1).
+        confidence is None. Must be in the open interval (0.5, 1). The value
+        stands for the ratio best class / second best class.
     cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
         The colormap for the confidence levels.
     boundary_dict: dict, optional (default=None)
