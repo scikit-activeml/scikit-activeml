@@ -74,10 +74,14 @@ class TestFeatureSpace(unittest.TestCase):
     def test_decision_boundary_boundary_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           bound=self.bound, boundary_dict='string')
+        plot_decision_boundary(clf=self.clf, bound=self.bound,
+                               boundary_dict={'colors': 'r'})
 
     def test_decision_boundary_confidence_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, boundary_dict='string')
+                          bound=self.bound, confidence_dict='string')
+        plot_decision_boundary(clf=self.clf, bound=self.bound,
+                               confidence_dict={'linestyles': ':'})
 
     # Tests for plot_utility function
     def test_utility_qs(self):
@@ -104,6 +108,13 @@ class TestFeatureSpace(unittest.TestCase):
     def test_utility_ax(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs,
                           qs_dict=self.qs_dict, bound=self.bound, ax=2)
+
+    def test_utility_contour_dict(self):
+        self.assertRaises(TypeError, plot_utility, qs=self.qs,
+                          qs_dict=self.qs_dict, bound=self.bound,
+                          contour_dict='string')
+        plot_utility(qs=self.qs, qs_dict=self.qs_dict, bound=self.bound,
+                     contour_dict={'linestyles': '.'})
 
     # Graphical tests
     def test_no_candidates(self):
