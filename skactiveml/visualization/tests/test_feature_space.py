@@ -118,15 +118,15 @@ class TestFeatureSpace(unittest.TestCase):
 
     # Graphical tests
     def test_no_candidates(self):
+        fig, ax = plt.subplots()
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     bound=self.bound)
-        plt.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
-        plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
-                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap)
+                     bound=self.bound, ax=ax)
+        ax.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
+        ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
+                   cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap, ax=ax)
 
-        plt.savefig(self.path_prefix + 'dec_bound_wo_cand.pdf')
-        plt.cla()
+        fig.savefig(self.path_prefix + 'dec_bound_wo_cand.pdf')
         comparison = compare_images(self.path_prefix +
                                     'dec_bound_wo_cand_base.pdf',
                                     self.path_prefix + 'dec_bound_wo_cand.pdf',
@@ -134,15 +134,15 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_with_candidates(self):
+        fig, ax = plt.subplots()
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     X_cand=self.X_cand)
-        plt.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
-        plt.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
-                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap)
+                     X_cand=self.X_cand, ax=ax)
+        ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
+        ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
+                   cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap, ax=ax)
 
-        plt.savefig(self.path_prefix + 'dec_bound_w_cand.pdf')
-        plt.cla()
+        fig.savefig(self.path_prefix + 'dec_bound_w_cand.pdf')
         comparison = compare_images(self.path_prefix +
                                     'dec_bound_w_cand_base.pdf',
                                     self.path_prefix + 'dec_bound_w_cand.pdf',
@@ -162,13 +162,13 @@ class TestFeatureSpace(unittest.TestCase):
         qs = UncertaintySampling(clf=clf)
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
-        plot_utility(qs, {'X': X_train, 'y': y_train}, bound=bound)
-        plt.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
-        plt.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
-                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(clf, bound=bound, cmap=self.cmap, res=101)
-        plt.savefig(self.path_prefix + 'dec_bound_multiclass.pdf')
-        plt.cla()
+        fig, ax = plt.subplots()
+        plot_utility(qs, {'X': X_train, 'y': y_train}, bound=bound, ax=ax)
+        ax.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
+        ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
+                   cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(clf, bound, cmap=self.cmap, res=101, ax=ax)
+        fig.savefig(self.path_prefix + 'dec_bound_multiclass.pdf')
         comparison = compare_images(self.path_prefix +
                                     'dec_bound_multiclass_base.pdf',
                                     self.path_prefix +
