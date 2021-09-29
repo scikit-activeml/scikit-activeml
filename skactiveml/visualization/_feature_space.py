@@ -20,7 +20,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
 
     Parameters
     ----------
-    clf: sklearn classifier # TODO correct?
+    clf: Sklearn classifier
         The fitted classifier whose decision boundary is plotted. If confidence
         is not None, the classifier must implement the predict_proba function.
     bound: array-like, [[xmin, ymin], [xmax, ymax]]
@@ -103,19 +103,19 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     posterior_list = []
 
     for y in classes:
-        posteriors = predictions[:, y]
-        posteriors = posteriors.reshape(X_mesh.shape)
+        posteriors = predictions[:, y].reshape(X_mesh.shape)
         posterior_list.append(posteriors)
 
     norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
 
     for y in classes:
         posteriors = posterior_list[y]
-        posteriors_2 = np.zeros_like(posteriors)
+        posteriors_best_alternative = np.zeros_like(posteriors)
         for y2 in np.setdiff1d(classes, [y]):
-            posteriors_2 = np.max([posteriors_2, posterior_list[y2]], axis=0)
+            posteriors_best_alternative = np.max([posteriors_best_alternative,
+                                                  posterior_list[y2]], axis=0)
 
-        posteriors = posteriors / (posteriors + posteriors_2)
+        posteriors = posteriors / (posteriors + posteriors_best_alternative)
         ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
         if confidence is not None:
             ax.contour(X_mesh, Y_mesh, posteriors, [confidence],
