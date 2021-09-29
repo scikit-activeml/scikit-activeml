@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 from matplotlib import pyplot as plt
@@ -55,14 +57,9 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     if not isinstance(cmap, Colormap):
         raise TypeError("'cmap' must be a string or a ColorMap.")
 
-    check_scalar(confidence, 'confidence', float, min_inclusive=False,
-                 max_inclusive=False, min_val=0.5, max_val=1)
-
-    # Create mesh for plotting
-    x_vec = np.linspace(xmin, xmax, res)
-    y_vec = np.linspace(ymin, ymax, res)
-    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+    if confidence is not None:
+        check_scalar(confidence, 'confidence', float, min_inclusive=False,
+                     max_inclusive=False, min_val=0.5, max_val=1)
 
     # Update additional arguments
     boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
@@ -77,10 +74,33 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
             raise TypeError("confidence_dict' must be a dictionary.")
         confidence_args.update(confidence_dict)
 
+    # Create mesh for plotting
+    x_vec = np.linspace(xmin, xmax, res)
+    y_vec = np.linspace(ymin, ymax, res)
+    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
+    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+
+    # Calculate predictions
+    if hasattr(clf, 'predict_proba'):
+        predictions = clf.predict_proba(mesh_instances)
+        classes = np.array(range(predictions.shape[1]))
+    else:
+        if confidence is not None:
+            warnings.warn("The given classifier does not implement "
+                          "'predict_proba'. Thus, the confidence cannot be "
+                          "plotted.")
+            confidence = None
+        predicted_classes = clf.predict(mesh_instances)
+        classes = np.array(range(len(np.unique(predicted_classes))))
+        predictions = np.zeros((len(predicted_classes), len(classes)))
+        for idx, y in enumerate(predicted_classes):
+            predictions[idx, y] = 1
+    # TODO check names
+
     posterior_list = []
-    classes = np.array(range(clf.predict_proba(mesh_instances).shape[1]))
+
     for y in classes:
-        posteriors = clf.predict_proba(mesh_instances)[:, y]
+        posteriors = predictions[:, y]
         posteriors = posteriors.reshape(X_mesh.shape)
         posterior_list.append(posteriors)
 
@@ -94,8 +114,9 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
 
         posteriors = posteriors / (posteriors + posteriors_2)
         ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
-        ax.contour(X_mesh, Y_mesh, posteriors, [.75], colors=[cmap(norm(y))],
-                   **confidence_args)
+        if confidence is not None:
+            ax.contour(X_mesh, Y_mesh, posteriors, [confidence],
+                       colors=[cmap(norm(y))], **confidence_args)
 
 
 def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
@@ -119,9 +140,6 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
     contour_dict: dict, optional (default=None)
         Additional parameters for the utility contour.
     """
-
-    # TODO: dict for contourf
-
     if not isinstance(qs, QueryStrategy):
         raise TypeError("'qs' must be a query strategy.")
     if not isinstance(qs_dict, dict):
