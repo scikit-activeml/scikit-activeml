@@ -430,11 +430,7 @@ def generate_example_script(filename, dir_path, data, package, template_path):
                 code_blocks.append(data[block])
                 block_str = format_code(data[block])
             elif block.startswith("plot"):
-                if "clf" in data.keys():
-                    clf = data["clf"]
-                else:
-                    clf = None
-                block_str = format_plot(data, template_path, clf=clf)
+                block_str = format_plot(data, template_path)
             elif block.startswith("refs"):
                 block_str = format_refs(data[block])
 
@@ -532,7 +528,7 @@ def format_code(code):
     return block_str + '\n'
 
 
-def format_plot(data, template_path, clf=None):
+def format_plot(data, template_path):
     """
     Generates the string for the plotting section of the example page,
     formatted for a 'sphinx-gallery' example script.
@@ -543,22 +539,10 @@ def format_plot(data, template_path, clf=None):
         The data from the jason example file for the example.
     template_path : path-like
         The path to the template file.
-    clf : string, optional (default=None)
-        An initialisation of the classifier used to initialize the query
-        strategy, if no clf is specified in 'init_params'.
-
     Returns
     -------
     string : The formatted string for the example script.
     """
-    # Set the clf if it is not set in the json file.
-    if 'clf' not in data['init_params'].keys() and 'clf' in \
-            inspect.signature(data["qs"].__init__).parameters:
-        data['init_params']['clf'] = 'clf'
-    # Set the random state if it is not set in the json file.
-    if 'random_state' not in data['init_params'].keys() and 'random_state' in \
-            inspect.signature(data["qs"].__init__).parameters:
-        data['init_params']['random_state'] = 'random_state'
     # Collect the expected parameters for the query method.
     if 'X' not in data['query_params'].keys() and \
             'X' in inspect.signature(data["qs"].query).parameters:
@@ -576,7 +560,8 @@ def format_plot(data, template_path, clf=None):
             if '#_' in line:
                 if 'import' in line:
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
-                    if clf is None and 'clf' not in data['init_params'].keys():
+                    if 'clf' not in data.keys() and \
+                            'clf' not in data['init_params'].keys():
                         line += 'from skactiveml.classifier import PWC\n'
                     if 'code_import' in data.keys():
                         if type(data['code_import']) != list:
@@ -585,14 +570,23 @@ def format_plot(data, template_path, clf=None):
                             line += l + '\n'
                 elif 'init_clf' in line:
                     # Decide which classifier to use, if clf is None.
-                    if clf is None:
+                    if 'clf' not in data.keys():
                         if 'clf' not in data['init_params'].keys():
                             clf = 'PWC(classes=[0, 1], random_state=random_state)'
                         else:
                             clf = data['init_params']['clf']
-                            data['init_params']['clf'] = 'clf'
+                    else:
+                        clf = data['clf']
                     line = ('clf = ' + clf + '\n')
                 elif 'init_qs' in line:
+                    if 'clf' not in data['init_params'].keys() and 'clf' in \
+                            inspect.signature(data["qs"].__init__).parameters:
+                        data['init_params']['clf'] = 'clf'
+                    # Set the random state if it is not set in the json file.
+                    if 'random_state' not in data[
+                        'init_params'].keys() and 'random_state' in \
+                            inspect.signature(data["qs"].__init__).parameters:
+                        data['init_params']['random_state'] = 'random_state'
                     # Initialise the query strategy.
                     line = f'qs = {data["qs"].__name__}({dict_to_str(data["init_params"])})\n'
                 elif '{query_params}' in line:
