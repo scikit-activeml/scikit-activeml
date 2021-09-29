@@ -84,7 +84,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     if hasattr(clf, 'predict_proba'):
         predictions = clf.predict_proba(mesh_instances)
         classes = np.array(range(predictions.shape[1]))
-    else:
+    elif hasattr(clf, 'predict'):
         if confidence is not None:
             warnings.warn("The given classifier does not implement "
                           "'predict_proba'. Thus, the confidence cannot be "
@@ -95,6 +95,9 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
         predictions = np.zeros((len(predicted_classes), len(classes)))
         for idx, y in enumerate(predicted_classes):
             predictions[idx, y] = 1
+    else:
+        raise AttributeError("'clf' must implement 'predict' or "
+                             "'predict_proba'")
     # TODO check names
 
     posterior_list = []

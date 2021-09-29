@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
 from sklearn.datasets import make_classification
+from sklearn.svm import LinearSVC
 
 from skactiveml.classifier import PWC
 from skactiveml import visualization
@@ -66,6 +67,11 @@ class TestFeatureSpace(unittest.TestCase):
                           bound=self.bound, confidence=0.0)
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           bound=self.bound, confidence='string')
+        plot_decision_boundary(self.clf, self.bound, confidence=None)
+        svc = LinearSVC()
+        svc.fit(self.X_train, self.y_train)
+        self.assertWarns(Warning, plot_decision_boundary, clf=svc,
+                         bound=self.bound, confidence=0.75)
 
     def test_decision_boundary_cmap(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
@@ -173,5 +179,24 @@ class TestFeatureSpace(unittest.TestCase):
                                     'dec_bound_multiclass_base.pdf',
                                     self.path_prefix +
                                     'dec_bound_multiclass.pdf',
+                                    tol=0)
+        self.assertIsNone(comparison)
+
+    def test_svc(self):
+        svc = LinearSVC()
+        svc.fit(self.X_train, self.y_train)
+
+        fig, ax = plt.subplots()
+        plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
+                     X_cand=self.X_cand, ax=ax)
+        ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
+        ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
+                   cmap=self.cmap, alpha=.9, marker='.')
+        plot_decision_boundary(svc, self.bound, cmap=self.cmap, ax=ax)
+
+        fig.savefig(self.path_prefix + 'dec_bound_svc.pdf')
+        comparison = compare_images(self.path_prefix +
+                                    'dec_bound_svc_base.pdf',
+                                    self.path_prefix + 'dec_bound_svc.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
