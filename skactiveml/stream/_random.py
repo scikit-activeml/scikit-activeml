@@ -9,7 +9,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
     """The RandomSampler samples instances completely randomly. The probability
     to sample an instance is dependent on the budget specified in the
     budget_manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1) with
-    a probability of 10%. Instances are sampled regardless of their position in
+    a probability of 10%. Instances are queried regardless of their position in
     the feature space. As this query strategy disregards any information about
     the instance. Thus, it should only be used as a baseline strategy.
 
@@ -41,7 +41,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         return_utilities : bool, optional
@@ -59,9 +59,9 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -73,7 +73,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
-        sampled_indices = self.budget_manager_.sample(
+        queried_indices = self.budget_manager_.query(
             utilities, simulate=simulate
         )
 
@@ -81,22 +81,22 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             self.random_state_.set_state(prior_random_state_state)
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
@@ -112,8 +112,8 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         self._validate_budget_manager()
         # update the random state assuming, that query(..., simulate=True) was
         # used
-        self.random_state_.random_sample(len(sampled))
-        self.budget_manager_.update(sampled, **budget_manager_kwargs)
+        self.random_state_.random_sample(len(queried))
+        self.budget_manager_.update(queried, **budget_manager_kwargs)
         return self
 
     def _validate_data(
@@ -129,7 +129,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
@@ -170,7 +170,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
     period is determined by the budget specified in the budget_manager. For
     instance, a budget of 25% would result in the PeriodicSampler sampling
     every fourth instance. The main idea behind this query strategy is to
-    exhaust a given budget as soon it is available. Instances are sampled
+    exhaust a given budget as soon it is available. Instances are queried
     regardless of their position in the feature space. As this query strategy
     disregards any information about the instance. Thus, it should only be used
     as a baseline strategy.
@@ -197,7 +197,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
 
         This query strategy only evaluates the time each instance arrives at.
         The utilities returned, when return_utilities is set to True, are
-        either 0 (the instance is not sampled) or 1 (the instance is sampled).
+        either 0 (the instance is not queried) or 1 (the instance is queried).
         Please note that, when the decisions from this function may differ from
         the final sampling, simulate=True can set, so that the query strategy
         can be updated later with update(...) with the final sampling. This is
@@ -206,7 +206,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         return_utilities : bool, optional
@@ -221,9 +221,9 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -261,28 +261,28 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         if not simulate:
             self.observed_instances_ = tmp_observed_instances
             self.queried_instances_ = tmp_queried_instances
-        sampled_indices = self.budget_manager_.sample(
+        queried_indices = self.budget_manager_.query(
             utilities, simulate=simulate
         )
-        # print("sampled_indices", sampled_indices)
+        # print("queried_indices", queried_indices)
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
@@ -300,9 +300,9 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        self.budget_manager_.update(sampled, **budget_manager_kwargs)
+        self.budget_manager_.update(queried, **budget_manager_kwargs)
         self.observed_instances_ += X_cand.shape[0]
-        self.queried_instances_ += np.sum(sampled > 0)
+        self.queried_instances_ += np.sum(queried > 0)
         # print("queried_instances_", self.queried_instances_)
         return self
 
@@ -319,7 +319,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.

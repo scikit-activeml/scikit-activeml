@@ -22,19 +22,15 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
     ----------
     clf : BaseEstimator
         The classifier which is trained using this query startegy.
-
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. The budget attribute set for
         the budget_manager will be used to determine the probability to sample
         instances
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     prior : float
         The prior value that is passed onto McPAL (see pool.McPAL).
-
     m_max : float
         The m_max value that is passed onto McPAL (see pool.McPAL).
         
@@ -64,9 +60,9 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X_cand,
         X,
         y,
-        return_utilities=False,
-        simulate=False,
         sample_weight=None,
+        simulate=False,
+        return_utilities=False,
         **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -79,61 +75,65 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
-
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
         self._validate_data(
-            X_cand,
-            return_utilities,
-            X,
-            y,
-            simulate,
-            sample_weight=sample_weight
+            X_cand=X_cand,
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities
         )
 
         k_vec = self.clf_.predict_freq(X_cand)
         utilities = probal._cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max
         )
-        sampled_indices = self.budget_manager_.sample(utilities,
+        queried_indices = self.budget_manager_.query(utilities,
                                                       simulate=simulate)
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
+    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
         """Updates the budget manager
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
@@ -145,17 +145,17 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled, **budget_manager_kwargs)
+        self.budget_manager_.update(queried, **budget_manager_kwargs)
         return self
 
     def _validate_data(
         self,
         X_cand,
-        return_utilities,
         X,
         y,
-        simulate,
         sample_weight,
+        simulate,
+        return_utilities,
         reset=True,
         **check_X_cand_params
     ):
@@ -165,10 +165,19 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         ----------
         X_cand: array-like, shape (n_candidates, n_features)
             Candidate samples.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -180,10 +189,18 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         -------
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
+        X: np.ndarray, shape (n_samples, n_features)
+            Checked training samples
+        y: np.ndarray, shape (n_candidates)
+            Checked training labels
+        sampling_weight: np.ndarray, shape (n_candidates)
+            Checked training sample weight
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        simulate : bool,
+            Checked boolean value of `simulate`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
         """
         X_cand, return_utilities, simulate = super()._validate_data(
             X_cand,
@@ -198,7 +215,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self._validate_m_max()
         self._validate_random_state()
 
-        return X_cand, return_utilities, X, y, simulate
+        return X_cand, X, y, sample_weight, simulate, return_utilities
 
     def _validate_clf(self, X, y, sample_weight=None):
         """Validate if clf is a classifier or create a new clf and fit X and y.

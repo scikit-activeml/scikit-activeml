@@ -53,24 +53,22 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
-
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -79,23 +77,23 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         return NotImplemented
 
     @abstractmethod
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, queried, *args, **kwargs):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
-        when the instances sampled from query(...) may differ from the
-        instances sampled in the end. In this case use query(...) with
+        when the instances queried from query(...) may differ from the
+        instances queried in the end. In this case use query(...) with
         simulate=true and provide the final decisions via update(...).
         This is especially helpful, when developing wrapper query strategies.
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -239,7 +237,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
     def _validate_data(
         self,
         X_cand,
-        return_utilities,
         X,
         y,
         tX,
@@ -247,8 +244,9 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         tX_cand,
         ty_cand,
         acquisitions,
-        simulate,
         sample_weight,
+        simulate,
+        return_utilities,
         reset=True,
         **check_X_cand_params
     ):
@@ -256,14 +254,33 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
         Parameters
         ----------
-        X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        simulate : bool,
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        tX : array-like of shape (n_samples)
+            Arrival time of the input samples 'X'
+        ty : array-like of shape (n_samples)
+            Arrival time of the Labels 'y'
+        tX_cand : array-like of shape (n_samples)
+            Arrival time of the input samples 'X_cand'
+        ty_cand : array-like of shape (n_samples)
+            Arrival time of the Labels 'y_cand'
+        acquisitions : array-like of shape (n_samples)
+            List of arrived labels. True if Label arrived otherwise False
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+        simulate : bool, optional
             If True, the internal state of the query strategy before and after
-            the query is the same.
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+            to the budget_manager, as well. The default is False.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -285,10 +302,10 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             Checked boolean value of `simulate`.
         """
         self._validate_base_query_strategy()
-        X_cand, return_utilities, simulate = super()._validate_data(
+        X_cand, simulate, return_utilities = super()._validate_data(
             X_cand,
-            return_utilities,
             simulate,
+            return_utilities,
             reset=reset,
             **check_X_cand_params
         )
@@ -301,7 +318,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
         return (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -309,8 +325,9 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities
         )
 
 
@@ -319,7 +336,8 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
     base_query_strategy that would be unavailable once the label for X_cand
     arrives. The ForgettingWrapper strategy assumes a sliding window with a
     length of w_train to forget obsolete data. Each instance for which
-    ty_cand - w_train + verification_latency <= tX does not hold, are discarded.
+    ty_cand - w_train + verification_latency <= tX does not hold, are 
+    discarded.
 
     Parameters
     ----------
@@ -351,8 +369,8 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         ty_cand,
         acquisitions,
         sample_weight=None,
-        return_utilities=False,
         simulate=False,
+        return_utilities=False,
         al_kwargs={},
         **kwargs
     ):
@@ -366,7 +384,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -382,22 +400,22 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             Arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -405,7 +423,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         """
         (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -413,11 +430,11 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         ) = self._validate_data(
             X_cand=X_cand,
-            return_utilities=return_utilities,
             X=X,
             y=y,
             tX=tX,
@@ -425,12 +442,13 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             tX_cand=tX_cand,
             ty_cand=ty_cand,
             acquisitions=acquisitions,
-            simulate=simulate,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
         )
 
         utilities = []
-        sampled_indices = []
+        queried_indices = []
         for i, (tX_cand_current, ty_cand_current, X_cand_current) in enumerate(
             zip(tX_cand, ty_cand, X_cand)
         ):
@@ -459,26 +477,26 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
                 **kwargs
             )
             if len(sample):
-                sampled_indices.append(i)
+                queried_indices.append(i)
             utilities.append(utility)
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         kwargs : kwargs
             Optional kwargs for budget_manager and query_strategy.
@@ -489,13 +507,12 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             The ForgettingWrapper returns itself, after it is updated.
         """
         self._validate_base_query_strategy()
-        self.base_query_strategy_.update(X_cand, sampled, **kwargs)
+        self.base_query_strategy_.update(X_cand, queried, **kwargs)
         return self
 
     def _validate_data(
         self,
         X_cand,
-        return_utilities,
         X,
         y,
         tX,
@@ -503,8 +520,9 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         tX_cand,
         ty_cand,
         acquisitions,
-        simulate,
         sample_weight,
+        simulate,
+        return_utilities,
         reset=True,
         **check_X_cand_params
     ):
@@ -513,7 +531,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -529,16 +547,16 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             Arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -564,18 +582,15 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             Checked arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
+        sample_weight : array-like of shape (n_samples,)
+            Checked sample weights for X
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
         """
         (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -583,11 +598,11 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         ) = super()._validate_data(
             X_cand=X_cand,
-            return_utilities=return_utilities,
             X=X,
             y=y,
             tX=tX,
@@ -595,8 +610,9 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             tX_cand=tX_cand,
             ty_cand=ty_cand,
             acquisitions=acquisitions,
-            simulate=simulate,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
             reset=reset,
             **check_X_cand_params
         )
@@ -605,7 +621,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
 
         return (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -613,8 +628,9 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         )
 
     def _validate_w_train(self):
@@ -703,7 +719,7 @@ class BaggingDelaySimulationWrapper(
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -732,9 +748,9 @@ class BaggingDelaySimulationWrapper(
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -742,7 +758,6 @@ class BaggingDelaySimulationWrapper(
         """
         (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -750,11 +765,11 @@ class BaggingDelaySimulationWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         ) = self._validate_data(
             X_cand=X_cand,
-            return_utilities=return_utilities,
             X=X,
             y=y,
             tX=tX,
@@ -762,11 +777,12 @@ class BaggingDelaySimulationWrapper(
             tX_cand=tX_cand,
             ty_cand=ty_cand,
             acquisitions=acquisitions,
-            simulate=simulate,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
         )
         sum_utilities = np.zeros(len(X))
-        sampled_indices = []
+        queried_indices = []
         avg_utilities = []
 
         # A_geq_n_tx = get_selected_A_geq_n_tx(X, y, X_cand, ty, TY_dict)
@@ -786,7 +802,7 @@ class BaggingDelaySimulationWrapper(
                 probabilities = self.get_class_probabilities(
                     X_B_n, X, y, sample_weight
                 )
-                tmp_sampled_indices = []
+                tmp_queried_indices = []
                 tmp_avg_utilities = []
                 sum_utilities = np.zeros(self.K)
                 # simulate randomly sampleing future instances
@@ -823,7 +839,7 @@ class BaggingDelaySimulationWrapper(
                 avg_utilities.append(tmp_avg_utilities[0])
             else:
                 (
-                    tmp_sampled_indices,
+                    tmp_queried_indices,
                     tmp_utilities,
                 ) = self.base_query_strategy_.query(
                     X_cand=X_cand[[i], :],
@@ -843,21 +859,21 @@ class BaggingDelaySimulationWrapper(
                 avg_utilities.append(tmp_utilities[0])
 
         avg_utilities = np.array(avg_utilities)
-        sampled_indices = self.base_query_strategy_.budget_manager_.sample(
+        queried_indices = self.base_query_strategy_.budget_manager_.query(
             avg_utilities, simulate=True
         )
-        sampled = np.zeros(len(X_cand))
-        sampled[sampled_indices] = 1
+        queried = np.zeros(len(X_cand))
+        queried[queried_indices] = 1
         kwargs = dict(utilities=avg_utilities)
         if not simulate:
             self.base_query_strategy_.update(
-                X_cand=X_cand, sampled=sampled, budget_manager_kwargs=kwargs
+                X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
             )
 
         if return_utilities:
-            return sampled_indices, avg_utilities
+            return queried_indices, avg_utilities
         else:
-            return sampled_indices
+            return queried_indices
 
     def get_class_probabilities(self, X_B_n, X, y, sample_weight):
         """Calculate the probabilities for the simulating 'X_B_n' window.
@@ -865,7 +881,7 @@ class BaggingDelaySimulationWrapper(
         Parameters
         ----------
         X_B_n : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -888,18 +904,18 @@ class BaggingDelaySimulationWrapper(
         )
         return probabilities
 
-    def update(self, X_cand, sampled, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         kwargs : kwargs
             Optional kwargs for budget_manager and query_strategy.
@@ -910,13 +926,12 @@ class BaggingDelaySimulationWrapper(
             The BaggingDelaySimulationWrapper returns itself, after it is updated.
         """
         self._validate_base_query_strategy()
-        self.base_query_strategy_.update(X_cand, sampled, **kwargs)
+        self.base_query_strategy_.update(X_cand, queried, **kwargs)
         return self
 
     def _validate_data(
         self,
         X_cand,
-        return_utilities,
         X,
         y,
         tX,
@@ -924,8 +939,9 @@ class BaggingDelaySimulationWrapper(
         tX_cand,
         ty_cand,
         acquisitions,
-        simulate,
         sample_weight,
+        simulate,
+        return_utilities,
         reset=True,
         **check_X_cand_params
     ):
@@ -934,7 +950,7 @@ class BaggingDelaySimulationWrapper(
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -950,16 +966,16 @@ class BaggingDelaySimulationWrapper(
             Arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -985,18 +1001,15 @@ class BaggingDelaySimulationWrapper(
             Checked arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
+        sample_weight : array-like of shape (n_samples,)
+            Checked sample weights for X
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
         """
         (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -1004,11 +1017,11 @@ class BaggingDelaySimulationWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         ) = super()._validate_data(
             X_cand=X_cand,
-            return_utilities=return_utilities,
             X=X,
             y=y,
             tX=tX,
@@ -1016,8 +1029,9 @@ class BaggingDelaySimulationWrapper(
             tX_cand=tX_cand,
             ty_cand=ty_cand,
             acquisitions=acquisitions,
-            simulate=simulate,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
             reset=reset,
             **check_X_cand_params
         )
@@ -1028,7 +1042,6 @@ class BaggingDelaySimulationWrapper(
 
         return (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -1036,8 +1049,9 @@ class BaggingDelaySimulationWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         )
 
     def _validate_K(self):
@@ -1144,8 +1158,8 @@ class FuzzyDelaySimulationWrapper(
         ty_cand,
         acquisitions,
         sample_weight=None,
-        return_utilities=False,
         simulate=False,
+        return_utilities=False,
         al_kwargs={},
         **kwargs
     ):
@@ -1159,7 +1173,7 @@ class FuzzyDelaySimulationWrapper(
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -1175,22 +1189,22 @@ class FuzzyDelaySimulationWrapper(
             Arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -1222,7 +1236,7 @@ class FuzzyDelaySimulationWrapper(
             sample_weight=sample_weight,
         )
 
-        sampled_indices = []
+        queried_indices = []
         utilities = []
 
         for i, (tX_cand_current, ty_cand_current) in enumerate(
@@ -1251,7 +1265,7 @@ class FuzzyDelaySimulationWrapper(
                 add_ty = []
                 add_sample_weight = []
                 simulate_ty = (np.max([ty, tX]) + tX_cand_current) / 2
-                tmp_sampled_indices = []
+                tmp_queried_indices = []
                 tmp_utilities = []
                 add_acquisitions = []
                 for count in range(len(X_B_n)):
@@ -1273,7 +1287,7 @@ class FuzzyDelaySimulationWrapper(
                     [sample_weight, add_sample_weight]
                 )
                 (
-                    tmp_sampled_indices,
+                    tmp_queried_indices,
                     tmp_utilities,
                 ) = self.base_query_strategy_.query(
                     X_cand=X_cand[[i], :],
@@ -1290,12 +1304,12 @@ class FuzzyDelaySimulationWrapper(
                     **al_kwargs,
                     **kwargs
                 )
-                if len(tmp_sampled_indices):
-                    sampled_indices.append(i)
+                if len(tmp_queried_indices):
+                    queried_indices.append(i)
                 utilities.append(tmp_utilities[0])
             else:
                 (
-                    tmp_sampled_indices,
+                    tmp_queried_indices,
                     tmp_utilities,
                 ) = self.base_query_strategy_.query(
                     X_cand=X_cand[[i], :],
@@ -1312,23 +1326,23 @@ class FuzzyDelaySimulationWrapper(
                     **al_kwargs,
                     **kwargs
                 )
-                if len(tmp_sampled_indices):
-                    sampled_indices.append(i)
+                if len(tmp_queried_indices):
+                    queried_indices.append(i)
                 utilities.append(tmp_utilities[0])
 
         # update base_query_strategy
-        sampled = np.zeros(len(X_cand))
-        sampled[tmp_sampled_indices] = 1
+        queried = np.zeros(len(X_cand))
+        queried[tmp_queried_indices] = 1
         kwargs = dict(utilities=utilities)
         if not simulate:
             self.base_query_strategy_.update(
-                X_cand=X_cand, sampled=sampled, budget_manager_kwargs=kwargs
+                X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
             )
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
     def get_class_probabilities(self, X_B_n, X, y, sample_weight):
         """Calculate the probabilities for the simulating 'X_B_n' window.
@@ -1336,7 +1350,7 @@ class FuzzyDelaySimulationWrapper(
         Parameters
         ----------
         X_B_n : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -1359,18 +1373,18 @@ class FuzzyDelaySimulationWrapper(
         )
         return probabilities
 
-    def update(self, X_cand, sampled, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         kwargs : kwargs
             Optional kwargs for budget_manager and query_strategy.
@@ -1381,7 +1395,7 @@ class FuzzyDelaySimulationWrapper(
             The FuzzyDelaySimulationWrapper returns itself, after it is updated.
         """
         self._validate_base_query_strategy()
-        self.base_query_strategy_.update(X_cand, sampled, **kwargs)
+        self.base_query_strategy_.update(X_cand, queried, **kwargs)
         return self
 
     def _validate_data(
@@ -1405,7 +1419,7 @@ class FuzzyDelaySimulationWrapper(
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
@@ -1421,16 +1435,16 @@ class FuzzyDelaySimulationWrapper(
             Arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -1456,18 +1470,15 @@ class FuzzyDelaySimulationWrapper(
             Checked arrival time of the Labels 'y_cand'
         acquisitions : array-like of shape (n_samples)
             List of arrived labels. True if Label arrived otherwise False
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
+        sample_weight : array-like of shape (n_samples,)
+            Checked sample weights for X
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
         """
         (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -1475,11 +1486,11 @@ class FuzzyDelaySimulationWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         ) = super()._validate_data(
             X_cand=X_cand,
-            return_utilities=return_utilities,
             X=X,
             y=y,
             tX=tX,
@@ -1487,8 +1498,9 @@ class FuzzyDelaySimulationWrapper(
             tX_cand=tX_cand,
             ty_cand=ty_cand,
             acquisitions=acquisitions,
-            simulate=simulate,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
             reset=reset,
             **check_X_cand_params
         )
@@ -1497,7 +1509,6 @@ class FuzzyDelaySimulationWrapper(
 
         return (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -1505,8 +1516,9 @@ class FuzzyDelaySimulationWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         )
 
     def _validate_delay_prior(self):

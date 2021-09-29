@@ -167,5 +167,5 @@ class TestStream(unittest.TestCase):
 
         query_strategy_update = query_strategy_class(random_state=qs_rand_seed)
         query_strategy_update.update(
-            X_cand=np.array([]).reshape([0, 2]), sampled=np.array([])
+            X_cand=np.array([]).reshape([0, 2]), queried=np.array([])
         )

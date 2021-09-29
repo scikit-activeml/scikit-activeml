@@ -91,7 +91,7 @@ class TestStreamDelay(unittest.TestCase):
         for t, (x_t, y_t, tX_t, ty_t) in enumerate(
             zip(X_stream, y_stream, tX_stream, ty_stream)
         ):
-            sampled_indices = query_strategy.query(
+            queried_indices = query_strategy.query(
                 X_cand=x_t.reshape([1, -1]),
                 X=X_train,
                 y=y_train,
@@ -102,7 +102,7 @@ class TestStreamDelay(unittest.TestCase):
                 acquisitions=acquisitions,
             )
 
-            acquisitions.append((len(sampled_indices) > 0))
+            acquisitions.append((len(queried_indices) > 0))
             # add the current instance to the training data
             tX_train.append(tX_t)
             ty_train.append(ty_t)
@@ -191,7 +191,7 @@ class TestStreamDelay(unittest.TestCase):
         for t, (x_t, y_t, tX_t, ty_t) in enumerate(
             zip(X_stream, y_stream, tX_stream, ty_stream)
         ):
-            sampled_indices_1, utilities_1 = query_strategy_1.query(
+            queried_indices_1, utilities_1 = query_strategy_1.query(
                 x_t.reshape([1, -1]),
                 X=X_train,
                 y=y_train,
@@ -203,7 +203,7 @@ class TestStreamDelay(unittest.TestCase):
                 return_utilities=True,
             )
 
-            sampled_indices_2, utilities_2 = query_strategy_2.query(
+            queried_indices_2, utilities_2 = query_strategy_2.query(
                 x_t.reshape([1, -1]),
                 X=X_train,
                 y=y_train,
@@ -215,26 +215,26 @@ class TestStreamDelay(unittest.TestCase):
                 simulate=True,
                 return_utilities=True,
             )
-            sampled = np.array([len(sampled_indices_2) > 0])
+            queried = np.array([len(queried_indices_2) > 0])
             query_strategy_2.update(
-                x_t.reshape([1, -1]), sampled, X=X_train, y=y_train
+                x_t.reshape([1, -1]), queried, X=X_train, y=y_train
             )
 
-            # if (len(sampled_indices_1) != len(sampled_indices_2)) or (
+            # if (len(queried_indices_1) != len(queried_indices_2)) or (
             #     utilities_1[0] != utilities_2[0]
             # ):
             #     print("query_strategy_class", query_strategy_class)
             #     print("t", t)
 
-            #     print("sampled_indices_1", sampled_indices_1)
+            #     print("queried_indices_1", queried_indices_1)
             #     print("utilities_1", utilities_1)
 
-            #     print("sampled_indices_2", sampled_indices_2)
+            #     print("queried_indices_2", queried_indices_2)
             #     print("utilities_2", utilities_2)
             self.assertEqual(utilities_1[0], utilities_2[0])
-            self.assertEqual(len(sampled_indices_1), len(sampled_indices_2))
+            self.assertEqual(len(queried_indices_1), len(queried_indices_2))
 
-            acquisitions.append((len(sampled_indices_1) > 0))
+            acquisitions.append((len(queried_indices_1) > 0))
             # add the current instance to the training data
             tX_train.append(tX_t)
             ty_train.append(ty_t)
@@ -243,5 +243,5 @@ class TestStreamDelay(unittest.TestCase):
 
         query_strategy_update = query_strategy_class(random_state=qs_rand_seed)
         query_strategy_update.update(
-            X_cand=np.array([]).reshape([0, 2]), sampled=np.array([])
+            X_cand=np.array([]).reshape([0, 2]), queried=np.array([])
         )

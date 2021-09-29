@@ -1,7 +1,5 @@
 import numpy as np
 
-from sklearn.utils import check_array
-
 from sklearn.base import is_classifier, clone
 
 from ..base import SingleAnnotStreamBasedQueryStrategy
@@ -18,7 +16,7 @@ from .budget_manager import (
 class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """The FixedUncertainty (Fixed-Uncertainty in [1]) query strategy samples
     instances based on the classifiers uncertainty assessed based on the
-    classifier's predictions. The instance is sampled when the probability of
+    classifier's predictions. The instance is queried when the probability of
     the most likely class exceeds a threshold calculated based on the budget
     and the number of classes.
 
@@ -60,8 +58,8 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X_cand,
         X,
         y,
-        return_utilities=False,
         simulate=False,
+        return_utilities=False,
         sample_weight=None,
         **kwargs
     ):
@@ -75,28 +73,28 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -104,37 +102,37 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         self._validate_data(
             X_cand,
-            return_utilities,
-            X,
-            y,
-            simulate,
+            X=X,
+            y=y,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
         )
 
         predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
-        sampled_indices = self.budget_manager_.sample(
+        queried_indices = self.budget_manager_.query(
             utilities, simulate=simulate
         )
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
@@ -146,16 +144,16 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled, **budget_manager_kwargs)
+        self.budget_manager_.update(queried, **budget_manager_kwargs)
         return self
 
     def _validate_data(
         self,
         X_cand,
-        return_utilities,
         X,
         y,
         simulate,
+        return_utilities,
         sample_weight,
         reset=True,
         **check_X_cand_params
@@ -165,19 +163,20 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -187,16 +186,20 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        X_cand: np.ndarray of shape (n_candidates, n_features)
-            Checked candidate samples.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        X : array-like of shape (n_samples, n_features)
-            Checked Input samples.
-        y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'.
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        X: np.ndarray, shape (n_samples, n_features)
+            Checked training samples
+        y: np.ndarray, shape (n_candidates)
+            Checked training labels
+        sampling_weight: np.ndarray, shape (n_candidates)
+            Checked training sample weight
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
         """
         X_cand, return_utilities, simulate = super()._validate_data(
             X_cand,
@@ -209,7 +212,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         self._validate_clf(X, y, sample_weight)
         self._validate_random_state()
 
-        return X_cand, return_utilities, X, y, simulate
+        return X_cand, X, y, sample_weight, simulate, return_utilities
 
     def _validate_clf(self, X, y, sample_weight):
         """Validate if clf is a classifier or create a new clf and fit X and y.
@@ -252,7 +255,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
 class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """The VariableUncertainty (Var-Uncertainty in [1]) query strategy samples
     instances based on the classifiers uncertainty assessed based on the
-    classifier's predictions. The instance is sampled when the probability of
+    classifier's predictions. The instance is queried when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
     on the budget, the number of classes and the number of observed and
     acquired samples.
@@ -310,7 +313,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         X : array-like of shape (n_samples, n_features)
@@ -334,9 +337,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -354,29 +357,29 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
-        sampled_indices = []
+        queried_indices = []
 
-        sampled_indices = self.budget_manager_.sample(
+        queried_indices = self.budget_manager_.query(
             utilities, simulate=simulate
         )
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
@@ -388,7 +391,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(sampled, **budget_manager_kwargs)
+        self.budget_manager_.update(queried, **budget_manager_kwargs)
         return self
 
     def _validate_data(
@@ -407,19 +410,20 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+        simulate : bool, optional
+            If True, the internal state of the query strategy before and after
+            the query is the same. This should only be used to prevent the
+            query strategy from adapting itself. Note, that this is propagated
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -429,16 +433,20 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        X_cand: np.ndarray of shape (n_candidates, n_features)
-            Checked candidate samples.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        X : array-like of shape (n_samples, n_features)
-            Checked Input samples.
-        y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'.
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        X: np.ndarray, shape (n_samples, n_features)
+            Checked training samples
+        y: np.ndarray, shape (n_candidates)
+            Checked training labels
+        sampling_weight: np.ndarray, shape (n_candidates)
+            Checked training sample weight
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
         """
         X_cand, return_utilities, simulate = super()._validate_data(
             X_cand,
@@ -545,7 +553,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         X : array-like of shape (n_samples, n_features)
@@ -569,9 +577,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
+            0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -588,29 +596,29 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
         predict_proba = self.clf_.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
-        sampled_indices = []
+        queried_indices = []
 
-        sampled_indices = self.budget_manager_.sample(
+        queried_indices = self.budget_manager_.query(
             utilities, simulate=simulate
         )
 
         if return_utilities:
-            return sampled_indices, utilities
+            return queried_indices, utilities
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, X_cand, sampled, budget_manager_kwargs={}, **kwargs):
-        """Updates the budget manager and the count for seen and sampled
+    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+        """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
@@ -625,7 +633,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         # Check if a random state is set
         self._validate_random_state()
 
-        self.budget_manager_.update(sampled, **budget_manager_kwargs)
+        self.budget_manager_.update(queried, **budget_manager_kwargs)
         return self
 
     def _validate_data(
@@ -644,21 +652,20 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        simulate : bool,
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+        simulate : bool, optional
             If True, the internal state of the query strategy before and after
             the query is the same. This should only be used to prevent the
             query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -668,16 +675,20 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
         Returns
         -------
-        X_cand: np.ndarray of shape (n_candidates, n_features)
-            Checked candidate samples.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        X : array-like of shape (n_samples, n_features)
-            Checked Input samples.
-        y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'.
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        X: np.ndarray, shape (n_samples, n_features)
+            Checked training samples
+        y: np.ndarray, shape (n_candidates)
+            Checked training labels
+        sampling_weight: np.ndarray, shape (n_candidates)
+            Checked training sample weight
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
         """
         X_cand, return_utilities, simulate = super()._validate_data(
             X_cand,

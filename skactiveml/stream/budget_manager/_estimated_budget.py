@@ -7,7 +7,7 @@ from skactiveml.utils import check_random_state
 
 class EstimatedBudget(BudgetManager):
     """Budget manager which checks, whether the specified budget has been
-    exhausted already. If not, an instance is sampled, when the utility is
+    exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget.
 
     This budget manager calculates the estimated budget spent in the last
@@ -21,7 +21,7 @@ class EstimatedBudget(BudgetManager):
     Parameters
     ----------
     budget : float
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of instances which are allowed to be queried, with
         0 <= budget <= 1.
     w : int
         Specifies the size of the memory window. Controlles the budget in the
@@ -33,7 +33,7 @@ class EstimatedBudget(BudgetManager):
         self.w = w
 
     def is_budget_left(self):
-        """Check whether there is any utility given to sample(...), which may
+        """Check whether there is any utility given to query(...), which may
         lead to sampling the corresponding instance, i.e., check if sampling
         another instance is currently possible under the budgeting constraint.
         This function is useful to determine, whether a provided
@@ -49,13 +49,13 @@ class EstimatedBudget(BudgetManager):
         """
         return self.budget_ > self.u_t_ / self.w
 
-    def update(self, sampled, **kwargs):
+    def update(self, queried, **kwargs):
         """Updates the budget manager.
 
         Parameters
         ----------
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -67,8 +67,8 @@ class EstimatedBudget(BudgetManager):
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
-        # update u_t for sampled X_cand
-        for s in sampled:
+        # update u_t for queried X_cand
+        for s in queried:
             self.u_t_ = self.u_t_ * ((self.w - 1) / self.w) + s
 
         return self
@@ -77,7 +77,7 @@ class EstimatedBudget(BudgetManager):
 class FixedUncertaintyBudget(EstimatedBudget):
     """Budget manager which is optimized for FixedUncertainty and checks,
     whether the specified budget has been exhausted already. If not, an
-    instance is sampled, when the utility is higher than the specified budget
+    instance is queried, when the utility is higher than the specified budget
     and the probability of the most likely class exceeds a threshold
     calculated based on the budget and the number of classes.
     See also :class:`.EstimatedBudget`
@@ -85,7 +85,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
     Parameters
     ----------
     budget : float
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of instances which are allowed to be queried, with
         0 <= budget <= 1.
     w : int
         Specifies the size of the memory window. Controlles the budget in the
@@ -98,10 +98,10 @@ class FixedUncertaintyBudget(EstimatedBudget):
         super().__init__(budget, w)
         self.num_classes = num_classes
 
-    def sample(
-        self, utilities, return_budget_left=False, simulate=False, **kwargs
+    def query(
+        self, utilities, simulate=False, return_budget_left=False, **kwargs
     ):
-        """Ask the budget manager which utilities are sufficient to sample the
+        """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
 
         Parameters
@@ -110,35 +110,33 @@ class FixedUncertaintyBudget(EstimatedBudget):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
-
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
             the query is the same. This should only be used to prevent the
             budget manager from adapting itself. The default is False.
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances represented by utilities which should be
-            sampled, with 0 <= n_sampled_instances <= n_samples.
+            queried, with 0 <= n_queried_instances <= n_samples.
 
         budget_left: ndarray of shape (n_samples,), optional
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        utilities, return_budget_left, simulate = self._validate_data(
-            utilities, return_budget_left, simulate
+        utilities, simulate, return_budget_left = self._validate_data(
+            utilities, simulate, return_budget_left
         )
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
 
         # intialize return parameters
-        sampled_indices = []
+        queried_indices = []
         budget_left = []
         # calculate theta with num_classes
         theta = 1 / self.num_classes + self.budget_ * (
@@ -157,9 +155,9 @@ class FixedUncertaintyBudget(EstimatedBudget):
                 d = False
             # u_t = u_t-1 * (w-1)/w + labeling_t
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + d
-            # get the indices instances that should be sampled
+            # get the indices instances that should be queried
             if d:
-                sampled_indices.append(i)
+                queried_indices.append(i)
 
         # set the internal state to the previous values
         if not simulate:
@@ -167,17 +165,17 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
         # check if budget_left should be returned
         if return_budget_left:
-            return sampled_indices, budget_left
+            return queried_indices, budget_left
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, sampled, **kwargs):
+    def update(self, queried, **kwargs):
         """Updates the budget manager.
 
         Parameters
         ----------
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -185,10 +183,10 @@ class FixedUncertaintyBudget(EstimatedBudget):
             The EstimatedBudget returns itself, after it is updated.
         """
 
-        super().update(sampled)
+        super().update(queried)
         return self
 
-    def _validate_data(self, utilities, return_budget_left, simulate):
+    def _validate_data(self, utilities, simulate, return_budget_left):
         """Validate input data.
 
         Parameters
@@ -212,13 +210,13 @@ class FixedUncertaintyBudget(EstimatedBudget):
             Checked boolean value of `simulate`.
         """
 
-        utilities, return_budget_left, simulate = super()._validate_data(
-            utilities, return_budget_left, simulate
+        utilities, simulate, return_budget_left = super()._validate_data(
+            utilities, simulate, return_budget_left
         )
         self._validate_w()
         self._validate_num_classes()
 
-        return utilities, return_budget_left, simulate
+        return utilities, simulate, return_budget_left
 
     def _validate_num_classes(self):
         """Validate if num_classes is an integer and greater than 0.
@@ -250,7 +248,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
 class VarUncertaintyBudget(EstimatedBudget):
     """Budget manager which checks, whether the specified budget has been
-    exhausted already. If not, an instance is sampled, when the utility is
+    exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
     on the budget, the number of classes and the number of observed and
@@ -268,7 +266,7 @@ class VarUncertaintyBudget(EstimatedBudget):
     Parameters
     ----------
     budget : float
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of instances which are allowed to be queried, with
         0 <= budget <= 1.
     w : int
         Specifies the size of the memory window. Controlles the budget in the
@@ -286,8 +284,8 @@ class VarUncertaintyBudget(EstimatedBudget):
         self.theta = theta
         self.s = s
 
-    def sample(
-        self, utilities, return_budget_left=False, simulate=False, **kwargs
+    def query(
+        self, utilities, simulate=False, return_budget_left=False, **kwargs
     ):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
@@ -298,28 +296,26 @@ class VarUncertaintyBudget(EstimatedBudget):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
-
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
             the query is the same. This should only be used to prevent the
             budget manager from adapting itself. The default is False.
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances represented by utilities which should be
-            sampled, with 0 <= n_sampled_instances <= n_samples.
+            queried, with 0 <= n_queried_instances <= n_samples.
 
         budget_left: ndarray of shape (n_samples,), optional
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        utilities, return_budget_left, simulate = self._validate_data(
-            utilities, return_budget_left, simulate
+        utilities, simulate, return_budget_left = self._validate_data(
+            utilities, simulate, return_budget_left
         )
         # check if theta exists
         if not hasattr(self, "theta_"):
@@ -329,7 +325,7 @@ class VarUncertaintyBudget(EstimatedBudget):
             self.u_t_ = 0
 
         # intialize return parameters
-        sampled_indices = []
+        queried_indices = []
         budget_left = []
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
@@ -343,10 +339,10 @@ class VarUncertaintyBudget(EstimatedBudget):
                 sample = False
             else:
                 sample = u < tmp_theta
-                # get the indices instances that should be sampled
+                # get the indices instances that should be queried
                 if sample:
                     tmp_theta *= 1 - self.s
-                    sampled_indices.append(i)
+                    queried_indices.append(i)
                 else:
                     tmp_theta *= 1 + self.s
             # u_t = u_t-1 * (w-1)/w + labeling_t
@@ -359,17 +355,17 @@ class VarUncertaintyBudget(EstimatedBudget):
 
         # check if budget_left should be returned
         if return_budget_left:
-            return sampled_indices, budget_left
+            return queried_indices, budget_left
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, sampled, **kwargs):
+    def update(self, queried, **kwargs):
         """Updates the budget manager.
 
         Parameters
         ----------
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -377,7 +373,7 @@ class VarUncertaintyBudget(EstimatedBudget):
             The EstimatedBudget returns itself, after it is updated.
         """
 
-        for i, s in enumerate(sampled):
+        for i, s in enumerate(queried):
             if self.is_budget_left():
                 if s:
                     self.theta_ *= 1 - self.s
@@ -386,7 +382,7 @@ class VarUncertaintyBudget(EstimatedBudget):
             super().update([s])
         return self
 
-    def _validate_data(self, utilities, return_budget_left, simulate):
+    def _validate_data(self, utilities, simulate, return_budget_left):
         """Validate input data.
 
         Parameters
@@ -394,24 +390,25 @@ class VarUncertaintyBudget(EstimatedBudget):
         utilities: ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy.
-        return_budget_left : bool,
-            If true, also return the budget based on the query strategy.
         simulate : bool,
             If True, the internal state of the budget manager before and after
             the query is the same.
+        return_budget_left : bool,
+            If true, also return the budget based on the query strategy.
+
 
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
             Checked utilities.
-        return_budget_left : bool,
-            Checked boolean value of `return_budget_left`.
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_budget_left : bool,
+            Checked boolean value of `return_budget_left`.
         """
 
-        utilities, return_budget_left, simulate = super()._validate_data(
-            utilities, return_budget_left, simulate
+        utilities, simulate, return_budget_left = super()._validate_data(
+            utilities, simulate, return_budget_left
         )
         # Check w
         self._validate_w()
@@ -420,7 +417,7 @@ class VarUncertaintyBudget(EstimatedBudget):
         # Chack s
         self._validate_s()
 
-        return utilities, return_budget_left, simulate
+        return utilities, simulate, return_budget_left
 
     def _validate_theta(self):
         """Validate if theta is set as a float.
@@ -459,15 +456,14 @@ class VarUncertaintyBudget(EstimatedBudget):
 
 class SplitBudget(EstimatedBudget):
     """Budget manager which checks, whether the specified budget has been
-    exhausted already. If not, an instance is sampled, when the utility is
-    higher than the specified budget. 100*v% of instances will be sampled
-    randomly and in 100*(1-v)% of will be sampled cases according
+    exhausted already. If not, an instance is queried, when the utility is
+    higher than the specified budget. 100*v% of instances will be queried
+    randomly and in 100*(1-v)% of will be queried cases according
     to VarUncertainty
 
     This budget manager calculates the estimated budget spent in the last
     w steps and compares that to the budget. If the ratio is smaller
-    than the specified budget, i.e.,
-    budget - u_t / w > 0 , the budget
+    than the specified budget, i.e., budget - u_t / w > 0 , the budget
     manager samples an instance when its utility is higher than the budget.
     u is the estimate of how many true lables were queried within the last
     w steps. The recursive funktion,
@@ -476,7 +472,7 @@ class SplitBudget(EstimatedBudget):
     Parameters
     ----------
     budget : float
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of instances which are allowed to be queried, with
         0 <= budget <= 1.
     w : int
         Specifies the size of the memory window. Controlles the budget in the
@@ -488,7 +484,7 @@ class SplitBudget(EstimatedBudget):
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
     v : float
-        Specifies the percent value of instances sampled randomly.
+        Specifies the percent value of instances queried randomly.
     """
 
     def __init__(
@@ -500,8 +496,8 @@ class SplitBudget(EstimatedBudget):
         self.s = s
         self.random_state = random_state
 
-    def sample(
-        self, utilities, return_budget_left=False, simulate=False, **kwargs
+    def query(
+        self, utilities, simulate=False, return_budget_left=False, **kwargs
     ):
         """Ask the budget manager which utilities are sufficient to sample the
         corresponding instance.
@@ -512,28 +508,26 @@ class SplitBudget(EstimatedBudget):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
-
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
             the query is the same. This should only be used to prevent the
             budget manager from adapting itself. The default is False.
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
 
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances represented by utilities which should be
-            sampled, with 0 <= n_sampled_instances <= n_samples.
+            queried, with 0 <= n_queried_instances <= n_samples.
 
         budget_left: ndarray of shape (n_samples,), optional
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        utilities, return_budget_left, simulate = self._validate_data(
-            utilities, return_budget_left, simulate
+        utilities, simulate, return_budget_left = self._validate_data(
+            utilities, simulate, return_budget_left
         )
         # check if theta exists
         if not hasattr(self, "theta_"):
@@ -543,15 +537,15 @@ class SplitBudget(EstimatedBudget):
             self.u_t_ = 0
 
         # intialise return parameters
-        sampled_indices = []
+        queried_indices = []
         budget_left = []
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
         tmp_theta = self.theta_
         random_state_state = self.random_state_.get_state()
 
-        # check for each sample separately if budget is left and the utility is
-        # high enough
+        # check for each queried separately if budget is left and the utility
+        # is high enough
         for i, u in enumerate(utilities):
             budget_left.append(tmp_u_t / self.w < self.budget_)
             if not budget_left[-1]:
@@ -564,13 +558,13 @@ class SplitBudget(EstimatedBudget):
                     sample = new_u <= self.budget_
                 else:
                     sample = u < tmp_theta
-                    # get the indices instances that should be sampled
+                    # get the indices instances that should be queried
                     if sample:
                         tmp_theta *= 1 - self.s
                     else:
                         tmp_theta *= 1 + self.s
                 if sample:
-                    sampled_indices.append(i)
+                    queried_indices.append(i)
 
             # u_t = u_t-1 * (w-1)/w + labeling_t
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + sample
@@ -584,17 +578,17 @@ class SplitBudget(EstimatedBudget):
 
         # check if budget_left should be returned
         if return_budget_left:
-            return sampled_indices, budget_left
+            return queried_indices, budget_left
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, sampled, **kwargs):
+    def update(self, queried, **kwargs):
         """Updates the budget manager.
 
         Parameters
         ----------
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -602,7 +596,7 @@ class SplitBudget(EstimatedBudget):
             The EstimatedBudget returns itself, after it is updated.
         """
 
-        for s in sampled:
+        for s in queried:
             if self.u_t_ / self.w < self.budget_:  # self.is_budget_left():
                 if self.v > self.random_state_.random_sample():
                     _ = self.random_state_.random_sample()
@@ -638,8 +632,8 @@ class SplitBudget(EstimatedBudget):
             Checked boolean value of `simulate`.
         """
 
-        utilities, return_budget_left, simulate = super()._validate_data(
-            utilities, return_budget_left, simulate
+        utilities, simulate, return_budget_left = super()._validate_data(
+            utilities, simulate, return_budget_left
         )
         # Check w
         self._validate_w()

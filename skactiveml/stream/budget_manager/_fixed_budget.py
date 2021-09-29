@@ -41,10 +41,10 @@ class FixedBudget(BudgetManager):
         )
         return available_budget >= 1
 
-    def sample(
+    def query(
         self, utilities, simulate=False, return_budget_left=False, **kwargs
     ):
-        """Ask the budget manager which utilities are sufficient to sample the
+        """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
         Parameters
         ----------
@@ -52,31 +52,31 @@ class FixedBudget(BudgetManager):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
             the query is the same. This should only be used to prevent the
             budget manager from adapting itself. The default is False.
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances represented by utilities which should be
-            sampled, with 0 <= n_sampled_instances <= n_samples.
+            sampled, with 0 <= n_queried_instances <= n_samples.
         budget_left: ndarray of shape (n_samples,), optional
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        self._validate_data(utilities, return_budget_left, simulate)
+        self._validate_data(utilities, simulate, return_budget_left)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
-        # keep record if the instance is sampled and if there was budget left,
+        # keep record if the instance is queried and if there was budget left,
         # when assessing the corresponding utilities
-        sampled = np.full(len(utilities), False)
+        queried = np.full(len(utilities), False)
         budget_left = np.full(len(utilities), False)
 
         # keep the internal state to reset it later if simulate is true
@@ -89,29 +89,29 @@ class FixedBudget(BudgetManager):
             budget_left[i] = (
                 tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
-            sampled[i] = budget_left[i] and (utility >= 1 - self.budget_)
-            tmp_queried_instances += sampled[i]
+            queried[i] = budget_left[i] and (utility >= 1 - self.budget_)
+            tmp_queried_instances += queried[i]
 
         # set the internal state to the previous values
         if not simulate:
             self.observed_instances_ = tmp_observed_instances
             self.queried_instances_ = tmp_queried_instances
 
-        # get the indices instances that should be sampled
-        sampled_indices = np.where(sampled)[0]
+        # get the indices instances that should be queried
+        queried_indices = np.where(queried)[0]
 
         # check if budget_left should be returned
         if return_budget_left:
-            return sampled_indices, budget_left
+            return queried_indices, budget_left
         else:
-            return sampled_indices
+            return queried_indices
 
-    def update(self, sampled, **kwargs):
+    def update(self, queried, **kwargs):
         """Updates the budget manager.
         Parameters
         ----------
-        sampled : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like of shape (n_samples,)
+            Indicates which instances from X_cand have been queried.
         Returns
         -------
         self : FixedBudget
@@ -124,6 +124,6 @@ class FixedBudget(BudgetManager):
             self.observed_instances_ = 0
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
-        self.observed_instances_ += sampled.shape[0]
-        self.queried_instances_ += np.sum(sampled)
+        self.observed_instances_ += queried.shape[0]
+        self.queried_instances_ += np.sum(queried)
         return self

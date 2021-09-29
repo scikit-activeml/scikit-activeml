@@ -189,17 +189,18 @@ class BudgetManager(ABC, BaseEstimator):
 
     Parameters
     ----------
-    budget : float
+    budget : float (default=None)
         Specifies the ratio of instances which are allowed to be sampled, with
-        0 <= budget <= 1.
+        0 <= budget <= 1. If budget is None, it is replaced with the default
+        budget
     """
 
-    def __init__(self, budget):
+    def __init__(self, budget=None):
         self.budget = budget
 
     @abstractmethod
     def is_budget_left(self):
-        """Check whether there is any utility given to sample(...), which may
+        """Check whether there is any utility given to query(...), which may
         lead to sampling the corresponding instance, i.e., check if sampling
         another instance is currently possible under the specified budgeting
         constraint. This function is useful to determine, whether a provided
@@ -215,10 +216,10 @@ class BudgetManager(ABC, BaseEstimator):
         return NotImplemented
 
     @abstractmethod
-    def sample(
-        self, utilities, return_budget_left=True, simulate=False, **kwargs
+    def query(
+        self, utilities, simulate=False, return_budget_left=True, **kwargs
     ):
-        """Ask the budget manager which utilities are sufficient to sample the
+        """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
        
         Parameters
@@ -228,20 +229,20 @@ class BudgetManager(ABC, BaseEstimator):
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
         
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
-        
         simulate : bool, optional
             If True, the internal state of the budget manager before and after
             the query is the same. This should only be used to prevent the
             budget manager from adapting itself. The default is False.
         
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
+        
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances represented by utilities which should be
-            sampled, with 0 <= n_sampled_instances <= n_samples.
+            queried, with 0 <= n_queried_instances <= n_samples.
         
         budget_left: ndarray of shape (n_samples,), optional
             Shows whether there was budget left for each assessed utility. Only
@@ -250,13 +251,13 @@ class BudgetManager(ABC, BaseEstimator):
         return NotImplemented
 
     @abstractmethod
-    def update(self, sampled, **kwargs):
+    def update(self, queried, **kwargs):
         """Updates the BudgetManager.
 
         Parameters
         ----------
-        sampled : array-like
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -278,13 +279,13 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = self.budget
         else:
             if default is None:
-                default = get_default_stream_budget()
+                default = self.get_default_stream_budget()
             self.budget_ = default
         check_scalar(
             self.budget_, "budget", float, min_val=0.0, max_val=1.0
         )
 
-    def _validate_data(self, utilities, return_budget_left, simulate):
+    def _validate_data(self, utilities, simulate, return_budget_left):
         """Validate input data.
 
         Parameters
@@ -292,21 +293,21 @@ class BudgetManager(ABC, BaseEstimator):
         utilities: ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy.
-        return_budget_left : bool,
-            If true, also return whether there was budget left for each
-            assessed utility.
         simulate : bool,
             If True, the internal state of the budget manager before and after
             the query is the same.
+        return_budget_left : bool,
+            If true, also return whether there was budget left for each
+            assessed utility.
 
         Returns
         -------
         utilities: ndarray of shape (n_samples,)
             Checked utilities
-        return_budget_left : bool,
-            Checked boolean value of `return_budget_left`.
         simulate : bool,
             Checked boolean value of `simulate`.
+        return_budget_left : bool,
+            Checked boolean value of `return_budget_left`.
         """
         # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
@@ -318,20 +319,19 @@ class BudgetManager(ABC, BaseEstimator):
         # Check return_utilities.
         check_scalar(simulate, "simulate", bool)
         # Check budget
-        self._validate_budget(get_default_stream_budget())
-        return utilities, return_budget_left, simulate
+        self._validate_budget(self.get_default_stream_budget())
+        return utilities, simulate, return_budget_left
 
+    def get_default_stream_budget(self):
+        """This function defines the default budget which should be used when no
+        budget is provided by the user.
 
-def get_default_stream_budget():
-    """This function defines the default budget which should be used when no
-    budget is provided by the user.
-
-        Returns
-        -------
-        default_budget: float
-            The default budget used by the user.
-        """
-    return 0.1
+            Returns
+            -------
+            default_budget: float
+                The default budget used by the user.
+            """
+        return 0.1
 
 
 class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
@@ -354,7 +354,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
     @abstractmethod
     def query(
-        self, X_cand, *args, return_utilities=False, simulate=False, **kwargs
+        self, X_cand, *args, simulate=False, return_utilities=False, **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -370,12 +370,8 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
 
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
@@ -383,9 +379,13 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
 
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_sampled_instances,)
             The indices of instances in X_cand which should be sampled, with
             0 <= n_sampled_instances <= n_samples.
 
@@ -396,23 +396,23 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return NotImplemented
 
     @abstractmethod
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, queried, *args, **kwargs):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
-        when the instances sampled from query(...) may differ from the
-        instances sampled in the end. In this case use query(...) with
+        when the instances queried from query(...) may differ from the
+        instances queried in the end. In this case use query(...) with
         simulate=true and provide the final decisions via update(...).
         This is especially helpful, when developing wrapper query strategies.
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -456,7 +456,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
@@ -474,8 +474,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         -------
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
@@ -501,18 +499,23 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         # Check budget_manager.
         self._validate_budget_manager()
 
-        return X_cand, return_utilities, simulate
+        return X_cand, simulate, return_utilities
 
 
 class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
-    """Base class for all stream-based active learning query strategies in
-       scikit-activeml.
+    """Base class for wrappers that modify the behavior of another pre-existing
+    query strategy (base_query_strategy). Ultimately, the difference between
+    SingleAnnotStreamBasedQueryStrategy and this class is that no budget is 
+    needed as it is predefined in base_query_strategy and the forwarding of
+    accesses.
+    
 
     Parameters
     ----------
-    budget_manager : BudgetManager
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting.
+    base_query_strategy : SingleAnnotStreamBasedQueryStrategy
+        The query strategy that should be wrapped. All function calls and
+        variable accesses are forwarded to the base_query_strategy if the
+        function or variable is not present within the wrapper itself.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -524,7 +527,7 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
 
     @abstractmethod
     def query(
-        self, X_cand, *args, return_utilities=False, simulate=False, **kwargs
+        self, X_cand, *args, simulate=False, return_utilities=False, **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -540,12 +543,8 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
 
         simulate : bool, optional
             If True, the internal state of the query strategy before and after
@@ -553,10 +552,14 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
             query strategy from adapting itself. Note, that this is propagated
             to the budget_manager, as well. The default is False.
 
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances in X_cand which should be queried, with
             0 <= n_sampled_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
@@ -566,23 +569,23 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         return NotImplemented
 
     @abstractmethod
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, queried, *args, **kwargs):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
-        when the instances sampled from query(...) may differ from the
-        instances sampled in the end. In this case use query(...) with
+        when the instances queried from query(...) may differ from the
+        instances queried in the end. In this case use query(...) with
         simulate=true and provide the final decisions via update(...).
         This is especially helpful, when developing wrapper query strategies.
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like
-            Indicates which instances from X_cand have been sampled.
+        queried : array-like
+            Indicates which instances from X_cand have been queried.
 
         Returns
         -------
@@ -642,7 +645,7 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         Parameters
         ----------
         X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
@@ -660,8 +663,6 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         -------
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
