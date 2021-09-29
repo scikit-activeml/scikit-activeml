@@ -26,13 +26,15 @@ class TestMultiAnnotWrapper(unittest.TestCase):
     def test_init_param_strategy(self):
         wrapper = MultiAnnotWrapper(CMM())
 
+        query_params_dict = {'X': self.X, 'y': self.y}
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
-                          self.X, self.y, A_cand=self.A_cand)
+                          query_params_dict, A_cand=self.A_cand)
 
         wrapper = MultiAnnotWrapper(0)
 
+        query_params_dict = {'X': self.X, 'y': self.y}
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
-                          self.X, self.y, A_cand=self.A_cand)
+                          query_params_dict, A_cand=self.A_cand)
 
     def test_init_param_n_annotators(self):
         random = RandomSampler(self.random_state)
@@ -83,6 +85,9 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertRaises(ValueError, wrapper.query, self.X_cand,
                           query_params_dict, A_cand=self.A_cand,
                           return_utilities=True)
+
+        self.assertRaises(TypeError, wrapper.query, self.X_cand,
+                          "string", A_cand=self.A_cand)
 
     def test_query_param_A_cand(self):
         random = RandomSampler(self.random_state)
