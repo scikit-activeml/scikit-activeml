@@ -1212,7 +1212,6 @@ class FuzzyDelaySimulationWrapper(
         """
         (
             X_cand,
-            return_utilities,
             X,
             y,
             tX,
@@ -1220,11 +1219,11 @@ class FuzzyDelaySimulationWrapper(
             tX_cand,
             ty_cand,
             acquisitions,
-            simulate,
             sample_weight,
+            simulate,
+            return_utilities,
         ) = self._validate_data(
             X_cand=X_cand,
-            return_utilities=return_utilities,
             X=X,
             y=y,
             tX=tX,
@@ -1232,8 +1231,9 @@ class FuzzyDelaySimulationWrapper(
             tX_cand=tX_cand,
             ty_cand=ty_cand,
             acquisitions=acquisitions,
-            simulate=simulate,
             sample_weight=sample_weight,
+            simulate=simulate,
+            return_utilities=return_utilities,
         )
 
         queried_indices = []
@@ -1319,10 +1319,10 @@ class FuzzyDelaySimulationWrapper(
                     ty=ty,
                     tX_cand=np.array(tX_cand[i]),
                     ty_cand=np.array(ty_cand[i]),
-                    sample_weight=sample_weight,
                     aquisitions=acquisitions,
-                    return_utilities=True,
+                    sample_weight=sample_weight,
                     simulate=True,
+                    return_utilities=True,
                     **al_kwargs,
                     **kwargs
                 )
