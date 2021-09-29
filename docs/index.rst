@@ -23,7 +23,7 @@ Welcome to scikit-activeml's documentation!
    :start-after: examples_start
    :end-before: examples_end
 
-You can find more examples under :doc:`Examples </generated/sphinx_gallery_examples/index>`
+You can find more examples under :doc:`Examples </generated/sphinx_gallery_examples/index>`.
 
 .. include:: ../README.rst
    :start-after: dev_start
