@@ -5,6 +5,7 @@ import os
 from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
+from sklearn.base import ClassifierMixin
 from sklearn.datasets import make_classification
 from sklearn.svm import LinearSVC
 
@@ -48,6 +49,9 @@ class TestFeatureSpace(unittest.TestCase):
     # Tests for plot_decision_boundary function
     def test_decision_boundary_clf(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.qs,
+                          bound=self.bound)
+        clf = TestClassifier()
+        self.assertRaises(AttributeError, plot_decision_boundary, clf=clf,
                           bound=self.bound)
 
     def test_decision_boundary_bound(self):
@@ -200,3 +204,7 @@ class TestFeatureSpace(unittest.TestCase):
                                     self.path_prefix + 'dec_bound_svc.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
+
+
+class TestClassifier(ClassifierMixin):
+    pass
