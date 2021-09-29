@@ -1,4 +1,5 @@
 import warnings
+from inspect import signature
 
 import numpy as np
 from sklearn.utils import check_random_state, check_array, check_scalar
@@ -9,6 +10,7 @@ from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
 
 from ...utils import compute_vote_vectors, rand_argmax
+from ...utils._aggregation import majority_vote
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -22,22 +24,37 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    strategy : SingleAnnotStreamBasedQueryStrategy
+    strategy : SingleAnnotPoolBasedQueryStrategy
         An active learning strategy for a single annotator.
-    random_state : int, RandomState instance, default=None
-        Controls the randomness of the estimator.
     n_annotators : int,
         Sets the number of annotators if no A_cand is None
+    y_aggregate : function,
+    array-like, shape (n_samples, n_annotators) -> array-like, shape (n_samples)
+    , default=None
+        `y_aggregate` is used, if the given `strategy` depends on y-values as
+        labels for samples.
+        `y_aggregate` is in this case used to transform `y` as a matrix of shape
+        (n_samples, n_annotators) into a vector of shape (n_samples) during
+        the querying process and then passed to the given `strategy`.
+        If `y_aggregate is None` and `y` is needed majority_vote is used as
+        `y_aggregate`.
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    n_annotators : int, default=None
+        Sets the number of annotators if `A_cand` (see query method) is None.
+        If `n_annotators` is None, `A_cand` has to be passed as an argument.
     """
 
-    def __init__(self, strategy, random_state=None, n_annotators=None):
+    def __init__(self, strategy, n_annotators=None, y_aggregate=None,
+                 random_state=None):
         super().__init__(random_state=random_state)
         self.strategy = strategy
         self.n_annotators = n_annotators
+        self.y_aggregate = y_aggregate
 
-    def query(self, X_cand, *args, A_cand=None, batch_size=1,
+    def query(self, X_cand, query_params_dict=None, A_cand=None, batch_size=1,
               return_utilities=False, pref_annotators_per_sample=1,
-              A_perfs=None, **kwargs):
+              A_perfs=None):
 
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
@@ -54,13 +71,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             Boolean matrix where `A_cand[i,j] = True` indicates that
             annotator `j` can be selected for annotating sample `X_cand[i]`,
             while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`. If A_cand=None, each
+            selected for annotating sample `X_cand[i]`. If `A_cand is None`, each
             annotator is assumed to be available for labeling each sample.
-        args : list
-            If (X, y) is contained by args. y can be a matrix or a vector
-            of assigned values. If y is a matrix the entries are interpreted
-            as follows: `y[i,j] = k` indicates that for the i-th sample the
-            j-th candidate annotator annotated the value k.
+            `A_cand` must only be None, if `n_annotators is non None`.
+        query_params_dict : dict, default=None
+            Dictionary for the parameters of the query method.
+            If `dict` contains a value for `y`, it is transformed by
+            `y_aggregate`. If `query_params_dict is None` an empty
+            dictionary is used.
         batch_size : 'adaptive'|int, optional (default=1)
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is set to 1.
@@ -118,33 +136,28 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 "but it must be a of type `SingleAnnotPoolBasedQueryStrategy`."
             )
 
-        # check args
-        if len(args) > 1:
-            X, y = args[0], args[1]
+        # check query_params_dict
+        if query_params_dict is None:
+            query_params_dict = {}
 
-            if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
-                if y.ndim > 2:
-                    raise ValueError(
-                        "The entries of args[0] and args[1] are interpreted as "
-                        "follows: args[0] is the labeling pool and args[1] is "
-                        "either the labels-vector of the labeling pool or the "
-                        "labels-annotator-matrix, where the entry at the i-th "
-                        "row and the j-th column, says that, the j-th "
-                        "annotator labeled the i-th data point with the given "
-                        "entry. Thereby the dimension of y has to be smaller "
-                        "or equal than 2."
-                    )
-                if y.ndim == 2:
-                    if y.shape[1] != A_cand.shape[1]:
-                        warnings.warn(f"y.shape[1] = {y.shape[1]} != "
-                                      f"A_cand.shape[1] = {A_cand.shape[1]}")
-                    args_list = list(args)
-                    vote_matrix = compute_vote_vectors(y)
-                    vote_vector = vote_matrix.argmax(axis=1)
-                    vote_vector = np.array(vote_vector, dtype=float)
-                    vote_vector[vote_matrix.sum(axis=1) == 0] = np.nan
-                    args_list[1] = vote_vector
-                    args = tuple(args_list)
+        if not isinstance(query_params_dict, dict):
+            raise TypeError(
+                f"`query_params_dict` must be of type `dict`."
+                f"`query_params_dict` is of type {type(query_params_dict)}."
+            )
+
+        # aggregate y
+        if 'y' in query_params_dict:
+            y_aggregate = majority_vote if self.y_aggregate is None \
+                else self.y_aggregate
+
+            if not callable(y_aggregate):
+                raise TypeError(
+                    f"`self.y_aggregate` must be callable."
+                    f"`self.y_aggregate` is of type {type(y_aggregate)}"
+                )
+
+            query_params_dict['y'] = y_aggregate(query_params_dict['y'])
 
         # set up X_cand and batch_size for the single annotator query
         a_indices = np.argwhere(np.any(A_cand, axis=1)).flatten()
@@ -217,8 +230,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 f"or of type None"
             )
 
-        val = self.strategy.query(X_cand_sq, *args, batch_size=batch_size_sq,
-                                  return_utilities=True, **kwargs)
+        val = self.strategy.query(X_cand_sq, **query_params_dict, batch_size=batch_size_sq,
+                                  return_utilities=True)
 
         single_query_indices, w_utilities = val
         sample_utilities = np.nan * np.ones((batch_size_sq, n_samples))
