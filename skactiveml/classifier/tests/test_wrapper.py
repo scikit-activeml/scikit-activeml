@@ -146,7 +146,3 @@ class TestSklearnClassifier(unittest.TestCase):
                                 random_state=0)
         clf.fit(X[:250], y[:250], sample_weight=sample_weights[:250])
         self.assertTrue(clf.score(X[250:], y_true[250:]) > 0.5)
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -165,7 +165,7 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
         Discovery Science. Springer, Cham, 2019.
     """
     if freq.shape[1] != 2:
-        raise ValueError('epistemic is only implemented for two-class '
+        raise ValueError('Epistemic is only implemented for two-class '
                          'problems, {} classes were given.'
                          ''.format(freq.shape[1]))
     n = freq[:, 0]
