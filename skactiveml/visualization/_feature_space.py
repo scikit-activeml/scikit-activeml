@@ -3,10 +3,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import Colormap
+from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array
 
-from skactiveml.base import QueryStrategy, SkactivemlClassifier
+from skactiveml.base import QueryStrategy
 from skactiveml.utils import check_scalar
 
 
@@ -18,7 +19,8 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     Parameters
     ----------
     clf: sklearn classifier # TODO correct?
-        The classifier whose decision boundary is plotted.
+        The fitted classifier whose decision boundary is plotted. If confidence
+        is not None, the classifier must implement the predict_proba function.
     bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     res: int, optional (default=21)
@@ -37,9 +39,8 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
     """
-    # TODO which type?
-    if not isinstance(clf, SkactivemlClassifier):
-        raise TypeError("'clf' must be a SkactivemlClassifier.")
+    if not isinstance(clf, ClassifierMixin):
+        raise TypeError("'clf' must be an Sklearn classifier.")
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
         ax = plt.gca()
