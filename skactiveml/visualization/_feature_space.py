@@ -98,7 +98,6 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     else:
         raise AttributeError("'clf' must implement 'predict' or "
                              "'predict_proba'")
-    # TODO check names
 
     posterior_list = []
 
