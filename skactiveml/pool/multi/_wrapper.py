@@ -1,6 +1,3 @@
-import warnings
-from inspect import signature
-
 import numpy as np
 from sklearn.utils import check_random_state, check_array, check_scalar
 import sklearn.utils.validation
@@ -9,7 +6,7 @@ from scipy.stats import rankdata
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
 
-from ...utils import compute_vote_vectors, rand_argmax
+from ...utils import rand_argmax
 from ...utils._aggregation import majority_vote
 
 
@@ -20,7 +17,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
     learning query strategies with a single annotator such that it transforms
     the query strategy for the single annotator into a query strategy for
     multiple annotators by randomly choosing an annotator and setting the
-    labeled matrix to a labeled vector by majority vote.
+    labeled matrix to a labeled vector by an aggregation function.
 
     Parameters
     ----------
@@ -28,7 +25,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         An active learning strategy for a single annotator.
     n_annotators : int,
         Sets the number of annotators if no A_cand is None
-    y_aggregate : function,
+    y_aggregate : callable,
     array-like, shape (n_samples, n_annotators) -> array-like, shape (n_samples)
     , default=None
         `y_aggregate` is used, if the given `strategy` depends on y-values as
@@ -36,8 +33,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         `y_aggregate` is in this case used to transform `y` as a matrix of shape
         (n_samples, n_annotators) into a vector of shape (n_samples) during
         the querying process and then passed to the given `strategy`.
-        If `y_aggregate is None` and `y` is needed majority_vote is used as
-        `y_aggregate`.
+        If `y_aggregate is None` and `y` is used in the strategy,
+        majority_vote is used as `y_aggregate`.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     n_annotators : int, default=None
@@ -53,8 +50,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         self.y_aggregate = y_aggregate
 
     def query(self, X_cand, query_params_dict=None, A_cand=None, batch_size=1,
-              return_utilities=False, pref_annotators_per_sample=1,
-              A_pref=None):
+              pref_annotators_per_sample=1, A_pref=None,
+              return_utilities=False):
 
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
@@ -230,7 +227,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 f"or of type None"
             )
 
-        val = self.strategy.query(X_cand_sq, **query_params_dict, batch_size=batch_size_sq,
+        val = self.strategy.query(X_cand_sq, **query_params_dict,
+                                  batch_size=batch_size_sq,
                                   return_utilities=True)
 
         single_query_indices, w_utilities = val
