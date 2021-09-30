@@ -1,8 +1,8 @@
 import numpy as np
 from sklearn.base import clone
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.base import ClassFrequencyEstimator
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, \
+    SkactivemlClassifier
 from skactiveml.utils import check_classifier_params, \
     check_X_y, is_labeled, simple_batch
 
@@ -18,7 +18,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    clf : ClassFrequencyEstimator
+    clf : SkactivemlClassifier
         Model implementing the methods 'fit' and and 'predict_proba'.
     method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is
@@ -132,9 +132,9 @@ def _expected_error_reduction(clf, X_cand, X, y, C, method='emr',
         The utilities of all unlabeled instances.
     """
     # Check if the classifier and its arguments are valid
-    if not isinstance(clf, ClassFrequencyEstimator):
+    if not isinstance(clf, SkactivemlClassifier):
         raise TypeError("'clf' must implement methods according to "
-                        "'ClassFrequencyEstimator'.")
+                        "'SkactivemlClassifier'.")
     check_classifier_params(clf.classes, clf.missing_label, C)
 
     # Check the given data
