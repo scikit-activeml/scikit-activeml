@@ -77,7 +77,7 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
 
     Returns
     -------
-    y_transformed : array-like, shape (n_samples)
+    y_aggregated : array-like, shape (n_samples)
         Assigned labels for each sample.
 
     """
@@ -90,14 +90,26 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
     is_labeled_y = np.any(is_labeled(y, missing_label), axis=1)
     y_labeled = y[is_labeled_y]
 
-    # perform voting
-    vote_matrix = compute_vote_vectors(y_labeled, w, classes, missing_label)
-    vote_vector = vote_matrix.argmax(axis=1)
+    # infer encoding
+    le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
+    le.fit(y_labeled)
+    y_aggregated = np.full((n_samples,), missing_label, dtype=le._dtype)
 
-    # assign labels
-    y_transformed = np.full((n_samples,), missing_label)
-    y_transformed[is_labeled_y] = vote_vector
+    if np.any(is_labeled_y):
+        # transform labels
+        y_labeled_transformed = le.transform(y_labeled)
+        max_value_y_l_t = np.nanmax(y_labeled_transformed)
 
-    return y_transformed
+        # perform voting
+        vote_matrix = compute_vote_vectors(y_labeled_transformed, w,
+                                           classes=np.arange(max_value_y_l_t+1))
+        vote_vector = vote_matrix.argmax(axis=1)
+
+        # inverse transform labels
+        y_labeled_inverse_transformed = le.inverse_transform(vote_vector)
+        # assign labels
+        y_aggregated[is_labeled_y] = y_labeled_inverse_transformed
+
+    return y_aggregated
 
 

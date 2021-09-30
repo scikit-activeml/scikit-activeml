@@ -27,16 +27,27 @@ class TestAggregation(unittest.TestCase):
         y = np.full(shape=(2, 3), fill_value=np.nan)
         self.assertRaises(ValueError, compute_vote_vectors, y)
 
-    def test_weighted_majority_vote(self):
+    def test_majority_vote(self):
         y = np.full(shape=(3, 3), fill_value=1, dtype=float)
         y[:, 1] = 0
         y[2, :] = np.nan
 
-        y_transformed_exp = np.full(shape=(3,), fill_value=1, dtype=float)
-        y_transformed_exp[2] = np.nan
-        y_transformed_rec = majority_vote(y=y)
+        y_aggregated_exp = np.full(shape=(3,), fill_value=1, dtype=float)
+        y_aggregated_exp[2] = np.nan
+        y_aggregated_rec = majority_vote(y=y)
 
-        np.testing.assert_array_equal(y_transformed_exp, y_transformed_rec)
+        np.testing.assert_array_equal(y_aggregated_exp, y_aggregated_rec)
+
+    def test_weighted_majority_vote_encoding(self):
+        y = [['tokyo', 'paris', 'tokyo'],
+             ['paris', 'paris', 'nan'],
+             ['nan', 'nan', 'nan']]
+        y_aggregated_rec = majority_vote(y=y,
+                                         classes=['tokyo', 'paris', 'new york'],
+                                         missing_label='nan')
+        y_aggregated_exp = ['tokyo', 'paris', 'nan']
+
+        np.testing.assert_array_equal(y_aggregated_rec, y_aggregated_exp)
 
 
 if __name__ == '__main__':
