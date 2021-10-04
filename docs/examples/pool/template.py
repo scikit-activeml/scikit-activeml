@@ -5,6 +5,7 @@ from sklearn.exceptions import NotFittedError
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, is_labeled
 from skactiveml.visualization import plot_utility, plot_decision_boundary
 #_ import
+#_bp_add_imports
 
 random_state = np.random.RandomState(0)
 
@@ -35,7 +36,8 @@ for c in range(n_cycles):
     X_labeled = X[is_labeled(y)]
 
     # Query the next instance/s.
-    query_idx = unlbld_idx[qs.query(X_cand)]  #_43 query_params
+    query_params = "#_query_params"
+    query_idx = unlbld_idx[qs.query(X_cand, **query_params)]  #_43 query_params
 
     # Plot the labeled data.
     coll_old = list(ax.collections)
@@ -44,7 +46,8 @@ for c in range(n_cycles):
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )
-    ax = plot_utility(qs, X_cand=X, bound=bound, ax=ax)  #_25 {query_params}
+    #ax = plot_utility(qs, X_cand=X, query_params, bound=bound, ax=ax)  #_25 {query_params}
+    #_bp_utilities Break point for ...
     ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
     ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
     try:

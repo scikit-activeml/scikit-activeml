@@ -604,12 +604,13 @@ def format_plot(data, template_path):
                 elif '#_bp' in line:
                     try:
                         s = line.find('#_')
-                        bp = line[s + 2:]
-                        line = line[:s]
-                        if type(data[bp[:-1]]) != list:
-                            data[bp[:-1]] = [data[bp[:-1]]]
-                        for l in data[bp[:-1]]:
-                            line += l + '\n'
+                        bp = line[s + 2:].split()[0]
+                        prefix = line[:s]
+                        line = ''
+                        if type(data[bp]) != list:
+                            data[bp] = [data[bp]]
+                        for l in data[bp]:
+                            line += prefix + l + '\n'
                     except KeyError:
                         pass
 
