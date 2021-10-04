@@ -49,4 +49,5 @@ jobs:
       run: |
         pip install jupyter
         pip install sphinx
+        pip install pydata_sphinx_theme
         sphinx-build -b html docs docs/_build

@@ -1,12 +1,13 @@
 [
   {
     "class" : "RandomSampler",
+    "method" : "Random Sampling",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Random Sampling",
+      "kumar2020active" : "Random Sampling"
     },
     "tags" : ["pool"],
-    "title" : "RandomSampler Example",
+    "title" : "Random Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",

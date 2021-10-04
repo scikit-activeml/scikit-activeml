@@ -1,13 +1,13 @@
 [
   {
     "class" : "UncertaintySampling",
-    "method" : "margin_sampling",
+    "method" : "Margin-based Uncertainty Sampling",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Uncertainty Sampling",
+      "kumar2020active" : "Uncertainty Sampling"
     },
     "tags" : ["pool"],
-    "title" : "UncertaintySampling Example For Method 'margin_sampling'",
+    "title" : "Margin-based Uncertainty Sampling",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
@@ -19,13 +19,13 @@
   },
   {
     "class" : "UncertaintySampling",
-    "method" : "least_confident",
+    "method" : "Least-confident-based Uncertainty Sampling",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Uncertainty Sampling",
+      "kumar2020active" : "Uncertainty Sampling"
     },
     "tags" : ["pool"],
-    "title" : "UncertaintySampling Example For Method 'least_confident'",
+    "title" : "Least-confident-based Uncertainty Sampling",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
@@ -37,19 +37,37 @@
   },
   {
     "class" : "UncertaintySampling",
-    "method" : "entropy",
+    "method" : "Entropy-based Uncertainty Sampling",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Uncertainty Sampling",
+      "kumar2020active" : "Uncertainty Sampling"
     },
     "tags" : ["pool"],
-    "title" : "UncertaintySampling Example For Method 'entropy'",
+    "title" : "Entropy-based Uncertainty Sampling",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "code_import" : [],
     "init_params" : {
       "method" : "'entropy'"
+    },
+    "query_params" : {}
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Expected Average Precision",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling",
+      "kumar2020active" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Expected Average Precision",
+    "refs" : ["wang2018uncertainty"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "code_import" : [],
+    "init_params" : {
+      "method" : "'expected_average_precision'"
     },
     "query_params" : {}
   }

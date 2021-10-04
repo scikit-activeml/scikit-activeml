@@ -1,17 +1,20 @@
 import numpy as np
 from matplotlib import pyplot as plt, animation
-from sklearn.datasets import make_classification
+from sklearn.datasets import make_blobs
 from sklearn.exceptions import NotFittedError
-from skactiveml.utils import MISSING_LABEL, is_unlabeled
+from skactiveml.utils import MISSING_LABEL, is_unlabeled, is_labeled
 from skactiveml.visualization import plot_utility, plot_decision_boundary
 #_ import
 
 random_state = np.random.RandomState(0)
 
 # Build a dataset.
-X, y_true = make_classification(n_features=2, n_redundant=0,
-                                random_state=random_state)
+X, y_true = make_blobs(n_samples=40, n_features=2,
+                  centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
+                  cluster_std=.7, random_state=random_state)
+y_true = y_true % 2
 y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
+
 # Initialise the classifier.
 clf = "#_init_clf"
 # Initialise the query strategy.
@@ -19,19 +22,17 @@ qs = "#_init_qs"
 
 # Preparation for plotting.
 fig, ax = plt.subplots()
-x1_min = min(X[:, 0])
-x1_max = max(X[:, 0])
-x2_min = min(X[:, 1])
-x2_max = max(X[:, 1])
-bound = [[x1_min, x2_min], [x1_max, x2_max]]
+# bound = [[min(X[:, 0]), max(X[:, 0])], [min(X[:, 1]), max(X[:, 1])]]
+bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
-n_cycles = 20
+n_cycles = 10
 for c in range(n_cycles):
     # Set X_cand to the unlabeled instances.
     unlbld_idx = np.where(is_unlabeled(y))[0]
     X_cand = X[unlbld_idx]
+    X_labeled = X[is_labeled(y)]
 
     # Query the next instance/s.
     query_idx = unlbld_idx[qs.query(X_cand)]  #_43 query_params
@@ -43,7 +44,7 @@ for c in range(n_cycles):
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )
-    ax = plot_utility(qs, bound=bound, ax=ax)  #_25 {query_params}
+    ax = plot_utility(qs, X_cand=X, bound=bound, ax=ax)  #_25 {query_params}
     ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
     ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
     try:

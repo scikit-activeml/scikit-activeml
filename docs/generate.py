@@ -248,7 +248,7 @@ def get_table_data(package, additional_data, rel_api_path):
         header row(Strategy | Method | Reference).
 
     """
-    head_line = ['Strategy', 'Method', 'Reference']
+    head_line = ['Method', 'Base Class', 'Reference']
     tabs = {}  # (Tab, Category, Collum, Row)
 
     # extract the tabs from 'examples_data'.
@@ -277,7 +277,7 @@ def get_table_data(package, additional_data, rel_api_path):
                     ref_text += f':footcite:t:`{ref}`, '
                 ref_text = ref_text[0:-2]
                 temp = np.append(temp,
-                                 [[strategy_text, methods_text, ref_text]],
+                                 [[methods_text, strategy_text, ref_text]],
                                  axis=0)
                 for tab, cats in tabs.items():
                     if tab in additional_data[qs_name][m][2].keys():
@@ -289,18 +289,18 @@ def get_table_data(package, additional_data, rel_api_path):
                     else:
                         cat = 'Others'
                     tabs[tab][cat] = np.append(tabs[tab][cat], [
-                        [strategy_text, methods_text, ref_text]], axis=0)
+                        [methods_text, strategy_text, ref_text]], axis=0)
         else:
             # it exists no example for qs_name
             methods_text = 'default'
             ref_text = ''
-            temp = np.append(temp, [[strategy_text, methods_text, ref_text]],
+            temp = np.append(temp, [[methods_text, strategy_text, ref_text]],
                              axis=0)
             for tab, cats in tabs.items():
                 if 'Others' not in cats.keys():
                     tabs[tab]['Others'] = np.array([head_line])
                 tabs[tab]['Others'] = np.append(cats['Others'], [
-                    [strategy_text, methods_text, ref_text]], axis=0)
+                    [methods_text, strategy_text, ref_text]], axis=0)
 
     return tabs
 
