@@ -1,12 +1,13 @@
 [
   {
     "class" : "FourDS",
+    "method" : "4DS",
     "categories" : {
       "Settles2012" : "",
       "kumar2020active" : ""
     },
     "tags" : ["pool"],
-    "title" : "FourDS Example",
+    "title" : "4DS",
     "refs" : ["reitmaier2013let"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
