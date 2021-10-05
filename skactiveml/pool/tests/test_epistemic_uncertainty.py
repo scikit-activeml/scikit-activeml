@@ -294,6 +294,3 @@ class TestEpistemicUncertainty(unittest.TestCase):
         comp = utilities_s == utilities
         self.assertTrue(not comp.all())
 
-
-if __name__ == '__main__':
-    unittest.main()

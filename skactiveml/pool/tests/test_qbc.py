@@ -262,6 +262,3 @@ class TestVoteEntropy(unittest.TestCase):
         scores = vote_entropy(votes=self.votes, classes=self.classes)
         np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
 
-
-if __name__ == '__main__':
-    unittest.main()

@@ -177,7 +177,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if len(self.estimator_.classes_) != len(self.classes_):
                 P_ext = np.zeros((len(X), len(self.classes_)))
                 class_indices = np.asarray(self.estimator_.classes_, dtype=int)
-                P_ext[:, class_indices] = P
+                # Exception for MLPCLassifier
+                P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
                 P = P_ext
             if not np.any(np.isnan(P)):
                 return P
@@ -215,8 +216,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if not has_fit_parameter(self.estimator, 'sample_weight') \
                 and sample_weight is not None:
             warnings.warn(
-                "{} does not support 'sample_weight'. "
-                "Therefore, they will be ignored.".format(self.estimator))
+                f"{self.estimator} does not support `sample_weight`. "
+                f"Therefore, this parameter will be ignored.")
         self.estimator_ = deepcopy(self.estimator)
         # Transform in case of 2-dimensional array of class labels.
         if y.ndim == 2:
