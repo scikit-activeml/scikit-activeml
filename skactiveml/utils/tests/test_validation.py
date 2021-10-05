@@ -73,7 +73,6 @@ class TestValidation(unittest.TestCase):
                           target_type=int)
 
     def test_check_X_y(self):
-        self.assertRaises(ValueError, check_X_y, None, None)
         X = [[1, 2], [3, 4]]
         y = [1, 0]
         X_cand = [[5, 6]]

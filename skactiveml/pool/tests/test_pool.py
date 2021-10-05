@@ -19,7 +19,13 @@ class TestGeneral(unittest.TestCase):
         self.X, self.y_true = make_blobs(n_samples=10, n_features=2, centers=2,
                                          cluster_std=1, random_state=1)
         self.budget = 5
-
+        self.clf = PWC(classes=np.unique(self.y_true), random_state=0)
+        self.cmm = CMM(classes=np.unique(self.y_true),
+                       missing_label=MISSING_LABEL,
+                       random_state=0)
+        self.y_missing_label = np.full(self.y_true.shape, self.MISSING_LABEL)
+        self.y = self.y_true.copy()
+        self.y[:3] = self.y_true[:3]
         self.query_strategies = {}
         # TODO Check is class.
         for qs_name in pool.__all__:
@@ -29,15 +35,7 @@ class TestGeneral(unittest.TestCase):
 
     def test_al_cycle(self):
         for qs_name in self.query_strategies:
-            if qs_name == "FourDS":
-                clf = CMM(classes=np.unique(self.y_true),
-                          missing_label=MISSING_LABEL,
-                          random_state=np.random.RandomState(0))
-            else:
-                clf = PWC(classes=np.unique(self.y_true),
-                          missing_label=MISSING_LABEL,
-                          random_state=np.random.RandomState(0))
-
+            clf = self.cmm if qs_name == "FourDS" else self.clf
             with self.subTest(msg="Random State", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
                 qs = call_func(
@@ -95,8 +93,6 @@ class TestGeneral(unittest.TestCase):
                         clf=clf, classes=np.unique(self.y_true),
                         random_state=1)
 
-                    unlabeled = np.where(is_unlabeled(y))[0]
-
                     for b in range(self.budget):
                         unlabeled = np.where(is_unlabeled(y))[0]
                         clf.fit(self.X, y)
@@ -106,9 +102,10 @@ class TestGeneral(unittest.TestCase):
                         y[sample_id] = self.y_true[sample_id]
 
     def test_param(self):
-        not_test = ['self', 'kwargs', 'random_state', 'X_cand', 'X', 'y',
-                    'clf', 'batch_size', 'return_utilities', 'refit']
+        not_test = ['self', 'kwargs', 'random_state', 'X_cand', 'batch_size',
+                    'return_utilities']
         for qs_name in self.query_strategies:
+            clf = self.cmm if qs_name == "FourDS" else self.clf
             with self.subTest(msg="Param Test", qs_name=qs_name):
                 # Get initial parameters.
                 qs_class = self.query_strategies[qs_name]
@@ -151,6 +148,63 @@ class TestGeneral(unittest.TestCase):
                     msg = f"'{test_func_name}()' missing for parameter " \
                           f"'{param}' of query()"
                     self.assertTrue(hasattr(test_obj, test_func_name), msg)
+
+                # Check standard parameters of `__init__` method.
+                self._test_init_param_random_state(qs_class, clf)
+
+                # Check standard parameters of `query` method.
+                self._test_query_param_X_cand(qs_class, clf)
+                self._test_query_param_batch_size(qs_class, clf)
+                self._test_query_param_return_utilities(qs_class, clf)
+
+    def _test_init_param_random_state(self, qs_class, clf):
+        qs_mdl = call_func(
+            qs_class, only_mandatory=True, classes=np.unique(self.y_true),
+            clf=clf
+        )
+        self.assertTrue(qs_mdl.random_state is None)
+        qs_mdl = call_func(
+            qs_class, classes=np.unique(self.y_true), clf=clf,
+            random_state='Test'
+        )
+        self.assertEqual(qs_mdl.random_state, 'Test')
+        self.assertRaises(ValueError, call_func, qs_mdl.query, X_cand=self.X,
+                          clf=clf, X=self.X, y=self.y)
+
+    def _test_query_param_X_cand(self, qs_class, clf):
+        qs_mdl = call_func(
+            qs_class, classes=np.unique(self.y_true),
+            clf=clf
+        )
+        for X_cand in [None, [], np.ones(5)]:
+            self.assertRaises(
+                ValueError, call_func, qs_mdl.query, X_cand=X_cand, clf=clf,
+                X=self.X, y=self.y
+            )
+
+    def _test_query_param_batch_size(self, qs_class, clf):
+        qs_mdl = call_func(
+            qs_class, classes=np.unique(self.y_true),
+            clf=clf
+        )
+        self.assertRaises(
+            ValueError, call_func, qs_mdl.query, X_cand=self.X, clf=clf,
+            X=self.X, y=self.y, batch_size=0
+        )
+        self.assertRaises(
+            TypeError, call_func, qs_mdl.query, X_cand=self.X, clf=clf,
+            X=self.X, y=self.y, batch_size=1.2
+        )
+
+    def _test_query_param_return_utilities(self, qs_class, clf):
+        qs_mdl = call_func(
+            qs_class, classes=np.unique(self.y_true),
+            clf=clf
+        )
+        self.assertRaises(
+            TypeError, call_func, qs_mdl.query, X_cand=self.X, clf=clf,
+            X=self.X, y=self.y, return_utilities='test'
+        )
 
 
 class Dummy:

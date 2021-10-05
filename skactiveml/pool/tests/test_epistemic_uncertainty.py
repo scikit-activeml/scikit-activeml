@@ -27,108 +27,89 @@ class TestEpistemicUncertainty(unittest.TestCase):
         self.kwargs_MISSING_LABEL = dict(X_cand=self.X_cand, X=self.X,
                                          y=self.y_MISSING_LABEL)
 
-    def test_init_param_clf(self):
-        selector = EpistemicUncertainty(clf=PWC(),
-                                        random_state=self.random_state)
-        selector.query(**self.kwargs)
-        self.assertTrue(hasattr(selector, 'clf'))
-        # selector = QBC(clf=GaussianProcessClassifier(
-        #    random_state=self.random_state), random_state=self.random_state)
-        # selector.query(**self.kwargs)
-
-        selector = EpistemicUncertainty(clf='string')
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-        selector = EpistemicUncertainty(clf=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-        selector = EpistemicUncertainty(clf=1)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-        selector = EpistemicUncertainty(
-            clf=SklearnClassifier(DecisionTreeClassifier())
-        )
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
-
     def test_init_param_precompute(self):
-        selector = EpistemicUncertainty(clf=self.clf, precompute=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = EpistemicUncertainty(precompute=None)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          clf=self.clf)
 
-        selector = EpistemicUncertainty(clf=self.clf, precompute=[])
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = EpistemicUncertainty(precompute=[])
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          clf=self.clf)
 
-        selector = EpistemicUncertainty(clf=self.clf, precompute=0)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        selector = EpistemicUncertainty(precompute=0)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          clf=self.clf)
 
     def test_init_param_random_state(self):
-        selector = EpistemicUncertainty(clf=self.clf, random_state='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
-        selector = EpistemicUncertainty(clf=self.clf,
-                                        random_state=self.random_state)
+        selector = EpistemicUncertainty(random_state='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          clf=self.clf)
+        selector = EpistemicUncertainty(random_state=self.random_state)
         self.assertTrue(hasattr(selector, 'random_state'))
-        self.assertRaises(ValueError, selector.query, X_cand=[[1]], X=self.X,
-                          y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=[[1]],
+                          clf=self.clf, X=self.X, y=self.y)
 
     def test_query_param_X_cand(self):
-        selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=[], X=self.X,
-                          y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=None, X=self.X,
-                          y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=np.nan, X=self.X,
-                          y=self.y)
+        selector = EpistemicUncertainty()
+        self.assertRaises(ValueError, selector.query, X_cand=[], clf=self.clf,
+                          X=self.X, y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=None,
+                          clf=self.clf, X=self.X, y=self.y)
+        self.assertRaises(ValueError, selector.query, X_cand=np.nan,
+                          clf=self.clf, X=self.X, y=self.y)
+
+    def test_query_param_clf(self):
+        selector = EpistemicUncertainty()
+        dt = SklearnClassifier(DecisionTreeClassifier())
+        for clf in [None, 'string', 1, dt]:
+            self.assertRaises(
+                TypeError, selector.query, **self.kwargs, clf=clf
+            )
 
     def test_query_param_X(self):
-        selector = EpistemicUncertainty(clf=self.clf)
+        selector = EpistemicUncertainty()
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=None, y=self.y)
+                          clf=self.clf, X=None, y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X='string', y=self.y)
+                          clf=self.clf, X='string', y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=[], y=self.y)
+                          clf=self.clf, X=[], y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=self.X[0:-1], y=self.y)
+                          clf=self.clf, X=self.X[0:-1], y=self.y)
 
     def test_query_param_y(self):
-        selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=self.X, y=None)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=self.X, y='string')
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=self.X, y=[])
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          X=self.X, y=self.y[0:-1])
+        selector = EpistemicUncertainty()
+        y_list = [None, 'string', [], self.y[0:-1]]
+        for y in y_list:
+            self.assertRaises(
+                ValueError, selector.query, X_cand=self.X_cand, clf=self.clf,
+                X=self.X, y=y
+            )
 
     def test_query_param_sample_weight(self):
-        selector = EpistemicUncertainty(clf=LogisticRegression())
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          sample_weight='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          sample_weight=self.X_cand)
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          sample_weight=self.X_cand[:-2])
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          sample_weight=np.empty((len(self.X) - 1)))
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          sample_weight=np.empty((len(self.X) + 1)))
+        selector = EpistemicUncertainty()
+        sample_weight_list = [
+            'string', self.X_cand, self.X_cand[:-2],
+            np.empty((len(self.X) - 1)), np.empty((len(self.X) + 1))
+        ]
+        for sample_weight in sample_weight_list:
+            self.assertRaises(ValueError, selector.query, **self.kwargs,
+                              clf=self.clf, sample_weight=sample_weight)
 
     def test_query_param_batch_size(self):
-        selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          batch_size=1.2)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          batch_size='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          batch_size=0)
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          batch_size=-10)
+        selector = EpistemicUncertainty()
+        for batch_size in ['string', 1.2]:
+            self.assertRaises(TypeError, selector.query, **self.kwargs,
+                              clf=self.clf, batch_size=batch_size)
+        for batch_size in [0, -10]:
+            self.assertRaises(ValueError, selector.query, **self.kwargs,
+                              clf=self.clf, batch_size=batch_size)
 
     def test_query_param_return_utilities(self):
-        selector = EpistemicUncertainty(clf=self.clf)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          return_utilities=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          return_utilities=[])
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          return_utilities=0)
+        selector = EpistemicUncertainty()
+        for return_utilities in [None, [], 0]:
+            self.assertRaises(TypeError, selector.query, **self.kwargs,
+                              clf=self.clf, return_utilities=return_utilities)
 
     # tests for epistemic PWC
     def test_interpolate(self):
@@ -179,13 +160,15 @@ class TestEpistemicUncertainty(unittest.TestCase):
             def predict_freq(self, X):
                 return freq
 
-        selector = EpistemicUncertainty(
-            clf=Dummy_PWC(classes=self.classes), precompute=True)
-        _, utilities = selector.query(**self.kwargs, return_utilities=True)
+        selector = EpistemicUncertainty(precompute=True)
+        _, utilities = selector.query(**self.kwargs,
+                                      clf=Dummy_PWC(classes=self.classes),
+                                      return_utilities=True)
         np.testing.assert_array_equal(val_utilities, utilities[0])
 
-        selector = EpistemicUncertainty(clf=PWC(classes=[0, 1, 2]))
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
+        selector = EpistemicUncertainty()
+        self.assertRaises(ValueError, selector.query,
+                          clf=PWC(classes=[0, 1, 2]), **self.kwargs)
 
 
     # tests for epistemic logistic regression
@@ -249,27 +232,30 @@ class TestEpistemicUncertainty(unittest.TestCase):
         # TODO
 
     def test_query(self):
-        selector = EpistemicUncertainty(clf=self.clf)
+        selector = EpistemicUncertainty()
 
         # return_utilities
-        L = list(selector.query(**self.kwargs, return_utilities=True))
+        L = list(selector.query(**self.kwargs, clf=self.clf,
+                                return_utilities=True))
         self.assertTrue(len(L) == 2)
-        L = list(selector.query(**self.kwargs, return_utilities=False))
+        L = list(selector.query(**self.kwargs, clf=self.clf,
+                                return_utilities=False))
         self.assertTrue(len(L) == 1)
 
         # batch_size
         bs = 3
-        selector = EpistemicUncertainty(clf=self.clf)
-        best_idx = selector.query(**self.kwargs, batch_size=bs)
+        selector = EpistemicUncertainty()
+        best_idx = selector.query(**self.kwargs, clf=self.clf,
+                                  batch_size=bs)
         self.assertEqual(bs, len(best_idx))
 
         # query - PWC
         clf = PWC(classes=self.classes, random_state=self.random_state)
-        selector = EpistemicUncertainty(clf=clf)
-        selector.query(**self.kwargs)
-        selector.query(**self.kwargs_MISSING_LABEL)
+        selector = EpistemicUncertainty()
+        selector.query(**self.kwargs, clf=clf)
+        selector.query(**self.kwargs_MISSING_LABEL, clf=clf)
 
-        best_indices, utilities = selector.query(**self.kwargs,
+        best_indices, utilities = selector.query(**self.kwargs, clf=clf,
                                                  return_utilities=True)
         self.assertEqual(utilities.shape, (1, len(self.X_cand)))
         self.assertEqual(best_indices.shape, (1,))
@@ -280,17 +266,19 @@ class TestEpistemicUncertainty(unittest.TestCase):
             random_state=self.random_state
         )
 
-        selector = EpistemicUncertainty(clf=clf)
-        selector.query(**self.kwargs)
-        selector.query(**self.kwargs_MISSING_LABEL)
+        selector = EpistemicUncertainty()
+        selector.query(**self.kwargs, clf=clf)
+        selector.query(**self.kwargs_MISSING_LABEL, clf=clf)
 
-        best_indices, utilities = selector.query(**self.kwargs,
+        best_indices, utilities = selector.query(**self.kwargs, clf=clf,
                                                  return_utilities=True)
         self.assertEqual(utilities.shape, (1, len(self.X_cand)))
         self.assertEqual(best_indices.shape, (1,))
 
         best_indices_s, utilities_s = selector.query(
-            **self.kwargs, return_utilities=True, sample_weight=[0.5, 1, 1, 1])
+            **self.kwargs, clf=clf, return_utilities=True,
+            sample_weight=[0.5, 1, 1, 1]
+        )
         comp = utilities_s == utilities
         self.assertTrue(not comp.all())
 
