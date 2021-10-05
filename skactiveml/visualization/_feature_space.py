@@ -9,13 +9,13 @@ from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array
 
-from skactiveml.base import QueryStrategy
-from skactiveml.utils import check_scalar
+from ..base import QueryStrategy
+from ..utils import check_scalar
 
 
-def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
-                           cmap='coolwarm_r', boundary_dict=None,
-                           confidence_dict=None):
+def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
+                           boundary_dict=None, confidence=0.75,
+                           cmap='coolwarm_r', confidence_dict=None):
     """Plot the decision boundary of the given classifier.
 
     Parameters
@@ -23,12 +23,12 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     clf: Sklearn classifier
         The fitted classifier whose decision boundary is plotted. If confidence
         is not None, the classifier must implement the predict_proba function.
-    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     res: int, optional (default=21)
         The resolution of the plot.
     ax: matplotlib.axes.Axes, optional (default=None)
-        The axis on which the boundary is plotted.
+        The axis on which the decision boundary is plotted.
     confidence: scalar | None, optional (default=0.5)
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
@@ -48,14 +48,14 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
         ax = plt.gca()
     if not isinstance(ax, Axes):
         raise TypeError("ax must be a matplotlib.axes.Axes.")
-    check_array(bound)
-    xmin, ymin, xmax, ymax = np.ravel(bound)
+    check_array(feature_bound)
+    xmin, ymin, xmax, ymax = np.ravel(feature_bound)
 
     # Check and convert the colormap
     if isinstance(cmap, str):
         cmap = plt.cm.get_cmap(cmap)
     if not isinstance(cmap, Colormap):
-        raise TypeError("'cmap' must be a string or a ColorMap.")
+        raise TypeError("'cmap' must be a string or a Colormap.")
 
     if confidence is not None:
         check_scalar(confidence, 'confidence', float, min_inclusive=False,
@@ -98,7 +98,6 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
     else:
         raise AttributeError("'clf' must implement 'predict' or "
                              "'predict_proba'")
-    # TODO check names
 
     posterior_list = []
 
@@ -122,7 +121,7 @@ def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.75,
                        colors=[cmap(norm(y))], **confidence_args)
 
 
-def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
+def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
                  contour_dict=None):
     """ Plot the utility for the given query strategy.
 
@@ -133,9 +132,13 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
     qs_dict: dict
         Dictionary with the parameters for the qs.query method.
     X_cand: array-like, shape(n_candidates, n_features)
-        Unlabeled candidate instances.
-    bound: array-like, [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted.
+        Unlabeled candidate instances. If X_cand is given, the utility is
+        calculated only for these instances and is interpolated. Otherwise, the
+        utility is calculated for every point in the given area.
+    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
+        Determines the area in which the boundary is plotted. If X_cand is not
+        given, bound must not be None. Otherwise, the bound is determined based
+        on the data.
     res: int, optional (default=21)
         The resolution of the plot.
     ax: matplotlib.axes.Axes, optional (default=None)
@@ -150,9 +153,9 @@ def plot_utility(qs, qs_dict, X_cand=None, bound=None, res=21, ax=None,
     if 'X_cand' in qs_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
 
-    if bound is not None:
-        check_array(bound)
-        xmin, ymin, xmax, ymax = np.ravel(bound)
+    if feature_bound is not None:
+        check_array(feature_bound)
+        xmin, ymin, xmax, ymax = np.ravel(feature_bound)
     elif X_cand is not None:
         xmin = min(X_cand[:, 0])
         xmax = max(X_cand[:, 0])

@@ -49,63 +49,63 @@ class TestFeatureSpace(unittest.TestCase):
     # Tests for plot_decision_boundary function
     def test_decision_boundary_clf(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.qs,
-                          bound=self.bound)
+                          feature_bound=self.bound)
         clf = TestClassifier()
         self.assertRaises(AttributeError, plot_decision_boundary, clf=clf,
-                          bound=self.bound)
+                          feature_bound=self.bound)
 
     def test_decision_boundary_bound(self):
         self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
-                          bound=[0, 0, 1, 1])
+                          feature_bound=[0, 0, 1, 1])
 
     def test_decision_boundary_res(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, res='string')
+                          feature_bound=self.bound, res='string')
 
     def test_decision_boundary_ax(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, ax=3)
+                          feature_bound=self.bound, ax=3)
 
     def test_decision_boundary_confidence(self):
         self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, confidence=0.0)
+                          feature_bound=self.bound, confidence=0.0)
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, confidence='string')
+                          feature_bound=self.bound, confidence='string')
         plot_decision_boundary(self.clf, self.bound, confidence=None)
         svc = LinearSVC()
         svc.fit(self.X_train, self.y_train)
         self.assertWarns(Warning, plot_decision_boundary, clf=svc,
-                         bound=self.bound, confidence=0.75)
+                         feature_bound=self.bound, confidence=0.75)
 
     def test_decision_boundary_cmap(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, cmap=4)
+                          feature_bound=self.bound, cmap=4)
 
     def test_decision_boundary_boundary_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, boundary_dict='string')
-        plot_decision_boundary(clf=self.clf, bound=self.bound,
+                          feature_bound=self.bound, boundary_dict='string')
+        plot_decision_boundary(clf=self.clf, feature_bound=self.bound,
                                boundary_dict={'colors': 'r'})
 
     def test_decision_boundary_confidence_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
-                          bound=self.bound, confidence_dict='string')
-        plot_decision_boundary(clf=self.clf, bound=self.bound,
+                          feature_bound=self.bound, confidence_dict='string')
+        plot_decision_boundary(clf=self.clf, feature_bound=self.bound,
                                confidence_dict={'linestyles': ':'})
 
     # Tests for plot_utility function
     def test_utility_qs(self):
         self.assertRaises(TypeError, plot_utility, qs=self.clf,
-                          qs_dict=self.qs_dict, bound=self.bound)
+                          qs_dict=self.qs_dict, feature_bound=self.bound)
 
     def test_utility_qs_dict(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs,
-                          qs_dict={0, 1, 2}, bound=self.bound)
+                          qs_dict={0, 1, 2}, feature_bound=self.bound)
 
         qs_dict = self.qs_dict
         qs_dict['X_cand'] = []
         self.assertRaises(ValueError, plot_utility, qs=self.qs,
-                          qs_dict=qs_dict, bound=self.bound)
+                          qs_dict=qs_dict, feature_bound=self.bound)
 
     def test_utility_X_cand(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs,
@@ -113,28 +113,30 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_utility_res(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs,
-                          qs_dict=self.qs_dict, bound=self.bound, res=-3)
+                          qs_dict=self.qs_dict, feature_bound=self.bound,
+                          res=-3)
 
     def test_utility_ax(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs,
-                          qs_dict=self.qs_dict, bound=self.bound, ax=2)
+                          qs_dict=self.qs_dict, feature_bound=self.bound, ax=2)
 
     def test_utility_contour_dict(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs,
-                          qs_dict=self.qs_dict, bound=self.bound,
+                          qs_dict=self.qs_dict, feature_bound=self.bound,
                           contour_dict='string')
-        plot_utility(qs=self.qs, qs_dict=self.qs_dict, bound=self.bound,
+        plot_utility(qs=self.qs, qs_dict=self.qs_dict,
+                     feature_bound=self.bound,
                      contour_dict={'linestyles': '.'})
 
     # Graphical tests
     def test_no_candidates(self):
         fig, ax = plt.subplots()
         plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     bound=self.bound, ax=ax)
+                     feature_bound=self.bound, ax=ax)
         ax.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap, ax=ax)
+        plot_decision_boundary(self.clf, self.bound, ax=ax, cmap=self.cmap)
 
         fig.savefig(self.path_prefix + 'dec_bound_wo_cand.pdf')
         comparison = compare_images(self.path_prefix +
@@ -150,7 +152,7 @@ class TestFeatureSpace(unittest.TestCase):
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(self.clf, self.bound, cmap=self.cmap, ax=ax)
+        plot_decision_boundary(self.clf, self.bound, ax=ax, cmap=self.cmap)
 
         fig.savefig(self.path_prefix + 'dec_bound_w_cand.pdf')
         comparison = compare_images(self.path_prefix +
@@ -173,11 +175,12 @@ class TestFeatureSpace(unittest.TestCase):
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
         fig, ax = plt.subplots()
-        plot_utility(qs, {'X': X_train, 'y': y_train}, bound=bound, ax=ax)
+        plot_utility(qs, {'X': X_train, 'y': y_train}, feature_bound=bound,
+                     ax=ax)
         ax.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
         ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(clf, bound, cmap=self.cmap, res=101, ax=ax)
+        plot_decision_boundary(clf, bound, ax=ax, res=101, cmap=self.cmap)
         fig.savefig(self.path_prefix + 'dec_bound_multiclass.pdf')
         comparison = compare_images(self.path_prefix +
                                     'dec_bound_multiclass_base.pdf',
@@ -196,7 +199,7 @@ class TestFeatureSpace(unittest.TestCase):
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
-        plot_decision_boundary(svc, self.bound, cmap=self.cmap, ax=ax)
+        plot_decision_boundary(svc, self.bound, ax=ax, cmap=self.cmap)
 
         fig.savefig(self.path_prefix + 'dec_bound_svc.pdf')
         comparison = compare_images(self.path_prefix +
