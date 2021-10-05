@@ -69,6 +69,7 @@
     "init_params" : {
       "method" : "'expected_average_precision'"
     },
-    "query_params" : {}
+    "query_params" : {},
+    "bp_utilities" : "ax = plot_utility(qs, {'X': X, 'y': y}, X_cand=X, bound=bound, ax=ax)"
   }
 ]
