@@ -99,7 +99,3 @@ class TestValidation(unittest.TestCase):
         ra = check_random_state(np.random.RandomState(None))
         rb = check_random_state(np.random.RandomState(None))
         self.assertTrue(ra.rand() != rb.rand())
-
-
-if __name__ == '__main__':
-    unittest.main()

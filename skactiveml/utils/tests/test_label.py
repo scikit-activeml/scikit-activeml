@@ -156,7 +156,3 @@ class TestLabel(unittest.TestCase):
         np.testing.assert_array_equal([np.nan, 1, 2, 3, np.nan],
                                       ExtLabelEncoder(
                                           classes=cls).fit_transform(self.y1))
-
-
-if __name__ == '__main__':
-    unittest.main()
