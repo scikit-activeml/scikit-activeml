@@ -1,3 +1,5 @@
+from inspect import signature, Parameter
+
 import numpy as np
 from sklearn.utils import check_random_state, check_array, check_scalar
 import sklearn.utils.validation
@@ -25,9 +27,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         An active learning strategy for a single annotator.
     n_annotators : int,
         Sets the number of annotators if no A_cand is None
-    y_aggregate : callable,
-    array-like, shape (n_samples, n_annotators) -> array-like, shape (n_samples)
-    , default=None
+    y_aggregate : callable, default=None
         `y_aggregate` is used, if the given `strategy` depends on y-values as
         labels for samples.
         `y_aggregate` is in this case used to transform `y` as a matrix of shape
@@ -139,7 +139,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         if not isinstance(query_params_dict, dict):
             raise TypeError(
-                f"`query_params_dict` must be of type `dict`."
+                f"`query_params_dict` must be of type `dict`. "
                 f"`query_params_dict` is of type {type(query_params_dict)}."
             )
 
@@ -150,9 +150,21 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
             if not callable(y_aggregate):
                 raise TypeError(
-                    f"`self.y_aggregate` must be callable."
+                    f"`self.y_aggregate` must be callable. "
                     f"`self.y_aggregate` is of type {type(y_aggregate)}"
                 )
+            else:
+                # count the number of arguments that have no default value
+                n_free_params = len(list(
+                    filter(lambda x: x.default == Parameter.empty,
+                           signature(y_aggregate).parameters.values())
+                ))
+                if n_free_params != 1:
+                    raise TypeError(
+                        f"The number of free parameters of the callable has to "
+                        f"equal one. "
+                        f"The number of free parameters is {n_free_params}."
+                    )
 
             query_params_dict['y'] = y_aggregate(query_params_dict['y'])
 
@@ -178,7 +190,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
             if pref_n_annotators.ndim != 1:
                 raise ValueError(
-                    "pref_annotators_per_sample, if an array, must be of dim"
+                    "pref_annotators_per_sample, if an array, must be of dim "
                     f"1 but, it is of dim {pref_n_annotators.ndim}"
                 )
             else:
@@ -192,7 +204,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
                     pref_n_annotators = np.append(pref_n_annotators, appended)
         else:
-            raise TypeError("pref_annotators_per_sample must be array like"
+            raise TypeError("pref_annotators_per_sample must be array like "
                             "or an integer")
 
         # check A_pref and set annotator_utilities
@@ -223,7 +235,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 )
         else:
             raise TypeError(
-                f"`A_pref` is of type {type(A_pref)}, but must be array like"
+                f"`A_pref` is of type {type(A_pref)}, but must be array like "
                 f"or of type None"
             )
 

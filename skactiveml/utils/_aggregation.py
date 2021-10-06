@@ -36,7 +36,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
 
     if n_classes == 0:
         raise ValueError(
-            "Number of classes can not be inferred."
+            "Number of classes can not be inferred. "
             "There must be at least one assigned label or classes must not be"
             "None. "
         )

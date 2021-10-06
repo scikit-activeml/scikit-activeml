@@ -54,6 +54,18 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                           query_params_dict=query_params_dict,
                           A_cand=self.A_cand, return_utilities=True)
 
+        def dummy_function(x, y):
+            return majority_vote(x)
+
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, y_aggregate=dummy_function,
+                                    random_state=self.random_state)
+
+        query_params_dict = {'X': self.X, 'y': self.y}
+        self.assertRaises(TypeError, wrapper.query, self.X_cand,
+                          query_params_dict=query_params_dict,
+                          A_cand=self.A_cand, return_utilities=True)
+
     def test_init_param_random_state(self):
         random = RandomSampler(self.random_state)
         wrapper = MultiAnnotWrapper(random, random_state='string')
