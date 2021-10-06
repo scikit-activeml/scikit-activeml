@@ -261,9 +261,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return self
 
     def __getattr__(self, item):
-        if item in self.__dict__:
-            return getattr(self, item)
-        elif 'estimator_' in self.__dict__:
+        if 'estimator_' in self.__dict__:
             return getattr(self.estimator_, item)
         else:
             return getattr(self.estimator, item)

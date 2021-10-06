@@ -96,7 +96,3 @@ class TestMultiAnnotClassifier(unittest.TestCase):
         y_pred_hard = clf.predict(X=self.X)
         self.assertEqual(len(y_pred_hard), len(self.X))
         self.assertTrue(clf.score(self.X, self.y_true), 0.8)
-
-
-if __name__ == '__main__':
-    unittest.main()
