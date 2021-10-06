@@ -1,8 +1,9 @@
 import unittest
 
 import numpy as np
+from sklearn.naive_bayes import GaussianNB
 
-from skactiveml.classifier import PWC
+from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.pool import ExpectedErrorReduction as EER
 from skactiveml.utils import MISSING_LABEL
 
@@ -16,6 +17,9 @@ class TestExpectedErrorReduction(unittest.TestCase):
         self.classes = [0, 1, 2]
         self.cost_matrix = np.eye(3)
         self.clf = PWC(classes=self.classes)
+        self.clf_partial = SklearnClassifier(
+            GaussianNB(), classes=self.classes
+        ).fit(self.X, self.y)
 
     # Test init parameters
     def test_init_param_method(self):
@@ -72,26 +76,38 @@ class TestExpectedErrorReduction(unittest.TestCase):
 
     def test_query_param_X(self):
         eer = EER(cost_matrix=self.cost_matrix)
-        self.assertRaises(ValueError, eer.query, X_cand=self.X_cand,
-                          X=np.ones((5, 3)), y=self.y, clf=self.clf)
+        for X in [None, np.ones((5, 3))]:
+            self.assertRaises(
+                ValueError, eer.query, X_cand=self.X_cand, X=X, y=self.y,
+                clf=self.clf
+            )
+        eer = EER(cost_matrix=self.cost_matrix, method='csl')
+        self.assertRaises(
+            ValueError, eer.query, X_cand=self.X_cand, X=None, y=self.y,
+            clf=self.clf_partial
+        )
 
     def test_query_param_y(self):
         eer = EER(cost_matrix=self.cost_matrix)
+        y_list = [None, [0, 1, 4, 0, 2, 1]]
+        for y in y_list:
+            self.assertRaises(
+                ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=y,
+                clf=self.clf
+            )
+        eer = EER(cost_matrix=self.cost_matrix, method='csl')
         self.assertRaises(
-            ValueError, eer.query, X_cand=self.X_cand, X=self.X,
-            y=[0, 1, 4, 0, 2, 1], clf=self.clf
+            ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=None,
+            clf=self.clf_partial
         )
 
     def test_query_param_sample_weight(self):
         eer = EER()
-        self.assertRaises(
-            ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=self.y,
-            sample_weight='string', clf=self.clf
-        )
-        self.assertRaises(
-            ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=self.y,
-            sample_weight=np.ones(3), clf=self.clf
-        )
+        for sample_weight in ['string', np.ones(3)]:
+            self.assertRaises(
+                ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=self.y,
+                sample_weight=sample_weight, clf=self.clf
+            )
 
     def test_query_param_sample_weight_cand(self):
         eer = EER()
@@ -118,14 +134,29 @@ class TestExpectedErrorReduction(unittest.TestCase):
     def test_query(self):
         # Test methods.
         X = [[0], [1], [2]]
+        clf = PWC(classes=[0, 1])
+        clf_partial = SklearnClassifier(GaussianNB(), classes=[0, 1])
         for method in ['emr', 'csl', 'log_loss']:
             eer = EER(method=method)
+            y = [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL]
+            clf_partial.fit(X, y)
             _, utilities = eer.query(
-                X_cand=X, X=X, y=[MISSING_LABEL, MISSING_LABEL, MISSING_LABEL],
-                clf=PWC(classes=[0, 1]), return_utilities=True
+                X_cand=X, X=X, y=y,
+                sample_weight=np.ones_like(y),
+                sample_weight_cand=np.ones_like(y),
+                clf=clf, return_utilities=True
             )
             self.assertEqual(utilities.shape, (1, len(X)))
             self.assertEqual(len(np.unique(utilities)), 1)
+
+            if method != 'csl':
+                _, utilities = eer.query(
+                    X_cand=X,
+                    sample_weight_cand=np.ones_like(y),
+                    clf=clf_partial, return_utilities=True
+                )
+                self.assertEqual(utilities.shape, (1, len(X)))
+                self.assertEqual(len(np.unique(utilities)), 1)
 
             _, utilities = eer.query(
                 X_cand=X, X=X, y=[0, 1, MISSING_LABEL], clf=self.clf,
@@ -148,58 +179,58 @@ class TestExpectedErrorReduction(unittest.TestCase):
         )
         np.testing.assert_array_equal(query_indices, [1])
 
-    def test_eer_new(self):
-        import numpy as np
-        from sklearn.neural_network import MLPClassifier
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.datasets import make_blobs
-        from skactiveml.utils import is_unlabeled, MISSING_LABEL
-        from skactiveml.classifier import SklearnClassifier
-        from skactiveml.pool import ExpectedErrorReduction, \
-            EpistemicUncertainty
-        from time import time
-        import warnings
-
-        with warnings.catch_warnings():
-            # warnings.simplefilter("ignore")
-            X, y_true = make_blobs(random_state=0, centers=5, n_samples=500,
-                                   shuffle=True)
-            y_true %= 2
-            X = StandardScaler().fit_transform(X)
-            y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
-            y[:450] = y_true[:450]
-
-            clf = SklearnClassifier(
-                MLPClassifier(
-                    max_iter=1000, hidden_layer_sizes=[100], random_state=0
-                ),
-                classes=np.unique(y_true), random_state=0)
-            qs = ExpectedErrorReduction(method='csl',
-                                        ignore_partial_fit=False,
-                                        random_state=0)
-            # qs = UncertaintySampling(method='least_confident', random_state=0)
-            # qs = FourDS(random_state=0)
-            # qs = McPAL(random_state=0)
-            # gmm = BayesianGaussianMixture(n_components=5, random_state=0)
-            # gmm.fit(X)
-            # clf = CMM(mixture_model=gmm, classes=np.unique(y_true))
-            qs = EpistemicUncertainty()
-            clf = SklearnClassifier(estimator=LogisticRegression(),
-                                    classes=np.unique(y_true))
-
-            n_cycles = 5
-            for c in range(n_cycles):
-                clf.fit(X, y)
-                print(f'Score: {clf.score(X, y_true)}')
-                unlbld_idx = \
-                    np.argwhere(is_unlabeled(y, missing_label=MISSING_LABEL))[
-                    :, 0]
-                X_cand = X[unlbld_idx]
-                t = time()
-                query_idx = unlbld_idx[
-                    qs.query(X_cand=X_cand, X=X, y=y, clf=clf, batch_size=2)]
-                print(f'Time: {time() - t}')
-                y[query_idx] = y_true[query_idx]
-            clf.fit(X, y)
-            print(clf.score(X, y_true))
+    # def test_eer_new(self):
+    #     import numpy as np
+    #     from sklearn.neural_network import MLPClassifier
+    #     from sklearn.linear_model import LogisticRegression
+    #     from sklearn.preprocessing import StandardScaler
+    #     from sklearn.datasets import make_blobs
+    #     from skactiveml.utils import is_unlabeled, MISSING_LABEL
+    #     from skactiveml.classifier import SklearnClassifier
+    #     from skactiveml.pool import ExpectedErrorReduction, \
+    #         EpistemicUncertainty
+    #     from time import time
+    #     import warnings
+    #
+    #     with warnings.catch_warnings():
+    #         # warnings.simplefilter("ignore")
+    #         X, y_true = make_blobs(random_state=0, centers=5, n_samples=500,
+    #                                shuffle=True)
+    #         y_true %= 2
+    #         X = StandardScaler().fit_transform(X)
+    #         y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
+    #         y[:450] = y_true[:450]
+    #
+    #         clf = SklearnClassifier(
+    #             MLPClassifier(
+    #                 max_iter=1000, hidden_layer_sizes=[100], random_state=0
+    #             ),
+    #             classes=np.unique(y_true), random_state=0)
+    #         qs = ExpectedErrorReduction(method='csl',
+    #                                     ignore_partial_fit=False,
+    #                                     random_state=0)
+    #         # qs = UncertaintySampling(method='least_confident', random_state=0)
+    #         # qs = FourDS(random_state=0)
+    #         # qs = McPAL(random_state=0)
+    #         # gmm = BayesianGaussianMixture(n_components=5, random_state=0)
+    #         # gmm.fit(X)
+    #         # clf = CMM(mixture_model=gmm, classes=np.unique(y_true))
+    #         qs = EpistemicUncertainty()
+    #         clf = SklearnClassifier(estimator=LogisticRegression(),
+    #                                 classes=np.unique(y_true))
+    #
+    #         n_cycles = 5
+    #         for c in range(n_cycles):
+    #             clf.fit(X, y)
+    #             print(f'Score: {clf.score(X, y_true)}')
+    #             unlbld_idx = \
+    #                 np.argwhere(is_unlabeled(y, missing_label=MISSING_LABEL))[
+    #                 :, 0]
+    #             X_cand = X[unlbld_idx]
+    #             t = time()
+    #             query_idx = unlbld_idx[
+    #                 qs.query(X_cand=X_cand, X=X, y=y, clf=clf, batch_size=2)]
+    #             print(f'Time: {time() - t}')
+    #             y[query_idx] = y_true[query_idx]
+    #         clf.fit(X, y)
+    #         print(clf.score(X, y_true))

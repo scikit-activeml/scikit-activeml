@@ -181,7 +181,8 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
             "`X` and `y` cannot be None for `method='csl'`."
         )
     use_sample_weight = sample_weight is not None
-    if bool(sample_weight is None) != bool(sample_weight_cand is None):
+    if bool(sample_weight is None and X is not None) \
+            != bool(sample_weight_cand is None):
         raise ValueError(
             '`sample_weight` and `sample_weight_cand` must either both be '
             'None or array-like.'

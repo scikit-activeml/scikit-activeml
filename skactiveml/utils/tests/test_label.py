@@ -1,8 +1,10 @@
-import numpy as np
 import unittest
 
+import numpy as np
 from sklearn.exceptions import NotFittedError
-from skactiveml.utils import ExtLabelEncoder, is_labeled, is_unlabeled
+
+from skactiveml.utils import ExtLabelEncoder, is_labeled, is_unlabeled, \
+    labeled_indices, unlabeled_indices
 
 
 class TestLabel(unittest.TestCase):
@@ -89,6 +91,24 @@ class TestLabel(unittest.TestCase):
                                       is_labeled(self.y6, missing_label=None))
         np.testing.assert_array_equal(~np.array([0, 0, 0, 1], dtype=bool),
                                       is_labeled(self.y6, missing_label='nan'))
+
+    def test_unlabeled_indices(self):
+        unlbld_indices = unlabeled_indices(self.y3, missing_label=None)
+        true_unlbld_indices = [0, 4]
+        np.testing.assert_array_equal(unlbld_indices, true_unlbld_indices)
+        y = np.array([self.y3]).T
+        unlbld_indices = unlabeled_indices(y, missing_label=None)
+        true_unlbld_indices = [[0, 0], [4, 0]]
+        np.testing.assert_array_equal(unlbld_indices, true_unlbld_indices)
+
+    def test_labeled_indices(self):
+        lbld_indices = labeled_indices(self.y3, missing_label=None)
+        true_lbld_indices = [1, 2, 3]
+        np.testing.assert_array_equal(lbld_indices, true_lbld_indices)
+        y = np.array([self.y3]).T
+        lbld_indices = labeled_indices(y, missing_label=None)
+        true_lbld_indices = [[1, 0], [2, 0], [3, 0]]
+        np.testing.assert_array_equal(lbld_indices, true_lbld_indices)
 
     def test_ExtLabelEncoder(self):
         ext_le = ExtLabelEncoder(classes=[2, '2'])
