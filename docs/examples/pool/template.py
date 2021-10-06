@@ -1,7 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
-from sklearn.exceptions import NotFittedError
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, is_labeled
 from skactiveml.visualization import plot_utility, plot_decision_boundary
 #_ import
@@ -30,6 +29,9 @@ artists = []
 # The active learning cycle:
 n_cycles = 10
 for c in range(n_cycles):
+    # Fit the classifier.
+    clf.fit(X, y)
+
     # Set X_cand to the unlabeled instances.
     unlbld_idx = np.where(is_unlabeled(y))[0]
     X_cand = X[unlbld_idx]
@@ -37,7 +39,7 @@ for c in range(n_cycles):
 
     # Query the next instance/s.
     query_params = "#_query_params"
-    query_idx = unlbld_idx[qs.query(X_cand, **query_params)]  #_43 query_params
+    query_idx = unlbld_idx[qs.query(X_cand, **query_params)]
 
     # Plot the labeled data.
     coll_old = list(ax.collections)
@@ -46,22 +48,16 @@ for c in range(n_cycles):
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )
-    #ax = plot_utility(qs, X_cand=X, query_params, bound=bound, ax=ax)  #_25 {query_params}
     #_bp_utilities Break point for ...
     ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
     ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
-    try:
-        ax = plot_decision_boundary(clf, bound, ax=ax)
-    except NotFittedError:
-        pass
+    ax = plot_decision_boundary(clf, bound, ax=ax)
+
     coll_new = list(ax.collections)
     coll_new.append(title)
     artists.append([x for x in coll_new if (x not in coll_old)])
 
     # Label the queried instances.
     y[query_idx] = y_true[query_idx]
-
-    # Fit the classifier.
-    clf.fit(X, y)
 
 ani = animation.ArtistAnimation(fig, artists, blit=True)

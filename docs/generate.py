@@ -207,7 +207,7 @@ def table_from_array(a, title='', caption='', widths=None, header_rows=0,
     table = title + '\n'
     table += ''.ljust(len(title), section_level) + '\n'
     table += f'{indents}.. list-table:: {caption}\n' \
-            f'{indents}   :header-rows: {header_rows}\n'
+             f'{indents}   :header-rows: {header_rows}\n'
     if widths is None:
         table += '\n'
     elif widths == 'auto':
@@ -272,7 +272,7 @@ def get_table_data(package, additional_data, rel_api_path):
 
                 methods_text = \
                     f':doc:`{method} </generated/sphinx_gallery_examples/' \
-                    f'{package_name}/plot_{qs_name}_{method}>`'
+                    f'{package_name}/plot_{qs_name}_{method.replace(" ", "_")}>`'
                 for ref in refs:
                     ref_text += f':footcite:t:`{ref}`, '
                 ref_text = ref_text[0:-2]
@@ -363,7 +363,7 @@ def generate_examples(gen_path, package, json_path):
                     method = data['method']
                 else:
                     method = 'default'
-                plot_filename += "_" + method
+                plot_filename += "_" + method.replace(' ', '_')
 
                 if not data['class'] in additional_data.keys():
                     additional_data[data['class']] = []
@@ -546,28 +546,20 @@ def format_plot(data, template_path):
     # Collect the expected parameters for the query method.
     if 'X' not in data['query_params'].keys() and \
             'X' in inspect.signature(data["qs"].query).parameters:
-        data['query_params']['X'] = 'X'
+        data['query_params']['"X"'] = 'X'
     if 'y' not in data['query_params'].keys() and \
             'y' in inspect.signature(data["qs"].query).parameters:
-        data['query_params']['y'] = 'y'
-    q_params = dict_to_str(data['query_params'])
-    if len(q_params) > 0:
-        q_params = ', ' + q_params
+        data['query_params']['"y"'] = 'y'
 
     block_str = ''
     with open(template_path, "r") as template:
         for line in template:
             if '#_' in line:
-                if 'import' in line:
+                if '#_ import' in line:
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
                     if 'clf' not in data.keys() and \
                             'clf' not in data['init_params'].keys():
                         line += 'from skactiveml.classifier import PWC\n'
-                    if 'code_import' in data.keys():
-                        if type(data['code_import']) != list:
-                            data['code_import'] = [data['code_import']]
-                        for l in data['code_import']:
-                            line += l + '\n'
                 elif 'init_clf' in line:
                     # Decide which classifier to use, if clf is None.
                     if 'clf' not in data.keys():
@@ -588,19 +580,12 @@ def format_plot(data, template_path):
                             inspect.signature(data["qs"].__init__).parameters:
                         data['init_params']['random_state'] = 'random_state'
                     # Initialise the query strategy.
-                    line = f'qs = {data["qs"].__name__}({dict_to_str(data["init_params"])})\n'
-                elif '{query_params}' in line:
-                    s = line.find('#_')
-                    idx = int(line[s + 2:].split(' ')[0]) - 1
-                    qp_str = ""
-                    for k, v in data['query_params'].items():
-                        qp_str += "'" + k + "': " + v + ", "
-                    qp_str = ', {' + qp_str[:-2] + '}'
-                    line = line[:idx] + qp_str + line[idx:s] + '\n'
-                elif 'query_params' in line:
-                    s = line.find('#_')
-                    idx = int(line[s + 2:].split(' ')[0]) - 1
-                    line = line[:idx] + q_params + line[idx:s] + '\n'
+                    line = f'qs = {data["qs"].__name__}' \
+                           f'({dict_to_str(data["init_params"])})\n'
+                elif '#_query_params' in line:
+                    start = line.find('#_query_params') - 1
+                    line = line[:start] + '{' + \
+                           dict_to_str(data['query_params'], allocator=': ') + '}\n'
                 elif '#_bp' in line:
                     try:
                         s = line.find('#_')
@@ -654,7 +639,7 @@ def format_refs(refs: list):
     return block_str + '\n'
 
 
-def dict_to_str(d, idx=None):
+def dict_to_str(d, idx=None, allocator='='):
     """Converts a dictionary into a string.
     Parameters
     ----------
@@ -667,10 +652,12 @@ def dict_to_str(d, idx=None):
         specific key. If idx is not given, the first value in the list is
         always used. It is not necessary to specify all keys from d.
         shape: {key1:int1,...}
+    allocator: string, optional (Default='=')
+        The allocator is used t separate the key and the value.
 
     Returns
     -------
-    String : dict_ as String. Shape: 'key1=value[idx[key1], key2...' or
+    String : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or
              'key1=value1, key2=value2...' or a combination of both.
     """
     dd_str = ""
@@ -681,5 +668,5 @@ def dict_to_str(d, idx=None):
             value = value[idx[key]]
         else:
             value = value[0]
-        dd_str += str(key) + "=" + value + ", "
+        dd_str += str(key) + allocator + value + ", "
     return dd_str[0:-2]
