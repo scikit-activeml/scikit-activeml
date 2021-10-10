@@ -35,7 +35,7 @@ The easiest way of installing scikit-activeml is using ``pip``   ::
 Example
 =======
 
-The following code implements an active learning Cycle with 20 iterations using a logistic regression classifier and uncertainty sampling. To use other classifiers, you can simply wrap classifiers from ``scikit-learn`` or use classifiers provided by ``scikit-activeml``. Note that the main difficulty using active learning with ``scikit-learn`` is the ability to handle unlabeled data, which we denote as a specific value (``MISSING_LABEL``) in the label vector ``y_true``. More query strategies can be found in the documentation.     ::
+The following code implements an active learning cycle with 20 iterations using a logistic regression classifier and uncertainty sampling. To use other classifiers, you can simply wrap classifiers from ``scikit-learn`` or use classifiers provided by ``scikit-activeml``. Note that the main difficulty using active learning with ``scikit-learn`` is the ability to handle unlabeled data, which we denote as a specific value (``MISSING_LABEL``) in the label vector ``y``. More query strategies can be found in the documentation.     ::
 
     import numpy as np
     from sklearn.linear_model import LogisticRegression
