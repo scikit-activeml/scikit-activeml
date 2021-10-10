@@ -180,7 +180,8 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
         raise ValueError(
             "`X` and `y` cannot be None for `method='csl'`."
         )
-    use_sample_weight = sample_weight is not None
+    use_sample_weight = sample_weight is not None \
+                        or sample_weight_cand is not None
     if bool(sample_weight is None and X is not None) \
             != bool(sample_weight_cand is None):
         raise ValueError(
