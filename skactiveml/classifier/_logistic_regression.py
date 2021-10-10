@@ -15,12 +15,12 @@ from scipy.stats import multivariate_normal as multi_normal
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
-from ..base import SkactivemlClassifier, AnnotModelMixing
+from ..base import SkactivemlClassifier, AnnotModelMixin
 from ..utils import MISSING_LABEL, compute_vote_vectors, \
     ext_confusion_matrix, rand_argmax
 
 
-class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
+class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
     """LogisticRegressionRY
 
     Logistic Regression based on Raykar [1] is a classification algorithm that
