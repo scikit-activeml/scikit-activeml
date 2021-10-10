@@ -89,13 +89,15 @@ class TestValidation(unittest.TestCase):
             X, y, X_cand, sample_weight, y_numeric=True
         )
         X_cand_false = [[5]]
-        self.assertRaises(ValueError, check_X_y,
-                          X, y, X_cand_false, sample_weight, multi_output=True
-                          )
+        self.assertRaises(
+            ValueError, check_X_y, X, y, X_cand_false, sample_weight,
+            multi_output=True
+        )
         y = np.array([[1, 0, 1], [2, 0, 1]])
-        self.assertRaises(ValueError, check_X_y,
-                          X, y, X_cand, sample_weight, multi_output=True
-                          )
+        self.assertRaises(
+            ValueError, check_X_y, X, y, X_cand, sample_weight,
+            multi_output=True
+        )
 
     def test_check_random_state(self):
         seed = 12

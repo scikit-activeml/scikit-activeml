@@ -6,9 +6,11 @@ from os import path
 
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.ensemble import RandomForestClassifier
 
 from skactiveml import pool
-from skactiveml.classifier import PWC, CMM
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.classifier import PWC, CMM, SklearnClassifier
 from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL
 
 
@@ -19,18 +21,29 @@ class TestGeneral(unittest.TestCase):
         self.X, self.y_true = make_blobs(n_samples=10, n_features=2, centers=2,
                                          cluster_std=1, random_state=1)
         self.budget = 5
-        self.clf = PWC(classes=np.unique(self.y_true), random_state=0)
-        self.cmm = CMM(classes=np.unique(self.y_true),
-                       missing_label=MISSING_LABEL,
-                       random_state=0)
+        self.clf = PWC(
+            classes=np.unique(self.y_true), missing_label=MISSING_LABEL,
+            random_state=0
+        )
+        self.cmm = CMM(
+            classes=np.unique(self.y_true), missing_label=MISSING_LABEL,
+            random_state=0
+        )
+        self.ensemble = SklearnClassifier(
+            classes=np.unique(self.y_true), missing_label=MISSING_LABEL,
+            estimator=RandomForestClassifier(random_state=0),
+            random_state=0
+        )
+
         self.y_missing_label = np.full(self.y_true.shape, self.MISSING_LABEL)
         self.y = self.y_true.copy()
         self.y[:3] = self.y_true[:3]
         self.query_strategies = {}
-        # TODO Check is class.
         for qs_name in pool.__all__:
-            if qs_name[0].isupper():
-                self.query_strategies[qs_name] = getattr(pool, qs_name)
+            qs = getattr(pool, qs_name)
+            if inspect.isclass(qs) and \
+                    issubclass(qs, SingleAnnotPoolBasedQueryStrategy):
+                self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())
 
     def test_al_cycle(self):
@@ -42,15 +55,20 @@ class TestGeneral(unittest.TestCase):
                     self.query_strategies[qs_name], only_mandatory=False,
                     classes=np.unique(self.y_true),
                     random_state=np.random.RandomState(0), clf=clf,
+                    ensemble=self.ensemble
                 )
 
                 unlabeled = np.where(is_unlabeled(y))[0]
-                id1, u1 = call_func(qs.query, X_cand=self.X[unlabeled],
-                                    X=self.X, y=y, clf=clf, X_eval=self.X,
-                                    return_utilities=True)
-                id2, u2 = call_func(qs.query, X_cand=self.X[unlabeled],
-                                    X=self.X, y=y, clf=clf, X_eval=self.X,
-                                    return_utilities=True)
+                id1, u1 = call_func(
+                    qs.query, X_cand=self.X[unlabeled], X=self.X, y=y, clf=clf,
+                    X_eval=self.X, ensemble=self.ensemble,
+                    return_utilities=True
+                )
+                id2, u2 = call_func(
+                    qs.query, X_cand=self.X[unlabeled], X=self.X, y=y, clf=clf,
+                    X_eval=self.X, ensemble=self.ensemble,
+                    return_utilities=True
+                )
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_array_equal(u1, u2)
 
@@ -60,26 +78,34 @@ class TestGeneral(unittest.TestCase):
                 qs = call_func(
                     self.query_strategies[qs_name], only_mandatory=True,
                     clf=clf, classes=np.unique(self.y_true),
-                    random_state=np.random.RandomState(0))
+                    ensemble=self.ensemble,
+                    random_state=np.random.RandomState(0)
+                )
 
-                ids, u = call_func(qs.query, X_cand=self.X[unlabeled],
-                                   X=self.X, y=y, clf=clf, X_eval=self.X,
-                                   batch_size=5, return_utilities=True)
+                ids, u = call_func(
+                    qs.query, X_cand=self.X[unlabeled], X=self.X, y=y, clf=clf,
+                    X_eval=self.X, batch_size=5, ensemble=self.ensemble,
+                    return_utilities=True
+                )
                 self.assertEqual(len(ids), 5)
                 self.assertEqual(len(u), 5, msg='utility score should '
                                                 'have shape (5xN)')
                 self.assertEqual(len(u[0]), len(unlabeled),
                                  msg='utility score must have shape (5xN)')
 
-                self.assertWarns(Warning, call_func, f_callable=qs.query,
-                                 X_cand=self.X[unlabeled], X=self.X, y=y,
-                                 clf=clf, X_eval=self.X, batch_size=15)
+                self.assertWarns(
+                    Warning, call_func, f_callable=qs.query,
+                    X_cand=self.X[unlabeled], X=self.X, y=y, clf=clf,
+                    X_eval=self.X, ensemble=self.ensemble, batch_size=15
+                )
 
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
-                    ids = call_func(qs.query, X_cand=self.X[unlabeled],
-                                    X=self.X, y=y, X_eval=self.X,
-                                    clf=clf, batch_size=15)
+                    ids = call_func(
+                        qs.query, X_cand=self.X[unlabeled], X=self.X, y=y,
+                        X_eval=self.X, clf=clf, batch_size=15,
+                        ensemble=self.ensemble
+                    )
                     self.assertEqual(len(ids), 10)
 
             for init_budget in [5, 1, 0]:
@@ -91,13 +117,17 @@ class TestGeneral(unittest.TestCase):
                     qs = call_func(
                         self.query_strategies[qs_name], only_mandatory=True,
                         clf=clf, classes=np.unique(self.y_true),
-                        random_state=1)
+                        random_state=1, ensemble=self.ensemble
+                    )
 
                     for b in range(self.budget):
                         unlabeled = np.where(is_unlabeled(y))[0]
                         clf.fit(self.X, y)
-                        ids = call_func(qs.query, X_cand=self.X[unlabeled],
-                                        clf=clf, X=self.X, y=y, X_eval=self.X)
+                        ids = call_func(
+                            qs.query, X_cand=self.X[unlabeled], clf=clf,
+                            X=self.X, y=y, X_eval=self.X,
+                            ensemble=self.ensemble,
+                        )
                         sample_id = unlabeled[ids]
                         y[sample_id] = self.y_true[sample_id]
 
@@ -158,10 +188,7 @@ class TestGeneral(unittest.TestCase):
                 self._test_query_param_return_utilities(qs_class, clf)
 
     def _test_init_param_random_state(self, qs_class, clf):
-        qs_mdl = call_func(
-            qs_class, only_mandatory=True, classes=np.unique(self.y_true),
-            clf=clf
-        )
+        qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
         self.assertTrue(qs_mdl.random_state is None)
         qs_mdl = call_func(
             qs_class, classes=np.unique(self.y_true), clf=clf,
@@ -169,41 +196,32 @@ class TestGeneral(unittest.TestCase):
         )
         self.assertEqual(qs_mdl.random_state, 'Test')
         self.assertRaises(ValueError, call_func, qs_mdl.query, X_cand=self.X,
-                          clf=clf, X=self.X, y=self.y)
+                          clf=clf, X=self.X, y=self.y, ensemble=self.ensemble)
 
     def _test_query_param_X_cand(self, qs_class, clf):
-        qs_mdl = call_func(
-            qs_class, classes=np.unique(self.y_true),
-            clf=clf
-        )
+        qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
         for X_cand in [None, [], np.ones(5)]:
             self.assertRaises(
                 ValueError, call_func, qs_mdl.query, X_cand=X_cand, clf=clf,
-                X=self.X, y=self.y
+                X=self.X, y=self.y, ensemble=self.ensemble
             )
 
     def _test_query_param_batch_size(self, qs_class, clf):
-        qs_mdl = call_func(
-            qs_class, classes=np.unique(self.y_true),
-            clf=clf
-        )
+        qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
         self.assertRaises(
             ValueError, call_func, qs_mdl.query, X_cand=self.X, clf=clf,
-            X=self.X, y=self.y, batch_size=0
+            X=self.X, y=self.y, batch_size=0, ensemble=self.ensemble
         )
         self.assertRaises(
             TypeError, call_func, qs_mdl.query, X_cand=self.X, clf=clf,
-            X=self.X, y=self.y, batch_size=1.2
+            X=self.X, y=self.y, batch_size=1.2, ensemble=self.ensemble
         )
 
     def _test_query_param_return_utilities(self, qs_class, clf):
-        qs_mdl = call_func(
-            qs_class, classes=np.unique(self.y_true),
-            clf=clf
-        )
+        qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
         self.assertRaises(
             TypeError, call_func, qs_mdl.query, X_cand=self.X, clf=clf,
-            X=self.X, y=self.y, return_utilities='test'
+            X=self.X, y=self.y, return_utilities='test', ensemble=self.ensemble
         )
 
 
