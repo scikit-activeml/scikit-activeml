@@ -42,20 +42,6 @@ class TestMcPAL(unittest.TestCase):
         self.assertRaises(TypeError, pal.query, self.X_cand, self.clf, self.X,
                           self.y)
 
-    def test_init_param_random_state(self):
-        pal = McPAL(random_state='string')
-        self.assertTrue(hasattr(pal, 'random_state'))
-        self.assertRaises(ValueError, pal.query, self.X_cand, self.clf, self.X,
-                          self.y)
-
-    # Test query parameters
-    def test_query_param_X_cand(self):
-        pal = McPAL()
-        self.assertRaises(ValueError, pal.query, X_cand=[], clf=self.clf, X=[],
-                          y=[])
-        self.assertRaises(ValueError, pal.query, X_cand=[], clf=self.clf,
-                          X=self.X, y=self.y)
-
     def test_query_param_clf(self):
         pal = McPAL()
         self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
@@ -88,24 +74,6 @@ class TestMcPAL(unittest.TestCase):
         self.assertRaises(ValueError, pal.query, X_cand=self.X_cand,
                           clf=self.clf, X=self.X, y=self.y,
                           utility_weight=np.ones(3))
-
-    def test_query_param_batch_size(self):
-        pal = McPAL()
-        self.assertRaises(TypeError, pal.query, self.X_cand, self.clf, self.X,
-                          self.y, batch_size=1.0)
-        self.assertRaises(ValueError, pal.query, self.X_cand, self.X, self.y,
-                          batch_size=0)
-
-    def test_query_param_return_utilities(self):
-        pal = McPAL()
-        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y=self.y,
-                          return_utilities=None)
-        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y=self.y,
-                          return_utilities=[])
-        self.assertRaises(TypeError, pal.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y=self.y, return_utilities=0)
 
     def test_query(self):
         mcpal = McPAL()

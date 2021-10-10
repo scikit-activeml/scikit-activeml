@@ -33,23 +33,6 @@ class TestQBC(unittest.TestCase):
                 y=self.y, ensemble=self.ensemble
             )
 
-    def test_init_param_random_state(self):
-        selector = QBC(random_state=self.random_state)
-        self.assertTrue(hasattr(selector, 'random_state'))
-        selector = QBC(random_state='string')
-        self.assertRaises(
-            ValueError, selector.query, X_cand=self.X_cand, X=self.X, y=self.y,
-            ensemble=self.ensemble
-        )
-
-    def test_query_param_X_cand(self):
-        selector = QBC()
-        for X_cand in [[], None, np.nan]:
-            self.assertRaises(
-                ValueError, selector.query, X_cand=X_cand, X=self.X, y=self.y,
-                ensemble=self.ensemble
-            )
-
     def test_query_param_ensemble(self):
         selector = QBC()
         ensemble_list = [

@@ -28,11 +28,6 @@ class TestFourDS(unittest.TestCase):
         self.assertRaises(ValueError, al4ds.query, X_cand=self.X, clf=self.clf,
                           X=self.X, y=self.y)
 
-    def test_init_param_random_state(self):
-        al4ds = FourDS(random_state='tests')
-        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, clf=self.clf,
-                          X=self.X, y=self.y)
-
     def test_query_param_clf(self):
         al4ds = FourDS()
         self.assertRaises(TypeError, al4ds.query, X_cand=self.X, clf=None,
@@ -41,28 +36,6 @@ class TestFourDS(unittest.TestCase):
         al4ds = FourDS()
         self.assertRaises(TypeError, al4ds.query, X_cand=self.X, clf=clf,
                           X=self.X, y=self.y)
-
-    def test_query_param_batch_size(self):
-        al4ds = FourDS()
-        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, clf=self.clf,
-                          X=self.X, y=self.y, batch_size=1.2)
-        al4ds = FourDS()
-        self.assertRaises(ValueError, al4ds.query, X_cand=self.X, clf=self.clf,
-                          X=self.X, y=self.y, batch_size=0)
-
-    def test_query_param_return_utilities(self):
-        al4ds = FourDS()
-        self.assertRaises(TypeError, al4ds.query, X_cand=self.X, clf=self.clf,
-                          X=self.X, y=self.y, return_utilities='test')
-
-    def test_query_param_X_cand(self):
-        al4ds = FourDS()
-        self.assertRaises(ValueError, al4ds.query, X_cand=None, clf=self.clf,
-                          X=self.X, y=self.y)
-        self.assertRaises(ValueError, al4ds.query, X_cand=np.ones(5),
-                          clf=self.clf, X=self.X, y=self.y)
-        self.assertRaises(ValueError, al4ds.query, X_cand=np.ones((5, 1)),
-                          clf=self.clf, X=self.X, y=self.y)
 
     def test_query_param_X(self):
         al4ds = FourDS()

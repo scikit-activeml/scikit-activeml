@@ -40,24 +40,6 @@ class TestEpistemicUncertainty(unittest.TestCase):
         self.assertRaises(TypeError, selector.query, **self.kwargs,
                           clf=self.clf)
 
-    def test_init_param_random_state(self):
-        selector = EpistemicUncertainty(random_state='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          clf=self.clf)
-        selector = EpistemicUncertainty(random_state=self.random_state)
-        self.assertTrue(hasattr(selector, 'random_state'))
-        self.assertRaises(ValueError, selector.query, X_cand=[[1]],
-                          clf=self.clf, X=self.X, y=self.y)
-
-    def test_query_param_X_cand(self):
-        selector = EpistemicUncertainty()
-        self.assertRaises(ValueError, selector.query, X_cand=[], clf=self.clf,
-                          X=self.X, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=None,
-                          clf=self.clf, X=self.X, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=np.nan,
-                          clf=self.clf, X=self.X, y=self.y)
-
     def test_query_param_clf(self):
         selector = EpistemicUncertainty()
         dt = SklearnClassifier(DecisionTreeClassifier())
@@ -95,21 +77,6 @@ class TestEpistemicUncertainty(unittest.TestCase):
         for sample_weight in sample_weight_list:
             self.assertRaises(ValueError, selector.query, **self.kwargs,
                               clf=self.clf, sample_weight=sample_weight)
-
-    def test_query_param_batch_size(self):
-        selector = EpistemicUncertainty()
-        for batch_size in ['string', 1.2]:
-            self.assertRaises(TypeError, selector.query, **self.kwargs,
-                              clf=self.clf, batch_size=batch_size)
-        for batch_size in [0, -10]:
-            self.assertRaises(ValueError, selector.query, **self.kwargs,
-                              clf=self.clf, batch_size=batch_size)
-
-    def test_query_param_return_utilities(self):
-        selector = EpistemicUncertainty()
-        for return_utilities in [None, [], 0]:
-            self.assertRaises(TypeError, selector.query, **self.kwargs,
-                              clf=self.clf, return_utilities=return_utilities)
 
     # tests for epistemic PWC
     def test_interpolate(self):

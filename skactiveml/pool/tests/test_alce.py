@@ -73,19 +73,7 @@ class TestALCE(unittest.TestCase):
         self.assertTrue(hasattr(alce, 'nn_params'))
         self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
 
-    def test_init_param_random_state(self):
-        alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
-                    random_state='string')
-        self.assertTrue(hasattr(alce, 'random_state'))
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
-
     # Test query parameters
-    def test_query_param_X_cand(self):
-        alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(ValueError, alce.query, X_cand=[], X=[], y=[])
-        self.assertRaises(ValueError, alce.query, X_cand=[], X=self.X,
-                          y=self.y)
-
     def test_query_param_X(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
@@ -95,22 +83,6 @@ class TestALCE(unittest.TestCase):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
-
-    def test_query_param_batch_size(self):
-        alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y,
-                          batch_size=1.0)
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y,
-                          batch_size=0)
-
-    def test_query_param_return_utilities(self):
-        alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(TypeError, alce.query, X_cand=self.X_cand,
-                          return_utilities=None)
-        self.assertRaises(TypeError, alce.query, X_cand=self.X_cand,
-                          return_utilities=[])
-        self.assertRaises(TypeError, alce.query, X_cand=self.X_cand,
-                          return_utilities=0)
 
     def test_query(self):
         alce = ALCE(base_regressor=self.regressor, classes=[0, 1])

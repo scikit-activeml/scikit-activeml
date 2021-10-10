@@ -39,23 +39,6 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(cost_matrix=np.ones((3, 3)))
         self.assertRaises(ValueError, selector.query, **self.kwargs)
 
-    def test_init_param_random_state(self):
-        selector = UncertaintySampling(random_state='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
-        selector = UncertaintySampling(random_state=self.random_state)
-        self.assertTrue(hasattr(selector, 'random_state'))
-        self.assertRaises(ValueError, selector.query, X_cand=[[1]],
-                          clf=self.clf, X=self.X, y=self.y)
-
-    def test_query_param_X_cand(self):
-        selector = UncertaintySampling()
-        self.assertRaises(ValueError, selector.query, X_cand=[], clf=self.clf,
-                          X=self.X, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=None, X=self.X,
-                          clf=self.clf, y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=np.nan, X=self.X,
-                          clf=self.clf, y=self.y)
-
     def test_query_param_clf(self):
         selector = UncertaintySampling()
         self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
@@ -93,26 +76,6 @@ class TestUncertaintySampling(unittest.TestCase):
                           sample_weight=np.empty((len(self.X) - 1)))
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=np.empty((len(self.X) + 1)))
-
-    def test_query_param_batch_size(self):
-        selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          batch_size=1.2)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          batch_size='string')
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          batch_size=0)
-        self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          batch_size=-10)
-
-    def test_query_param_return_utilities(self):
-        selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          return_utilities=None)
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          return_utilities=[])
-        self.assertRaises(TypeError, selector.query, **self.kwargs,
-                          return_utilities=0)
 
     def test_query(self):
         compare_list = []

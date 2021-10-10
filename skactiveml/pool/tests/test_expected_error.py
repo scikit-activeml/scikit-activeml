@@ -43,13 +43,6 @@ class TestExpectedErrorReduction(unittest.TestCase):
                 clf=self.clf
             )
 
-    def test_init_param_random_state(self):
-        eer = EER(random_state='string')
-        self.assertRaises(
-            ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=self.y,
-            clf=self.clf
-        )
-
     def test_init_param_ignore_partial_fit(self):
         eer = EER(ignore_partial_fit=None)
         self.assertRaises(
@@ -63,15 +56,6 @@ class TestExpectedErrorReduction(unittest.TestCase):
         self.assertRaises(
             TypeError, eer.query, X_cand=self.X_cand, X=self.X, y=self.y,
             clf='test'
-        )
-
-    def test_query_param_X_cand(self):
-        eer = EER(cost_matrix=self.cost_matrix)
-        self.assertRaises(
-            ValueError, eer.query, X_cand=[], X=[], y=[], clf=self.clf
-        )
-        self.assertRaises(
-            ValueError, eer.query, X_cand=[], X=self.X, y=self.y, clf=self.clf
         )
 
     def test_query_param_X(self):
@@ -116,20 +100,6 @@ class TestExpectedErrorReduction(unittest.TestCase):
                 ValueError, eer.query, X_cand=self.X_cand, X=self.X, y=self.y,
                 sample_weight_cand=sample_weight_cand, clf=self.clf
             )
-
-    def test_query_param_batch_size(self):
-        eer = EER()
-        self.assertRaises(TypeError, eer.query, X_cand=self.X_cand, X=self.X,
-                          y=self.y, clf=self.clf, batch_size=1.0)
-        self.assertRaises(ValueError, eer.query, X_cand=self.X_cand, X=self.X,
-                          y=self.y, clf=self.clf, batch_size=0)
-
-    def test_query_param_return_utilities(self):
-        eer = EER(cost_matrix=self.cost_matrix)
-        for return_utilities in [None, [], 0]:
-            self.assertRaises(TypeError, eer.query, X_cand=self.X_cand,
-                              X=self.X, y=self.y, clf=self.clf,
-                              return_utilities=return_utilities)
 
     def test_query(self):
         # Test methods.
@@ -178,59 +148,3 @@ class TestExpectedErrorReduction(unittest.TestCase):
             X_cand=[[0], [100], [200]], X=[[0], [200]], y=[0, 1], clf=self.clf
         )
         np.testing.assert_array_equal(query_indices, [1])
-
-    # def test_eer_new(self):
-    #     import numpy as np
-    #     from sklearn.neural_network import MLPClassifier
-    #     from sklearn.linear_model import LogisticRegression
-    #     from sklearn.preprocessing import StandardScaler
-    #     from sklearn.datasets import make_blobs
-    #     from skactiveml.utils import is_unlabeled, MISSING_LABEL
-    #     from skactiveml.classifier import SklearnClassifier
-    #     from skactiveml.pool import ExpectedErrorReduction, \
-    #         EpistemicUncertainty
-    #     from time import time
-    #     import warnings
-    #
-    #     with warnings.catch_warnings():
-    #         # warnings.simplefilter("ignore")
-    #         X, y_true = make_blobs(random_state=0, centers=5, n_samples=500,
-    #                                shuffle=True)
-    #         y_true %= 2
-    #         X = StandardScaler().fit_transform(X)
-    #         y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
-    #         y[:450] = y_true[:450]
-    #
-    #         clf = SklearnClassifier(
-    #             MLPClassifier(
-    #                 max_iter=1000, hidden_layer_sizes=[100], random_state=0
-    #             ),
-    #             classes=np.unique(y_true), random_state=0)
-    #         qs = ExpectedErrorReduction(method='csl',
-    #                                     ignore_partial_fit=False,
-    #                                     random_state=0)
-    #         # qs = UncertaintySampling(method='least_confident', random_state=0)
-    #         # qs = FourDS(random_state=0)
-    #         # qs = McPAL(random_state=0)
-    #         # gmm = BayesianGaussianMixture(n_components=5, random_state=0)
-    #         # gmm.fit(X)
-    #         # clf = CMM(mixture_model=gmm, classes=np.unique(y_true))
-    #         qs = EpistemicUncertainty()
-    #         clf = SklearnClassifier(estimator=LogisticRegression(),
-    #                                 classes=np.unique(y_true))
-    #
-    #         n_cycles = 5
-    #         for c in range(n_cycles):
-    #             clf.fit(X, y)
-    #             print(f'Score: {clf.score(X, y_true)}')
-    #             unlbld_idx = \
-    #                 np.argwhere(is_unlabeled(y, missing_label=MISSING_LABEL))[
-    #                 :, 0]
-    #             X_cand = X[unlbld_idx]
-    #             t = time()
-    #             query_idx = unlbld_idx[
-    #                 qs.query(X_cand=X_cand, X=X, y=y, clf=clf, batch_size=2)]
-    #             print(f'Time: {time() - t}')
-    #             y[query_idx] = y_true[query_idx]
-    #         clf.fit(X, y)
-    #         print(clf.score(X, y_true))
