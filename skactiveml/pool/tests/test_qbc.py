@@ -120,13 +120,14 @@ class TestQBC(unittest.TestCase):
         )
         ensemble_list = [self.ensemble, ensemble_classifiers, ensemble_bagging]
         for ensemble in ensemble_list:
-            selector = QBC()
-            idx, u = selector.query(
-                X_cand=self.X_cand, ensemble=ensemble, X=self.X, y=self.y,
-                return_utilities=True
-            )
-            self.assertEqual(len(idx), 1)
-            self.assertEqual(len(u), 1)
+            for method in ['KL_divergence', 'vote_entropy']:
+                selector = QBC(method=method)
+                idx, u = selector.query(
+                    X_cand=self.X_cand, ensemble=ensemble, X=self.X, y=self.y,
+                    return_utilities=True
+                )
+                self.assertEqual(len(idx), 1)
+                self.assertEqual(len(u), 1)
 
 
 class TestAverageKlDivergence(unittest.TestCase):

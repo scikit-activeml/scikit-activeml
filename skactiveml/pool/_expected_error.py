@@ -31,7 +31,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     ignore_partial_fit: bool, optional (default=False)
         If false, the classifier will be refitted through `partial_fit` if
         available. Otherwise, the use of `fit` is enforced.
-    random_state: numeric | np.random.RandomState, optional (defatult=None)
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for annotator selection.
 
     References
