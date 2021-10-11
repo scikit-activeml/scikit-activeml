@@ -51,14 +51,14 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         ----------
         X_cand : array-like, shape (n_candidate_samples, n_features)
             Candidate samples from which the strategy can select.
-        clf : {skactiveml.base.SkactivemlClassifier}
+        clf : {SkactivemlClassifier, PWC}
             Only the PWC and a wrapped logistic regression are supported as
             classifiers.
-        X: array-like, shape (n_samples, n_features),
+        X : array-like, shape (n_samples, n_features),
             Complete training data set.
-        y: array-like, shape (n_samples),
+        y : array-like, shape (n_samples),
             Labels of the training data set.
-        sample_weight: array-like, shape (n_samples), optional (default=None)
+        sample_weight : array-like, shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
@@ -95,7 +95,7 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
             # Create precompute_array if necessary.
             if not isinstance(self.precompute, bool):
-                raise TypeError("'precompute' should be from type bool but {} "
+                raise TypeError("'precompute' should be of type bool but {} "
                                 "were given".format(type(self.precompute)))
             if self.precompute and self._precompute_array is None:
                 self._precompute_array = np.full((2, 2), np.nan)
@@ -111,9 +111,9 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                 sample_weight=sample_weight[mask_labeled]
             )
         else:
-            raise TypeError(f"`clf` must be from type `PWC` or "
+            raise TypeError(f"`clf` must be of type `PWC` or "
                             f"a wrapped `LogisticRegression` classifier. "
-                            f"The given is from type {type(clf)}.")
+                            f"The given is of type {type(clf)}.")
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
@@ -289,7 +289,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
     y : np.array
         The labels of the labeled pool X.
     clf : skactiveml.classifier.SklearnClassifier
-        The fitted classifier.
+        Only a wrapped logistic regression is supported as classifier.
     sample_weight : array-like of shape (n_samples,) (default=None)
         Sample weights for X, only used if clf is a logistic regression
         classifier.

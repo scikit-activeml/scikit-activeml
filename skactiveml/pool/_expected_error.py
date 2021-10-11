@@ -67,14 +67,14 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             Candidate samples from which the strategy can select.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        X: array-like, shape (n_samples, n_features), optional (default=None)
+        X : array-like, shape (n_samples, n_features), optional (default=None)
             Complete training data set.
-        y: array-like, shape (n_samples), optional (default=None)
+        y : array-like, shape (n_samples), optional (default=None)
             Labels of the training data set.
-        sample_weight: array-like, shape (n_samples), optional
+        sample_weight : array-like, shape (n_samples), optional
         (default=None)
             Weights of training samples in `X`.
-        sample_weight_cand: array-like, shape (n_candidate_samples), optional
+        sample_weight_cand : array-like, shape (n_candidate_samples), optional
         (default=None)
             Weights of candidate samples in `X_cand`.
         batch_size : int, optional (default=1)
@@ -126,32 +126,32 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
             Model implementing the methods `fit` and `predict_proba`.
     X_cand : array-like, shape (n_candidate_samples, n_features)
             Candidate samples from which the strategy can select.
-    X: array-like, shape (n_samples, n_features), optional (default=None)
+    X : array-like, shape (n_samples, n_features), optional (default=None)
         Complete training data set.
-    y: array-like, shape (n_samples), optional (default=None)
+    y : array-like, shape (n_samples), optional (default=None)
         Labels of the training data set.
-    cost_matrix: array-like, shape (n_classes, n_classes), optional
+    cost_matrix : array-like, shape (n_classes, n_classes), optional
     (default=None)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`.
         Only supported for least confident
         variant.
-    method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
+    method : {'log_loss', 'emr', 'csl'}, optional (default='emr')
         Variant of expected error reduction to be used: 'log_loss' is
         cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
-    sample_weight: array-like, shape (n_samples), optional
+    sample_weight : array-like, shape (n_samples), optional
     (default=None)
         Weights of training samples in `X`.
-    sample_weight_cand: array-like, shape (n_candidate_samples), optional
+    sample_weight_cand : array-like, shape (n_candidate_samples), optional
     (default=None)
         Weights of candidate samples in `X_cand`.
-    ignore_partial_fit: bool, optional (default=False)
+    ignore_partial_fit : bool, optional (default=False)
         If false, the classifier will be refitted through `partial_fit` if
         available. Otherwise, the use of `fit` is enforced.
 
     Returns
     -------
-    utilities: np.ndarray, shape (n_candidates)
+    utilities : np.ndarray, shape (n_candidates)
         The utilities of all unlabeled instances.
 
     References
@@ -201,24 +201,36 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
     n_classes = len(clf.classes_)
     cost_matrix = 1 - np.eye(len(clf.classes_)) if cost_matrix is None else \
         cost_matrix
-
     cost_matrix = check_cost_matrix(cost_matrix, n_classes)
+
+    # Compute class-membership probabilities of candidate samples.
     P = clf.predict_proba(X_cand)
 
+    # Storage for computed errors per candidate sample.
     errors = np.zeros(len(X_cand))
     errors_per_class = np.zeros(n_classes)
+
+    # Iterate over candidate samples
     for i, x in enumerate(X_cand):
+        # Simulate acquisition of label for each candidate sample and class.
         for yi in range(n_classes):
+            # Create sample array for the retraining of the classifier.
             X_new = np.vstack((X, [x])) if use_fit else np.array([x])
+            # Create label array for the retraining of the classifier.
             y_new = np.append(y, [[yi]]) if use_fit else np.array([yi])
+
             if use_sample_weight:
+                # Create sample weight array for the retraining of the
+                # classifier.
                 w = sample_weight_cand[i]
                 if use_fit:
                     sample_weight_new = np.append(sample_weight, [[w]])
                 else:
                     sample_weight_new = np.array([w])
+                # Retrain classifier with sample weights.
                 clf_new = clf_refit(X_new, y_new, sample_weight_new)
             else:
+                # Retrain classifier without sample weights.
                 clf_new = clf_refit(X_new, y_new)
             if method == 'emr':
                 P_new = clf_new.predict_proba(X_cand)

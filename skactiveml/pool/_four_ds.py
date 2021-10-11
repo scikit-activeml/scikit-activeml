@@ -9,7 +9,7 @@ from sklearn.utils.validation import check_array, check_scalar, column_or_1d
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..classifier import CMM
-from ..utils import rand_argmax, is_labeled, fit_if_not_fitted
+from ..utils import rand_argmax, is_labeled, fit_if_not_fitted, check_type
 
 
 class FourDS(SingleAnnotPoolBasedQueryStrategy):
@@ -30,8 +30,8 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
     References
     ---------
     [1] Reitmaier, T., & Sick, B. (2013). Let us know your decision: Pool-based
-        active training of a generative classifier with the selection strategy 4DS.
-        Information Sciences, 230, 106-131.
+        active training of a generative classifier with the selection strategy
+        4DS. Information Sciences, 230, 106-131.
     """
 
     def __init__(self, lmbda=None, random_state=None):
@@ -82,10 +82,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         y = column_or_1d(y)
 
         # Check classifier type.
-        if not isinstance(clf, CMM):
-            raise TypeError(
-                f'`clf` must be a `skactiveml.classifier.CMM` but got `{clf}`.'
-            )
+        check_type(clf, CMM, 'clf')
 
         # Storage for query indices.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
