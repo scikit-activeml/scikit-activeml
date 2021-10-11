@@ -50,7 +50,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -65,7 +64,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -80,7 +78,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -99,7 +96,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -114,7 +110,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -129,7 +124,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -148,7 +142,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -163,7 +156,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -178,7 +170,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -196,7 +187,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -211,7 +201,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -226,7 +215,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -244,7 +232,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -259,7 +246,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -274,7 +260,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -292,7 +277,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -307,7 +291,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -322,7 +305,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -340,7 +322,6 @@ class QueryTests(ABC):
             ty_cand=None,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -355,7 +336,6 @@ class QueryTests(ABC):
             ty_cand=np.ones(5),
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -370,7 +350,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand[1:],
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -388,7 +367,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities="string",
         )
         self.assertRaises(
@@ -403,41 +381,7 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=1,
-        )
-
-    def test_query_param_simulate(self):
-        # simulate needs to be a boolean
-        self.assertRaises(
-            TypeError,
-            self.delay_wrapper.query,
-            X_cand=self.X_cand,
-            X=self.X,
-            y=self.y,
-            tX=self.tX,
-            ty=self.ty,
-            tX_cand=self.tX_cand,
-            ty_cand=self.ty_cand,
-            acquisitions=self.acquisitions,
-            sample_weight=self.sample_weight,
-            simulate="string",
-            return_utilities=False,
-        )
-        self.assertRaises(
-            TypeError,
-            self.delay_wrapper.query,
-            X_cand=self.X_cand,
-            X=self.X,
-            y=self.y,
-            tX=self.tX,
-            ty=self.ty,
-            tX_cand=self.tX_cand,
-            ty_cand=self.ty_cand,
-            acquisitions=self.acquisitions,
-            sample_weight=self.sample_weight,
-            simulate=1,
-            return_utilities=False,
         )
 
     def test_query_param_acquisitions(self):
@@ -454,7 +398,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=None,
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -469,7 +412,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions="string",
             sample_weight=self.sample_weight,
-            simulate=False,
             return_utilities=False,
         )
 
@@ -488,7 +430,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight="string",
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -503,7 +444,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=["string", "numbers", "test"],
-            simulate=False,
             return_utilities=False,
         )
         self.assertRaises(
@@ -518,7 +458,6 @@ class QueryTests(ABC):
             ty_cand=self.ty_cand,
             acquisitions=self.acquisitions,
             sample_weight=[1],
-            simulate=False,
             return_utilities=False,
         )
 
@@ -595,9 +534,6 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
 
     def test_query_param_sample_weight(self):
         return super().test_query_param_sample_weight()
-
-    def test_query_param_simulate(self):
-        return super().test_query_param_simulate()
 
     # init param test
     def test_init_param_base_query_strategy(self):
@@ -703,7 +639,6 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
             return_utilities=False,
-            simulate=False,
         )
         self.delay_wrapper = FuzzyDelaySimulationWrapper(
             base_query_strategy=self.query_strategies,
@@ -754,9 +689,6 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
 
     def test_query_param_sample_weight(self):
         return super().test_query_param_sample_weight()
-
-    def test_query_param_simulate(self):
-        return super().test_query_param_simulate()
 
     # init param test
     def test_init_param_base_query_strategy(self):
@@ -885,7 +817,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             acquisitions=self.acquisitions,
             sample_weight=self.sample_weight,
             return_utilities=False,
-            simulate=False,
         )
         self.delay_wrapper = BaggingDelaySimulationWrapper(
             base_query_strategy=self.query_strategies,
@@ -937,9 +868,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
 
     def test_query_param_sample_weight(self):
         return super().test_query_param_sample_weight()
-
-    def test_query_param_simulate(self):
-        return super().test_query_param_simulate()
 
     # init param test
     def test_init_param_base_query_strategy(self):

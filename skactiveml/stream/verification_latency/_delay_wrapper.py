@@ -37,7 +37,7 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
 
     @abstractmethod
     def query(
-        self, X_cand, *args, return_utilities=False, simulate=False, **kwargs
+        self, X_cand, *args, return_utilities=False, **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -55,11 +55,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -156,8 +151,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             Checked Input samples.
         y : array-like of shape (n_samples)
             Checked Labels of the input samples 'X'. Converts y to a numpy array
-        simulate : bool,
-            Checked boolean value of `simulate`.
         """
         if sample_weight is not None:
             sample_weight = np.array(sample_weight)
@@ -179,7 +172,7 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         Returns
         -------
         acquisitions : array-like of shape (n_samples, n_features)
-            Checked boolean value of `simulate`.
+            Checked boolean array value of `acquisitions`.
         """
         acquisitions = np.array(acquisitions)
         if not acquisitions.dtype == bool:
@@ -245,7 +238,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
         ty_cand,
         acquisitions,
         sample_weight,
-        simulate,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -273,11 +265,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -298,13 +285,10 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
             Checked random state to use.
-        simulate : bool,
-            Checked boolean value of `simulate`.
         """
         self._validate_base_query_strategy()
-        X_cand, simulate, return_utilities = super()._validate_data(
+        X_cand, return_utilities = super()._validate_data(
             X_cand,
-            simulate,
             return_utilities,
             reset=reset,
             **check_X_cand_params
@@ -326,7 +310,6 @@ class SingleAnnotStreamBasedQueryStrategyDelayWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities
         )
 
@@ -369,7 +352,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         ty_cand,
         acquisitions,
         sample_weight=None,
-        simulate=False,
         return_utilities=False,
         al_kwargs={},
         **kwargs
@@ -402,11 +384,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -431,7 +408,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         ) = self._validate_data(
             X_cand=X_cand,
@@ -443,7 +419,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             ty_cand=ty_cand,
             acquisitions=acquisitions,
             sample_weight=sample_weight,
-            simulate=simulate,
             return_utilities=return_utilities,
         )
 
@@ -472,7 +447,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
                 acquisitions=A_n_acquisitions,
                 sample_weight=A_n_sample_weight,
                 return_utilities=True,
-                simulate=simulate,
                 **al_kwargs,
                 **kwargs
             )
@@ -521,7 +495,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
         ty_cand,
         acquisitions,
         sample_weight,
-        simulate,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -549,11 +522,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -584,8 +552,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,)
             Checked sample weights for X
-        simulate : bool,
-            Checked boolean value of `simulate`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -599,7 +565,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         ) = super()._validate_data(
             X_cand=X_cand,
@@ -611,7 +576,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             ty_cand=ty_cand,
             acquisitions=acquisitions,
             sample_weight=sample_weight,
-            simulate=simulate,
             return_utilities=return_utilities,
             reset=reset,
             **check_X_cand_params
@@ -629,7 +593,6 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         )
 
@@ -705,7 +668,6 @@ class BaggingDelaySimulationWrapper(
         acquisitions,
         sample_weight=None,
         return_utilities=False,
-        simulate=False,
         al_kwargs={},
         **kwargs
     ):
@@ -738,11 +700,6 @@ class BaggingDelaySimulationWrapper(
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
 
@@ -766,7 +723,6 @@ class BaggingDelaySimulationWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         ) = self._validate_data(
             X_cand=X_cand,
@@ -778,7 +734,6 @@ class BaggingDelaySimulationWrapper(
             ty_cand=ty_cand,
             acquisitions=acquisitions,
             sample_weight=sample_weight,
-            simulate=simulate,
             return_utilities=return_utilities,
         )
         sum_utilities = np.zeros(len(X))
@@ -829,7 +784,6 @@ class BaggingDelaySimulationWrapper(
                         ty_cand=np.array(ty_cand[i]),
                         sample_weight=sample_weight,
                         acquisitions=acquisitions,
-                        simulate=True,
                         return_utilities=True,
                         **al_kwargs,
                         **kwargs
@@ -852,7 +806,6 @@ class BaggingDelaySimulationWrapper(
                     sample_weight=sample_weight,
                     acquisitions=acquisitions,
                     return_utilities=True,
-                    simulate=simulate,
                     **al_kwargs,
                     **kwargs
                 )
@@ -860,15 +813,15 @@ class BaggingDelaySimulationWrapper(
 
         avg_utilities = np.array(avg_utilities)
         queried_indices = self.base_query_strategy_.budget_manager_.query(
-            avg_utilities, simulate=True
+            avg_utilities
         )
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
         kwargs = dict(utilities=avg_utilities)
-        if not simulate:
-            self.base_query_strategy_.update(
-                X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
-            )
+        # if not simulate:
+        #     self.base_query_strategy_.update(
+        #         X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
+        #     )
 
         if return_utilities:
             return queried_indices, avg_utilities
@@ -940,7 +893,6 @@ class BaggingDelaySimulationWrapper(
         ty_cand,
         acquisitions,
         sample_weight,
-        simulate,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -968,11 +920,6 @@ class BaggingDelaySimulationWrapper(
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -1003,8 +950,6 @@ class BaggingDelaySimulationWrapper(
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,)
             Checked sample weights for X
-        simulate : bool,
-            Checked boolean value of `simulate`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -1018,7 +963,6 @@ class BaggingDelaySimulationWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         ) = super()._validate_data(
             X_cand=X_cand,
@@ -1030,7 +974,6 @@ class BaggingDelaySimulationWrapper(
             ty_cand=ty_cand,
             acquisitions=acquisitions,
             sample_weight=sample_weight,
-            simulate=simulate,
             return_utilities=return_utilities,
             reset=reset,
             **check_X_cand_params
@@ -1050,7 +993,6 @@ class BaggingDelaySimulationWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         )
 
@@ -1158,7 +1100,6 @@ class FuzzyDelaySimulationWrapper(
         ty_cand,
         acquisitions,
         sample_weight=None,
-        simulate=False,
         return_utilities=False,
         al_kwargs={},
         **kwargs
@@ -1191,11 +1132,6 @@ class FuzzyDelaySimulationWrapper(
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -1220,7 +1156,6 @@ class FuzzyDelaySimulationWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         ) = self._validate_data(
             X_cand=X_cand,
@@ -1232,7 +1167,6 @@ class FuzzyDelaySimulationWrapper(
             ty_cand=ty_cand,
             acquisitions=acquisitions,
             sample_weight=sample_weight,
-            simulate=simulate,
             return_utilities=return_utilities,
         )
 
@@ -1300,7 +1234,6 @@ class FuzzyDelaySimulationWrapper(
                     sample_weight=new_sample_weight,
                     aquisitions=new_acquisitions,
                     return_utilities=True,
-                    simulate=True,
                     **al_kwargs,
                     **kwargs
                 )
@@ -1321,7 +1254,6 @@ class FuzzyDelaySimulationWrapper(
                     ty_cand=np.array(ty_cand[i]),
                     aquisitions=acquisitions,
                     sample_weight=sample_weight,
-                    simulate=True,
                     return_utilities=True,
                     **al_kwargs,
                     **kwargs
@@ -1334,10 +1266,10 @@ class FuzzyDelaySimulationWrapper(
         queried = np.zeros(len(X_cand))
         queried[tmp_queried_indices] = 1
         kwargs = dict(utilities=utilities)
-        if not simulate:
-            self.base_query_strategy_.update(
-                X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
-            )
+        # if not simulate:
+        #     self.base_query_strategy_.update(
+        #         X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
+        #     )
 
         if return_utilities:
             return queried_indices, utilities
@@ -1409,7 +1341,6 @@ class FuzzyDelaySimulationWrapper(
         tX_cand,
         ty_cand,
         acquisitions,
-        simulate,
         sample_weight,
         reset=True,
         **check_X_cand_params
@@ -1437,11 +1368,6 @@ class FuzzyDelaySimulationWrapper(
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -1472,8 +1398,6 @@ class FuzzyDelaySimulationWrapper(
             List of arrived labels. True if Label arrived otherwise False
         sample_weight : array-like of shape (n_samples,)
             Checked sample weights for X
-        simulate : bool,
-            Checked boolean value of `simulate`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -1487,7 +1411,6 @@ class FuzzyDelaySimulationWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         ) = super()._validate_data(
             X_cand=X_cand,
@@ -1499,7 +1422,6 @@ class FuzzyDelaySimulationWrapper(
             ty_cand=ty_cand,
             acquisitions=acquisitions,
             sample_weight=sample_weight,
-            simulate=simulate,
             return_utilities=return_utilities,
             reset=reset,
             **check_X_cand_params
@@ -1517,7 +1439,6 @@ class FuzzyDelaySimulationWrapper(
             ty_cand,
             acquisitions,
             sample_weight,
-            simulate,
             return_utilities,
         )
 

@@ -11,7 +11,7 @@ from .budget_manager import BIQF
 
 
 class PAL(SingleAnnotStreamBasedQueryStrategy):
-    '''Probabilistic Active Learning (PAL) in Datastreams is an extension to
+    """Probabilistic Active Learning (PAL) in Datastreams is an extension to
     Multi-Class Probabilistic Active Learning (see pool.McPAL). It assesses
     MCPAL spatial to assess the spatial utility. The Balanced Incremental
     Quantile Filter (BIQF), that is implemented within the default
@@ -40,7 +40,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M. 
         (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture 
         Notes in Computer Science, vol 9385. Springer, Cham.
-    '''
+    """
+
     def __init__(
         self,
         clf=None,
@@ -61,7 +62,6 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         sample_weight=None,
-        simulate=False,
         return_utilities=False,
         **kwargs
     ):
@@ -83,11 +83,6 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -107,23 +102,23 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             X=X,
             y=y,
             sample_weight=sample_weight,
-            simulate=simulate,
-            return_utilities=return_utilities
+            return_utilities=return_utilities,
         )
 
         k_vec = self.clf_.predict_freq(X_cand)
         utilities = probal._cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max
         )
-        queried_indices = self.budget_manager_.query(utilities,
-                                                      simulate=simulate)
+        queried_indices = self.budget_manager_.query(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+    def update(
+        self, X_cand, queried_indices, budget_manager_kwargs={}, **kwargs
+    ):
         """Updates the budget manager
 
         Parameters
@@ -132,7 +127,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        queried : array-like of shape (n_samples,)
+        queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
@@ -145,7 +140,9 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
-        self.budget_manager_.update(queried, **budget_manager_kwargs)
+        self.budget_manager_.update(
+            X_cand, queried_indices, **budget_manager_kwargs
+        )
         return self
 
     def _validate_data(
@@ -154,7 +151,6 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         sample_weight,
-        simulate,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -171,11 +167,6 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         reset : bool, default=True
@@ -197,17 +188,11 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             Checked training sample weight
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
-        simulate : bool,
-            Checked boolean value of `simulate`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        X_cand, return_utilities, simulate = super()._validate_data(
-            X_cand,
-            return_utilities,
-            simulate,
-            reset=reset,
-            **check_X_cand_params
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
 
         self._validate_clf(X, y, sample_weight)
@@ -215,7 +200,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self._validate_m_max()
         self._validate_random_state()
 
-        return X_cand, X, y, sample_weight, simulate, return_utilities
+        return X_cand, X, y, sample_weight, return_utilities
 
     def _validate_clf(self, X, y, sample_weight=None):
         """Validate if clf is a classifier or create a new clf and fit X and y.
@@ -244,7 +229,9 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             # check if y is not multi dimensinal
             if isinstance(y, np.ndarray):
                 if y.ndim > 1:
-                    raise ValueError("{} is not a valid Value for y".format(type(y)))
+                    raise ValueError(
+                        "{} is not a valid Value for y".format(type(y))
+                    )
         else:
             self.clf_ = self.clf
 
@@ -252,7 +239,9 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """Validate if the prior is a float and greater than 0.
         """
         if not isinstance(self.prior, float) and not None:
-            raise TypeError("{} is not a valid type for prior".format(type(self.prior)))
+            raise TypeError(
+                "{} is not a valid type for prior".format(type(self.prior))
+            )
         if self.prior <= 0:
             raise ValueError(
                 "The value of prior is incorrect."
@@ -264,7 +253,9 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if m_max is set
         if not isinstance(self.m_max, int):
-            raise TypeError("{} is not a valid type for m_max".format(type(self.m_max)))
+            raise TypeError(
+                "{} is not a valid type for m_max".format(type(self.m_max))
+            )
         if self.m_max <= 0:
             raise ValueError(
                 "The value of m_max is incorrect."

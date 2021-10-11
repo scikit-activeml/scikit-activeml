@@ -217,7 +217,7 @@ class BudgetManager(ABC, BaseEstimator):
 
     @abstractmethod
     def query(
-        self, utilities, simulate=False, return_budget_left=True, **kwargs
+        self, utilities, return_budget_left=True, **kwargs
     ):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
@@ -228,11 +228,6 @@ class BudgetManager(ABC, BaseEstimator):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-        
-        simulate : bool, optional
-            If True, the internal state of the budget manager before and after
-            the query is the same. This should only be used to prevent the
-            budget manager from adapting itself. The default is False.
         
         return_utilities : bool, optional
             If true, also return whether there was budget left for each
@@ -285,7 +280,7 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_, "budget", float, min_val=0.0, max_val=1.0
         )
 
-    def _validate_data(self, utilities, simulate, return_budget_left):
+    def _validate_data(self, utilities, return_budget_left):
         """Validate input data.
 
         Parameters
@@ -293,9 +288,6 @@ class BudgetManager(ABC, BaseEstimator):
         utilities: ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy.
-        simulate : bool,
-            If True, the internal state of the budget manager before and after
-            the query is the same.
         return_budget_left : bool,
             If true, also return whether there was budget left for each
             assessed utility.
@@ -304,8 +296,6 @@ class BudgetManager(ABC, BaseEstimator):
         -------
         utilities: ndarray of shape (n_samples,)
             Checked utilities
-        simulate : bool,
-            Checked boolean value of `simulate`.
         return_budget_left : bool,
             Checked boolean value of `return_budget_left`.
         """
@@ -316,11 +306,9 @@ class BudgetManager(ABC, BaseEstimator):
             )
         # Check return_utilities.
         check_scalar(return_budget_left, "return_budget_left", bool)
-        # Check return_utilities.
-        check_scalar(simulate, "simulate", bool)
         # Check budget
         self._validate_budget(self.get_default_stream_budget())
-        return utilities, simulate, return_budget_left
+        return utilities, return_budget_left
 
     def get_default_stream_budget(self):
         """This function defines the default budget which should be used when no
@@ -354,7 +342,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
     @abstractmethod
     def query(
-        self, X_cand, *args, simulate=False, return_utilities=False, **kwargs
+        self, X_cand, *args, return_utilities=False, **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -372,12 +360,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
 
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
@@ -447,7 +429,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self,
         X_cand,
         return_utilities,
-        simulate,
         reset=True,
         **check_X_cand_params
     ):
@@ -460,9 +441,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -478,8 +456,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
             Checked random state to use.
-        simulate : bool,
-            Checked boolean value of `simulate`.
         """
         # Check candidate instances.
         X_cand = check_array(X_cand, **check_X_cand_params)
@@ -490,8 +466,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check simulate.
-        check_scalar(simulate, "simulate", bool)
 
         # Check random state.
         self._validate_random_state()
@@ -499,7 +473,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         # Check budget_manager.
         self._validate_budget_manager()
 
-        return X_cand, simulate, return_utilities
+        return X_cand, return_utilities
 
 
 class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
@@ -527,7 +501,7 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
 
     @abstractmethod
     def query(
-        self, X_cand, *args, simulate=False, return_utilities=False, **kwargs
+        self, X_cand, *args, return_utilities=False, **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
 
@@ -545,12 +519,6 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
 
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
@@ -636,7 +604,6 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         self,
         X_cand,
         return_utilities,
-        simulate,
         reset=True,
         **check_X_cand_params
     ):
@@ -649,9 +616,6 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        simulate : bool,
-            If True, the internal state of the query strategy before and after
-            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -667,8 +631,6 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
             Checked boolean value of `return_utilities`.
         random_state : np.random.RandomState,
             Checked random state to use.
-        simulate : bool,
-            Checked boolean value of `simulate`.
         """
         # Check candidate instances.
         X_cand = check_array(X_cand, **check_X_cand_params)
@@ -679,16 +641,13 @@ class SingleAnnotStreamBasedQueryStrategyWrapper(QueryStrategy):
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
 
-        # Check simulate.
-        check_scalar(simulate, "simulate", bool)
-
         # Check random state.
         self._validate_random_state()
 
         # Check base_query_strategy.
         self._validate_base_query_strategy()
 
-        return X_cand, return_utilities, simulate
+        return X_cand, return_utilities
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):

@@ -30,7 +30,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             budget_manager=budget_manager, random_state=random_state
         )
 
-    def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
+    def query(self, X_cand, return_utilities=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -48,15 +48,6 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             If true, also return the utilities based on the query strategy.
             The default is False.
 
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Member variabled created
-            during the query call may not be deleted, however, their state is
-            reset in such a way, as the query call never happened. Note, that
-            this parameter is propagated to the budget_manager, as well.
-            The default is False.
-
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
@@ -67,25 +58,20 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, simulate)
-        # copy random state in case of simulating the query
-        prior_random_state_state = self.random_state_.get_state()
+        self._validate_data(X_cand, return_utilities)
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
-        queried_indices = self.budget_manager_.query(
-            utilities, simulate=simulate
-        )
-
-        if simulate:
-            self.random_state_.set_state(prior_random_state_state)
+        queried_indices = self.budget_manager_.query(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+    def update(
+        self, X_cand, queried_indices, budget_manager_kwargs={}, **kwargs
+    ):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -95,7 +81,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        queried : array-like of shape (n_samples,)
+        queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
@@ -112,17 +98,14 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         self._validate_budget_manager()
         # update the random state assuming, that query(..., simulate=True) was
         # used
-        self.random_state_.random_sample(len(queried))
-        self.budget_manager_.update(queried, **budget_manager_kwargs)
+        self.random_state_.random_sample(len(queried_indices))
+        self.budget_manager_.update(
+            X_cand, queried_indices, **budget_manager_kwargs
+        )
         return self
 
     def _validate_data(
-        self,
-        X_cand,
-        return_utilities,
-        simulate,
-        reset=True,
-        **check_X_cand_params
+        self, X_cand, return_utilities, reset=True, **check_X_cand_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -133,9 +116,6 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -149,15 +129,9 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        simulate : bool,
-            Checked boolean value of `simulate`.
         """
-        X_cand, return_utilities, simulate = super()._validate_data(
-            X_cand,
-            return_utilities,
-            simulate,
-            reset=reset,
-            **check_X_cand_params
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
 
         self._validate_random_state()
@@ -192,7 +166,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             budget_manager=budget_manager, random_state=random_state
         )
 
-    def query(self, X_cand, return_utilities=False, simulate=False, **kwargs):
+    def query(self, X_cand, return_utilities=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         This query strategy only evaluates the time each instance arrives at.
@@ -213,12 +187,6 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             If true, also return the utilities based on the query strategy.
             The default is False.
 
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
-
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
@@ -229,7 +197,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities, simulate)
+        self._validate_data(X_cand, return_utilities)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
@@ -246,32 +214,22 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             remaining_budget = (
                 tmp_observed_instances * budget - tmp_queried_instances
             )
-            # print(remaining_budget >= 1)
             if remaining_budget >= 1:
                 utilities[i] = 1
                 tmp_queried_instances += 1
             else:
                 utilities[i] = 0
 
-            # print("observed_instances", observed_instances)
-            # print("queried_instances", queried_instances)
-            # print("budget", budget)
-            # print("remaining_budget", remaining_budget)
-
-        if not simulate:
-            self.observed_instances_ = tmp_observed_instances
-            self.queried_instances_ = tmp_queried_instances
-        queried_indices = self.budget_manager_.query(
-            utilities, simulate=simulate
-        )
-        # print("queried_indices", queried_indices)
+        queried_indices = self.budget_manager_.query(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, X_cand, queried, budget_manager_kwargs={}, **kwargs):
+    def update(
+        self, X_cand, queried_indices, budget_manager_kwargs={}, **kwargs
+    ):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -281,7 +239,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        queried : array-like of shape (n_samples,)
+        queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
         budget_manager_kwargs : kwargs
@@ -300,19 +258,18 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        self.budget_manager_.update(queried, **budget_manager_kwargs)
-        self.observed_instances_ += X_cand.shape[0]
-        self.queried_instances_ += np.sum(queried > 0)
+        self.budget_manager_.update(
+            X_cand, queried_indices, **budget_manager_kwargs
+        )
+        queried = np.zeros(len(X_cand))
+        queried[queried_indices] = 1
+        self.observed_instances_ += len(queried)
+        self.queried_instances_ += np.sum(queried)
         # print("queried_instances_", self.queried_instances_)
         return self
 
     def _validate_data(
-        self,
-        X_cand,
-        return_utilities,
-        simulate,
-        reset=True,
-        **check_X_cand_params
+        self, X_cand, return_utilities, reset=True, **check_X_cand_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -323,9 +280,6 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -341,15 +295,9 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        simulate : bool,
-            Checked boolean value of `simulate`.
         """
-        X_cand, return_utilities, simulate = super()._validate_data(
-            X_cand,
-            return_utilities,
-            simulate,
-            reset=reset,
-            **check_X_cand_params
+        X_cand, return_utilities = super()._validate_data(
+            X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
 
         self._validate_random_state()
