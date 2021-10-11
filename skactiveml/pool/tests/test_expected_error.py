@@ -120,13 +120,14 @@ class TestExpectedErrorReduction(unittest.TestCase):
             self.assertEqual(len(np.unique(utilities)), 1)
 
             if method != 'csl':
-                _, utilities = eer.query(
-                    X_cand=X,
-                    sample_weight_cand=np.ones_like(y),
-                    clf=clf_partial, return_utilities=True
-                )
-                self.assertEqual(utilities.shape, (1, len(X)))
-                self.assertEqual(len(np.unique(utilities)), 1)
+                for sample_weight_cand in [None, np.ones_like(y)]:
+                    _, utilities = eer.query(
+                        X_cand=X, clf=clf_partial,
+                        sample_weight_cand=sample_weight_cand,
+                        return_utilities=True
+                    )
+                    self.assertEqual(utilities.shape, (1, len(X)))
+                    self.assertEqual(len(np.unique(utilities)), 1)
 
             _, utilities = eer.query(
                 X_cand=X, X=X, y=[0, 1, MISSING_LABEL], clf=self.clf,

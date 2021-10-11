@@ -182,11 +182,11 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
         )
     use_sample_weight = sample_weight is not None \
                         or sample_weight_cand is not None
-    if bool(sample_weight is None and X is not None) \
-            != bool(sample_weight_cand is None):
+    if use_fit and (bool(sample_weight is None)
+                    != bool(sample_weight_cand is None)):
         raise ValueError(
             '`sample_weight` and `sample_weight_cand` must either both be '
-            'None or array-like.'
+            'None or array-like, if the fit method is used.'
         )
     X, y, X_cand, sample_weight, sample_weight_cand_checked = check_X_y(
         X, y, X_cand, sample_weight, sample_weight_cand,
