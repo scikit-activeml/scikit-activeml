@@ -129,10 +129,10 @@ class TestALCE(unittest.TestCase):
         X_cand = np.random.random((15, 2))
 
         alce = ALCE(self.classes, self.regressor, self.cost_matrix,
-                    random_state=14, mds_params={'n_jobs': 1})
+                    random_state=14, mds_params={'n_jobs': 1, 'verbose': 2})
         cand1 = alce.query(X_cand, X, y)
         alce = ALCE(self.classes, self.regressor, self.cost_matrix,
-                    random_state=14, mds_params={'n_jobs': 2, 'verbose': 2})
+                    random_state=14, mds_params={'n_jobs': 2})
         cand2 = alce.query(X_cand, X, y)
         np.testing.assert_array_equal(cand1, cand2)
 
