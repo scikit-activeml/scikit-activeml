@@ -16,8 +16,8 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.svm import SVR
 from sklearn.utils import check_array, check_symmetric
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.utils import simple_batch, check_classifier_params, \
+from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils import simple_batch, check_classifier_params, \
     MISSING_LABEL, check_scalar, check_random_state, check_X_y, is_labeled, \
     ExtLabelEncoder
 
