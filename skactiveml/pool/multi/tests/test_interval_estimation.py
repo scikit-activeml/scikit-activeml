@@ -125,6 +125,11 @@ class TestIEThresh(unittest.TestCase):
         self.assertRaises(TypeError, ie_thresh.query, X_cand=self.X,
                           A_cand=self.A_cand, X=self.X, y=self.y)
 
+    def test_init_param_n_annotators(self):
+        ie_thresh = IEThresh(clf=self.clf, n_annotators='test')
+        self.assertRaises(TypeError, ie_thresh.query, X_cand=self.X,
+                          X=self.X, y=self.y)
+
     def test_init_param_random_state(self):
         ie_thresh = IEThresh(clf=self.clf, random_state='test')
         self.assertRaises(ValueError, ie_thresh.query, X_cand=self.X,
@@ -198,7 +203,7 @@ class TestIEThresh(unittest.TestCase):
                           X_cand=self.X, X=self.X, A_cand=self.A_cand,
                           y=self.y, sample_weight='test')
 
-    def test_query_padram_sample_weight(self):
+    def test_query_param_sample_weight(self):
         ie_thresh = IEThresh(clf=self.clf)
         self.assertRaises(ValueError, ie_thresh.query, X_cand=self.X, X=self.X,
                           y=self.y, A_cand=self.A_cand,

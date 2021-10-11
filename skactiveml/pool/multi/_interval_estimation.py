@@ -192,14 +192,15 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         Discovery and Data Mining, pp. 259-268. 2009.
     """
 
-    def __init__(self, clf, epsilon=0.9, alpha=0.05, random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, clf, epsilon=0.9, alpha=0.05, n_annotators=None,
+                 random_state=None):
+        super().__init__(n_annotators=n_annotators, random_state=random_state)
         self.clf = clf
         self.epsilon = epsilon
         self.alpha = alpha
 
-    def query(self, X_cand, A_cand, X, y, sample_weight=None,
-              batch_size='adaptive', return_utilities=False, **kwargs):
+    def query(self, X_cand, X, y, A_cand=None, sample_weight=None,
+              batch_size='adaptive', return_utilities=False):
         """Determines which candidate sample is to be annotated by which
         annotator.
 

@@ -141,7 +141,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     n_annotators : int,
         Sets the number of annotators if no A_cand is None
     """
-    def __init__(self, random_state=None, n_annotators=None):
+    def __init__(self, n_annotators=None, random_state=None):
         super().__init__(random_state=random_state)
         self.n_annotators = n_annotators
 
@@ -242,6 +242,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
                     "A_cand as the annotators matrix."
                 )
             else:
+                check_scalar(x=self.n_annotators, target_type=int,
+                             name='n_annotators', min_val=1)
                 A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
         else:
             A_cand = check_array(A_cand, dtype=bool)
