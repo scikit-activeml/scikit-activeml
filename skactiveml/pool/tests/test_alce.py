@@ -5,6 +5,8 @@ from sklearn.svm import SVR
 
 from skactiveml.classifier import PWC
 from skactiveml.pool import ALCE
+from skactiveml.pool._alce import MDSP, smacof_p
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestALCE(unittest.TestCase):
@@ -49,12 +51,6 @@ class TestALCE(unittest.TestCase):
                     embed_dim=0)
         self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
 
-    def test_init_param_sample_weight(self):
-        alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
-                    sample_weight='string')
-        self.assertTrue(hasattr(alce, 'sample_weight'))
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
-
     def test_init_param_missing_label(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     missing_label=[1, 2, 3])
@@ -90,11 +86,20 @@ class TestALCE(unittest.TestCase):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
                           X=np.ones((5, 3)), y=self.y)
+        _, result = alce.query(self.X_cand, X=self.X,
+                               y=[MISSING_LABEL]*len(self.X),
+                               return_utilities=True)
+        np.testing.assert_array_equal(result, np.ones((1, len(self.X_cand))))
 
     def test_query_param_y(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
+
+    def test_query_param_sample_weight(self):
+        alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix)
+        self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
+                          X=self.X, y=self.y, sample_weight='string')
 
     def test_query_param_batch_size(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
@@ -117,6 +122,73 @@ class TestALCE(unittest.TestCase):
         query_indices = alce.query([[0], [100], [200]], [[0], [200]], [0, 1])
         np.testing.assert_array_equal(query_indices, [1])
 
+    def test_mds_params(self):
+        np.random.seed(14)
+        X = np.random.random((10, 2))
+        y = np.random.randint(0, 2, 10)
+        X_cand = np.random.random((15, 2))
 
-if __name__ == '__main__':
-    unittest.main()
+        alce = ALCE(self.classes, self.regressor, self.cost_matrix,
+                    random_state=14, mds_params={'n_jobs': 1, 'verbose': 2})
+        cand1 = alce.query(X_cand, X, y)
+        alce = ALCE(self.classes, self.regressor, self.cost_matrix,
+                    random_state=14, mds_params={'n_jobs': 2})
+        cand2 = alce.query(X_cand, X, y)
+        np.testing.assert_array_equal(cand1, cand2)
+
+        alce = ALCE(self.classes, self.regressor, self.cost_matrix,
+                    mds_params={'dissimilarity': 'wrong'})
+        self.assertRaises(ValueError, alce.query, X_cand, X, y)
+
+        alce = ALCE(base_regressor=self.regressor, classes=[0, 1],
+                    mds_params={'dissimilarity': 'precomputed'})
+        query_indices = alce.query([[0], [100], [200]], [[0], [200]], [0, 1])
+        np.testing.assert_array_equal(query_indices, [1])
+
+    def test_MDS(self):
+        sim = np.array([[0, 5, 3, 4],
+                        [5, 0, 2, 2],
+                        [3, 2, 0, 1],
+                        [4, 2, 1, 0]])
+        mds_clf = MDSP(metric=False, n_jobs=3, dissimilarity="precomputed")
+        mds_clf.fit(sim)
+
+        mds = MDSP()
+        init = np.array([[2], [3], [1], [1]])
+        mds.fit_transform(sim, init=init)
+        mds.fit_transform(sim)
+
+    def test_smacof_p_error(self):
+        # Not symmetric similarity matrix:
+        sim = np.array([[0, 5, 9, 4],
+                        [5, 0, 2, 2],
+                        [3, 2, 0, 1],
+                        [4, 2, 1, 0]])
+
+        np.testing.assert_raises(ValueError, smacof_p, sim, n_uq=1)
+
+        # Not squared similarity matrix:
+        sim = np.array([[0, 5, 9, 4],
+                        [5, 0, 2, 2],
+                        [4, 2, 1, 0]])
+
+        np.testing.assert_raises(ValueError, smacof_p, sim, n_uq=1)
+
+        # init not None and not correct format:
+        sim = np.array([[0, 5, 3, 4],
+                        [5, 0, 2, 2],
+                        [3, 2, 0, 1],
+                        [4, 2, 1, 0]])
+
+        Z = np.array([[-.266, -.539],
+                      [.016, -.238],
+                      [-.200, .524]])
+        np.testing.assert_raises(ValueError, smacof_p, sim, n_uq=1, init=Z,
+                                 n_init=1)
+
+    def test_smacof_p(self):
+        sim = np.array([[0, 5, 3, 4],
+                        [5, 0, 2, 2],
+                        [3, 2, 0, 1],
+                        [4, 2, 1, 0]])
+        smacof_p(sim, n_uq=1, return_n_iter=False)
