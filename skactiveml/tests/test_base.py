@@ -3,8 +3,41 @@ from unittest.mock import patch
 
 import numpy as np
 
-from skactiveml.base import SkactivemlClassifier, ClassFrequencyEstimator, \
-    AnnotModelMixin
+from skactiveml.base import QueryStrategy, SingleAnnotPoolBasedQueryStrategy, \
+    MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier, \
+    ClassFrequencyEstimator, AnnotModelMixin
+
+
+class QueryStrategyTest(unittest.TestCase):
+
+    @patch.multiple(QueryStrategy, __abstractmethods__=set())
+    def setUp(self):
+        self.qs = QueryStrategy()
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+
+
+class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
+
+    @patch.multiple(SingleAnnotPoolBasedQueryStrategy,
+                    __abstractmethods__=set())
+    def setUp(self):
+        self.qs = SingleAnnotPoolBasedQueryStrategy()
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+
+
+class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
+
+    @patch.multiple(MultiAnnotPoolBasedQueryStrategy,
+                    __abstractmethods__=set())
+    def setUp(self):
+        self.qs = MultiAnnotPoolBasedQueryStrategy()
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
 
 
 class SkactivemlClassifierTest(unittest.TestCase):
