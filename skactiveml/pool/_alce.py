@@ -45,8 +45,10 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
     embed_dim : int, optional (default=None)
         If is None, embed_dim = n_classes
     mds_params : dict, optional (default=None)
+        For further information, see
         https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
     nn_params : dict, optional (default=None)
+        For further information, see
         https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
 
     References
@@ -194,8 +196,10 @@ def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
     random_state: numeric | np.random.RandomState
         Random state for annotator selection.
     mds_params : dict
+        For further information, see
         https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
     nn_params : dict
+        For further information, see
         https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
 
     Returns
