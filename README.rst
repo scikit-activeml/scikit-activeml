@@ -60,7 +60,7 @@ The following code implements an active learning cycle with 20 iterations using 
          X_cand = X[unlbld_idx]
          query_idx = unlbld_idx[qs.query(X_cand=X_cand, clf=clf)]
          y[query_idx] = y_true[query_idx]
-    print(f'Accuracy: {clf.score(X, y_true)}')
+    print(f'Accuracy: {clf.fit(X, y).score(X, y_true)}')
 
 Development
 ===========
