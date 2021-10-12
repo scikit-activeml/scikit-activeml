@@ -229,26 +229,28 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._label_counts = [np.sum(y[is_lbld] == c) for c in
                               range(len(self._le.classes_))]
         try:
+            X_lbld = X[is_lbld].astype(np.float32)
+            y_lbld = y[is_lbld].astype(np.int64)
             if not has_fit_parameter(self.estimator,
                                      'sample_weight') or sample_weight is None:
                 if fit_function == 'partial_fit':
                     classes = self._le.transform(self.classes_)
-                    self.estimator_.partial_fit(X=X[is_lbld], y=y[is_lbld],
+                    self.estimator_.partial_fit(X=X_lbld, y=y_lbld,
                                                 classes=classes,
                                                 **fit_kwargs)
                 elif fit_function == 'fit':
-                    self.estimator_.fit(X=X[is_lbld], y=y[is_lbld],
+                    self.estimator_.fit(X=X_lbld, y=y_lbld,
                                         **fit_kwargs)
             else:
                 if fit_function == 'partial_fit':
                     classes = self._le.transform(self.classes_)
-                    self.estimator_.partial_fit(X=X[is_lbld], y=y[is_lbld],
+                    self.estimator_.partial_fit(X=X_lbld, y=y_lbld,
                                                 classes=classes,
                                                 sample_weight=sample_weight[
                                                     is_lbld],
                                                 **fit_kwargs)
                 elif fit_function == 'fit':
-                    self.estimator_.fit(X=X[is_lbld], y=y[is_lbld],
+                    self.estimator_.fit(X=X_lbld, y=y_lbld,
                                         sample_weight=sample_weight[is_lbld],
                                         **fit_kwargs)
             self.is_fitted_ = True
