@@ -188,13 +188,16 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
             '`sample_weight` and `sample_weight_cand` must either both be '
             'None or array-like, if the fit method is used.'
         )
-    X, y, X_cand, sample_weight, sample_weight_cand_checked = check_X_y(
+    X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
         X, y, X_cand, sample_weight, sample_weight_cand,
         force_all_finite=False, missing_label=clf.missing_label
     )
 
     # Refit classifier.
-    clf = fit_if_not_fitted(clf, X, y, sample_weight, False)
+    if use_sample_weight:
+        clf = fit_if_not_fitted(clf, X, y, sample_weight, False)
+    else:
+        clf = fit_if_not_fitted(clf, X, y, None, False)
     clf_refit = clone(clf).fit if use_fit else deepcopy(clf).partial_fit
 
     # Check cost matrix.
@@ -218,7 +221,7 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
             X_new = np.vstack((X, [x])) if use_fit else np.array([x])
             # Create label array for the retraining of the classifier.
             y_new = np.append(y, [[yi]]) if use_fit else np.array([yi])
-
+            # Check whether sample weights are used.
             if use_sample_weight:
                 # Create sample weight array for the retraining of the
                 # classifier.
