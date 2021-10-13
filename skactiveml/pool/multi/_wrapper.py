@@ -1,15 +1,15 @@
 from inspect import signature, Parameter
 
 import numpy as np
-from sklearn.utils import check_random_state, check_array, check_scalar
 import sklearn.utils.validation
 from scipy.stats import rankdata
 
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
 
-from ...utils import rand_argmax
+from ...utils import rand_argmax, check_type
 from ...utils._aggregation import majority_vote
+from ...utils._validation import check_random_state, check_array, check_scalar
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -29,7 +29,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         Sets the number of annotators if no A_cand is None
     y_aggregate : callable, default=None
         `y_aggregate` is used, if the given `strategy` depends on y-values as
-        labels for samples.
+        labels for samples. These y-values are passed to `query_params_dict`
+        when calling `query`.
         `y_aggregate` is in this case used to transform `y` as a matrix of shape
         (n_samples, n_annotators) into a vector of shape (n_samples) during
         the querying process and then passed to the given `strategy`.
@@ -127,21 +128,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                                    self.random_state, reset=True)
 
         # check strategy
-        if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
-            raise TypeError(
-                f"The given strategy is of type `{type(self.strategy)}`, "
-                "but it must be a of type `SingleAnnotPoolBasedQueryStrategy`."
-            )
+        check_type(self.strategy, SingleAnnotPoolBasedQueryStrategy,
+                   'self.strategy')
 
         # check query_params_dict
         if query_params_dict is None:
             query_params_dict = {}
 
-        if not isinstance(query_params_dict, dict):
-            raise TypeError(
-                f"`query_params_dict` must be of type `dict`. "
-                f"`query_params_dict` is of type {type(query_params_dict)}."
-            )
+        check_type(query_params_dict, dict, 'query_params_dict')
 
         # aggregate y
         if 'y' in query_params_dict:
@@ -153,18 +147,19 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                     f"`self.y_aggregate` must be callable. "
                     f"`self.y_aggregate` is of type {type(y_aggregate)}"
                 )
-            else:
-                # count the number of arguments that have no default value
-                n_free_params = len(list(
-                    filter(lambda x: x.default == Parameter.empty,
-                           signature(y_aggregate).parameters.values())
-                ))
-                if n_free_params != 1:
-                    raise TypeError(
-                        f"The number of free parameters of the callable has to "
-                        f"equal one. "
-                        f"The number of free parameters is {n_free_params}."
-                    )
+
+            # count the number of arguments that have no default value
+            n_free_params = len(list(
+                filter(lambda x: x.default == Parameter.empty,
+                       signature(y_aggregate).parameters.values())
+            ))
+
+            if n_free_params != 1:
+                raise TypeError(
+                    f"The number of free parameters of the callable has to "
+                    f"equal one. "
+                    f"The number of free parameters is {n_free_params}."
+                )
 
             query_params_dict['y'] = y_aggregate(query_params_dict['y'])
 

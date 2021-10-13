@@ -4,15 +4,15 @@ import warnings
 from scipy.stats import t, rankdata
 
 from sklearn.base import BaseEstimator
-from sklearn.utils.validation import check_array, check_consistent_length, \
+from sklearn.utils.validation import check_array,\
     check_random_state, check_is_fitted
 
-from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
+from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier, AnnotModelMixin
-from skactiveml.utils import rand_argmax, check_scalar, compute_vote_vectors, \
+from ...utils import rand_argmax, check_scalar, compute_vote_vectors, \
     MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type
-from skactiveml.pool._uncertainty import uncertainty_scores
-from skactiveml.utils._functions import simple_batch, fit_if_not_fitted
+from ...pool._uncertainty import uncertainty_scores
+from ...utils._functions import simple_batch, fit_if_not_fitted
 
 
 class IEAnnotModel(BaseEstimator, AnnotModelMixin):
