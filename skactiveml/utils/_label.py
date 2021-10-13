@@ -15,7 +15,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     ----------
     y : array-like, shape (n_samples) or (n_samples, n_outputs)
         Class labels to be checked w.r.t. to missing labels.
-    missing_label : number | str | None | np.nan
+    missing_label : number | str | None | np.nan, optional (default=np.nan)
         Symbol to represent a missing label.
 
     Returns
@@ -61,7 +61,7 @@ def is_labeled(y, missing_label=MISSING_LABEL):
     ----------
     y : array-like, shape (n_samples) or (n_samples, n_outputs)
         Class labels to be checked w.r.t. to present labels.
-    missing_label : number | str | None | np.nan
+    missing_label : number | str | None | np.nan, optional (default=np.nan)
         Symbol to represent a missing label.
 
     Returns
@@ -70,6 +70,48 @@ def is_labeled(y, missing_label=MISSING_LABEL):
         Boolean mask indicating present labels in y.
     """
     return ~is_unlabeled(y, missing_label)
+
+
+def unlabeled_indices(y, missing_label=MISSING_LABEL):
+    """Return an array of indices indicating missing labels.
+
+    Parameters
+    ----------
+    y : array-like, shape (n_samples) or (n_samples, n_outputs)
+        Class labels to be checked w.r.t. to present labels.
+    missing_label : number | str | None | np.nan, optional (default=np.nan)
+        Symbol to represent a missing label.
+
+    Returns
+    -------
+    unlbld_indices : numpy.ndarray, shape (n_samples) or (n_samples, 2)
+        Index array of missing labels. If y is a 2D-array, the indices
+        have shape `(n_samples, 2), otherwise it has the shape `(n_samples)`.
+    """
+    is_unlbld = is_unlabeled(y, missing_label)
+    unlbld_indices = np.argwhere(is_unlbld)
+    return unlbld_indices[:, 0] if is_unlbld.ndim == 1 else unlbld_indices
+
+
+def labeled_indices(y, missing_label=MISSING_LABEL):
+    """Return an array of indices indicating present labels.
+
+    Parameters
+    ----------
+    y : array-like, shape (n_samples) or (n_samples, n_outputs)
+        Class labels to be checked w.r.t. to present labels.
+    missing_label : number | str | None | np.nan, optional (default=np.nan)
+        Symbol to represent a missing label.
+
+    Returns
+    -------
+    lbld_indices : numpy.ndarray, shape (n_samples) or (n_samples, 2)
+        Index array of present labels. If y is a 2D-array, the indices
+        have shape `(n_samples, 2), otherwise it has the shape `(n_samples)`.
+    """
+    is_lbld = is_labeled(y, missing_label)
+    lbld_indices = np.argwhere(is_lbld)
+    return lbld_indices[:, 0] if is_lbld.ndim == 1 else lbld_indices
 
 
 class ExtLabelEncoder(TransformerMixin, BaseEstimator):
@@ -89,7 +131,6 @@ class ExtLabelEncoder(TransformerMixin, BaseEstimator):
     classes_: array-like, shape (n_classes)
         Holds the label for each class.
     """
-
     def __init__(self, classes=None, missing_label=MISSING_LABEL):
         self.classes = classes
         self.missing_label = missing_label

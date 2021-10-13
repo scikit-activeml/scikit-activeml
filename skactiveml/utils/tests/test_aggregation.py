@@ -1,5 +1,6 @@
-import numpy as np
 import unittest
+
+import numpy as np
 
 from skactiveml.utils import compute_vote_vectors
 
@@ -21,7 +22,3 @@ class TestAggregation(unittest.TestCase):
                                      missing_label=np.nan)
         v_exp = [[0, 0, 0], [0, 0, 0]]
         np.testing.assert_array_equal(v_rec, v_exp)
-
-
-if __name__ == '__main__':
-    unittest.main()
