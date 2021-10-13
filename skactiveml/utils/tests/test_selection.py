@@ -1,5 +1,6 @@
-import numpy as np
 import unittest
+
+import numpy as np
 
 from skactiveml.utils import rand_argmin, rand_argmax
 
@@ -47,7 +48,3 @@ class TestSelection(unittest.TestCase):
         np.testing.assert_array_equal([0, 0],
                                       rand_argmax(self.d, random_state=10))
         np.testing.assert_array_equal([1], rand_argmax(self.e))
-
-
-if __name__ == '__main__':
-    unittest.main()

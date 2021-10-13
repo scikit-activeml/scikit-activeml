@@ -69,19 +69,7 @@ class TestALCE(unittest.TestCase):
         self.assertTrue(hasattr(alce, 'nn_params'))
         self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
 
-    def test_init_param_random_state(self):
-        alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
-                    random_state='string')
-        self.assertTrue(hasattr(alce, 'random_state'))
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
-
     # Test query parameters
-    def test_query_param_X_cand(self):
-        alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(ValueError, alce.query, X_cand=[], X=[], y=[])
-        self.assertRaises(ValueError, alce.query, X_cand=[], X=self.X,
-                          y=self.y)
-
     def test_query_param_X(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
         self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
