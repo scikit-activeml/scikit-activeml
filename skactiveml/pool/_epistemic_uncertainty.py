@@ -1,20 +1,20 @@
 """
 Epistemic uncertainty query strategy
 """
-
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
+#         Marek Herde <marek.herde@uni-kassel.de>
 import warnings
 
 import numpy as np
 from scipy.interpolate import griddata
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
-from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model._logistic import _logistic_loss
 
-from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
+from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..classifier import SklearnClassifier, PWC
-from ..utils import is_labeled, check_X_y, simple_batch, check_scalar
+from ..utils import is_labeled, check_X_y, simple_batch, check_scalar, \
+    fit_if_not_fitted
 
 
 class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
@@ -25,24 +25,11 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    clf : SkactivemlClassifier
-        A classifier. Only skactiveml.classifier.PWC or
-        sklearn.linear_model.LogisticRegression are supported.
     precompute : boolean (default=False)
         Whether the epistemic uncertainty should be precomputed.
         Only for PWC significant.
     random_state : numeric | np.random.RandomState
         The random state to use.
-
-    Attributes
-    ----------
-    clf : SkactivemlClassifier
-        The given SkactivemlClassifier.
-    precompute : boolean (default=False)
-        Whether the epistemic uncertainty should be precomputed.
-        Only for PWC significant.
-    random_state : numeric | np.random.RandomState
-        Random state to use.
 
     References
     ---------
@@ -51,67 +38,64 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         Discovery Science. Springer, Cham, 2019.
     """
 
-    def __init__(self, clf, precompute=False, random_state=None):
+    def __init__(self, precompute=False, random_state=None):
         super().__init__(random_state=random_state)
-
-        self.clf = clf
         self.precompute = precompute
 
-    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+    def query(self, X_cand, clf, X, y, sample_weight=None, batch_size=1,
               return_utilities=False):
         """
         Queries the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand : np.ndarray
-            The unlabeled pool from which to choose.
-        X : np.ndarray
-            The labeled pool used to fit the classifier.
-        y : np.array
-            The labels of the labeled pool X.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, only used if clf is a logistic regression
-            classifier.
+        X_cand : array-like, shape (n_candidate_samples, n_features)
+            Candidate samples from which the strategy can select.
+        clf : {SkactivemlClassifier, PWC}
+            Only the PWC and a wrapped logistic regression are supported as
+            classifiers.
+        X : array-like, shape (n_samples, n_features),
+            Complete training data set.
+        y : array-like, shape (n_samples),
+            Labels of the training data set.
+        sample_weight : array-like, shape (n_samples), optional (default=None)
+            Weights of training samples in `X`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool (default=False)
-            If True, the utilities are returned.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        best_indices : np.ndarray, shape (batch_size)
-            The index of the queried instance.
-        batch_utilities : np.ndarray,  shape (batch_size, len(X_cand))
-            The utilities of all instances of
-            X_cand(if return_utilities=True).
+        query_indices : numpy.ndarray, shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+        utilities : numpy.ndarray, shape (batch_size, n_samples)
+            The utilities of all candidate samples after each selected
+            sample of the batch, e.g., `utilities[0]` indicates the utilities
+            used for selecting the first sample (with index `query_indices[0]`)
+            of the batch.
         """
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
-
+        if X is None or y is None:
+            raise ValueError('`X` and `y` cannot be None.')
         X, y, sample_weight = check_X_y(X, y, sample_weight=sample_weight)
-        # Check if the attribute clf is valid
-        if not isinstance(self.clf, SkactivemlClassifier):
-            raise TypeError(
-                'clf as to be from type SkactivemlClassifier. The #'
-                'given type is {}. Use the wrapper in '
-                'skactiveml.classifier to use a sklearn '
-                'classifier/ensemble.'.format(type(self.clf)))
 
-        # fit the classifier and get the probabilities
-        clf = clone(self.clf)
-        clf.fit(X, y, sample_weight=sample_weight)
+        # Fit the classifier.
+        clf = fit_if_not_fitted(clf, X, y, sample_weight, print_warning=False)
 
-        # chose the correct method for the given clf
+        # Chose the correct method for the given classifier.
         if isinstance(clf, PWC):
             if not hasattr(self, 'precompute_array'):
                 self._precompute_array = None
 
-            # create precompute_array if necessary
+            # Create precompute_array if necessary.
             if not isinstance(self.precompute, bool):
-                raise TypeError("'precompute' should be from type bool but {} "
+                raise TypeError("'precompute' should be of type bool but {} "
                                 "were given".format(type(self.precompute)))
             if self.precompute and self._precompute_array is None:
                 self._precompute_array = np.full((2, 2), np.nan)
@@ -120,17 +104,16 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
             utilities, self._precompute_array = _epistemic_uncertainty_pwc(
                 freq, self._precompute_array)
         elif isinstance(clf, SklearnClassifier) and \
-                isinstance(clf.estimator, LogisticRegression):
+                isinstance(clf.estimator_, LogisticRegression):
             mask_labeled = is_labeled(y, clf.missing_label)
             utilities = _epistemic_uncertainty_logreg(
                 X_cand=X_cand, X=X[mask_labeled], y=y[mask_labeled], clf=clf,
                 sample_weight=sample_weight[mask_labeled]
             )
         else:
-            raise TypeError("'clf' must be from type PWC or "
-                            "a wrapped LogisticRegression classifier. "
-                            "The given is from type {}."
-                            "".format(type(self.clf)))
+            raise TypeError(f"`clf` must be of type `PWC` or "
+                            f"a wrapped `LogisticRegression` classifier. "
+                            f"The given is of type {type(clf)}.")
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
@@ -305,8 +288,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
         The labeled pool used to fit the classifier.
     y : np.array
         The labels of the labeled pool X.
-    clf : LogisticRegression
-        The fitted classifier.
+    clf : skactiveml.classifier.SklearnClassifier
+        Only a wrapped logistic regression is supported as classifier.
     sample_weight : array-like of shape (n_samples,) (default=None)
         Sample weights for X, only used if clf is a logistic regression
         classifier.
@@ -324,8 +307,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
     """
     if not isinstance(clf, SklearnClassifier) \
             or not isinstance(clf.estimator, LogisticRegression):
-        raise TypeError('clf has to be a wrapped LogisticRegression classifier '
-                        'but \n{}\n was given.'.format(clf))
+        raise TypeError('clf has to be a wrapped LogisticRegression '
+                        'classifier but \n{}\n was given.'.format(clf))
     if len(clf.classes) != 2:
         raise ValueError('epistemic is only implemented for two-class '
                          'problems, {} classes were given.'

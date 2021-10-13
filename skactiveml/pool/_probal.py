@@ -1,14 +1,12 @@
 import itertools
+
 import numpy as np
-
 from scipy.special import factorial, gammaln
-from sklearn import clone
-from sklearn.utils import check_array
+from sklearn.utils.validation import check_array
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.base import ClassFrequencyEstimator
-from skactiveml.utils import check_scalar, check_classifier_params, \
-    simple_batch
+from ..base import ClassFrequencyEstimator
+from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..utils import check_scalar, simple_batch, check_type, fit_if_not_fitted
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -19,8 +17,6 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    clf: BaseEstimator
-        Probabilistic classifier for gain calculation.
     prior: float, optional (default=1)
         Prior probabilities for the Dirichlet distribution of the samples.
     m_max: int, optional (default=1)
@@ -31,59 +27,67 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
     References
     ----------
     [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra
-    Spiliopoulou.
-        Multi-Class Probabilistic Active Learning,
+        Spiliopoulou. Multi-Class Probabilistic Active Learning,
         vol. 285 of Frontiers in Artificial Intelligence and Applications,
         pages 586-594. IOS Press, 2016
     """
 
-    def __init__(self, clf, prior=1, m_max=1, random_state=None):
+    def __init__(self, prior=1, m_max=1, random_state=None):
         super().__init__(random_state=random_state)
-        self.clf = clf
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X_cand, X, y, sample_weight=None, utility_weight=None,
-              batch_size=1, return_utilities=False):
+    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
+              utility_weight=None, batch_size=1, return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand: array-like, shape(n_candidates, n_features)
-            Unlabeled candidate samples
-        X: array-like (n_training_samples, n_features)
-            Complete data set
-        y: array-like (n_training_samples)
-            Labels of the data set
-        sample_weight: array-like, shape (n_training_samples),
-                       optional (default=None)
-            Weights for uncertain annotators
-        batch_size: int, optional (default=1)
-            The number of instances to be selected.
-        utility_weight: array-like (n_candidate_samples)
-            Densities for each instance in X
-        return_utilities: bool (default=False)
-            If True, the utilities are additionally returned.
+        X_cand : array-like, shape (n_candidate_samples, n_features)
+            Candidate samples from which the strategy can select.
+        clf : skactiveml.base.ClassFrequencyEstimator
+            Model implementing the methods `fit` and `predict_proba`.
+        X: array-like, shape (n_samples, n_features), optional (default=None)
+            Complete training data set.
+        y: array-like, shape (n_samples), optional (default=None)
+            Labels of the training data set.
+        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Weights of training samples in `X`.
+        utility_weight: array-like (n_candidate_samples), optional
+        (default=None)
+            Densities for each sample in `X`.
+        batch_size : int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices: np.ndarray, shape (1)
-            The index of the queried instance.
-        utilities: np.ndarray, shape (1, n_candidates)
-            The utilities of all instances in X_cand
-            (only returned if return_utilities is True).
+        query_indices : numpy.ndarray, shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+        utilities : numpy.ndarray, shape (batch_size, n_samples)
+            The utilities of all candidate samples after each selected
+            sample of the batch, e.g., `utilities[0]` indicates the utilities
+            used for selecting the first sample (with index `query_indices[0]`)
+            of the batch.
         """
-        # Validate input
+        # Validate input parameters.
         X_cand, return_utilities, batch_size, utility_weight, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 utility_weight, self.random_state, reset=True)
 
-        # Calculate utilities and return the output
-        clf = clone(self.clf)
-        clf.fit(X, y, sample_weight)
+        # Check the classifier's type.
+        check_type(clf, ClassFrequencyEstimator, 'clf')
+
+        # Fit the classifier and predict frequencies.
+        clf = fit_if_not_fitted(clf, X, y, sample_weight)
         k_vec = clf.predict_freq(X_cand)
-        utilities = utility_weight * _cost_reduction(k_vec, prior=self.prior,
-                                                     m_max=self.m_max)
+
+        # Calculate utilities and return the output.
+        utilities = utility_weight * cost_reduction(k_vec, prior=self.prior,
+                                                    m_max=self.m_max)
 
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
@@ -94,18 +98,13 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         X_cand, return_utilities, batch_size, random_state = \
             super()._validate_data(X_cand, return_utilities, batch_size,
                                    self.random_state, reset=True)
-        # Check if the classifier and its arguments are valid
-        if not isinstance(self.clf, ClassFrequencyEstimator):
-            raise TypeError("'clf' must implement methods according to "
-                            "'ClassFrequencyEstimator'.")
-        check_classifier_params(self.clf.classes, self.clf.missing_label)
 
-        # Check 'utility_weight'
+        # Check `utility_weight`.
         if utility_weight is None:
             utility_weight = np.ones(len(X_cand))
         utility_weight = check_array(utility_weight, ensure_2d=False)
 
-        # Check if X_cand and utility_weight have the same length
+        # Check if `X_cand` and `utility_weight` have the same length.
         if not len(X_cand) == len(utility_weight):
             raise ValueError(
                 "'X_cand' and 'utility_weight' must have the same length."
@@ -115,7 +114,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             random_state
 
 
-def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
+def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     """Calculate the expected cost reduction.
 
     Calculate the expected cost reduction for given maximum number of
@@ -172,10 +171,10 @@ def _cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
                         for elem in list(itertools.product(*combs))])
 
     # three factors of the closed form solution
-    factor_1 = 1 / euler_beta(k_vec_list)
-    factor_2 = multinomial(l_vec_list)
-    factor_3 = euler_beta(np.sum(combs, axis=1)).reshape(n_samples, n_l_vecs,
-                                                         n_classes)
+    factor_1 = 1 / _euler_beta(k_vec_list)
+    factor_2 = _multinomial(l_vec_list)
+    factor_3 = _euler_beta(np.sum(combs, axis=1)).reshape(n_samples, n_l_vecs,
+                                                          n_classes)
 
     # expected classification cost for each m
     m_sums = np.asarray(
@@ -233,7 +232,7 @@ def _gen_l_vec_list(m_approx, n_classes):
     return label_vec_list
 
 
-def euler_beta(a):
+def _euler_beta(a):
     """
     Represents Euler beta function:
     B(a(i)) = Gamma(a(i,1))*...*Gamma(a_n)/Gamma(a(i,1)+...+a(i,n))
@@ -251,7 +250,7 @@ def euler_beta(a):
     return np.exp(np.sum(gammaln(a), axis=1) - gammaln(np.sum(a, axis=1)))
 
 
-def multinomial(a):
+def _multinomial(a):
     """
     Computes Multinomial coefficient:
     Mult(a(i)) = (a(i,1)+...+a(i,n))!/(a(i,1)!...a(i,n)!)
