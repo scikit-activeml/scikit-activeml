@@ -88,12 +88,12 @@ class TestMultiAnnotWrapper(unittest.TestCase):
     def test_query_param_query_params_dict(self):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 random_state=self.random_state)
-        uncertainty = UncertaintySampling(clf=clf, method='entropy')
+        uncertainty = UncertaintySampling(method='entropy')
         wrapper = MultiAnnotWrapper(uncertainty, self.random_state)
 
         y = np.array([[[1, 0], [0, 1], [1, 1], [0, 0]]])
 
-        query_params_dict = {'X': self.X, 'y': y}
+        query_params_dict = {'X': self.X, 'y': y, 'clf': clf}
         self.assertRaises(ValueError, wrapper.query, self.X_cand,
                           query_params_dict, A_cand=self.A_cand,
                           return_utilities=True)
@@ -151,7 +151,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 random_state=self.random_state)
 
-        uncertainty = UncertaintySampling(clf=clf, method='entropy')
+        uncertainty = UncertaintySampling(method='entropy')
 
         def y_aggregate(y_t):
             w = np.repeat(np.arange(y.shape[1]).reshape(1, -1), y.shape[0],
@@ -164,7 +164,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3, 4]])
         y = np.array([[1, 0], [0, 1], [1, 1], [0, 0], [0, 1]])
 
-        query_params_dict = {'X': X, 'y': y}
+        query_params_dict = {'X': X, 'y': y, 'clf': clf}
         re_val = wrapper.query(self.X_cand, query_params_dict,
                                A_cand=self.A_cand, return_utilities=True)
 

@@ -2,7 +2,7 @@ import warnings
 from abc import ABC, abstractmethod
 
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin, clone
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.multiclass import type_of_target
@@ -27,7 +27,7 @@ class QueryStrategy(ABC, BaseEstimator):
     def query(self, *args, **kwargs):
         """Determines the query for active learning based on input arguments.
         """
-        return NotImplemented
+        raise NotImplementedError
 
 
 class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
@@ -69,7 +69,7 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
             used for selecting the first sample (with index `query_indices[0]`)
             of the batch.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def _validate_data(self, X_cand, return_utilities, batch_size,
                        random_state, reset=True, **check_X_cand_params):
@@ -180,7 +180,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator pair (with indices `query_indices[0]`).
         """
-        return NotImplemented
+        raise NotImplementedError
+
 
     def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
                        random_state, reset=True, adaptive=False,
@@ -315,8 +316,9 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
         for a sample of class classes_[i].
     """
-    def __init__(self, classes, missing_label=MISSING_LABEL, cost_matrix=None,
-                 random_state=None):
+
+    def __init__(self, classes=None, missing_label=MISSING_LABEL,
+                 cost_matrix=None, random_state=None):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
@@ -343,7 +345,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         self: SkactivemlClassifier,
             The SkactivemlClassifier is fitted on the training data.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def predict_proba(self, X):
         """Return probability estimates for the test data X.
@@ -359,7 +361,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             The class probabilities of the test samples. Classes are ordered
             according to 'classes_'.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def predict(self, X):
         """Return class label predictions for the test samples X.
@@ -406,7 +408,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         y_pred = self._le.transform(self.predict(X))
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
-    def _validate_data(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight=None):
         # Check common classifier parameters.
         check_classifier_params(self.classes, self.missing_label,
                                 self.cost_matrix)
@@ -529,7 +531,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             The class frequency estimates of the test samples 'X'. Classes are
             ordered according to attribute 'classes_'.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def predict_proba(self, X):
         """Return probability estimates for the test data X.
@@ -553,7 +555,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
-    def _validate_data(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight=None):
         X, y, sample_weight = super()._validate_data(X, y, sample_weight)
         # Check class prior.
         self.class_prior_ = check_class_prior(self.class_prior,
@@ -561,12 +563,13 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return X, y, sample_weight
 
 
-class AnnotModelMixing(ABC):
-    """AnnotModelMixing
+class AnnotModelMixin(ABC):
+    """AnnotModelMixin
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.
     """
+
     @abstractmethod
     def predict_annot_proba(self, X):
         """Calculates the probability that an annotator provides the true label
@@ -583,4 +586,4 @@ class AnnotModelMixing(ABC):
             `P_annot[i,l]` is the probability, that annotator `l` provides the
             correct class label for sample `X[i]`.
         """
-        return NotImplemented
+        raise NotImplementedError

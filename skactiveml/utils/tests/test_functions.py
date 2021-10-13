@@ -44,7 +44,3 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(result, 50)
         result = call_func(dummy_function, only_mandatory=True, a=2, b=5, c=5)
         self.assertEqual(result, 12)
-
-
-if __name__ == '__main__':
-    unittest.main()

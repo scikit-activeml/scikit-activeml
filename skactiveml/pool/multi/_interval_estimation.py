@@ -10,14 +10,14 @@ from sklearn.utils.validation import check_array, check_consistent_length, \
     check_random_state, check_is_fitted
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, \
-    SkactivemlClassifier, AnnotModelMixing
+    SkactivemlClassifier, AnnotModelMixin
 from skactiveml.utils import rand_argmax, check_scalar, compute_vote_vectors, \
     MISSING_LABEL, ExtLabelEncoder, is_labeled
 from skactiveml.pool._uncertainty import uncertainty_scores
 from skactiveml.utils._functions import simple_batch
 
 
-class IEAnnotModel(BaseEstimator, AnnotModelMixing):
+class IEAnnotModel(BaseEstimator, AnnotModelMixin):
     """IEAnnotModel
 
     This annotator model relies on 'Interval Estimation Learning' (IELearning)

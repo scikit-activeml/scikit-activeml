@@ -1,5 +1,6 @@
-import numpy as np
 import unittest
+
+import numpy as np
 
 from skactiveml.utils import compute_vote_vectors
 from skactiveml.utils._aggregation import majority_vote
