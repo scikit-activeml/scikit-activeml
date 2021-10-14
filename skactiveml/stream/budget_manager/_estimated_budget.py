@@ -131,9 +131,6 @@ class FixedUncertaintyBudget(EstimatedBudget):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
-        # check if calculation of estimate bought/true lables has begun
-        if not hasattr(self, "u_t_"):
-            self.u_t_ = 0
 
         # intialize return parameters
         queried_indices = []
