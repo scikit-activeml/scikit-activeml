@@ -218,7 +218,7 @@ class BudgetManager(ABC, BaseEstimator):
 
     @abstractmethod
     def query(
-        self, utilities, return_budget_left=True, **kwargs
+        self, utilities, **kwargs
     ):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
@@ -281,7 +281,7 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_, "budget", float, min_val=0.0, max_val=1.0
         )
 
-    def _validate_data(self, utilities, return_budget_left):
+    def _validate_data(self, utilities):
         """Validate input data.
 
         Parameters
@@ -289,27 +289,20 @@ class BudgetManager(ABC, BaseEstimator):
         utilities: ndarray of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy.
-        return_budget_left : bool,
-            If true, also return whether there was budget left for each
-            assessed utility.
 
         Returns
         -------
         utilities: ndarray of shape (n_samples,)
             Checked utilities
-        return_budget_left : bool,
-            Checked boolean value of `return_budget_left`.
         """
         # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
             raise TypeError(
                 "{} is not a valid type for utilities".format(type(utilities))
             )
-        # Check return_utilities.
-        check_scalar(return_budget_left, "return_budget_left", bool)
         # Check budget
         self._validate_budget(self.get_default_stream_budget())
-        return utilities, return_budget_left
+        return utilities
 
     def get_default_stream_budget(self):
         """This function defines the default budget which should be used when no

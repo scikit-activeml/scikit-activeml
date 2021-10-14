@@ -42,7 +42,7 @@ class FixedBudget(BudgetManager):
         return available_budget >= 1
 
     def query(
-        self, utilities, return_budget_left=False, **kwargs
+        self, utilities, **kwargs
     ):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
@@ -60,11 +60,8 @@ class FixedBudget(BudgetManager):
         queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances represented by utilities which should be
             sampled, with 0 <= n_queried_instances <= n_samples.
-        budget_left: ndarray of shape (n_samples,), optional
-            Shows whether there was budget left for each assessed utility. Only
-            provided if return_utilities is True.
         """
-        self._validate_data(utilities, return_budget_left)
+        self._validate_data(utilities)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
@@ -91,11 +88,7 @@ class FixedBudget(BudgetManager):
         # get the indices instances that should be queried
         queried_indices = np.where(queried)[0]
 
-        # check if budget_left should be returned
-        if return_budget_left:
-            return queried_indices, budget_left
-        else:
-            return queried_indices
+        return queried_indices
 
     def update(self, X_cand, queried_indices, **kwargs):
         """Updates the budget manager.

@@ -13,7 +13,7 @@ class TestStream(unittest.TestCase):
     def test_selection_strategies(self):
         # Create data set for testing.
         rand = np.random.RandomState(0)
-        stream_length = 300
+        stream_length = 3000
         train_init_size = 10
         training_size = 100
         X, y = make_classification(
@@ -70,14 +70,20 @@ class TestStream(unittest.TestCase):
         y_train.extend(y_init)
 
         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
-            sampled_indices, utilities = query_strategy.query(
+            return_utilities = t % 2 == 0
+            qs_output = query_strategy.query(
                 x_t.reshape([1, -1]),
                 clf=clf,
                 X=X_train,
                 y=y_train,
                 sample_weight=np.ones(len(y_train)),
-                return_utilities=True
+                return_utilities=return_utilities
             )
+            if return_utilities:
+                sampled_indices, utilities = qs_output
+            else:
+                sampled_indices = qs_output
+
             query_strategy.update(
                 x_t.reshape([1, -1]), sampled_indices
             )

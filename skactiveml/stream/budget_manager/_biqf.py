@@ -50,23 +50,23 @@ class BIQF(BudgetManager):
 
     def is_budget_left(self):
         """Check whether there is any utility given to query(...), which may
-            lead to sampling the corresponding instance, i.e., check if sampling
-            another instance is currently possible under the budgeting constraint.
-            This function is useful to determine, whether a provided
-            utility is not sufficient, or the budgeting constraint was simply
-            exhausted. For this budget manager this function returns True, when
-            budget > estimated_spending.
+        lead to sampling the corresponding instance, i.e., check if sampling
+        another instance is currently possible under the budgeting constraint.
+        This function is useful to determine, whether a provided
+        utility is not sufficient, or the budgeting constraint was simply
+        exhausted. For this budget manager this function returns True, when
+        budget > estimated_spending.
 
-            Returns
-            -------
-            budget_left : bool
-                True, if there is a utility which leads to sampling another
-                instance.
+        Returns
+        -------
+        budget_left : bool
+            True, if there is a utility which leads to sampling another
+            instance.
         """
         return True
 
     def query(
-        self, utilities, return_budget_left=False, **kwargs
+        self, utilities, **kwargs
     ):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
@@ -77,9 +77,6 @@ class BIQF(BudgetManager):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
 
         Returns
         -------
@@ -91,9 +88,7 @@ class BIQF(BudgetManager):
             Shows whether there was budget left for each assessed utility. Only
             provided if return_utilities is True.
         """
-        utilities, return_budget_left = self.validate_data(
-            utilities, return_budget_left
-        )
+        utilities = self._validate_data(utilities)
 
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
@@ -102,8 +97,6 @@ class BIQF(BudgetManager):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
-        if not hasattr(self, "utility_queue_"):
-            self.utility_queue_ = deque(maxlen=self.w)
         # intialize return parameters
         queried_indices = []
 
@@ -162,7 +155,7 @@ class BIQF(BudgetManager):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
-            self.history_sorted_ = deque(maxlen=self.w)
+            self.history_sorted_ = deque(maxlen=self.w) 
         self.observed_instances_ += len(queried)
         self.queried_instances_ += np.sum(queried)
         if utilities is not None:
@@ -179,32 +172,28 @@ class BIQF(BudgetManager):
 
         return self
 
-    def validate_data(self, utilities, return_budget_left):
+    def _validate_data(self, utilities):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
         ----------
         utilities : ndarray of shape (n_samples,)
             candidate samples
-        return_budget_left : bool,
-            If true, also return the budget based on the query strategy.
 
         Returns
         -------
         utilities : ndarray of shape (n_samples,)
             Checked candidate samples
-        return_budget_left : bool,
-            Checked boolean value of `return_budget_left`.
         """
 
-        utilities, return_budget_left = super()._validate_data(
-            utilities, return_budget_left
+        utilities = super()._validate_data(
+            utilities
         )
         self._validate_w()
         self._validate_w_tol()
         self._validate_save_utilities()
 
-        return utilities, return_budget_left
+        return utilities
 
     def _validate_w_tol(self):
         """Validate if w_tol is set as an int and greater than 0.
