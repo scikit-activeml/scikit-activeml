@@ -15,6 +15,7 @@ class QueryTests(ABC):
         self,
         delay_wrapper,
         X_cand,
+        clf,
         X,
         y,
         tX,
@@ -26,6 +27,7 @@ class QueryTests(ABC):
     ):
         self.delay_wrapper = delay_wrapper
         self.X_cand = X_cand
+        self.clf = clf
         self.X = X
         self.y = y
         self.tX = tX
@@ -42,6 +44,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=np.ones(5),
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -56,6 +59,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=None,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -70,6 +74,40 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=1,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            tX=self.tX,
+            ty=self.ty,
+            tX_cand=self.tX_cand,
+            ty_cand=self.ty_cand,
+            acquisitions=self.acquisitions,
+            sample_weight=self.sample_weight,
+            return_utilities=False,
+        )
+
+    def test_query_param_clf(self):
+        # clf must be defined as a classifier
+        self.assertRaises(
+            TypeError,
+            self.delay_wrapper.query,
+            X_cand=self.X_cand,
+            clf="string",
+            X=self.X,
+            y=self.y,
+            tX=self.tX,
+            ty=self.ty,
+            tX_cand=self.tX_cand,
+            ty_cand=self.ty_cand,
+            acquisitions=self.acquisitions,
+            sample_weight=self.sample_weight,
+            return_utilities=False,
+        )
+        self.assertRaises(
+            TypeError,
+            self.delay_wrapper.query,
+            X_cand=self.X_cand,
+            clf=1,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -88,6 +126,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=None,
             y=self.y,
             tX=self.tX,
@@ -102,6 +141,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=np.ones(5),
             y=self.y,
             tX=self.tX,
@@ -116,6 +156,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X[1:],
             y=self.y,
             tX=self.tX,
@@ -131,23 +172,10 @@ class QueryTests(ABC):
         # y must be defined as a one Dimensional array and must be equal in
         # length to X
         self.assertRaises(
-            ValueError,
-            self.delay_wrapper.query,
-            X_cand=self.X_cand,
-            X=self.X,
-            y=np.zeros((len(self.y), 2)),
-            tX=self.tX,
-            ty=self.ty,
-            tX_cand=self.tX_cand,
-            ty_cand=self.ty_cand,
-            acquisitions=self.acquisitions,
-            sample_weight=self.sample_weight,
-            return_utilities=False,
-        )
-        self.assertRaises(
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=None,
             tX=self.tX,
@@ -162,6 +190,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y[1:],
             tX=self.tX,
@@ -179,6 +208,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=None,
@@ -193,6 +223,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX[1:],
@@ -207,6 +238,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=np.ones(5),
@@ -224,6 +256,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -238,6 +271,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -252,6 +286,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -269,6 +304,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -283,6 +319,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -297,6 +334,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -314,6 +352,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -328,6 +367,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -342,6 +382,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -359,6 +400,7 @@ class QueryTests(ABC):
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -373,6 +415,7 @@ class QueryTests(ABC):
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -390,6 +433,7 @@ class QueryTests(ABC):
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -404,6 +448,7 @@ class QueryTests(ABC):
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -422,6 +467,7 @@ class QueryTests(ABC):
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -436,6 +482,7 @@ class QueryTests(ABC):
             TypeError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -450,6 +497,7 @@ class QueryTests(ABC):
             ValueError,
             self.delay_wrapper.query,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -469,7 +517,7 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
         self.X_cand = np.array([self.X[2]])
         self.clf = PWC(classes=[0, 1])
         self.query_strategies = Split(
-            clf=self.clf, random_state=self.random_state.randint(2 ** 31 - 1)
+            random_state=self.random_state.randint(2 ** 31 - 1)
         )
         self.delay_prior = 0.001
         self.w_train = 2.5
@@ -482,6 +530,7 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
         self.ty = self.tX
         self.kwargs = dict(
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -500,6 +549,7 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
         self._test_init(
             delay_wrapper=self.delay_wrapper,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -513,6 +563,9 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
     # query param test
     def test_query_param_X_cand(self):
         return super().test_query_param_X_cand()
+
+    def test_query_param_clf(self):
+        return super().test_query_param_clf()
 
     def test_query_param_tX(self):
         return super().test_query_param_tX()
@@ -581,6 +634,7 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
 
         _, util = self.delay_wrapper.query(
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=y,
             sample_weight=self.sample_weight,
@@ -598,6 +652,7 @@ class TestForgettingWrapper(unittest.TestCase, QueryTests):
 
         _, util = self.delay_wrapper.query(
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=y,
             sample_weight=self.sample_weight,
@@ -618,7 +673,7 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
         self.X_cand = np.array([self.X[2]])
         self.clf = PWC(classes=[0, 1])
         self.query_strategies = Split(
-            clf=self.clf, random_state=self.random_state.randint(2 ** 31 - 1)
+            random_state=self.random_state.randint(2 ** 31 - 1)
         )
         self.delay_prior = 0.001
         self.acquisitions = np.full(3, True)
@@ -630,6 +685,7 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
         self.ty = self.tX
         self.kwargs = dict(
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -644,11 +700,11 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
             base_query_strategy=self.query_strategies,
             delay_prior=self.delay_prior,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self._test_init(
             delay_wrapper=self.delay_wrapper,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -662,6 +718,9 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
     # query param test
     def test_query_param_X_cand(self):
         return super().test_query_param_X_cand()
+
+    def test_query_param_clf(self):
+        return super().test_query_param_clf()
 
     def test_query_param_X(self):
         return super().test_query_param_X()
@@ -696,7 +755,6 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
             base_query_strategy=[],
             delay_prior=self.delay_prior,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
 
@@ -704,47 +762,27 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
         delay_wrapper = FuzzyDelaySimulationWrapper(
             base_query_strategy=self.query_strategies,
             delay_prior=self.delay_prior,
-            clf=self.clf,
             random_state="string",
         )
         self.assertRaises(ValueError, delay_wrapper.query, **(self.kwargs))
-
-    def test_init_param_clf(self):
-        delay_wrapper = FuzzyDelaySimulationWrapper(
-            base_query_strategy=self.query_strategies,
-            delay_prior=self.delay_prior,
-            random_state=self.random_state,
-            clf="string",
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
-        delay_wrapper = FuzzyDelaySimulationWrapper(
-            base_query_strategy=self.query_strategies,
-            delay_prior=self.delay_prior,
-            random_state=self.random_state,
-            clf=1,
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
 
     def test_init_param_delay_prior(self):
         delay_wrapper = FuzzyDelaySimulationWrapper(
             base_query_strategy=self.query_strategies,
             delay_prior="string",
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
         delay_wrapper = FuzzyDelaySimulationWrapper(
             base_query_strategy=self.query_strategies,
             delay_prior=-1.0,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(ValueError, delay_wrapper.query, **(self.kwargs))
         delay_wrapper = FuzzyDelaySimulationWrapper(
             base_query_strategy=self.query_strategies,
             delay_prior=0.0,
             random_state=self.random_state,
-            clf=self.clf,
         )
 
     # query stategy test
@@ -758,6 +796,7 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
 
         _, util = self.delay_wrapper.query(
             X_cand,
+            self.clf,
             X,
             y,
             tX,
@@ -775,6 +814,7 @@ class TestFuzzyDelaySimulationWrapper(unittest.TestCase, QueryTests):
 
         _, util = self.delay_wrapper.query(
             X_cand,
+            self.clf,
             X,
             y,
             tX,
@@ -795,7 +835,7 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
         self.X_cand = np.array([self.X[2]])
         self.clf = PWC(classes=[0, 1])
         self.query_strategies = Split(
-            clf=self.clf, random_state=self.random_state.randint(2 ** 31 - 1)
+            random_state=self.random_state.randint(2 ** 31 - 1)
         )
         self.delay_prior = 0.001
         self.K = 2
@@ -808,6 +848,7 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
         self.ty = self.tX
         self.kwargs = dict(
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -823,11 +864,11 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K=self.K,
             delay_prior=self.delay_prior,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self._test_init(
             delay_wrapper=self.delay_wrapper,
             X_cand=self.X_cand,
+            clf=self.clf,
             X=self.X,
             y=self.y,
             tX=self.tX,
@@ -841,6 +882,9 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
     # query param test
     def test_query_param_X_cand(self):
         return super().test_query_param_X_cand()
+
+    def test_query_param_clf(self):
+        return super().test_query_param_clf()
 
     def test_query_param_X(self):
         return super().test_query_param_X()
@@ -876,7 +920,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K=self.K,
             delay_prior=self.delay_prior,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
 
@@ -885,28 +928,9 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             base_query_strategy=self.query_strategies,
             K=self.K,
             delay_prior=self.delay_prior,
-            clf=self.clf,
             random_state="string",
         )
         self.assertRaises(ValueError, delay_wrapper.query, **(self.kwargs))
-
-    def test_init_param_clf(self):
-        delay_wrapper = BaggingDelaySimulationWrapper(
-            base_query_strategy=self.query_strategies,
-            K=self.K,
-            delay_prior=self.delay_prior,
-            random_state=self.random_state,
-            clf="string",
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
-        delay_wrapper = BaggingDelaySimulationWrapper(
-            base_query_strategy=self.query_strategies,
-            K=self.K,
-            delay_prior=self.delay_prior,
-            random_state=self.random_state,
-            clf=1,
-        )
-        self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
 
     def test_init_param_delay_prior(self):
         delay_wrapper = BaggingDelaySimulationWrapper(
@@ -914,7 +938,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K=self.K,
             delay_prior="string",
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
         delay_wrapper = BaggingDelaySimulationWrapper(
@@ -922,7 +945,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K=self.K,
             delay_prior=-1.0,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(ValueError, delay_wrapper.query, **(self.kwargs))
         delay_wrapper = BaggingDelaySimulationWrapper(
@@ -930,7 +952,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K=self.K,
             delay_prior=0.0,
             random_state=self.random_state,
-            clf=self.clf,
         )
 
     def test_init_param_K(self):
@@ -939,7 +960,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K="string",
             delay_prior=self.delay_prior,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(TypeError, delay_wrapper.query, **(self.kwargs))
         delay_wrapper = BaggingDelaySimulationWrapper(
@@ -947,7 +967,6 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
             K=-1,
             delay_prior=self.delay_prior,
             random_state=self.random_state,
-            clf=self.clf,
         )
         self.assertRaises(ValueError, delay_wrapper.query, **(self.kwargs))
 
@@ -960,6 +979,7 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
 
         _, util = self.delay_wrapper.query(
             self.X_cand,
+            self.clf,
             self.X,
             y,
             tX,
@@ -977,6 +997,7 @@ class TestBaggingDelaySimulationWrapper(unittest.TestCase, QueryTests):
 
         _, util = self.delay_wrapper.query(
             self.X_cand,
+            self.clf,
             self.X,
             y,
             tX,

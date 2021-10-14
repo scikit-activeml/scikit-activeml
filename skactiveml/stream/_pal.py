@@ -1,11 +1,11 @@
 import numpy as np
 
-from sklearn.base import is_classifier, clone
-from skactiveml.utils import check_random_state
+from sklearn.utils import check_array, check_consistent_length
 
 import skactiveml.pool._probal as probal
-from ..base import SingleAnnotStreamBasedQueryStrategy
-from ..classifier import PWC
+from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
+# from ..classifier import PWC
+from ..utils import fit_if_not_fitted, check_type, check_random_state
 
 from .budget_manager import BIQF
 
@@ -36,21 +36,19 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         
     References
     ----------
-    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active 
-        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M. 
-        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture 
+    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active
+        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M.
+        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture
         Notes in Computer Science, vol 9385. Springer, Cham.
     """
 
     def __init__(
         self,
-        clf=None,
         budget_manager=BIQF(),
         random_state=None,
         prior=1.0e-3,
         m_max=2,
     ):
-        self.clf = clf
         self.budget_manager = budget_manager
         self.random_state = random_state
         self.prior = prior
@@ -59,6 +57,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         sample_weight=None,
@@ -97,16 +96,20 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(
+        X_cand, X, y, sample_weight, return_utilities = self._validate_data(
             X_cand=X_cand,
             X=X,
             y=y,
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, 'clf')
 
-        k_vec = self.clf_.predict_freq(X_cand)
-        utilities = probal._cost_reduction(
+        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+
+        k_vec = clf.predict_freq(X_cand)
+        utilities = probal.cost_reduction(
             k_vec, prior=self.prior, m_max=self.m_max
         )
         queried_indices = self.budget_manager_.query(utilities)
@@ -194,16 +197,15 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X_cand, return_utilities = super()._validate_data(
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
-
-        self._validate_clf(X, y, sample_weight)
+        self._validate_X_y_sample_weight(X, y, sample_weight)
         self._validate_prior()
         self._validate_m_max()
         self._validate_random_state()
 
         return X_cand, X, y, sample_weight, return_utilities
 
-    def _validate_clf(self, X, y, sample_weight=None):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
+    def _validate_X_y_sample_weight(self, X, y, sample_weight):
+        """Validate if X, y and sample_weight are numeric and of equal lenght.
 
         Parameters
         ----------
@@ -212,28 +214,25 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
 
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        X : array-like of shape (n_samples, n_features)
+            Checked Input samples.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. Converts y to a numpy array
         """
+        if sample_weight is not None:
+            sample_weight = np.array(sample_weight)
+            check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError(
-                        "{} is not a valid Value for y".format(type(y))
-                    )
-        else:
-            self.clf_ = self.clf
+            X = check_array(X)
+            y = np.array(y)
+            check_consistent_length(X, y)
+        return X, y, sample_weight
 
     def _validate_prior(self):
         """Validate if the prior is a float and greater than 0.

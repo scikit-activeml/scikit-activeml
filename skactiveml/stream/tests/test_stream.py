@@ -5,6 +5,7 @@ from sklearn.datasets import make_classification
 from sklearn.utils import check_random_state
 
 from skactiveml import stream
+from skactiveml.classifier import PWC
 from collections import deque
 
 
@@ -20,6 +21,8 @@ class TestStream(unittest.TestCase):
             random_state=rand.randint(2 ** 31 - 1),
             shuffle=True,
         )
+
+        clf = PWC(classes=[0, 1], random_state=rand.randint(2 ** 31 - 1))
 
         X_init = X[:train_init_size, :]
         y_init = y[:train_init_size]
@@ -37,6 +40,7 @@ class TestStream(unittest.TestCase):
             self._test_selection_strategy(
                 rand.randint(2 ** 31 - 1),
                 qs_class,
+                clf,
                 X_init,
                 y_init,
                 X_stream,
@@ -48,6 +52,7 @@ class TestStream(unittest.TestCase):
         self,
         rand_seed,
         query_strategy_class,
+        clf,
         X_init,
         y_init,
         X_stream,
@@ -66,10 +71,14 @@ class TestStream(unittest.TestCase):
 
         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             sampled_indices = query_strategy.query(
-                x_t.reshape([1, -1]), X=X_train, y=y_train, simulate=True
+                x_t.reshape([1, -1]),
+                clf=clf,
+                X=X_train,
+                y=y_train,
+                simulate=True,
             )
             query_strategy.update(
-                x_t.reshape([1, -1]), sampled_indices, X=X_train, y=y_train
+                x_t.reshape([1, -1]), sampled_indices
             )
             if len(sampled_indices):
                 X_train.append(x_t)

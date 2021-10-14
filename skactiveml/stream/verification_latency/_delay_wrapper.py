@@ -2,7 +2,8 @@ import numpy as np
 
 from abc import abstractmethod
 from copy import deepcopy
-from ...base import SingleAnnotStreamBasedQueryStrategy
+from ...base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
+from ...utils import fit_if_not_fitted, check_type, check_random_state
 from sklearn.base import is_classifier, clone
 from ...classifier import PWC
 
@@ -319,7 +320,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
     base_query_strategy that would be unavailable once the label for X_cand
     arrives. The ForgettingWrapper strategy assumes a sliding window with a
     length of w_train to forget obsolete data. Each instance for which
-    ty_cand - w_train + verification_latency <= tX does not hold, are 
+    ty_cand - w_train + verification_latency <= tX does not hold, are
     discarded.
 
     Parameters
@@ -344,6 +345,7 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         tX,
@@ -438,12 +440,13 @@ class ForgettingWrapper(SingleAnnotStreamBasedQueryStrategyDelayWrapper):
             )
             sample, utility = self.base_query_strategy_.query(
                 X_cand=X_cand_current.reshape([1, -1]),
+                clf=clone(clf),
                 X=A_n_X,
                 y=A_n_y,
                 tX=A_n_tX,
                 ty=A_n_ty,
-                tX_cand=np.array(tX_cand_current),
-                ty_cand=np.array(ty_cand_current),
+                tX_cand=[tX_cand_current],
+                ty_cand=[ty_cand_current],
                 acquisitions=A_n_acquisitions,
                 sample_weight=A_n_sample_weight,
                 return_utilities=True,
@@ -648,17 +651,16 @@ class BaggingDelaySimulationWrapper(
         base_query_strategy=None,
         K=2,
         delay_prior=0.001,
-        clf=None,
         random_state=None,
     ):
         super().__init__(base_query_strategy, random_state)
         self.K = K
         self.delay_prior = delay_prior
-        self.clf = clf
 
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         tX,
@@ -736,6 +738,12 @@ class BaggingDelaySimulationWrapper(
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
+
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, 'clf')
+
+        clf_fitted = fit_if_not_fitted(clf, X, y, sample_weight, print_warning=False)
+
         sum_utilities = np.zeros(len(X))
         queried_indices = []
         avg_utilities = []
@@ -755,7 +763,7 @@ class BaggingDelaySimulationWrapper(
                 X_B_n = X[map_B_n, :]
                 # calculate p^L
                 probabilities = self.get_class_probabilities(
-                    X_B_n, X, y, sample_weight
+                    X_B_n, clf_fitted, X, y, sample_weight
                 )
                 tmp_queried_indices = []
                 tmp_avg_utilities = []
@@ -777,11 +785,12 @@ class BaggingDelaySimulationWrapper(
                     _, utilities = self.base_query_strategy_.query(
                         X_cand=X_cand[[i], :],
                         X=X,
+                        clf=clone(clf_fitted),
                         y=new_y,
                         tX=tX,
                         ty=new_ty,
-                        tX_cand=np.array(tX_cand[i]),
-                        ty_cand=np.array(ty_cand[i]),
+                        tX_cand=[tX_cand[i]],
+                        ty_cand=[ty_cand[i]],
                         sample_weight=sample_weight,
                         acquisitions=acquisitions,
                         return_utilities=True,
@@ -797,12 +806,13 @@ class BaggingDelaySimulationWrapper(
                     tmp_utilities,
                 ) = self.base_query_strategy_.query(
                     X_cand=X_cand[[i], :],
+                    clf=clone(clf_fitted),
                     X=X,
                     y=y,
                     tX=tX,
                     ty=ty,
-                    tX_cand=np.array(tX_cand[i]),
-                    ty_cand=np.array(ty_cand[i]),
+                    tX_cand=[tX_cand[i]],
+                    ty_cand=[ty_cand[i]],
                     sample_weight=sample_weight,
                     acquisitions=acquisitions,
                     return_utilities=True,
@@ -818,17 +828,13 @@ class BaggingDelaySimulationWrapper(
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
         kwargs = dict(utilities=avg_utilities)
-        # if not simulate:
-        #     self.base_query_strategy_.update(
-        #         X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
-        #     )
 
         if return_utilities:
             return queried_indices, avg_utilities
         else:
             return queried_indices
 
-    def get_class_probabilities(self, X_B_n, X, y, sample_weight):
+    def get_class_probabilities(self, X_B_n, clf, X, y, sample_weight):
         """Calculate the probabilities for the simulating 'X_B_n' window.
 
         Parameters
@@ -848,7 +854,7 @@ class BaggingDelaySimulationWrapper(
         probabilities : ndarray of shape (n_probabilities,)
             List of probabilities for 'X_B_n'
         """
-        pwc = self.clf_
+        pwc = clf
         pwc.fit(X=X, y=y, sample_weight=sample_weight)
         frequencies = pwc.predict_freq(X_B_n)
         frequencies_w_prior = frequencies + self.delay_prior
@@ -978,8 +984,7 @@ class BaggingDelaySimulationWrapper(
             reset=reset,
             **check_X_cand_params
         )
-
-        self._validate_clf(X, y, sample_weight)
+        
         self._validate_delay_prior()
         self._validate_K()
 
@@ -1018,42 +1023,6 @@ class BaggingDelaySimulationWrapper(
                 self.delay_prior, "delay_prior", (float, int), min_val=0.0
             )
 
-    def _validate_clf(self, X, y, sample_weight):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        """
-        # check if clf is a classifier
-        if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if np.array(y).ndim > 1:
-                raise ValueError(
-                    "{} is not a valid Value for y".format(type(y))
-                )
-        else:
-            self.clf_ = self.clf
-
 
 class FuzzyDelaySimulationWrapper(
     SingleAnnotStreamBasedQueryStrategyDelayWrapper
@@ -1082,16 +1051,15 @@ class FuzzyDelaySimulationWrapper(
         self,
         base_query_strategy=None,
         delay_prior=0.001,
-        clf=None,
         random_state=None,
     ):
         super().__init__(base_query_strategy, random_state)
         self.delay_prior = delay_prior
-        self.clf = clf
 
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         tX,
@@ -1170,6 +1138,11 @@ class FuzzyDelaySimulationWrapper(
             return_utilities=return_utilities,
         )
 
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, 'clf')
+
+        clf_fitted = fit_if_not_fitted(clf, X, y, sample_weight, print_warning=False)
+
         queried_indices = []
         utilities = []
 
@@ -1187,7 +1160,7 @@ class FuzzyDelaySimulationWrapper(
                 X_B_n = X[map_B_n, :]
 
                 probabilities = self.get_class_probabilities(
-                    X_B_n, X, y, sample_weight
+                    X_B_n, clf_fitted, X, y, sample_weight
                 )
 
                 if sample_weight is None:
@@ -1225,12 +1198,13 @@ class FuzzyDelaySimulationWrapper(
                     tmp_utilities,
                 ) = self.base_query_strategy_.query(
                     X_cand=X_cand[[i], :],
+                    clf=clone(clf_fitted),
                     X=new_X,
                     y=new_y,
                     tX=new_tX,
                     ty=new_ty,
-                    tX_cand=np.array(tX_cand[i]),
-                    ty_cand=np.array(ty_cand[i]),
+                    tX_cand=[tX_cand[i]],
+                    ty_cand=[ty_cand[i]],
                     sample_weight=new_sample_weight,
                     aquisitions=new_acquisitions,
                     return_utilities=True,
@@ -1246,12 +1220,13 @@ class FuzzyDelaySimulationWrapper(
                     tmp_utilities,
                 ) = self.base_query_strategy_.query(
                     X_cand=X_cand[[i], :],
+                    clf=clone(clf_fitted),
                     X=X,
                     y=y,
                     tX=tX,
                     ty=ty,
-                    tX_cand=np.array(tX_cand[i]),
-                    ty_cand=np.array(ty_cand[i]),
+                    tX_cand=[tX_cand[i]],
+                    ty_cand=[ty_cand[i]],
                     aquisitions=acquisitions,
                     sample_weight=sample_weight,
                     return_utilities=True,
@@ -1266,17 +1241,13 @@ class FuzzyDelaySimulationWrapper(
         queried = np.zeros(len(X_cand))
         queried[tmp_queried_indices] = 1
         kwargs = dict(utilities=utilities)
-        # if not simulate:
-        #     self.base_query_strategy_.update(
-        #         X_cand=X_cand, queried=queried, budget_manager_kwargs=kwargs
-        #     )
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def get_class_probabilities(self, X_B_n, X, y, sample_weight):
+    def get_class_probabilities(self, X_B_n, clf, X, y, sample_weight):
         """Calculate the probabilities for the simulating 'X_B_n' window.
 
         Parameters
@@ -1296,7 +1267,7 @@ class FuzzyDelaySimulationWrapper(
         probabilities : ndarray of shape (n_probabilities,)
             List of probabilities for 'X_B_n'
         """
-        pwc = self.clf_
+        pwc = clf
         pwc.fit(X=X, y=y, sample_weight=sample_weight)
         frequencies = pwc.predict_freq(X_B_n)
         frequencies_w_prior = frequencies + self.delay_prior
@@ -1426,7 +1397,6 @@ class FuzzyDelaySimulationWrapper(
             reset=reset,
             **check_X_cand_params
         )
-        self._validate_clf(X, y, sample_weight)
         self._validate_delay_prior()
 
         return (
@@ -1449,39 +1419,3 @@ class FuzzyDelaySimulationWrapper(
             check_scalar(
                 self.delay_prior, "delay_prior", (float, int), min_val=0.0
             )
-
-    def _validate_clf(self, X, y, sample_weight):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        """
-        # check if clf is a classifier
-        if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if np.array(y).ndim > 1:
-                raise ValueError(
-                    "{} is not a valid Value for y".format(type(y))
-                )
-        else:
-            self.clf_ = self.clf

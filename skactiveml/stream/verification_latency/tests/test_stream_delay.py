@@ -5,6 +5,7 @@ from sklearn.datasets import make_classification
 from sklearn.utils import check_random_state
 
 from skactiveml.stream import verification_latency
+from skactiveml.classifier import PWC
 from collections import deque
 
 
@@ -21,6 +22,7 @@ class TestStreamDelay(unittest.TestCase):
             random_state=rand.randint(2 ** 31 - 1),
             shuffle=True,
         )
+        clf = PWC(classes=[0, 1], random_state=rand.randint(2 ** 31 - 1))
 
         X_init = X[:train_init_size, :]
         y_init = y[:train_init_size]
@@ -47,6 +49,7 @@ class TestStreamDelay(unittest.TestCase):
             self._test_selection_strategy(
                 rand.randint(2 ** 31 - 1),
                 qs_class,
+                clf,
                 X_init,
                 y_init,
                 X_stream,
@@ -62,6 +65,7 @@ class TestStreamDelay(unittest.TestCase):
         self,
         rand_seed,
         query_strategy_class,
+        clf,
         X_init,
         y_init,
         X_stream,
@@ -93,6 +97,7 @@ class TestStreamDelay(unittest.TestCase):
         ):
             queried_indices = query_strategy.query(
                 X_cand=x_t.reshape([1, -1]),
+                clf=clf,
                 X=X_train,
                 y=y_train,
                 tX=tX_train,

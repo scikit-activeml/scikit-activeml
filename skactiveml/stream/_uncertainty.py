@@ -1,10 +1,11 @@
 import numpy as np
 
-from sklearn.base import is_classifier, clone
+from sklearn.utils import check_array, check_consistent_length
 
-from ..base import SingleAnnotStreamBasedQueryStrategy
+from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
+from ..utils import fit_if_not_fitted, check_type
 
-from ..classifier import PWC
+# from ..classifier import PWC
 
 from .budget_manager import (
     FixedUncertaintyBudget,
@@ -44,18 +45,17 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
     def __init__(
         self,
-        clf=None,
         budget_manager=FixedUncertaintyBudget(),
         random_state=None,
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )
-        self.clf = clf
 
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         return_utilities=False,
@@ -101,8 +101,12 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, 'clf')
 
-        predict_proba = self.clf_.predict_proba(X_cand)
+        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+
+        predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
         queried_indices = self.budget_manager_.query(utilities)
@@ -192,14 +196,13 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X_cand, return_utilities = super()._validate_data(
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
-
-        self._validate_clf(X, y, sample_weight)
+        self._validate_X_y_sample_weight(X, y, sample_weight)
         self._validate_random_state()
 
         return X_cand, X, y, sample_weight, return_utilities
 
-    def _validate_clf(self, X, y, sample_weight):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
+    def _validate_X_y_sample_weight(self, X, y, sample_weight):
+        """Validate if X, y and sample_weight are numeric and of equal lenght.
 
         Parameters
         ----------
@@ -211,29 +214,22 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        X : array-like of shape (n_samples, n_features)
+            Checked Input samples.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. Converts y to a numpy array
         """
-        # check if clf is a classifier
+        if sample_weight is not None:
+            sample_weight = np.array(sample_weight)
+            check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError(
-                        "{} is not a valid Value for y".format(type(y))
-                    )
-        else:
-            self.clf_ = self.clf
+            X = check_array(X)
+            y = np.array(y)
+            check_consistent_length(X, y)
+        return X, y, sample_weight
 
 
 class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
@@ -268,18 +264,17 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
     def __init__(
         self,
-        clf=None,
         budget_manager=VarUncertaintyBudget(),
         random_state=None,
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )
-        self.clf = clf
 
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         return_utilities=False,
@@ -325,8 +320,12 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         self._validate_data(
             X_cand, return_utilities, X, y, sample_weight=sample_weight,
         )
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, 'clf')
 
-        predict_proba = self.clf_.predict_proba(X_cand)
+        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+
+        predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
         queried_indices = self.budget_manager_.query(utilities)
@@ -417,13 +416,13 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
 
-        self._validate_clf(X, y, sample_weight=sample_weight)
+        self._validate_X_y_sample_weight(X, y, sample_weight=sample_weight)
         self._validate_random_state()
 
         return X_cand, return_utilities, X, y
 
-    def _validate_clf(self, X, y, sample_weight):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
+    def _validate_X_y_sample_weight(self, X, y, sample_weight):
+        """Validate if X, y and sample_weight are numeric and of equal lenght.
 
         Parameters
         ----------
@@ -435,29 +434,22 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        X : array-like of shape (n_samples, n_features)
+            Checked Input samples.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. Converts y to a numpy array
         """
-        # check if clf is a classifier
+        if sample_weight is not None:
+            sample_weight = np.array(sample_weight)
+            check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError(
-                        "{} is not a valid Value for y".format(type(y))
-                    )
-        else:
-            self.clf_ = self.clf
+            X = check_array(X)
+            y = np.array(y)
+            check_consistent_length(X, y)
+        return X, y, sample_weight
 
 
 class Split(SingleAnnotStreamBasedQueryStrategy):
@@ -487,16 +479,16 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, clf=None, budget_manager=SplitBudget(), random_state=None
+        self, budget_manager=SplitBudget(), random_state=None
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )
-        self.clf = clf
 
     def query(
         self,
         X_cand,
+        clf,
         X,
         y,
         return_utilities=False,
@@ -542,8 +534,12 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         self._validate_data(
             X_cand, return_utilities, X, y, sample_weight=sample_weight,
         )
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, 'clf')
 
-        predict_proba = self.clf_.predict_proba(X_cand)
+        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+
+        predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
 
         queried_indices = self.budget_manager_.query(utilities)
@@ -637,14 +633,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
 
-        self._validate_clf(X, y, sample_weight)
+        self._validate_X_y_sample_weight(X, y, sample_weight)
         self._validate_random_state()
         self._validate_budget_manager()
 
         return X_cand, return_utilities, X, y
 
-    def _validate_clf(self, X, y, sample_weight):
-        """Validate if clf is a classifier or create a new clf and fit X and y.
+    def _validate_X_y_sample_weight(self, X, y, sample_weight):
+        """Validate if X, y and sample_weight are numeric and of equal lenght.
 
         Parameters
         ----------
@@ -656,26 +652,19 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        X : array-like of shape (n_samples, n_features)
+            Checked Input samples.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. Converts y to a numpy array
         """
-        # check if clf is a classifier
+        if sample_weight is not None:
+            sample_weight = np.array(sample_weight)
+            check_consistent_length(sample_weight, y)
         if X is not None and y is not None:
-            if self.clf is None:
-                self.clf_ = PWC(
-                    random_state=self.random_state_.randint(2 ** 31 - 1)
-                )
-            elif is_classifier(self.clf):
-                self.clf_ = clone(self.clf)
-            else:
-                raise TypeError(
-                    "clf is not a classifier. Please refer to "
-                    + "sklearn.base.is_classifier"
-                )
-            self.clf_.fit(X, y, sample_weight=sample_weight)
-            # check if y is not multi dimensinal
-            if isinstance(y, np.ndarray):
-                if y.ndim > 1:
-                    raise ValueError(
-                        "{} is not a valid Value for y".format(type(y))
-                    )
-        else:
-            self.clf_ = self.clf
+            X = check_array(X)
+            y = np.array(y)
+            check_consistent_length(X, y)
+        return X, y, sample_weight
