@@ -70,16 +70,18 @@ class TestStream(unittest.TestCase):
         y_train.extend(y_init)
 
         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
-            sampled_indices = query_strategy.query(
+            sampled_indices, utilities = query_strategy.query(
                 x_t.reshape([1, -1]),
                 clf=clf,
                 X=X_train,
                 y=y_train,
-                simulate=True,
+                sample_weight=np.ones(len(y_train)),
+                return_utilities=True
             )
             query_strategy.update(
                 x_t.reshape([1, -1]), sampled_indices
             )
+            query_strategy.budget_manager_.is_budget_left()
             if len(sampled_indices):
                 X_train.append(x_t)
                 y_train.append(y_t)

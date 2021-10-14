@@ -64,16 +64,27 @@ class EstimatedBudget(BudgetManager):
         """
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
-        # check if budget has been set
-        self._validate_budget()
-        # check if calculation of estimate bought/true lables has begun
-        if not hasattr(self, "u_t_"):
-            self.u_t_ = 0
+        self._validate_data(np.array([]), True)
         # update u_t for queried X_cand
         for s in queried:
             self.u_t_ = self.u_t_ * ((self.w - 1) / self.w) + s
 
         return self
+
+    def _validate_data(self, utilities, return_budget_left):
+        """
+        TODO: documentation
+        """
+        utilities, return_budget_left = super()._validate_data(
+            utilities,
+            return_budget_left
+        )
+
+        # check if calculation of estimate bought/true lables has begun
+        if not hasattr(self, "u_t_"):
+            self.u_t_ = 0
+
+        return utilities, return_budget_left
 
 
 class FixedUncertaintyBudget(EstimatedBudget):
@@ -176,7 +187,6 @@ class FixedUncertaintyBudget(EstimatedBudget):
         self : EstimatedBudget
             The EstimatedBudget returns itself, after it is updated.
         """
-
         super().update(X_cand, queried_indices)
         return self
 
@@ -352,6 +362,8 @@ class VarUncertaintyBudget(EstimatedBudget):
         self : EstimatedBudget
             The EstimatedBudget returns itself, after it is updated.
         """
+        self._validate_data(np.array([]), return_budget_left=True)
+
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
         for i, s in enumerate(queried):
@@ -398,6 +410,9 @@ class VarUncertaintyBudget(EstimatedBudget):
     def _validate_theta(self):
         """Validate if theta is set as a float.
         """
+        # check if theta exists
+        if not hasattr(self, "theta_"):
+            self.theta_ = self.theta
         if not isinstance(self.theta, float):
             raise TypeError(
                 "{} is not a valid type for theta".format(type(self.theta))
@@ -501,9 +516,6 @@ class SplitBudget(EstimatedBudget):
         utilities, return_budget_left = self._validate_data(
             utilities, return_budget_left
         )
-        # check if theta exists
-        if not hasattr(self, "theta_"):
-            self.theta_ = self.theta
         # check if calculation of estimate bought/true lables has begun
         if not hasattr(self, "u_t_"):
             self.u_t_ = 0
@@ -563,9 +575,11 @@ class SplitBudget(EstimatedBudget):
         self : EstimatedBudget
             The EstimatedBudget returns itself, after it is updated.
         """
+        self._validate_data(np.array([]), return_budget_left=True)
+
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
-        for q in queried:
+        for x_t, q in zip(X_cand, queried):
             if self.u_t_ / self.w < self.budget_:
                 if self.v > self.random_state_.random_sample():
                     _ = self.random_state_.random_sample()
@@ -574,7 +588,8 @@ class SplitBudget(EstimatedBudget):
                         self.theta_ *= 1 - self.s
                     else:
                         self.theta_ *= 1 + self.s
-        super().update(X_cand, queried_indices)
+            new_queried_indices = [0] if q else []
+            super().update([x_t], new_queried_indices)
         return self
 
     def _validate_data(self, utilities, return_budget_left):
@@ -615,6 +630,9 @@ class SplitBudget(EstimatedBudget):
     def _validate_theta(self):
         """Validate if theta is set as a float.
         """
+        # check if theta exists
+        if not hasattr(self, "theta_"):
+            self.theta_ = self.theta
         if not isinstance(self.theta, float):
             raise TypeError(
                 "{} is not a valid type for theta".format(type(self.theta))
