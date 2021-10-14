@@ -1,9 +1,9 @@
 import copy
+import warnings
 from collections.abc import Iterable
 
 import numpy as np
 import sklearn
-import warnings
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
@@ -241,7 +241,8 @@ def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
     return cost_matrix_new
 
 
-def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
+def check_X_y(X=None, y=None, X_cand=None, sample_weight=None,
+              sample_weight_cand=None,
               accept_sparse=False, *, accept_large_sparse=True,
               dtype="numeric", order=None, copy=False, force_all_finite=True,
               ensure_2d=True, allow_nd=False, multi_output=False,
@@ -371,29 +372,35 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
         The converted and validated sample_weight_cand.
         Only returned if X_cand is not None.
     """
-    if y is None:
-        raise ValueError("y cannot be None")
-
     if allow_nan is None:
         allow_nan = True if missing_label is np.nan else False
-
-    X = check_array(X, accept_sparse=accept_sparse,
-                    accept_large_sparse=accept_large_sparse,
-                    dtype=dtype, order=order, copy=copy,
-                    force_all_finite=force_all_finite,
-                    ensure_2d=ensure_2d, allow_nd=allow_nd,
-                    ensure_min_samples=ensure_min_samples,
-                    ensure_min_features=ensure_min_features,
-                    estimator=estimator)
-    if multi_output:
-        y = check_array(y, accept_sparse='csr', force_all_finite=True,
-                        ensure_2d=False, dtype=None)
-    else:
-        y = column_or_1d(y, warn=True)
-        assert_all_finite(y, allow_nan=allow_nan)
-    if y_numeric and y.dtype.kind == 'O':
-        y = y.astype(np.float64)
-    check_consistent_length(X, y)
+    if X is not None:
+        X = check_array(X, accept_sparse=accept_sparse,
+                        accept_large_sparse=accept_large_sparse,
+                        dtype=dtype, order=order, copy=copy,
+                        force_all_finite=force_all_finite,
+                        ensure_2d=ensure_2d, allow_nd=allow_nd,
+                        ensure_min_samples=ensure_min_samples,
+                        ensure_min_features=ensure_min_features,
+                        estimator=estimator)
+    if y is not None:
+        if multi_output:
+            y = check_array(y, accept_sparse='csr', force_all_finite=True,
+                            ensure_2d=False, dtype=None)
+        else:
+            y = column_or_1d(y, warn=True)
+            assert_all_finite(y, allow_nan=allow_nan)
+        if y_numeric and y.dtype.kind == 'O':
+            y = y.astype(np.float64)
+    if X is not None and y is not None:
+        check_consistent_length(X, y)
+        if sample_weight is None:
+            sample_weight = np.ones(y.shape)
+        sample_weight = check_array(sample_weight, ensure_2d=False)
+        check_consistent_length(y, sample_weight)
+        if y.ndim > 1 and y.shape[1] > 1 or \
+                sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
+            check_consistent_length(y.T, sample_weight.T)
 
     if X_cand is not None:
         X_cand = check_array(X_cand, accept_sparse=accept_sparse,
@@ -404,7 +411,7 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
                              ensure_min_samples=ensure_min_samples,
                              ensure_min_features=ensure_min_features,
                              estimator=estimator)
-        if X_cand.shape[1] is not X.shape[1]:
+        if X is not None and X_cand.shape[1] != X.shape[1]:
             raise ValueError("The number of features of X_cand does not match"
                              "the number of features of X")
 
@@ -412,15 +419,6 @@ def check_X_y(X, y, X_cand=None, sample_weight=None, sample_weight_cand=None,
             sample_weight_cand = np.ones(len(X_cand))
         sample_weight_cand = check_array(sample_weight_cand, ensure_2d=False)
         check_consistent_length(X_cand, sample_weight_cand)
-
-    if sample_weight is None:
-        sample_weight = np.ones(y.shape)
-
-    sample_weight = check_array(sample_weight, ensure_2d=False)
-    check_consistent_length(y, sample_weight)
-    if y.ndim > 1 and y.shape[1] > 1 or \
-            sample_weight.ndim > 1 and sample_weight.shape[1] > 1:
-        check_consistent_length(y.T, sample_weight.T)
 
     if X_cand is None:
         return X, y, sample_weight
@@ -457,6 +455,13 @@ def check_random_state(random_state, seed_multiplier=None):
     random_state = copy.deepcopy(random_state)
     random_state = sklearn.utils.check_random_state(random_state)
 
-    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
+    seed = (random_state.randint(1, 2 ** 31) * seed_multiplier) % (2 ** 31)
     return np.random.RandomState(seed)
 
+
+def check_type(obj, target_type, name):
+    if not isinstance(obj, target_type):
+        raise TypeError(
+            f'`{name}` has type `{type(obj)}` but must have type '
+            f'`{target_type}`.'
+        )

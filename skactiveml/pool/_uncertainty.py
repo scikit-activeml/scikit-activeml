@@ -1,44 +1,41 @@
 """
-Uncertainty query strategies
+Module implementing various uncertainty based query strategies.
 """
 
-# Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
+# Authors: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
+#          Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
+from sklearn.utils.validation import check_array
 
-from sklearn.base import clone
-from sklearn.utils import check_array
-
-from ..base import SingleAnnotPoolBasedQueryStrategy,\
-    SkactivemlClassifier
+from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..utils import check_cost_matrix, simple_batch, check_classes, \
-    ExtLabelEncoder
+    fit_if_not_fitted, check_type
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
-    """
-    Uncertainty Sampling query strategy.
+    """Uncertainty Sampling
+
+    This class implement various uncertainty based query strategies, i.e., the
+    standard uncertainty measures [1], cost-sensitive ones [2], and one
+    optimizing expected average precision [3].
 
     Parameters
     ----------
-    clf : sklearn classifier
-        A probabilistic sklearn classifier.
-    method : string (default='margin_sampling')
+    method : string (default='least_confident')
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
         Epistemic only works with Parzen Window Classifier or
         Logistic Regression.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] defining the cost of predicting class j for a
-        sample with the actual class i. Only supported for least confident
-        variant.
+        Cost matrix with cost_matrix[i,j] defining the cost of predicting class
+        j for a sample with the actual class i. Only supported for
+        `least_confident` and `margin_sampling` variant.
     random_state : numeric | np.random.RandomState
         The random state to use.
 
     Attributes
     ----------
-    clf : sklearn classifier
-        A probabilistic sklearn classifier.
     method : string
         The method to calculate the uncertainty. Only entropy, least_confident,
         margin_sampling and expected_average_precisionare.
@@ -53,87 +50,86 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     ---------
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
-        http://www.burrsettles.com/pub/settles.activelearning.pdf
-    [2] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
+    [2] Chen, Po-Lung, and Hsuan-Tien Lin. "Active learning for multiclass
+        cost-sensitive classification using probabilistic models." 2013
+        Conference on Technologies and Applications of Artificial Intelligence.
+        IEEE, 2013.
+    [3] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
 
-    def __init__(self, clf, method='margin_sampling', cost_matrix=None,
+    def __init__(self, method='least_confident', cost_matrix=None,
                  random_state=None):
         super().__init__(random_state=random_state)
-
         self.method = method
         self.cost_matrix = cost_matrix
-        self.clf = clf
 
-    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
+              batch_size=1,
               return_utilities=False):
         """
         Queries the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand : np.ndarray
-            The unlabeled pool from which to choose.
-        X : np.ndarray
-            The labeled pool used to fit the classifier.
-        y : np.array
-            The labels of the labeled pool X.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
+        X_cand : array-like, shape (n_candidate_samples, n_features)
+            Candidate samples from which the strategy can select.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X: array-like, shape (n_samples, n_features), optional (default=None)
+            Complete training data set.
+        y: array-like, shape (n_samples), optional (default=None)
+            Labels of the training data set.
+        sample_weight: array-like, shape (n_samples), optional
+        (default=None)
+            Weights of training samples in `X`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool (default=False)
-            If True, the utilities are returned.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        best_indices : np.ndarray, shape (batch_size)
-            The index of the queried instance.
-        batch_utilities : np.ndarray,  shape (batch_size, len(X_cand))
-            The utilities of all instances of
-            X_cand(if return_utilities=True).
+        query_indices : numpy.ndarray, shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+        utilities : numpy.ndarray, shape (batch_size, n_samples)
+            The utilities of all candidate samples after each selected
+            sample of the batch, e.g., `utilities[0]` indicates the utilities
+            used for selecting the first sample (with index `query_indices[0]`)
+            of the batch.
         """
-        self._clf = clone(self.clf)
-
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
 
-        # Check if the attribute clf is valid
-        if not isinstance(self._clf, SkactivemlClassifier):
-            raise TypeError('clf has to be from type SkactivemlClassifier. '
-                            'The given type is {}. Use the wrapper in '
-                            'skactiveml.classifier to use a sklearn '
-                            'classifier/ensemble.'.format(type(self._clf)))
+        # Validate classifier type.
+        check_type(clf, SkactivemlClassifier, 'clf')
 
-        # Extract classes from clf
-        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
-                                        classes=self.clf.classes).fit(y)
-        classes = label_encoder.classes_
-
-        # check self.method
+        # Validate method.
         if not isinstance(self.method, str):
             raise TypeError('{} is an invalid type for method. Type {} is '
                             'expected'.format(type(self.method), str))
 
-        if getattr(self.clf, 'predict_proba', None) is None:
-            raise TypeError("'clf' must implement the method 'predict_proba'")
+        # Fit the classifier.
+        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
-        # fit the classifier and get the probabilities
-        self._clf.fit(X, y, sample_weight=sample_weight)
-        probas = self._clf.predict_proba(X_cand)
+        # Predict class-membership probabilities.
+        probas = clf.predict_proba(X_cand)
 
-        # choose the method and calculate the utilities
+        # Choose the method and calculate corresponding utilities.
         with np.errstate(divide='ignore'):
             if self.method in ['least_confident', 'margin_sampling',
                                'entropy']:
-                utilities = uncertainty_scores(probas=probas,
-                                               method=self.method,
-                                               cost_matrix=self.cost_matrix)
+                utilities = uncertainty_scores(
+                    probas=probas, method=self.method,
+                    cost_matrix=self.cost_matrix
+                )
             elif self.method == 'expected_average_precision':
+                classes = clf.classes_
                 utilities = expected_average_precision(classes, probas)
             else:
                 raise ValueError(
@@ -183,12 +179,12 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
     """
     # Check probabilities.
     probas = check_array(probas, accept_sparse=False,
-            accept_large_sparse=True, dtype="numeric", order=None,
-            copy=False, force_all_finite=True, ensure_2d=True,
-            allow_nd=False, ensure_min_samples=1,
-            ensure_min_features=1, estimator=None)
+                         accept_large_sparse=True, dtype="numeric", order=None,
+                         copy=False, force_all_finite=True, ensure_2d=True,
+                         allow_nd=False, ensure_min_samples=1,
+                         ensure_min_features=1, estimator=None)
 
-    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.e-14):
+    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.e-3):
         raise ValueError(
             "'probas' are invalid. The sum over axis 1 must be one."
         )
@@ -225,7 +221,6 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
         )
 
 
-# expected average precision:
 def expected_average_precision(classes, probas):
     """
     Calculate the expected average precision.
@@ -241,24 +236,30 @@ def expected_average_precision(classes, probas):
     -------
     score : np.ndarray, shape=(n_X_cand)
         The expected average precision score of all instances in X_cand.
+
+    References
+    ---------
+    [1] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
+        via maximizing expected average precision."
+        IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
-    # check if probas is valid
+    # Check if `probas` is valid.
     probas = check_array(probas, accept_sparse=False,
-            accept_large_sparse=True, dtype="numeric", order=None,
-            copy=False, force_all_finite=True, ensure_2d=True,
-            allow_nd=False, ensure_min_samples=1,
-            ensure_min_features=1, estimator=None)
+                         accept_large_sparse=True, dtype="numeric", order=None,
+                         copy=False, force_all_finite=True, ensure_2d=True,
+                         allow_nd=False, ensure_min_samples=1,
+                         ensure_min_features=1, estimator=None)
 
     if (np.sum(probas, axis=1) - 1).all():
         raise ValueError('probas are invalid. The sum over axis 1 must be '
                          'one.')
 
-    # check if classes is valid
+    # Check if `classes` are valid.
     check_classes(classes)
     if len(classes) < 2:
-        raise ValueError('classes must contain at least 2 entries.')
+        raise ValueError('`classes` must contain at least 2 entries.')
     if len(classes) != probas.shape[1]:
-        raise ValueError('classes must have the same length as probas has '
+        raise ValueError('`classes` must have the same length as `probas` has '
                          'columns.')
 
     score = np.zeros(len(probas))
@@ -304,5 +305,5 @@ def _f(n, t, p, f_arr, g_arr):
         return 0
     if t == 0 and n == 0:
         return 1
-    return p[n - 1] * f_arr[n - 1, t - 1] + p[n - 1] * t * g_arr[n - 1, t - 1] / n + (1 - p[n - 1]) * f_arr[n - 1, t]
-
+    return p[n - 1] * f_arr[n - 1, t - 1] + p[n - 1] * t * \
+           g_arr[n - 1, t - 1] / n + (1 - p[n - 1]) * f_arr[n - 1, t]

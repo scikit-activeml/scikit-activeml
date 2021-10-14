@@ -16,6 +16,9 @@ class TestFixedBudget(unittest.TestCase):
         # sampled param test
         self._test_sampled_param_utilities(FixedBudget)
 
+        # update test
+        self._test_update_without_query(FixedBudget)
+
     def _test_init_param_budget(self, budget_manager_name):
         # budget must be defined as a float with a range of: 0 < budget <= 1
         budget_manager = budget_manager_name(budget="string")
@@ -31,3 +34,7 @@ class TestFixedBudget(unittest.TestCase):
         self.assertRaises(TypeError, budget_manager.query, utilities="string")
         self.assertRaises(TypeError, budget_manager.query, utilities=None)
         self.assertRaises(TypeError, budget_manager.query, utilities=[10, 10])
+
+    def _test_update_without_query(self, query_strategy_name):
+        qs = query_strategy_name()
+        qs.update(np.array([[0], [1], [2]]), np.array([0, 2]))

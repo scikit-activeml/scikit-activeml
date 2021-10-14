@@ -22,6 +22,8 @@ class TestEstimatedBudget(unittest.TestCase):
         # sampled param test
         self._test_sampled_param_utilities(FixedUncertaintyBudget)
 
+        self._test_update_without_query(FixedUncertaintyBudget)
+
         # functinality test
         # self._test_sampled_utilities(FixedUncertaintyBudget)
 
@@ -34,6 +36,8 @@ class TestEstimatedBudget(unittest.TestCase):
 
         # sampled param test
         self._test_sampled_param_utilities(VarUncertaintyBudget)
+
+        self._test_update_without_query(VarUncertaintyBudget)
 
         # functinality test
         # self._test_sampled_utilities(VarUncertaintyBudget)
@@ -48,6 +52,8 @@ class TestEstimatedBudget(unittest.TestCase):
 
         # sampled param test
         self._test_sampled_param_utilities(SplitBudget)
+
+        self._test_update_without_query(SplitBudget)
 
         # functinality test
         # self._test_sampled_utilities(SplitBudget)
@@ -116,6 +122,10 @@ class TestEstimatedBudget(unittest.TestCase):
         self.assertRaises(TypeError, budget_manager.query, utilities="string")
         self.assertRaises(TypeError, budget_manager.query, utilities=None)
         self.assertRaises(TypeError, budget_manager.query, utilities=[10, 10])
+
+    def _test_update_without_query(self, query_strategy_name):
+        qs = query_strategy_name()
+        qs.update(np.array([[0], [1], [2]]), np.array([0, 2]))
 
 #     def _test_sampled_utilities(self, budget_manager_name):
 #         # only budget% +/- theta of utilities can be purchased
