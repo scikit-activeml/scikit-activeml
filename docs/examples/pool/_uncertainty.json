@@ -11,11 +11,13 @@
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "" : [],
     "init_params" : {
       "method" : "'margin_sampling'"
     },
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   },
   {
     "class" : "UncertaintySampling",
@@ -29,11 +31,13 @@
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "" : [],
     "init_params" : {
       "method" : "'least_confident'"
     },
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   },
   {
     "class" : "UncertaintySampling",
@@ -47,11 +51,13 @@
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "" : [],
     "init_params" : {
       "method" : "'entropy'"
     },
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   },
   {
     "class" : "UncertaintySampling",
@@ -65,11 +71,13 @@
     "refs" : ["wang2018uncertainty"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : [],
     "init_params" : {
       "method" : "'expected_average_precision'"
     },
-    "query_params" : {},
-    "bp_utilities" : "ax = plot_utility(qs, {'X': X, 'y': y}, X_cand=X, bound=bound, ax=ax)"
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, bound=bound, ax=ax)"
   }
 ]

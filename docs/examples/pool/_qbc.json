@@ -11,11 +11,15 @@
     "refs" : ["seung1992query", ""],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
+                        "from skactiveml.classifier import SklearnClassifier"],
+    "clf" : "SklearnClassifier(BaggingClassifier(), classes=np.unique(y_true))",
     "init_params" : {
         "method" : "'KL_divergence'"
     },
-    "query_params" : {}
+    "query_params" : {
+      "ensemble" : "clf"
+    }
   },
   {
     "class" : "QBC",
@@ -29,10 +33,14 @@
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
+                        "from skactiveml.classifier import SklearnClassifier"],
+    "clf" : "SklearnClassifier(BaggingClassifier(), classes=np.unique(y_true))",
     "init_params" : {
         "method" : "'vote_entropy'"
     },
-    "query_params" : {}
+    "query_params" : {
+      "ensemble" : "clf"
+    }
   }
 ]

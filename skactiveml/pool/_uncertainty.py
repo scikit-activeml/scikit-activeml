@@ -236,7 +236,7 @@ def expected_average_precision(classes, probas):
         The expected average precision score of all instances in X_cand.
 
     References
-    ---------
+    ----------
     [1] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.

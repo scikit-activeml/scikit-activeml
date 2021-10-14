@@ -43,7 +43,7 @@ def generate_api_reference_rst(gen_path):
         file.write('.. autosummary::\n')
         file.write('   :nosignatures:\n')
         file.write('   :toctree: api\n')
-        file.write('   :template: class.rst\n')
+        file.write('   :template: module.rst\n')
         file.write('\n')
         for item in pool.__all__:
             file.write(f'   pool.{item}\n')
@@ -585,7 +585,8 @@ def format_plot(data, template_path):
                 elif '#_query_params' in line:
                     start = line.find('#_query_params') - 1
                     line = line[:start] + '{' + \
-                           dict_to_str(data['query_params'], allocator=': ') + '}\n'
+                           dict_to_str(data['query_params'], allocator=': ',
+                                       key_as_string=True) + '}\n'
                 elif '#_bp' in line:
                     try:
                         s = line.find('#_')
@@ -639,7 +640,7 @@ def format_refs(refs: list):
     return block_str + '\n'
 
 
-def dict_to_str(d, idx=None, allocator='='):
+def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
     """Converts a dictionary into a string.
     Parameters
     ----------
@@ -653,7 +654,7 @@ def dict_to_str(d, idx=None, allocator='='):
         always used. It is not necessary to specify all keys from d.
         shape: {key1:int1,...}
     allocator: string, optional (Default='=')
-        The allocator is used t separate the key and the value.
+        The allocator is used to separate the key and the value.
 
     Returns
     -------
@@ -668,5 +669,10 @@ def dict_to_str(d, idx=None, allocator='='):
             value = value[idx[key]]
         else:
             value = value[0]
+        key = str(key)
+        if key_as_string:
+            if not ((key.startswith('"') and key.endswith('"')) or \
+                    (key.startswith('\'') and key.endswith('\''))):
+                key = '"' + key + '"'
         dd_str += str(key) + allocator + value + ", "
     return dd_str[0:-2]

@@ -10,7 +10,7 @@
     "refs" : ["huang2016novel"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : [],
     "init_params" : {
       "classes" : "[0, 1]"
     },

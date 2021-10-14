@@ -11,9 +11,11 @@
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : [],
     "init_params" : {},
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   },
   {
     "class" : "ExpectedErrorReduction",
@@ -27,9 +29,11 @@
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : [],
     "init_params" : {},
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   },
   {
     "class" : "ExpectedErrorReduction",
@@ -43,8 +47,10 @@
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [],
+    "bp_add_imports" : [],
     "init_params" : {},
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   }
 ]

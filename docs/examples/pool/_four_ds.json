@@ -11,11 +11,13 @@
     "refs" : ["reitmaier2013let"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "code_import" : [
+    "bp_add_imports" : [
       "from skactiveml.classifier import CMM"
     ],
     "clf" : "CMM(classes=[0, 1])",
     "init_params" : {},
-    "query_params" : {}
+    "query_params" : {
+      "clf" : "clf"
+    }
   }
 ]
