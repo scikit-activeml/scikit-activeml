@@ -234,22 +234,21 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 f"or of type None."
             )
 
-        val = self.strategy.query(X_cand_sq, **query_params_dict,
-                                  batch_size=batch_size_sq,
-                                  return_utilities=True)
+        re_val = self.strategy.query(X_cand_sq, **query_params_dict,
+                                     batch_size=batch_size_sq,
+                                     return_utilities=True)
 
-        single_query_indices, w_utilities = val
+        single_query_indices, w_utilities = re_val
         sample_utilities = np.nan * np.ones((batch_size_sq, n_samples))
         sample_utilities[:, a_indices] = w_utilities
-        single_query_indices = a_indices[single_query_indices]
 
         return self._query_annotators(A_cand, batch_size, sample_utilities,
                                       annotator_utilities, return_utilities,
-                                      pref_n_annotators, single_query_indices)
+                                      pref_n_annotators)
 
     def _query_annotators(self, A_cand, batch_size, sample_utilities,
                           annotator_utilities, return_utilities,
-                          pref_n_annotators, single_query_indices):
+                          pref_n_annotators):
 
         random_state = check_random_state(self.random_state)
 
@@ -257,8 +256,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         n_samples = A_cand.shape[0]
 
         re_val = self._get_order_preserving_s_query(A_cand, sample_utilities,
-                                                    annotator_utilities,
-                                                    single_query_indices)
+                                                    annotator_utilities)
 
         s_indices, s_utilities = re_val
 
@@ -295,20 +293,15 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
     @staticmethod
     def _get_order_preserving_s_query(A_cand, candidate_utilities,
-                                      annotator_utilities,
-                                      single_query_indices):
+                                      annotator_utilities):
 
         nan_indices = np.argwhere(np.isnan(candidate_utilities))
 
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = -np.inf
 
         # prepare candidate_utilities
-        candidate_utilities = rankdata(candidate_utilities, method='dense',
+        candidate_utilities = rankdata(candidate_utilities, method='ordinal',
                                        axis=1).astype(float)
-        batch_size_sq = len(single_query_indices)
-
-        # prefer selected sample of the single query strategy
-        candidate_utilities[np.arange(batch_size_sq), single_query_indices] += 1
 
         # calculate indices of maximum sample
         indices = np.argmax(candidate_utilities, axis=1)
