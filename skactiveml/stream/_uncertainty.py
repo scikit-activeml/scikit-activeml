@@ -29,9 +29,6 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         the budget_manager will be used to determine the interval between
         sampling instances
 
-    clf : BaseEstimator
-        The classifier which is trained using this query startegy.
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
 
@@ -56,10 +53,10 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         self,
         X_cand,
         clf,
-        X,
-        y,
-        return_utilities=False,
+        X=None,
+        y=None,
         sample_weight=None,
+        return_utilities=False,
         **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -74,15 +71,17 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        X : array-like of shape (n_samples, n_features)
+        clf : BaseEstimator
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), optional (default=None)
             Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
 
         Returns
         -------
@@ -248,9 +247,6 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         the budget_manager will be used to determine the interval between
         sampling instances
 
-    clf : BaseEstimator
-        The classifier which is trained using this query startegy.
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
 
@@ -275,10 +271,10 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         self,
         X_cand,
         clf,
-        X,
-        y,
-        return_utilities=False,
+        X=None,
+        y=None,
         sample_weight=None,
+        return_utilities=False,
         **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -294,18 +290,21 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        X : array-like of shape (n_samples, n_features)
+        clf : BaseEstimator
+            Model implementing the methods `fit` and `predict_proba`.
+
+        X : array-like of shape (n_samples, n_features), optional (default=None)
             Input samples used to fit the classifier.
 
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
 
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
-
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
 
         Returns
         -------
@@ -464,9 +463,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         the budget_manager will be used to determine the interval between
         sampling instances
 
-    clf : BaseEstimator
-        The classifier which is trained using this query startegy.
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
 
@@ -489,10 +485,10 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         self,
         X_cand,
         clf,
-        X,
-        y,
-        return_utilities=False,
+        X=None,
+        y=None,
         sample_weight=None,
+        return_utilities=False,
         **kwargs
     ):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -508,18 +504,22 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        X : array-like of shape (n_samples, n_features)
+        clf : BaseEstimator
+            Model implementing the methods `fit` and `predict_proba`.
+
+        X : array-like of shape (n_samples, n_features), optional (default=None)
             Input samples used to fit the classifier.
 
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
+
+        
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
 
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
-
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
 
         Returns
         -------

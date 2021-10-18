@@ -30,12 +30,15 @@ class TestUncertainty(unittest.TestCase):
     def test_fixed_uncertainty(self):
         # init param test
         self._test_init_param_budget_manager(FixedUncertainty)
+        self._test_init_param_random_state(FixedUncertainty)
 
         # query param test
         self._test_query_param_clf(FixedUncertainty)
         self._test_query_param_X_cand(FixedUncertainty)
         self._test_query_param_X(FixedUncertainty)
         self._test_query_param_y(FixedUncertainty)
+        self._test_query_param_sample_weight(FixedUncertainty)
+        self._test_query_param_return_utilities(FixedUncertainty)
 
     def test_var_uncertainty(self):
         # init param test
@@ -46,6 +49,9 @@ class TestUncertainty(unittest.TestCase):
         self._test_query_param_X_cand(VariableUncertainty)
         self._test_query_param_X(VariableUncertainty)
         self._test_query_param_y(VariableUncertainty)
+        self._test_init_param_random_state(VariableUncertainty)
+        self._test_query_param_sample_weight(VariableUncertainty)
+        self._test_query_param_return_utilities(VariableUncertainty)
 
     def test_split(self):
         # init param test
@@ -56,12 +62,19 @@ class TestUncertainty(unittest.TestCase):
         self._test_query_param_X_cand(Split)
         self._test_query_param_X(Split)
         self._test_query_param_y(Split)
+        self._test_init_param_random_state(Split)
+        self._test_query_param_sample_weight(Split)
+        self._test_query_param_return_utilities(Split)
 
     def _test_init_param_budget_manager(self, query_strategy_name):
         # budget_manager must be defined as an object of an budget manager
         # class
         query_strategy = query_strategy_name(budget_manager=[])
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+
+    def _test_init_param_random_state(self, query_strategy_name):
+        query_strategy = query_strategy_name(random_state="string",)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def _test_query_param_X_cand(self, query_strategy_name):
         # X_cand must be defined as a two dimensinal array
@@ -176,4 +189,58 @@ class TestUncertainty(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=self.y[1:],
+        )
+
+    def _test_query_param_sample_weight(self, query_strategy_name):
+        # sample weight needs to be a list that can be convertet to float
+        # equal in size of y
+        query_strategy = query_strategy_name()
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            sample_weight="string",
+        )
+        self.assertRaises(
+            ValueError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            sample_weight=["string", "numbers", "test"],
+        )
+        self.assertRaises(
+            ValueError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            sample_weight=[1],
+        )
+
+    def _test_query_param_return_utilities(self, query_strategy_name):
+        # return_utilities needs to be a boolean
+        query_strategy = query_strategy_name()
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            return_utilities="string",
+        )
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            return_utilities=1,
         )

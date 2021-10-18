@@ -72,8 +72,18 @@ class EstimatedBudget(BudgetManager):
         return self
 
     def _validate_data(self, utilities):
-        """
-        TODO: documentation
+        """Validate input data.
+
+        Parameters
+        ----------
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
+
+        Returns
+        -------
+        utilities : ndarray of shape (n_samples,)
+            Checked utilities.
         """
         utilities = super()._validate_data(utilities)
 

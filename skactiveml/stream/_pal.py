@@ -20,8 +20,6 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
 
     Parameters
     ----------
-    clf : BaseEstimator
-        The classifier which is trained using this query startegy.
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. The budget attribute set for
@@ -58,8 +56,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         self,
         X_cand,
         clf,
-        X,
-        y,
+        X=None,
+        y=None,
         sample_weight=None,
         return_utilities=False,
         **kwargs
@@ -76,9 +74,11 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        X : array-like of shape (n_samples, n_features)
+        clf : BaseEstimator
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), optional (default=None)
             Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.

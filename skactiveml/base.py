@@ -213,7 +213,7 @@ class BudgetManager(ABC, BaseEstimator):
             True, if there is a utility which leads to sampling another
             instance.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def query(
@@ -239,7 +239,7 @@ class BudgetManager(ABC, BaseEstimator):
             The indices of instances represented by utilities which should be
             queried, with 0 <= n_queried_instances <= n_samples.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def update(self, queried, **kwargs):
@@ -255,7 +255,7 @@ class BudgetManager(ABC, BaseEstimator):
         self : BudgetManager
             The BudgetManager returns itself, after it is updated.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def _validate_budget(self, default=None):
         """check the assigned budget and set a default value, when none is set
@@ -364,7 +364,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
     def update(self, X_cand, queried, *args, **kwargs):
@@ -390,7 +390,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self : StreamBasedQueryStrategy
             The StreamBasedQueryStrategy returns itself, after it is updated.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of

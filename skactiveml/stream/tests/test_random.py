@@ -30,6 +30,10 @@ class TestRandom(unittest.TestCase):
     def test_periodic_sampler(self):
         # init param test
         self._test_init_param_budget_manager(PeriodicSampler)
+        self._test_init_param_random_state(PeriodicSampler)
+
+        # query param test
+        self._test_query_param_return_utilities(PeriodicSampler)
 
         # update test
         self._test_update_without_query(PeriodicSampler)
@@ -37,6 +41,10 @@ class TestRandom(unittest.TestCase):
     def test_random_sampler(self):
         # init param test
         self._test_init_param_budget_manager(RandomSampler)
+        self._test_init_param_random_state(RandomSampler)
+
+        # query param test
+        self._test_query_param_return_utilities(RandomSampler)
 
         # update test
         self._test_update_without_query(RandomSampler)
@@ -46,6 +54,32 @@ class TestRandom(unittest.TestCase):
         # class
         query_strategy = query_strategy_name(budget_manager=[])
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+
+    def _test_init_param_random_state(self, query_strategy_name):
+        query_strategy = query_strategy_name(random_state="string",)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+
+    def _test_query_param_return_utilities(self, query_strategy_name):
+        # return_utilities needs to be a boolean
+        query_strategy = query_strategy_name()
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            return_utilities="string",
+        )
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y[1:],
+            return_utilities=1,
+        )
 
     def _test_update_without_query(self, query_strategy_name):
         qs = query_strategy_name()
