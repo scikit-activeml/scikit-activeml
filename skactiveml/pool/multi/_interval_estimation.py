@@ -194,8 +194,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         self.epsilon = epsilon
         self.alpha = alpha
 
-    def query(self, X_cand, clf, X=None, y=None, A_cand=None, sample_weight=None,
-              batch_size='adaptive', return_utilities=False):
+    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
+              A_cand=None, batch_size='adaptive', return_utilities=False):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
