@@ -51,7 +51,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         self.y_aggregate = y_aggregate
 
     def query(self, X_cand, query_params_dict=None, A_cand=None, batch_size=1,
-              pref_annotators_per_sample=1, A_pref=None,
+              pref_annotators_per_sample=1, A_perf=None,
               return_utilities=False):
 
         """Determines which candidate sample is to be annotated by which
@@ -80,18 +80,18 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         batch_size : 'adaptive'|int, optional (default=1)
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is set to 1.
-        A_pref : array-like, shape (n_samples, n_annotators) or
+        A_perf : array-like, shape (n_samples, n_annotators) or
                   (n_annotators,) optional (default=None)
             The preferred ranking of each annotator.
-            1.) If `A_pref` is of shape (n_samples, n_annotators) for each
+            1.) If `A_perf` is of shape (n_samples, n_annotators) for each
              sample `i` the value-annotators pair `(i, j)` is preferably picked
-             over the pair `(i, k)` if `A_pref[i, j]` is greater or
-             equal to `A_pref[i, k]`.
-            2.) If `A_pref` is of shape (n_annotators,) for each sample
+             over the pair `(i, k)` if `A_perf[i, j]` is greater or
+             equal to `A_perf[i, k]`.
+            2.) If `A_perf` is of shape (n_annotators,) for each sample
             `i` the value-annotators pair `(i, j)` is preferentially picked
-             over the pair `(i, k)` if `A_pref[j]` is greater or
-             equal to `A_pref[k]`.
-            3.) If `A_pref` is None, the annotators are chosen at random, with
+             over the pair `(i, k)` if `A_perf[j]` is greater or
+             equal to `A_perf[k]`.
+            3.) If `A_perf` is None, the annotators are chosen at random, with
              a different distribution for each sample.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
@@ -202,35 +202,35 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             raise TypeError("pref_annotators_per_sample must be array like "
                             "or an integer")
 
-        # check A_pref and set annotator_utilities
-        if A_pref is None:
+        # check A_perf and set annotator_utilities
+        if A_perf is None:
             annotator_utilities = random_state.rand(1, n_samples, n_annotators)\
                 .repeat(batch_size_sq, axis=0)
-        elif sklearn.utils.validation._is_arraylike(A_pref):
-            A_pref = check_array(A_pref, ensure_2d=False)
-            # ensure A_pref lies in [0, 1)
-            if A_pref.min() != A_pref.max():
-                A_pref = 1/(A_pref.max()-A_pref.min()+1)\
-                          *(A_pref - A_pref.min())
+        elif sklearn.utils.validation._is_arraylike(A_perf):
+            A_perf = check_array(A_perf, ensure_2d=False)
+            # ensure A_perf lies in [0, 1)
+            if A_perf.min() != A_perf.max():
+                A_perf = 1 / (A_perf.max() - A_perf.min() + 1) \
+                         * (A_perf - A_perf.min())
             else:
-                A_pref = np.zeros_like(A_pref, dtype=float)
+                A_perf = np.zeros_like(A_perf, dtype=float)
 
-            if A_pref.shape == (n_samples, n_annotators):
-                annotator_utilities = A_pref[np.newaxis, :, :]\
+            if A_perf.shape == (n_samples, n_annotators):
+                annotator_utilities = A_perf[np.newaxis, :, :]\
                     .repeat(batch_size_sq, axis=0)
-            elif A_pref.shape == (n_annotators,):
-                annotator_utilities = A_pref[np.newaxis, np.newaxis, :]\
+            elif A_perf.shape == (n_annotators,):
+                annotator_utilities = A_perf[np.newaxis, np.newaxis, :]\
                     .repeat(n_samples, axis=1)\
                     .repeat(batch_size_sq, axis=0)
             else:
                 raise ValueError(
-                    f"`A_pref` is of shape {A_pref.shape}, but must be of "
+                    f"`A_perf` is of shape {A_perf.shape}, but must be of "
                     f"shape ({n_samples}, {n_annotators}) or of shape "
                     f"({n_annotators},)."
                 )
         else:
             raise TypeError(
-                f"`A_pref` is of type {type(A_pref)}, but must be array like "
+                f"`A_perf` is of type {type(A_perf)}, but must be array like "
                 f"or of type None."
             )
 

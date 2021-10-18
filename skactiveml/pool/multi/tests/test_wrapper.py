@@ -313,7 +313,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         re_val = wrapper.query(X_cand=X_cand, batch_size=6,
                                pref_annotators_per_sample=3,
-                               A_pref=A_pref,
+                               A_perf=A_pref,
                                return_utilities=True)
 
         best_cand_indices, utilities = re_val
@@ -337,7 +337,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         re_val = wrapper.query(X_cand=X_cand, batch_size=6,
                                pref_annotators_per_sample=3,
-                               A_pref=A_pref,
+                               A_perf=A_pref,
                                return_utilities=True)
 
         best_cand_indices, utilities = re_val
