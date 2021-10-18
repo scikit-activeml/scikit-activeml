@@ -7,6 +7,7 @@ from os import path
 import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import NotFittedError
 
@@ -25,7 +26,7 @@ class TestClassifier(unittest.TestCase):
         # Create data set for testing.
         self.X, self.y_true = make_blobs(random_state=0)
         self.X = StandardScaler().fit_transform(self.X)
-        self.y = np.repeat(self.y_true.reshape(-1, 1), 2, axis=1)
+        self.y = np.repeat(self.y_true.reshape(-1, 1), 3, axis=1)
         self.y = self.y.astype('object')
         self.classes = np.unique(self.y_true)
         self.missing_label = None
@@ -36,9 +37,14 @@ class TestClassifier(unittest.TestCase):
         # Set up estimators for Sklearn wrapper and multi-annot classifier.
         self.estimator = GaussianNB()
         cmm = classifier.CMM(missing_label=self.missing_label, random_state=0)
-        gnb = classifier.SklearnClassifier(GaussianNB(),
-                                           missing_label=self.missing_label)
-        self.estimators = [('CMM', cmm), ('GaussianNB', gnb)]
+        gnb = classifier.SklearnClassifier(
+            GaussianNB(), missing_label=self.missing_label
+        )
+        mlp = classifier.SklearnClassifier(
+            MLPClassifier(), missing_label=self.missing_label
+        )
+        self.estimators = [('CMM', cmm), ('GaussianNB', gnb),
+                           ('MLP', mlp)]
 
     def test_classifiers(self):
         # Test predictions of classifiers.

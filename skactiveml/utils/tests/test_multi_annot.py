@@ -1,5 +1,6 @@
-import numpy as np
 import unittest
+
+import numpy as np
 
 from skactiveml.utils import ext_confusion_matrix
 
@@ -27,7 +28,8 @@ class TestMultiAnnot(unittest.TestCase):
                                              missing_label=None,
                                              normalize='true')
         np.testing.assert_array_equal(np.eye(3), conf_matrices[0])
-        np.testing.assert_array_equal(np.ones((3, 3)) * 1/3, conf_matrices[1])
+        np.testing.assert_array_equal(np.ones((3, 3)) * 1 / 3,
+                                      conf_matrices[1])
         conf_matrices = ext_confusion_matrix(y_true=y_true, y_pred=y_pred,
                                              missing_label=None,
                                              normalize='all')
@@ -39,7 +41,3 @@ class TestMultiAnnot(unittest.TestCase):
         np.testing.assert_array_equal(np.eye(3), conf_matrices[0])
         np.testing.assert_array_equal(np.ones((3, 3)) * 1 / 3,
                                       conf_matrices[1])
-
-
-if __name__ == '__main__':
-    unittest.main()

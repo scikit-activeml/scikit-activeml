@@ -1,22 +1,17 @@
 """
-query by committee strategies
+Query-by-committee strategies.
 """
-
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
+#         Marek Herde <marek.herde@uni-kassel.de>
+
+from copy import deepcopy
 
 import numpy as np
-import warnings
-import inspect
-
-from sklearn import clone
+from sklearn.utils.validation import check_array, _is_arraylike
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
-
-from sklearn.ensemble import BaggingClassifier, BaseEnsemble
-from sklearn.utils import check_array
-
-from ..classifier import SklearnClassifier
-from ..utils import simple_batch, check_classes, ExtLabelEncoder
+from ..utils import simple_batch, fit_if_not_fitted, check_type, \
+    compute_vote_vectors
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
@@ -28,33 +23,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    clf : SkactivemlClassifier
-        If clf is an wrapped ensemble, it will used as committee. If clf is a
-        classifier, it will used for ensemble construction with the specified
-        ensemble or with BaggigngClassifier, if ensemble is None. clf must
-        implementing the methods 'fit', 'predict'(for vote entropy) and
-        'predict_proba'(for KL divergence).
-    ensemble : BaseEnsemble, default=None
-        sklearn.ensemble used to construct the committee. If None,
-        baggingClassifier is used.
-    method : string, default='KL_divergence'
+    method : {'KL_divergence', 'vote_entropy'}, optional
+    (default='KL_divergence')
         The method to calculate the disagreement.
-        'vote_entropy' or 'KL_divergence' are possible.
-    random_state : numeric | np.random.RandomState
-        Random state to use.
-    ensemble_dict : dictionary
-        Will be passed on to the ensemble.
-
-    Attributes
-    ----------
-    ensemble : sklearn.ensemble
-        Ensemble used as committee. Implementing the methods 'fit',
-        'predict'(for vote entropy) and 'predict_proba'(for KL divergence).
-    method : string, default='KL_divergence'
-        The method to calculate the disagreement. 'vote_entropy' or
-        'KL_divergence' are possible.
-    random_state : numeric | np.random.RandomState
-        Random state to use.
+    random_state: numeric | np.random.RandomState, optional (default=None)
+        Random state for annotator selection.
 
     References
     ----------
@@ -66,123 +39,99 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         Learning (ICML), pages 1-9. Morgan Kaufmann, 1998.
     """
 
-    def __init__(self, clf, ensemble=None, method='KL_divergence',
-                 random_state=None, ensemble_dict=None):
-
+    def __init__(self, method='KL_divergence', random_state=None):
         super().__init__(random_state=random_state)
-
         self.method = method
-        self.ensemble = ensemble
-        self.clf = clf
-        self.ensemble_dict = ensemble_dict
 
-
-    def query(self, X_cand, X, y, sample_weight=None,  batch_size=1,
-              return_utilities=False):
-        """
-        Queries the next instance to be labeled.
+    def query(self, X_cand, ensemble, X=None, y=None, sample_weight=None,
+              batch_size=1, return_utilities=False):
+        """Queries the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand : array-like
-            The unlabeled pool from which to choose.
-        X : array-like
-            The labeled pool used to fit the classifier.
-        y : array-like
-            The labels of the labeled pool X.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights.
+        X_cand : array-like, shape (n_candidate_samples, n_features)
+            Candidate samples from which the strategy can select.
+        ensemble : {skactiveml.base.SkactivemlClassifier, array-like}
+            If `ensemble` is a `SkactivemlClassifier`, it must have
+            `n_estimators` and `estimators_` after fitting as attribute. Then,
+            its estimators will be used as committee. If `ensemble` is
+            array-like, each element of this list must be
+            `SkactivemlClassifier` and will be used as committee member.
+        X: array-like, shape (n_samples, n_features), optional (default=None)
+            Complete training data set.
+        y: array-like, shape (n_samples), optional (default=None)
+            Labels of the training data set.
+        sample_weight: array-like, shape (n_samples), optional
+        (default=None)
+            Weights of training samples in `X`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool (default=False)
-            If True, the utilities are returned.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        best_indices : np.ndarray, shape (batch_size)
-            The index of the queried instance.
-        batch_utilities : np.ndarray,  shape (batch_size, len(X_cnad))
-            The utilities of all instances of
-            X_cand(if return_utilities=True).
+        query_indices : numpy.ndarray, shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+        utilities : numpy.ndarray, shape (batch_size, n_samples)
+            The utilities of all candidate samples after each selected
+            sample of the batch, e.g., `utilities[0]` indicates the utilities
+            used for selecting the first sample (with index `query_indices[0]`)
+            of the batch.
         """
-        self._clf = clone(self.clf)
-
-        if self.ensemble_dict is None:
-            ensemble_dict = dict()
-        else:
-            ensemble_dict = self.ensemble_dict
-
         # Validate input parameters.
         X_cand, return_utilities, batch_size, random_state = \
             self._validate_data(X_cand, return_utilities, batch_size,
                                 self.random_state, reset=True)
 
-        # Check if the attribute clf is valid
-        if not isinstance(self._clf, SkactivemlClassifier):
-            raise TypeError('clf has to be from type SkactivemlClassifier. The '
-                            'given type is {}. Use the wrapper in '
-                            'skactiveml.classifier to use a sklearn '
-                            'classifier/ensemble.'.format(type(self.clf)))
-
-        # Extract classes from clf
-        label_encoder = ExtLabelEncoder(missing_label=self._clf.missing_label,
-                                        classes=self.clf.classes).fit(y)
-        classes = label_encoder.classes_
-
-        # Check self.clf and self.method
-        if not isinstance(self.method, str):
-            raise TypeError("{} is an invalid type for the attribute "
-                            "'self.method'.".format(type(self.method)))
+        # Check attributed `method`.
         if self.method not in ['KL_divergence', 'vote_entropy']:
             raise ValueError(
-                "The given method {} is not valid. Supported methods are "
-                "'KL_divergence' and 'vote_entropy'".format(self.method))
+                f"The given method {self.method} is not valid. "
+                f"Supported methods are 'KL_divergence' and 'vote_entropy'")
 
-        if self.method == 'KL_divergence' and \
-                getattr(self._clf, 'predict_proba', None) is None:
-            raise TypeError(
-                "'clf' must implement the method 'predict_proba'")
-
-        # Build ensemble if necessary.
-        if not isinstance(self._clf, SklearnClassifier) or \
-                not isinstance(self._clf.estimator, BaseEnsemble):
-            # Validate 'ensemble'.
-            if self.ensemble is None:
-                warnings.warn('\'ensemble\' is not specified, '
-                              '\'BaggingClassifier\' will be used.')
-                ensemble = BaggingClassifier
-            elif not callable(self.ensemble):
-                raise TypeError("{} is not valid for the attribute "
-                                "'self.ensemble'.".format(self.ensemble))
-            elif not isinstance(self.ensemble(), BaseEnsemble):
-                raise TypeError("{} is an invalid type for the attribute "
-                                "'self.ensemble'.".format(type(self.ensemble)))
+        # Check if the parameter `ensemble` is valid.
+        if isinstance(ensemble, SkactivemlClassifier) and \
+                hasattr(ensemble, 'n_estimators'):
+            ensemble = fit_if_not_fitted(
+                ensemble, X, y, sample_weight=sample_weight
+            )
+            classes = ensemble.classes_
+            if hasattr(ensemble, 'estimators_'):
+                est_arr = ensemble.estimators_
             else:
-                ensemble = self.ensemble
-            # Build ensemble.
-            parameters = inspect.signature(ensemble.__init__).parameters
-            if not isinstance(ensemble_dict, dict):
-                raise TypeError("ensemble_dict is not a dictionary.")
-            if 'base_estimator' in parameters:
-                ensemble_dict['base_estimator'] = self._clf
-            self._clf = SklearnClassifier(
-                ensemble(**ensemble_dict, random_state=random_state),
-                classes=classes
+                est_arr = [ensemble] * ensemble.n_estimators
+        elif _is_arraylike(ensemble):
+            est_arr = deepcopy(ensemble)
+            for i in range(len(est_arr)):
+                check_type(est_arr[i], SkactivemlClassifier, f'ensemble[{i}]')
+                est_arr[i] = fit_if_not_fitted(
+                    est_arr[i], X, y, sample_weight=sample_weight
+                )
+                if i > 0:
+                    np.testing.assert_array_equal(
+                        est_arr[i - 1].classes_, est_arr[i].classes_,
+                        err_msg=f'The inferred classes of the {i - 1}-th and '
+                                f'{i}-th are not equal. Set the `classes` '
+                                f'parameter of each ensemble member to avoid '
+                                f'this error.'
+                    )
+            classes = est_arr[0].classes_
+        else:
+            raise TypeError(
+                f'`ensemble` must either be a `{SkactivemlClassifier} '
+                f'with the attribute `n_esembles` and `estimators_` after '
+                f'fitting or a list of {SkactivemlClassifier} objects.'
             )
 
-        # fit the classifier
-        self._clf.fit(X, y, sample_weight=sample_weight)
-
-        # choose the disagreement method and calculate the utilities
-        if hasattr(self._clf, 'estimators_') and self._clf.is_fitted_:
-            est_arr = self._clf.estimators_
-        else:
-            est_arr = [self._clf] * self._clf.n_estimators
+        # Compute utilities.
         if self.method == 'KL_divergence':
-            probas = [est.predict_proba(X_cand) for est in est_arr]
+            probas = np.array([est.predict_proba(X_cand) for est in est_arr])
             utilities = average_kl_divergence(probas)
         elif self.method == 'vote_entropy':
-            votes = [est.predict(X_cand) for est in est_arr]
+            votes = np.array([est.predict(X_cand) for est in est_arr]).T
             utilities = vote_entropy(votes, classes)
 
         return simple_batch(utilities, random_state,
@@ -191,40 +140,33 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
 
 def average_kl_divergence(probas):
-    """
-    Calculate the average Kullback-Leibler (KL) divergence for measuring the
-    level of disagreement in QBC.
+    """Calculates the average Kullback-Leibler (KL) divergence for measuring
+    the level of disagreement in QBC.
 
     Parameters
     ----------
-    probas : array-like, shape (n_estimators, n_X_cand, n_classes)
-        The probability estimations of all estimators, instances and classes.
+    probas : array-like, shape (n_estimators, n_samples, n_classes)
+        The probability estimates of all estimators, samples, and classes.
 
     Returns
     -------
-    scores: np.ndarray, shape (n_X_cand)
+    scores: np.ndarray, shape (n_samples)
         The Kullback-Leibler (KL) divergences.
 
     References
     ----------
     [1] A. McCallum and K. Nigam. Employing EM in pool-based active learning
-    for text classification. In Proceedings of the International Conference on
-    Machine Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
+        for text classification. In Proceedings of the International Conference
+        on Machine Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
     """
-
-    # validation:
-    # check P
-    probas = check_array(probas, accept_sparse=False,
-                         accept_large_sparse=True, dtype="numeric", order=None,
-                         copy=False, force_all_finite=True, ensure_2d=True,
-                         allow_nd=True, ensure_min_samples=1,
-                         ensure_min_features=1, estimator=None)
+    # Check probabilities.
+    probas = check_array(probas, allow_nd=True)
     if probas.ndim != 3:
-        raise ValueError("Expected 2D array, got 1D array instead:"
-                         "\narray={}.".format(probas))
+        raise ValueError(
+            f"Expected 3D array, got {probas.ndim}D array instead."
+        )
 
-    # calculate the average KL divergence:
-    probas = np.array(probas)
+    # Calculate the average KL divergence.
     probas_mean = np.mean(probas, axis=0)
     with np.errstate(divide='ignore', invalid='ignore'):
         scores = np.nansum(
@@ -235,52 +177,36 @@ def average_kl_divergence(probas):
 
 
 def vote_entropy(votes, classes):
-    """
-    Calculate the vote entropy for measuring the level of disagreement in QBC.
+    """Calculates the vote entropy for measuring the level of disagreement in
+    QBC.
 
     Parameters
     ----------
-    votes : array-like, shape (n_estimators, n_X_cand)
-        The class predicted by the estimators for each instance.
+    votes : array-like, shape (n_samples, n_estimators)
+        The class predicted by the estimators for each sample.
     classes : array-like, shape (n_classes)
         A list of all possible classes.
 
     Returns
     -------
-    vote_entropy : np.ndarray, shape (n_X_cand))
-        The vote entropy of each instance in X_cand.
+    vote_entropy : np.ndarray, shape (n_samples)
+        The vote entropy of each row in `votes`.
 
     References
     ----------
     [1] Engelson, Sean P., and Ido Dagan.
-    "Minimizing manual annotation cost in supervised training from corpora."
-    arXiv preprint cmp-lg/9606030 (1996).
+        Minimizing manual annotation cost in supervised training from corpora.
+        arXiv preprint cmp-lg/9606030 (1996).
     """
-    # check votes to be valid
-    votes = check_array(votes, accept_sparse=False,
-                        accept_large_sparse=True, dtype=None, order=None,
-                        copy=False, force_all_finite=True, ensure_2d=True,
-                        allow_nd=False, ensure_min_samples=1,
-                        ensure_min_features=1, estimator=None)
+    # Check `votes` array.
+    votes = check_array(votes)
 
-    # Check classes to be valid
-    check_classes(classes)
-    try:
-        for c in np.unique(votes.flatten()):
-            if c not in classes:
-                raise ValueError("The votes element '{}' "
-                                 "is not in classes.".format(c))
-    except TypeError:
-        raise TypeError("The type of classes and votes are not compatible.")
-    # count the votes
-    vote_count = np.zeros((votes.shape[1], len(classes)))
-    for i in range(votes.shape[1]):
-        for c_idx, c in enumerate(classes):
-            for m in range(len(votes)):
-                vote_count[i, c_idx] += (votes[m, i] == c)
+    # Count the votes.
+    vote_count = compute_vote_vectors(y=votes, classes=classes,
+                                      missing_label=None)
 
-    # compute vote entropy
+    # Compute vote entropy.
     v = vote_count / len(votes)
     with np.errstate(divide='ignore', invalid='ignore'):
-        scores = -np.nansum(v*np.log(v), axis=1) / np.log(len(votes))
+        scores = -np.nansum(v * np.log(v), axis=1) / np.log(len(votes))
     return scores
