@@ -3,8 +3,7 @@
     "class" : "FourDS",
     "method" : "4DS",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Uncertainty Sampling"
     },
     "tags" : ["pool"],
     "title" : "4DS",
@@ -18,6 +17,7 @@
     "init_params" : {},
     "query_params" : {
       "clf" : "clf"
-    }
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, bound=bound, ax=ax)"
   }
 ]

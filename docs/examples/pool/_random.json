@@ -3,8 +3,7 @@
     "class" : "RandomSampler",
     "method" : "Random Sampling",
     "categories" : {
-      "Settles2012" : "Random Sampling",
-      "kumar2020active" : "Random Sampling"
+      "Settles2012" : "Random Sampling"
     },
     "tags" : ["pool"],
     "title" : "Random Sampling",

@@ -1,56 +1,62 @@
 [
   {
     "class" : "ExpectedErrorReduction",
-    "method" : "emr",
+    "method" : "Expected Misclassification Risk",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Expected Error Reduction"
     },
     "tags" : ["pool"],
-    "title" : "ExpectedErrorReduction Example For Method 'emr'",
-    "refs" : ["settles2009active"],
+    "title" : "Expected Misclassification Risk",
+    "refs" : ["Joshi2009"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "bp_add_imports" : [],
-    "init_params" : {},
+    "init_params" : {
+      "method" : "'emr'"
+    },
     "query_params" : {
       "clf" : "clf"
-    }
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, bound=bound, ax=ax)"
   },
   {
     "class" : "ExpectedErrorReduction",
-    "method" : "csl",
+    "method" : "Cost-sensitive Expected Error Reduction",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Expected Error Reduction"
     },
     "tags" : ["pool"],
-    "title" : "ExpectedErrorReduction Example For Method 'csl'",
-    "refs" : [],
+    "title" : "Cost-sensitive Expected Error Reduction",
+    "refs" : ["Margineantu2005"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "bp_add_imports" : [],
-    "init_params" : {},
+    "init_params" : {
+      "method" : "'csl'"
+    },
     "query_params" : {
       "clf" : "clf"
-    }
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, bound=bound, ax=ax)"
   },
   {
     "class" : "ExpectedErrorReduction",
-    "method" : "log_loss",
+    "method" : "Log Loss Expected Error Reduction",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Expected Error Reduction"
     },
     "tags" : ["pool"],
-    "title" : "ExpectedErrorReduction Example For Method 'log_loss'",
-    "refs" : [],
+    "title" : "Log Loss Expected Error Reduction",
+    "refs" : ["RoyMacallum2001"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "bp_add_imports" : [],
-    "init_params" : {},
+    "init_params" : {
+      "method" : "'log_loss'"
+    },
     "query_params" : {
       "clf" : "clf"
-    }
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, bound=bound, ax=ax)"
   }
 ]

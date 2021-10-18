@@ -3,8 +3,7 @@
     "class" : "QBC",
     "method" : "KL_divergence",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Query-by-Committee"
     },
     "tags" : ["pool"],
     "title" : "QBC Example For Method 'KL_divergence'",
@@ -19,14 +18,14 @@
     },
     "query_params" : {
       "ensemble" : "clf"
-    }
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, bound=bound, ax=ax)"
   },
   {
     "class" : "QBC",
     "method" : "vote_entropy",
     "categories" : {
-      "Settles2012" : "",
-      "kumar2020active" : ""
+      "Settles2012" : "Query-by-Committee"
     },
     "tags" : ["pool"],
     "title" : "QBC Example For Method 'vote_entropy'",
@@ -41,6 +40,7 @@
     },
     "query_params" : {
       "ensemble" : "clf"
-    }
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, bound=bound, ax=ax)"
   }
 ]
