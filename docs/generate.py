@@ -5,6 +5,7 @@ from pybtex.database import parse_file
 
 import numpy as np
 
+import skactiveml
 from skactiveml import pool, classifier, utils, \
     visualization  # , stream TODO stream
 import warnings
@@ -25,18 +26,56 @@ def generate_api_reference_rst(gen_path):
     gen_path = os.path.join(os.path.basename(gen_path), 'api')
     os.makedirs(os.path.abspath(gen_path), exist_ok=True)
     with open(path, 'w') as file:
-        file.write('.. _sphx_glr_api_reference:\n')
+        file.write('.. _api_reference:\n')
         file.write('\n')
+        file.write('=============\n')
         file.write('API Reference\n')
         file.write('=============\n')
-        file.write('\n')
-        file.write('.. toctree::\n')
         file.write('\n')
         file.write('This is an overview of the API.\n')
         file.write('\n')
         file.write('.. module:: skactiveml\n')
         file.write('\n')
 
+        for package in skactiveml.__all__:
+            package = getattr(skactiveml, package)
+            if inspect.ismodule(package):
+                title = f':mod:`{package.__name__}`:'
+                file.write(title + '\n')
+                file.write(''.ljust(len(title), '=') + '\n')
+                file.write('\n')
+                file.write(f'.. automodule:: {package.__name__}\n')
+                file.write('    :no-members:\n')
+                file.write('    :no-inherited-members:\n')
+                file.write('\n')
+                file.write('Classes\n')
+                file.write('-------\n')
+                file.write('.. currentmodule:: skactiveml\n')
+                file.write('\n')
+                file.write('.. autosummary::\n')
+                file.write('   :nosignatures:\n')
+                file.write('   :toctree: api\n')
+                file.write('   :template: class.rst\n')
+                file.write('\n')
+                for item in package.__all__:
+                    if inspect.isclass(getattr(package, item)):
+                        file.write(f'   {package.__name__}.{item}\n')
+                file.write('\n')
+                file.write('Functions\n')
+                file.write('---------\n')
+                file.write('.. currentmodule:: skactiveml\n')
+                file.write('\n')
+                file.write('.. autosummary::\n')
+                file.write('   :nosignatures:\n')
+                file.write('   :toctree: api\n')
+                file.write('   :template: function.rst\n')
+                file.write('\n')
+                for item in package.__all__:
+                    if inspect.isfunction(getattr(package, item)):
+                        file.write(f'   {package.__name__}.{item}\n')
+                file.write('\n')
+
+        return
         file.write('Pool\n')
         file.write('----\n')
         file.write('\n')
@@ -261,6 +300,8 @@ def get_table_data(package, additional_data, rel_api_path):
     package_name = package.__name__.split('.')[1]
     # iterate over the query strategies in the package.
     for qs_name in sorted(package.__all__):
+        if not inspect.isclass(getattr(package, qs_name)):
+            continue
         strategy_text = \
             f':doc:`{qs_name} </{rel_api_path}/{package.__name__}.{qs_name}>`'
         if qs_name in additional_data.keys():

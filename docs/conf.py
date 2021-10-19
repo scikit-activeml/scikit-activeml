@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath('..'))
-from skactiveml import pool
+from skactiveml import pool, __version__
 
 # -- Project information -----------------------------------------------------
 
@@ -25,9 +25,9 @@ copyright = '2020'
 author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergard, Christoph Sandrock'
 
 # The short X.Y version
-version = '0.0.0'
+version = __version__
 # The full version, including alpha/beta/rc tags
-release = '0.0.0'
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -210,7 +210,8 @@ autodoc_default_options = {
     'members': True,
     'undoc-members': True,
     'show-inheritance': True,
-    'inherited-members': True
+    'inherited-members': True,
+    ':special-members:': False
 }
 
 generate_api_reference_rst(

@@ -1,3 +1,8 @@
+"""
+The :mod:`skactiveml.base` package implements the base classes for
+:mod:`skactiveml`.
+"""
+
 import warnings
 from abc import ABC, abstractmethod
 
