@@ -107,7 +107,7 @@ Json example file structure
 * The json file should contain a list with one entry for each example.
 * Each example entry it self is a dictionary with the following keys:
     * "class": The name of the class for which the example is intended. Multiple use is possible.
-    * "method" (optional): The name of the method for which the example is intended. Each method-class combination should only be used once.
+    * "method": The method for which the example is intended. Each method-class combination should only be used once.
     * "refs" (optional): A list of references to bibliographic entries in the 'refs.bib' file.
     * "title": The title of the example page.
     * "text": Every key that starts with 'text' will be formatted as a paragraph in the example.
