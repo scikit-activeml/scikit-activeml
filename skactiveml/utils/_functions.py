@@ -69,8 +69,7 @@ def simple_batch(utilities, random_state, batch_size=1, return_utilities=False):
                             force_all_finite='allow-nan', allow_nd=True)
     if batch_size == 'adaptive':
         batch_size = 1
-    check_scalar(batch_size, target_type=int, name='batch_size',
-                 min_val=1)
+    check_scalar(batch_size, target_type=int, name='batch_size', min_val=1)
     max_batch_size = np.sum(~np.isnan(utilities))
     if max_batch_size < batch_size:
         warnings.warn(

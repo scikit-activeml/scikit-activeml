@@ -62,8 +62,8 @@ class TestIEAnnotModel(unittest.TestCase):
 
     def test_predict_annot_perf_param_X(self):
         ie_model = IEAnnotModel().fit(self.y)
-        self.assertRaises(ValueError, ie_model.predict_annot_proba, X=None)
-        self.assertRaises(ValueError, ie_model.predict_annot_proba,
+        self.assertRaises(ValueError, ie_model.predict_annot_perf, X=None)
+        self.assertRaises(ValueError, ie_model.predict_annot_perf,
                           X=np.ones(2))
 
     def test_fit(self):
@@ -80,7 +80,7 @@ class TestIEAnnotModel(unittest.TestCase):
         for i, m in enumerate(['lower', 'mean', 'upper']):
             ie_model = IEAnnotModel(mode=m)
             ie_model.fit(self.y, sample_weight=self.sample_weight)
-            P_annot = ie_model.predict_annot_proba(X=np.ones((10, 2)))
+            P_annot = ie_model.predict_annot_perf(X=np.ones((10, 2)))
             np.testing.assert_array_equal(P_annot[0], ie_model.A_perf_[:, i])
             self.assertEqual(len(P_annot), 10)
 

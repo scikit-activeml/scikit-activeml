@@ -79,7 +79,7 @@ class TestClassifier(unittest.TestCase):
             P = clf_mdl.predict_proba(X=self.X)
             np.testing.assert_array_equal(P, np.ones((len(self.X), 3)) / 3)
             if hasattr(clf_mdl, 'predict_annot_proba'):
-                P = clf_mdl.predict_annot_proba(X=self.X)
+                P = clf_mdl.predict_annot_perf(X=self.X)
                 np.testing.assert_array_equal(P, np.ones((len(self.X), 1)) / 3)
 
         # Test classifier on data with only missing labels.
@@ -402,10 +402,10 @@ class TestClassifier(unittest.TestCase):
             missing_label=self.missing_label
         )
         clf_mdl.fit(X=self.X, y=self.y)
-        self.assertRaises(ValueError, clf_mdl.predict_annot_proba, X=[0, 0])
-        self.assertRaises(ValueError, clf_mdl.predict_annot_proba,
+        self.assertRaises(ValueError, clf_mdl.predict_annot_perf, X=[0, 0])
+        self.assertRaises(ValueError, clf_mdl.predict_annot_perf,
                           X=[[0], [0]])
-        self.assertRaises(ValueError, clf_mdl.predict_annot_proba,
+        self.assertRaises(ValueError, clf_mdl.predict_annot_perf,
                           X=[['x', 'y']])
 
 

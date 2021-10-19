@@ -139,7 +139,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     n_annotators : int,
-        Sets the number of annotators if no A_cand is None
+        Sets the number of annotators if `A_cand is None`.
     """
     def __init__(self, n_annotators=None, random_state=None):
         super().__init__(random_state=random_state)
@@ -571,7 +571,7 @@ class AnnotModelMixin(ABC):
     """
 
     @abstractmethod
-    def predict_annot_proba(self, X):
+    def predict_annot_perf(self, X):
         """Calculates the probability that an annotator provides the true label
         for a given sample.
 

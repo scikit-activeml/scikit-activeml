@@ -127,7 +127,7 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixin):
 
         return self
 
-    def predict_annot_proba(self, X):
+    def predict_annot_perf(self, X):
         """Calculates the probability that an annotator provides the true label
         for a given sample.
 
@@ -176,6 +176,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         selection.
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
+    n_annotators : int,
+        Sets the number of annotators if `A_cand is None`.
     random_state : None|int|numpy.random.RandomState, optional (default=None)
         The random state used for deciding on majority vote labels in case of
         ties.

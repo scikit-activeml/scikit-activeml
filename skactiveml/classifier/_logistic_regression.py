@@ -407,7 +407,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         P = softmax(X @ self.W_, axis=1)
         return P
 
-    def predict_annot_proba(self, X):
+    def predict_annot_perf(self, X):
         """Calculates the probability that an annotator provides the true label
         for a given sample. The true label is hereby provided by the
         classification model. The label provided by an annotator l is based
