@@ -177,7 +177,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
     n_annotators : int,
-        Sets the number of annotators if `A_cand is None`.
+        Sets the number of annotators if `A_cand is None`.r
     random_state : None|int|numpy.random.RandomState, optional (default=None)
         The random state used for deciding on majority vote labels in case of
         ties.
