@@ -572,7 +572,7 @@ class AnnotModelMixin(ABC):
 
     @abstractmethod
     def predict_annot_perf(self, X):
-        """Calculates the probability that an annotator provides the true label
+        """Calculates the performance of an annotator to provide the true label
         for a given sample.
 
         Parameters

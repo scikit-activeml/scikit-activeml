@@ -66,11 +66,13 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixin):
         self.mode = mode
         self.random_state = random_state
 
-    def fit(self, y, sample_weight=None):
+    def fit(self, X, y, sample_weight=None):
         """Fit annotator model for given samples.
 
         Parameters
         ----------
+        X : array-like, shape (n_samples, n_features)
+            Test samples.
         y : array-like, shape (n_samples, n_annotators)
             Class labels of annotators.
         sample_weight : array-like, shape (n_samples, n_annotators),

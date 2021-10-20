@@ -32,7 +32,6 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     is_unlabeled_y = np.isnan(y)
     y[is_unlabeled_y] = 0
     y = y.astype(int)
-    n_classes = len(np.unique(y)) if n_classes is None else n_classes
 
     if n_classes == 0:
         raise ValueError(

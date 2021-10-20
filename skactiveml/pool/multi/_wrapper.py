@@ -51,8 +51,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         self.y_aggregate = y_aggregate
 
     def query(self, X_cand, query_params_dict=None, A_cand=None, batch_size=1,
-              annotators_per_sample=1, A_perf=None,
-              return_utilities=False):
+              n_annotators_per_sample=1, A_perf=None, return_utilities=False):
 
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
@@ -95,22 +94,22 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
              a different distribution for each sample.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
-        annotators_per_sample : int, array-like, optional (default=1)
+        n_annotators_per_sample : int, array-like, optional (default=1)
         array-like, shape (k,), k <= n_samples
-            If `annotators_per_sample` is an int, the value indicates
+            If `n_annotators_per_sample` is an int, the value indicates
             the number of annotators that are preferably assigned to a candidate
             sample, selected by the query_strategy.
             `Preferably` in this case means depending on how many annotators
             can be assigned to a given candidate sample and how many
             annotator-sample pairs should be assigned considering the
             `batch_size`.
-            If `annotators_per_sample` is an int array, the values of the
+            If `n_annotators_per_sample` is an int array, the values of the
             array are interpreted as follows. The value at the i-th index
             determines the preferred number of annotators for the candidate
             sample at the i-th index in the ranking of the batch.
             The ranking of the batch is given by the `strategy`
             (SingleAnnotPoolBasedQueryStrategy). The last index
-            of the annotators_per_sample array (k-1) indicates the
+            of the n_annotators_per_sample array (k-1) indicates the
             preferred number of annotators for all candidate sample at an index
             greater of equal to k-1.
 
@@ -177,20 +176,20 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         X_cand_sq = X_cand[a_indices]
         batch_size_sq = min(batch_size, X_cand_sq.shape[0])
 
-        # check annotators_per_sample and set pref_n_annotators
-        if isinstance(annotators_per_sample, (int, np.int_)):
-            check_scalar(annotators_per_sample,
-                         name='annotators_per_sample',
+        # check n_annotators_per_sample and set pref_n_annotators
+        if isinstance(n_annotators_per_sample, (int, np.int_)):
+            check_scalar(n_annotators_per_sample,
+                         name='n_annotators_per_sample',
                          target_type=int, min_val=1)
-            pref_n_annotators = annotators_per_sample * \
+            pref_n_annotators = n_annotators_per_sample * \
                                 np.ones(batch_size_sq)
-        elif sklearn.utils.validation._is_arraylike(annotators_per_sample):
-            pref_n_annotators = check_array(annotators_per_sample,
+        elif sklearn.utils.validation._is_arraylike(n_annotators_per_sample):
+            pref_n_annotators = check_array(n_annotators_per_sample,
                                             ensure_2d=False)
 
             if pref_n_annotators.ndim != 1:
                 raise ValueError(
-                    "annotators_per_sample, if an array, must be of dim "
+                    "n_annotators_per_sample, if an array, must be of dim "
                     f"1 but, it is of dim {pref_n_annotators.ndim}"
                 )
             else:
@@ -204,7 +203,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
                     pref_n_annotators = np.append(pref_n_annotators, appended)
         else:
-            raise TypeError("annotators_per_sample must be array like "
+            raise TypeError("n_annotators_per_sample must be array like "
                             "or an integer")
 
         # check A_perf and set annotator_utilities

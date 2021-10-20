@@ -26,15 +26,15 @@ class TestFunctions(unittest.TestCase):
                                         return_utilities=True)
         np.testing.assert_array_equal(indices, expected_indices)
         np.testing.assert_array_equal(batches, expected_batches)
-        indices = simple_batch(utils, random_state=42,
-                               batch_size='adaptive',
-                               return_utilities=False)
-        np.testing.assert_array_equal(indices, expected_indices[:1])
 
         indices, batches = simple_batch(utils, random_state=42, batch_size=3,
                                         return_utilities=True)
         np.testing.assert_array_equal(indices[0:3], expected_indices[0:3])
         np.testing.assert_array_equal(batches[0:3], expected_batches[0:3])
+        indices, batches = simple_batch([[np.nan, np.nan], [np.nan, np.nan]], random_state=42, batch_size=1,
+                                        return_utilities=True)
+        np.testing.assert_equal((0, 2), indices.shape)
+        np.testing.assert_array_equal((0, 2, 2), batches.shape)
 
     def test_call_func(self):
         def dummy_function(a, b=2, c=3):
