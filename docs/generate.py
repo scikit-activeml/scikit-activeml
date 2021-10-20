@@ -264,7 +264,7 @@ def table_from_array(a, title='', caption='', widths=None, header_rows=0,
 
 
 def get_table_data(package, additional_data, rel_api_path):
-    """Creates a np.array holding the data for the strategy overview.
+    """Creates a np.ndarray holding the data for the strategy overview.
 
     Parameters
     ----------
@@ -279,6 +279,9 @@ def get_table_data(package, additional_data, rel_api_path):
         'strategy_2' : [...],
         ...
         }
+
+        ['example_1']
+
     rel_api_path : string
         The relative path of the directory in which the api reference rst files
         are saved.
@@ -298,7 +301,6 @@ def get_table_data(package, additional_data, rel_api_path):
             for tab in method[2].keys():
                 tabs[tab] = {}
 
-    temp = np.empty((0, 3))
     package_name = package.__name__.split('.')[1]
     # iterate over the query strategies in the package.
     for qs_name in sorted(package.__all__):
@@ -319,9 +321,7 @@ def get_table_data(package, additional_data, rel_api_path):
                 for ref in refs:
                     ref_text += f':footcite:t:`{ref}`, '
                 ref_text = ref_text[0:-2]
-                temp = np.append(temp,
-                                 [[methods_text, strategy_text, ref_text]],
-                                 axis=0)
+
                 for tab, cats in tabs.items():
                     if tab in additional_data[qs_name][m][2].keys():
                         cat = additional_data[qs_name][m][2][tab]
@@ -334,16 +334,7 @@ def get_table_data(package, additional_data, rel_api_path):
                     tabs[tab][cat] = np.append(tabs[tab][cat], [
                         [methods_text, strategy_text, ref_text]], axis=0)
         else:
-            # it exists no example for qs_name
-            methods_text = 'default'
-            ref_text = ''
-            temp = np.append(temp, [[methods_text, strategy_text, ref_text]],
-                             axis=0)
-            for tab, cats in tabs.items():
-                if 'Others' not in cats.keys():
-                    tabs[tab]['Others'] = np.array([head_line])
-                tabs[tab]['Others'] = np.append(cats['Others'], [
-                    [methods_text, strategy_text, ref_text]], axis=0)
+            raise NotImplementedError('no json example')
 
     return tabs
 
@@ -402,10 +393,7 @@ def generate_examples(gen_path, package, json_path):
                 plot_filename = 'plot_' + data["class"]
                 # add the data to the 'examples_data' variable
                 # needed to create the strategy overview
-                if "method" in data.keys():
-                    method = data['method']
-                else:
-                    method = 'default'
+                method = data['method']
                 plot_filename += "_" + method.replace(' ', '_')
 
                 if not data['class'] in additional_data.keys():
