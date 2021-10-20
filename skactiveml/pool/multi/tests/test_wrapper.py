@@ -54,8 +54,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                           query_params_dict=query_params_dict,
                           A_cand=self.A_cand, return_utilities=True)
 
-        def dummy_function(x, y):
-            return majority_vote(x)
+        dummy_function = lambda x, y: majority_vote(x)
 
         random = RandomSampler(self.random_state)
         wrapper = MultiAnnotWrapper(random, y_aggregate=dummy_function,
@@ -166,7 +165,8 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         query_params_dict = {'X': X, 'y': y, 'clf': clf}
         re_val = wrapper.query(self.X_cand, query_params_dict,
-                               A_cand=self.A_cand, return_utilities=True)
+                               A_cand=self.A_cand, return_utilities=True,
+                               batch_size='adaptive')
 
         best_cand_indices, utilities = re_val
         self.assertEqual((1, 2), best_cand_indices.shape)
