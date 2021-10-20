@@ -143,9 +143,12 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     ----------
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
+    n_annotators : int,
+        Sets the number of annotators if `A_cand is None`.
     """
-    def __init__(self, random_state=None):
+    def __init__(self, n_annotators=None, random_state=None):
         super().__init__(random_state=random_state)
+        self.n_annotators = n_annotators
 
     @abstractmethod
     def query(self, X_cand, *args, A_cand=None, batch_size=1,
@@ -157,7 +160,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         ----------
         X_cand : array-like, shape (n_samples, n_features)
             Candidate samples from which the strategy can select.
-        A_cand : array-like, shape (n_samples, n_features), optional
+        A_cand : array-like, shape (n_samples, n_annotators), optional
         (default=None)
             Boolean matrix where `A_cand[i,j] = True` indicates that
             annotator `j` can be selected for annotating sample `X_cand[i]`,
@@ -183,6 +186,109 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             the first sample-annotator pair (with indices `query_indices[0]`).
         """
         raise NotImplementedError
+
+
+    def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
+                       random_state, reset=True, adaptive=False,
+                       **check_X_cand_params):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like, shape (n_candidates, n_features)
+            Candidate samples.
+        A_cand : array-like, shape (n_candidates, n_annotators), optional
+        (default=None)
+            Boolean matrix where `A_cand[i,j] = True` indicates that
+            annotator `j` can be selected for annotating sample `X_cand[i]`,
+            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
+            selected for annotating sample `X_cand[i]`. If A_cand=None, each
+            annotator is assumed to be available for labeling each sample.
+        batch_size : 'adaptive'|int,
+            The number of samples to be selected in one AL cycle. If 'adaptive'
+            is set, the `batch_size` is determined by the query strategy or set
+            to 1 by default.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric | np.random.RandomState, optional
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        adaptive : bool, default=False
+            Whether the query strategy implements an adaptive batch size or not.
+            If False and batch_size is set to adaptive, the batch_size will be
+            set to one.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        A_cand: np.ndarray, shape (n_candidates, n_annotators)
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check annotator instances.
+        if A_cand is None:
+            if self.n_annotators is None:
+                raise TypeError(
+                    "The number of annotators can not be determined. "
+                    "Pass n_annotators in the Initialization or pass "
+                    "A_cand as the annotators matrix."
+                )
+            else:
+                check_scalar(x=self.n_annotators, target_type=int,
+                             name='n_annotators', min_val=1)
+                A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
+        else:
+            A_cand = check_array(A_cand, dtype=bool)
+
+        check_consistent_length(X_cand, A_cand)
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, 'return_utilities', bool)
+
+        # Check batch size.
+        if isinstance(batch_size, str):
+            if batch_size != 'adaptive':
+                raise ValueError('If `batch_size` is a string, it '
+                                 'must be set to `adaptive`.')
+            elif not adaptive:
+                batch_size = 1
+        elif isinstance(batch_size, int):
+            check_scalar(batch_size, target_type=int, name='batch_size',
+                         min_val=1)
+
+            n_queries = np.sum(A_cand)
+            if n_queries < batch_size:
+                warnings.warn(
+                    "'batch_size={}' is larger than number of candidate queries "
+                    "in 'A_cand'. Instead, 'batch_size={}' was set."
+                        .format(batch_size, n_queries))
+                batch_size = int(n_queries)
+        else:
+            raise TypeError('`batch_size` must be either a string or an '
+                            'integer.')
+
+        # Check random state.
+        random_state = check_random_state(random_state=self.random_state,
+                                          seed_multiplier=len(X_cand))
+
+        return X_cand, A_cand, return_utilities, batch_size, random_state
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
@@ -348,7 +454,8 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         # Check classes.
         if sample_weight is not None:
-            sample_weight = np.array(sample_weight)
+            sample_weight = check_array(sample_weight, ensure_2d=False,
+                                        force_all_finite=False)
             if not np.array_equal(y.shape, sample_weight.shape):
                 raise ValueError(
                     f'`y` has the shape {y.shape} and `sample_weight` has the '
@@ -469,8 +576,8 @@ class AnnotModelMixin(ABC):
     """
 
     @abstractmethod
-    def predict_annot_proba(self, X):
-        """Calculates the probability that an annotator provides the true label
+    def predict_annot_perf(self, X):
+        """Calculates the performance of an annotator to provide the true label
         for a given sample.
 
         Parameters

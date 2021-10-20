@@ -75,5 +75,5 @@ class AnnotModelMixinTest(unittest.TestCase):
         self.clf = AnnotModelMixin()
 
     def test_predict_annot_proba(self):
-        self.assertRaises(NotImplementedError, self.clf.predict_annot_proba,
+        self.assertRaises(NotImplementedError, self.clf.predict_annot_perf,
                           X=None)
