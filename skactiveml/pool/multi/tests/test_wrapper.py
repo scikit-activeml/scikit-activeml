@@ -121,18 +121,18 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=None)
 
-    def test_query_param_annotators_per_sample(self):
+    def test_query_param_n_annotators_per_sample(self):
         random = RandomSampler(self.random_state)
         wrapper = MultiAnnotWrapper(random, self.random_state)
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
-                          annotators_per_sample=None)
-        annotators_per_sample = np.array([[0, 1], [0, 2]])
+                          n_annotators_per_sample=None)
+        n_annotators_per_sample = np.array([[0, 1], [0, 2]])
         self.assertRaises(ValueError, wrapper.query, self.X_cand,
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
-                          annotators_per_sample=annotators_per_sample)
+                          n_annotators_per_sample=n_annotators_per_sample)
 
     def test_query_param_A_perf(self):
         random = RandomSampler(self.random_state)
@@ -211,13 +211,13 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertEqual((5, 5, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
 
-    def test_query_three_annotators_per_sample_batch_size_five(self):
+    def test_query_three_n_annotators_per_sample_batch_size_five(self):
         random = RandomSampler(self.random_state)
 
         wrapper = MultiAnnotWrapper(random, self.random_state)
 
         re_val = wrapper.query(self.X_cand, A_cand=self.A_cand, batch_size=5,
-                               annotators_per_sample=3,
+                               n_annotators_per_sample=3,
                                return_utilities=True)
         best_cand_indices, utilities = re_val
         self.assertEqual((5, 2), best_cand_indices.shape)
@@ -225,7 +225,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
         self.check_availability(best_cand_indices, self.A_cand)
 
-    def test_query_three_annotators_per_sample_batch_size_five_mismatch(self):
+    def test_query_three_n_annotators_per_sample_batch_size_five_mismatch(self):
         random = RandomSampler(self.random_state)
 
         X_cand = np.array([[7, 1], [9, 1]])
@@ -236,7 +236,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         wrapper = MultiAnnotWrapper(random, self.random_state)
 
         re_val = wrapper.query(X_cand, A_cand=A_cand, batch_size=5,
-                               annotators_per_sample=3,
+                               n_annotators_per_sample=3,
                                return_utilities=True)
         best_cand_indices, utilities = re_val
         self.assertEqual((5, 2), best_cand_indices.shape)
@@ -244,7 +244,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
         self.check_availability(best_cand_indices, A_cand)
 
-    def test_query_varying_annotators_per_sample_batch_size_five(self):
+    def test_query_varying_n_annotators_per_sample_batch_size_five(self):
         random = RandomSampler(self.random_state)
 
         wrapper = MultiAnnotWrapper(random, n_annotators=3,
@@ -253,7 +253,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         pref = np.array([3, 2])
 
         re_val = wrapper.query(self.X_cand, A_cand=None,
-                               batch_size=5, annotators_per_sample=pref,
+                               batch_size=5, n_annotators_per_sample=pref,
                                return_utilities=True)
         best_cand_indices, utilities = re_val
         self.assertEqual((5, 2), best_cand_indices.shape)
@@ -271,7 +271,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         pref = np.array([3, 2, 1, 1, 1, 1])
 
         re_val = wrapper.query(self.X_cand, A_cand=None,
-                               batch_size=1, annotators_per_sample=pref,
+                               batch_size=1, n_annotators_per_sample=pref,
                                return_utilities=True)
 
         best_cand_indices, utilities = re_val
@@ -312,7 +312,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                             [3, 2, 1]])
 
         re_val = wrapper.query(X_cand=X_cand, batch_size=6,
-                               annotators_per_sample=3,
+                               n_annotators_per_sample=3,
                                A_perf=A_perf,
                                return_utilities=True)
 
@@ -336,7 +336,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         A_perf = np.array([1, 1, 1])
 
         re_val = wrapper.query(X_cand=X_cand, batch_size=6,
-                               annotators_per_sample=3,
+                               n_annotators_per_sample=3,
                                A_perf=A_perf,
                                return_utilities=True)
 

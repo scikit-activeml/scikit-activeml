@@ -15,6 +15,7 @@ class TestIEAnnotModel(unittest.TestCase):
                            [0, np.nan, 1, 1],
                            [0, np.nan, 0, 0],
                            [0, np.nan, 1, 0]])
+        self.X = np.arange(8).reshape(4, 2)
         self.sample_weight = np.array([[1, np.nan, 1, 1],
                                        [1, np.nan, 1, 1],
                                        [1, np.nan, 1, 1],
@@ -22,52 +23,53 @@ class TestIEAnnotModel(unittest.TestCase):
 
     def test_init_param_classes(self):
         ie_model = IEAnnotModel(classes='test')
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
         ie_model = IEAnnotModel(classes=[0])
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
     def test_init_param_missing_label(self):
         ie_model = IEAnnotModel(missing_label=['test'])
-        self.assertRaises(TypeError, ie_model.fit, y=self.y)
+        self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)
         ie_model = IEAnnotModel(missing_label='o')
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
     def test_init_param_alpha(self):
         ie_model = IEAnnotModel(alpha=0.0)
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
         ie_model = IEAnnotModel(alpha=1.0)
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
         ie_model = IEAnnotModel(alpha='test')
-        self.assertRaises(TypeError, ie_model.fit, y=self.y)
+        self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)
 
     def test_init_param_mode(self):
         ie_model = IEAnnotModel(mode='test')
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
     def test_init_param_random_state(self):
         ie_model = IEAnnotModel(random_state='test')
-        self.assertRaises(ValueError, ie_model.fit, y=self.y)
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
     def test_fit_param_y(self):
         ie_model = IEAnnotModel()
-        self.assertRaises(ValueError, ie_model.fit, y=np.ones(4))
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=np.ones(4))
         self.assertRaises(TypeError, ie_model.fit, y='test')
 
     def test_fit_param_sample_weight(self):
         ie_model = IEAnnotModel()
-        self.assertRaises(ValueError, ie_model.fit, y=self.y,
+        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y,
                           sample_weight=np.ones(len(self.y)))
         self.assertRaises(TypeError, ie_model.fit, y=self.y,
                           sample_weight='test')
 
     def test_predict_annot_perf_param_X(self):
-        ie_model = IEAnnotModel().fit(self.y)
+        ie_model = IEAnnotModel().fit(self.X, self.y)
         self.assertRaises(ValueError, ie_model.predict_annot_perf, X=None)
         self.assertRaises(ValueError, ie_model.predict_annot_perf,
                           X=np.ones(2))
 
     def test_fit(self):
-        ie_model = IEAnnotModel().fit(self.y, sample_weight=self.sample_weight)
+        ie_model = IEAnnotModel().fit(self.X, self.y,
+                                      sample_weight=self.sample_weight)
         np.testing.assert_array_equal(ie_model.A_perf_.shape,
                                       (self.y.shape[1], 3))
         self.assertEqual(ie_model.A_perf_[2, 1], 5/6)
@@ -79,7 +81,7 @@ class TestIEAnnotModel(unittest.TestCase):
     def test_predict_proba(self):
         for i, m in enumerate(['lower', 'mean', 'upper']):
             ie_model = IEAnnotModel(mode=m)
-            ie_model.fit(self.y, sample_weight=self.sample_weight)
+            ie_model.fit(self.X, self.y, sample_weight=self.sample_weight)
             P_annot = ie_model.predict_annot_perf(X=np.ones((10, 2)))
             np.testing.assert_array_equal(P_annot[0], ie_model.A_perf_[:, i])
             self.assertEqual(len(P_annot), 10)

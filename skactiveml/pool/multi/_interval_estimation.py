@@ -284,7 +284,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
                                 missing_label=clf.missing_label,
                                 alpha=self.alpha, mode='upper')
 
-        ie_model.fit(y=y, sample_weight=sample_weight)
+        ie_model.fit(X=X, y=y, sample_weight=sample_weight)
         A_perf = ie_model.A_perf_
 
         # Compute utilities.
