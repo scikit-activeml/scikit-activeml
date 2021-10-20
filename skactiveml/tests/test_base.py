@@ -3,14 +3,19 @@ from unittest.mock import patch
 
 import numpy as np
 
-from skactiveml.base import QueryStrategy, SingleAnnotPoolBasedQueryStrategy, \
-    MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier, \
-    ClassFrequencyEstimator, AnnotModelMixin, BudgetManager, \
-    SingleAnnotStreamBasedQueryStrategy
+from skactiveml.base import (
+    QueryStrategy,
+    SingleAnnotPoolBasedQueryStrategy,
+    MultiAnnotPoolBasedQueryStrategy,
+    SkactivemlClassifier,
+    ClassFrequencyEstimator,
+    AnnotModelMixin,
+    BudgetManager,
+    SingleAnnotStreamBasedQueryStrategy,
+)
 
 
 class QueryStrategyTest(unittest.TestCase):
-
     @patch.multiple(QueryStrategy, __abstractmethods__=set())
     def setUp(self):
         self.qs = QueryStrategy()
@@ -20,9 +25,9 @@ class QueryStrategyTest(unittest.TestCase):
 
 
 class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
-
-    @patch.multiple(SingleAnnotPoolBasedQueryStrategy,
-                    __abstractmethods__=set())
+    @patch.multiple(
+        SingleAnnotPoolBasedQueryStrategy, __abstractmethods__=set()
+    )
     def setUp(self):
         self.qs = SingleAnnotPoolBasedQueryStrategy()
 
@@ -31,9 +36,9 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
 
 class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
-
-    @patch.multiple(MultiAnnotPoolBasedQueryStrategy,
-                    __abstractmethods__=set())
+    @patch.multiple(
+        MultiAnnotPoolBasedQueryStrategy, __abstractmethods__=set()
+    )
     def setUp(self):
         self.qs = MultiAnnotPoolBasedQueryStrategy()
 
@@ -42,7 +47,6 @@ class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
 
 class SkactivemlClassifierTest(unittest.TestCase):
-
     @patch.multiple(SkactivemlClassifier, __abstractmethods__=set())
     def setUp(self):
         self.clf = SkactivemlClassifier(classes=[0, 1], missing_label=-1)
@@ -60,7 +64,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
 
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
-
     @patch.multiple(ClassFrequencyEstimator, __abstractmethods__=set())
     def setUp(self):
         self.clf = ClassFrequencyEstimator()
@@ -70,18 +73,17 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
 
 
 class AnnotModelMixinTest(unittest.TestCase):
-
     @patch.multiple(AnnotModelMixin, __abstractmethods__=set())
     def setUp(self):
         self.clf = AnnotModelMixin()
 
     def test_predict_annot_proba(self):
-        self.assertRaises(NotImplementedError, self.clf.predict_annot_proba,
-                          X=None)
+        self.assertRaises(
+            NotImplementedError, self.clf.predict_annot_proba, X=None
+        )
 
 
 class BudgetManagerTest(unittest.TestCase):
-
     @patch.multiple(BudgetManager, __abstractmethods__=set())
     def setUp(self):
         self.bm = BudgetManager()
@@ -90,13 +92,18 @@ class BudgetManagerTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.bm.query, utilities=None)
 
     def test_update(self):
-        self.assertRaises(NotImplementedError, self.bm.update, queried=None)
+        self.assertRaises(
+            NotImplementedError,
+            self.bm.update,
+            X_cand=None,
+            queried_indices=None,
+        )
 
 
 class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
-
-    @patch.multiple(SingleAnnotStreamBasedQueryStrategy,
-                    __abstractmethods__=set())
+    @patch.multiple(
+        SingleAnnotStreamBasedQueryStrategy, __abstractmethods__=set()
+    )
     def setUp(self):
         self.qs = SingleAnnotStreamBasedQueryStrategy(budget_manager=None)
 
@@ -104,5 +111,6 @@ class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
 
     def test_update(self):
-        self.assertRaises(NotImplementedError, self.qs.update, X_cand=None,
-                          queried=None)
+        self.assertRaises(
+            NotImplementedError, self.qs.update, X_cand=None, queried=None
+        )
