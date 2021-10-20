@@ -123,9 +123,9 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
     Parameters
     ----------
     clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
+        Model implementing the methods `fit` and `predict_proba`.
     X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
+        Candidate samples from which the strategy can select.
     X : array-like, shape (n_samples, n_features), optional (default=None)
         Complete training data set.
     y : array-like, shape (n_samples), optional (default=None)
