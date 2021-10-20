@@ -186,8 +186,8 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             file.write(title)
             file.write(''.ljust(len(title) + 1, '=') + '\n')
             file.write('\n')
-            file.write(f'This is a overview of all implemented AL strategies. '
-                       f'The strategies are categorized, according to '
+            file.write(f'This is an overview of all implemented AL strategies. '
+                       f'The strategies are categorized according to '
                        f':footcite:t:`{tab}`.\n')
             file.write('\n')
             file.write('Pool Strategies\n')
@@ -206,6 +206,8 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
                 file.write(table_from_array(cats['Others'], title='Others',
                                             section_level='~',
                                             header_rows=1, indent=0))
+            file.write('References\n')
+            file.write('----------\n')
             file.write('.. footbibliography::')
             # TODO stream
             # file.write('\n')

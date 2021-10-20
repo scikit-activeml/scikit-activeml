@@ -1,13 +1,13 @@
 [
   {
     "class" : "QBC",
-    "method" : "KL_divergence",
+    "method" : "Query-by-Committee with Kullback-Leibler Divergence",
     "categories" : {
       "Settles2012" : "Query-by-Committee"
     },
     "tags" : ["pool"],
-    "title" : "QBC Example For Method 'KL_divergence'",
-    "refs" : ["seung1992query", ""],
+    "title" : "Query-by-Committee with Kullback-Leibler Divergence",
+    "refs" : ["seung1992query","mccallum1998employing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
@@ -23,13 +23,13 @@
   },
   {
     "class" : "QBC",
-    "method" : "vote_entropy",
+    "method" : "Query-by-Committee with Vote Entropy",
     "categories" : {
       "Settles2012" : "Query-by-Committee"
     },
     "tags" : ["pool"],
-    "title" : "QBC Example For Method 'vote_entropy'",
-    "refs" : [],
+    "title" : "Query-by-Committee with Vote Entropy",
+    "refs" : ["seung1992query","engelson1996minimizing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",

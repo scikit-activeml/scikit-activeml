@@ -19,6 +19,7 @@ y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 clf = "#_init_clf"
 # Initialise the query strategy.
 qs = "#_init_qs"
+#_bp_preproc Breakpoint for preprocessing
 
 # Preparation for plotting.
 fig, ax = plt.subplots()
@@ -49,8 +50,10 @@ for c in range(n_cycles):
         transform=ax.transAxes
     )
     #_bp_utilities Break point for ...
-    ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
-    ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
+    ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2)
+    ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8, marker=".", s=300)
+    #ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
+    #ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
     ax = plot_decision_boundary(clf, bound, ax=ax)
 
     coll_new = list(ax.collections)
