@@ -199,26 +199,7 @@ class BudgetManager(ABC, BaseEstimator):
         self.budget = budget
 
     @abstractmethod
-    def is_budget_left(self):
-        """Check whether there is any utility given to query(...), which may
-        lead to sampling the corresponding instance, i.e., check if sampling
-        another instance is currently possible under the specified budgeting
-        constraint. This function is useful to determine, whether a provided
-        utility is not sufficient, or the budgeting constraint was simply
-        exhausted.
-
-        Returns
-        -------
-        budget_left : bool
-            True, if there is a utility which leads to sampling another
-            instance.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def query(
-        self, utilities, **kwargs
-    ):
+    def query(self, utilities, *args, **kwargs):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
 
@@ -229,10 +210,6 @@ class BudgetManager(ABC, BaseEstimator):
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
 
-        return_utilities : bool, optional
-            If true, also return whether there was budget left for each
-            assessed utility. The default is False.
-
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
@@ -242,12 +219,15 @@ class BudgetManager(ABC, BaseEstimator):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, queried, **kwargs):
+    def update(self, X_cand, queried_indices, *args, **kwargs):
         """Updates the BudgetManager.
 
         Parameters
         ----------
-        queried : array-like
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        queried_indices : array-like
             Indicates which instances from X_cand have been queried.
 
         Returns
@@ -257,26 +237,19 @@ class BudgetManager(ABC, BaseEstimator):
         """
         raise NotImplementedError
 
-    def _validate_budget(self, default=None):
-        """check the assigned budget and set a default value, when none is set
-        prior.
-
-        Parameters
-        ----------
-        default : float, optional
-            the budget which should be assigned, when none is set.
+    def _validate_budget(self):
+        """check the assigned budget and set the default value 0.1 if budget is
+        set to None.
         """
         if self.budget is not None:
             self.budget_ = self.budget
         else:
-            if default is None:
-                default = self.get_default_stream_budget()
-            self.budget_ = default
+            self.budget_ = 0.1
         check_scalar(
             self.budget_, "budget", float, min_val=0.0, max_val=1.0
         )
 
-    def _validate_data(self, utilities):
+    def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.
 
         Parameters
@@ -296,19 +269,8 @@ class BudgetManager(ABC, BaseEstimator):
                 "{} is not a valid type for utilities".format(type(utilities))
             )
         # Check budget
-        self._validate_budget(self.get_default_stream_budget())
+        self._validate_budget()
         return utilities
-
-    def get_default_stream_budget(self):
-        """This function defines the default budget which should be used when no
-        budget is provided by the user.
-
-            Returns
-            -------
-            default_budget: float
-                The default budget used by the user.
-            """
-        return 0.1
 
 
 class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
@@ -418,6 +380,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self,
         X_cand,
         return_utilities,
+        *args,
         reset=True,
         **check_X_cand_params
     ):

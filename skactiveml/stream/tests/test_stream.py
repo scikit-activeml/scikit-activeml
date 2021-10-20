@@ -87,7 +87,6 @@ class TestStream(unittest.TestCase):
             query_strategy.update(
                 x_t.reshape([1, -1]), sampled_indices
             )
-            query_strategy.budget_manager_.is_budget_left()
             if len(sampled_indices):
                 X_train.append(x_t)
                 y_train.append(y_t)

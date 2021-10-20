@@ -4,6 +4,7 @@ from sklearn.utils import check_array, check_consistent_length
 
 import skactiveml.pool._probal as probal
 from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
+
 # from ..classifier import PWC
 from ..utils import fit_if_not_fitted, check_type, check_random_state
 
@@ -31,7 +32,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         The prior value that is passed onto McPAL (see pool.McPAL).
     m_max : float
         The m_max value that is passed onto McPAL (see pool.McPAL).
-        
+
     References
     ----------
     [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active
@@ -41,11 +42,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self,
-        budget_manager=BIQF(),
-        random_state=None,
-        prior=1.0e-3,
-        m_max=2,
+        self, budget_manager=BIQF(), random_state=None, prior=1.0e-3, m_max=2,
     ):
         self.budget_manager = budget_manager
         self.random_state = random_state
@@ -65,17 +62,17 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful, when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful, when developing wrapper query strategies.
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        clf : BaseEstimator
-            Model implementing the methods `fit` and `predict_proba`.
+        clf : SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_freq`.
         X : array-like of shape (n_samples, n_features), optional (default=None)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples), optional (default=None)
@@ -96,17 +93,21 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        X_cand, X, y, sample_weight, return_utilities = self._validate_data(
+        (
+            X_cand,
+            clf,
+            X,
+            y,
+            sample_weight,
+            return_utilities,
+        ) = self._validate_data(
             X_cand=X_cand,
+            clf=clf,
             X=X,
             y=y,
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, 'clf')
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         k_vec = clf.predict_freq(X_cand)
         utilities = probal.cost_reduction(
@@ -129,10 +130,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
-
         budget_manager_kwargs : kwargs
             Optional kwargs for budget_manager.
 
@@ -151,6 +150,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
     def _validate_data(
         self,
         X_cand,
+        clf,
         X,
         y,
         sample_weight,
@@ -168,6 +168,8 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
+        clf : SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_freq`.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
         return_utilities : bool,
@@ -198,20 +200,20 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
         self._validate_X_y_sample_weight(X, y, sample_weight)
+        self._validate_clf(clf, X, y, sample_weight)
         self._validate_prior()
         self._validate_m_max()
         self._validate_random_state()
 
-        return X_cand, X, y, sample_weight, return_utilities
+        return X_cand, clf, X, y, sample_weight, return_utilities
 
     def _validate_X_y_sample_weight(self, X, y, sample_weight):
-        """Validate if X, y and sample_weight are numeric and of equal lenght.
+        """Validate if X, y and sample_weight are numeric and of equal length.
 
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
-
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
 
@@ -233,6 +235,19 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             y = np.array(y)
             check_consistent_length(X, y)
         return X, y, sample_weight
+
+    def _validate_clf(self, clf, X, y, sample_weight):
+        """Validate if clf is a valid SkactivemlClassifier. If clf is
+        untrained, clf is trained using X, y and sample_weight.
+
+        Parameters
+        ----------
+        clf : SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_freq`.
+        """
+        # Check if the classifier and its arguments are valid.
+        check_type(clf, SkactivemlClassifier, "clf")
+        return fit_if_not_fitted(clf, X, y, sample_weight)
 
     def _validate_prior(self):
         """Validate if the prior is a float and greater than 0.

@@ -32,23 +32,6 @@ class EstimatedBudget(BudgetManager):
         super().__init__(budget)
         self.w = w
 
-    def is_budget_left(self):
-        """Check whether there is any utility given to query(...), which may
-        lead to sampling the corresponding instance, i.e., check if sampling
-        another instance is currently possible under the budgeting constraint.
-        This function is useful to determine, whether a provided
-        utility is not sufficient, or the budgeting constraint was simply
-        exhausted. For this budget manager this function returns True, when
-        budget > estimated_spending.
-
-        Returns
-        -------
-        budget_left : bool
-            True, if there is a utility which leads to sampling another
-            instance.
-        """
-        return self.budget_ > self.u_t_ / self.w
-
     def update(self, X_cand, queried_indices, **kwargs):
         """Updates the budget manager.
 
@@ -339,7 +322,7 @@ class VarUncertaintyBudget(EstimatedBudget):
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
         for i, s in enumerate(queried):
-            if self.is_budget_left():
+            if self.budget_ > self.u_t_ / self.w:
                 if s:
                     self.theta_ *= 1 - self.s
                 else:

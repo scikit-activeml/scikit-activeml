@@ -58,7 +58,9 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities)
+        X_Cand, return_utilities = self._validate_data(
+            X_cand, return_utilities
+        )
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
@@ -197,12 +199,10 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        self._validate_data(X_cand, return_utilities)
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
+        X_cand, return_utilities = self._validate_data(
+            X_cand,
+            return_utilities
+            )
 
         utilities = np.zeros(X_cand.shape[0])
         budget = getattr(self.budget_manager_, "budget_", 0)
@@ -301,5 +301,11 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         )
 
         self._validate_random_state()
+
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
 
         return X_cand, return_utilities

@@ -48,23 +48,6 @@ class BIQF(BudgetManager):
         self.w_tol = w_tol
         self.save_utilities = save_utilities
 
-    def is_budget_left(self):
-        """Check whether there is any utility given to query(...), which may
-        lead to sampling the corresponding instance, i.e., check if sampling
-        another instance is currently possible under the budgeting constraint.
-        This function is useful to determine, whether a provided
-        utility is not sufficient, or the budgeting constraint was simply
-        exhausted. For this budget manager this function returns True, when
-        budget > estimated_spending.
-
-        Returns
-        -------
-        budget_left : bool
-            True, if there is a utility which leads to sampling another
-            instance.
-        """
-        return True
-
     def query(
         self, utilities, **kwargs
     ):
@@ -90,13 +73,6 @@ class BIQF(BudgetManager):
         """
         utilities = self._validate_data(utilities)
 
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
-        if not hasattr(self, "history_sorted_"):
-            self.history_sorted_ = deque(maxlen=self.w)
         # intialize return parameters
         queried_indices = []
 
@@ -155,7 +131,7 @@ class BIQF(BudgetManager):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
         if not hasattr(self, "history_sorted_"):
-            self.history_sorted_ = deque(maxlen=self.w) 
+            self.history_sorted_ = deque(maxlen=self.w)
         self.observed_instances_ += len(queried)
         self.queried_instances_ += np.sum(queried)
         if utilities is not None:
@@ -192,6 +168,14 @@ class BIQF(BudgetManager):
         self._validate_w()
         self._validate_w_tol()
         self._validate_save_utilities()
+
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
+        if not hasattr(self, "history_sorted_"):
+            self.history_sorted_ = deque(maxlen=self.w)
 
         return utilities
 

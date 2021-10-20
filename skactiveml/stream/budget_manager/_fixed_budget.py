@@ -22,25 +22,6 @@ class FixedBudget(BudgetManager):
     def __init__(self, budget=None):
         super().__init__(budget)
 
-    def is_budget_left(self):
-        """Check whether there is any utility given to sample(...), which may
-        lead to sampling the corresponding instance, i.e., check if sampling
-        another instance is currently possible under the specified budgeting
-        constraint. This function is useful to determine, whether a provided
-        utility is not sufficient, or the budgeting constraint was simply
-        exhausted. For this budget manager this function returns True, when
-        n_observed_instances * budget  - n_sampled_instances >= 1.
-        Returns
-        -------
-        budget_left : bool
-            True, if there is a utility which leads to sampling another
-            instance.
-        """
-        available_budget = (
-            self.observed_instances_ * self.budget_ - self.queried_instances_
-        )
-        return available_budget >= 1
-
     def query(
         self, utilities, **kwargs
     ):
@@ -61,7 +42,7 @@ class FixedBudget(BudgetManager):
             The indices of instances represented by utilities which should be
             sampled, with 0 <= n_queried_instances <= n_samples.
         """
-        self._validate_data(utilities)
+        utilities = self._validate_data(utilities)
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):
             self.observed_instances_ = 0
