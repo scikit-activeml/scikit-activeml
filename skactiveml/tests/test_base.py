@@ -86,9 +86,6 @@ class BudgetManagerTest(unittest.TestCase):
     def setUp(self):
         self.bm = BudgetManager()
 
-    def test_is_budget_left(self):
-        self.assertRaises(NotImplementedError, self.bm.is_budget_left)
-
     def test_fit(self):
         self.assertRaises(NotImplementedError, self.bm.query, utilities=None)
 

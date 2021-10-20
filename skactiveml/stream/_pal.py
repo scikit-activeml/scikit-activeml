@@ -199,8 +199,10 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
         X_cand, return_utilities = super()._validate_data(
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
-        self._validate_X_y_sample_weight(X, y, sample_weight)
-        self._validate_clf(clf, X, y, sample_weight)
+        X, y, sample_weight = self._validate_X_y_sample_weight(
+            X, y, sample_weight
+        )
+        clf = self._validate_clf(clf, X, y, sample_weight)
         self._validate_prior()
         self._validate_m_max()
         self._validate_random_state()
