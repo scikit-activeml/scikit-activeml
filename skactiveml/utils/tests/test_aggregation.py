@@ -49,7 +49,3 @@ class TestAggregation(unittest.TestCase):
         y_aggregated_exp = ['tokyo', 'paris', 'nan']
 
         np.testing.assert_array_equal(y_aggregated_rec, y_aggregated_exp)
-
-
-if __name__ == '__main__':
-    unittest.main()
