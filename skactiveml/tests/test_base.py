@@ -16,6 +16,7 @@ from skactiveml.base import (
 
 
 class QueryStrategyTest(unittest.TestCase):
+
     @patch.multiple(QueryStrategy, __abstractmethods__=set())
     def setUp(self):
         self.qs = QueryStrategy()
@@ -25,9 +26,9 @@ class QueryStrategyTest(unittest.TestCase):
 
 
 class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
-    @patch.multiple(
-        SingleAnnotPoolBasedQueryStrategy, __abstractmethods__=set()
-    )
+
+    @patch.multiple(SingleAnnotPoolBasedQueryStrategy,
+                    __abstractmethods__=set())
     def setUp(self):
         self.qs = SingleAnnotPoolBasedQueryStrategy()
 
@@ -36,9 +37,9 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
 
 class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
-    @patch.multiple(
-        MultiAnnotPoolBasedQueryStrategy, __abstractmethods__=set()
-    )
+
+    @patch.multiple(MultiAnnotPoolBasedQueryStrategy,
+                    __abstractmethods__=set())
     def setUp(self):
         self.qs = MultiAnnotPoolBasedQueryStrategy()
 
@@ -47,6 +48,7 @@ class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
 
 class SkactivemlClassifierTest(unittest.TestCase):
+
     @patch.multiple(SkactivemlClassifier, __abstractmethods__=set())
     def setUp(self):
         self.clf = SkactivemlClassifier(classes=[0, 1], missing_label=-1)
@@ -64,6 +66,7 @@ class SkactivemlClassifierTest(unittest.TestCase):
 
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
+
     @patch.multiple(ClassFrequencyEstimator, __abstractmethods__=set())
     def setUp(self):
         self.clf = ClassFrequencyEstimator()
@@ -73,15 +76,14 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
 
 
 class AnnotModelMixinTest(unittest.TestCase):
+
     @patch.multiple(AnnotModelMixin, __abstractmethods__=set())
     def setUp(self):
         self.clf = AnnotModelMixin()
 
     def test_predict_annot_proba(self):
-        self.assertRaises(
-            NotImplementedError, self.clf.predict_annot_proba, X=None
-        )
-
+        self.assertRaises(NotImplementedError, self.clf.predict_annot_perf,
+                          X=None)
 
 class BudgetManagerTest(unittest.TestCase):
     @patch.multiple(BudgetManager, __abstractmethods__=set())

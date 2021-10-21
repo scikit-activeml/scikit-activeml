@@ -125,11 +125,11 @@ class TestLogisticRegressionRY(unittest.TestCase):
         y_pred = lr.predict(X=self.X)
         np.testing.assert_array_equal(y_pred, ['tokyo', 'tokyo'])
 
-    def test_predict_annot_proba(self):
+    def test_predict_annot_perf(self):
         lr = LogisticRegressionRY(random_state=0, missing_label='nan',
                                   classes=['tokyo', 'paris'])
         lr.fit(X=self.X, y=self.y_nan)
-        P_annot = lr.predict_annot_proba(X=self.X)
+        P_annot = lr.predict_annot_perf(X=self.X)
         np.testing.assert_array_equal(P_annot, np.ones_like(P_annot) * 0.5)
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
         self.assertTrue((P_annot <= 1).all())
