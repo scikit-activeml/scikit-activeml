@@ -3,11 +3,11 @@ import numpy as np
 
 from sklearn.datasets import make_classification
 
-from ...classifier import PWC
-from .._pal import PAL
+from skactiveml.classifier import PWC
+from skactiveml.stream import PALS
 
 
-class TestPAL(unittest.TestCase):
+class TestPALS(unittest.TestCase):
     def setUp(self):
         # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
@@ -20,7 +20,7 @@ class TestPAL(unittest.TestCase):
         )
 
         self.X = X[:train_init_size, :]
-        self.X_cand = X[train_init_size:, :]
+        self.X_cand = X[[train_init_size], :]
         self.y = y[:train_init_size]
         self.clf = PWC()
         self.kwargs = dict(
@@ -29,18 +29,19 @@ class TestPAL(unittest.TestCase):
 
     def test_pal(self):
         # init param test
-        self._test_init_param_budget_manager(PAL)
-        self._test_init_param_prior(PAL)
-        self._test_init_param_m_max(PAL)
-        self._test_init_param_random_state(PAL)
+        self._test_init_param_budget_manager(PALS)
+        self._test_init_param_prior(PALS)
+        self._test_init_param_m_max(PALS)
+        self._test_init_param_random_state(PALS)
 
         # query param test
-        self._test_query_param_clf(PAL)
-        self._test_query_param_X_cand(PAL)
-        self._test_query_param_X(PAL)
-        self._test_query_param_y(PAL)
-        self._test_query_param_sample_weight(PAL)
-        self._test_query_param_return_utilities(PAL)
+        self._test_query_param_clf(PALS)
+        self._test_query_param_X_cand(PALS)
+        self._test_query_param_X(PALS)
+        self._test_query_param_y(PALS)
+        self._test_query_param_sample_weight(PALS)
+        self._test_query_param_utility_weight(PALS)
+        self._test_query_param_return_utilities(PALS)
 
     def _test_init_param_budget_manager(self, query_strategy_name):
         # budget_manager must be defined as an object of an budget manager
@@ -197,7 +198,7 @@ class TestPAL(unittest.TestCase):
             X_cand=self.X_cand,
             clf=self.clf,
             X=self.X,
-            y=self.y[1:],
+            y=self.y,
             sample_weight="string",
         )
         self.assertRaises(
@@ -206,7 +207,7 @@ class TestPAL(unittest.TestCase):
             X_cand=self.X_cand,
             clf=self.clf,
             X=self.X,
-            y=self.y[1:],
+            y=self.y,
             sample_weight=["string", "numbers", "test"],
         )
         self.assertRaises(
@@ -215,8 +216,40 @@ class TestPAL(unittest.TestCase):
             X_cand=self.X_cand,
             clf=self.clf,
             X=self.X,
-            y=self.y[1:],
+            y=self.y,
             sample_weight=[1],
+        )
+
+    def _test_query_param_utility_weight(self, query_strategy_name):
+        # sample weight needs to be a list that can be convertet to float
+        # equal in size of y
+        query_strategy = query_strategy_name()
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            utility_weight="string",
+        )
+        self.assertRaises(
+            ValueError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            utility_weight=["string", "numbers", "test"],
+        )
+        self.assertRaises(
+            ValueError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            utility_weight=[1],
         )
 
     def _test_query_param_return_utilities(self, query_strategy_name):
@@ -228,7 +261,7 @@ class TestPAL(unittest.TestCase):
             X_cand=self.X_cand,
             clf=self.clf,
             X=self.X,
-            y=self.y[1:],
+            y=self.y,
             return_utilities="string",
         )
         self.assertRaises(
@@ -237,6 +270,6 @@ class TestPAL(unittest.TestCase):
             X_cand=self.X_cand,
             clf=self.clf,
             X=self.X,
-            y=self.y[1:],
+            y=self.y,
             return_utilities=1,
         )

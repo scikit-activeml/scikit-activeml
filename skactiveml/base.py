@@ -290,21 +290,21 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
 
 class BudgetManager(ABC, BaseEstimator):
     """Base class for all budget managers for stream-based active learning
-       in scikit-activeml to model budgeting constraints.
+    in scikit-activeml to model budgeting constraints.
 
     Parameters
     ----------
     budget : float (default=None)
         Specifies the ratio of instances which are allowed to be sampled, with
         0 <= budget <= 1. If budget is None, it is replaced with the default
-        budget
+        budget 0.1.
     """
 
     def __init__(self, budget=None):
         self.budget = budget
 
     @abstractmethod
-    def query(self, utilities, *args, **kwargs):
+    def query_by_utility(self, utilities, *args, **kwargs):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
 
@@ -350,9 +350,7 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = self.budget
         else:
             self.budget_ = 0.1
-        check_scalar(
-            self.budget_, "budget", float, min_val=0.0, max_val=1.0
-        )
+        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0)
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.

@@ -4,7 +4,7 @@ stream-based active learning.
 """
 
 from ._random import RandomSampler, PeriodicSampler
-from ._pal import PAL
+from ._pals import PALS
 from ._uncertainty import FixedUncertainty, VariableUncertainty, Split
 
 __all__ = [
@@ -13,5 +13,5 @@ __all__ = [
     "FixedUncertainty",
     "VariableUncertainty",
     "Split",
-    "PAL",
+    "PALS",
 ]

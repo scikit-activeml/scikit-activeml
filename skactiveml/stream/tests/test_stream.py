@@ -64,6 +64,10 @@ class TestStream(unittest.TestCase):
             random_state=rand.randint(2 ** 31 - 1)
         )
 
+        query_strategy2 = query_strategy_class(
+            random_state=rand.randint(2 ** 31 - 1)
+        )
+
         X_train = deque(maxlen=training_size)
         X_train.extend(X_init)
         y_train = deque(maxlen=training_size)
@@ -79,12 +83,33 @@ class TestStream(unittest.TestCase):
                 sample_weight=np.ones(len(y_train)),
                 return_utilities=return_utilities
             )
+
+            for _ in range(3):
+                qs_output2 = query_strategy2.query(
+                    x_t.reshape([1, -1]),
+                    clf=clf,
+                    X=X_train,
+                    y=y_train,
+                    sample_weight=np.ones(len(y_train)),
+                    return_utilities=return_utilities
+                )
+
             if return_utilities:
                 sampled_indices, utilities = qs_output
+                sampled_indices2, utilities2 = qs_output2
+
+                self.assertEqual(sampled_indices, sampled_indices2)
+                self.assertEqual(utilities, utilities2)
+
             else:
                 sampled_indices = qs_output
+                sampled_indices2 = qs_output2
+                self.assertEqual(sampled_indices, sampled_indices2)
 
             query_strategy.update(
+                x_t.reshape([1, -1]), sampled_indices
+            )
+            query_strategy2.update(
                 x_t.reshape([1, -1]), sampled_indices
             )
             if len(sampled_indices):
