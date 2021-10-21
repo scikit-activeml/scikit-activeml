@@ -6,7 +6,8 @@ import skactiveml.pool._probal as probal
 from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
 
 # from ..classifier import PWC
-from ..utils import fit_if_not_fitted, check_type, check_random_state
+from ..utils import fit_if_not_fitted, check_type, check_random_state, \
+                    check_scalar
 
 from .budget_manager import BIQF
 
@@ -203,6 +204,7 @@ class PAL(SingleAnnotStreamBasedQueryStrategy):
             X, y, sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight)
+        check_scalar(self.prior, "prior", float, min_val=0)
         self._validate_prior()
         self._validate_m_max()
         self._validate_random_state()
