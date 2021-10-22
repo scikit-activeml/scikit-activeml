@@ -31,8 +31,8 @@ class TestFeatureSpace(unittest.TestCase):
         self.X_cand = self.X[cand_indices]
         self.clf = PWC()
         self.clf.fit(self.X_train, self.y_train)
-        self.qs = UncertaintySampling(clf=self.clf)
-        self.qs_dict = {'X': self.X_train, 'y': self.y_train}
+        self.qs = UncertaintySampling()
+        self.qs_dict = {'clf': self.clf, 'X': self.X_train, 'y': self.y_train}
 
         x1_min = min(self.X[:, 0])
         x1_max = max(self.X[:, 0])
@@ -131,8 +131,7 @@ class TestFeatureSpace(unittest.TestCase):
     # Graphical tests
     def test_no_candidates(self):
         fig, ax = plt.subplots()
-        plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     feature_bound=self.bound, ax=ax)
+        plot_utility(self.qs, self.qs_dict, feature_bound=self.bound, ax=ax)
         ax.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
@@ -147,8 +146,7 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_with_candidates(self):
         fig, ax = plt.subplots()
-        plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     X_cand=self.X_cand, ax=ax)
+        plot_utility(self.qs, self.qs_dict, X_cand=self.X_cand, ax=ax)
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
@@ -171,12 +169,12 @@ class TestFeatureSpace(unittest.TestCase):
         X_cand = X[cand_indices]
         clf = PWC()
         clf.fit(X_train, y_train)
-        qs = UncertaintySampling(clf=clf)
+        qs = UncertaintySampling()
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
         fig, ax = plt.subplots()
-        plot_utility(qs, {'X': X_train, 'y': y_train}, feature_bound=bound,
-                     ax=ax)
+        plot_utility(qs, {'clf': clf, 'X': X_train, 'y': y_train},
+                     feature_bound=bound, ax=ax)
         ax.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
         ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
@@ -194,8 +192,7 @@ class TestFeatureSpace(unittest.TestCase):
         svc.fit(self.X_train, self.y_train)
 
         fig, ax = plt.subplots()
-        plot_utility(self.qs, {'X': self.X_train, 'y': self.y_train},
-                     X_cand=self.X_cand, ax=ax)
+        plot_utility(self.qs, self.qs_dict, X_cand=self.X_cand, ax=ax)
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
