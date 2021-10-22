@@ -78,8 +78,8 @@ class TestClassifier(unittest.TestCase):
             clf_mdl.fit(X=[], y=[])
             P = clf_mdl.predict_proba(X=self.X)
             np.testing.assert_array_equal(P, np.ones((len(self.X), 3)) / 3)
-            if hasattr(clf_mdl, 'predict_annot_proba'):
-                P = clf_mdl.predict_annot_proba(X=self.X)
+            if hasattr(clf_mdl, 'predict_annot_perf'):
+                P = clf_mdl.predict_annot_perf(X=self.X)
                 np.testing.assert_array_equal(P, np.ones((len(self.X), 1)) / 3)
 
         # Test classifier on data with only missing labels.
@@ -148,7 +148,7 @@ class TestClassifier(unittest.TestCase):
                     self.assertTrue(hasattr(test_obj, test_func_name), msg)
 
                 methods = ['fit', 'predict', 'predict_proba', 'predict_freq',
-                           'predict_annot_proba']
+                           'predict_annot_perf']
                 for m in methods:
                     if not hasattr(clf_mdl, m):
                         continue
@@ -176,8 +176,8 @@ class TestClassifier(unittest.TestCase):
                     self._test_predict_proba_param_X(clf_class)
                 if hasattr(clf_mdl, 'predict_freq'):
                     self._test_predict_freq_param_X(clf_class)
-                if hasattr(clf_mdl, 'predict_annot_proba'):
-                    self._test_predict_annot_proba_param_X(clf_class)
+                if hasattr(clf_mdl, 'predict_annot_perf'):
+                    self._test_predict_annot_perf_param_X(clf_class)
 
     def _test_init_param_class_prior(self, clf_class):
         clf_mdl = call_func(
@@ -394,7 +394,7 @@ class TestClassifier(unittest.TestCase):
         self.assertRaises(ValueError, clf_mdl.predict_freq, X=[[0], [0]])
         self.assertRaises(ValueError, clf_mdl.predict_freq, X=[['x', 'y']])
 
-    def _test_predict_annot_proba_param_X(self, clf_class):
+    def _test_predict_annot_perf_param_X(self, clf_class):
         clf_mdl = call_func(
             clf_class,
             estimator=self.estimator,
@@ -402,10 +402,10 @@ class TestClassifier(unittest.TestCase):
             missing_label=self.missing_label
         )
         clf_mdl.fit(X=self.X, y=self.y)
-        self.assertRaises(ValueError, clf_mdl.predict_annot_proba, X=[0, 0])
-        self.assertRaises(ValueError, clf_mdl.predict_annot_proba,
+        self.assertRaises(ValueError, clf_mdl.predict_annot_perf, X=[0, 0])
+        self.assertRaises(ValueError, clf_mdl.predict_annot_perf,
                           X=[[0], [0]])
-        self.assertRaises(ValueError, clf_mdl.predict_annot_proba,
+        self.assertRaises(ValueError, clf_mdl.predict_annot_perf,
                           X=[['x', 'y']])
 
 
