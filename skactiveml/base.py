@@ -350,7 +350,8 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = self.budget
         else:
             self.budget_ = 0.1
-        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0)
+        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
+                     min_inclusive=False)
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.

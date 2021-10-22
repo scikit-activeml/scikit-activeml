@@ -91,7 +91,8 @@ class BudgetManagerTest(unittest.TestCase):
         self.bm = BudgetManager()
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.bm.query, utilities=None)
+        self.assertRaises(NotImplementedError, self.bm.query_by_utility, 
+                          utilities=None)
 
     def test_update(self):
         self.assertRaises(

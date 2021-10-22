@@ -3,6 +3,7 @@ import numpy as np
 from ..base import SingleAnnotStreamBasedQueryStrategy
 
 from .budget_manager import FixedBudget
+from ..utils import call_func
 
 
 class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
@@ -30,7 +31,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             budget_manager=budget_manager, random_state=random_state
         )
 
-    def query(self, X_cand, return_utilities=False, **kwargs):
+    def query(self, X_cand, return_utilities=False):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
@@ -64,16 +65,14 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
-        queried_indices = self.budget_manager_.query(utilities)
+        queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(
-        self, X_cand, queried_indices, budget_manager_kwargs={}, **kwargs
-    ):
+    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -101,8 +100,11 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         # update the random state assuming, that query(..., simulate=True) was
         # used
         self.random_state_.random_sample(len(queried_indices))
-        self.budget_manager_.update(
-            X_cand, queried_indices, **budget_manager_kwargs
+        call_func(
+            self.budget_manager_.update,
+            X_cand=X_cand,
+            queried_indices=queried_indices,
+            **budget_manager_kwargs
         )
         return self
 
@@ -168,7 +170,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             budget_manager=budget_manager, random_state=random_state
         )
 
-    def query(self, X_cand, return_utilities=False, **kwargs):
+    def query(self, X_cand, return_utilities=False):
         """Ask the query strategy which instances in X_cand to acquire.
 
         This query strategy only evaluates the time each instance arrives at.
@@ -220,16 +222,14 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             else:
                 utilities[i] = 0
 
-        queried_indices = self.budget_manager_.query(utilities)
+        queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(
-        self, X_cand, queried_indices, budget_manager_kwargs={}, **kwargs
-    ):
+    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -251,15 +251,13 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The PeriodicSampler returns itself, after it is updated.
         """
         # check if a budget_manager is set
-        self._validate_budget_manager()
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
+        self._validate_data(np.array([0]), False)
 
-        self.budget_manager_.update(
-            X_cand, queried_indices, **budget_manager_kwargs
+        call_func(
+            self.budget_manager_.update,
+            X_cand=X_cand,
+            queried_indices=queried_indices,
+            **budget_manager_kwargs
         )
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1

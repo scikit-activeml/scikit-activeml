@@ -132,11 +132,9 @@ class BIQF(BudgetManager):
             Checked candidate samples
         """
 
-        utilities = super()._validate_data(
-            utilities
-        )
+        utilities = super()._validate_data(utilities)
         check_scalar(self.w, 'w', int, min_val=0, min_inclusive=False)
-        check_scalar(self.w_tol, 'w_tol', float)
+        check_scalar(self.w_tol, 'w_tol', (float, int))
 
         # check if counting of instances has begun
         if not hasattr(self, "observed_instances_"):

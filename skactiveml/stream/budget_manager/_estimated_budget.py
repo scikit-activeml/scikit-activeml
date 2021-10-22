@@ -1,8 +1,8 @@
 import numpy as np
 from copy import deepcopy
 
-from skactiveml.base import BudgetManager
-from skactiveml.utils import check_random_state
+from ...base import BudgetManager
+from ...utils import check_random_state, check_scalar
 
 
 class EstimatedBudget(BudgetManager):
@@ -32,7 +32,7 @@ class EstimatedBudget(BudgetManager):
         super().__init__(budget)
         self.w = w
 
-    def update(self, X_cand, queried_indices, **kwargs):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager.
 
         Parameters
@@ -101,9 +101,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         super().__init__(budget, w)
         self.num_classes = num_classes
 
-    def query(
-        self, utilities, **kwargs
-    ):
+    def query_by_utility(self, utilities):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
 
@@ -135,7 +133,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
-        
+
         samples = np.array(utilities) <= theta
         # check for each sample separately if budget is left and the utility is
         # high enough
@@ -151,7 +149,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
             return queried_indices
 
-    def update(self, X_cand, queried_indices, **kwargs):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager.
 
         Parameters
@@ -183,37 +181,16 @@ class FixedUncertaintyBudget(EstimatedBudget):
         """
 
         utilities = super()._validate_data(utilities)
-        self._validate_w()
-        self._validate_num_classes()
+        check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
+        check_scalar(
+            self.num_classes,
+            "num_classes",
+            int,
+            min_val=0,
+            min_inclusive=False,
+        )
 
         return utilities
-
-    def _validate_num_classes(self):
-        """Validate if num_classes is an integer and greater than 0.
-        """
-        if not isinstance(self.num_classes, int):
-            raise TypeError(
-                "{} is not a valid type for num_classes".format(
-                    type(self.num_classes)
-                )
-            )
-        if self.num_classes <= 0:
-            raise ValueError(
-                "The value of num_classes is incorrect."
-                + " num_classes must be greater than 0"
-            )
-
-    def _validate_w(self):
-        """Validate if w is an integer and greater than 0.
-        """
-        if not isinstance(self.w, int):
-            raise TypeError(
-                "{} is not a valid type for w".format(type(self.w))
-            )
-        if self.w <= 0:
-            raise ValueError(
-                "The value of w is incorrect." + " w must be greater than 0"
-            )
 
 
 class VarUncertaintyBudget(EstimatedBudget):
@@ -254,10 +231,8 @@ class VarUncertaintyBudget(EstimatedBudget):
         self.theta = theta
         self.s = s
 
-    def query(
-        self, utilities, **kwargs
-    ):
-        """Ask the budget manager which utilities are sufficient to sample the
+    def query_by_utility(self, utilities):
+        """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
 
         Parameters
@@ -304,7 +279,7 @@ class VarUncertaintyBudget(EstimatedBudget):
 
         return queried_indices
 
-    def update(self, X_cand, queried_indices, **kwargs):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager.
 
         Parameters
@@ -348,50 +323,24 @@ class VarUncertaintyBudget(EstimatedBudget):
 
         utilities = super()._validate_data(utilities)
         # Check w
-        self._validate_w()
+        check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
         # Check theta
         self._validate_theta()
+        check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
         # Chack s
-        self._validate_s()
+        check_scalar(
+            self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
+        )
 
         return utilities
 
     def _validate_theta(self):
         """Validate if theta is set as a float.
         """
+        check_scalar(self.theta, "theta", float)
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-        if not isinstance(self.theta, float):
-            raise TypeError(
-                "{} is not a valid type for theta".format(type(self.theta))
-            )
-
-    def _validate_s(self):
-        """Validate if s a float and in range (0,1].
-        """
-        if self.s is not None:
-            if not isinstance(self.s, float):
-                raise TypeError(
-                    "{} is not a valid type for s".format(type(self.s))
-                )
-            if self.s <= 0 or self.s > 1.0:
-                raise ValueError(
-                    "The value of s is incorrect."
-                    + " s must be defined in range (0,1]"
-                )
-
-    def _validate_w(self):
-        """Validate if w is an integer and greater than 0.
-        """
-        if not isinstance(self.w, int):
-            raise TypeError(
-                "{} is not a valid type for w".format(type(self.w))
-            )
-        if self.w <= 0:
-            raise ValueError(
-                "The value of w is incorrect." + " w must be greater than 0"
-            )
 
 
 class SplitBudget(EstimatedBudget):
@@ -436,10 +385,8 @@ class SplitBudget(EstimatedBudget):
         self.s = s
         self.random_state = random_state
 
-    def query(
-        self, utilities, **kwargs
-    ):
-        """Ask the budget manager which utilities are sufficient to sample the
+    def query_by_utility(self, utilities):
+        """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
 
         Parameters
@@ -495,7 +442,7 @@ class SplitBudget(EstimatedBudget):
 
         return queried_indices
 
-    def update(self, X_cand, queried_indices, **kwargs):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager.
 
         Parameters
@@ -542,13 +489,19 @@ class SplitBudget(EstimatedBudget):
 
         utilities = super()._validate_data(utilities)
         # Check w
-        self._validate_w()
+        check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
         # Check theta
         self._validate_theta()
         # Check s
         self._validate_s()
+        check_scalar(
+            self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
+        )
         # Check v
         self._validate_v()
+        check_scalar(
+            self.v, "v", float, min_val=0, min_inclusive=False, max_val=1
+        )
         # Check random_state
         self._validate_random_state()
 
@@ -557,52 +510,10 @@ class SplitBudget(EstimatedBudget):
     def _validate_theta(self):
         """Validate if theta is set as a float.
         """
+        check_scalar(self.theta, "theta", float)
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
-        if not isinstance(self.theta, float):
-            raise TypeError(
-                "{} is not a valid type for theta".format(type(self.theta))
-            )
-
-    def _validate_s(self):
-        """Validate if s a float and in range (0,1].
-        """
-        if self.s is not None:
-            if not isinstance(self.s, float):
-                raise TypeError(
-                    "{} is not a valid type for s".format(type(self.s))
-                )
-            if self.s <= 0 or self.s > 1.0:
-                raise ValueError(
-                    "The value of s is incorrect."
-                    + " s must be defined in range (0,1]"
-                )
-
-    def _validate_v(self):
-        """Validate if v is a float and in range (0,1].
-        """
-        if not isinstance(self.v, float):
-            raise TypeError(
-                "{} is not a valid type for v".format(type(self.v))
-            )
-        if self.v <= 0 or self.v >= 1:
-            raise ValueError(
-                "The value of v is incorrect."
-                + " v must be defined in range (0,1)"
-            )
-
-    def _validate_w(self):
-        """Validate if w an integer and greater than 0.
-        """
-        if not isinstance(self.w, int):
-            raise TypeError(
-                "{} is not a valid type for w".format(type(self.w))
-            )
-        if self.w <= 0:
-            raise ValueError(
-                "The value of w is incorrect." + " w must be greater than 0"
-            )
 
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of

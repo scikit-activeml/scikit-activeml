@@ -22,9 +22,7 @@ class FixedBudget(BudgetManager):
     def __init__(self, budget=None):
         super().__init__(budget)
 
-    def query(
-        self, utilities, **kwargs
-    ):
+    def query_by_utility(self, utilities):
         """Ask the budget manager which utilities are sufficient to query the
         corresponding instance.
         Parameters
@@ -71,7 +69,7 @@ class FixedBudget(BudgetManager):
 
         return queried_indices
 
-    def update(self, X_cand, queried_indices, **kwargs):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager.
         Parameters
         ----------

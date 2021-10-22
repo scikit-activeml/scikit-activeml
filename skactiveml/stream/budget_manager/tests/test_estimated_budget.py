@@ -55,73 +55,116 @@ class TestEstimatedBudget(unittest.TestCase):
 
         self._test_update_without_query(SplitBudget)
 
-        # functinality test
-        # self._test_sampled_utilities(SplitBudget)
-
     def _test_init_param_budget(self, budget_manager_name):
         # budget must be defined as a float with a range of: 0 < budget <= 1
         budget_manager = budget_manager_name(budget="string")
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(budget=1.1)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(budget=-1.0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
 
     def _test_init_param_w(self, budget_manager_name):
         # w must be defined as an int with a range of w > 0
         budget_manager = budget_manager_name(w="string")
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(w=None)
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(w=1.1)
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(w=0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(w=-1)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
 
     def _test_init_param_num_classes(self, budget_manager_name):
         # num_classes must be defined as an int and greater than 0
         budget_manager = budget_manager_name(num_classes="string")
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(num_classes=-1)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(num_classes=0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
 
     def _test_init_param_theta(self, budget_manager_name):
         # theta must be defined as a float
         budget_manager = budget_manager_name(theta="string")
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
 
     def _test_init_param_s(self, budget_manager_name):
         # s must be defined as a float with a range of: 0 < s <= 1
         budget_manager = budget_manager_name(s="string")
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(s=1.1)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(s=0.0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(s=-1.0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
 
     def _test_init_param_v(self, budget_manager_name):
         # v must be defined as an float with a range of: 0 < v < 1
         budget_manager = budget_manager_name(v="string")
-        self.assertRaises(TypeError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(v=1.1)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(v=0.0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
         budget_manager = budget_manager_name(v=-1.0)
-        self.assertRaises(ValueError, budget_manager.query, self.utilities)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
 
     def _test_sampled_param_utilities(self, budget_manager_name):
         # s must be defined as a float ndarray
         budget_manager = budget_manager_name()
-        self.assertRaises(TypeError, budget_manager.query, utilities="string")
-        self.assertRaises(TypeError, budget_manager.query, utilities=None)
-        self.assertRaises(TypeError, budget_manager.query, utilities=[10, 10])
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, utilities="string"
+        )
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, utilities=None
+        )
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, utilities=[10, 10]
+        )
 
     def _test_update_without_query(self, query_strategy_name):
         qs = query_strategy_name()

@@ -19,12 +19,11 @@ class TestRandom(unittest.TestCase):
             shuffle=True,
         )
 
-        self.X = X[:train_init_size, :]
+        self.X = X[[train_init_size], :]
         self.X_cand = X[train_init_size:, :]
         self.y = y[:train_init_size]
-        self.clf = PWC()
         self.kwargs = dict(
-            X_cand=self.X_cand, clf=self.clf, X=self.X, y=self.y
+            X_cand=self.X_cand
         )
 
     def test_periodic_sampler(self):
@@ -66,21 +65,15 @@ class TestRandom(unittest.TestCase):
             TypeError,
             query_strategy.query,
             X_cand=self.X_cand,
-            clf=self.clf,
-            X=self.X,
-            y=self.y[1:],
             return_utilities="string",
         )
         self.assertRaises(
             TypeError,
             query_strategy.query,
             X_cand=self.X_cand,
-            clf=self.clf,
-            X=self.X,
-            y=self.y[1:],
             return_utilities=1,
         )
 
     def _test_update_without_query(self, query_strategy_name):
         qs = query_strategy_name()
-        qs.update(np.array([[0], [1], [2]]), np.array([0, 2]))
+        qs.update(np.array([[0], [1], [2]]).reshape(), np.array([0, 2]))
