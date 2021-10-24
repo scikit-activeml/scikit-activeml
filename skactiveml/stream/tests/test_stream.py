@@ -80,15 +80,13 @@ class TestStream(unittest.TestCase):
 
         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             return_utilities = t % 2 == 0
-            if qs_name == "PALS":
-                return_utilities = True
             qs_output = call_func(query_strategy.query,
                                   X_cand=x_t.reshape([1, -1]),
                                   clf=clf,
                                   return_utilities=return_utilities
                                   )
 
-            for _ in range(3):
+            for i in range(3):
                 qs_output2 = call_func(query_strategy2.query,
                                        X_cand=x_t.reshape([1, -1]),
                                        clf=clf,
@@ -102,8 +100,8 @@ class TestStream(unittest.TestCase):
             else:
                 sampled_indices = qs_output
                 sampled_indices2 = qs_output2
-                utilities = None
-                utilities2 = None
+                utilities = [0.5]
+                utilities2 = [0.5]
             self.assertEqual(len(sampled_indices), len(sampled_indices2))
             query_strategy.update(
                 x_t.reshape([1, -1]), sampled_indices, utilities=utilities
