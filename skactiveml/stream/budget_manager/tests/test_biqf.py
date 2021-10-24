@@ -89,14 +89,14 @@ class TestBIQF(unittest.TestCase):
         )
 
     def _test_update_without_query(self, budget_manager_name):
-        budget_manager = budget_manager_name(save_utilities=False)
+        budget_manager = budget_manager_name()
         budget_manager.update(
             np.array([[0], [1], [2]]),
             np.array([0, 2]),
             utilities=[0.9, 0.1, 0.8],
         )
         self.assertRaises(
-            ValueError,
+            TypeError,
             budget_manager.update,
             np.array([[0], [1], [2]]),
             np.array([0, 2]),

@@ -3,7 +3,6 @@ import numpy as np
 
 from sklearn.datasets import make_classification
 
-from ...classifier import PWC
 from .._random import PeriodicSampler, RandomSampler
 
 
@@ -76,4 +75,4 @@ class TestRandom(unittest.TestCase):
 
     def _test_update_without_query(self, query_strategy_name):
         qs = query_strategy_name()
-        qs.update(np.array([[0], [1], [2]]).reshape(), np.array([0, 2]))
+        qs.update(np.array([[0], [1], [2]]), np.array([0, 2]))

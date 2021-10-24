@@ -493,12 +493,10 @@ class SplitBudget(EstimatedBudget):
         # Check theta
         self._validate_theta()
         # Check s
-        self._validate_s()
         check_scalar(
             self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
         )
         # Check v
-        self._validate_v()
         check_scalar(
             self.v, "v", float, min_val=0, min_inclusive=False, max_val=1
         )

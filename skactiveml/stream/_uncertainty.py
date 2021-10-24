@@ -99,6 +99,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             return_utilities,
         ) = self._validate_data(
             X_cand,
+            clf=clf,
             X=X,
             y=y,
             sample_weight=sample_weight,
@@ -119,7 +120,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -205,9 +206,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         X_cand, return_utilities = super()._validate_data(
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
-        clf = self._validate_clf(clf, X, y, sample_weight)
         self._validate_random_state()
-        X, y, sample_weight = _validate_X_y_sample_weight(X, y, sample_weight)
+        X, y, sample_weight = _validate_X_y_sample_weight(X=X, y=y, sample_weight=sample_weight)
+        clf = self._validate_clf(clf, X, y, sample_weight)
 
         return X_cand, clf, X, y, sample_weight, return_utilities
 
@@ -319,7 +320,12 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             sample_weight,
             return_utilities,
         ) = self._validate_data(
-            X_cand, return_utilities, X, y, sample_weight=sample_weight,
+            X_cand,
+            clf=clf,
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            return_utilities=return_utilities,
         )
         # Check if the classifier and its arguments are valid.
         check_type(clf, SkactivemlClassifier, "clf")
@@ -336,7 +342,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -424,7 +430,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         )
 
         X, y, sample_weight = _validate_X_y_sample_weight(
-            X, y, sample_weight=sample_weight
+            X=X, y=y, sample_weight=sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight)
         self._validate_random_state()
@@ -534,7 +540,12 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             sample_weight,
             return_utilities,
         ) = self._validate_data(
-            X_cand, return_utilities, X, y, sample_weight=sample_weight,
+            X_cand,
+            clf=clf,
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            return_utilities=return_utilities,
         )
         # Check if the classifier and its arguments are valid.
         check_type(clf, SkactivemlClassifier, "clf")
@@ -551,7 +562,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -666,7 +677,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         return fit_if_not_fitted(clf, X, y, sample_weight)
 
 
-def _validate_X_y_sample_weight(self, X, y, sample_weight):
+def _validate_X_y_sample_weight(X, y, sample_weight):
     """Validate if X, y and sample_weight are numeric and of equal lenght.
 
     Parameters

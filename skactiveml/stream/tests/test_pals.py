@@ -225,7 +225,7 @@ class TestPALS(unittest.TestCase):
         # equal in size of y
         query_strategy = query_strategy_name()
         self.assertRaises(
-            TypeError,
+            ValueError,
             query_strategy.query,
             X_cand=self.X_cand,
             clf=self.clf,
@@ -249,7 +249,7 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=self.y,
-            utility_weight=[1],
+            utility_weight=[1, 1],
         )
 
     def _test_query_param_return_utilities(self, query_strategy_name):

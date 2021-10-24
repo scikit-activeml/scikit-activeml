@@ -139,7 +139,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
         """Updates the budget manager
 
         Parameters
@@ -232,7 +232,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             X, y, sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight)
-        utility_weight = self._validate_utility_weight(utility_weight)
+        utility_weight = self._validate_utility_weight(utility_weight, X_cand)
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
         )
@@ -315,6 +315,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         if utility_weight is None:
             utility_weight = np.ones(len(X_cand))
         utility_weight = check_array(utility_weight, ensure_2d=False)
+        check_consistent_length(utility_weight, X_cand)
         return utility_weight
 
     def _validate_random_state(self):

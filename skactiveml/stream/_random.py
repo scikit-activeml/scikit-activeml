@@ -63,7 +63,12 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             X_cand, return_utilities
         )
 
+        # copy random state in case of simulating the query
+        prior_random_state_state = self.random_state_.get_state()
+
         utilities = self.random_state_.random_sample(len(X_cand))
+
+        self.random_state_.set_state(prior_random_state_state)
 
         queried_indices = self.budget_manager_.query_by_utility(utilities)
 
@@ -72,7 +77,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -99,7 +104,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         self._validate_budget_manager()
         # update the random state assuming, that query(..., simulate=True) was
         # used
-        self.random_state_.random_sample(len(queried_indices))
+        self.random_state_.random_sample(len(X_cand))
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
@@ -229,7 +234,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -251,7 +256,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             The PeriodicSampler returns itself, after it is updated.
         """
         # check if a budget_manager is set
-        self._validate_data(np.array([0]), False)
+        self._validate_data(np.array([[0]]), False)
 
         call_func(
             self.budget_manager_.update,
