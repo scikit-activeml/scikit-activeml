@@ -433,7 +433,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, queried, *args, **kwargs):
+    def update(self, X_cand, queried_indices, *args, **kwargs):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
@@ -448,7 +448,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        queried : array-like
+        queried_indices : array-like
             Indicates which instances from X_cand have been queried.
 
         Returns
@@ -510,8 +510,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             Checked candidate samples
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
         """
         # Check candidate instances.
         X_cand = check_array(X_cand, **check_X_cand_params)
