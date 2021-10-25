@@ -114,6 +114,5 @@ class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
 
     def test_update(self):
-        self.assertRaises(
-            NotImplementedError, self.qs.update, X_cand=None, queried=None
-        )
+        self.assertRaises(NotImplementedError, self.qs.update, X_cand=None,
+                          queried_indices=None)

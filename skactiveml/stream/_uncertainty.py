@@ -120,7 +120,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -133,7 +133,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
-        budget_manager_kwargs : kwargs
+        budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
         Returns
@@ -143,11 +143,13 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
+        budget_manager_param_dict = ({} if budget_manager_param_dict is None
+                                     else budget_manager_param_dict)
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
             queried_indices=queried_indices,
-            **budget_manager_kwargs
+            **budget_manager_param_dict
         )
         return self
 
@@ -344,7 +346,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -357,7 +359,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
-        budget_manager_kwargs : kwargs
+        budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
         Returns
@@ -367,11 +369,13 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_budget_manager()
+        budget_manager_param_dict = ({} if budget_manager_param_dict is None
+                                     else budget_manager_param_dict)
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
             queried_indices=queried_indices,
-            **budget_manager_kwargs
+            **budget_manager_param_dict
         )
         return self
 
@@ -564,7 +568,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -577,7 +581,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
-        budget_manager_kwargs : kwargs
+        budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
         Returns
@@ -589,12 +593,13 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         self._validate_budget_manager()
         # Check if a random state is set
         self._validate_random_state()
-
+        budget_manager_param_dict = ({} if budget_manager_param_dict is None
+                                     else budget_manager_param_dict)
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
             queried_indices=queried_indices,
-            **budget_manager_kwargs
+            **budget_manager_param_dict
         )
         return self
 

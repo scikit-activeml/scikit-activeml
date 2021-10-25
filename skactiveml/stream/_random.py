@@ -77,7 +77,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -90,7 +90,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
-        budget_manager_kwargs : kwargs
+        budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
         Returns
@@ -102,6 +102,8 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         self._validate_random_state()
         # check if a budget_manager is set
         self._validate_budget_manager()
+        budget_manager_param_dict = ({} if budget_manager_param_dict is None
+                                     else budget_manager_param_dict)
         # update the random state assuming, that query(..., simulate=True) was
         # used
         self.random_state_.random_sample(len(X_cand))
@@ -109,7 +111,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             self.budget_manager_.update,
             X_cand=X_cand,
             queried_indices=queried_indices,
-            **budget_manager_kwargs
+            **budget_manager_param_dict
         )
         return self
 
@@ -234,7 +236,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
+    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -247,7 +249,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from X_cand have been queried.
 
-        budget_manager_kwargs : kwargs
+        budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
         Returns
@@ -257,12 +259,13 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_data(np.array([[0]]), False)
-
+        budget_manager_param_dict = ({} if budget_manager_param_dict is None
+                                     else budget_manager_param_dict)
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
             queried_indices=queried_indices,
-            **budget_manager_kwargs
+            **budget_manager_param_dict
         )
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
