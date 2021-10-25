@@ -233,7 +233,7 @@ class TestExamples(unittest.TestCase):
 
     def test_json(self):
         exceptions = []
-        json_path = path.abspath('../../../docs/examples/pool')
+        json_path = path.abspath('docs/examples/pool')
 
         # Collect all strategies for which an example exists
         expected_strats = []
