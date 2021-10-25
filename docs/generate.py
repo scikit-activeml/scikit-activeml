@@ -127,22 +127,6 @@ def automodule(module, level=0):
 
     return rst_str
 
-    is_classes = False
-    is_fuctions = False
-    for item in package.__all__:
-        item = getattr(package, item)
-        if inspect.ismodule(item):
-            rst_str += doc_package(item, level=level + 1)
-        if inspect.isclass(item):
-            if not is_classes:
-                is_classes = True
-                title = f':mod:`{item.__name__}`:'
-                rst_str += title + '\n'
-                rst_str += ''.ljust(len(title), '=') + '\n'
-            pass
-        if inspect.isfunction(item):
-            pass
-
 
 def generate_strategy_overview_rst(gen_path, examples_data={}):
     """Creates the strategy_overview.rst file in the specified path.
