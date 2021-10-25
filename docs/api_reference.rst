@@ -15,19 +15,19 @@ This is an overview of the API.
     :no-members:
     :no-inherited-members:
 
-.. currentmodule:: skactiveml
+.. currentmodule:: skactiveml.base
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: class.rst
 
-   skactiveml.QueryStrategy
-   skactiveml.SingleAnnotPoolBasedQueryStrategy
-   skactiveml.MultiAnnotPoolBasedQueryStrategy
-   skactiveml.SkactivemlClassifier
-   skactiveml.ClassFrequencyEstimator
-   skactiveml.AnnotModelMixin
+   QueryStrategy
+   SingleAnnotPoolBasedQueryStrategy
+   MultiAnnotPoolBasedQueryStrategy
+   SkactivemlClassifier
+   ClassFrequencyEstimator
+   AnnotModelMixin
 
 
 :mod:`skactiveml.pool`: Pool-based strategies
@@ -37,39 +37,60 @@ This is an overview of the API.
     :no-members:
     :no-inherited-members:
 
+.. currentmodule:: skactiveml.pool
+
 Classes
 -------
-.. currentmodule:: skactiveml
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: class.rst
 
-   skactiveml.pool.RandomSampler
-   skactiveml.pool.McPAL
-   skactiveml.pool.UncertaintySampling
-   skactiveml.pool.EpistemicUncertainty
-   skactiveml.pool.ExpectedErrorReduction
-   skactiveml.pool.QBC
-   skactiveml.pool.FourDS
-   skactiveml.pool.ALCE
+   RandomSampler
+   McPAL
+   UncertaintySampling
+   EpistemicUncertainty
+   ExpectedErrorReduction
+   QBC
+   FourDS
+   ALCE
 
 Functions
 ---------
-.. currentmodule:: skactiveml
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: function.rst
 
-   skactiveml.pool.cost_reduction
-   skactiveml.pool.uncertainty_scores
-   skactiveml.pool.expected_average_precision
-   skactiveml.pool.expected_error_reduction
-   skactiveml.pool.average_kl_divergence
-   skactiveml.pool.vote_entropy
+   cost_reduction
+   uncertainty_scores
+   expected_average_precision
+   expected_error_reduction
+   average_kl_divergence
+   vote_entropy
+
+:mod:`skactiveml.pool.multi`: Multi Annotator Pool-based strategies
+===================================================================
+
+.. automodule:: skactiveml.pool.multi
+    :no-members:
+    :no-inherited-members:
+
+.. currentmodule:: skactiveml.pool.multi
+
+Classes
+-------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated/api
+   :template: class.rst
+
+   IEThresh
+   IEAnnotModel
+   MultiAnnotWrapper
 
 :mod:`skactiveml.classifier`: Classifier
 ========================================
@@ -78,18 +99,18 @@ Functions
     :no-members:
     :no-inherited-members:
 
-.. currentmodule:: skactiveml
+.. currentmodule:: skactiveml.classifier
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: class.rst
 
-   skactiveml.classifier.PWC
-   skactiveml.classifier.CMM
-   skactiveml.classifier.SklearnClassifier
-   skactiveml.classifier.MultiAnnotClassifier
-   skactiveml.classifier.LogisticRegressionRY
+   PWC
+   CMM
+   SklearnClassifier
+   MultiAnnotClassifier
+   LogisticRegressionRY
 
 :mod:`skactiveml.visualization`: Visualization functions
 ========================================================
@@ -98,15 +119,15 @@ Functions
     :no-members:
     :no-inherited-members:
 
-.. currentmodule:: skactiveml
+.. currentmodule:: skactiveml.visualization
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: function.rst
 
-   skactiveml.visualization.plot_utility
-   skactiveml.visualization.plot_decision_boundary
+   plot_utility
+   plot_decision_boundary
 
 :mod:`skactiveml.utils`: Utility classes, functions and constants
 =================================================================
@@ -115,46 +136,46 @@ Functions
     :no-members:
     :no-inherited-members:
 
+.. currentmodule:: skactiveml.utils
+
 Classes
 -------
-.. currentmodule:: skactiveml
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: class.rst
 
-   skactiveml.utils.ExtLabelEncoder
+   ExtLabelEncoder
 
 Functions
 ---------
-.. currentmodule:: skactiveml
 
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
    :template: function.rst
 
-   skactiveml.utils.rand_argmax
-   skactiveml.utils.rand_argmin
-   skactiveml.utils.compute_vote_vectors
-   skactiveml.utils.is_unlabeled
-   skactiveml.utils.is_labeled
-   skactiveml.utils.check_classes
-   skactiveml.utils.check_missing_label
-   skactiveml.utils.check_cost_matrix
-   skactiveml.utils.check_scalar
-   skactiveml.utils.check_classifier_params
-   skactiveml.utils.check_X_y
-   skactiveml.utils.check_random_state
-   skactiveml.utils.call_func
-   skactiveml.utils.simple_batch
-   skactiveml.utils.check_class_prior
-   skactiveml.utils.ext_confusion_matrix
-   skactiveml.utils.fit_if_not_fitted
-   skactiveml.utils.labeled_indices
-   skactiveml.utils.unlabeled_indices
-   skactiveml.utils.check_type
+   rand_argmax
+   rand_argmin
+   compute_vote_vectors
+   is_unlabeled
+   is_labeled
+   check_classes
+   check_missing_label
+   check_cost_matrix
+   check_scalar
+   check_classifier_params
+   check_X_y
+   check_random_state
+   call_func
+   simple_batch
+   check_class_prior
+   ext_confusion_matrix
+   fit_if_not_fitted
+   labeled_indices
+   unlabeled_indices
+   check_type
 
 Constants
 ---------
@@ -165,7 +186,7 @@ Constants
    :toctree: generated/api
    :template: module.rst
 
-   skactiveml.utils.MISSING_LABEL
+   utils.MISSING_LABEL
 
 .. currentmodule:: skactiveml
 

@@ -16,6 +16,10 @@ from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
     is_labeled, check_scalar, check_class_prior
 
+__all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
+           'MultiAnnotPoolBasedQueryStrategy', 'SkactivemlClassifier',
+           'ClassFrequencyEstimator', 'AnnotModelMixin']
+
 
 class QueryStrategy(ABC, BaseEstimator):
     """Base class for all query strategies in scikit-activeml.

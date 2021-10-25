@@ -1,12 +1,6 @@
-from skactiveml import pool, utils, classifier, visualization
-from skactiveml.base import QueryStrategy, SingleAnnotPoolBasedQueryStrategy, \
-    MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier, \
-    ClassFrequencyEstimator, AnnotModelMixin
+from skactiveml import pool, utils, classifier, visualization, base
 
-__all__ = ['pool', 'classifier', 'visualization', 'utils',
-           'QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
-           'MultiAnnotPoolBasedQueryStrategy', 'SkactivemlClassifier',
-           'ClassFrequencyEstimator', 'AnnotModelMixin']
+__all__ = ['base', 'pool', 'classifier', 'visualization', 'utils']
 
 __version__ = '0.0.0'
 

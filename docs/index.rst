@@ -7,7 +7,7 @@ Welcome to scikit-activeml's documentation!
 
    notebooks/getting_started
    Strategy Overview <generated/strategy_overview/strategy_overview-Settles2012>
-   api_reference
+   generated/api_reference
    generated/sphinx_gallery_examples/index
    developers_guide
 

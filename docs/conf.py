@@ -94,9 +94,6 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
-# sphinx-autogen docs/index.rst
-autosummary_generate = True
-
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
     'run_stale_examples': False,
@@ -206,13 +203,17 @@ todo_include_todos = True
 
 # -- Generate files for strategy overview and api reference ------------------
 
+autosummary_generate = True
+
 autodoc_default_options = {
     'members': True,
     'undoc-members': True,
     'show-inheritance': True,
     'inherited-members': True,
-    ':special-members:': False
+#    'special-members': False
 }
+
+autoclass_content = 'class'
 
 generate_api_reference_rst(
     gen_path=os.path.abspath('generated')

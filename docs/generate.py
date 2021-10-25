@@ -36,96 +36,112 @@ def generate_api_reference_rst(gen_path):
         file.write('\n')
         file.write('.. module:: skactiveml\n')
         file.write('\n')
+        for item in skactiveml.__all__:
+            if inspect.ismodule(getattr(skactiveml, item)):
+                file.write(automodule(getattr(skactiveml, item)))
 
-        for package in skactiveml.__all__:
-            package = getattr(skactiveml, package)
-            if inspect.ismodule(package):
-                title = f':mod:`{package.__name__}`:'
-                file.write(title + '\n')
-                file.write(''.ljust(len(title), '=') + '\n')
-                file.write('\n')
-                file.write(f'.. automodule:: {package.__name__}\n')
-                file.write('    :no-members:\n')
-                file.write('    :no-inherited-members:\n')
-                file.write('\n')
-                file.write('Classes\n')
-                file.write('-------\n')
-                file.write('.. currentmodule:: skactiveml\n')
-                file.write('\n')
-                file.write('.. autosummary::\n')
-                file.write('   :nosignatures:\n')
-                file.write('   :toctree: api\n')
-                file.write('   :template: class.rst\n')
-                file.write('\n')
-                for item in package.__all__:
-                    if inspect.isclass(getattr(package, item)):
-                        file.write(f'   {package.__name__}.{item}\n')
-                file.write('\n')
-                file.write('Functions\n')
-                file.write('---------\n')
-                file.write('.. currentmodule:: skactiveml\n')
-                file.write('\n')
-                file.write('.. autosummary::\n')
-                file.write('   :nosignatures:\n')
-                file.write('   :toctree: api\n')
-                file.write('   :template: function.rst\n')
-                file.write('\n')
-                for item in package.__all__:
-                    if inspect.isfunction(getattr(package, item)):
-                        file.write(f'   {package.__name__}.{item}\n')
-                file.write('\n')
 
-        return
-        file.write('Pool\n')
-        file.write('----\n')
-        file.write('\n')
-        file.write('.. autosummary::\n')
-        file.write('   :nosignatures:\n')
-        file.write('   :toctree: api\n')
-        file.write('   :template: module.rst\n')
-        file.write('\n')
-        for item in pool.__all__:
-            file.write(f'   pool.{item}\n')
-        file.write('\n')
-        # TODO stream
+def automodule(module, level=0):
+    rst_str = ''
+    modules = []
+    classes = []
+    functions = []
+    constants = []
 
-        file.write('Classifier\n')
-        file.write('----------\n')
-        file.write('\n')
-        file.write('.. autosummary::\n')
-        # file.write('   :nosignatures:\n')
-        file.write('   :recursive:\n')
-        file.write('   :toctree: api\n')
-        file.write('   :template: class.rst\n')
-        file.write('\n')
-        for item in classifier.__all__:
-            file.write(f'   classifier.{item}\n')
-        file.write('\n')
+    for item in module.__all__:
+        if inspect.ismodule(getattr(module, item)):
+            modules.append(item)
+        if inspect.isclass(getattr(module, item)):
+            classes.append(item)
+        if inspect.isfunction(getattr(module, item)):
+            functions.append(item)
+        if isinstance(getattr(module, item), object) and item.isupper():
+            constants.append(item)
 
-        file.write('Utils\n')
-        file.write('-----\n')
-        file.write('\n')
-        file.write('.. autosummary::\n')
-        file.write('   :nosignatures:\n')
-        file.write('   :toctree: api\n')
-        file.write('   :template: base.rst\n')
-        file.write('\n')
-        for item in utils.__all__:
-            if item == 'MISSING_LABEL': continue
-            file.write(f'   utils.{item}\n')
-        file.write('\n')
+    title = f':mod:`{module.__name__}`:'
+    rst_str += title + '\n'
+    rst_str += ''.ljust(len(title), '=') + '\n\n'
 
-        file.write('Visualization\n')
-        file.write('-------------\n')
-        file.write('\n')
-        file.write('.. autosummary::\n')
-        file.write('   :nosignatures:\n')
-        file.write('   :toctree: api\n')
-        file.write('   :template: base.rst\n')
-        file.write('\n')
-        for item in visualization.__all__:
-            file.write(f'   visualization.{item}\n')
-        file.write('\n')
+    rst_str += f'.. automodule:: {module.__name__}\n'
+    rst_str += f'    :no-members:\n'
+    rst_str += f'    :no-inherited-members:\n\n'
+
+    rst_str += f'.. currentmodule:: {module.__name__.split(".")[0]}\n\n'
+    if classes:
+        rst_str += f'Classes\n'
+        rst_str += f'-------\n\n'
+
+        rst_str += f'.. autosummary::\n'
+        rst_str += f'   :nosignatures:\n'
+        rst_str += f'   :toctree: api\n'
+        rst_str += f'   :template: class.rst\n\n'
+        for item in classes:
+            name = module.__name__
+            if 'skactiveml.' in name:
+                name = name.replace('skactiveml.', '')
+            if name:
+                name += '.'
+            name += item
+            rst_str += f'   {name}' + '\n'
+        rst_str += '\n'
+
+    if functions:
+        rst_str += f'Functions\n'
+        rst_str += f'---------\n\n'
+
+        rst_str += f'.. autosummary::\n'
+        rst_str += f'   :nosignatures:\n'
+        rst_str += f'   :toctree: api\n'
+        rst_str += f'   :template: function.rst\n\n'
+        for item in functions:
+            name = module.__name__
+            if 'skactiveml.' in name:
+                name = name.replace('skactiveml.', '')
+            if name:
+                name += '.'
+            name += item
+            rst_str += f'   {name}' + '\n'
+        rst_str += '\n'
+
+    if constants:
+        rst_str += f'Constants\n'
+        rst_str += f'---------\n\n'
+
+        rst_str += f'.. autosummary::\n'
+        rst_str += f'   :nosignatures:\n'
+        rst_str += f'   :toctree: api\n'
+        rst_str += f'   :template: function.rst\n\n'
+        for item in constants:
+            name = module.__name__
+            if 'skactiveml.' in name:
+                name = name.replace('skactiveml.', '')
+            if name:
+                name += '.'
+            name += item
+            rst_str += f'   {name}' + '\n'
+
+        rst_str += '\n'
+
+    for item in modules:
+        rst_str += automodule(getattr(module, item), level=level + 1)
+
+    return rst_str
+
+    is_classes = False
+    is_fuctions = False
+    for item in package.__all__:
+        item = getattr(package, item)
+        if inspect.ismodule(item):
+            rst_str += doc_package(item, level=level + 1)
+        if inspect.isclass(item):
+            if not is_classes:
+                is_classes = True
+                title = f':mod:`{item.__name__}`:'
+                rst_str += title + '\n'
+                rst_str += ''.ljust(len(title), '=') + '\n'
+            pass
+        if inspect.isfunction(item):
+            pass
 
 
 def generate_strategy_overview_rst(gen_path, examples_data={}):
