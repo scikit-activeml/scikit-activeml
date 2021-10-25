@@ -77,7 +77,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
+    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -234,7 +234,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, **budget_manager_kwargs):
+    def update(self, X_cand, queried_indices, budget_manager_kwargs={}):
         """Updates the budget manager and the count for seen and queried
         instances
 

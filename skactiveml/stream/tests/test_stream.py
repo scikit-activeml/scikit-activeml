@@ -103,11 +103,13 @@ class TestStream(unittest.TestCase):
                 utilities = [0.5]
                 utilities2 = [0.5]
             self.assertEqual(len(sampled_indices), len(sampled_indices2))
+            budget_manager_kwargs1 = {"utilities": utilities}
+            budget_manager_kwargs2 = {"utilities": utilities2}
             query_strategy.update(
-                x_t.reshape([1, -1]), sampled_indices, utilities=utilities
+                x_t.reshape([1, -1]), sampled_indices, budget_manager_kwargs1
             )
             query_strategy2.update(
-                x_t.reshape([1, -1]), sampled_indices, utilities=utilities2
+                x_t.reshape([1, -1]), sampled_indices, budget_manager_kwargs2
             )
             if len(sampled_indices):
                 # X_train.append(x_t)
