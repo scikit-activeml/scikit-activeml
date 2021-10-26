@@ -63,4 +63,4 @@ for c in range(n_cycles):
     # Label the queried instances.
     y[query_idx] = y_true[query_idx]
 
-ani = animation.ArtistAnimation(fig, artists, blit=True)
+ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
