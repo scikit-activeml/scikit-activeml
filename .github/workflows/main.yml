@@ -21,13 +21,6 @@ jobs:
       run: |
         sudo apt-get install pandoc
         python -m pip install --upgrade pip
-        pip install sphinx>=3.5.1
-        pip install sphinxcontrib-bibtex>=2.3.0
-        pip install numpydoc>=1.1.0
-        pip install nbsphinx>=0.8.2
-        pip install pydata-sphinx-theme>=0.6.3
-        pip install sphinx-gallery>=0.8.2
-        pip install pybtex>=0.23.0
         pip install -r requirements.txt
     - name: Lint with flake8
       run: |
@@ -48,6 +41,11 @@ jobs:
     - name: Create documentation with sphinx
       run: |
         pip install jupyter
-        pip install sphinx
-        pip install pydata_sphinx_theme
+        pip install sphinx>=3.5.1
+        pip install sphinxcontrib-bibtex>=2.3.0
+        pip install numpydoc>=1.1.0
+        pip install nbsphinx>=0.8.2
+        pip install sphinx-gallery>=0.8.2
+        pip install pybtex>=0.23.0
+        pip install pydata_sphinx_theme>=0.7.1
         sphinx-build -b html docs docs/_build
