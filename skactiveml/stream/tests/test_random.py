@@ -6,7 +6,7 @@ from sklearn.datasets import make_classification
 from skactiveml.stream import PeriodicSampler, RandomSampler
 
 
-class TestRandom:
+class TemplateTestRandom:
     def setUp(self):
         # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
@@ -75,11 +75,11 @@ class TestRandom:
         qs.update(np.array([[0], [1], [2]]), np.array([0, 2]))
 
 
-class TestRandomSampler(TestRandom, unittest.TestCase):
+class TestRandomSampler(TemplateTestRandom, unittest.TestCase):
     def get_query_strategy(self):
         return RandomSampler
 
 
-class TestPeriodicSampler(TestRandom, unittest.TestCase):
+class TestPeriodicSampler(TemplateTestRandom, unittest.TestCase):
     def get_query_strategy(self):
         return PeriodicSampler

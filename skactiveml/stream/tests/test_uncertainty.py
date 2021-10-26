@@ -1,5 +1,4 @@
 import unittest
-from abc import ABC
 import numpy as np
 
 from sklearn.datasets import make_classification
@@ -8,7 +7,7 @@ from skactiveml.classifier import PWC
 from skactiveml.stream import FixedUncertainty, VariableUncertainty, Split
 
 
-class TestUncertainty(ABC):
+class TemplateTestUncertainty:
     def setUp(self):
         # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
@@ -208,16 +207,16 @@ class TestUncertainty(ABC):
         )
 
 
-class TestSplit(TestUncertainty, unittest.TestCase):
+class TestSplit(TemplateTestUncertainty, unittest.TestCase):
     def get_query_strategy(self):
         return Split
 
 
-class TestFixedUncertainty(TestUncertainty, unittest.TestCase):
+class TestFixedUncertainty(TemplateTestUncertainty, unittest.TestCase):
     def get_query_strategy(self):
         return FixedUncertainty
 
 
-class TestVariableUncertainty(TestUncertainty, unittest.TestCase):
+class TestVariableUncertainty(TemplateTestUncertainty, unittest.TestCase):
     def get_query_strategy(self):
         return VariableUncertainty
