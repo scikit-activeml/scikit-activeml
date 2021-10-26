@@ -27,55 +27,39 @@ class TestPALS(unittest.TestCase):
             X_cand=self.X_cand, clf=self.clf, X=self.X, y=self.y
         )
 
-    def test_pal(self):
-        # init param test
-        self._test_init_param_budget_manager(PALS)
-        self._test_init_param_prior(PALS)
-        self._test_init_param_m_max(PALS)
-        self._test_init_param_random_state(PALS)
-
-        # query param test
-        self._test_query_param_clf(PALS)
-        self._test_query_param_X_cand(PALS)
-        self._test_query_param_X(PALS)
-        self._test_query_param_y(PALS)
-        self._test_query_param_sample_weight(PALS)
-        self._test_query_param_utility_weight(PALS)
-        self._test_query_param_return_utilities(PALS)
-
-    def _test_init_param_budget_manager(self, query_strategy_name):
+    def test_init_param_budget_manager(self):
         # budget_manager must be defined as an object of an budget manager
         # class
-        query_strategy = query_strategy_name(budget_manager=[])
+        query_strategy = PALS(budget_manager=[])
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
-    def _test_init_param_prior(self, query_strategy_name):
+    def test_init_param_prior(self):
         # prior must be defined as a float with a range of: 0 < prior
-        query_strategy = query_strategy_name(prior="string")
+        query_strategy = PALS(prior="string")
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(prior=0.0)
+        query_strategy = PALS(prior=0.0)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(prior=-1.0)
+        query_strategy = PALS(prior=-1.0)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
-    def _test_init_param_m_max(self, query_strategy_name):
+    def test_init_param_m_max(self):
         # m_max must be defined as a integer greater than 0
-        query_strategy = query_strategy_name(m_max="string")
+        query_strategy = PALS(m_max="string")
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(m_max=0.1)
+        query_strategy = PALS(m_max=0.1)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(m_max=0)
+        query_strategy = PALS(m_max=0)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
-        query_strategy = query_strategy_name(m_max=-1)
+        query_strategy = PALS(m_max=-1)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
-    def _test_init_param_random_state(self, query_strategy_name):
-        query_strategy = query_strategy_name(random_state="string",)
+    def test_init_param_random_state(self):
+        query_strategy = PALS(random_state="string",)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
-    def _test_query_param_X_cand(self, query_strategy_name):
+    def test_query_param_X_cand(self):
         # X_cand must be defined as a two dimensinal array
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             ValueError,
             query_strategy.query,
@@ -101,9 +85,9 @@ class TestPALS(unittest.TestCase):
             y=self.y,
         )
 
-    def _test_query_param_clf(self, query_strategy_name):
+    def test_query_param_clf(self):
         # clf must be defined as a classifier
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             TypeError,
             query_strategy.query,
@@ -112,7 +96,7 @@ class TestPALS(unittest.TestCase):
             X=self.X,
             y=self.y,
         )
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             TypeError,
             query_strategy.query,
@@ -122,10 +106,10 @@ class TestPALS(unittest.TestCase):
             y=self.y,
         )
 
-    def _test_query_param_X(self, query_strategy_name):
+    def test_query_param_X(self):
         # X must be defined as a two dimensinal array and must be equal in
         # length to y
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             ValueError,
             query_strategy.query,
@@ -159,10 +143,10 @@ class TestPALS(unittest.TestCase):
             y=self.y,
         )
 
-    def _test_query_param_y(self, query_strategy_name):
+    def test_query_param_y(self):
         # y must be defined as a one Dimensional array and must be equal in
         # length to X
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             TypeError,
             query_strategy.query,
@@ -188,10 +172,10 @@ class TestPALS(unittest.TestCase):
             y=self.y[1:],
         )
 
-    def _test_query_param_sample_weight(self, query_strategy_name):
+    def test_query_param_sample_weight(self):
         # sample weight needs to be a list that can be convertet to float
         # equal in size of y
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             TypeError,
             query_strategy.query,
@@ -220,10 +204,10 @@ class TestPALS(unittest.TestCase):
             sample_weight=[1],
         )
 
-    def _test_query_param_utility_weight(self, query_strategy_name):
+    def test_query_param_utility_weight(self):
         # sample weight needs to be a list that can be convertet to float
         # equal in size of y
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             ValueError,
             query_strategy.query,
@@ -252,9 +236,9 @@ class TestPALS(unittest.TestCase):
             utility_weight=[1, 1],
         )
 
-    def _test_query_param_return_utilities(self, query_strategy_name):
+    def test_query_param_return_utilities(self):
         # return_utilities needs to be a boolean
-        query_strategy = query_strategy_name()
+        query_strategy = PALS()
         self.assertRaises(
             TypeError,
             query_strategy.query,

@@ -1,3 +1,6 @@
+from importlib import import_module
+import inspect
+from os import path
 import unittest
 import numpy as np
 from collections import deque
@@ -6,11 +9,21 @@ from sklearn.datasets import make_classification
 from sklearn.utils import check_random_state
 
 from skactiveml import stream
+from skactiveml.base import SingleAnnotStreamBasedQueryStrategy
 from skactiveml.utils import call_func
 from skactiveml.classifier import PWC
 
 
 class TestStream(unittest.TestCase):
+    def setUp(self):
+        self.query_strategies = {}
+        for qs_name in stream.__all__:
+            qs = getattr(stream, qs_name)
+            if inspect.isclass(qs) and \
+                    issubclass(qs, SingleAnnotStreamBasedQueryStrategy):
+                self.query_strategies[qs_name] = qs
+        self.clf = PWC()
+
     def test_selection_strategies(self):
         # Create data set for testing.
         rand = np.random.RandomState(0)
@@ -31,14 +44,14 @@ class TestStream(unittest.TestCase):
         X_stream = X[train_init_size:, :]
         y_stream = y[train_init_size:]
 
-        # Build dictionary of attributes.
-        query_strategy_classes = {}
-        for s_class in stream.__all__:
-            query_strategy_classes[s_class] = getattr(stream, s_class)
+        # # Build dictionary of attributes.
+        # query_strategy_classes = {}
+        # for s_class in stream.__all__:
+        #     query_strategy_classes[s_class] = getattr(stream, s_class)
 
         # Test predictions of classifiers.
-        for qs_name, qs_class in query_strategy_classes.items():
-            self._test_selection_strategy(
+        for qs_name, qs_class in self.query_strategies.items():
+            self._test_query_strategy(
                 rand.randint(2 ** 31 - 1),
                 qs_class,
                 clf,
@@ -50,7 +63,7 @@ class TestStream(unittest.TestCase):
                 qs_name
             )
 
-    def _test_selection_strategy(
+    def _test_query_strategy(
         self,
         rand_seed,
         query_strategy_class,
@@ -121,3 +134,54 @@ class TestStream(unittest.TestCase):
             else:
                 y_train.append(clf.missing_label)
             clf.fit(X_train, y_train)
+
+    def test_param(self):
+        not_test = ['self', 'kwargs']
+        for qs_name in self.query_strategies:
+            with self.subTest(msg="Param Test", qs_name=qs_name):
+                # Get initial parameters.
+                qs_class = self.query_strategies[qs_name]
+                init_params = inspect.signature(qs_class).parameters.keys()
+                init_params = list(init_params)
+
+                # Get query parameters.
+                query_params = inspect.signature(qs_class.query).parameters
+                query_params = list(query_params.keys())
+
+                # Check initial parameters.
+                values = [Dummy() for i in range(len(init_params))]
+                qs_obj = qs_class(*values)
+                for param, value in zip(init_params, values):
+                    self.assertTrue(
+                        hasattr(qs_obj, param),
+                        msg=f'"{param}" not tested for __init__()')
+                    self.assertEqual(getattr(qs_obj, param), value)
+
+                # Get class to check.
+                class_filename = path.basename(inspect.getfile(qs_class))[:-3]
+                mod = 'skactiveml.stream.tests.test' + class_filename
+                mod = import_module(mod)
+                test_class_name = 'Test' + qs_class.__name__
+                msg = f'{qs_name} has no test called {test_class_name}.'
+                self.assertTrue(hasattr(mod, test_class_name), msg=msg)
+                test_obj = getattr(mod, test_class_name)
+
+                # Check init parameters.
+                for param in np.setdiff1d(init_params, not_test):
+                    test_func_name = 'test_init_param_' + param
+                    self.assertTrue(
+                        hasattr(test_obj, test_func_name),
+                        msg="'{}()' missing for parameter '{}' of "
+                            "__init__()".format(test_func_name, param))
+
+                # Check query parameters.
+                for param in np.setdiff1d(query_params, not_test):
+                    test_func_name = 'test_query_param_' + param
+                    msg = f"'{test_func_name}()' missing for parameter " \
+                          f"'{param}' of query()"
+                    self.assertTrue(hasattr(test_obj, test_func_name), msg)
+
+
+class Dummy:
+    def __init__(self):
+        pass
