@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+from collections import deque
 
 from sklearn.datasets import make_classification
 from sklearn.utils import check_random_state
@@ -7,7 +8,6 @@ from sklearn.utils import check_random_state
 from skactiveml import stream
 from skactiveml.utils import call_func
 from skactiveml.classifier import PWC
-from collections import deque
 
 
 class TestStream(unittest.TestCase):
@@ -94,24 +94,30 @@ class TestStream(unittest.TestCase):
                                        )
 
             if return_utilities:
-                sampled_indices, utilities = qs_output
-                sampled_indices2, utilities2 = qs_output2
+                queried_indices, utilities = qs_output
+                queried_indices2, utilities2 = qs_output2
                 self.assertEqual(utilities, utilities2)
             else:
-                sampled_indices = qs_output
-                sampled_indices2 = qs_output2
+                queried_indices = qs_output
+                queried_indices2 = qs_output2
                 utilities = [0.5]
                 utilities2 = [0.5]
-            self.assertEqual(len(sampled_indices), len(sampled_indices2))
+            self.assertEqual(len(queried_indices), len(queried_indices2))
             budget_manager_param_dict1 = {"utilities": utilities}
             budget_manager_param_dict2 = {"utilities": utilities2}
             query_strategy.update(
-                x_t.reshape([1, -1]), sampled_indices, budget_manager_param_dict1
+                x_t.reshape([1, -1]),
+                queried_indices,
+                budget_manager_param_dict1
             )
             query_strategy2.update(
-                x_t.reshape([1, -1]), sampled_indices, budget_manager_param_dict2
+                x_t.reshape([1, -1]),
+                queried_indices,
+                budget_manager_param_dict2
             )
-            if len(sampled_indices):
-                # X_train.append(x_t)
-                # y_train.append(y_t)
-                clf.fit(X_train, y_train)
+            X_train.append(x_t)
+            if len(queried_indices):
+                y_train.append(y_t)
+            else:
+                y_train.append(clf.missing_label)
+            clf.fit(X_train, y_train)

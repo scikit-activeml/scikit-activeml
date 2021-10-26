@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from .._estimated_budget import (
+from skactiveml.stream.budget_manager import (
     FixedUncertaintyBudget,
     VarUncertaintyBudget,
     SplitBudget,
@@ -20,7 +20,7 @@ class TestEstimatedBudget(unittest.TestCase):
         self._test_init_param_num_classes(FixedUncertaintyBudget)
 
         # sampled param test
-        self._test_sampled_param_utilities(FixedUncertaintyBudget)
+        self._test_query_param_utilities(FixedUncertaintyBudget)
 
         self._test_update_without_query(FixedUncertaintyBudget)
 
@@ -35,7 +35,7 @@ class TestEstimatedBudget(unittest.TestCase):
         self._test_init_param_s(VarUncertaintyBudget)
 
         # sampled param test
-        self._test_sampled_param_utilities(VarUncertaintyBudget)
+        self._test_query_param_utilities(VarUncertaintyBudget)
 
         self._test_update_without_query(VarUncertaintyBudget)
 
@@ -51,7 +51,7 @@ class TestEstimatedBudget(unittest.TestCase):
         self._test_init_param_v(SplitBudget)
 
         # sampled param test
-        self._test_sampled_param_utilities(SplitBudget)
+        self._test_query_param_utilities(SplitBudget)
 
         self._test_update_without_query(SplitBudget)
 
@@ -153,7 +153,7 @@ class TestEstimatedBudget(unittest.TestCase):
             ValueError, budget_manager.query_by_utility, self.utilities
         )
 
-    def _test_sampled_param_utilities(self, budget_manager_name):
+    def _test_query_param_utilities(self, budget_manager_name):
         # s must be defined as a float ndarray
         budget_manager = budget_manager_name()
         self.assertRaises(

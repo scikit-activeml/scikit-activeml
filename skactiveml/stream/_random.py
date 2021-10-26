@@ -2,7 +2,7 @@ import numpy as np
 
 from ..base import SingleAnnotStreamBasedQueryStrategy
 
-from .budget_manager import FixedBudget
+from .budget_manager import FixedThresholdBudget
 from ..utils import call_func
 
 
@@ -26,7 +26,8 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager=FixedBudget(), random_state=None):
+    def __init__(self, budget_manager=FixedThresholdBudget(),
+                 random_state=None):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )
@@ -172,7 +173,8 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager=FixedBudget(), random_state=None):
+    def __init__(self, budget_manager=FixedThresholdBudget(),
+                 random_state=None):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )

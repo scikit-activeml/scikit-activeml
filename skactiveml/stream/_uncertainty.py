@@ -5,8 +5,6 @@ from sklearn.utils import check_array, check_consistent_length
 from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
 from ..utils import fit_if_not_fitted, check_type, call_func
 
-# from ..classifier import PWC
-
 from .budget_manager import (
     FixedUncertaintyBudget,
     VarUncertaintyBudget,

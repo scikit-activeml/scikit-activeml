@@ -3,7 +3,7 @@ import numpy as np
 
 from sklearn.datasets import make_classification
 
-from .._random import PeriodicSampler, RandomSampler
+from skactiveml.stream import PeriodicSampler, RandomSampler
 
 
 class TestRandom(unittest.TestCase):

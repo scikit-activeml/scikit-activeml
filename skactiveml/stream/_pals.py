@@ -2,10 +2,9 @@ import numpy as np
 
 from sklearn.utils import check_array, check_consistent_length
 
-import skactiveml.pool._probal as probal
+from ..pool import cost_reduction
 from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
 
-# from ..classifier import PWC
 from ..utils import (
     fit_if_not_fitted,
     check_type,
@@ -122,9 +121,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         )
 
         k_vec = clf.predict_freq(X_cand)
-        utilities = probal.cost_reduction(
-            k_vec, prior=self.prior, m_max=self.m_max
-        )
+        utilities = cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
 
         utilities *= utility_weight
 

@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from .._biqf import BIQF
+from skactiveml.stream.budget_manager import BIQF
 
 
 class TestBIQF(unittest.TestCase):

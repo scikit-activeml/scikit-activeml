@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from .._fixed_budget import FixedBudget
+from skactiveml.stream.budget_manager import FixedThresholdBudget
 
 
 class TestFixedBudget(unittest.TestCase):
@@ -11,13 +11,16 @@ class TestFixedBudget(unittest.TestCase):
 
     def test_fixed_budget(self):
         # init param test
-        self._test_init_param_budget(FixedBudget)
+        self._test_init_param_budget(FixedThresholdBudget)
+
+        # init param test
+        self._test_init_param_allow_exceeding_budget(FixedThresholdBudget)
 
         # sampled param test
-        self._test_sampled_param_utilities(FixedBudget)
+        self._test_sampled_param_utilities(FixedThresholdBudget)
 
         # update test
-        self._test_update_without_query(FixedBudget)
+        self._test_update_without_query(FixedThresholdBudget)
 
     def _test_init_param_budget(self, budget_manager_name):
         # budget must be defined as a float with a range of: 0 < budget <= 1
@@ -32,6 +35,23 @@ class TestFixedBudget(unittest.TestCase):
         budget_manager = budget_manager_name(budget=-1.0)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
+        )
+
+    def _test_init_param_allow_exceeding_budget(self, budget_manager_name):
+        # allow_exceeding_budget must be defined as a bool
+        budget_manager = budget_manager_name(allow_exceeding_budget="string")
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
+
+        budget_manager = budget_manager_name(allow_exceeding_budget=1)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
+
+        budget_manager = budget_manager_name(allow_exceeding_budget=None)
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
         )
 
     def _test_sampled_param_utilities(self, budget_manager_name):

@@ -433,7 +433,8 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, queried_indices, *args, **kwargs):
+    def update(self, X_cand, queried_indices, *args,
+               budget_manager_param_dict=None, **kwargs):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
@@ -451,6 +452,8 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         queried_indices : array-like
             Indicates which instances from X_cand have been queried.
 
+        budget_manager_param_dict : kwargs, optional
+            Optional kwargs for budget_manager.
         Returns
         -------
         self : StreamBasedQueryStrategy

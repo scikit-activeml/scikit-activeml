@@ -1,8 +1,9 @@
 import numpy as np
 
-from skactiveml.base import BudgetManager
 from collections import deque
 from copy import copy
+
+from ...base import BudgetManager
 from ...utils import check_scalar
 
 

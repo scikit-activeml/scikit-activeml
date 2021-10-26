@@ -3,8 +3,8 @@ import numpy as np
 
 from sklearn.datasets import make_classification
 
-from ...classifier import PWC
-from .._uncertainty import FixedUncertainty, VariableUncertainty, Split
+from skactiveml.classifier import PWC
+from skactiveml.stream import FixedUncertainty, VariableUncertainty, Split
 
 
 class TestUncertainty(unittest.TestCase):
