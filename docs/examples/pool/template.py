@@ -24,7 +24,7 @@ qs = "#_init_qs"
 # Preparation for plotting.
 fig, ax = plt.subplots()
 # bound = [[min(X[:, 0]), max(X[:, 0])], [min(X[:, 1]), max(X[:, 1])]]
-bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
+feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
@@ -54,7 +54,7 @@ for c in range(n_cycles):
     ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8, marker=".", s=300)
     #ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
     #ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
-    ax = plot_decision_boundary(clf, bound, ax=ax)
+    ax = plot_decision_boundary(clf, feature_bound, ax=ax)
 
     coll_new = list(ax.collections)
     coll_new.append(title)

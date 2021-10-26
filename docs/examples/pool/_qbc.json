@@ -19,7 +19,7 @@
     "query_params" : {
       "ensemble" : "clf"
     },
-    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, bound=bound, ax=ax)"
+    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
   },
   {
     "class" : "QBC",
@@ -41,6 +41,6 @@
     "query_params" : {
       "ensemble" : "clf"
     },
-    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, bound=bound, ax=ax)"
+    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
   }
 ]

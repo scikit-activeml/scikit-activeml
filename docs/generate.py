@@ -101,25 +101,6 @@ def automodule(module, level=0):
             rst_str += f'   {name}' + '\n'
         rst_str += '\n'
 
-    if constants:
-        rst_str += f'Constants\n'
-        rst_str += f'---------\n\n'
-
-        rst_str += f'.. autosummary::\n'
-        rst_str += f'   :nosignatures:\n'
-        rst_str += f'   :toctree: api\n'
-        rst_str += f'   :template: function.rst\n\n'
-        for item in constants:
-            name = module.__name__
-            if 'skactiveml.' in name:
-                name = name.replace('skactiveml.', '')
-            if name:
-                name += '.'
-            name += item
-            rst_str += f'   {name}' + '\n'
-
-        rst_str += '\n'
-
     for item in modules:
         rst_str += automodule(getattr(module, item), level=level + 1)
 
