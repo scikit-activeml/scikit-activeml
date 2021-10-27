@@ -1,7 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
-from skactiveml.utils import MISSING_LABEL, is_unlabeled, is_labeled
+from skactiveml.utils import MISSING_LABEL, unlabeled_indices, labeled_indices
 from skactiveml.visualization import plot_utility, plot_decision_boundary
 #_ import
 #_bp_add_imports
@@ -9,7 +9,7 @@ from skactiveml.visualization import plot_utility, plot_decision_boundary
 random_state = np.random.RandomState(0)
 
 # Build a dataset.
-X, y_true = make_blobs(n_samples=40, n_features=2,
+X, y_true = make_blobs(n_samples=100, n_features=2,
                   centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
                   cluster_std=.7, random_state=random_state)
 y_true = y_true % 2
@@ -28,15 +28,15 @@ feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
-n_cycles = 10
+n_cycles = 25
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
 
     # Set X_cand to the unlabeled instances.
-    unlbld_idx = np.where(is_unlabeled(y))[0]
+    unlbld_idx = unlabeled_indices(y)
     X_cand = X[unlbld_idx]
-    X_labeled = X[is_labeled(y)]
+    X_labeled = X[labeled_indices(y)]
 
     # Query the next instance/s.
     query_params = "#_query_params"
@@ -52,8 +52,6 @@ for c in range(n_cycles):
     #_bp_utilities Break point for ...
     ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2)
     ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8, marker=".", s=300)
-    #ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
-    #ax.scatter(X[:, 0], X[:, 1], c=-y, cmap="coolwarm_r", alpha=.9, marker=".")
     ax = plot_decision_boundary(clf, feature_bound, ax=ax)
 
     coll_new = list(ax.collections)
