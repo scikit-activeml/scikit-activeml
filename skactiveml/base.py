@@ -7,7 +7,8 @@ import warnings
 from abc import ABC, abstractmethod
 
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin
+from copy import deepcopy
+from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.multiclass import type_of_target
@@ -17,7 +18,8 @@ from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     is_labeled, check_scalar, check_class_prior
 
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
-           'MultiAnnotPoolBasedQueryStrategy', 'SkactivemlClassifier',
+           'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
+           'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
            'ClassFrequencyEstimator', 'AnnotModelMixin']
 
 
@@ -29,6 +31,7 @@ class QueryStrategy(ABC, BaseEstimator):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
+
     def __init__(self, random_state=None):
         self.random_state = random_state
 
@@ -48,6 +51,7 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
+
     def __init__(self, random_state=None):
         super().__init__(random_state=random_state)
 
@@ -191,7 +195,6 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         """
         raise NotImplementedError
 
-
     def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
                        random_state, reset=True, adaptive=False,
                        **check_X_cand_params):
@@ -293,6 +296,250 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
                                           seed_multiplier=len(X_cand))
 
         return X_cand, A_cand, return_utilities, batch_size, random_state
+
+
+class BudgetManager(ABC, BaseEstimator):
+    """Base class for all budget managers for stream-based active learning
+    in scikit-activeml to model budgeting constraints.
+
+    Parameters
+    ----------
+    budget : float (default=None)
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1. If budget is None, it is replaced with the default
+        budget 0.1.
+    """
+
+    def __init__(self, budget=None):
+        self.budget = budget
+
+    @abstractmethod
+    def query_by_utility(self, utilities, *args, **kwargs):
+        """Ask the budget manager which utilities are sufficient to query the
+        corresponding instance.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy, which are used to determine whether sampling an instance
+            is worth it given the budgeting constraint.
+
+        Returns
+        -------
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances represented by utilities which should be
+            queried, with 0 <= n_queried_instances <= n_samples.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, X_cand, queried_indices, *args, **kwargs):
+        """Updates the BudgetManager.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        queried_indices : array-like
+            Indicates which instances from X_cand have been queried.
+
+        Returns
+        -------
+        self : BudgetManager
+            The BudgetManager returns itself, after it is updated.
+        """
+        raise NotImplementedError
+
+    def _validate_budget(self):
+        """check the assigned budget and set the default value 0.1 if budget is
+        set to None.
+        """
+        if self.budget is not None:
+            self.budget_ = self.budget
+        else:
+            self.budget_ = 0.1
+        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
+                     min_inclusive=False)
+
+    def _validate_data(self, utilities, *args, **kwargs):
+        """Validate input data.
+
+        Parameters
+        ----------
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
+
+        Returns
+        -------
+        utilities: ndarray of shape (n_samples,)
+            Checked utilities
+        """
+        # Check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError(
+                "{} is not a valid type for utilities".format(type(utilities))
+            )
+        # Check budget
+        self._validate_budget()
+        return utilities
+
+
+class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
+    """Base class for all stream-based active learning query strategies in
+       scikit-activeml.
+
+    Parameters
+    ----------
+    budget_manager : BudgetManager
+        The BudgetManager which models the budgeting constraint used in
+        the stream-based active learning setting.
+
+    random_state : int, RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
+
+    def __init__(self, budget_manager, random_state=None):
+        super().__init__(random_state=random_state)
+        self.budget_manager = budget_manager
+
+    @abstractmethod
+    def query(
+        self, X_cand, *args, return_utilities=False, **kwargs
+    ):
+        """Ask the query strategy which instances in X_cand to acquire.
+
+        The query startegy determines the most useful instances in X_cand,
+        which can be acquired within the budgeting constraint specified by the
+        budget_manager.
+        Please note that, when the decisions from this function
+        may differ from the final sampling, simulate=True can set, so that the
+        query strategy can be updated later with update(...) with the final
+        sampling. This is especially helpful, when developing wrapper query
+        strategies.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        return_utilities : bool, optional
+            If true, also return the utilities based on the query strategy.
+            The default is False.
+
+        Returns
+        -------
+        queried_indices : ndarray of shape (n_sampled_instances,)
+            The indices of instances in X_cand which should be sampled, with
+            0 <= n_sampled_instances <= n_samples.
+
+        utilities: ndarray of shape (n_samples,), optional
+            The utilities based on the query strategy. Only provided if
+            return_utilities is True.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, X_cand, queried_indices, *args,
+               budget_manager_param_dict=None, **kwargs):
+        """Update the query strategy with the decisions taken.
+
+        This function should be used in conjunction with the query function,
+        when the instances queried from query(...) may differ from the
+        instances queried in the end. In this case use query(...) with
+        simulate=true and provide the final decisions via update(...).
+        This is especially helpful, when developing wrapper query strategies.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        queried_indices : array-like
+            Indicates which instances from X_cand have been queried.
+
+        budget_manager_param_dict : kwargs, optional
+            Optional kwargs for budget_manager.
+        Returns
+        -------
+        self : StreamBasedQueryStrategy
+            The StreamBasedQueryStrategy returns itself, after it is updated.
+        """
+        raise NotImplementedError
+
+    def _validate_random_state(self):
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
+        """
+        if not hasattr(self, "random_state_"):
+            self.random_state_ = deepcopy(self.random_state)
+        self.random_state_ = check_random_state(self.random_state_)
+
+    def _validate_budget_manager(self):
+        """Validate if budget manager is a budget_manager class and create a
+        copy 'budget_manager_'.
+        """
+        if not hasattr(self, "budget_manager_"):
+            self.budget_manager_ = clone(self.budget_manager)
+        if not isinstance(self.budget_manager_, BudgetManager):
+            raise TypeError(
+                "{} is not a valid Type for budget_manager".format(
+                    type(self.budget_manager_)
+                )
+            )
+
+    def _validate_data(
+        self,
+        X_cand,
+        return_utilities,
+        *args,
+        reset=True,
+        **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like of shape (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, "return_utilities", bool)
+
+        # Check random state.
+        self._validate_random_state()
+
+        # Check budget_manager.
+        self._validate_budget_manager()
+
+        return X_cand, return_utilities
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):

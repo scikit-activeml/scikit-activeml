@@ -3,9 +3,16 @@ from unittest.mock import patch
 
 import numpy as np
 
-from skactiveml.base import QueryStrategy, SingleAnnotPoolBasedQueryStrategy, \
-    MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier, \
-    ClassFrequencyEstimator, AnnotModelMixin
+from skactiveml.base import (
+    QueryStrategy,
+    SingleAnnotPoolBasedQueryStrategy,
+    MultiAnnotPoolBasedQueryStrategy,
+    SkactivemlClassifier,
+    ClassFrequencyEstimator,
+    AnnotModelMixin,
+    BudgetManager,
+    SingleAnnotStreamBasedQueryStrategy,
+)
 
 
 class QueryStrategyTest(unittest.TestCase):
@@ -77,3 +84,35 @@ class AnnotModelMixinTest(unittest.TestCase):
     def test_predict_annot_proba(self):
         self.assertRaises(NotImplementedError, self.clf.predict_annot_perf,
                           X=None)
+
+class BudgetManagerTest(unittest.TestCase):
+    @patch.multiple(BudgetManager, __abstractmethods__=set())
+    def setUp(self):
+        self.bm = BudgetManager()
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.bm.query_by_utility, 
+                          utilities=None)
+
+    def test_update(self):
+        self.assertRaises(
+            NotImplementedError,
+            self.bm.update,
+            X_cand=None,
+            queried_indices=None,
+        )
+
+
+class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
+    @patch.multiple(
+        SingleAnnotStreamBasedQueryStrategy, __abstractmethods__=set()
+    )
+    def setUp(self):
+        self.qs = SingleAnnotStreamBasedQueryStrategy(budget_manager=None)
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+
+    def test_update(self):
+        self.assertRaises(NotImplementedError, self.qs.update, X_cand=None,
+                          queried_indices=None)
