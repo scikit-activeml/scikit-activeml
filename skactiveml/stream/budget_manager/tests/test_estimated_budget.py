@@ -3,7 +3,7 @@ import numpy as np
 
 from skactiveml.stream.budget_manager import (
     FixedUncertaintyBudget,
-    VarUncertaintyBudget,
+    VariableUncertaintyBudget,
     SplitBudget,
 )
 
@@ -93,9 +93,11 @@ class TestFixedUncertaintyBudget(
         )
 
 
-class TestVarUncertaintyBudget(TemplateTestEstimatedBudget, unittest.TestCase):
+class TestVariableUncertaintyBudget(
+    TemplateTestEstimatedBudget, unittest.TestCase
+):
     def get_budget_manager(self):
-        return VarUncertaintyBudget
+        return VariableUncertaintyBudget
 
     def test_init_param_theta(self):
         # theta must be defined as a float
@@ -124,7 +126,7 @@ class TestVarUncertaintyBudget(TemplateTestEstimatedBudget, unittest.TestCase):
         )
 
 
-class TestSplitBudget(TestVarUncertaintyBudget):
+class TestSplitBudget(TestVariableUncertaintyBudget):
     def get_budget_manager(self):
         return SplitBudget
 

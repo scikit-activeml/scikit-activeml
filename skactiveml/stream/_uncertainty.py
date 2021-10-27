@@ -7,7 +7,7 @@ from ..utils import fit_if_not_fitted, check_type, call_func
 
 from .budget_manager import (
     FixedUncertaintyBudget,
-    VarUncertaintyBudget,
+    VariableUncertaintyBudget,
     SplitBudget,
 )
 
@@ -39,7 +39,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=FixedUncertaintyBudget(), random_state=None,
+        self, budget_manager=None, random_state=None,
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
@@ -151,6 +151,16 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         )
         return self
 
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return FixedUncertaintyBudget()
+
     def _validate_data(
         self,
         X_cand,
@@ -260,7 +270,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=VarUncertaintyBudget(), random_state=None,
+        self, budget_manager=None, random_state=None,
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
@@ -377,6 +387,16 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         )
         return self
 
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return VariableUncertaintyBudget()
+
     def _validate_data(
         self,
         X_cand,
@@ -461,7 +481,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
 class Split(SingleAnnotStreamBasedQueryStrategy):
     """The Split [1] query strategy samples in 100*v% of instances randomly and
-    in 100*(1-v)% of cases according to VarUncertainty.
+    in 100*(1-v)% of cases according to VariableUncertainty.
 
     Parameters
     ----------
@@ -482,7 +502,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
     """
 
-    def __init__(self, budget_manager=SplitBudget(), random_state=None):
+    def __init__(self, budget_manager=None, random_state=None):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )
@@ -600,6 +620,17 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             **budget_manager_param_dict
         )
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        random_state = self.random_state_.randint(2**31)
+        return SplitBudget(random_state=random_state)
 
     def _validate_data(
         self,

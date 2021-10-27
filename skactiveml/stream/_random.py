@@ -26,7 +26,7 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager=FixedThresholdBudget(),
+    def __init__(self, budget_manager=None,
                  random_state=None):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
@@ -115,6 +115,16 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             **budget_manager_param_dict
         )
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return FixedThresholdBudget()
 
     def _validate_data(
         self, X_cand, return_utilities, reset=True, **check_X_cand_params
@@ -275,6 +285,16 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         self.queried_instances_ += np.sum(queried)
         # print("queried_instances_", self.queried_instances_)
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return FixedThresholdBudget()
 
     def _validate_data(
         self, X_cand, return_utilities, reset=True, **check_X_cand_params

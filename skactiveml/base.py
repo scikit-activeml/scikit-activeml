@@ -461,6 +461,17 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        raise NotImplementedError
+
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of
         np.random_state. If not create a new random state. See also
@@ -475,7 +486,10 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         copy 'budget_manager_'.
         """
         if not hasattr(self, "budget_manager_"):
-            self.budget_manager_ = clone(self.budget_manager)
+            if self.budget_manager is None:
+                self.budget_manager_ = self.get_default_budget_manager()
+            else:
+                self.budget_manager_ = clone(self.budget_manager)
         if not isinstance(self.budget_manager_, BudgetManager):
             raise TypeError(
                 "{} is not a valid Type for budget_manager".format(

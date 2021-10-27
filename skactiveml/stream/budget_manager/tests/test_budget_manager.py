@@ -68,51 +68,51 @@ class TestBudgetManager(unittest.TestCase):
     def test_param(self):
         not_test = ['self', 'kwargs']
         for bm_name in self.budget_managers:
-            # with self.subTest(msg="Param Test", bm_name=bm_name):
-            # Get initial parameters.
-            bm_class = self.budget_managers[bm_name]
-            init_sig = inspect.signature(bm_class)
-            init_params = init_sig.parameters.keys()
-            init_params = list(init_params)
+            with self.subTest(msg="Param Test", bm_name=bm_name):
+                # Get initial parameters.
+                bm_class = self.budget_managers[bm_name]
+                init_sig = inspect.signature(bm_class)
+                init_params = init_sig.parameters.keys()
+                init_params = list(init_params)
 
-            # Get query parameters.
-            query_sig = inspect.signature(bm_class.query_by_utility)
-            query_params = query_sig.parameters.keys()
-            query_params = list(query_params)
+                # Get query parameters.
+                query_sig = inspect.signature(bm_class.query_by_utility)
+                query_params = query_sig.parameters.keys()
+                query_params = list(query_params)
 
-            # Check initial parameters.
-            values = [Dummy() for i in range(len(init_params))]
-            qs_obj = bm_class(*values)
-            for param, value in zip(init_params, values):
-                self.assertTrue(
-                    hasattr(qs_obj, param),
-                    msg=f'"{param}" not tested for __init__()')
-                self.assertEqual(getattr(qs_obj, param), value)
+                # Check initial parameters.
+                values = [Dummy() for i in range(len(init_params))]
+                qs_obj = bm_class(*values)
+                for param, value in zip(init_params, values):
+                    self.assertTrue(
+                        hasattr(qs_obj, param),
+                        msg=f'"{param}" not tested for __init__()')
+                    self.assertEqual(getattr(qs_obj, param), value)
 
-            # Get class to check.
-            class_filename = path.basename(inspect.getfile(bm_class))[:-3]
-            mod = ('skactiveml.stream.budget_manager.tests.test'
-                   + class_filename)
-            mod = import_module(mod)
-            test_class_name = 'Test' + bm_class.__name__
-            msg = f'{bm_class} has no test called {test_class_name}.'
-            self.assertTrue(hasattr(mod, test_class_name), msg=msg)
-            test_obj = getattr(mod, test_class_name)
+                # Get class to check.
+                class_filename = path.basename(inspect.getfile(bm_class))[:-3]
+                mod = ('skactiveml.stream.budget_manager.tests.test'
+                    + class_filename)
+                mod = import_module(mod)
+                test_class_name = 'Test' + bm_class.__name__
+                msg = f'{bm_class} has no test called {test_class_name}.'
+                self.assertTrue(hasattr(mod, test_class_name), msg=msg)
+                test_obj = getattr(mod, test_class_name)
 
-            # Check init parameters.
-            for param in np.setdiff1d(init_params, not_test):
-                test_func_name = 'test_init_param_' + param
-                self.assertTrue(
-                    hasattr(test_obj, test_func_name),
-                    msg=f"'{test_func_name}()' missing for parameter '{param}'"
-                        f" of {bm_name}.__init__()")
+                # Check init parameters.
+                for param in np.setdiff1d(init_params, not_test):
+                    test_func_name = 'test_init_param_' + param
+                    self.assertTrue(
+                        hasattr(test_obj, test_func_name),
+                        msg=f"'{test_func_name}()' missing for parameter '{param}'"
+                            f" of {bm_name}.__init__()")
 
-            # Check query parameters.
-            for param in np.setdiff1d(query_params, not_test):
-                test_func_name = 'test_query_param_' + param
-                msg = f"'{test_func_name}()' missing for parameter " \
-                      f"'{param}' of {bm_name}.query()"
-                self.assertTrue(hasattr(test_obj, test_func_name), msg)
+                # Check query parameters.
+                for param in np.setdiff1d(query_params, not_test):
+                    test_func_name = 'test_query_param_' + param
+                    msg = f"'{test_func_name}()' missing for parameter " \
+                        f"'{param}' of {bm_name}.query()"
+                    self.assertTrue(hasattr(test_obj, test_func_name), msg)
 
 
 class Dummy:
