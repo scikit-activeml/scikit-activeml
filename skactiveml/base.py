@@ -18,7 +18,8 @@ from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     is_labeled, check_scalar, check_class_prior
 
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
-           'MultiAnnotPoolBasedQueryStrategy', 'SkactivemlClassifier',
+           'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
+           'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
            'ClassFrequencyEstimator', 'AnnotModelMixin']
 
 
