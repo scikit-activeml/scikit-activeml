@@ -1,0 +1,62 @@
+[
+  {
+    "class" : "ExpectedErrorReduction",
+    "method" : "Expected Misclassification Risk",
+    "categories" : {
+      "Settles2012" : "Expected Error Reduction"
+    },
+    "tags" : ["pool"],
+    "title" : "Expected Misclassification Risk",
+    "refs" : ["joshi2009multi"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "method" : "'emr'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "ExpectedErrorReduction",
+    "method" : "Cost-sensitive Expected Error Reduction",
+    "categories" : {
+      "Settles2012" : "Expected Error Reduction"
+    },
+    "tags" : ["pool"],
+    "title" : "Cost-sensitive Expected Error Reduction",
+    "refs" : ["margineantu2005active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "method" : "'csl'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "ExpectedErrorReduction",
+    "method" : "Log Loss Expected Error Reduction",
+    "categories" : {
+      "Settles2012" : "Expected Error Reduction"
+    },
+    "tags" : ["pool"],
+    "title" : "Log Loss Expected Error Reduction",
+    "refs" : ["roy2001toward"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "method" : "'log_loss'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+  }
+]

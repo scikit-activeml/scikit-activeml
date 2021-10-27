@@ -1,3 +1,5 @@
+.. intro_start
+
 |Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_
 
 .. |Doc| image:: https://img.shields.io/badge/readthedocs.io-latest-green
@@ -23,6 +25,9 @@
 *scikit-activeml* is a Python module for active learning on top of SciPy and scikit-learn. It is distributed under the 3-Clause BSD licence.
 
 The project was initiated in 2020 by the Intelligent Embedded Systems Group at University Kassel.
+.. intro_end
+
+.. install_start
 
 Installation
 ============
@@ -31,6 +36,9 @@ The easiest way of installing scikit-activeml is using ``pip``   ::
 
     pip install -U scikit-activeml
 
+.. install_end
+
+.. examples_start
 
 Example
 =======
@@ -62,11 +70,17 @@ The following code implements an active learning cycle with 20 iterations using 
          y[query_idx] = y_true[query_idx]
     print(f'Accuracy: {clf.fit(X, y).score(X, y_true)}')
 
+.. examples_end
+
+.. dev_start
+
 Development
 ===========
 
 More information are available in the `Developer's Guide
 <https://scikit-activeml.readthedocs.io/en/latest/developers_guide.html>`_.
+
+.. dev_end
 
 Documentation
 =============

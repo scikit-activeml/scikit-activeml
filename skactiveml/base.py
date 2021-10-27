@@ -1,3 +1,8 @@
+"""
+The :mod:`skactiveml.base` package implements the base classes for
+:mod:`skactiveml`.
+"""
+
 import warnings
 from abc import ABC, abstractmethod
 
@@ -11,6 +16,10 @@ from sklearn.utils.multiclass import type_of_target
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
     is_labeled, check_scalar, check_class_prior
+
+__all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
+           'MultiAnnotPoolBasedQueryStrategy', 'SkactivemlClassifier',
+           'ClassFrequencyEstimator', 'AnnotModelMixin']
 
 
 class QueryStrategy(ABC, BaseEstimator):

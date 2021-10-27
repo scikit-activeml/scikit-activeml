@@ -32,7 +32,7 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         The random state to use.
 
     References
-    ---------
+    ----------
     [1] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
         "Epistemic uncertainty sampling." International Conference on
         Discovery Science. Springer, Cham, 2019.
