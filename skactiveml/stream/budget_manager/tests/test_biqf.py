@@ -9,78 +9,66 @@ class TestBIQF(unittest.TestCase):
         # initialise var for sampled var tests
         self.utilities = np.array([True, False])
 
-    def test_biqf(self):
-        # init param test
-        self._test_init_param_budget(BIQF)
-        self._test_init_param_w(BIQF)
-        self._test_init_param_w_tol(BIQF)
-
-        # sample param test
-        self._test_query_param_utilities(BIQF)
-
-        # update test
-        self._test_update_without_query(BIQF)
-
-    def _test_init_param_budget(self, budget_manager_name):
+    def test_init_param_budget(self):
         # budget must be defined as a float with a range of: 0 < budget <= 1
-        budget_manager = budget_manager_name(budget="string")
+        budget_manager = BIQF(budget="string")
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(budget=1.1)
+        budget_manager = BIQF(budget=1.1)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(budget=-1.0)
+        budget_manager = BIQF(budget=-1.0)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
 
-    def _test_init_param_w(self, budget_manager_name):
+    def test_init_param_w(self):
         # w must be defined as an int with a range of w > 0
-        budget_manager = budget_manager_name(w="string")
+        budget_manager = BIQF(w="string")
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w=None)
+        budget_manager = BIQF(w=None)
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w=1.1)
+        budget_manager = BIQF(w=1.1)
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w=0)
+        budget_manager = BIQF(w=0)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w=-1)
+        budget_manager = BIQF(w=-1)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
 
-    def _test_init_param_w_tol(self, budget_manager_name):
+    def test_init_param_w_tol(self):
         # w must be defined as an int with a range of w_tol > 0
-        budget_manager = budget_manager_name(w_tol="string")
+        budget_manager = BIQF(w_tol="string")
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w_tol=None)
+        budget_manager = BIQF(w_tol=None)
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w_tol=0)
+        budget_manager = BIQF(w_tol=0)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
-        budget_manager = budget_manager_name(w_tol=-1)
+        budget_manager = BIQF(w_tol=-1)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
 
-    def _test_query_param_utilities(self, budget_manager_name):
+    def test_query_param_utilities(self):
         # s must be defined as a float ndarray
-        budget_manager = budget_manager_name()
+        budget_manager = BIQF()
         self.assertRaises(
             TypeError, budget_manager.query_by_utility, utilities="string"
         )
@@ -88,8 +76,8 @@ class TestBIQF(unittest.TestCase):
             TypeError, budget_manager.query_by_utility, utilities=None
         )
 
-    def _test_update_without_query(self, budget_manager_name):
-        budget_manager = budget_manager_name()
+    def test_update_without_query(self):
+        budget_manager = BIQF()
         budget_manager.update(
             np.array([[0], [1], [2]]),
             np.array([0, 2]),
