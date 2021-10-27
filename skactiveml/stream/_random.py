@@ -18,9 +18,8 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
     ----------
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the probability to sample
-        instances
+        the stream-based active learning setting. if set to None,
+        FixedThresholdBudget will be used by default.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -175,9 +174,8 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
     ----------
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the interval between
-        sampling instnces
+        the stream-based active learning setting. if set to None,
+        FixedThresholdBudget will be used by default.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
