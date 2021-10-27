@@ -12,6 +12,7 @@ from ._validation import check_classes, check_missing_label, check_scalar, \
     check_cost_matrix, check_classifier_params, check_X_y, MISSING_LABEL, \
     check_random_state, check_class_prior, check_type
 
+
 __all__ = ['rand_argmax', 'rand_argmin', 'compute_vote_vectors',
            'majority_vote', 'is_unlabeled', 'is_labeled', 'ExtLabelEncoder',
            'check_classes', 'check_missing_label', 'check_cost_matrix',

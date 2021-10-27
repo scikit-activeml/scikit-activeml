@@ -1,0 +1,23 @@
+[
+  {
+    "class" : "McPAL",
+    "method" : "Multi-class Probabilistic Active Learning",
+    "categories" : {
+      "Settles2012" : ""
+    },
+    "tags" : ["pool"],
+    "title" : "Multi-class Probabilistic Active Learning",
+    "refs" : ["kottke2016multi"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {},
+    "query_params" : {
+      "clf" : "clf",
+      "utility_weight" : "dens[unlbld_idx]"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y, 'utility_weight': dens}, X_cand=X, feature_bound=feature_bound, ax=ax)",
+    "bp_preproc" : ["dens_est = clf.fit(X, np.zeros(len(X)))",
+                    "dens = clf.predict_freq(X)[:,0]"]
+  }
+]

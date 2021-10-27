@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 #
 # Configuration file for the Sphinx documentation builder.
@@ -15,19 +14,23 @@
 #
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
+from skactiveml import pool, __version__
+
+from docs.generate import generate_strategy_overview_rst, \
+    generate_api_reference_rst, generate_examples
 
 # -- Project information -----------------------------------------------------
 
 project = 'scikit-activeml'
 copyright = '2020'
-author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergardt, Christoph Sandrock'
+author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergard, Christoph Sandrock'
 
 # The short X.Y version
-version = '0.0.0'
+version = __version__
 # The full version, including alpha/beta/rc tags
-release = '0.0.0'
-
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -49,12 +52,13 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx_gallery.gen_gallery',
     'sphinxcontrib.bibtex',
     'nbsphinx',
     'numpydoc'
 ]
 
-#nbsphinx_execute = 'always'
+# nbsphinx_execute = 'always'
 
 # Napoleon settings
 napoleon_numpy_docstring = True
@@ -90,13 +94,40 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
+# Set the paths for the sphinx_gallery extension:
+sphinx_gallery_conf = {
+    'run_stale_examples': False,
+    'line_numbers': True,
+
+    # path to your example scripts
+    'examples_dirs': os.path.normpath('generated/examples'),
+
+    # the path where to save gallery generated output
+    'gallery_dirs': os.path.normpath('generated/sphinx_gallery_examples'),
+
+    'matplotlib_animations': True,
+
+    # directory where function/class granular galleries are stored
+    'backreferences_dir':
+        os.path.normpath('generated/sphinx_gallery_backreferences'),
+
+    # Modules for which function/class level galleries are created.
+    'doc_module': ('skactiveml',),
+
+    'reference_url': {
+        # The module you locally document uses None
+        'skactiveml': None
+    }
+}
+os.makedirs(os.path.abspath(sphinx_gallery_conf['gallery_dirs']),
+            exist_ok=True)
 
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
 
 html_logo = 'logos/scikit-activeml-logo.png'
 
@@ -104,7 +135,17 @@ html_logo = 'logos/scikit-activeml-logo.png'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    "github_url": "https://github.com/scikit-activeml/scikit-activeml",
+    "icon_links": [
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/scikit-activeml",
+            "icon": "fas fa-box",
+        }
+    ],
+    "icon_links_label": "Quick Links"
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -127,7 +168,6 @@ html_static_path = []
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'scikit-activeml-guide'
 
-
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
@@ -139,15 +179,52 @@ man_pages = [
 
 # -- Extension configuration -------------------------------------------------
 
-# -- Options for bibtex extension ---------------------------------------
-bibtex_bibfiles = []
+# -- Options for bibtex extension --------------------------------------------
+
+bibtex_bibfiles = ['refs.bib']
+# bibtex_encoding = 'latin'
 
 # -- Options for intersphinx extension ---------------------------------------
 
-# Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/3/': None}
+intersphinx_mapping = {
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'python': ('https://docs.python.org/3/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+    "matplotlib": ("https://matplotlib.org/", None),
+    "joblib": ("https://joblib.readthedocs.io/en/latest/", None),
+    "iteration-utilities": (
+    "https://iteration-utilities.readthedocs.io/en/latest/", None)
+}
 
 # -- Options for todo extension ----------------------------------------------
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+# -- Generate files for strategy overview and api reference ------------------
+
+autosummary_generate = True
+
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': True,
+    'show-inheritance': True,
+    'inherited-members': True,
+#    'special-members': False
+}
+
+autoclass_content = 'class'
+
+generate_api_reference_rst(
+    gen_path=os.path.abspath('generated')
+)
+
+examples_data = generate_examples(
+    gen_path=os.path.abspath('generated'),
+    package=pool,
+    json_path=os.path.abspath('examples/pool'))
+
+generate_strategy_overview_rst(
+    gen_path=os.path.abspath('generated'),
+    examples_data=examples_data
+)

@@ -1,0 +1,24 @@
+[
+  {
+    "class" : "FourDS",
+    "method" : "4DS",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "4DS",
+    "refs" : ["reitmaier2013let"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [
+      "from skactiveml.classifier import CMM",
+      "from sklearn.mixture import BayesianGaussianMixture"
+    ],
+    "clf" : "CMM(classes=[0, 1], mixture_model=BayesianGaussianMixture(n_components=8))",
+    "init_params" : {},
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  }
+]

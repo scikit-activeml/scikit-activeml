@@ -1,0 +1,46 @@
+[
+  {
+    "class" : "QBC",
+    "method" : "Query-by-Committee with Kullback-Leibler Divergence",
+    "categories" : {
+      "Settles2012" : "Query-by-Committee"
+    },
+    "tags" : ["pool"],
+    "title" : "Query-by-Committee with Kullback-Leibler Divergence",
+    "refs" : ["seung1992query","mccallum1998employing"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
+                        "from skactiveml.classifier import SklearnClassifier, PWC"],
+    "clf" : "SklearnClassifier(BaggingClassifier(PWC()), classes=np.unique(y_true))",
+    "init_params" : {
+        "method" : "'KL_divergence'"
+    },
+    "query_params" : {
+      "ensemble" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "QBC",
+    "method" : "Query-by-Committee with Vote Entropy",
+    "categories" : {
+      "Settles2012" : "Query-by-Committee"
+    },
+    "tags" : ["pool"],
+    "title" : "Query-by-Committee with Vote Entropy",
+    "refs" : ["seung1992query","engelson1996minimizing"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
+                        "from skactiveml.classifier import SklearnClassifier, PWC"],
+    "clf" : "SklearnClassifier(BaggingClassifier(PWC()), classes=np.unique(y_true))",
+    "init_params" : {
+        "method" : "'vote_entropy'"
+    },
+    "query_params" : {
+      "ensemble" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'ensemble': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  }
+]
