@@ -25,8 +25,6 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     method : string (default='least_confident')
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
-        Epistemic only works with Parzen Window Classifier or
-        Logistic Regression.
     cost_matrix : array-like, shape (n_classes, n_classes)
         Cost matrix with cost_matrix[i,j] defining the cost of predicting class
         j for a sample with the actual class i. Only supported for
@@ -38,16 +36,16 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     ----------
     method : string
         The method to calculate the uncertainty. Only entropy, least_confident,
-        margin_sampling and expected_average_precisionare.
+        margin_sampling and expected_average_precision.
     cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a
+        Cost matrix with C[i, j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
     random_state : numeric | np.random.RandomState
         Random state to use.
 
     References
-    ---------
+    ----------
     [1] Settles, Burr. Active learning literature survey.
         University of Wisconsin-Madison Department of Computer Sciences, 2009.
     [2] Chen, Po-Lung, and Hsuan-Tien Lin. "Active learning for multiclass
@@ -238,7 +236,7 @@ def expected_average_precision(classes, probas):
         The expected average precision score of all instances in X_cand.
 
     References
-    ---------
+    ----------
     [1] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
         via maximizing expected average precision."
         IJCAI International Joint Conference on Artificial Intelligence. 2018.

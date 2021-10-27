@@ -40,6 +40,10 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     confidence_dict: dict, optional (default=None)
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
+
+    Returns
+    -------
+    matplotlib.axes.Axes: The axis on which the boundary was plotted.
     """
     if not isinstance(clf, ClassifierMixin):
         raise TypeError("'clf' must be an Sklearn classifier.")
@@ -120,6 +124,8 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
             ax.contour(X_mesh, Y_mesh, posteriors, [confidence],
                        colors=[cmap(norm(y))], **confidence_args)
 
+    return ax
+
 
 def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
                  contour_dict=None):
@@ -140,11 +146,15 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
         given, bound must not be None. Otherwise, the bound is determined based
         on the data.
     ax: matplotlib.axes.Axes, optional (default=None)
-        The axis on which the boundary is plotted.
+        The axis on which the utility is plotted.
     res: int, optional (default=21)
         The resolution of the plot.
     contour_dict: dict, optional (default=None)
         Additional parameters for the utility contour.
+
+    Returns
+    -------
+    matplotlib.axes.Axes: The axis on which the utility was plotted.
     """
     if not isinstance(qs, QueryStrategy):
         raise TypeError("'qs' must be a query strategy.")
@@ -193,3 +203,5 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
         neighbors.fit(X_cand, utilities)
         scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
         ax.contourf(X_mesh, Y_mesh, scores, **contour_args)
+
+    return ax

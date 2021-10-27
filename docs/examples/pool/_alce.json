@@ -1,0 +1,20 @@
+[
+  {
+    "class" : "ALCE",
+    "method" : "Active Learning with Cost Embedding",
+    "categories" : {
+      "Settles2012" : ""
+    },
+    "tags" : ["pool"],
+    "title" : "Active Learning with Cost Embedding",
+    "refs" : ["huang2016novel"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "classes" : "[0, 1]"
+    },
+    "query_params" : {},
+    "bp_utilities" : "ax = plot_utility(qs, {'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  }
+]

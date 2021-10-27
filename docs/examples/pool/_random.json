@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "RandomSampler",
+    "method" : "Random Sampling",
+    "categories" : {
+      "Settles2012" : "Random Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Random Sampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {},
+    "query_params" : {}
+  }
+]

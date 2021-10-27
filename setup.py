@@ -1,4 +1,5 @@
 import setuptools
+from skactiveml import __version__
 
 
 def readme():
@@ -14,7 +15,7 @@ def requirements():
 
 
 setuptools.setup(name='scikit-activeml',
-                 version='0.0.0',
+                 version=__version__,
                  description='The package scikit-activeml is a library of '
                              'that covers the most relevant query strategies '
                              'in active learning and implements tools to work '
