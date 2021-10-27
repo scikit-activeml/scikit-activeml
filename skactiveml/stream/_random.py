@@ -181,7 +181,7 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager=FixedThresholdBudget(),
+    def __init__(self, budget_manager=None,
                  random_state=None):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
