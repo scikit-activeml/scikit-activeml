@@ -3,10 +3,6 @@ import inspect
 from os import path
 import unittest
 import numpy as np
-from collections import deque
-
-from sklearn.datasets import make_classification
-from sklearn.utils import check_random_state
 
 from skactiveml.stream import budget_manager
 from skactiveml.base import BudgetManager
@@ -92,7 +88,7 @@ class TestBudgetManager(unittest.TestCase):
                 # Get class to check.
                 class_filename = path.basename(inspect.getfile(bm_class))[:-3]
                 mod = ('skactiveml.stream.budget_manager.tests.test'
-                    + class_filename)
+                       + class_filename)
                 mod = import_module(mod)
                 test_class_name = 'Test' + bm_class.__name__
                 msg = f'{bm_class} has no test called {test_class_name}.'
@@ -104,8 +100,8 @@ class TestBudgetManager(unittest.TestCase):
                     test_func_name = 'test_init_param_' + param
                     self.assertTrue(
                         hasattr(test_obj, test_func_name),
-                        msg=f"'{test_func_name}()' missing for parameter '{param}'"
-                            f" of {bm_name}.__init__()")
+                        msg=f"'{test_func_name}()' missing for parameter"
+                            f" '{param}' of {bm_name}.__init__()")
 
                 # Check query parameters.
                 for param in np.setdiff1d(query_params, not_test):

@@ -56,9 +56,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -67,11 +67,11 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             only if they are supported by the base query strategy.
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features), optional (default=None)
+        X : array-like of shape (n_samples, n_features), optional
             Input samples used to fit the classifier.
-        y : array-like of shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples), optional
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,), optional
             Sample weights for X, used to fit the clf.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
@@ -286,9 +286,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -299,13 +299,13 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
 
-        X : array-like of shape (n_samples, n_features), optional (default=None)
+        X : array-like of shape (n_samples, n_features), optional
             Input samples used to fit the classifier.
 
-        y : array-like of shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples), optional
             Labels of the input samples 'X'. There may be missing labels.
 
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         return_utilities : bool, optional
@@ -516,9 +516,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -529,14 +529,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
 
-        X : array-like of shape (n_samples, n_features), optional (default=None)
+        X : array-like of shape (n_samples, n_features), optional
             Input samples used to fit the classifier.
 
-        y : array-like of shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples), optional
             Labels of the input samples 'X'. There may be missing labels.
 
 
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         return_utilities : bool, optional

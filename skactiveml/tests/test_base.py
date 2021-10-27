@@ -85,13 +85,14 @@ class AnnotModelMixinTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.clf.predict_annot_perf,
                           X=None)
 
+
 class BudgetManagerTest(unittest.TestCase):
     @patch.multiple(BudgetManager, __abstractmethods__=set())
     def setUp(self):
         self.bm = BudgetManager()
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.bm.query_by_utility, 
+        self.assertRaises(NotImplementedError, self.bm.query_by_utility,
                           utilities=None)
 
     def test_update(self):

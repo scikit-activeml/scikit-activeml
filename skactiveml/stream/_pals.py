@@ -31,7 +31,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         the stream-based active learning setting. if set to None, BIQF will be
         used by default.
     random_state : int, RandomState instance, default=None
-        Controls the randomness of the query strategy. 
+        Controls the randomness of the query strategy.
     prior : float
         The prior value that is passed onto McPAL (see pool.McPAL).
     m_max : float
