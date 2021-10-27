@@ -117,3 +117,7 @@ class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
     def test_update(self):
         self.assertRaises(NotImplementedError, self.qs.update, X_cand=None,
                           queried_indices=None)
+
+    def test_get_default_budget_manager(self):
+        self.assertRaises(NotImplementedError,
+                          self.qs.get_default_budget_manager, X_cand=None)
