@@ -25,18 +25,18 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
         is not None, the classifier must implement the predict_proba function.
     feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
-    res: int, optional (default=21)
-        The resolution of the plot.
     ax: matplotlib.axes.Axes, optional (default=None)
         The axis on which the decision boundary is plotted.
+    res: int, optional (default=21)
+        The resolution of the plot.
+    boundary_dict: dict, optional (default=None)
+        Additional parameters for the boundary contour.
     confidence: scalar | None, optional (default=0.5)
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
         stands for the ratio best class / second best class.
     cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
         The colormap for the confidence levels.
-    boundary_dict: dict, optional (default=None)
-        Additional parameters for the boundary contour.
     confidence_dict: dict, optional (default=None)
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
@@ -139,10 +139,10 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
         Determines the area in which the boundary is plotted. If X_cand is not
         given, bound must not be None. Otherwise, the bound is determined based
         on the data.
-    res: int, optional (default=21)
-        The resolution of the plot.
     ax: matplotlib.axes.Axes, optional (default=None)
         The axis on which the boundary is plotted.
+    res: int, optional (default=21)
+        The resolution of the plot.
     contour_dict: dict, optional (default=None)
         Additional parameters for the utility contour.
     """
