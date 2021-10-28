@@ -15,7 +15,7 @@ from ..utils import check_scalar
 
 def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
                            boundary_dict=None, confidence=0.75,
-                           cmap='coolwarm_r', confidence_dict=None):
+                           cmap='coolwarm', confidence_dict=None):
     """Plot the decision boundary of the given classifier.
 
     Parameters
