@@ -9,6 +9,7 @@ __pycache__/
 #
 .vs/
 .idea/
+.vscode
 venv/
 
 # Distribution / packaging
