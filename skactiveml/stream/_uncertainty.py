@@ -102,10 +102,6 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -337,10 +333,6 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -568,10 +560,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
