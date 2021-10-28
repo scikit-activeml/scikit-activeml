@@ -2,8 +2,8 @@
 
 |Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_
 
-.. |Doc| image:: https://img.shields.io/badge/readthedocs.io-latest-green
-.. _Doc: https://scikit-activeml.readthedocs.io/en/latest/
+.. |Doc| image:: https://img.shields.io/badge/docs-latest-green
+.. _Doc: https://scikit-activeml.github.io/scikit-activeml/
 
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
 .. _Codecov: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
