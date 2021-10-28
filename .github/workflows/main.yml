@@ -49,8 +49,9 @@ jobs:
         pip install pybtex>=0.23.0
         pip install pydata_sphinx_theme>=0.7.1
         sphinx-build -b html docs docs/_build
-    - name: Deploy
+    - name: Deploy documentation to Github Pages
       uses: JamesIves/github-pages-deploy-action@4.1.5
+      if: ${{ github.event_name == 'push' && github.project.updated }}
       with:
-        branch: gh-pages # The branch the action should deploy to.
-        folder: docs/_build # The folder the action should deploy.
+        branch: gh-pages
+        folder: docs/_build
