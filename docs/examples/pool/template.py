@@ -9,7 +9,7 @@ from skactiveml.visualization import plot_utility, plot_decision_boundary
 random_state = np.random.RandomState(0)
 
 # Build a dataset.
-X, y_true = make_blobs(n_samples=100, n_features=2,
+X, y_true = make_blobs(n_samples=10, n_features=2,
                   centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
                   cluster_std=.7, random_state=random_state)
 y_true = y_true % 2
@@ -28,7 +28,7 @@ feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
-n_cycles = 25
+n_cycles = 1
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
