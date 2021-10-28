@@ -236,28 +236,29 @@ class TestExamples(unittest.TestCase):
         json_path = path.abspath('docs/examples/pool')
 
         # Collect all strategies for which an example exists
-        expected_strats = []
+        strats_with_json = []
         for filename in listdir(json_path):
             if not filename.endswith('.json'):
                 continue
             with open(path.join(json_path, filename)) as file:
                 for example in json.load(file):
-                    if example['class'] not in expected_strats:
-                        expected_strats.append(example['class'])
+                    if example['class'] not in strats_with_json:
+                        strats_with_json.append(example['class'])
 
         # Test if there is a json example for every AL-strategy.
         for item in pool.__all__:
-            if not inspect.isclass(getattr(pool, item)) or item in exceptions:
-                continue
-            if item not in expected_strats:
-                raise ValueError(
-                    f'No json example found for "{item}". Please add an '
-                    f'example in\n'
-                    f'{json_path}.\n'
-                    f'For information how to create one, see the Developers '
-                    f'Guide. If {item} is not a AL-strategy, add "{item}" to '
-                    f'the "exceptions" list in this test function.'
-                )
+            with self.subTest(msg="JSON Test", qs_name=item):
+                item_missing = inspect.isclass(getattr(pool, item)) \
+                               and not item in exceptions \
+                               and item not in strats_with_json
+                self.assertFalse(item_missing,
+                                 f'No json example found for "{item}". Please '
+                                 f'add an example in\n'
+                                 f'{json_path}.\n'
+                                 f'For information how to create one, see the '
+                                 f'Developers Guide. If {item} is not an '
+                                 f'AL-strategy, add "{item}" to the '
+                                 f'"exceptions" list in this test function.')
 
 
 class Dummy:
