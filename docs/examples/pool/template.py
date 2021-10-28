@@ -23,7 +23,6 @@ qs = "#_init_qs"
 
 # Preparation for plotting.
 fig, ax = plt.subplots()
-# bound = [[min(X[:, 0]), max(X[:, 0])], [min(X[:, 1]), max(X[:, 1])]]
 feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
