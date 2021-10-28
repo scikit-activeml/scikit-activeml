@@ -28,11 +28,10 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
     ----------
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the probability to sample
-        instances
+        the stream-based active learning setting. if set to None, BIQF will be
+        used by default.
     random_state : int, RandomState instance, default=None
-        Controls the randomness of the estimator.
+        Controls the randomness of the query strategy.
     prior : float
         The prior value that is passed onto McPAL (see pool.McPAL).
     m_max : float
@@ -47,7 +46,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=BIQF(), random_state=None, prior=1.0e-3, m_max=2,
+        self, budget_manager=None, random_state=None, prior=1.0e-3, m_max=2,
     ):
         self.budget_manager = budget_manager
         self.random_state = random_state
@@ -161,6 +160,16 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             **budget_manager_param_dict
         )
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return BIQF()
 
     def _validate_data(
         self,

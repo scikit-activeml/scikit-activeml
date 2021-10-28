@@ -7,7 +7,7 @@ from ..utils import fit_if_not_fitted, check_type, call_func
 
 from .budget_manager import (
     FixedUncertaintyBudget,
-    VarUncertaintyBudget,
+    VariableUncertaintyBudget,
     SplitBudget,
 )
 
@@ -23,9 +23,8 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
     ----------
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the interval between
-        sampling instances
+        the stream-based active learning setting. if set to None,
+        FixedUncertaintyBudget will be used by default.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -39,7 +38,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=FixedUncertaintyBudget(), random_state=None,
+        self, budget_manager=None, random_state=None,
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
@@ -57,9 +56,9 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -68,11 +67,11 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             only if they are supported by the base query strategy.
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features), optional (default=None)
+        X : array-like of shape (n_samples, n_features), optional
             Input samples used to fit the classifier.
-        y : array-like of shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples), optional
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,), optional
             Sample weights for X, used to fit the clf.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
@@ -103,10 +102,6 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -150,6 +145,16 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             **budget_manager_param_dict
         )
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return FixedUncertaintyBudget()
 
     def _validate_data(
         self,
@@ -244,9 +249,8 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
     ----------
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the interval between
-        sampling instances
+        the stream-based active learning setting. if set to None,
+        VariableUncertaintyBudget will be used by default.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -260,7 +264,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=VarUncertaintyBudget(), random_state=None,
+        self, budget_manager=None, random_state=None,
     ):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
@@ -278,9 +282,9 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -291,13 +295,13 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
 
-        X : array-like of shape (n_samples, n_features), optional (default=None)
+        X : array-like of shape (n_samples, n_features), optional
             Input samples used to fit the classifier.
 
-        y : array-like of shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples), optional
             Labels of the input samples 'X'. There may be missing labels.
 
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         return_utilities : bool, optional
@@ -329,10 +333,6 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -376,6 +376,16 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             **budget_manager_param_dict
         )
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return VariableUncertaintyBudget()
 
     def _validate_data(
         self,
@@ -461,15 +471,14 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
 
 class Split(SingleAnnotStreamBasedQueryStrategy):
     """The Split [1] query strategy samples in 100*v% of instances randomly and
-    in 100*(1-v)% of cases according to VarUncertainty.
+    in 100*(1-v)% of cases according to VariableUncertainty.
 
     Parameters
     ----------
     budget_manager : BudgetManager
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. The budget attribute set for
-        the budget_manager will be used to determine the interval between
-        sampling instances
+        the stream-based active learning setting. if set to None, SplitBudget
+        will be used by default.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -482,7 +491,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
 
     """
 
-    def __init__(self, budget_manager=SplitBudget(), random_state=None):
+    def __init__(self, budget_manager=None, random_state=None):
         super().__init__(
             budget_manager=budget_manager, random_state=random_state
         )
@@ -499,9 +508,9 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         """Ask the query strategy which instances in X_cand to acquire.
 
         Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query strategy
-        can be updated later with update(...) with the final sampling. This is
-        especially helpful when developing wrapper query strategies.
+        the final sampling, simulate=True can be set, so that the query
+        strategy can be updated later with update(...) with the final sampling.
+        This is especially helpful when developing wrapper query strategies.
 
         Parameters
         ----------
@@ -512,14 +521,14 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
 
-        X : array-like of shape (n_samples, n_features), optional (default=None)
+        X : array-like of shape (n_samples, n_features), optional
             Input samples used to fit the classifier.
 
-        y : array-like of shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples), optional
             Labels of the input samples 'X'. There may be missing labels.
 
 
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         return_utilities : bool, optional
@@ -551,10 +560,6 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             sample_weight=sample_weight,
             return_utilities=return_utilities,
         )
-        # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
-
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
 
         predict_proba = clf.predict_proba(X_cand)
         utilities = np.max(predict_proba, axis=1)
@@ -600,6 +605,17 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             **budget_manager_param_dict
         )
         return self
+
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        random_state = self.random_state_.randint(2**31)
+        return SplitBudget(random_state=random_state)
 
     def _validate_data(
         self,

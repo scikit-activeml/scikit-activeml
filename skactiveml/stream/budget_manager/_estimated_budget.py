@@ -193,7 +193,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         return utilities
 
 
-class VarUncertaintyBudget(EstimatedBudget):
+class VariableUncertaintyBudget(EstimatedBudget):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
@@ -348,7 +348,7 @@ class SplitBudget(EstimatedBudget):
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget. 100*v% of instances will be queried
     randomly and in 100*(1-v)% of will be queried cases according
-    to VarUncertainty
+    to VariableUncertainty
 
     This budget manager calculates the estimated budget spent in the last
     w steps and compares that to the budget. If the ratio is smaller

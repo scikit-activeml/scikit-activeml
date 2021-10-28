@@ -9,7 +9,7 @@ from ._biqf import BIQF
 from ._estimated_budget import (
     EstimatedBudget,
     FixedUncertaintyBudget,
-    VarUncertaintyBudget,
+    VariableUncertaintyBudget,
     SplitBudget,
 )
 
@@ -17,7 +17,7 @@ __all__ = [
     "FixedThresholdBudget",
     "EstimatedBudget",
     "FixedUncertaintyBudget",
-    "VarUncertaintyBudget",
+    "VariableUncertaintyBudget",
     "SplitBudget",
     "BIQF",
 ]
