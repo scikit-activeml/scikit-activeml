@@ -17,11 +17,12 @@
 .. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue
 .. _Paper: https://www.preprints.org/manuscript/202103.0194/v1
 
+|
 
-.. raw:: html
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
+   :width: 200
 
-    <img src="https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png" height="200px" class="center">
-
+|
 
 *scikit-activeml* is a Python module for active learning on top of SciPy and scikit-learn. It is distributed under the 3-Clause BSD licence.
 
