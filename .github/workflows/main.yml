@@ -34,7 +34,7 @@ jobs:
         pip install pytest
         pip install pytest-cov
         pytest --cov=./skactiveml  --cov-report=xml
-    - name: "Upload coverage to Codecov"
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
         fail_ci_if_error: true
@@ -49,3 +49,9 @@ jobs:
         pip install pybtex>=0.23.0
         pip install pydata_sphinx_theme>=0.7.1
         sphinx-build -b html docs docs/_build
+    - name: Deploy documentation to Github Pages
+      uses: JamesIves/github-pages-deploy-action@4.1.5
+      if: github.ref == 'refs/heads/master'
+      with:
+        branch: gh-pages
+        folder: docs/_build
