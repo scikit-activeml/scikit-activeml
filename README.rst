@@ -74,19 +74,3 @@ The following code implements an active learning cycle with 20 iterations using 
     print(f'Accuracy: {clf.fit(X, y).score(X, y_true)}')
 
 .. examples_end
-
-.. dev_start
-
-Development
-===========
-
-More information are available in the `Developer's Guide
-<https://scikit-activeml.readthedocs.io/en/latest/developers_guide.html>`_.
-
-.. dev_end
-
-Documentation
-=============
-
-The documentation is available here:
-https://scikit-activeml.readthedocs.io
