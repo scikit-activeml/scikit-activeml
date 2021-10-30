@@ -1,7 +1,9 @@
-import numpy as np
 import unittest
 
-from skactiveml.utils import compute_vote_vectors, MISSING_LABEL
+import numpy as np
+
+from skactiveml.utils import compute_vote_vectors
+from skactiveml.utils._aggregation import majority_vote
 
 
 class TestAggregation(unittest.TestCase):
@@ -22,14 +24,28 @@ class TestAggregation(unittest.TestCase):
         v_exp = [[0, 0, 0], [0, 0, 0]]
         np.testing.assert_array_equal(v_rec, v_exp)
 
-    def test_compute_vote_vectors_all_nan(self):
-        y = np.full(shape=(2, 3), fill_value=MISSING_LABEL)
+    def test_compute_vote_vectors_no_label(self):
+        y = np.full(shape=(2, 3), fill_value=np.nan)
+        self.assertRaises(ValueError, compute_vote_vectors, y)
 
-        v_rec = compute_vote_vectors(y=y)
-        v_exp = np.zeros((2, 1))
+    def test_majority_vote(self):
+        y = np.full(shape=(3, 3), fill_value=1, dtype=float)
+        y[:, 1] = 0
+        y[2, :] = np.nan
 
-        np.testing.assert_array_equal(v_rec, v_exp)
+        y_aggregated_exp = np.full(shape=(3,), fill_value=1, dtype=float)
+        y_aggregated_exp[2] = np.nan
+        y_aggregated_rec = majority_vote(y=y)
 
+        np.testing.assert_array_equal(y_aggregated_exp, y_aggregated_rec)
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_weighted_majority_vote_encoding(self):
+        y = [['tokyo', 'paris', 'tokyo'],
+             ['paris', 'paris', 'nan'],
+             ['nan', 'nan', 'nan']]
+        y_aggregated_rec = majority_vote(y=y,
+                                         classes=['tokyo', 'paris', 'new york'],
+                                         missing_label='nan')
+        y_aggregated_exp = ['tokyo', 'paris', 'nan']
+
+        np.testing.assert_array_equal(y_aggregated_rec, y_aggregated_exp)

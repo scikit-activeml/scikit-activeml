@@ -6,6 +6,7 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from skactiveml.classifier import SklearnClassifier, CMM
 from skactiveml.pool import UncertaintySampling, RandomSampler
 from skactiveml.pool.multi._wrapper import MultiAnnotWrapper
+from skactiveml.utils._aggregation import majority_vote
 
 
 class TestMultiAnnotWrapper(unittest.TestCase):
@@ -25,20 +26,15 @@ class TestMultiAnnotWrapper(unittest.TestCase):
     def test_init_param_strategy(self):
         wrapper = MultiAnnotWrapper(CMM())
 
+        query_params_dict = {'X': self.X, 'y': self.y}
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
-                          self.X, self.y, A_cand=self.A_cand)
+                          query_params_dict, A_cand=self.A_cand)
 
         wrapper = MultiAnnotWrapper(0)
 
+        query_params_dict = {'X': self.X, 'y': self.y}
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
-                          self.X, self.y, A_cand=self.A_cand)
-
-    def test_init_param_random_state(self):
-        random = RandomSampler(self.random_state)
-        wrapper = MultiAnnotWrapper(random, random_state='string')
-
-        self.assertRaises(ValueError, wrapper.query, self.X_cand,
-                          A_cand=self.A_cand, return_utilities=True)
+                          query_params_dict, A_cand=self.A_cand)
 
     def test_init_param_n_annotators(self):
         random = RandomSampler(self.random_state)
@@ -47,6 +43,34 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
                           A_cand=None, return_utilities=True)
+
+    def test_init_param_y_aggregate(self):
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, y_aggregate='string',
+                                    random_state=self.random_state)
+
+        query_params_dict = {'X': self.X, 'y': self.y}
+        self.assertRaises(TypeError, wrapper.query, self.X_cand,
+                          query_params_dict=query_params_dict,
+                          A_cand=self.A_cand, return_utilities=True)
+
+        dummy_function = lambda x, y: majority_vote(x)
+
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, y_aggregate=dummy_function,
+                                    random_state=self.random_state)
+
+        query_params_dict = {'X': self.X, 'y': self.y}
+        self.assertRaises(TypeError, wrapper.query, self.X_cand,
+                          query_params_dict=query_params_dict,
+                          A_cand=self.A_cand, return_utilities=True)
+
+    def test_init_param_random_state(self):
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, random_state='string')
+
+        self.assertRaises(ValueError, wrapper.query, self.X_cand,
+                          A_cand=self.A_cand, return_utilities=True)
 
     def test_query_param_X_cand(self):
         random = RandomSampler(self.random_state)
@@ -60,20 +84,25 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertRaises(ValueError, wrapper.query, 0, A_cand=self.A_cand,
                           return_utilities=False)
 
-    def test_query_param_args(self):
+    def test_query_param_query_params_dict(self):
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 random_state=self.random_state)
-        uncertainty = UncertaintySampling(clf=clf, method='entropy')
+        uncertainty = UncertaintySampling(method='entropy')
         wrapper = MultiAnnotWrapper(uncertainty, self.random_state)
 
         y = np.array([[[1, 0], [0, 1], [1, 1], [0, 0]]])
 
-        self.assertRaises(ValueError, wrapper.query, self.X_cand, self.X,
-                          y, A_cand=self.A_cand, return_utilities=True)
+        query_params_dict = {'X': self.X, 'y': y, 'clf': clf}
+        self.assertRaises(ValueError, wrapper.query, self.X_cand,
+                          query_params_dict, A_cand=self.A_cand,
+                          return_utilities=True)
+
+        self.assertRaises(TypeError, wrapper.query, self.X_cand,
+                          "string", A_cand=self.A_cand)
 
     def test_query_param_A_cand(self):
         random = RandomSampler(self.random_state)
-        wrapper = MultiAnnotWrapper(random, self.random_state)
+        wrapper = MultiAnnotWrapper(random, random_state=self.random_state)
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
                           A_cand=None, batch_size=5, return_utilities=False)
 
@@ -91,45 +120,53 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=None)
 
-    def test_query_param_pref_annotators_per_sample(self):
+    def test_query_param_n_annotators_per_sample(self):
         random = RandomSampler(self.random_state)
         wrapper = MultiAnnotWrapper(random, self.random_state)
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
-                          pref_annotators_per_sample=None)
-        pref_annotators_per_sample = np.array([[0, 1], [0, 2]])
+                          n_annotators_per_sample=None)
+        n_annotators_per_sample = np.array([[0, 1], [0, 2]])
         self.assertRaises(ValueError, wrapper.query, self.X_cand,
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
-                          pref_annotators_per_sample=pref_annotators_per_sample)
+                          n_annotators_per_sample=n_annotators_per_sample)
 
-    def test_query_param_A_perfs(self):
+    def test_query_param_A_perf(self):
         random = RandomSampler(self.random_state)
         wrapper = MultiAnnotWrapper(random, self.random_state)
         self.assertRaises(TypeError, wrapper.query, self.X_cand,
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
-                          A_perfs=3)
+                          A_perf=3)
         self.assertRaises(ValueError, wrapper.query, self.X_cand,
                           A_cand=self.A_cand, batch_size=5,
                           return_utilities=False,
-                          A_perfs=np.array([[0, ], ]))
+                          A_perf=np.array([[0, ], ]))
 
     def test_query_one_annotator_per_sample_batch_size_one(self):
         # test functionality with uncertainty sampling
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
                                 random_state=self.random_state)
 
-        uncertainty = UncertaintySampling(clf=clf, method='entropy')
+        uncertainty = UncertaintySampling(method='entropy')
 
-        wrapper = MultiAnnotWrapper(uncertainty, self.random_state)
+        def y_aggregate(y_t):
+            w = np.repeat(np.arange(y.shape[1]).reshape(1, -1), y.shape[0],
+                          axis=0)
+            return majority_vote(y_t, w=w)
+
+        wrapper = MultiAnnotWrapper(uncertainty, y_aggregate=y_aggregate,
+                                    random_state=self.random_state)
 
         X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3, 4]])
         y = np.array([[1, 0], [0, 1], [1, 1], [0, 0], [0, 1]])
 
-        re_val = wrapper.query(self.X_cand, X, y, A_cand=self.A_cand,
-                               return_utilities=True)
+        query_params_dict = {'X': X, 'y': y, 'clf': clf}
+        re_val = wrapper.query(self.X_cand, query_params_dict,
+                               A_cand=self.A_cand, return_utilities=True,
+                               batch_size='adaptive')
 
         best_cand_indices, utilities = re_val
         self.assertEqual((1, 2), best_cand_indices.shape)
@@ -174,13 +211,13 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertEqual((5, 5, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
 
-    def test_query_three_annotators_per_sample_batch_size_five(self):
+    def test_query_three_n_annotators_per_sample_batch_size_five(self):
         random = RandomSampler(self.random_state)
 
         wrapper = MultiAnnotWrapper(random, self.random_state)
 
         re_val = wrapper.query(self.X_cand, A_cand=self.A_cand, batch_size=5,
-                               pref_annotators_per_sample=3,
+                               n_annotators_per_sample=3,
                                return_utilities=True)
         best_cand_indices, utilities = re_val
         self.assertEqual((5, 2), best_cand_indices.shape)
@@ -188,7 +225,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
         self.check_availability(best_cand_indices, self.A_cand)
 
-    def test_query_three_annotators_per_sample_batch_size_five_mismatch(self):
+    def test_query_three_n_annotators_per_sample_batch_size_five_mismatch(self):
         random = RandomSampler(self.random_state)
 
         X_cand = np.array([[7, 1], [9, 1]])
@@ -199,7 +236,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         wrapper = MultiAnnotWrapper(random, self.random_state)
 
         re_val = wrapper.query(X_cand, A_cand=A_cand, batch_size=5,
-                               pref_annotators_per_sample=3,
+                               n_annotators_per_sample=3,
                                return_utilities=True)
         best_cand_indices, utilities = re_val
         self.assertEqual((5, 2), best_cand_indices.shape)
@@ -207,15 +244,16 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
         self.check_availability(best_cand_indices, A_cand)
 
-    def test_query_varying_annotators_per_sample_batch_size_five(self):
+    def test_query_varying_n_annotators_per_sample_batch_size_five(self):
         random = RandomSampler(self.random_state)
 
-        wrapper = MultiAnnotWrapper(random, self.random_state, n_annotators=3)
+        wrapper = MultiAnnotWrapper(random, n_annotators=3,
+                                    random_state=self.random_state)
 
         pref = np.array([3, 2])
 
         re_val = wrapper.query(self.X_cand, A_cand=None,
-                               batch_size=5, pref_annotators_per_sample=pref,
+                               batch_size=5, n_annotators_per_sample=pref,
                                return_utilities=True)
         best_cand_indices, utilities = re_val
         self.assertEqual((5, 2), best_cand_indices.shape)
@@ -227,12 +265,13 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
     def test_query_per_sample_too_large(self):
         random = RandomSampler(self.random_state)
-        wrapper = MultiAnnotWrapper(random, self.random_state, n_annotators=3)
+        wrapper = MultiAnnotWrapper(random, n_annotators=3,
+                                    random_state=self.random_state)
 
         pref = np.array([3, 2, 1, 1, 1, 1])
 
         re_val = wrapper.query(self.X_cand, A_cand=None,
-                               batch_size=1, pref_annotators_per_sample=pref,
+                               batch_size=1, n_annotators_per_sample=pref,
                                return_utilities=True)
 
         best_cand_indices, utilities = re_val
@@ -264,21 +303,21 @@ class TestMultiAnnotWrapper(unittest.TestCase):
     def test_query_custom_annotator_special_preference(self):
         random = RandomSampler(self.random_state)
 
-        wrapper = MultiAnnotWrapper(random, self.random_state,
-                                    n_annotators=3)
+        wrapper = MultiAnnotWrapper(random, n_annotators=3,
+                                    random_state=self.random_state)
 
         X_cand = np.array([[7, 1], [9, 1]])
 
-        A_perfs = np.array([[1, 2, 3],
+        A_perf = np.array([[1, 2, 3],
                             [3, 2, 1]])
 
         re_val = wrapper.query(X_cand=X_cand, batch_size=6,
-                               pref_annotators_per_sample=3,
-                               A_perfs=A_perfs,
+                               n_annotators_per_sample=3,
+                               A_perf=A_perf,
                                return_utilities=True)
 
         best_cand_indices, utilities = re_val
-        # assert the utilities fit A_perfs
+        # assert the utilities fit A_perf
         self.assertFalse(np.any(utilities[:, 0, 2] < utilities[:, 0, 1]))
         self.assertFalse(np.any(utilities[:, 0, 1] < utilities[:, 0, 0]))
 
@@ -290,19 +329,19 @@ class TestMultiAnnotWrapper(unittest.TestCase):
     def test_query_custom_annotator_general_equal_preference(self):
         random = RandomSampler(self.random_state)
 
-        wrapper = MultiAnnotWrapper(random, self.random_state,
-                                    n_annotators=3)
+        wrapper = MultiAnnotWrapper(random, n_annotators=3,
+                                    random_state=self.random_state)
 
         X_cand = np.array([[7, 1], [9, 1]])
-        A_perfs = np.array([1, 1, 1])
+        A_perf = np.array([1, 1, 1])
 
         re_val = wrapper.query(X_cand=X_cand, batch_size=6,
-                               pref_annotators_per_sample=3,
-                               A_perfs=A_perfs,
+                               n_annotators_per_sample=3,
+                               A_perf=A_perf,
                                return_utilities=True)
 
         best_cand_indices, utilities = re_val
-        # assert the utilities fit A_perfs
+        # assert the utilities fit A_perf
         self.assertTrue(np.all((utilities[:, :, 2] == utilities[:, :, 1])
                                | np.isnan(utilities[:, :, 2])
                                | np.isnan(utilities[:, :, 1])))

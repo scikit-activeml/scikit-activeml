@@ -1,0 +1,20 @@
+[
+  {
+    "class" : "EpistemicUncertainty",
+    "method" : "Epistemic Uncertainty Sampling",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Epistemic Uncertainty Sampling",
+    "refs" : ["nguyen2019epistemic"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {},
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  }
+]

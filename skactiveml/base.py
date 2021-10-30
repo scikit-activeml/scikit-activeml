@@ -1,7 +1,13 @@
+"""
+The :mod:`skactiveml.base` package implements the base classes for
+:mod:`skactiveml`.
+"""
+
 import warnings
 from abc import ABC, abstractmethod
 
 import numpy as np
+from copy import deepcopy
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length
@@ -10,6 +16,11 @@ from sklearn.utils.multiclass import type_of_target
 from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
     is_labeled, check_scalar, check_class_prior
+
+__all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
+           'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
+           'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
+           'ClassFrequencyEstimator', 'AnnotModelMixin']
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -20,6 +31,7 @@ class QueryStrategy(ABC, BaseEstimator):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
+
     def __init__(self, random_state=None):
         self.random_state = random_state
 
@@ -27,7 +39,7 @@ class QueryStrategy(ABC, BaseEstimator):
     def query(self, *args, **kwargs):
         """Determines the query for active learning based on input arguments.
         """
-        return NotImplemented
+        raise NotImplementedError
 
 
 class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
@@ -39,6 +51,7 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
+
     def __init__(self, random_state=None):
         super().__init__(random_state=random_state)
 
@@ -69,7 +82,7 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
             used for selecting the first sample (with index `query_indices[0]`)
             of the batch.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def _validate_data(self, X_cand, return_utilities, batch_size,
                        random_state, reset=True, **check_X_cand_params):
@@ -139,9 +152,9 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     n_annotators : int,
-        Sets the number of annotators if no A_cand is None
+        Sets the number of annotators if `A_cand is None`.
     """
-    def __init__(self, random_state=None, n_annotators=None):
+    def __init__(self, n_annotators=None, random_state=None):
         super().__init__(random_state=random_state)
         self.n_annotators = n_annotators
 
@@ -180,7 +193,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator pair (with indices `query_indices[0]`).
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
                        random_state, reset=True, adaptive=False,
@@ -242,6 +255,8 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
                     "A_cand as the annotators matrix."
                 )
             else:
+                check_scalar(x=self.n_annotators, target_type=int,
+                             name='n_annotators', min_val=1)
                 A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
         else:
             A_cand = check_array(A_cand, dtype=bool)
@@ -283,6 +298,95 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         return X_cand, A_cand, return_utilities, batch_size, random_state
 
 
+class BudgetManager(ABC, BaseEstimator):
+    """Base class for all budget managers for stream-based active learning
+    in scikit-activeml to model budgeting constraints.
+
+    Parameters
+    ----------
+    budget : float (default=None)
+        Specifies the ratio of instances which are allowed to be sampled, with
+        0 <= budget <= 1. If budget is None, it is replaced with the default
+        budget 0.1.
+    """
+
+    def __init__(self, budget=None):
+        self.budget = budget
+
+    @abstractmethod
+    def query_by_utility(self, utilities, *args, **kwargs):
+        """Ask the budget manager which utilities are sufficient to query the
+        corresponding instance.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy, which are used to determine whether sampling an instance
+            is worth it given the budgeting constraint.
+
+        Returns
+        -------
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances represented by utilities which should be
+            queried, with 0 <= n_queried_instances <= n_samples.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def update(self, X_cand, queried_indices, *args, **kwargs):
+        """Updates the BudgetManager.
+
+        Parameters
+        ----------
+        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        queried_indices : array-like
+            Indicates which instances from X_cand have been queried.
+
+        Returns
+        -------
+        self : BudgetManager
+            The BudgetManager returns itself, after it is updated.
+        """
+        raise NotImplementedError
+
+    def _validate_budget(self):
+        """check the assigned budget and set the default value 0.1 if budget is
+        set to None.
+        """
+        if self.budget is not None:
+            self.budget_ = self.budget
+        else:
+            self.budget_ = 0.1
+        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
+                     min_inclusive=False)
+
+    def _validate_data(self, utilities, *args, **kwargs):
+        """Validate input data.
+
+        Parameters
+        ----------
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
+
+        Returns
+        -------
+        utilities: ndarray of shape (n_samples,)
+            Checked utilities
+        """
+        # Check if utilities is set
+        if not isinstance(utilities, np.ndarray):
+            raise TypeError(
+                "{} is not a valid type for utilities".format(type(utilities))
+            )
+        # Check budget
+        self._validate_budget()
+        return utilities
+
+
 class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
        scikit-activeml.
@@ -302,8 +406,9 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self.budget_manager = budget_manager
 
     @abstractmethod
-    def query(self, X_cand, *args, return_utilities=False, simulate=False,
-              **kwargs):
+    def query(
+        self, X_cand, *args, return_utilities=False, **kwargs
+    ):
         """Ask the query strategy which instances in X_cand to acquire.
 
         The query startegy determines the most useful instances in X_cand,
@@ -318,22 +423,16 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which may be sampled. Sparse matrices are accepted
+            The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
 
-        simulate : bool, optional
-            If True, the internal state of the query strategy before and after
-            the query is the same. This should only be used to prevent the
-            query strategy from adapting itself. Note, that this is propagated
-            to the budget_manager, as well. The default is False.
-
         Returns
         -------
-        sampled_indices : ndarray of shape (n_sampled_instances,)
+        queried_indices : ndarray of shape (n_sampled_instances,)
             The indices of instances in X_cand which should be sampled, with
             0 <= n_sampled_instances <= n_samples.
 
@@ -341,42 +440,120 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, sampled, *args, **kwargs):
+    def update(self, X_cand, queried_indices, *args,
+               budget_manager_param_dict=None, **kwargs):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
-        when the instances sampled from query(...) may differ from the
-        instances sampled in the end. In this case use query(...) with
+        when the instances queried from query(...) may differ from the
+        instances queried in the end. In this case use query(...) with
         simulate=true and provide the final decisions via update(...).
         This is especially helpful, when developing wrapper query strategies.
 
         Parameters
         ----------
         X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be sampled. Sparse matrices are accepted
+            The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        sampled : array-like
-            Indicates which instances from X_cand have been sampled.
+        queried_indices : array-like
+            Indicates which instances from X_cand have been queried.
 
+        budget_manager_param_dict : kwargs, optional
+            Optional kwargs for budget_manager.
         Returns
         -------
         self : StreamBasedQueryStrategy
             The StreamBasedQueryStrategy returns itself, after it is updated.
         """
-        return NotImplemented
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
+
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        raise NotImplementedError
 
     def _validate_random_state(self):
-        if not hasattr(self, 'random_state_'):
-            self.random_state_ = self.random_state
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
+        """
+        if not hasattr(self, "random_state_"):
+            self.random_state_ = deepcopy(self.random_state)
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget_manager(self):
-        if not hasattr(self, 'budget_manager_'):
-            self.budget_manager_ = clone(self.budget_manager)
+        """Validate if budget manager is a budget_manager class and create a
+        copy 'budget_manager_'.
+        """
+        if not hasattr(self, "budget_manager_"):
+            if self.budget_manager is None:
+                self.budget_manager_ = self.get_default_budget_manager()
+            else:
+                self.budget_manager_ = clone(self.budget_manager)
+        if not isinstance(self.budget_manager_, BudgetManager):
+            raise TypeError(
+                "{} is not a valid Type for budget_manager".format(
+                    type(self.budget_manager_)
+                )
+            )
+
+    def _validate_data(
+        self,
+        X_cand,
+        return_utilities,
+        *args,
+        reset=True,
+        **check_X_cand_params
+    ):
+        """Validate input data and set or check the `n_features_in_` attribute.
+
+        Parameters
+        ----------
+        X_cand: array-like of shape (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_cand_params : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X_cand: np.ndarray, shape (n_candidates, n_features)
+            Checked candidate samples
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        """
+        # Check candidate instances.
+        X_cand = check_array(X_cand, **check_X_cand_params)
+
+        # Check number of features.
+        self._check_n_features(X_cand, reset=reset)
+
+        # Check return_utilities.
+        check_scalar(return_utilities, "return_utilities", bool)
+
+        # Check random state.
+        self._validate_random_state()
+
+        # Check budget_manager.
+        self._validate_budget_manager()
+
+        return X_cand, return_utilities
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
@@ -409,8 +586,9 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
         for a sample of class classes_[i].
     """
-    def __init__(self, classes, missing_label=MISSING_LABEL, cost_matrix=None,
-                 random_state=None):
+
+    def __init__(self, classes=None, missing_label=MISSING_LABEL,
+                 cost_matrix=None, random_state=None):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
@@ -437,7 +615,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         self: SkactivemlClassifier,
             The SkactivemlClassifier is fitted on the training data.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def predict_proba(self, X):
         """Return probability estimates for the test data X.
@@ -453,7 +631,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             The class probabilities of the test samples. Classes are ordered
             according to 'classes_'.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def predict(self, X):
         """Return class label predictions for the test samples X.
@@ -500,7 +678,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         y_pred = self._le.transform(self.predict(X))
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
-    def _validate_data(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight=None):
         # Check common classifier parameters.
         check_classifier_params(self.classes, self.missing_label,
                                 self.cost_matrix)
@@ -623,7 +801,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             The class frequency estimates of the test samples 'X'. Classes are
             ordered according to attribute 'classes_'.
         """
-        return NotImplemented
+        raise NotImplementedError
 
     def predict_proba(self, X):
         """Return probability estimates for the test data X.
@@ -647,7 +825,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
-    def _validate_data(self, X, y, sample_weight):
+    def _validate_data(self, X, y, sample_weight=None):
         X, y, sample_weight = super()._validate_data(X, y, sample_weight)
         # Check class prior.
         self.class_prior_ = check_class_prior(self.class_prior,
@@ -655,15 +833,16 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return X, y, sample_weight
 
 
-class AnnotModelMixing(ABC):
-    """AnnotModelMixing
+class AnnotModelMixin(ABC):
+    """AnnotModelMixin
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.
     """
+
     @abstractmethod
-    def predict_annot_proba(self, X):
-        """Calculates the probability that an annotator provides the true label
+    def predict_annot_perf(self, X):
+        """Calculates the performance of an annotator to provide the true label
         for a given sample.
 
         Parameters
@@ -677,4 +856,4 @@ class AnnotModelMixing(ABC):
             `P_annot[i,l]` is the probability, that annotator `l` provides the
             correct class label for sample `X[i]`.
         """
-        return NotImplemented
+        raise NotImplementedError

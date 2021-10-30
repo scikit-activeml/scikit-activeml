@@ -98,3 +98,28 @@ Stopping criteria
 -----------------
 * extra package stopping
 * separate inductive from transductive?
+
+Json example file structure
+---------------------------
+* The example can be modified by modifying the template.py file
+* One json file for each module.
+* Organized in the same folder and naming structure as the packages.
+* The json file should contain a list with one entry for each example.
+* Each example entry it self is a dictionary with the following keys:
+    * "class": The name of the class for which the example is intended. Multiple use is possible.
+    * "method": The method for which the example is intended. Each method-class combination should only be used once.
+    * "refs" (optional): A list of references to bibliographic entries in the 'refs.bib' file.
+    * "title": The title of the example page.
+    * "text": Every key that starts with 'text' will be formatted as a paragraph in the example.
+    * "code": Every key that starts with 'code' will be formatted as a python code block in the example.
+    * "bp": Each key that starts with 'bp' is formatted as Python code and added on a specific line in the example. You need to define the line by adding the key starting with '#_' to the appropriate line in the template.py file.
+    * "sequence": A list that contains the order in which the blocks are shown. Possible blocks are:
+        * 'title': Shows the title.
+        * 'text': Shows the specified text paragraph.
+        * 'code': Shows the specified code block.
+        * 'refs': Shows the references.
+        * 'plot': Shows the example plot including the generated code of the AL cycle.
+    * "categories": A dictionary with a survey as key and the depending category as value.
+    * "init_params": A dictionary which contains the parameters used to initialize the query strategy.
+    * "query_params": A dictionary which contains the parameters used to call the 'query' method.
+    * "clf" (optional): The initialization string of the classifier used as model.

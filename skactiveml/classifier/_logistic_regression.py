@@ -15,12 +15,12 @@ from scipy.stats import multivariate_normal as multi_normal
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
-from ..base import SkactivemlClassifier, AnnotModelMixing
+from ..base import SkactivemlClassifier, AnnotModelMixin
 from ..utils import MISSING_LABEL, compute_vote_vectors, \
     ext_confusion_matrix, rand_argmax
 
 
-class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
+class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
     """LogisticRegressionRY
 
     Logistic Regression based on Raykar [1] is a classification algorithm that
@@ -407,7 +407,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixing):
         P = softmax(X @ self.W_, axis=1)
         return P
 
-    def predict_annot_proba(self, X):
+    def predict_annot_perf(self, X):
         """Calculates the probability that an annotator provides the true label
         for a given sample. The true label is hereby provided by the
         classification model. The label provided by an annotator l is based

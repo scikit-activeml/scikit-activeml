@@ -1,14 +1,15 @@
-import warnings
+from inspect import signature, Parameter
 
 import numpy as np
-from sklearn.utils import check_random_state, check_array, check_scalar
 import sklearn.utils.validation
 from scipy.stats import rankdata
 
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
 
-from ...utils import compute_vote_vectors, rand_argmax
+from ...utils import rand_argmax, check_type
+from ...utils._aggregation import majority_vote
+from ...utils._validation import check_random_state, check_array, check_scalar
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -18,26 +19,39 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
     learning query strategies with a single annotator such that it transforms
     the query strategy for the single annotator into a query strategy for
     multiple annotators by randomly choosing an annotator and setting the
-    labeled matrix to a labeled vector by majority vote.
+    labeled matrix to a labeled vector by an aggregation function.
 
     Parameters
     ----------
-    strategy : SingleAnnotStreamBasedQueryStrategy
+    strategy : SingleAnnotPoolBasedQueryStrategy
         An active learning strategy for a single annotator.
+    n_annotators : int,
+        Sets the number of annotators if `A_cand is None`.
+    y_aggregate : callable, default=None
+        `y_aggregate` is used, if the given `strategy` depends on y-values as
+        labels for samples. These y-values are passed to `query_params_dict`
+        when calling `query`.
+        `y_aggregate` is in this case used to transform `y` as a matrix of shape
+        (n_samples, n_annotators) into a vector of shape (n_samples) during
+        the querying process and then passed to the given `strategy`.
+        If `y_aggregate is None` and `y` is used in the strategy,
+        majority_vote is used as `y_aggregate`.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-    n_annotators : int,
-        Sets the number of annotators if no A_cand is None
+    n_annotators : int, default=None
+        Sets the number of annotators if `A_cand` (see query method) is None.
+        If `n_annotators` is None, `A_cand` has to be passed as an argument.
     """
 
-    def __init__(self, strategy, random_state=None, n_annotators=None):
+    def __init__(self, strategy, n_annotators=None, y_aggregate=None,
+                 random_state=None):
         super().__init__(random_state=random_state)
         self.strategy = strategy
         self.n_annotators = n_annotators
+        self.y_aggregate = y_aggregate
 
-    def query(self, X_cand, *args, A_cand=None, batch_size=1,
-              return_utilities=False, pref_annotators_per_sample=1,
-              A_perfs=None, **kwargs):
+    def query(self, X_cand, query_params_dict=None, A_cand=None, batch_size=1,
+              n_annotators_per_sample=1, A_perf=None, return_utilities=False):
 
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
@@ -54,42 +68,48 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             Boolean matrix where `A_cand[i,j] = True` indicates that
             annotator `j` can be selected for annotating sample `X_cand[i]`,
             while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`. If A_cand=None, each
+            selected for annotating sample `X_cand[i]`. If `A_cand is None`, each
             annotator is assumed to be available for labeling each sample.
-        args : list
-            If (X, y) is contained by args. y can be a matrix or a vector
-            of assigned values. If y is a matrix the entries are interpreted
-            as follows: `y[i,j] = k` indicates that for the i-th sample the
-            j-th candidate annotator annotated the value k.
+            `A_cand` must only be None, if `n_annotators is non None`.
+        query_params_dict : dict, default=None
+            Dictionary for the parameters of the query method.
+            If `dict` contains a value for `y`, it is transformed by
+            `y_aggregate`. If `query_params_dict is None` an empty
+            dictionary is used.
         batch_size : 'adaptive'|int, optional (default=1)
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is set to 1.
-        A_perfs : array-like, shape (n_samples, n_annotators) or
+        A_perf : array-like, shape (n_samples, n_annotators) or
                   (n_annotators,) optional (default=None)
-            The preferred ranking of each annotator.
-            1.) If `A_perfs` is of shape (n_samples, n_annotators) for each
-             sample `i` the value-annotators pair `(i, j)` is preferably picked
-             over the pair `(i, k)` if `A_perfs[i, j]` is greater or
-             equal to `A_perfs[i, k]`.
-            2.) If `A_perfs` is of shape (n_annotators,) for each sample
-            `i` the value-annotators pair `(i, j)` is preferentially picked
-             over the pair `(i, k)` if `A_perfs[j]` is greater or
-             equal to `A_perfs[k]`.
-            3.) If `A_perfs` is None, the annotators are chosen at random, with
+            The performance based ranking of each annotator.
+            1.) If `A_perf` is of shape (n_samples, n_annotators) for each
+             sample `i` the value-annotators pair `(i, j)` is chosen over
+             over the pair `(i, k)` if `A_perf[i, j]` is greater or
+             equal to `A_perf[i, k]`.
+            2.) If `A_perf` is of shape (n_annotators,) for each sample
+            `i` the value-annotators pair `(i, j)` is chosen over
+             over the pair `(i, k)` if `A_perf[j]` is greater or
+             equal to `A_perf[k]`.
+            3.) If `A_perf` is None, the annotators are chosen at random, with
              a different distribution for each sample.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
-        pref_annotators_per_sample : int, array-like, optional (default=1)
-        array-like, shape (k), k <= n_samples
-            If `pref_annotators_per_sample` is an int, the value indicates
+        n_annotators_per_sample : int, array-like, optional (default=1)
+        array-like, shape (k,), k <= n_samples
+            If `n_annotators_per_sample` is an int, the value indicates
             the number of annotators that are preferably assigned to a candidate
-            sample, if annotators can still be assigned to the given candidate
-            sample.
-            If `pref_annotators_per_sample` is an int array, the values of the
+            sample, selected by the query_strategy.
+            `Preferably` in this case means depending on how many annotators
+            can be assigned to a given candidate sample and how many
+            annotator-sample pairs should be assigned considering the
+            `batch_size`.
+            If `n_annotators_per_sample` is an int array, the values of the
             array are interpreted as follows. The value at the i-th index
             determines the preferred number of annotators for the candidate
-            sample at the i-th index in the ranking of the batch. The last index
-            of the pref_annotators_per_sample array (k-1) indicates the
+            sample at the i-th index in the ranking of the batch.
+            The ranking of the batch is given by the `strategy`
+            (SingleAnnotPoolBasedQueryStrategy). The last index
+            of the n_annotators_per_sample array (k-1) indicates the
             preferred number of annotators for all candidate sample at an index
             greater of equal to k-1.
 
@@ -112,39 +132,40 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                                    self.random_state, reset=True)
 
         # check strategy
-        if not isinstance(self.strategy, SingleAnnotPoolBasedQueryStrategy):
-            raise TypeError(
-                f"The given strategy is of the type `{type(self.strategy)}`, "
-                "but it must be a `SingleAnnotStreamBasedQueryStrategy`."
-            )
+        check_type(self.strategy, SingleAnnotPoolBasedQueryStrategy,
+                   'self.strategy')
 
-        # check args
-        if len(args) > 1:
-            X, y = args[0], args[1]
+        # check query_params_dict
+        if query_params_dict is None:
+            query_params_dict = {}
 
-            if isinstance(X, np.ndarray) and isinstance(y, np.ndarray):
-                if y.ndim > 2:
-                    raise ValueError(
-                        "The entries of args[0] and args[1] are interpreted as "
-                        "follows: args[0] is the labeling pool and args[1] is "
-                        "either the labels-vector of the labeling pool or the "
-                        "labels-annotator-matrix, where the entry at the i-th "
-                        "row and the j-th column, says that, the j-th "
-                        "annotator labeled the i-th data point with the given "
-                        "entry. Thereby the dimension of y has to be smaller "
-                        "or equal than 2."
-                    )
-                if y.ndim == 2:
-                    if y.shape[1] != A_cand.shape[1]:
-                        warnings.warn(f"y.shape[1] = {y.shape[1]} != "
-                                      f"A_cand.shape[1] = {A_cand.shape[1]}")
-                    args_list = list(args)
-                    vote_matrix = compute_vote_vectors(y)
-                    vote_vector = vote_matrix.argmax(axis=1)
-                    vote_vector = np.array(vote_vector, dtype=float)
-                    vote_vector[vote_matrix.sum(axis=1) == 0] = np.nan
-                    args_list[1] = vote_vector
-                    args = tuple(args_list)
+        check_type(query_params_dict, dict, 'query_params_dict')
+
+        # aggregate y
+        if 'y' in query_params_dict:
+            y_aggregate = majority_vote if self.y_aggregate is None \
+                else self.y_aggregate
+
+            if not callable(y_aggregate):
+                raise TypeError(
+                    f"`self.y_aggregate` must be callable. "
+                    f"`self.y_aggregate` is of type {type(y_aggregate)}"
+                )
+
+            # count the number of arguments that have no default value
+            n_free_params = len(list(
+                filter(lambda x: x.default == Parameter.empty,
+                       signature(y_aggregate).parameters.values())
+            ))
+
+            if n_free_params != 1:
+                raise TypeError(
+                    f"The number of free parameters of the callable has to "
+                    f"equal one. "
+                    f"The number of free parameters is {n_free_params}."
+                )
+
+            query_params_dict['y'] = y_aggregate(query_params_dict['y'])
 
         # set up X_cand and batch_size for the single annotator query
         a_indices = np.argwhere(np.any(A_cand, axis=1)).flatten()
@@ -155,20 +176,20 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         X_cand_sq = X_cand[a_indices]
         batch_size_sq = min(batch_size, X_cand_sq.shape[0])
 
-        # check pref_annotators_per_sample and set pref_n_annotators
-        if isinstance(pref_annotators_per_sample, (int, np.int_)):
-            check_scalar(pref_annotators_per_sample,
-                         name='pref_annotators_per_sample',
+        # check n_annotators_per_sample and set pref_n_annotators
+        if isinstance(n_annotators_per_sample, (int, np.int_)):
+            check_scalar(n_annotators_per_sample,
+                         name='n_annotators_per_sample',
                          target_type=int, min_val=1)
-            pref_n_annotators = pref_annotators_per_sample * \
+            pref_n_annotators = n_annotators_per_sample * \
                                 np.ones(batch_size_sq)
-        elif sklearn.utils.validation._is_arraylike(pref_annotators_per_sample):
-            pref_n_annotators = check_array(pref_annotators_per_sample,
+        elif sklearn.utils.validation._is_arraylike(n_annotators_per_sample):
+            pref_n_annotators = check_array(n_annotators_per_sample,
                                             ensure_2d=False)
 
             if pref_n_annotators.ndim != 1:
                 raise ValueError(
-                    "pref_annotators_per_sample, if an array, must be of dim"
+                    "n_annotators_per_sample, if an array, must be of dim "
                     f"1 but, it is of dim {pref_n_annotators.ndim}"
                 )
             else:
@@ -182,56 +203,56 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
                     pref_n_annotators = np.append(pref_n_annotators, appended)
         else:
-            raise TypeError("pref_annotators_per_sample must be array like"
+            raise TypeError("n_annotators_per_sample must be array like "
                             "or an integer")
 
-        # check A_perfs and set annotator_utilities
-        if A_perfs is None:
+        # check A_perf and set annotator_utilities
+        if A_perf is None:
             annotator_utilities = random_state.rand(1, n_samples, n_annotators)\
                 .repeat(batch_size_sq, axis=0)
-        elif sklearn.utils.validation._is_arraylike(A_perfs):
-            A_perfs = check_array(A_perfs, ensure_2d=False)
-            # ensure A_perfs lies in [0, 1)
-            if A_perfs.min() != A_perfs.max():
-                A_perfs = 1/(A_perfs.max()-A_perfs.min()+1)\
-                          *(A_perfs - A_perfs.min())
+        elif sklearn.utils.validation._is_arraylike(A_perf):
+            A_perf = check_array(A_perf, ensure_2d=False)
+            # ensure A_perf lies in [0, 1)
+            if A_perf.min() != A_perf.max():
+                A_perf = 1 / (A_perf.max() - A_perf.min() + 1) \
+                         * (A_perf - A_perf.min())
             else:
-                A_perfs = np.zeros_like(A_perfs, dtype=float)
+                A_perf = np.zeros_like(A_perf, dtype=float)
 
-            if A_perfs.shape == (n_samples, n_annotators):
-                annotator_utilities = A_perfs[np.newaxis, :, :]\
+            if A_perf.shape == (n_samples, n_annotators):
+                annotator_utilities = A_perf[np.newaxis, :, :]\
                     .repeat(batch_size_sq, axis=0)
-            elif A_perfs.shape == (n_annotators,):
-                annotator_utilities = A_perfs[np.newaxis, np.newaxis, :]\
+            elif A_perf.shape == (n_annotators,):
+                annotator_utilities = A_perf[np.newaxis, np.newaxis, :]\
                     .repeat(n_samples, axis=1)\
                     .repeat(batch_size_sq, axis=0)
             else:
                 raise ValueError(
-                    f"`A_perfs` is of shape {A_perfs.shape}, but must be of "
+                    f"`A_perf` is of shape {A_perf.shape}, but must be of "
                     f"shape ({n_samples}, {n_annotators}) or of shape "
                     f"({n_annotators},)."
                 )
         else:
             raise TypeError(
-                f"`A_perfs` is of type {type(A_perfs)}, but must be array like"
-                f"or of type None"
+                f"`A_perf` is of type {type(A_perf)}, but must be array like "
+                f"or of type None."
             )
 
-        val = self.strategy.query(X_cand_sq, *args, batch_size=batch_size_sq,
-                                  return_utilities=True, **kwargs)
+        re_val = self.strategy.query(X_cand_sq, **query_params_dict,
+                                     batch_size=batch_size_sq,
+                                     return_utilities=True)
 
-        single_query_indices, w_utilities = val
+        single_query_indices, w_utilities = re_val
         sample_utilities = np.nan * np.ones((batch_size_sq, n_samples))
         sample_utilities[:, a_indices] = w_utilities
-        single_query_indices = a_indices[single_query_indices]
 
         return self._query_annotators(A_cand, batch_size, sample_utilities,
                                       annotator_utilities, return_utilities,
-                                      pref_n_annotators, single_query_indices)
+                                      pref_n_annotators)
 
     def _query_annotators(self, A_cand, batch_size, sample_utilities,
                           annotator_utilities, return_utilities,
-                          pref_n_annotators, single_query_indices):
+                          pref_n_annotators):
 
         random_state = check_random_state(self.random_state)
 
@@ -239,8 +260,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         n_samples = A_cand.shape[0]
 
         re_val = self._get_order_preserving_s_query(A_cand, sample_utilities,
-                                                    annotator_utilities,
-                                                    single_query_indices)
+                                                    annotator_utilities)
 
         s_indices, s_utilities = re_val
 
@@ -277,20 +297,15 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
     @staticmethod
     def _get_order_preserving_s_query(A_cand, candidate_utilities,
-                                      annotator_utilities,
-                                      single_query_indices):
+                                      annotator_utilities):
 
         nan_indices = np.argwhere(np.isnan(candidate_utilities))
 
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = -np.inf
 
         # prepare candidate_utilities
-        candidate_utilities = rankdata(candidate_utilities, method='dense',
+        candidate_utilities = rankdata(candidate_utilities, method='ordinal',
                                        axis=1).astype(float)
-        batch_size_sq = len(single_query_indices)
-
-        # prefer selected sample of the single query strategy
-        candidate_utilities[np.arange(batch_size_sq), single_query_indices] += 1
 
         # calculate indices of maximum sample
         indices = np.argmax(candidate_utilities, axis=1)
@@ -313,12 +328,12 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         annot_per_sample = np.minimum(n_max_chosen_annotators,
                                       pref_n_annotators)
 
-        total_annotators = np.sum(annot_per_sample)
+        n_annotator_sample_pairs = np.sum(annot_per_sample)
 
-        while total_annotators < batch_size:
+        while n_annotator_sample_pairs < batch_size:
             annot_per_sample = np.minimum(n_max_chosen_annotators,
                                           annot_per_sample + 1)
 
-            total_annotators = np.sum(annot_per_sample)
+            n_annotator_sample_pairs = np.sum(annot_per_sample)
 
         return annot_per_sample

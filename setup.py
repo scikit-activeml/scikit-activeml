@@ -1,5 +1,7 @@
 import setuptools
 
+from skactiveml import __version__
+
 
 def readme():
     with open('README.rst', 'r') as f:
@@ -14,11 +16,10 @@ def requirements():
 
 
 setuptools.setup(name='scikit-activeml',
-                 version='0.0.0',
-                 description='The package scikit-activeml is a library of '
-                             'that covers the most relevant query strategies '
-                             'in active learning and implements tools to work '
-                             'with partially labeled data.',
+                 version=__version__,
+                 description='Our package scikit-activeml is a Python library '
+                             'for active learning on top of SciPy and '
+                             'scikit-learn.',
                  long_description=readme(),
                  long_description_content_type='text/x-rst',
                  classifiers=[
@@ -34,7 +35,7 @@ setuptools.setup(name='scikit-activeml',
                  keywords=['active learning', 'machine learning',
                            'semi-supervised learning', 'data mining',
                            'pattern recognition', 'artificial intelligence'],
-                 url='https://scikit-activeml.readthedocs.io/en/latest/',
+                 url='https://github.com/scikit-activeml/scikit-activeml',
                  author='Daniel Kottke',
                  author_email='daniel.kottke@uni-kassel.de',
                  license='BSD 3-Clause License',

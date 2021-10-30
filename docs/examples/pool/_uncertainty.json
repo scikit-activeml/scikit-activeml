@@ -1,0 +1,82 @@
+[
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Margin-based Uncertainty Sampling",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Margin-based Uncertainty Sampling",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "" : [],
+    "init_params" : {
+      "method" : "'margin_sampling'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Least-confident-based Uncertainty Sampling",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Least-confident-based Uncertainty Sampling",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "" : [],
+    "init_params" : {
+      "method" : "'least_confident'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Entropy-based Uncertainty Sampling",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Entropy-based Uncertainty Sampling",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "" : [],
+    "init_params" : {
+      "method" : "'entropy'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Expected Average Precision",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Expected Average Precision",
+    "refs" : ["wang2018uncertainty"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "method" : "'expected_average_precision'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+  }
+]
