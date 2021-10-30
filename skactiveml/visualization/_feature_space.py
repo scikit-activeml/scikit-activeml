@@ -11,6 +11,7 @@ from sklearn.utils import check_array
 
 from ..base import QueryStrategy
 from ..utils import check_scalar
+from ..utils._validation import check_bound, check_type
 
 
 def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
@@ -45,21 +46,18 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     -------
     matplotlib.axes.Axes: The axis on which the boundary was plotted.
     """
-    if not isinstance(clf, ClassifierMixin):
-        raise TypeError("'clf' must be an Sklearn classifier.")
+    check_type(clf, 'clf', ClassifierMixin)
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
         ax = plt.gca()
-    if not isinstance(ax, Axes):
-        raise TypeError("ax must be a matplotlib.axes.Axes.")
-    check_array(feature_bound)
+    check_type(ax, 'ax', Axes)
+    feature_bound = check_bound(bound=feature_bound)
     xmin, ymin, xmax, ymax = np.ravel(feature_bound)
 
     # Check and convert the colormap
     if isinstance(cmap, str):
         cmap = plt.cm.get_cmap(cmap)
-    if not isinstance(cmap, Colormap):
-        raise TypeError("'cmap' must be a string or a Colormap.")
+    check_type(cmap, 'cmap', Colormap, str)
 
     if confidence is not None:
         check_scalar(confidence, 'confidence', float, min_inclusive=False,
@@ -163,16 +161,9 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
     if 'X_cand' in qs_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
 
-    if feature_bound is not None:
-        check_array(feature_bound)
-        xmin, ymin, xmax, ymax = np.ravel(feature_bound)
-    elif X_cand is not None:
-        xmin = min(X_cand[:, 0])
-        xmax = max(X_cand[:, 0])
-        ymin = min(X_cand[:, 1])
-        ymax = max(X_cand[:, 1])
-    else:
-        raise ValueError("If 'X_cand' is None, 'bound' must be given.")
+    feature_bound = check_bound(bound=feature_bound, X=X_cand)
+
+    xmin, ymin, xmax, ymax = np.ravel(feature_bound)
 
     if ax is None:
         ax = plt.gca()

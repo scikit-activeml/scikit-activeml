@@ -459,9 +459,83 @@ def check_random_state(random_state, seed_multiplier=None):
     return np.random.RandomState(seed)
 
 
-def check_type(obj, target_type, name):
-    if not isinstance(obj, target_type):
-        raise TypeError(
-            f'`{name}` has type `{type(obj)}` but must have type '
-            f'`{target_type}`.'
-        )
+def check_type(obj, name, *args):
+    """Check if obj is one of the given types.
+
+    Parameters
+    ----------
+    obj: object
+        The object to be checked.
+    name: str
+        The variable name of object.
+    args : iterable of types
+        The possible types.
+    """
+    if not isinstance(name, str):
+        raise TypeError(f'`name` has type {type(name)} must be of type `str`.')
+    if any(not isinstance(target_type, type) for target_type in args):
+        different_types = set(type(target_type) for target_type in args)
+        raise TypeError(f'`target_types` are of type {different_types} but '
+                        f'`target_types` must be all of type `type`.')
+    if len(args) == 0:
+        raise TypeError('at least one type must be given in args')
+    if all(not isinstance(obj, target_type) for target_type in args):
+        if len(args) == 1:
+            raise TypeError(
+                f'`{name}` has type `{type(obj)}` but must have type '
+                f'`{args[0]}`.'
+            )
+        elif len(args) <= 3:
+            error_str = f'`{name}` has type `{type(obj)}` but must have type '
+            for i in range(len(args)-1):
+                error_str += f'`{args[i]}`,'
+            error_str = error_str.removesuffix(',')
+            error_str += f'or `{args[len(args)-1]}`.'
+            raise TypeError(error_str)
+        else:
+            raise TypeError(
+                f'`{name}` has type `{type(obj)}` but must be one of the '
+                f'following types `{args}`.'
+            )
+
+
+def check_bound(bound=None, X=None, epsilon=0.5):
+    """ Validates bound or returns the bounds of X if bound is None.
+    `bound` or `X` must not be None.
+
+    Parameters
+    ----------
+    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+        The given bound.
+    X : matrix-like, shape (n_samples, 2)
+        The sample matrix X is the feature matrix representing the samples.
+        The feature space must be two dimensional.
+    epsilon: float
+        The minimal distance between the returned bound and the values of `X`,
+        if `bound` is not specified.
+    """
+    if X is not None:
+        X = check_array(X)
+        if X.shape[1] != 2:
+            raise ValueError(f"`X` along axis 1 must be of length two."
+                             f"`X` along axis 1 is of length {X.shape[1]}.")
+    if bound is not None:
+        bound = check_array(bound)
+        if bound.shape != (2, 2):
+            raise ValueError(f"Shape of `bound` must be (2, 2)."
+                             f"Shape of `bound` is {bound.shape}.")
+
+    if bound is None and X is not None:
+        return np.array([[min(X[:, 0]) - epsilon, min(X[:, 1]) - epsilon],
+                         [max(X[:, 0]) + epsilon, max(X[:, 1]) + epsilon]])
+
+    elif bound is not None and X is not None:
+        x_min, y_min, x_max, y_max = np.ravel(bound)
+        if np.any((x_min > X[:, 0]) + (X[:, 0] > x_max) +
+                  (y_min > X[:, 1]) + (X[:, 1] > y_max)):
+            warnings.warn("`X` contains values not within range of `bound`.")
+        return bound
+    elif bound is not None:
+        return bound
+    else:
+        raise TypeError("`X` or `bound` must not be None.")

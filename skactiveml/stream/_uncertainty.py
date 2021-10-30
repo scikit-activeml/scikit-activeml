@@ -233,7 +233,7 @@ class FixedUncertainty(SingleAnnotStreamBasedQueryStrategy):
             Checked model implementing the methods `fit` and `predict_freq`.
         """
         # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
+        check_type(clf, "clf", SkactivemlClassifier)
         return fit_if_not_fitted(clf, X, y, sample_weight)
 
 
@@ -465,7 +465,7 @@ class VariableUncertainty(SingleAnnotStreamBasedQueryStrategy):
             Checked model implementing the methods `fit` and `predict_freq`.
         """
         # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
+        check_type(clf, "clf", SkactivemlClassifier)
         return fit_if_not_fitted(clf, X, y, sample_weight)
 
 
@@ -694,7 +694,7 @@ class Split(SingleAnnotStreamBasedQueryStrategy):
             Checked model implementing the methods `fit` and `predict_freq`.
         """
         # Check if the classifier and its arguments are valid.
-        check_type(clf, SkactivemlClassifier, "clf")
+        check_type(clf, "clf", SkactivemlClassifier)
         return fit_if_not_fitted(clf, X, y, sample_weight)
 
 
