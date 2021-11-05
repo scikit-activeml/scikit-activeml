@@ -1,8 +1,6 @@
-import warnings
-
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
+from matplotlib.colors import Colormap
 from matplotlib.figure import Figure
 
 from matplotlib.lines import Line2D
@@ -14,10 +12,11 @@ from sklearn.utils import check_array, check_consistent_length
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from skactiveml.utils import is_labeled, check_scalar
-from ...utils._validation import check_bound
+from .. import plot_decision_boundary
+from ...utils._validation import check_bound, check_type
 
 
-def check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
+def _check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
     if fig is None:
         if fig_size is None:
             fig_size = (8, 5)
@@ -43,7 +42,7 @@ def check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
         return fig
 
 
-def set_up_annotator_axis(ax, annotator_index, bound, fontsize):
+def _set_up_annotator_axis(ax, annotator_index, bound, fontsize):
     x_min, y_min, x_max, y_max = np.ravel(bound)
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
@@ -62,7 +61,7 @@ def set_up_annotator_axis(ax, annotator_index, bound, fontsize):
     return ax
 
 
-def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
+def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
                        bound=None, title=None, fontsize=15, fig_size=None,
                        plot_legend=True, legend_dict=None, contour_dict=None,
                        boundary_dict=None, confidence_dict=None):
@@ -83,7 +82,7 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
         The correct labels
     ma_qs: MultiAnnotPoolBasedQueryStrategy
         The multi-annotator query strategy.
-    clf: sklearn classifier # TODO correct?
+    clf: sklearn classifier
         The classifier whose decision boundary is plotted.
     ma_qs_arg_dict: dict
         The argument dictionary for the multiple annotator query strategy.
@@ -109,11 +108,7 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
         colormap because cmap is used.
     """
 
-    if ma_qs_arg_dict is None:
-        ma_qs_arg_dict = {}
-    ma_qs_arg_dict.update({"X": X, "y": y})
-
-    bound = check_bound(X, bound)
+    bound = check_bound(bound, X)
 
     fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
                        ma_qs_arg_dict=ma_qs_arg_dict,
@@ -129,7 +124,8 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict=None,
 
 
 def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
-                  fig_size=None, plot_legend=True, legend_dict=None):
+                  fig_size=None, plot_legend=True, legend_dict=None,
+                  cmap='coolwarm'):
     """Plots the annotations of a binary classification problem, differentiating
     between correctly and incorrectly labeled data.
 
@@ -159,6 +155,8 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
         Whether to plot the legend.
     legend_dict: dict, optional (default=None)
         Additional parameters for the legend.
+    cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
+        The colormap for the confidence levels.
     """
 
     # check input values
@@ -178,18 +176,26 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
     check_consistent_length(y_true, y)
 
     n_annotators = y.shape[1]
-    fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
-                              fontsize=fontsize, n_annotators=n_annotators)
+    fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
+                               fontsize=fontsize, n_annotators=n_annotators)
 
-    bound = check_bound(X, bound)
+    bound = check_bound(bound, X)
 
     check_scalar(plot_legend, 'plot_legend', bool)
 
     legend_args = {'fontsize': fontsize, 'loc': 'lower left'}
     if legend_dict is not None:
-        if not isinstance(legend_dict, dict):
-            raise TypeError("'legend_dict' must be a dictionary.")
+        check_type(legend_dict, 'legend_dict', dict)
         legend_args.update(legend_dict)
+
+    if isinstance(cmap, str):
+        cmap = plt.cm.get_cmap(cmap)
+    check_type(cmap, 'cmap', Colormap, str)
+
+    classes = np.array(range(len(np.unique(np.append(y, y_true.reshape(-1, 1),
+                                                    axis=1)))))
+
+    norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
 
     # plot data set
 
@@ -199,8 +205,8 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
     axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
     for a, ax in enumerate(axes):
 
-        set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                              fontsize=fontsize)
+        _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
+                               fontsize=fontsize)
 
         ax.scatter(X[labeled_indices[:, a], 0], X[labeled_indices[:, a], 1],
                    c=[[.2, .2, .2]], s=180, marker='o', zorder=3.8)
@@ -294,11 +300,11 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     else:
         n_annotators = A_cand.shape[1]
 
-    bound = check_bound(X_cand, bound)
+    bound = check_bound(bound, X_cand)
     x_min, y_min, x_max, y_max = np.ravel(bound)
 
-    fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
-                              fontsize=fontsize, n_annotators=n_annotators)
+    fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
+                               fontsize=fontsize, n_annotators=n_annotators)
 
     contour_args = {'cmap': 'Greens', 'alpha': 0.75}
     if contour_dict is not None:
@@ -320,8 +326,8 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
                                    **ma_qs_arg_dict, return_utilities=True)
 
         for a, ax in enumerate(axes):
-            set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                                  fontsize=fontsize)
+            _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
+                                   fontsize=fontsize)
 
             a_utilities = utilities[:, :, a]
             a_utilities_mesh = a_utilities.reshape(X_mesh.shape)
@@ -331,8 +337,8 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
         _, utilities = ma_qs.query(X_cand, A_cand=A_cand, **ma_qs_arg_dict,
                                    return_utilities=True)
         for a, ax in enumerate(axes):
-            set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                                  fontsize=fontsize)
+            _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
+                                   fontsize=fontsize)
 
             utilities_a = utilities[0, :, a]
             neighbors = KNeighborsRegressor(n_neighbors=1)
@@ -345,15 +351,16 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
 
 
 def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
-                                       confidence=0.5, title=None, res=21,
+                                       boundary_dict=None, confidence=0.75,
+                                       title=None, res=21,
                                        fig_size=None, fontsize=15,
-                                       cmap='coolwarm_r', boundary_dict=None,
+                                       cmap='coolwarm_r',
                                        confidence_dict=None):
     """Plot the decision boundary of the given classifier for each annotator.
 
     Parameters
     ----------
-    clf: sklearn classifier # TODO correct?
+    clf: sklearn classifier
         The classifier whose decision boundary is plotted.
     bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
@@ -383,71 +390,6 @@ def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
     """
-    def plot_decision_boundary(clf, bound, res=21, ax=None, confidence=0.5,
-                               cmap='coolwarm_r', boundary_dict=None,
-                               confidence_dict=None):
-        """Plot the decision boundary of the given classifier.
-        Parameters
-        ----------
-        clf: sklearn classifier # TODO correct?
-            The classifier whose decision boundary is plotted.
-        bound: array-like, [[xmin, ymin], [xmax, ymax]]
-            Determines the area in which the boundary is plotted.
-        res: int, optional (default=21)
-            The resolution of the plot.
-        ax: matplotlib.axes.Axes, optional (default=None)
-            The axis on which the boundary is plotted.
-        confidence: scalar | None, optional (default=0.5)
-            The confidence interval plotted with dashed lines. It is not plotted if
-            confidence is None.
-        cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
-            The colormap for the confidence levels.
-        boundary_dict: dict, optional (default=None)
-            Additional parameters for the boundary contour.
-        confidence_dict: dict, optional (default=None)
-            Additional parameters for the confidence contour. Must not contain a
-            colormap because cmap is used.
-        """
-
-        # TODO: extend to multiclass, add parameter confidence [0,1] evtl. [0,0.5], or None
-        # TODO: colors per class colormap or list of colors
-
-        if not isinstance(clf, SkactivemlClassifier):
-            raise TypeError("'clf' must be a SkactivemlClassifier.")
-        check_scalar(res, 'res', int, min_val=1)
-        if ax is None:
-            ax = plt.gca()
-        if not isinstance(ax, Axes):
-            raise TypeError("ax must be a matplotlib.axes.Axes.")
-        check_array(bound)
-        xmin, ymin, xmax, ymax = np.ravel(bound)
-
-        check_scalar(confidence, 'confidence', float, min_inclusive=False,
-                     max_inclusive=False, min_val=0, max_val=1)
-
-        # Create mesh for plotting
-        x_vec = np.linspace(xmin, xmax, res)
-        y_vec = np.linspace(ymin, ymax, res)
-        X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-        mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
-
-        posteriors = clf.predict_proba(mesh_instances)[:, 0].reshape(X_mesh.shape)
-
-        boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
-        if boundary_dict is not None:
-            if not isinstance(boundary_dict, dict):
-                raise TypeError("boundary_dict' must be a dictionary.")
-            boundary_args.update(boundary_dict)
-        ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
-
-        confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
-                           'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
-        if confidence_dict is not None:
-            if not isinstance(confidence_dict, dict):
-                raise TypeError("confidence_dict' must be a dictionary.")
-            confidence_args.update(confidence_dict)
-        ax.contour(X_mesh, Y_mesh, posteriors, [.25, .75], cmap=cmap,
-                   **confidence_args)
 
     # check arguments
     if n_annotators is None and fig is None:
@@ -457,16 +399,16 @@ def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
         n_annotators = check_scalar(n_annotators, name='n_annotators',
                                     target_type=int)
 
-    fig = check_or_get_figure(fig, fig_size=fig_size, title=title,
-                              fontsize=fontsize, n_annotators=n_annotators)
+    fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
+                               fontsize=fontsize, n_annotators=n_annotators)
 
     # plot decision boundary
 
     # type of axis has to equal axes_grid.Axes and must not be a subtype
     axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
     for a, ax in enumerate(axes):
-        set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                              fontsize=fontsize)
+        _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
+                               fontsize=fontsize)
 
         plot_decision_boundary(clf, bound, res=res, ax=ax,
                                confidence=confidence, cmap=cmap,

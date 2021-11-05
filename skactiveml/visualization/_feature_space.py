@@ -66,14 +66,12 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     # Update additional arguments
     boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
     if boundary_dict is not None:
-        if not isinstance(boundary_dict, dict):
-            raise TypeError("boundary_dict' must be a dictionary.")
+        check_type(boundary_dict, 'boundary_dict', dict)
         boundary_args.update(boundary_dict)
     confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
                        'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
     if confidence_dict is not None:
-        if not isinstance(confidence_dict, dict):
-            raise TypeError("confidence_dict' must be a dictionary.")
+        check_type(confidence_dict, 'confidence_dict', dict)
         confidence_args.update(confidence_dict)
 
     # Create mesh for plotting
@@ -154,10 +152,8 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
     -------
     matplotlib.axes.Axes: The axis on which the utility was plotted.
     """
-    if not isinstance(qs, QueryStrategy):
-        raise TypeError("'qs' must be a query strategy.")
-    if not isinstance(qs_dict, dict):
-        raise TypeError("'qs_dict' must be a dictionary.")
+    check_type(qs, 'qs', QueryStrategy)
+    check_type(qs_dict, 'qs_dict', dict)
     if 'X_cand' in qs_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
 
@@ -167,8 +163,7 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
 
     if ax is None:
         ax = plt.gca()
-    if not isinstance(ax, Axes):
-        raise TypeError("ax must be a matplotlib.axes.Axes.")
+    check_type(ax, 'ax', Axes)
     check_scalar(res, 'res', int, min_val=1)
 
     x_vec = np.linspace(xmin, xmax, res)

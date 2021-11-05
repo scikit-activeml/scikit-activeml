@@ -471,6 +471,7 @@ def check_type(obj, name, *args):
     args : iterable of types
         The possible types.
     """
+    # check parameters
     if not isinstance(name, str):
         raise TypeError(f'`name` has type {type(name)} must be of type `str`.')
     if any(not isinstance(target_type, type) for target_type in args):
@@ -479,6 +480,8 @@ def check_type(obj, name, *args):
                         f'`target_types` must be all of type `type`.')
     if len(args) == 0:
         raise TypeError('at least one type must be given in args')
+
+    # check object
     if all(not isinstance(obj, target_type) for target_type in args):
         if len(args) == 1:
             raise TypeError(
@@ -495,7 +498,7 @@ def check_type(obj, name, *args):
         else:
             raise TypeError(
                 f'`{name}` has type `{type(obj)}` but must be one of the '
-                f'following types `{args}`.'
+                f'following types: {args}.'
             )
 
 
@@ -517,12 +520,12 @@ def check_bound(bound=None, X=None, epsilon=0.5):
     if X is not None:
         X = check_array(X)
         if X.shape[1] != 2:
-            raise ValueError(f"`X` along axis 1 must be of length two."
+            raise ValueError(f"`X` along axis 1 must be of length two. "
                              f"`X` along axis 1 is of length {X.shape[1]}.")
     if bound is not None:
         bound = check_array(bound)
         if bound.shape != (2, 2):
-            raise ValueError(f"Shape of `bound` must be (2, 2)."
+            raise ValueError(f"Shape of `bound` must be (2, 2). "
                              f"Shape of `bound` is {bound.shape}.")
 
     if bound is None and X is not None:

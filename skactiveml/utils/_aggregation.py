@@ -91,7 +91,7 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
 
     # infer encoding
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
-    le.fit(y_labeled)
+    le.fit(y)
     y_aggregated = np.full((n_samples,), missing_label, dtype=le._dtype)
 
     if np.any(is_labeled_y):
