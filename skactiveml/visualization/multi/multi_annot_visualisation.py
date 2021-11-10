@@ -10,10 +10,11 @@ from mpl_toolkits.axes_grid1 import axes_grid
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array, check_consistent_length
 
-from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier
+from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
 from skactiveml.utils import is_labeled, check_scalar
 from .. import plot_decision_boundary
-from ...utils._validation import check_bound, check_type
+from ...utils._validation import check_type, check_bound
+from ...utils._visualisation import mesh
 
 
 def _check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
@@ -192,14 +193,14 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
         cmap = plt.cm.get_cmap(cmap)
     check_type(cmap, 'cmap', Colormap, str)
 
-    classes = np.array(range(len(np.unique(np.append(y, y_true.reshape(-1, 1),
-                                                    axis=1)))))
+    labeled_indices = is_labeled(y)
+
+    n_classes = len(np.unique(np.append(y[labeled_indices].flatten(), y_true, axis=0)))
+    classes = np.arange(n_classes)
 
     norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
 
     # plot data set
-
-    labeled_indices = is_labeled(y)
 
     # type of axis has to equal axes_grid.Axes and must not be a subtype
     axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
@@ -213,15 +214,17 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
         ax.scatter(X[labeled_indices[:, a], 0], X[labeled_indices[:, a], 1],
                    c=[[.8, .8, .8]], s=120, marker='o', zorder=4)
 
-        for cl, color in zip([0, 1], ['b', 'r']):
-            for cl_true in [0, 1]:
-                cl_current = np.logical_and(y[:, a] == cl, y_true == cl_true)
+        for cl, color in zip(classes, cmap(norm(classes))):
+            for is_true, marker in zip([False, True], ['x', 's']):
+
+                cl_is_true = np.logical_xor(y_true != cl, is_true)
+                cl_current = np.logical_and(y[:, a] == cl, cl_is_true)
 
                 cl_labeled = np.logical_and(cl_current, labeled_indices[:, a])
 
                 ax.scatter(X[cl_labeled, 0],
                            X[cl_labeled, 1],
-                           color=color, marker='x' if cl != cl_true else 's',
+                           color=color, marker=marker,
                            vmin=-0.2, vmax=1.2,
                            cmap='coolwarm', s=40, zorder=5)
 
@@ -283,16 +286,13 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     """
 
     # check arguments
-
-    if not isinstance(ma_qs, MultiAnnotPoolBasedQueryStrategy):
-        raise TypeError("'ma_qs' must be a MultiAnnotPoolBasedQueryStrategy.")
-    if not isinstance(ma_qs_arg_dict, dict):
-        raise TypeError("'ma_qs_arg_dict' must be a dictionary.")
+    check_type(ma_qs, 'ma_qs', MultiAnnotPoolBasedQueryStrategy)
+    check_type(ma_qs_arg_dict, 'ma_qs_arg_dict', dict)
     if 'X_cand' in ma_qs_arg_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
     if ma_qs.n_annotators is None and A_cand is None:
-        raise ValueError("'n_annotators' must be set in the multi annotator"
-                         "query strategy or A_cand must be set, to determine"
+        raise ValueError("'n_annotators' must be set in the multi annotator "
+                         "query strategy or A_cand must be set, to determine "
                          "the number of annotators.")
 
     if A_cand is None:
@@ -301,7 +301,6 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
         n_annotators = A_cand.shape[1]
 
     bound = check_bound(bound, X_cand)
-    x_min, y_min, x_max, y_max = np.ravel(bound)
 
     fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
                                fontsize=fontsize, n_annotators=n_annotators)
@@ -313,17 +312,14 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
         contour_args.update(contour_dict)
 
     # plot the utilities
-
-    x_vec = np.linspace(x_min, x_max, res)
-    y_vec = np.linspace(y_min, y_max, res)
-    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+    X_mesh, Y_mesh, mesh_instances = mesh(bound, res)
 
     # type of axis has to equal axes_grid.Axes and must not be a subtype
     axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
     if X_cand is None:
         _, utilities = ma_qs.query(X_cand=mesh_instances,
-                                   **ma_qs_arg_dict, return_utilities=True)
+                                   **ma_qs_arg_dict, return_utilities=True,
+                                   batch_size=1)
 
         for a, ax in enumerate(axes):
             _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
@@ -410,7 +406,6 @@ def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
         _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
                                fontsize=fontsize)
 
-        plot_decision_boundary(clf, bound, res=res, ax=ax,
-                               confidence=confidence, cmap=cmap,
-                               boundary_dict=boundary_dict,
-                               confidence_dict=confidence_dict)
+    plot_decision_boundary(clf, bound, ax=axes, res=res,
+                           boundary_dict=boundary_dict, confidence=confidence,
+                           cmap=cmap, confidence_dict=confidence_dict)

@@ -7,11 +7,11 @@ from matplotlib.axes import Axes
 from matplotlib.colors import Colormap
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.utils import check_array
 
 from ..base import QueryStrategy
 from ..utils import check_scalar
-from ..utils._validation import check_bound, check_type
+from ..utils._validation import check_type, check_bound
+from ..utils._visualisation import mesh
 
 
 def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
@@ -26,8 +26,9 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
         is not None, the classifier must implement the predict_proba function.
     feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
-    ax: matplotlib.axes.Axes, optional (default=None)
-        The axis on which the decision boundary is plotted.
+    ax: matplotlib.axes.Axes or List, optional (default=None)
+        The axis on which the decision boundary is plotted. If ax is a List,
+        each entry has to be an `matplotlib.axes.Axes`.
     res: int, optional (default=21)
         The resolution of the plot.
     boundary_dict: dict, optional (default=None)
@@ -50,9 +51,13 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
         ax = plt.gca()
-    check_type(ax, 'ax', Axes)
+    check_type(ax, 'ax', Axes, list)
+    if isinstance(ax, list):
+        for ax_item in ax:
+            check_type(ax_item, 'one item of ax', Axes)
+    else:
+        ax = [ax, ]
     feature_bound = check_bound(bound=feature_bound)
-    xmin, ymin, xmax, ymax = np.ravel(feature_bound)
 
     # Check and convert the colormap
     if isinstance(cmap, str):
@@ -75,15 +80,12 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
         confidence_args.update(confidence_dict)
 
     # Create mesh for plotting
-    x_vec = np.linspace(xmin, xmax, res)
-    y_vec = np.linspace(ymin, ymax, res)
-    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
     # Calculate predictions
     if hasattr(clf, 'predict_proba'):
         predictions = clf.predict_proba(mesh_instances)
-        classes = np.array(range(predictions.shape[1]))
+        classes = np.arange(predictions.shape[1])
     elif hasattr(clf, 'predict'):
         if confidence is not None:
             warnings.warn("The given classifier does not implement "
@@ -115,10 +117,12 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
                                                   posterior_list[y2]], axis=0)
 
         posteriors = posteriors / (posteriors + posteriors_best_alternative)
-        ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
+        for ax_item in ax:
+            ax_item.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
         if confidence is not None:
-            ax.contour(X_mesh, Y_mesh, posteriors, [confidence],
-                       colors=[cmap(norm(y))], **confidence_args)
+            for ax_item in ax:
+                ax_item.contour(X_mesh, Y_mesh, posteriors, [confidence],
+                                colors=[cmap(norm(y))], **confidence_args)
 
     return ax
 
@@ -159,17 +163,12 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
 
     feature_bound = check_bound(bound=feature_bound, X=X_cand)
 
-    xmin, ymin, xmax, ymax = np.ravel(feature_bound)
-
     if ax is None:
         ax = plt.gca()
     check_type(ax, 'ax', Axes)
     check_scalar(res, 'res', int, min_val=1)
 
-    x_vec = np.linspace(xmin, xmax, res)
-    y_vec = np.linspace(ymin, ymax, res)
-    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
     contour_args = {'cmap': 'Greens', 'alpha': 0.75}
     if contour_dict is not None:
