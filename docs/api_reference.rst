@@ -109,6 +109,21 @@ Classes
    PWC
    CMM
    SklearnClassifier
+
+:mod:`skactiveml.classifier`: Multi-annotator classifier
+========================================================
+
+.. automodule:: skactiveml.classifier.multi
+    :no-members:
+    :no-inherited-members:
+
+.. currentmodule:: skactiveml.classifier.multi
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated/api
+   :template: class.rst
+
    MultiAnnotEnsemble
    LogisticRegressionRY
 
