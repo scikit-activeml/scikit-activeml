@@ -41,7 +41,7 @@ jobs:
     - name: Create documentation with sphinx
       run: |
         pip install jupyter
-        pip install sphinx>=4.2.0
+        pip install sphinx==4.2.0
         pip install sphinxcontrib-bibtex>=2.3.0
         pip install numpydoc>=1.1.0
         pip install nbsphinx>=0.8.2
