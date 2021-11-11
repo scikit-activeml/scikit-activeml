@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import NotFittedError
 
 from skactiveml import classifier
+from skactiveml.classifier import multi
 from skactiveml.utils import call_func
 
 
@@ -20,19 +21,32 @@ class TestClassifier(unittest.TestCase):
     def setUp(self):
         # Build dictionary of attributes.
         self.classifiers = {}
+        self.is_multi = {}
         for clf in classifier.__all__:
             self.classifiers[clf] = getattr(classifier, clf)
+            self.is_multi[clf] = False
+        for clf in multi.__all__:
+            self.classifiers[clf] = getattr(multi, clf)
+            self.is_multi[clf] = True
 
         # Create data set for testing.
         self.X, self.y_true = make_blobs(random_state=0)
-        self.X = StandardScaler().fit_transform(self.X)
-        self.y = np.repeat(self.y_true.reshape(-1, 1), 3, axis=1)
-        self.y = self.y.astype('object')
         self.classes = np.unique(self.y_true)
         self.missing_label = None
-        self.y[:100, 0] = self.missing_label
-        self.y[200:, 1] = self.missing_label
-        self.y_missing_label = np.full_like(self.y, self.missing_label)
+        self.X = StandardScaler().fit_transform(self.X)
+        self.y_single = self.y_true.copy()
+        self.y_single = self.y_single.astype('object')
+        self.y_single[:20] = self.missing_label
+        self.y_single_missing_label = np.full_like(
+            self.y_single, self.missing_label, dtype=object
+        )
+        self.y_multi = np.repeat(self.y_true.reshape(-1, 1), 3, axis=1)
+        self.y_multi = self.y_multi.astype('object')
+        self.y_multi[:100, 0] = self.missing_label
+        self.y_multi[200:, 1] = self.missing_label
+        self.y_multi_missing_label = np.full_like(
+            self.y_multi, self.missing_label, dtype=object
+        )
 
         # Set up estimators for Sklearn wrapper and multi-annot classifier.
         self.estimator = GaussianNB()
@@ -49,6 +63,11 @@ class TestClassifier(unittest.TestCase):
     def test_classifiers(self):
         # Test predictions of classifiers.
         for clf in self.classifiers:
+            self.y = self.y_single
+            self.y_missing_label = self.y_single_missing_label
+            if self.is_multi[clf]:
+                self.y = self.y_multi
+                self.y_missing_label = self.y_multi_missing_label
             self._test_single_classifier(clf)
 
     def _test_single_classifier(self, clf):
@@ -64,8 +83,6 @@ class TestClassifier(unittest.TestCase):
         # Create classifier without classes parameter.
         clf_mdl_cls = deepcopy(clf_mdl)
         clf_mdl_cls.classes = None
-        if isinstance(clf_mdl_cls, classifier.MultiAnnotClassifier):
-            clf_mdl_cls.estimators = [clf_mdl_cls.estimators[1]]
 
         # Test classifier without fitting.
         with self.subTest(msg="Not Fitted Test", clf_name=clf):
@@ -114,6 +131,14 @@ class TestClassifier(unittest.TestCase):
                     'missing_label', 'random_state', 'cost_matrix',
                     'class_prior']
         for clf in self.classifiers:
+            self.y = self.y_single
+            self.y_missing_label = self.y_single_missing_label
+            mod = 'skactiveml.classifier.tests.test'
+            if self.is_multi[clf]:
+                self.y = self.y_multi
+                mod = 'skactiveml.classifier.multi.tests.test'
+                self.y_missing_label = self.y_multi_missing_label
+            self._test_single_classifier(clf)
             with self.subTest(msg=f"Parameter/Method Test", clf=clf):
                 # Get initial parameters.
                 clf_class = self.classifiers[clf]
@@ -131,7 +156,7 @@ class TestClassifier(unittest.TestCase):
 
                 # Get test class to check.
                 class_filename = path.basename(inspect.getfile(clf_class))[:-3]
-                mod = 'skactiveml.classifier.tests.test' + class_filename
+                mod += class_filename
                 mod = import_module(mod)
                 test_class_name = 'Test' + clf_class.__name__
                 self.assertTrue(hasattr(mod, test_class_name),

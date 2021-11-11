@@ -109,7 +109,7 @@ Classes
    PWC
    CMM
    SklearnClassifier
-   MultiAnnotClassifier
+   MultiAnnotEnsemble
    LogisticRegressionRY
 
 :mod:`skactiveml.visualization`: Visualization functions

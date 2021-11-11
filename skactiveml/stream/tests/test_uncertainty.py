@@ -1,6 +1,6 @@
 import unittest
-import numpy as np
 
+import numpy as np
 from sklearn.datasets import make_classification
 
 from skactiveml.classifier import PWC
@@ -99,7 +99,7 @@ class TemplateTestUncertainty:
             y=self.y,
         )
         self.assertRaises(
-            TypeError,
+            ValueError,
             query_strategy.query,
             X_cand=self.X_cand,
             clf=self.clf,

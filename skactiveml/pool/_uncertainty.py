@@ -176,11 +176,7 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
         IEEE, 2013.
     """
     # Check probabilities.
-    probas = check_array(probas, accept_sparse=False,
-                         accept_large_sparse=True, dtype="numeric", order=None,
-                         copy=False, force_all_finite=True, ensure_2d=True,
-                         allow_nd=False, ensure_min_samples=1,
-                         ensure_min_features=1, estimator=None)
+    probas = check_array(probas)
 
     if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.e-3):
         raise ValueError(

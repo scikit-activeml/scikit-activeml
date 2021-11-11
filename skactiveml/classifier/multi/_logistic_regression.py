@@ -15,8 +15,8 @@ from scipy.stats import multivariate_normal as multi_normal
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
-from ..base import SkactivemlClassifier, AnnotModelMixin
-from ..utils import MISSING_LABEL, compute_vote_vectors, \
+from skactiveml.base import SkactivemlClassifier, AnnotModelMixin
+from skactiveml.utils import MISSING_LABEL, compute_vote_vectors, \
     ext_confusion_matrix, rand_argmax
 
 
@@ -108,9 +108,9 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
 
     References
     ----------
-    Raykar, V. C., Yu, S., Zhao, L. H., Valadez, G. H., Florin, C., Bogoni, L.,
-    & Moy, L. (2010). Learning from crowds. Journal of Machine Learning
-    Research, 11(4).
+    .. [1] `Raykar, V. C., Yu, S., Zhao, L. H., Valadez, G. H., Florin, C.,
+       Bogoni, L., & Moy, L. (2010). Learning from crowds. Journal of Machine
+       Learning Research, 11(4).`_
     """
 
     def __init__(self, tol=1.e-2, max_iter=100, fit_intercept=True,
@@ -151,7 +151,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         """
         # Check input data.
         X, y, sample_weight = self._validate_data(
-            X=X, y=y, sample_weight=sample_weight
+            X=X, y=y, sample_weight=sample_weight, y_ensure_1d=False
         )
         self._check_n_features(X, reset=True)
 
@@ -186,8 +186,14 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
                              "'float', got {}".format(self.weights_prior))
 
         # Check for empty training data.
-        if len(X) == 0:
+        if self.n_features_in_ is None:
             return self
+
+        if len(y.shape) != 2:
+            raise ValueError(
+                '`y` must be an array-like of shape '
+                '`(n_samples, n_annotators)`.'
+            )
 
         # Insert bias, if 'fit_intercept' is set to 'True'.
         if self.fit_intercept:
@@ -377,18 +383,18 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         return self
 
     def predict_proba(self, X):
-        """Return probability estimates for the test data X.
+        """Return probability estimates for the test data `X`.
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             Test samples.
 
         Returns
         -------
-        P : numpy.ndarray, shape (n_samples, classes)
+        P : numpy.ndarray of shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to classes_.
+            according to `classes_`.
         """
         # Check test samples.
         check_is_fitted(self)
@@ -411,18 +417,18 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         """Calculates the probability that an annotator provides the true label
         for a given sample. The true label is hereby provided by the
         classification model. The label provided by an annotator l is based
-        on his/her confusion matrix (i.e., attribute Alpha_[l]).
+        on his/her confusion matrix (i.e., attribute `Alpha_[l]`).
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             Test samples.
 
         Returns
         -------
-        P_annot : numpy.ndarray, shape (n_samples, classes)
-            P_annot[i,l] is the probability, that annotator l provides the
-            correct class label for sample X[i].
+        P_annot : numpy.ndarray of shape (n_samples, classes)
+            `P_annot[i,l]` is the probability, that annotator l provides the
+            correct class label for sample `X[i]`.
         """
         # Prediction without training data.
         if self.n_features_in_ is None:
@@ -445,9 +451,9 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
 
         Parameters
         ----------
-        y: numpy.ndarray, shape (n_samples, n_annotators)
+        y: numpy.ndarray of shape (n_samples, n_annotators)
             The class labels provided by the annotators for all samples.
-        Alpha: numpy.ndarray, shape (n_annotators, n_classes, n_classes)
+        Alpha: numpy.ndarray of shape (n_annotators, n_classes, n_classes)
             annot_prior vector (n_annotators, n_classes, n_classes) containing
             the new estimates for Alpha. This is effectively a confusion matrix
             for each annotator, where each row is normalized.
@@ -475,21 +481,21 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
 
         Parameters
         ----------
-        y : numpy.ndarray, shape (n_samples, n_annotators)
+        y : numpy.ndarray of shape (n_samples, n_annotators)
             The class labels provided by the annotators for all samples.
-        Mu : numpy.ndarray, shape (n_samples, n_classes)
+        Mu : numpy.ndarray of shape (n_samples, n_classes)
             Mu[i,k] contains the probability of a sample X[i] to be of class
             classes_[k] estimated according to the EM-algorithm.
-        A : numpy.ndarray, shape (n_annotators, n_classes, n_classes)
+        A : numpy.ndarray of shape (n_annotators, n_classes, n_classes)
             A[l,i,j] is the estimated number of times.
             annotator l has provided label j for an instance of true label i.
-        sample_weight : numpy.ndarray, shape (n_samples, n_annotators)
+        sample_weight : numpy.ndarray of shape (n_samples, n_annotators)
             It contains the weights of the training samples' class labels.
             It must have the same shape as y.
 
         Returns
         ----------
-        new_Alpha : numpy..ndarray, shape (n_annotators, n_classes, n_classes)
+        new_Alpha : numpy..ndarray of shape (n_annotators, n_classes, n_classes)
             This is a confusion matrix for each annotator, where each
             row is normalized. `new_Alpha[l,k,c]` describes the probability
             that annotator l provides the class label c for a sample belonging

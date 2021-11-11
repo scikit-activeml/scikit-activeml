@@ -50,7 +50,7 @@ class TestQBC(unittest.TestCase):
         selector = QBC()
         for X in [None, np.nan]:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.X_cand, X=X, y=self.y,
+                ValueError, selector.query, X_cand=self.X_cand, X=X, y=self.y,
                 ensemble=self.ensemble
             )
         for X in [[], self.X[:3]]:
