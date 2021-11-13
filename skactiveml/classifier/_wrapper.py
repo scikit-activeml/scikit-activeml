@@ -172,7 +172,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._check_n_features(X, reset=False)
         if self.is_fitted_:
             P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-            if len(self.estimator_.classes_) != len(self.classes_):
+            if P.shape[1] != len(self.classes_):
                 P_ext = np.zeros((len(X), len(self.classes_)))
                 class_indices = np.asarray(self.estimator_.classes_, dtype=int)
                 # Exception for the MLPCLassifier

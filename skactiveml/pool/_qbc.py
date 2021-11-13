@@ -93,7 +93,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
         # Check if the parameter `ensemble` is valid.
         if isinstance(ensemble, SkactivemlClassifier) and \
-                hasattr(ensemble, 'n_estimators'):
+                (hasattr(ensemble, 'n_estimators')
+                 or hasattr(ensemble, 'estimators')):
             ensemble = fit_if_not_fitted(
                 ensemble, X, y, sample_weight=sample_weight
             )

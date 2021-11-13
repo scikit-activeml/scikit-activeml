@@ -86,7 +86,7 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     def _validate_data(self, X_cand, return_utilities, batch_size,
-                       random_state, reset=True, **check_X_cand_params):
+                       random_state, reset=True, check_X_cand_dict=None):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -118,7 +118,9 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
             Checked random state to use.
         """
         # Check candidate instances.
-        X_cand = check_array(X_cand, **check_X_cand_params)
+        if check_X_cand_dict is None:
+            check_X_cand_dict = {'allow_nd': True}
+        X_cand = check_array(X_cand, **check_X_cand_dict)
 
         # Check number of features.
         self._check_n_features(X_cand, reset=reset)
