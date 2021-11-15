@@ -32,7 +32,7 @@ To simplify the use of this library, a homogeneous naming scheme is important. T
     * `y`
     * `X_eval`
     * `y_eval`
-    * `A_cand` (multiannot) - matrix wer was noch labeln kann
+    * `A_cand` (multiannot) - matrix containing labels from annotators
     * (kernel kram...)
     * `sample_weight_cand`
     * `sample_weight` (same dim as y)
