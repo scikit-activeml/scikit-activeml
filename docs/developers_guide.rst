@@ -83,7 +83,7 @@ Handling of uncertain oracles
 
 Transductive and inductive active learning
 ------------------------------------------
-* possible with distinct X_cand list independent X, y, E_eval, etc.
+* possible with distinct X_cand list independent X, y, X_eval, etc.
 * explain with notebooks
 
 Classification and regression
