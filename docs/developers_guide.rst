@@ -11,7 +11,7 @@ As the selection streategies are inheriting from BaseEstimator, the selection st
 
 Code style and linting
 ----------------------
-As this library conforms to the convention of scikit-learn, the code should conform to `PEP 8 Sytle Guide for Python Code <https://www.python.org/dev/peps/pep-0008/>`_. For linting, the use of `flake8 <https://flake8.pycqa.org/en/latest/>`_ is recommended.
+As this library conforms to the convention of scikit-learn, the code should conform to `PEP 8 Style Guide for Python Code <https://www.python.org/dev/peps/pep-0008/>`_. For linting, the use of `flake8 <https://flake8.pycqa.org/en/latest/>`_ is recommended.
 
 Homogeneous naming scheme
 -------------------------
