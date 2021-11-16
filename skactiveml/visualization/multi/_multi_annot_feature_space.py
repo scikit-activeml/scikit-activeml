@@ -6,17 +6,17 @@ from sklearn.utils import check_array, check_consistent_length
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
 from skactiveml.utils import is_labeled, check_scalar
-from .. import plot_decision_boundary
+from .._feature_space import plot_decision_boundary
 from ...utils._validation import check_type
 from ...utils._visualisation import mesh, check_bound, _get_contour_args, \
     _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
 
 
-def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
-                       bound=None, epsilon=1, title=None, fontsize=15,
-                       fig_size=None, plot_legend=True, legend_dict=None,
-                       contour_dict=None, boundary_dict=None,
-                       confidence_dict=None, tick_dict=None):
+def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
+                          bound=None, epsilon=1, title=None, fontsize=15,
+                          fig_size=None, plot_legend=True, legend_dict=None,
+                          contour_dict=None, boundary_dict=None,
+                          confidence_dict=None, tick_dict=None):
     """Shows the annotations from the different annotators, the decision
     boundary of the given classifier and the utilities expected of querying
     a sample from a given region based on the query strategy.
@@ -72,24 +72,24 @@ def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
 
     bound = check_bound(bound, X, epsilon=epsilon)
 
-    fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
-                       ma_qs_arg_dict=ma_qs_arg_dict,
-                       bound=bound, title=title, fontsize=fontsize, res=5,
-                       contour_dict=contour_dict, tick_dict=tick_dict)
-    plot_data_set(fig=fig, X=X, y=y, y_true=y_true, bound=bound,
-                  plot_legend=plot_legend, legend_dict=legend_dict,
-                  tick_dict=tick_dict)
-    plot_multi_annotator_decision_boundary(clf, fig=fig, bound=bound,
-                                           boundary_dict=boundary_dict,
-                                           confidence_dict=confidence_dict,
-                                           tick_dict=tick_dict)
+    fig = plot_ma_utility(fig_size=fig_size, ma_qs=ma_qs,
+                          ma_qs_arg_dict=ma_qs_arg_dict,
+                          bound=bound, title=title, fontsize=fontsize, res=5,
+                          contour_dict=contour_dict, tick_dict=tick_dict)
+    plot_ma_data_set(fig=fig, X=X, y=y, y_true=y_true, bound=bound,
+                     plot_legend=plot_legend, legend_dict=legend_dict,
+                     tick_dict=tick_dict)
+    plot_ma_decision_boundary(clf, fig=fig, bound=bound,
+                              boundary_dict=boundary_dict,
+                              confidence_dict=confidence_dict,
+                              tick_dict=tick_dict)
 
     return fig
 
 
-def plot_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15,
-                  fig_size=None, plot_legend=True, legend_dict=None,
-                  tick_dict=None, cmap='coolwarm', marker_size=10):
+def plot_ma_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15,
+                     fig_size=None, plot_legend=True, legend_dict=None,
+                     tick_dict=None, cmap='coolwarm', marker_size=10):
     """Plots the annotations of a binary classification problem, differentiating
     between correctly and incorrectly labeled data.
 
@@ -206,9 +206,9 @@ def plot_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15,
     return fig
 
 
-def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
-                 fig_size=None, bound=None, title=None, res=21, fontsize=15,
-                 contour_dict=None, tick_dict=None):
+def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
+                    fig_size=None, bound=None, title=None, res=21, fontsize=15,
+                    contour_dict=None, tick_dict=None):
     """Plots the utilities for the different annotators of the given
     multi-annotator query strategy.
 
@@ -256,12 +256,14 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     check_type(ma_qs_arg_dict, 'ma_qs_arg_dict', dict)
     if 'X_cand' in ma_qs_arg_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
+    if 'A_cand' in ma_qs_arg_dict.keys():
+        raise ValueError("'A_cand' must be given as separate argument.")
 
     n_annotators = None
     if fig is None:
         if A_cand is not None:
             check_array(A_cand)
-            n_annotators = A_cand.shape[0]
+            n_annotators = A_cand.shape[1]
         elif ma_qs.n_annotators is not None:
             check_scalar(ma_qs.n_annotators, "ma_qs.n_annotators",
                          target_type=int)
@@ -298,12 +300,12 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     X_mesh, Y_mesh, mesh_instances = mesh(bound, res)
 
     if X_cand is None:
-        _, utilities = ma_qs.query(X_cand=mesh_instances,
+        _, utilities = ma_qs.query(mesh_instances, A_cand=A_cand,
                                    **ma_qs_arg_dict, return_utilities=True,
                                    batch_size=1)
 
         for a, ax in enumerate(fig.get_axes()):
-            a_utilities = utilities[:, :, a]
+            a_utilities = utilities[0, :, a]
             a_utilities_mesh = a_utilities.reshape(X_mesh.shape)
             ax.contourf(X_mesh, Y_mesh, a_utilities_mesh, **contour_args)
     else:
@@ -311,7 +313,7 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
                                    return_utilities=True, batch_size=1)
 
         for a, ax in enumerate(fig.get_axes()):
-            utilities_a = utilities[:, :, a]
+            utilities_a = utilities[0, :, a]
             neighbors = KNeighborsRegressor(n_neighbors=1)
             neighbors.fit(X_cand, utilities_a)
             scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
@@ -320,13 +322,13 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     return fig
 
 
-def plot_multi_annotator_decision_boundary(clf, bound, n_annotators=None,
-                                           fig=None, boundary_dict=None,
-                                           confidence=0.75, title=None, res=21,
-                                           fig_size=None, fontsize=15,
-                                           cmap='coolwarm',
-                                           confidence_dict=None,
-                                           tick_dict=None):
+def plot_ma_decision_boundary(clf, bound, n_annotators=None,
+                              fig=None, boundary_dict=None,
+                              confidence=0.75, title=None, res=21,
+                              fig_size=None, fontsize=15,
+                              cmap='coolwarm',
+                              confidence_dict=None,
+                              tick_dict=None):
     """Plot the decision boundary of the given classifier for each annotator.
 
     Parameters
@@ -371,11 +373,10 @@ def plot_multi_annotator_decision_boundary(clf, bound, n_annotators=None,
 
     # check arguments
     if n_annotators is None and fig is None:
-        raise TypeError("`n_annotators` or `fig` must not be `None`")
+        raise ValueError("`n_annotators` or `fig` must not be `None`")
 
     if n_annotators is not None:
-        n_annotators = check_scalar(n_annotators, name='n_annotators',
-                                    target_type=int)
+        check_scalar(n_annotators, name='n_annotators', target_type=int)
 
     tick_args = _get_tick_args(tick_dict)
     fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title,
