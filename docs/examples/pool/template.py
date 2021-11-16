@@ -5,8 +5,8 @@ from sklearn.datasets import make_blobs
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices, labeled_indices
 from skactiveml.visualization import plot_decision_boundary
 
-# _ import
-# _bp_add_imports
+#_ import
+#_bp_add_imports
 
 random_state = np.random.RandomState(0)
 
@@ -29,7 +29,7 @@ feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
-n_cycles = 5
+n_cycles = 25
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
