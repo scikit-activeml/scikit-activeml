@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
 
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices, labeled_indices
-from skactiveml.visualization import plot_decision_boundary
+from skactiveml.visualization import plot_utility, plot_decision_boundary
 
 #_ import
 #_bp_add_imports
