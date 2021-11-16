@@ -17,9 +17,8 @@ from ..utils import simple_batch, fit_if_not_fitted, check_type, \
 class QBC(SingleAnnotPoolBasedQueryStrategy):
     """QBC
 
-    The Query-By-Committee (QBC) algorithm minimizes the version space, which
-    is the set of hypotheses that are consistent with the current labeled
-    training data.
+    The Query-By-Committee (QBC) strategy uses an ensemble of classifiers to
+    identify on which instances many classifiers disagree.
 
     Parameters
     ----------
