@@ -56,6 +56,7 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     if isinstance(ax, list):
         for ax_item in ax:
             check_type(ax_item, 'one item of ax', Axes)
+        ax = ax
     else:
         ax = [ax, ]
     feature_bound = check_bound(bound=feature_bound)
@@ -115,7 +116,6 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
             for ax_item in ax:
                 ax_item.contour(X_mesh, Y_mesh, posteriors, [confidence],
                                 colors=[cmap(norm(y))], **confidence_args)
-
     return ax
 
 
