@@ -10,8 +10,9 @@ from sklearn.neighbors import KNeighborsRegressor
 
 from ..base import QueryStrategy
 from ..utils import check_scalar
-from ..utils._validation import check_type, check_bound
-from ..utils._visualisation import mesh
+from ..utils._validation import check_type
+from ..utils._visualisation import mesh, check_bound, _get_boundary_args, \
+    _get_confidence_args, _get_contour_args, _get_cmap
 
 
 def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
@@ -60,24 +61,15 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     feature_bound = check_bound(bound=feature_bound)
 
     # Check and convert the colormap
-    if isinstance(cmap, str):
-        cmap = plt.cm.get_cmap(cmap)
-    check_type(cmap, 'cmap', Colormap, str)
+    cmap = _get_cmap(cmap)
 
     if confidence is not None:
         check_scalar(confidence, 'confidence', float, min_inclusive=False,
                      max_inclusive=False, min_val=0.5, max_val=1)
 
     # Update additional arguments
-    boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
-    if boundary_dict is not None:
-        check_type(boundary_dict, 'boundary_dict', dict)
-        boundary_args.update(boundary_dict)
-    confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
-                       'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
-    if confidence_dict is not None:
-        check_type(confidence_dict, 'confidence_dict', dict)
-        confidence_args.update(confidence_dict)
+    boundary_args = _get_boundary_args(boundary_dict)
+    confidence_args = _get_confidence_args(confidence_dict)
 
     # Create mesh for plotting
     X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
@@ -93,7 +85,7 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
                           "plotted.")
             confidence = None
         predicted_classes = clf.predict(mesh_instances)
-        classes = np.array(range(len(np.unique(predicted_classes))))
+        classes = np.arange(len(np.unique(predicted_classes)))
         predictions = np.zeros((len(predicted_classes), len(classes)))
         for idx, y in enumerate(predicted_classes):
             predictions[idx, y] = 1
@@ -170,11 +162,7 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
 
     X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
-    contour_args = {'cmap': 'Greens', 'alpha': 0.75}
-    if contour_dict is not None:
-        if not isinstance(contour_dict, dict):
-            raise TypeError("contour_dict' must be a dictionary.")
-        contour_args.update(contour_dict)
+    contour_args = _get_contour_args(contour_dict)
 
     if X_cand is None:
         _, utilities = qs.query(mesh_instances, **qs_dict,

@@ -1,71 +1,22 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import Colormap
-from matplotlib.figure import Figure
-
+import numpy as np
 from matplotlib.lines import Line2D
-
-from mpl_toolkits.axes_grid1 import AxesGrid
-from mpl_toolkits.axes_grid1 import axes_grid
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array, check_consistent_length
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
 from skactiveml.utils import is_labeled, check_scalar
 from .. import plot_decision_boundary
-from ...utils._validation import check_type, check_bound
-from ...utils._visualisation import mesh
+from ...utils._validation import check_type
+from ...utils._visualisation import mesh, check_bound, _get_contour_args, \
+    _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
 
 
-def _check_or_get_figure(fig, fig_size, title, fontsize, n_annotators):
-    if fig is None:
-        if fig_size is None:
-            fig_size = (8, 5)
-        fig = plt.figure(figsize=fig_size)
-        if title is not None:
-            plt.title(title, fontsize=fontsize)
-        AxesGrid(fig, 111,
-                 nrows_ncols=(1, n_annotators),
-                 axes_pad=0.05,
-                 cbar_mode='single',
-                 cbar_location='right',
-                 cbar_pad=0.1
-                 )
-        return fig
-    elif not isinstance(fig, Figure):
-        raise TypeError("'fig' must be a matplotlib.figure.Figure")
-    # type of axis has to equal axes_grid.Axes and must not be a subtype
-    elif n_annotators is not None \
-            and len([ax for ax in fig.axes if type(ax) == axes_grid.Axes]
-            ) != n_annotators:
-        raise ValueError("'fig' must contain an axes for each annotator")
-    else:
-        return fig
-
-
-def _set_up_annotator_axis(ax, annotator_index, bound, fontsize):
-    x_min, y_min, x_max, y_max = np.ravel(bound)
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(y_min, y_max)
-    ax.set_title(r'annotator $a_{}$'.format(annotator_index + 1),
-                 fontsize=fontsize)
-    ax.set_xlabel(r'feature $x_1$', fontsize=fontsize, color='k')
-    ax.set_ylabel(r'feature $x_2$', fontsize=fontsize, color='k')
-
-    ax.tick_params(
-        axis='both',  # changes apply to the x-axis
-        which='both',  # both major and minor ticks are affected
-        direction='in',
-        labelbottom=False,  # labels along the bottom edge are off
-        labelleft=False)  # labels along the bottom edge are off
-
-    return ax
-
-
-def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
-                       bound=None, title=None, fontsize=15, fig_size=None,
-                       plot_legend=True, legend_dict=None, contour_dict=None,
-                       boundary_dict=None, confidence_dict=None):
+def plot_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
+                       bound=None, epsilon=1, title=None, fontsize=15,
+                       fig_size=None, plot_legend=True, legend_dict=None,
+                       contour_dict=None, boundary_dict=None,
+                       confidence_dict=None, tick_dict=None):
     """Shows the annotations from the different annotators, the decision
     boundary of the given classifier and the utilities expected of querying
     a sample from a given region based on the query strategy.
@@ -89,6 +40,9 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
         The argument dictionary for the multiple annotator query strategy.
     bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
+    epsilon: float, optional (default=1)
+        The minimal distance between the returned bound and the values of `X`,
+        if `bound` is not specified.
     title : str, optional
         The title for the figure.
     fontsize: int
@@ -107,26 +61,35 @@ def show_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
     confidence_dict: dict, optional (default=None)
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
+    tick_dict: dict, optional (default=None):
+        Additional parameters for the ticks of the plots.
+
+    Returns
+    ----------
+    fig: matplotlib.figure.Figure
+        The figure onto which the current state is plotted
     """
 
-    bound = check_bound(bound, X)
+    bound = check_bound(bound, X, epsilon=epsilon)
 
     fig = plot_utility(fig_size=fig_size, ma_qs=ma_qs,
                        ma_qs_arg_dict=ma_qs_arg_dict,
                        bound=bound, title=title, fontsize=fontsize, res=5,
-                       contour_dict=contour_dict)
-    plot_data_set(fig=fig, X=X, y=y, y_true=y_true,
-                  plot_legend=plot_legend, legend_dict=legend_dict)
-    plot_multi_annot_decision_boundary(clf, fig=fig, bound=bound,
-                                       boundary_dict=boundary_dict,
-                                       confidence_dict=confidence_dict)
+                       contour_dict=contour_dict, tick_dict=tick_dict)
+    plot_data_set(fig=fig, X=X, y=y, y_true=y_true, bound=bound,
+                  plot_legend=plot_legend, legend_dict=legend_dict,
+                  tick_dict=tick_dict)
+    plot_multi_annotator_decision_boundary(clf, fig=fig, bound=bound,
+                                           boundary_dict=boundary_dict,
+                                           confidence_dict=confidence_dict,
+                                           tick_dict=tick_dict)
 
-    plt.show()
+    return fig
 
 
-def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
+def plot_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15,
                   fig_size=None, plot_legend=True, legend_dict=None,
-                  cmap='coolwarm'):
+                  tick_dict=None, cmap='coolwarm', marker_size=10):
     """Plots the annotations of a binary classification problem, differentiating
     between correctly and incorrectly labeled data.
 
@@ -156,8 +119,17 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
         Whether to plot the legend.
     legend_dict: dict, optional (default=None)
         Additional parameters for the legend.
+    tick_dict: dict, optional (default=None)
+        Additional parameters for the ticks.
     cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
         The colormap for the confidence levels.
+    marker_size: int
+        The size of the markers on the plot.
+
+    Returns
+    ----------
+    fig: matplotlib.figure.Figure
+        The figure onto which the data set is plotted
     """
 
     # check input values
@@ -177,42 +149,27 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
     check_consistent_length(y_true, y)
 
     n_annotators = y.shape[1]
-    fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
-                               fontsize=fontsize, n_annotators=n_annotators)
-
+    legend_args = _get_legend_args(legend_dict, fontsize)
+    tick_args = _get_tick_args(tick_dict)
+    fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title, fontsize=fontsize,
+                             n_annotators=n_annotators, tick_args=tick_args)
     bound = check_bound(bound, X)
-
     check_scalar(plot_legend, 'plot_legend', bool)
-
-    legend_args = {'fontsize': fontsize, 'loc': 'lower left'}
-    if legend_dict is not None:
-        check_type(legend_dict, 'legend_dict', dict)
-        legend_args.update(legend_dict)
-
-    if isinstance(cmap, str):
-        cmap = plt.cm.get_cmap(cmap)
-    check_type(cmap, 'cmap', Colormap, str)
-
+    cmap = _get_cmap(cmap)
     labeled_indices = is_labeled(y)
 
-    n_classes = len(np.unique(np.append(y[labeled_indices].flatten(), y_true, axis=0)))
+    n_classes = len(np.unique(np.append(y[labeled_indices].flatten(), y_true,
+                                        axis=0)))
     classes = np.arange(n_classes)
 
     norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
 
     # plot data set
-
-    # type of axis has to equal axes_grid.Axes and must not be a subtype
-    axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
-    for a, ax in enumerate(axes):
-
-        _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                               fontsize=fontsize)
-
-        ax.scatter(X[labeled_indices[:, a], 0], X[labeled_indices[:, a], 1],
-                   c=[[.2, .2, .2]], s=180, marker='o', zorder=3.8)
-        ax.scatter(X[labeled_indices[:, a], 0], X[labeled_indices[:, a], 1],
-                   c=[[.8, .8, .8]], s=120, marker='o', zorder=4)
+    for a, ax in enumerate(fig.get_axes()):
+        ax.scatter(X[~labeled_indices[:, a], 0], X[~labeled_indices[:, a], 1],
+                   c='gray', marker='o', s=marker_size)
+        ax.set_xlim(bound[:, 0])
+        ax.set_ylim(bound[:, 1])
 
         for cl, color in zip(classes, cmap(norm(classes))):
             for is_true, marker in zip([False, True], ['x', 's']):
@@ -222,14 +179,11 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
 
                 cl_labeled = np.logical_and(cl_current, labeled_indices[:, a])
 
-                ax.scatter(X[cl_labeled, 0],
-                           X[cl_labeled, 1],
-                           color=color, marker=marker,
-                           vmin=-0.2, vmax=1.2,
-                           cmap='coolwarm', s=40, zorder=5)
+                ax.scatter(X[cl_labeled, 0], X[cl_labeled, 1], color=color,
+                           marker=marker, s=marker_size)
 
     patch = Line2D([0], [0], marker='o', markerfacecolor='grey',
-                   markeredgecolor='k', markersize=20, alpha=0.8, color='w')
+                   markersize=20, alpha=0.8, color='w')
     true_patches = (Line2D([0], [0], marker='s', markerfacecolor='b',
                            markersize=15, color='w'),
                     Line2D([0], [0], marker='s', markerfacecolor='r',
@@ -238,8 +192,13 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
                             markeredgecolor='b', markersize=15, color='w'),
                      Line2D([0], [0], marker='x', markerfacecolor='r',
                             markeredgecolor='r', markersize=15, color='w'))
-    handles = [patch, true_patches, false_patches]
-    labels = ['acquired annotation', 'true annotation', 'false annotation']
+
+    handles = [true_patches, false_patches]
+    labels = ['true annotation', 'false annotation']
+
+    if not(np.all(is_labeled(y))):
+        handles = [patch, ] + handles
+        labels = ['not acquired annotation', ] + labels
 
     if plot_legend:
         fig.legend(handles, labels, **legend_args)
@@ -249,7 +208,7 @@ def plot_data_set(X, y_true, y, fig=None, bound=None, title=None, fontsize=15,
 
 def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
                  fig_size=None, bound=None, title=None, res=21, fontsize=15,
-                 contour_dict=None):
+                 contour_dict=None, tick_dict=None):
     """Plots the utilities for the different annotators of the given
     multi-annotator query strategy.
 
@@ -283,6 +242,13 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
         The fontsize of the labels.
     contour_dict: dict, optional (default=None)
         Additional parameters for the utility contour.
+    tick_dict: dict, optional (default=None)
+        Additional parameters for the ticks.
+
+    Returns
+    ----------
+    fig: matplotlib.figure.Figure
+        The figure onto which the utilities are plotted
     """
 
     # check arguments
@@ -290,68 +256,77 @@ def plot_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     check_type(ma_qs_arg_dict, 'ma_qs_arg_dict', dict)
     if 'X_cand' in ma_qs_arg_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
-    if ma_qs.n_annotators is None and A_cand is None:
-        raise ValueError("'n_annotators' must be set in the multi annotator "
-                         "query strategy or A_cand must be set, to determine "
-                         "the number of annotators.")
 
-    if A_cand is None:
-        n_annotators = ma_qs.n_annotators
-    else:
-        n_annotators = A_cand.shape[1]
+    n_annotators = None
+    if fig is None:
+        if A_cand is not None:
+            check_array(A_cand)
+            n_annotators = A_cand.shape[0]
+        elif ma_qs.n_annotators is not None:
+            check_scalar(ma_qs.n_annotators, "ma_qs.n_annotators",
+                         target_type=int)
+            n_annotators = ma_qs.n_annotators
+        else:
+            raise ValueError("`A_cand`, `fig` or `n_annotators` must be set in "
+                             "the multi annotator query strategy, to determine "
+                             "the number of annotators.")
+    elif fig is not None and A_cand is not None:
+        check_array(A_cand)
+        if A_cand.shape[0] != len(fig.get_axes()):
+            raise ValueError(f"`A_cand.shape[0]` must equal "
+                             f"`len(fig.get_axes())`, but "
+                             f"`A_cand.shape[0] == {A_cand.shape[0]})` and "
+                             f"`len(fig.get_axes()) == {len(fig.get_axes())}`.")
+
+    elif fig is not None and ma_qs.n_annotators is not None:
+        check_scalar(ma_qs.n_annotators, "ma_qs.n_annotators", target_type=int)
+        qs_n_a = ma_qs.n_annotators
+        if qs_n_a != len(fig.get_axes()):
+            raise ValueError(f"`ma_qs.n_annotators` must equal "
+                             f"`len(fig.get_axes())`, but "
+                             f"`ma_qs.n_annotators == {qs_n_a})` and "
+                             f"`len(fig.get_axes()) == {len(fig.get_axes())}`.")
 
     bound = check_bound(bound, X_cand)
-
-    fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
-                               fontsize=fontsize, n_annotators=n_annotators)
-
-    contour_args = {'cmap': 'Greens', 'alpha': 0.75}
-    if contour_dict is not None:
-        if not isinstance(contour_dict, dict):
-            raise TypeError("'contour_dict' must be a dictionary.")
-        contour_args.update(contour_dict)
+    contour_args = _get_contour_args(contour_dict)
+    tick_args = _get_tick_args(tick_dict)
+    fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title,
+                             fontsize=fontsize, n_annotators=n_annotators,
+                             tick_args=tick_args)
 
     # plot the utilities
     X_mesh, Y_mesh, mesh_instances = mesh(bound, res)
 
-    # type of axis has to equal axes_grid.Axes and must not be a subtype
-    axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
     if X_cand is None:
         _, utilities = ma_qs.query(X_cand=mesh_instances,
                                    **ma_qs_arg_dict, return_utilities=True,
                                    batch_size=1)
 
-        for a, ax in enumerate(axes):
-            _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                                   fontsize=fontsize)
-
+        for a, ax in enumerate(fig.get_axes()):
             a_utilities = utilities[:, :, a]
             a_utilities_mesh = a_utilities.reshape(X_mesh.shape)
-
             ax.contourf(X_mesh, Y_mesh, a_utilities_mesh, **contour_args)
     else:
         _, utilities = ma_qs.query(X_cand, A_cand=A_cand, **ma_qs_arg_dict,
-                                   return_utilities=True)
-        for a, ax in enumerate(axes):
-            _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                                   fontsize=fontsize)
+                                   return_utilities=True, batch_size=1)
 
-            utilities_a = utilities[0, :, a]
+        for a, ax in enumerate(fig.get_axes()):
+            utilities_a = utilities[:, :, a]
             neighbors = KNeighborsRegressor(n_neighbors=1)
             neighbors.fit(X_cand, utilities_a)
             scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
-
-            ax.contourf(X_mesh, Y_mesh, scores, cmap='Greens', alpha=.75)
+            ax.contourf(X_mesh, Y_mesh, scores, **contour_args)
 
     return fig
 
 
-def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
-                                       boundary_dict=None, confidence=0.75,
-                                       title=None, res=21,
-                                       fig_size=None, fontsize=15,
-                                       cmap='coolwarm_r',
-                                       confidence_dict=None):
+def plot_multi_annotator_decision_boundary(clf, bound, n_annotators=None,
+                                           fig=None, boundary_dict=None,
+                                           confidence=0.75, title=None, res=21,
+                                           fig_size=None, fontsize=15,
+                                           cmap='coolwarm',
+                                           confidence_dict=None,
+                                           tick_dict=None):
     """Plot the decision boundary of the given classifier for each annotator.
 
     Parameters
@@ -385,27 +360,30 @@ def plot_multi_annot_decision_boundary(clf, bound, n_annotators=None, fig=None,
     confidence_dict: dict, optional (default=None)
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
+    tick_dict: dict, optional (default=None)
+        Additional parameters for the ticks.
+
+    Returns
+    ----------
+    fig: matplotlib.figure.Figure
+        The figure onto which the decision boundaries are plotted.
     """
 
     # check arguments
     if n_annotators is None and fig is None:
-        raise TypeError("n_annotators or fig have to be passed as an argument")
+        raise TypeError("`n_annotators` or `fig` must not be `None`")
 
     if n_annotators is not None:
         n_annotators = check_scalar(n_annotators, name='n_annotators',
                                     target_type=int)
 
-    fig = _check_or_get_figure(fig, fig_size=fig_size, title=title,
-                               fontsize=fontsize, n_annotators=n_annotators)
+    tick_args = _get_tick_args(tick_dict)
+    fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title,
+                             fontsize=fontsize, n_annotators=n_annotators,
+                             tick_args=tick_args)
 
     # plot decision boundary
-
-    # type of axis has to equal axes_grid.Axes and must not be a subtype
-    axes = [ax for ax in fig.axes if type(ax) == axes_grid.Axes]
-    for a, ax in enumerate(axes):
-        _set_up_annotator_axis(ax, annotator_index=a, bound=bound,
-                               fontsize=fontsize)
-
-    plot_decision_boundary(clf, bound, ax=axes, res=res,
+    plot_decision_boundary(clf, bound, ax=fig.get_axes(), res=res,
                            boundary_dict=boundary_dict, confidence=confidence,
                            cmap=cmap, confidence_dict=confidence_dict)
+    return fig
