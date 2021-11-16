@@ -480,7 +480,7 @@ def check_type(obj, name, *target_types):
             error_str = f'`{name}` has type `{type(obj)}` but must have type '
             for i in range(len(target_types) - 1):
                 error_str += f'`{target_types[i]}`,'
-            error_str = error_str.removesuffix(',')
+            error_str = error_str[:-1]
             error_str += f'or `{target_types[len(target_types) - 1]}`.'
             raise TypeError(error_str)
         else:
