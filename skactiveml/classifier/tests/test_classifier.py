@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import NotFittedError
 
 from skactiveml import classifier
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import multi
 from skactiveml.utils import call_func
 
@@ -22,12 +23,18 @@ class TestClassifier(unittest.TestCase):
         # Build dictionary of attributes.
         self.classifiers = {}
         self.is_multi = {}
-        for clf in classifier.__all__:
-            self.classifiers[clf] = getattr(classifier, clf)
-            self.is_multi[clf] = False
-        for clf in multi.__all__:
-            self.classifiers[clf] = getattr(multi, clf)
-            self.is_multi[clf] = True
+        for clf_name in classifier.__all__:
+            clf = getattr(classifier, clf_name)
+            if inspect.isclass(clf) and \
+                    issubclass(clf, SkactivemlClassifier):
+                self.classifiers[clf_name] = clf
+                self.is_multi[clf_name] = False
+        for clf_name in multi.__all__:
+            clf = getattr(multi, clf_name)
+            if inspect.isclass(clf) and \
+                    issubclass(clf, SkactivemlClassifier):
+                self.classifiers[clf_name] = clf
+                self.is_multi[clf_name] = True
 
         # Create data set for testing.
         self.X, self.y_true = make_blobs(random_state=0)
