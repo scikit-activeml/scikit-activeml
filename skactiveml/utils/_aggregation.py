@@ -84,6 +84,9 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
     y = check_array(y, ensure_2d=False, dtype=None, force_all_finite=False)
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     n_samples = y.shape[0]
+    w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
+                                                      force_all_finite=False,
+                                                      dtype=None, copy=True)
 
     # extract labeled samples
     is_labeled_y = np.any(is_labeled(y, missing_label), axis=1)
@@ -100,7 +103,8 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
         max_value_y_l_t = np.nanmax(y_labeled_transformed)
 
         # perform voting
-        vote_matrix = compute_vote_vectors(y_labeled_transformed, w,
+        vote_matrix = compute_vote_vectors(y_labeled_transformed,
+                                           w=w[is_labeled_y],
                                            classes=np.arange(max_value_y_l_t+1))
         vote_vector = vote_matrix.argmax(axis=1)
 

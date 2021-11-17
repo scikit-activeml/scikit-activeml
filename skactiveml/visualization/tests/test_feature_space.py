@@ -87,7 +87,6 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(clf=self.clf, feature_bound=self.bound,
                                boundary_dict={'colors': 'r'})
 
-
     def test_decision_boundary_confidence_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, confidence_dict='string')
