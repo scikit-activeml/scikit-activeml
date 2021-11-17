@@ -42,7 +42,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
 
     w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
                                                       force_all_finite=False,
-                                                      dtype=None, copy=True)
+                                                      dtype=float, copy=True)
     w = w if w.ndim == 2 else w.reshape((-1, 1))
     check_consistent_length(y, w)
     check_consistent_length(y.T, w.T)
@@ -84,6 +84,9 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
     y = check_array(y, ensure_2d=False, dtype=None, force_all_finite=False)
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     n_samples = y.shape[0]
+    w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
+                                                      force_all_finite=False,
+                                                      dtype=None, copy=True)
 
     # extract labeled samples
     is_labeled_y = np.any(is_labeled(y, missing_label), axis=1)
@@ -91,7 +94,7 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
 
     # infer encoding
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
-    le.fit(y_labeled)
+    le.fit(y)
     y_aggregated = np.full((n_samples,), missing_label, dtype=le._dtype)
 
     if np.any(is_labeled_y):
@@ -100,7 +103,9 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
         max_value_y_l_t = np.nanmax(y_labeled_transformed)
 
         # perform voting
-        vote_matrix = compute_vote_vectors(y_labeled_transformed, w,
+        h = w[is_labeled_y]
+        vote_matrix = compute_vote_vectors(y_labeled_transformed,
+                                           w=w[is_labeled_y],
                                            classes=np.arange(max_value_y_l_t+1))
         vote_vector = vote_matrix.argmax(axis=1)
 

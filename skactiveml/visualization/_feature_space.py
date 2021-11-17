@@ -7,10 +7,12 @@ from matplotlib.axes import Axes
 from matplotlib.colors import Colormap
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.utils import check_array
 
 from ..base import QueryStrategy
 from ..utils import check_scalar
+from ..utils._validation import check_type
+from ..utils._visualisation import mesh, check_bound, _get_boundary_args, \
+    _get_confidence_args, _get_contour_args, _get_cmap
 
 
 def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
@@ -25,8 +27,9 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
         is not None, the classifier must implement the predict_proba function.
     feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
-    ax: matplotlib.axes.Axes, optional (default=None)
-        The axis on which the decision boundary is plotted.
+    ax: matplotlib.axes.Axes or List, optional (default=None)
+        The axis on which the decision boundary is plotted. If ax is a List,
+        each entry has to be an `matplotlib.axes.Axes`.
     res: int, optional (default=21)
         The resolution of the plot.
     boundary_dict: dict, optional (default=None)
@@ -45,49 +48,37 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     -------
     matplotlib.axes.Axes: The axis on which the boundary was plotted.
     """
-    if not isinstance(clf, ClassifierMixin):
-        raise TypeError("'clf' must be an Sklearn classifier.")
+    check_type(clf, 'clf', ClassifierMixin)
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
         ax = plt.gca()
-    if not isinstance(ax, Axes):
-        raise TypeError("ax must be a matplotlib.axes.Axes.")
-    check_array(feature_bound)
-    xmin, ymin, xmax, ymax = np.ravel(feature_bound)
+    check_type(ax, 'ax', Axes, list)
+    if isinstance(ax, list):
+        for ax_item in ax:
+            check_type(ax_item, 'one item of ax', Axes)
+        axs = ax
+    else:
+        axs = [ax, ]
+    feature_bound = check_bound(bound=feature_bound)
 
     # Check and convert the colormap
-    if isinstance(cmap, str):
-        cmap = plt.cm.get_cmap(cmap)
-    if not isinstance(cmap, Colormap):
-        raise TypeError("'cmap' must be a string or a Colormap.")
+    cmap = _get_cmap(cmap)
 
     if confidence is not None:
         check_scalar(confidence, 'confidence', float, min_inclusive=False,
                      max_inclusive=False, min_val=0.5, max_val=1)
 
     # Update additional arguments
-    boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
-    if boundary_dict is not None:
-        if not isinstance(boundary_dict, dict):
-            raise TypeError("boundary_dict' must be a dictionary.")
-        boundary_args.update(boundary_dict)
-    confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
-                       'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
-    if confidence_dict is not None:
-        if not isinstance(confidence_dict, dict):
-            raise TypeError("confidence_dict' must be a dictionary.")
-        confidence_args.update(confidence_dict)
+    boundary_args = _get_boundary_args(boundary_dict)
+    confidence_args = _get_confidence_args(confidence_dict)
 
     # Create mesh for plotting
-    x_vec = np.linspace(xmin, xmax, res)
-    y_vec = np.linspace(ymin, ymax, res)
-    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
     # Calculate predictions
     if hasattr(clf, 'predict_proba'):
         predictions = clf.predict_proba(mesh_instances)
-        classes = np.array(range(predictions.shape[1]))
+        classes = np.arange(predictions.shape[1])
     elif hasattr(clf, 'predict'):
         if confidence is not None:
             warnings.warn("The given classifier does not implement "
@@ -95,7 +86,7 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
                           "plotted.")
             confidence = None
         predicted_classes = clf.predict(mesh_instances)
-        classes = np.array(range(len(np.unique(predicted_classes))))
+        classes = np.arange(len(np.unique(predicted_classes)))
         predictions = np.zeros((len(predicted_classes), len(classes)))
         for idx, y in enumerate(predicted_classes):
             predictions[idx, y] = 1
@@ -119,11 +110,12 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
                                                   posterior_list[y2]], axis=0)
 
         posteriors = posteriors / (posteriors + posteriors_best_alternative)
-        ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
+        for ax_item in axs:
+            ax_item.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
         if confidence is not None:
-            ax.contour(X_mesh, Y_mesh, posteriors, [confidence],
-                       colors=[cmap(norm(y))], **confidence_args)
-
+            for ax_item in axs:
+                ax_item.contour(X_mesh, Y_mesh, posteriors, [confidence],
+                                colors=[cmap(norm(y))], **confidence_args)
     return ax
 
 
@@ -156,40 +148,21 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
     -------
     matplotlib.axes.Axes: The axis on which the utility was plotted.
     """
-    if not isinstance(qs, QueryStrategy):
-        raise TypeError("'qs' must be a query strategy.")
-    if not isinstance(qs_dict, dict):
-        raise TypeError("'qs_dict' must be a dictionary.")
+    check_type(qs, 'qs', QueryStrategy)
+    check_type(qs_dict, 'qs_dict', dict)
     if 'X_cand' in qs_dict.keys():
         raise ValueError("'X_cand' must be given as separate argument.")
 
-    if feature_bound is not None:
-        check_array(feature_bound)
-        xmin, ymin, xmax, ymax = np.ravel(feature_bound)
-    elif X_cand is not None:
-        xmin = min(X_cand[:, 0])
-        xmax = max(X_cand[:, 0])
-        ymin = min(X_cand[:, 1])
-        ymax = max(X_cand[:, 1])
-    else:
-        raise ValueError("If 'X_cand' is None, 'bound' must be given.")
+    feature_bound = check_bound(bound=feature_bound, X=X_cand)
 
     if ax is None:
         ax = plt.gca()
-    if not isinstance(ax, Axes):
-        raise TypeError("ax must be a matplotlib.axes.Axes.")
+    check_type(ax, 'ax', Axes)
     check_scalar(res, 'res', int, min_val=1)
 
-    x_vec = np.linspace(xmin, xmax, res)
-    y_vec = np.linspace(ymin, ymax, res)
-    X_mesh, Y_mesh = np.meshgrid(x_vec, y_vec)
-    mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
-    contour_args = {'cmap': 'Greens', 'alpha': 0.75}
-    if contour_dict is not None:
-        if not isinstance(contour_dict, dict):
-            raise TypeError("contour_dict' must be a dictionary.")
-        contour_args.update(contour_dict)
+    contour_args = _get_contour_args(contour_dict)
 
     if X_cand is None:
         _, utilities = qs.query(mesh_instances, **qs_dict,

@@ -459,9 +459,31 @@ def check_random_state(random_state, seed_multiplier=None):
     return np.random.RandomState(seed)
 
 
-def check_type(obj, target_type, name):
-    if not isinstance(obj, target_type):
-        raise TypeError(
-            f'`{name}` has type `{type(obj)}` but must have type '
-            f'`{target_type}`.'
-        )
+def check_type(obj, name, *target_types):
+    """Check if obj is one of the given types.
+
+    Parameters
+    ----------
+    obj: object
+        The object to be checked.
+    name: str
+        The variable name of the object.
+    target_types : iterable of types
+        The possible types.
+    """
+    if all(not isinstance(obj, target_type) for target_type in target_types):
+        if len(target_types) == 1:
+            raise TypeError(
+                f'`{name}` has type `{type(obj)}` but must have type '
+                f'`{target_types[0]}`.')
+        elif len(target_types) <= 3:
+            error_str = f'`{name}` has type `{type(obj)}` but must have type '
+            for i in range(len(target_types) - 1):
+                error_str += f'`{target_types[i]}`,'
+            error_str = error_str[:-1]
+            error_str += f'or `{target_types[len(target_types) - 1]}`.'
+            raise TypeError(error_str)
+        else:
+            raise TypeError(
+                f'`{name}` has type `{type(obj)}` but must be one of the '
+                f'following types: {target_types}.')

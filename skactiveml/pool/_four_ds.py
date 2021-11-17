@@ -82,7 +82,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         y = column_or_1d(y)
 
         # Check classifier type.
-        check_type(clf, CMM, 'clf')
+        check_type(clf, 'clf', CMM)
 
         # Storage for query indices.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)

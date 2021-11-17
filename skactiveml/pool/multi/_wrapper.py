@@ -132,14 +132,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                                    self.random_state, reset=True)
 
         # check strategy
-        check_type(self.strategy, SingleAnnotPoolBasedQueryStrategy,
-                   'self.strategy')
+        check_type(self.strategy, 'self.strategy',
+                   SingleAnnotPoolBasedQueryStrategy)
 
         # check query_params_dict
         if query_params_dict is None:
             query_params_dict = {}
 
-        check_type(query_params_dict, dict, 'query_params_dict')
+        check_type(query_params_dict, 'query_params_dict', dict)
 
         # aggregate y
         if 'y' in query_params_dict:

@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
-    check_missing_label, check_scalar, check_X_y
+    check_missing_label, check_scalar, check_X_y, check_type
 from skactiveml.utils import check_random_state, check_class_prior
 
 
@@ -119,3 +119,9 @@ class TestValidation(unittest.TestCase):
         ra = check_random_state(np.random.RandomState(None))
         rb = check_random_state(np.random.RandomState(None))
         self.assertTrue(ra.rand() != rb.rand())
+
+    def test_check_type(self):
+        self.assertRaises(TypeError, check_type, 10, 'a', str)
+        self.assertRaises(TypeError, check_type, 10, 'a', str, bool)
+        self.assertRaises(TypeError, check_type, 10, 'a', str, bool, map, list)
+        check_type(10, 'a', int)
