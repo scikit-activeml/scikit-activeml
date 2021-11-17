@@ -59,6 +59,10 @@ The following code implements an active learning cycle with 20 iterations using 
     X, y_true = make_classification(random_state=0)
     y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
+    # LogisticRegression needs ititial training data otherwise a warning will 
+    # be raised. Therfore initialize first 10 instances as training data
+    y[:10] = y_true[:10]
+
     # Create classifier and query strategy.
     clf = SklearnClassifier(LogisticRegression(), classes=np.unique(y_true))
     qs = UncertaintySampling(method='entropy')
