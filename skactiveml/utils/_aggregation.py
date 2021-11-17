@@ -42,7 +42,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
 
     w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
                                                       force_all_finite=False,
-                                                      dtype=None, copy=True)
+                                                      dtype=float, copy=True)
     w = w if w.ndim == 2 else w.reshape((-1, 1))
     check_consistent_length(y, w)
     check_consistent_length(y.T, w.T)
@@ -103,6 +103,7 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
         max_value_y_l_t = np.nanmax(y_labeled_transformed)
 
         # perform voting
+        h = w[is_labeled_y]
         vote_matrix = compute_vote_vectors(y_labeled_transformed,
                                            w=w[is_labeled_y],
                                            classes=np.arange(max_value_y_l_t+1))
