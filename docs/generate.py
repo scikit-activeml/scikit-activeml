@@ -7,6 +7,7 @@ import numpy as np
 
 import skactiveml
 import warnings
+import shutil
 
 warnings.filterwarnings("ignore")
 
@@ -634,3 +635,7 @@ def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
                 key = '"' + key + '"'
         dd_str += str(key) + allocator + value + ", "
     return dd_str[0:-2]
+
+
+def generate_tutorials(source_path, dest_path):
+    shutil.copytree(src=source_path, dst=dest_path, dirs_exist_ok=True)
