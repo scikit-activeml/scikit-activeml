@@ -230,6 +230,6 @@ generate_strategy_overview_rst(
 )
 
 generate_tutorials(
-    source_path=os.path.abspath('../tutorials/'),
-    dest_path=os.path.abspath('generated/tutorials/'),
+    src_path=os.path.abspath('../tutorials/'),
+    dst_path=os.path.abspath('generated/tutorials/'),
 )

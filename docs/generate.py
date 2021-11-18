@@ -7,7 +7,7 @@ import numpy as np
 
 import skactiveml
 import warnings
-import shutil
+import distutils.dir_util
 
 warnings.filterwarnings("ignore")
 
@@ -637,5 +637,16 @@ def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
     return dd_str[0:-2]
 
 
-def generate_tutorials(source_path, dest_path):
-    shutil.copytree(src=source_path, dst=dest_path, dirs_exist_ok=True)
+def generate_tutorials(src_path, dst_path):
+    """Includes the tutorials folder from the git root, such that tutorials are
+    included in the documentation. Effectively this function copies all 
+    contents from src_path to dst_path.
+    Parameters
+    ----------
+    src_path: string
+        The path where the notebooks are found.
+    dst_path: string
+        The path where the notebooks are saved, such that tutorials.rst can
+        find them.
+    """
+    distutils.dir_util.copy_tree(src=src_path, dst=dst_path)
