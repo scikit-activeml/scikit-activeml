@@ -28,7 +28,7 @@ feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
-n_cycles = #_n_cycles
+n_cycles = "#_n_cycles"
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)

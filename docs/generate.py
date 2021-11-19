@@ -546,7 +546,7 @@ def format_plot(data, template_path):
                     line = line[:start] + '{' + \
                            dict_to_str(data['query_params'], allocator=': ',
                                        key_as_string=True) + '}\n'
-                elif '#_n_cycles' in line:
+                elif '"#_n_cycles"' in line:
                     start = line.find('#_n_cycles')
                     n_cycles = os.getenv('N_CYCLES', default='2')
                     line = line[:start] + n_cycles + '\n'
