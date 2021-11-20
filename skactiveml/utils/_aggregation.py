@@ -1,5 +1,6 @@
 import numpy as np
 
+from ._selection import rand_argmax
 from ._label import ExtLabelEncoder, is_labeled
 from sklearn.utils import check_array, check_consistent_length
 
@@ -58,7 +59,8 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     return v
 
 
-def majority_vote(y, w=None, classes=None, missing_label=np.nan):
+def majority_vote(y, w=None, classes=None, missing_label=np.nan,
+                  random_state=None):
     """ Assigns a label to each sample based on weighted voting.
     Samples with no labels are assigned with `missing_label`.
 
@@ -73,6 +75,9 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
         Holds the label for each class.
     missing_label : scalar|string|np.nan|None, default=np.nan
         Value to represent a missing label.
+    random_state : int, RandomState instance or None, optional (default=None)
+        Determines random number generation for shuffling the data. Pass an int
+        for reproducible results across multiple function calls.
 
     Returns
     -------
@@ -103,11 +108,11 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan):
         max_value_y_l_t = np.nanmax(y_labeled_transformed)
 
         # perform voting
-        h = w[is_labeled_y]
         vote_matrix = compute_vote_vectors(y_labeled_transformed,
                                            w=w[is_labeled_y],
                                            classes=np.arange(max_value_y_l_t+1))
-        vote_vector = vote_matrix.argmax(axis=1)
+
+        vote_vector = rand_argmax(vote_matrix, random_state, axis=1)
 
         # inverse transform labels
         y_labeled_inverse_transformed = le.inverse_transform(vote_vector)

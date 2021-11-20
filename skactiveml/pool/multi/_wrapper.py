@@ -143,8 +143,11 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         # aggregate y
         if 'y' in query_params_dict:
-            y_aggregate = majority_vote if self.y_aggregate is None \
-                else self.y_aggregate
+            if self.y_aggregate is None:
+                y_aggregate = lambda y: majority_vote(y,
+                                                      random_state=random_state)
+            else:
+                y_aggregate = self.y_aggregate
 
             if not callable(y_aggregate):
                 raise TypeError(
@@ -208,7 +211,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         # check A_perf and set annotator_utilities
         if A_perf is None:
-            annotator_utilities = random_state.rand(1, n_samples, n_annotators)\
+            annotator_utilities = random_state.rand(1, n_samples, n_annotators) \
                 .repeat(batch_size_sq, axis=0)
         elif sklearn.utils.validation._is_arraylike(A_perf):
             A_perf = check_array(A_perf, ensure_2d=False)
@@ -220,11 +223,11 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                 A_perf = np.zeros_like(A_perf, dtype=float)
 
             if A_perf.shape == (n_samples, n_annotators):
-                annotator_utilities = A_perf[np.newaxis, :, :]\
+                annotator_utilities = A_perf[np.newaxis, :, :] \
                     .repeat(batch_size_sq, axis=0)
             elif A_perf.shape == (n_annotators,):
-                annotator_utilities = A_perf[np.newaxis, np.newaxis, :]\
-                    .repeat(n_samples, axis=1)\
+                annotator_utilities = A_perf[np.newaxis, np.newaxis, :] \
+                    .repeat(n_samples, axis=1) \
                     .repeat(batch_size_sq, axis=0)
             else:
                 raise ValueError(
@@ -280,9 +283,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             query_indices[batch_index] = rand_argmax(utilities[batch_index],
                                                      random_state=random_state)
 
-            s_utilities[sample_index,
-                        query_indices[batch_index, 0],
-                        query_indices[batch_index, 1]] = np.nan
+            s_utilities[:, query_indices[batch_index, 0],
+            query_indices[batch_index, 1]] = np.nan
 
             batch_index += 1
             annotator_ps += 1

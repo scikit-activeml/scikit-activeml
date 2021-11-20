@@ -3,13 +3,14 @@ import unittest
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import testing
 from matplotlib.testing.compare import compare_images
 from sklearn.datasets import make_classification
 
 from skactiveml import visualization
 from skactiveml.classifier import PWC
 from skactiveml.pool.multi import IEThresh
-from skactiveml.utils import check_bound
+from skactiveml.utils import check_bound, majority_vote
 from skactiveml.visualization.multi import plot_ma_data_set, plot_ma_utility, plot_ma_decision_boundary, \
     plot_ma_current_state
 
@@ -35,6 +36,10 @@ class TestFeatureSpace(unittest.TestCase):
 
         self.clf = PWC(random_state=0)
         self.ma_qs = IEThresh(random_state=0, n_annotators=self.n_annotators)
+
+        testing.set_font_settings_for_testing()
+        testing.set_reproducibility_for_testing()
+        testing.setup()
 
     def test_ma_plot_data_set_X(self):
         self.assertRaises(ValueError, plot_ma_data_set, self.X.T, self.y,
@@ -84,6 +89,7 @@ class TestFeatureSpace(unittest.TestCase):
                                     self.path_prefix +
                                     'data_set_mf_returned_result.pdf',
                                     tol=0)
+        self.assertIsNone(comparison)
 
     def test_ma_plot_utility_args(self):
         y = np.array(self.y, dtype=float)
@@ -146,7 +152,7 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_ma_plot_decision_boundary(self):
         bound = check_bound(X=self.X)
-        self.clf.fit(self.X, self.y)
+        self.clf.fit(self.X, majority_vote(self.y, random_state=0))
         fig = plot_ma_decision_boundary(self.clf, bound,
                                         n_annotators=self.n_annotators)
         fig.tight_layout()
@@ -163,7 +169,7 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_ma_plot_current_state(self):
         maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
-        self.clf.fit(self.X, self.y)
+        self.clf.fit(self.X, majority_vote(self.y, random_state=0))
         fig = plot_ma_current_state(self.X, self.y, self.y_true, self.ma_qs,
                                     self.clf, maqs_arg_dict)
         fig.tight_layout()
