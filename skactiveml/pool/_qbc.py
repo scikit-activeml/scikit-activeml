@@ -102,7 +102,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             if hasattr(ensemble, 'estimators_'):
                 est_arr = ensemble.estimators_
             else:
-                est_arr = [ensemble] * ensemble.n_estimators
+                if hasattr(ensemble, 'estimators'):
+                    n_estimators = len(ensemble.estimators)
+                else:
+                    n_estimators = ensemble.n_estimators
+                est_arr = [ensemble] * n_estimators
         elif _is_arraylike(ensemble):
             est_arr = deepcopy(ensemble)
             for i in range(len(est_arr)):

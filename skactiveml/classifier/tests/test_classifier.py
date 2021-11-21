@@ -362,7 +362,6 @@ class TestClassifier(unittest.TestCase):
         )
         y = [0, 1]
         self.assertRaises(ValueError, clf_mdl.fit, X=[0, 1], y=y)
-        self.assertRaises(ValueError, clf_mdl.fit, X=[['Test'], ['Test']], y=y)
         self.assertRaises(ValueError, clf_mdl.fit, X=[[0], [1], [2]], y=y)
 
     def _test_fit_param_y(self, clf_class):

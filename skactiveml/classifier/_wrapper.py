@@ -198,7 +198,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         # Check input parameters.
         self.check_X_dict_ = {
             'ensure_min_samples': 0, 'ensure_min_features': 0,
-            'allow_nd': True
+            'allow_nd': True, 'dtype': None
         }
         X, y, sample_weight = self._validate_data(
             X=X, y=y, sample_weight=sample_weight,
@@ -235,10 +235,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._label_counts = [np.sum(y[is_lbld] == c) for c in
                               range(len(self._le.classes_))]
         try:
-            X_lbld = X[is_lbld].astype(np.float32)
+            X_lbld = X[is_lbld]
             y_lbld = y[is_lbld].astype(np.int64)
-            if not has_fit_parameter(self.estimator,
-                                     'sample_weight') or sample_weight is None:
+            if np.sum(is_lbld) == 0:
+                raise ValueError('There is no labeled data.')
+            elif not has_fit_parameter(self.estimator, 'sample_weight') \
+                    or sample_weight is None:
                 if fit_function == 'partial_fit':
                     classes = self._le.transform(self.classes_)
                     self.estimator_.partial_fit(X=X_lbld, y=y_lbld,
