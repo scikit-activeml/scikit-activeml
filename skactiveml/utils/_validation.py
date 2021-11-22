@@ -487,3 +487,58 @@ def check_type(obj, name, *target_types):
             raise TypeError(
                 f'`{name}` has type `{type(obj)}` but must be one of the '
                 f'following types: {target_types}.')
+
+
+def check_bound(bound=None, X=None, ndim=2, epsilon=0,
+                bound_must_be_given=False):
+    """ Validates bound and returns the bound of X if bound is None.
+    `bound` and `X` must not be None.
+
+    Parameters
+    ----------
+    bound: array-like, shape (2, ndim), optional (default=None)
+        The given bound of shape
+        [[x1_min, x2_min, ..., xndim_min], [x1_max, x2_max, ..., xndim_max]]
+    X: matrix-like, shape (n_samples, ndim), optional (default=None)
+        The sample matrix X is the feature matrix representing samples.
+    ndim: int, optional (default=2)
+        The number of dimensions.
+    epsilon: float, optional (default=0)
+        The minimal distance between the returned bound and the values of `X`,
+        if `bound` is not specified.
+    bound_must_be_given: bool, optional (default=False)
+        Whether it is allowed for the bound to be `None` and to be inferred by
+        `X`.
+
+    Returns
+    -------
+    bound: array-like, shape (2, ndim), optional (default=None)
+        The given bound or bound of X.
+    """
+
+    if X is not None:
+        X = check_array(X)
+        if X.shape[1] != ndim:
+            raise ValueError(f"`X` along axis 1 must be of length {ndim}. "
+                             f"`X` along axis 1 is of length {X.shape[1]}.")
+    if bound is not None:
+        bound = check_array(bound)
+        if bound.shape != (2, ndim):
+            raise ValueError(f"Shape of `bound` must be (2, {ndim}). "
+                             f"Shape of `bound` is {bound.shape}.")
+    elif bound_must_be_given:
+        raise ValueError("`bound` must not be `None`.")
+
+    if bound is None and X is not None:
+        minima = np.nanmin(X, axis=0) - epsilon
+        maxima = np.nanmax(X, axis=0) + epsilon
+        bound = np.append(minima.reshape(1, -1), maxima.reshape(1, -1), axis=0)
+        return bound
+    elif bound is not None and X is not None:
+        if np.any(np.logical_or(bound[0] > X, X > bound[1])):
+            warnings.warn("`X` contains values not within range of `bound`.")
+        return bound
+    elif bound is not None:
+        return bound
+    else:
+        raise ValueError("`X` or `bound` must not be None.")

@@ -4,14 +4,13 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.colors import Colormap
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
 
 from ..base import QueryStrategy
 from ..utils import check_scalar
 from ..utils._validation import check_type
-from ..utils._visualisation import mesh, check_bound, _get_boundary_args, \
+from skactiveml.visualization._auxiliary_functions import mesh, check_bound, _get_boundary_args, \
     _get_confidence_args, _get_contour_args, _get_cmap
 
 
@@ -46,7 +45,9 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
 
     Returns
     -------
-    matplotlib.axes.Axes: The axis on which the boundary was plotted.
+    ax: matplotlib.axes.Axes or List
+        The axis on which the boundary was plotted or the list of axis if ax
+        was a list.
     """
     check_type(clf, 'clf', ClassifierMixin)
     check_scalar(res, 'res', int, min_val=1)

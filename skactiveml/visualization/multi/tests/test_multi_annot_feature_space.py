@@ -121,7 +121,7 @@ class TestFeatureSpace(unittest.TestCase):
         y[np.arange(5), np.arange(5)] = np.nan
         maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
         bound = check_bound(X=self.X)
-        fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, bound=bound,
+        fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, feature_bound=bound,
                               title='utility', fig_size=(20, 5))
         fig.tight_layout()
         fig.savefig(self.path_prefix + 'plot_utility_returned_result.pdf')

@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 
 from skactiveml.utils import check_cost_matrix, check_classes, \
-    check_missing_label, check_scalar, check_X_y, check_type
+    check_missing_label, check_scalar, check_X_y, check_type, check_bound
 from skactiveml.utils import check_random_state, check_class_prior
 
 
@@ -125,3 +125,27 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool)
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool, map, list)
         check_type(10, 'a', int)
+
+    def test_check_bound(self):
+        self.assertRaises(ValueError, check_bound, X=7)
+        self.assertRaises(ValueError, check_bound, bound=7)
+
+        X = np.array([[3, 4], [2, 7], [-1, 5]])
+        wrong_X = np.array([[3, 4, 2]])
+        correct_bound = np.array([[-1, 4], [3, 7]])
+        small_bound = np.array([[1, 4], [3, 7]])
+        wrong_bound = np.array([[1, 4]])
+
+        re_correct_bound = check_bound(bound=correct_bound, X=X)
+        re_no_bound = check_bound(X=X)
+        re_no_X = check_bound(bound=correct_bound)
+        np.testing.assert_array_equal(correct_bound, re_correct_bound)
+        np.testing.assert_array_equal(correct_bound, re_no_bound)
+        np.testing.assert_array_equal(correct_bound, re_no_X)
+        with self.assertWarns(Warning):
+            check_bound(small_bound, re_correct_bound)
+        self.assertRaises(ValueError, check_bound, X=wrong_X)
+        self.assertRaises(ValueError, check_bound, bound=wrong_bound)
+        self.assertRaises(ValueError, check_bound)
+        self.assertRaises(ValueError, check_bound, X=X,
+                          bound_must_be_given=True)

@@ -8,7 +8,7 @@ from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
 from skactiveml.utils import is_labeled, check_scalar
 from .._feature_space import plot_decision_boundary
 from ...utils._validation import check_type
-from ...utils._visualisation import mesh, check_bound, _get_contour_args, \
+from skactiveml.visualization._auxiliary_functions import mesh, check_bound, _get_contour_args, \
     _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
 
 
@@ -73,13 +73,13 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
     bound = check_bound(bound, X, epsilon=epsilon)
 
     fig = plot_ma_utility(fig_size=fig_size, ma_qs=ma_qs,
-                          ma_qs_arg_dict=ma_qs_arg_dict,
-                          bound=bound, title=title, fontsize=fontsize, res=5,
+                          ma_qs_arg_dict=ma_qs_arg_dict, feature_bound=bound,
+                          title=title, fontsize=fontsize, res=5,
                           contour_dict=contour_dict, tick_dict=tick_dict)
-    plot_ma_data_set(fig=fig, X=X, y=y, y_true=y_true, bound=bound,
+    plot_ma_data_set(fig=fig, X=X, y=y, y_true=y_true, feature_bound=bound,
                      plot_legend=plot_legend, legend_dict=legend_dict,
                      tick_dict=tick_dict)
-    plot_ma_decision_boundary(clf, fig=fig, bound=bound,
+    plot_ma_decision_boundary(clf, fig=fig, feature_bound=bound,
                               boundary_dict=boundary_dict,
                               confidence_dict=confidence_dict,
                               tick_dict=tick_dict)
@@ -87,9 +87,10 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
     return fig
 
 
-def plot_ma_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15,
-                     fig_size=None, plot_legend=True, legend_dict=None,
-                     tick_dict=None, cmap='coolwarm', marker_size=10):
+def plot_ma_data_set(X, y, y_true, fig=None, feature_bound=None, title=None,
+                     fontsize=15, fig_size=None, plot_legend=True,
+                     cmap='coolwarm', legend_dict=None, tick_dict=None,
+                     marker_size=10):
     """Plots the annotations of a binary classification problem, differentiating
     between correctly and incorrectly labeled data.
 
@@ -109,7 +110,7 @@ def plot_ma_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15
     fig_size: tuple, shape (width, height) (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
-    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     title : str, optional
         The title for the figure.
@@ -151,9 +152,10 @@ def plot_ma_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15
     n_annotators = y.shape[1]
     legend_args = _get_legend_args(legend_dict, fontsize)
     tick_args = _get_tick_args(tick_dict)
-    fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title, fontsize=fontsize,
-                             n_annotators=n_annotators, tick_args=tick_args)
-    bound = check_bound(bound, X)
+    fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title,
+                             fontsize=fontsize, n_annotators=n_annotators,
+                             tick_args=tick_args)
+    feature_bound = check_bound(feature_bound, X)
     check_scalar(plot_legend, 'plot_legend', bool)
     cmap = _get_cmap(cmap)
     labeled_indices = is_labeled(y)
@@ -168,8 +170,8 @@ def plot_ma_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15
     for a, ax in enumerate(fig.get_axes()):
         ax.scatter(X[~labeled_indices[:, a], 0], X[~labeled_indices[:, a], 1],
                    c='gray', marker='o', s=marker_size)
-        ax.set_xlim(bound[:, 0])
-        ax.set_ylim(bound[:, 1])
+        ax.set_xlim(feature_bound[:, 0])
+        ax.set_ylim(feature_bound[:, 1])
 
         for cl, color in zip(classes, cmap(norm(classes))):
             for is_true, marker in zip([False, True], ['x', 's']):
@@ -207,8 +209,8 @@ def plot_ma_data_set(X, y, y_true, fig=None, bound=None, title=None, fontsize=15
 
 
 def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
-                    fig_size=None, bound=None, title=None, res=21, fontsize=15,
-                    contour_dict=None, tick_dict=None):
+                    fig_size=None, feature_bound=None, title=None, res=21,
+                    fontsize=15, contour_dict=None, tick_dict=None):
     """Plots the utilities for the different annotators of the given
     multi-annotator query strategy.
 
@@ -223,7 +225,7 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     fig_size: tuple, shape (width, height) (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
-    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     X_cand : array-like, shape (n_samples, n_features)
         Candidate samples from which the strategy can select.
@@ -289,7 +291,7 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
                              f"`ma_qs.n_annotators == {qs_n_a})` and "
                              f"`len(fig.get_axes()) == {len(fig.get_axes())}`.")
 
-    bound = check_bound(bound, X_cand)
+    feature_bound = check_bound(feature_bound, X_cand)
     contour_args = _get_contour_args(contour_dict)
     tick_args = _get_tick_args(tick_dict)
     fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title,
@@ -297,7 +299,7 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
                              tick_args=tick_args)
 
     # plot the utilities
-    X_mesh, Y_mesh, mesh_instances = mesh(bound, res)
+    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
     if X_cand is None:
         _, utilities = ma_qs.query(mesh_instances, A_cand=A_cand,
@@ -322,12 +324,10 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     return fig
 
 
-def plot_ma_decision_boundary(clf, bound, n_annotators=None,
-                              fig=None, boundary_dict=None,
-                              confidence=0.75, title=None, res=21,
-                              fig_size=None, fontsize=15,
-                              cmap='coolwarm',
-                              confidence_dict=None,
+def plot_ma_decision_boundary(clf, feature_bound, n_annotators=None, fig=None,
+                              boundary_dict=None, confidence=0.75, title=None,
+                              res=21, fig_size=None, fontsize=15,
+                              cmap='coolwarm', confidence_dict=None,
                               tick_dict=None):
     """Plot the decision boundary of the given classifier for each annotator.
 
@@ -335,7 +335,7 @@ def plot_ma_decision_boundary(clf, bound, n_annotators=None,
     ----------
     clf: sklearn classifier
         The classifier whose decision boundary is plotted.
-    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     n_annotators: int, optional (default=None)
         The number of annotators for which the decision boundary will be
@@ -384,7 +384,7 @@ def plot_ma_decision_boundary(clf, bound, n_annotators=None,
                              tick_args=tick_args)
 
     # plot decision boundary
-    plot_decision_boundary(clf, bound, ax=fig.get_axes(), res=res,
+    plot_decision_boundary(clf, feature_bound, ax=fig.get_axes(), res=res,
                            boundary_dict=boundary_dict, confidence=confidence,
                            cmap=cmap, confidence_dict=confidence_dict)
     return fig
