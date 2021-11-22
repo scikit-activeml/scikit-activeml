@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib.colors import Colormap
 from matplotlib.figure import Figure
 
-from skactiveml.utils import check_scalar, check_type, check_bound
+from ..utils import check_scalar, check_type, check_bound
 
 
 def mesh(bound, res):

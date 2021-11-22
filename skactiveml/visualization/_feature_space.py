@@ -10,7 +10,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from ..base import QueryStrategy
 from ..utils import check_scalar
 from ..utils._validation import check_type
-from skactiveml.visualization._auxiliary_functions import mesh, check_bound, _get_boundary_args, \
+from ._auxiliary_functions import mesh, check_bound, _get_boundary_args, \
     _get_confidence_args, _get_contour_args, _get_cmap
 
 

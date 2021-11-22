@@ -8,7 +8,7 @@ from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
 from skactiveml.utils import is_labeled, check_scalar
 from .._feature_space import plot_decision_boundary
 from ...utils._validation import check_type
-from skactiveml.visualization._auxiliary_functions import mesh, check_bound, _get_contour_args, \
+from .._auxiliary_functions import mesh, check_bound, _get_contour_args, \
     _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
 
 
