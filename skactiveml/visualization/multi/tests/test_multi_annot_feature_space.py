@@ -69,6 +69,7 @@ class TestFeatureSpace(unittest.TestCase):
                                     tol=0)
         self.assertIsNone(comparison)
 
+    def test_ma_plot_data_set_mc(self):
         X_prime, y_true_prime = make_classification(n_features=2, n_redundant=0,
                                                     n_clusters_per_class=1,
                                                     n_classes=4, random_state=0)
@@ -132,6 +133,7 @@ class TestFeatureSpace(unittest.TestCase):
                                     tol=0)
         self.assertIsNone(comparison)
 
+    def test_ma_plot_utility_with_X(self):
         maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
         A_cand = np.ones((self.n_samples, self.n_annotators))
         fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, X_cand=self.X,
