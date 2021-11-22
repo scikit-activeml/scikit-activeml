@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from skactiveml.utils import mesh, check_bound
+from skactiveml.visualization import mesh
 
 
 class TestAuxiliaryFunctions(unittest.TestCase):

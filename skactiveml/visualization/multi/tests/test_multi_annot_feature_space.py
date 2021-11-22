@@ -98,23 +98,23 @@ class TestFeatureSpace(unittest.TestCase):
                          'X_cand': self.X}
         bound = check_bound(X=self.X)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, bound=bound)
+                          maqs_arg_dict, feature_bound=bound)
         maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y,
                          'A_cand': np.ones((self.n_samples, self.n_annotators))}
         bound = check_bound(X=self.X)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, bound=bound)
+                          maqs_arg_dict, feature_bound=bound)
         maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
         self.ma_qs.n_annotators = None
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, bound=bound)
+                          maqs_arg_dict, feature_bound=bound)
         fig, _ = plt.subplots(ncols=7)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
                           maqs_arg_dict, A_cand=np.ones((100, 5)), fig=fig,
-                          bound=bound)
+                          feature_bound=bound)
         self.ma_qs.n_annotators = 5
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, fig=fig, bound=bound)
+                          maqs_arg_dict, fig=fig, feature_bound=bound)
 
     def test_ma_plot_utility(self):
         y = np.array(self.y, dtype=float)
