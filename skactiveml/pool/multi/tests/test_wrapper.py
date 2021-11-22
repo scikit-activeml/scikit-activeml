@@ -155,7 +155,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         def y_aggregate(y_t):
             w = np.repeat(np.arange(y.shape[1]).reshape(1, -1), y.shape[0],
                           axis=0)
-            return majority_vote(y_t, w=w)
+            return majority_vote(y_t, w=w, random_state=0)
 
         wrapper = MultiAnnotWrapper(uncertainty, y_aggregate=y_aggregate,
                                     random_state=self.random_state)

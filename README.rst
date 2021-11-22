@@ -61,7 +61,7 @@ The following code implements an active learning cycle with 20 iterations using 
     X, y_true = make_classification(random_state=0)
     y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
-    # LogisticRegression needs ititial training data otherwise a warning will 
+    # LogisticRegression needs initial training data otherwise a warning will 
     # be raised by SklearnClassifier. Therfore, the first 10 instances are used as
     # training data.
     y[:10] = y_true[:10]
@@ -73,11 +73,11 @@ The following code implements an active learning cycle with 20 iterations using 
     # Execute active learning cycle.
     n_cycles = 20
     for c in range(n_cycles):
-            clf.fit(X, y)
-            unlbld_idx = unlabeled_indices(y)
-            X_cand = X[unlbld_idx]
-            query_idx = unlbld_idx[qs.query(X_cand=X_cand, clf=clf)]
-            y[query_idx] = y_true[query_idx]
+        clf.fit(X, y)
+        unlbld_idx = unlabeled_indices(y)
+        X_cand = X[unlbld_idx]
+        query_idx = unlbld_idx[qs.query(X_cand=X_cand, clf=clf)]
+        y[query_idx] = y_true[query_idx]
     print(f'Accuracy: {clf.fit(X, y).score(X, y_true)}')
 
 .. examples_end
