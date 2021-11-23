@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('..'))
 from skactiveml import pool, __version__
 
 from docs.generate import generate_strategy_overview_rst, \
-    generate_api_reference_rst, generate_examples
+    generate_api_reference_rst, generate_examples, generate_tutorials
 
 # -- Project information -----------------------------------------------------
 
@@ -74,7 +74,7 @@ templates_path = ['_templates']
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ['.rst']
 
 # The master toctree document.
 master_doc = 'index'
@@ -227,4 +227,9 @@ examples_data = generate_examples(
 generate_strategy_overview_rst(
     gen_path=os.path.abspath('generated'),
     examples_data=examples_data
+)
+
+generate_tutorials(
+    src_path=os.path.abspath('../tutorials/'),
+    dst_path=os.path.abspath('generated/tutorials/'),
 )
