@@ -20,6 +20,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get install pandoc
+        sudo apt-get install ghostscript
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     - name: Lint with flake8
@@ -49,6 +50,10 @@ jobs:
         pip install pybtex>=0.23.0
         pip install pydata_sphinx_theme>=0.7.1
         sphinx-build -b html docs docs/_build
+
+  trigger_scikit-activeml-docs:
+    runs-on: ubuntu-latest
+    steps:
     - name: Trigger documentation for scikit-activeml-docs
       if: github.ref == 'refs/heads/master'
       run: |
