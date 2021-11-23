@@ -105,7 +105,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                                 self.random_state, reset=True)
 
         # Validate classifier type.
-        check_type(clf, SkactivemlClassifier, 'clf')
+        check_type(clf, 'clf', SkactivemlClassifier)
 
         # Validate method.
         if not isinstance(self.method, str):
