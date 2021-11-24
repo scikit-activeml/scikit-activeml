@@ -199,15 +199,9 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         if self.fit_intercept:
             X = np.insert(X, 0, values=1, axis=1)
 
-        # Ensure class labels to form a 2d array.
-        if y.ndim <= 1:
-            y = y.copy().reshape(-1, 1)
-
         # Ensure sample weights to form a 2d array.
         if sample_weight is None:
             sample_weight = np.ones_like(y)
-        if sample_weight.ndim <= 1:
-            sample_weight = sample_weight.copy().reshape(-1, 1)
 
         # Set auxiliary variables.
         n_samples = X.shape[0]

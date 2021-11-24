@@ -107,7 +107,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        self: SklearnClassifier,
+        self : SklearnClassifier,
             The SklearnClassifier is fitted on the training data.
         """
         return self._fit(fit_function='partial_fit', X=X, y=y,
@@ -142,9 +142,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                                      axis=1)
         else:
             p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state_.choice(np.arange(len(self.classes_)),
-                                               len(X),
-                                               replace=True, p=p)
+            y_pred = self.random_state_.choice(
+                np.arange(len(self.classes_)), len(X), replace=True, p=p
+            )
         y_pred = self._le.inverse_transform(y_pred)
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
@@ -225,12 +225,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 f"{self.estimator} does not support `sample_weight`. "
                 f"Therefore, this parameter will be ignored.")
         self.estimator_ = deepcopy(self.estimator)
-        # Transform in case of 2-dimensional array of class labels.
-        if y.ndim == 2:
-            X = np.repeat(X, np.size(y, axis=1), axis=0)
-            y = y.ravel()
-            if sample_weight is not None:
-                sample_weight = sample_weight.ravel()
+
+        # Count labels per class.
         is_lbld = ~np.isnan(y)
         self._label_counts = [np.sum(y[is_lbld] == c) for c in
                               range(len(self._le.classes_))]

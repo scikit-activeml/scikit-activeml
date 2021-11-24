@@ -83,6 +83,7 @@ class TestClassifier(unittest.TestCase):
                             estimator=self.estimator,
                             estimators=self.estimators,
                             classes=self.classes,
+                            cost_matrix=1 - np.eye(len(self.classes)),
                             missing_label=self.missing_label,
                             voting='soft',
                             random_state=0)
