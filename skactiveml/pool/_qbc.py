@@ -105,7 +105,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         elif _is_arraylike(ensemble):
             est_arr = deepcopy(ensemble)
             for i in range(len(est_arr)):
-                check_type(est_arr[i], SkactivemlClassifier, f'ensemble[{i}]')
+                check_type(est_arr[i], f'ensemble[{i}]', SkactivemlClassifier)
                 est_arr[i] = fit_if_not_fitted(
                     est_arr[i], X, y, sample_weight=sample_weight
                 )
