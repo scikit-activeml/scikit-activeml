@@ -2,8 +2,10 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
+
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices, labeled_indices
 from skactiveml.visualization import plot_utility, plot_decision_boundary
+
 #_ import
 #_bp_add_imports
 
@@ -11,8 +13,8 @@ random_state = np.random.RandomState(0)
 
 # Build a dataset.
 X, y_true = make_blobs(n_samples=100, n_features=2,
-                  centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
-                  cluster_std=.7, random_state=random_state)
+                       centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
+                       cluster_std=.7, random_state=random_state)
 y_true = y_true % 2
 y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 

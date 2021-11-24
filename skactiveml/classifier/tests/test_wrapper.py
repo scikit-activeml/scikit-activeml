@@ -2,7 +2,6 @@ import unittest
 import warnings
 
 import numpy as np
-from sklearn.datasets import load_breast_cancer
 from sklearn.ensemble import BaggingClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier, \
     GaussianProcessRegressor
@@ -19,8 +18,7 @@ class TestSklearnClassifier(unittest.TestCase):
         self.X = np.zeros((4, 1))
         self.y1 = ['tokyo', 'paris', 'nan', 'tokyo']
         self.y2 = ['tokyo', 'nan', 'nan', 'tokyo']
-        self.y_nan = [['nan', 'nan'], ['nan', 'nan'], ['nan', 'nan'],
-                      ['nan', 'nan']]
+        self.y_nan = ['nan', 'nan', 'nan', 'nan']
 
     def test_init_param_estimator(self):
         clf = SklearnClassifier(estimator='Test')
@@ -134,15 +132,3 @@ class TestSklearnClassifier(unittest.TestCase):
             self.assertEqual(len(w), 1)
         y_exp = ['tokyo'] * len(self.X)
         np.testing.assert_array_equal(y_exp, y)
-
-    def test_multi_annotator_scenario(self):
-        X, y_true = load_breast_cancer(return_X_y=True)
-        y = np.repeat(y_true.reshape(-1, 1), 2, axis=1)
-        y[:100, 0] = -1
-        y[200:, 0] = -1
-        sample_weights = np.ones_like(y) * 0.9
-        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1,
-                                classes=[0, 1], cost_matrix=1 - np.eye(2),
-                                random_state=0)
-        clf.fit(X[:250], y[:250], sample_weight=sample_weights[:250])
-        self.assertTrue(clf.score(X[250:], y_true[250:]) > 0.5)
