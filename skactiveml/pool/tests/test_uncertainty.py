@@ -46,9 +46,9 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_X(self):
         selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           clf=self.clf, X=None, y=self.y)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           clf=self.clf, X='string', y=self.y)
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           clf=self.clf, X=[], y=self.y)
@@ -61,7 +61,7 @@ class TestUncertaintySampling(unittest.TestCase):
                           clf=self.clf, X=self.X, y=None)
         self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           clf=self.clf, X=self.X, y='string')
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
                           clf=self.clf, X=self.X, y=[])
         self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
                           clf=self.clf, X=self.X, y=self.y[0:-1])
