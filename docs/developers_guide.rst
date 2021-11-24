@@ -11,7 +11,7 @@ As the selection streategies are inheriting from BaseEstimator, the selection st
 
 Code style and linting
 ----------------------
-As this library conforms to the convention of scikit-learn, the code should conform to `PEP 8 Sytle Guide for Python Code <https://www.python.org/dev/peps/pep-0008/>`_. For linting, the use of `flake8 <https://flake8.pycqa.org/en/latest/>`_ is recommended.
+As this library conforms to the convention of scikit-learn, the code should conform to `PEP 8 Style Guide for Python Code <https://www.python.org/dev/peps/pep-0008/>`_. For linting, the use of `flake8 <https://flake8.pycqa.org/en/latest/>`_ is recommended.
 
 Homogeneous naming scheme
 -------------------------
@@ -32,7 +32,7 @@ To simplify the use of this library, a homogeneous naming scheme is important. T
     * `y`
     * `X_eval`
     * `y_eval`
-    * `A_cand` (multiannot) - matrix wer was noch labeln kann
+    * `A_cand` (multiannot) - matrix containing labels from annotators
     * (kernel kram...)
     * `sample_weight_cand`
     * `sample_weight` (same dim as y)
@@ -83,7 +83,7 @@ Handling of uncertain oracles
 
 Transductive and inductive active learning
 ------------------------------------------
-* possible with distinct X_cand list independent X, y, E_eval, etc.
+* possible with distinct X_cand list independent X, y, X_eval, etc.
 * explain with notebooks
 
 Classification and regression
