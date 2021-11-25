@@ -12,9 +12,9 @@
     "text_0" : "",
     "bp_add_imports" : [
       "from skactiveml.classifier import CMM",
-      "from sklearn.mixture import BayesianGaussianMixture"
+      "from sklearn.mixture import GaussianMixture"
     ],
-    "clf" : "CMM(classes=[0, 1], mixture_model=BayesianGaussianMixture(n_components=8))",
+    "clf" : "CMM(classes=[0, 1], mixture_model=GaussianMixture(n_components=5))",
     "init_params" : {},
     "query_params" : {
       "clf" : "clf"

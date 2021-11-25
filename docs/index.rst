@@ -5,7 +5,8 @@ Welcome to scikit-activeml's documentation!
    :maxdepth: 2
    :hidden:
 
-   notebooks/getting_started
+   Home <self>
+   Tutorials <tutorials>
    Strategy Overview <generated/strategy_overview/strategy_overview-Settles2012>
    generated/api_reference
    generated/sphinx_gallery_examples/index

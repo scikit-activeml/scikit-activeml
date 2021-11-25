@@ -252,7 +252,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
                                    self.random_state, reset=True, adaptive=True)
 
         # Validate classifier type.
-        check_type(clf, SkactivemlClassifier, 'clf')
+        check_type(clf, 'clf', SkactivemlClassifier)
 
         # Check whether epsilon is float in [0, 1].
         check_scalar(x=self.epsilon, target_type=float, name='epsilon',

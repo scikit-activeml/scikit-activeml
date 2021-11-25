@@ -79,7 +79,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
                                 utility_weight, self.random_state, reset=True)
 
         # Check the classifier's type.
-        check_type(clf, ClassFrequencyEstimator, 'clf')
+        check_type(clf, 'clf', ClassFrequencyEstimator)
 
         # Fit the classifier and predict frequencies.
         clf = fit_if_not_fitted(clf, X, y, sample_weight)

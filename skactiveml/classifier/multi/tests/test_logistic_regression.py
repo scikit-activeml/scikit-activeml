@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.utils.validation import check_is_fitted
 
-from skactiveml.classifier import LogisticRegressionRY
+from skactiveml.classifier.multi import LogisticRegressionRY
 
 
 class TestLogisticRegressionRY(unittest.TestCase):
@@ -103,8 +103,6 @@ class TestLogisticRegressionRY(unittest.TestCase):
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
         self.assertTrue(np.abs(lr.Alpha_ - Alpha_exp).sum() > 0)
         self.assertTrue(np.abs(lr.W_ - W_exp).sum() > 0)
-        lr.fit(X=self.X, y=self.y[:, 0], sample_weight=self.w[:, 0])
-        self.assertEqual(len(lr.Alpha_), 1)
 
     def test_predict_proba(self):
         lr = LogisticRegressionRY(random_state=0, missing_label='nan',

@@ -166,10 +166,10 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
         In IJCAI (Vol. 5, pp. 1622-1623).
     """
     # Check if the classifier and its arguments are valid.
-    check_type(clf, SkactivemlClassifier, 'clf')
+    check_type(clf, 'clf', SkactivemlClassifier)
 
     # Check whether to use `fit` or `partial_fit`.
-    check_type(ignore_partial_fit, bool, 'ignore_partial_fit')
+    check_type(ignore_partial_fit, 'ignore_partial_fit', bool)
     use_fit = ignore_partial_fit or not hasattr(clf, 'partial_fit')
     if use_fit and (X is None or y is None):
         raise ValueError(
@@ -190,7 +190,8 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
         )
     X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
         X, y, X_cand, sample_weight, sample_weight_cand,
-        force_all_finite=False, missing_label=clf.missing_label
+        force_all_finite=False, missing_label=clf.missing_label,
+        allow_nd=True
     )
 
     # Refit classifier.
