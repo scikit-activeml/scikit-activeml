@@ -556,6 +556,60 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return X_cand, return_utilities
 
 
+class SkactivemlRegressor(BaseEstimator, ABC):
+    """SkactivemlRegressor
+
+    Bass class for scikit-activeml regressor.
+
+    Parameters
+    __________
+    random_state : int, RandomState instance or None, optional (default=None)
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+
+    Attributes
+    ----------
+    """
+
+    def __init__(self, random_state=None):
+        self.random_state = random_state
+
+    @abstractmethod
+    def fit(self, X, y, sample_weight=None):
+        """Fit the model using X as training data and y as class labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_output_features)
+            Contains the values of the samples, where
+            missing values are represented the attribute 'np.nan'.
+        sample_weight : array-like, shape (n_samples)
+            It contains the weights of the training samples' values.
+
+        Returns
+        -------
+        self: SkactivemlEstimator,
+            The SkactivemlEstimator is fitted on the training data.
+        """
+        raise NotImplementedError
+
+    def predict(self, X):
+        """Return value predictions for the test samples X.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+        Returns
+        -------
+        y : numpy.ndarray, shape (n_samples)
+            Predicted values of the test samples 'X'.
+        """
+        raise NotImplementedError
+
+
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
     """SkactivemlClassifier
 
