@@ -1,8 +1,8 @@
 import unittest
 
 import numpy as np
-from sklearn.ensemble import BaggingClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, \
+    VotingClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.classifier import PWC, SklearnClassifier
@@ -50,7 +50,7 @@ class TestQBC(unittest.TestCase):
         selector = QBC()
         for X in [None, np.nan]:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.X_cand, X=X, y=self.y,
+                ValueError, selector.query, X_cand=self.X_cand, X=X, y=self.y,
                 ensemble=self.ensemble
             )
         for X in [[], self.X[:3]]:
@@ -101,7 +101,13 @@ class TestQBC(unittest.TestCase):
             estimator=BaggingClassifier(base_estimator=gpc),
             classes=self.classes
         )
-        ensemble_list = [self.ensemble, ensemble_classifiers, ensemble_bagging]
+        ensemble_voting = SklearnClassifier(
+            VotingClassifier(estimators=ensemble_classifiers, voting='soft')
+        )
+        ensemble_list = [
+            self.ensemble, ensemble_classifiers, ensemble_bagging,
+            ensemble_voting
+        ]
         for ensemble in ensemble_list:
             for method in ['KL_divergence', 'vote_entropy']:
                 selector = QBC(method=method)

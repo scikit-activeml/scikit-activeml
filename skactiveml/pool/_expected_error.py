@@ -190,7 +190,8 @@ def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
         )
     X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
         X, y, X_cand, sample_weight, sample_weight_cand,
-        force_all_finite=False, missing_label=clf.missing_label
+        force_all_finite=False, missing_label=clf.missing_label,
+        allow_nd=True
     )
 
     # Refit classifier.

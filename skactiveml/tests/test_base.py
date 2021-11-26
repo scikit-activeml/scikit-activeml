@@ -63,6 +63,9 @@ class SkactivemlClassifierTest(unittest.TestCase):
         X = np.ones((10, 2))
         y = np.random.rand(10)
         self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
+        y = np.full(10, fill_value=-1)
+        self.clf.classes = None
+        self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
 
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
