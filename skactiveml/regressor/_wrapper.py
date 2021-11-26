@@ -1,5 +1,7 @@
+from copy import deepcopy
+
 import numpy as np
-from sklearn.base import MetaEstimatorMixin
+from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.utils.validation import has_fit_parameter
 
 from skactiveml.base import SkactivemlRegressor
@@ -16,7 +18,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
     def __init__(self, estimator, random_state=None):
         super().__init__(random_state=random_state)
-        self.estimator_ = estimator
+        self.estimator = estimator
+        self.estimator_ = None
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -39,6 +42,13 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         self: SklearnRegressor,
             The SklearnRegressor is fitted on the training data.
         """
+
+        if not is_regressor(estimator=self.estimator):
+            raise TypeError("'{}' must be a scikit-learn "
+                            "classifier.".format(self.estimator))
+
+        self.estimator_ = deepcopy(self.estimator)
+
         labeled_indices = ~np.isnan(y)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]

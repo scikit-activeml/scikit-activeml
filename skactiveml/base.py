@@ -582,7 +582,7 @@ class SkactivemlRegressor(BaseEstimator, ABC):
         ----------
         X : matrix-like, shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_output_features)
+        y : array-like, shape (n_samples) or (n_samples, n_targets)
             Contains the values of the samples, where
             missing values are represented the attribute 'np.nan'.
         sample_weight : array-like, shape (n_samples)
@@ -604,7 +604,7 @@ class SkactivemlRegressor(BaseEstimator, ABC):
             Input samples.
         Returns
         -------
-        y : numpy.ndarray, shape (n_samples)
+        y : numpy.ndarray, shape (n_samples) or (n_samples, n_targets)
             Predicted values of the test samples 'X'.
         """
         raise NotImplementedError

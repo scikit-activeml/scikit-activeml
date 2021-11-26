@@ -12,6 +12,7 @@ from scipy.optimize import minimize
 from scipy.special import softmax
 from scipy.stats import dirichlet
 from scipy.stats import multivariate_normal as multi_normal
+from sklearn.linear_model import LinearRegression
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
@@ -128,6 +129,8 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         self.weights_prior = weights_prior
         self.solver = solver
         self.solver_dict = solver_dict
+
+        LinearRegression()
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
