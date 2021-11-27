@@ -35,10 +35,9 @@ class TestRegXPal(unittest.TestCase):
 
         qs = RegxPal(random_state=0)
 
-        reg = SklearnRegressor(estimator=RandomForestRegressor())
-        #reg = NWR()
+        reg = SklearnRegressor(estimator=LinearRegression())
 
-        X_cand = np.linspace(-3, 6, 20)
+        X_cand = np.linspace(-3, 6, 100)
         X_cand_r = np.array([[0], [-1], [4], [6]])
         X = np.array([[1], [2], [3]])
         E = np.append(X_cand_r, X, axis=0)
@@ -46,7 +45,7 @@ class TestRegXPal(unittest.TestCase):
         reg.fit(X, y)
 
         query_indices, utilities = qs.query(X_cand.reshape(-1, 1), reg, E, X, y, batch_size=1,
-                                            assume_linear=False, return_utilities=True)
+                                            assume_linear=True, return_utilities=True)
 
         y_pred = reg.predict(X_cand.reshape(-1, 1))
 

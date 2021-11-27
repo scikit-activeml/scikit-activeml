@@ -3,28 +3,32 @@ from copy import deepcopy
 import numpy as np
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.utils import simple_batch
+from skactiveml.regression._gsx import GSx
+from skactiveml.utils import fit_if_not_fitted, rand_argmax
 
 
-class QBC(SingleAnnotPoolBasedQueryStrategy):
-    """Greedy Sampling on the feature space
+class EMC(SingleAnnotPoolBasedQueryStrategy):
+    """Expected Model Change
 
-    This class implements query by committee
+    This class implements greedy sampling
 
     Parameters
     ----------
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
     k_bootstraps: int, optional (default=1)
-        The number of members in a committee.
+        The minimum number of samples the estimator requires.
+    ord: int or string (default=2)
+        The Norm to measure the gradient.
     """
 
-    def __init__(self, random_state=None, k_bootstraps=5):
+    def __init__(self, k_bootstraps=10, ord=2, random_state=None):
         super().__init__(random_state=random_state)
+        self.ord = ord
         self.k_bootstraps = k_bootstraps
 
-    def query(self, X_cand, reg, X, y, batch_size=1,
-              return_utilities=False):
+    def query(self, X_cand, reg, X, y, batch_size=1, return_utilities=False):
+
         """Query the next instance to be labeled.
 
         Parameters
@@ -34,7 +38,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         X: array-like, shape (n_samples, n_features)
             Complete training data set.
         reg: SkactivemlRegressor
-            Regressor to predict the data.
+            regressor to predict values of X_cand.
         y: array-like, shape (n_samples)
             Values of the training data set.
         batch_size: int, optional (default=1)
@@ -65,10 +69,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             learner.fit(X_for_learner, y_for_learner)
 
         results = np.array([learner.predict(X_cand) for learner in learners])
-        utilities = np.std(results, axis=0)
+        scalars = np.average(np.abs(results), axis=0)
+        norms = np.linalg.norm(X_cand, ord=self.ord, axis=1)
+        utilities = np.multiply(scalars, norms)
 
-        return simple_batch(utilities, return_utilities=return_utilities)
-
-
-
-
+        if return_utilities:
+            return rand_argmax(utilities), utilities
+        else:
+            return rand_argmax(utilities)
