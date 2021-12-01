@@ -1,42 +1,32 @@
 # Developer Guide
 
-`scikit-activeml` is a library that executes the most important query strategies. It is built upon the well-known machine learning framework scikit-learn, which makes it user-friendly.
-> TODO-MMUEJDE: Review
+> TODO-MMUEJDE: Please use capitalized captions.
+
+`scikit-activeml` is a library that implements the most important query strategies of active learning. It is built upon the well-known machine learning framework scikit-learn.
 
 ## Introduction
 
 ### Getting Help
 
-> TODO-MMUEJDE: Wo und wie kann man uns erreichen?
+If you have any questions, please reach out to other developers via the following channels:
 
-If you have any questions at all, please reach out to other developers via the channels listed in:
-
-- Github issues
-- Github Discussions
+- [Github Issues](https://github.com/scikit-activeml/scikit-activeml/issues)
 
 ### Roadmap
 
-> TODO-MMUEJDE: Haben wir eine Roadmap oder wollen wir eine Roadmap angeben?
-
-Our Roadmap is ...
-
-### Issue Tracker
-
-> TODO-MMUEJDE: Review
-
-We use [Github Issues](https://github.com/scikit-activeml/scikit-activeml/issues) as our issue tracker.
+Our Roadmap is summarized in the issue [Upcoming Features](https://github.com/scikit-activeml/scikit-activeml/issues/145).
 
 ## Get Started
 
-> TODO-MMUEJDE: Review
+Before you can contribute to this project, you might execute the following steps.
 
-Before you can contribute to this project, you need to do some busy work.
+### Setup Development Environment
 
-### Setup development environment
+> TODO-MMUEJDE: Add links
 
 There are several ways to create a local Python environment, such as virtualenv[], pipenv[], miniconda[], etc. One possible workflow is to install miniconda and use it to create a Python environment. And use pip to install packages in this environment.
 
-#### Example with miniconda
+#### Example With miniconda
 
 Create a new python environment named scikit-activeml:
 
@@ -58,17 +48,18 @@ conda install pip
 
 ### Install Dependencies
 
-> TODO-MMUEJDE: Review
-
 Now we can install some required dependencies for scikit-activeml, which are defined in the `requirements.txt` file.
 
 ```bash
 # Make sure your scikit-activeml python env is active!
 cd <project-root>
 pip install -r requirements.txt
+pip install -r requirements_extra.txt
 ```
 
-After the pip installation was successful, we have to install `pandoc` if it is not already installed.
+After the pip installation was successful, we have to install `pandoc` and `ghostscript` if it is not already installed.
+
+> TODO-MMUEJDE: Ghostscript unten ergänzen und alles vervollständigen (Links zu Packages ist ggf ausreichend. Beispiele sind zu divers)
 
 #### Example: Macintosh (Homebrew)
 
@@ -96,9 +87,11 @@ brew install pandoc
 
 ### General Coding Conventions
 
-> TODO-MMUEJDE: Einfach ein Verweis auf Sklearn oder wie unten? (Letzter Stand: Einfach ein Verweis auf Sklearn)
+> TODO-MMUEJDE: Einfach ein Verweis auf Sklearn oder wie unten? (Letzter Stand: Einfach ein Verweis auf Sklearn) | Verweis auf sklearn ist ausreichend. L
 
 As this library conforms to the convention of scikit-learn, the code should conform to PEP 8 Style Guide for Python Code. For linting, the use of flake8 is recommended.
+
+> TODO-MMUEJDE: Ab hier nur Verweis auf sklearn reicht. Mit Link zu den guides für sklearn und pep8
 
 - File organization
 - Comments?
@@ -112,35 +105,41 @@ As this library conforms to the convention of scikit-learn, the code should conf
   - https://chris.beams.io/posts/git-commit/
 - etc.
 
-### Pull Requests
+### Example for C3 (Code Contribution Cycle) and Pull Requests
 
-> TODO-MMUEJDE: Explain the common lifecycle...
-
-### Example for C3 (Code Contribution Cycle)
-
-> TODO-MMUEJDE: Brauchen wir sowas?
+> TODO-MMUEJDE: Brauchen wir sowas? | Gute Idee. 
 
 1. Fork the repository and clone your fork to your local machine:
 
 ```bash
-git clone git@github.com:username/repo.git
+git clone https://github.com/USERNAME/FORKED_REPOSITORY.git
 ```
 
-2. Create a feature branch for the changes from the dev branch:
+2. Create a feature branch for the changes from the `master` branch:
 
 ```bash
 git checkout -b <feature, bug-fix, hotfix, etc...>/new-feature dev
 ```
 
-> Make sure that you create your branch from dev.
+> Make sure that you create your branch from `master`.
 
 3. After you have finished implementing the feature, make sure that all the tests pass. The tests can be run as
 
 ```bash
-$ python3 path-to-repo/tests/core_tests.py
+$ pytest
+```
+
+Make sure, you covered all lines by tests.
+
+```bash
+$ pytest --cov=./skactiveml
 ```
 
 4. Commit and push the changes.
+
+> TODO-MMUEJDE: Bitte beschreiben, wie das als Pull request bei uns auftaucht.
+
+> TODO-MMUEJDE: Bitte hier noch schreiben, dass wir über alle contributions froh sind. Kurzer Satz dazu reicht.
 
 ```bash
 $ git add modified_files
@@ -218,7 +217,7 @@ $ git push origin new-feature
 
 ### Guidelines for writing documentation
 
-> TODO-MMUEJDE: Sollen wir bestimmte Regeln aus [here](https://scikit-learn.org/stable/developers/contributing.html#guidelines-for-writing-documentation) übernehmen?
+> TODO-MMUEJDE: Sollen wir bestimmte Regeln aus [here](https://scikit-learn.org/stable/developers/contributing.html#guidelines-for-writing-documentation) übernehmen? | ALL: einfach nur zitieren und erwähnen, dass wir uns daran halten
 
 ### Building the documentation
 
@@ -226,15 +225,11 @@ $ git push origin new-feature
 
 ## Issue Tracking
 
-> TODO-MMUEJDE: Review
-
 We use [Github Issues](https://github.com/scikit-activeml/scikit-activeml/issues) as our issue tracker.
 
 If you think you have found a bug in scikit-activeml, you can report it to the issue tracker. Documentation bugs can also be reported there.
 
-### Checking if a bug already exists
-
-> TODO-MMUEJDE: Review
+### Checking If A Bug Already Exists
 
 The first step before filing an issue report is to see whether the problem has already been reported.
 
@@ -243,12 +238,13 @@ Checking if the problem is an existing issue will:
 - help you see if the problem has already been resolved or has been fixed for the next release
 - save time for you and the developers
 - help you learn what needs to be done to fix it
-determine if additional information, such as how to replicate the issue, is needed
-- To do see if the issue already exists, search the bug database using the search box on the top of the issue tracker page.
+- determine if additional information, such as how to replicate the issue, is needed
+
+To see if the issue already exists, search the issue database (`bug` label) using the search box on the top of the issue tracker page.
 
 ### Reporting an issue
 
-> TODO-MMUEJDE: Muss was beachtet werden?
+> TODO-MMUEJDE: Muss was beachtet werden? | ALL: mach mal einen konkreten entwurf. Wir schauen dann. Sieh auch unsere labels.
 
 - Use the following labels
   - documentation: If you ...
@@ -261,53 +257,3 @@ determine if additional information, such as how to replicate the issue, is need
 - python version
 - dependency versions
 - ...
-
-## Code Review Guidelines
-
-> TODO-MMUEJDE: Review
-
->  TODO-MMUEJDE: “Wenn wir es nicht haben, dann auch nicht anlegen” 
-
-### Communication Guidelines
-
-> TODO-MMUEJDE: Implement me
-## Releasing
-
-> TODO-MMUEJDE: Implement me
-
-### Before a release
-
-> TODO-MMUEJDE: Implement me
-
-### Making a release
-
-> TODO-MMUEJDE: Implement me
-
-### Release checklist
-
-> TODO-MMUEJDE: Implement me
-
-## Tips and Tricks
-
-> TODO-MMUEJDE: Implement me
-
-### Productivity
-
-> TODO-MMUEJDE: Implement me
-
-### Tools
-
-> TODO-MMUEJDE: Implement me
-
-## Troubleshooting
-
-> TODO-MMUEJDE: Hier kann man bekannte Probleme auflisten und unnötige Github issues sparen.
-
-### Pandoc error on macOS (Beispiel)
-
-
-```bash
-error 0001: pandoc.py not found
-```
-
-A Solution is ...
