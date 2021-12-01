@@ -154,7 +154,11 @@ $ git push origin new-feature
 
 > TODO-MMUEJDE: Review
 
+> TODO-ALL@MMUEJDE: Einleitetext mit Übersicht der allgmeinen Struktur (Klassen, Methoden) und kurze Erklärung, dass jedes Szenario der Einfachheit wegen gesondert beschrieben wird. Evtl. einbringen eines UML Diagramms (mit/ohne Parameter/Attribute je nach Übersichtlichkeit).
+
 ### Pool-based Query Strategies
+
+> TODO-ALL@MMUEJDE: Bitte Vorschlag machen, wie man die einzelnen Beschreibungen visuell besser darstellen kann (z.B. Einleitetext mit Sätzen. Methoden als Anstriche und Parameter/Attribute als Unterpunkte, evtl Unterüberschriften-einheitlich für jedes Szenario).
 
 - All query strategies are stored in a file skactiveml/pool/_query_strategy.py
 - Every class inherits from `SingleAnnotatorPoolBasedQueryStrategy`
