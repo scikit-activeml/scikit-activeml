@@ -156,7 +156,7 @@ $ git push
   | `sample_weight_cand` | Weights of samples in `X_cand` |
   | `batch_size` | Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
   | `return_utilities` | Inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
-  
+
 - `X_cand` (Set of candidate instances, inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
 - `clf` (The classifier used by the strategy)
 - `X` (Set of labeled and unlabeled instances)
