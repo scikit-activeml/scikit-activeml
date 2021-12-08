@@ -142,14 +142,25 @@ $ git push
 
 - Typical parameters of the query function are:
 
-  - `X_cand` (Set of candidate instances, inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
-  - `clf` (The classifier used by the strategy)
-  - `X` (Set of labeled and unlabeled instances)
-  - `y` ((unknown) labels of `X`)
-  - `sample_weight` (Weights of training samples in `X`)
-  - `sample_weight_cand` (Weights of samples in `X_cand`)
-  - `batch_size` (Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
-  - `return_utilities` (Inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
+| Parameter | Description |
+| --- | --- |
+| `X_cand` | Set of candidate instances, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
+| `clf` | The classifier used by the strategy |
+| `X` | Set of labeled and unlabeled instances |
+| `y` | (unknown) labels of `X` |
+| `sample_weight` | Weights of training samples in `X` |
+| `sample_weight_cand` | Weights of samples in `X_cand` |
+| `batch_size` | Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
+| `return_utilities` | Inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
+
+- `X_cand` (Set of candidate instances, inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
+- `clf` (The classifier used by the strategy)
+- `X` (Set of labeled and unlabeled instances)
+- `y` ((unknown) labels of `X`)
+- `sample_weight` (Weights of training samples in `X`)
+- `sample_weight_cand` (Weights of samples in `X_cand`)
+- `batch_size` (Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
+- `return_utilities` (Inherited from `SingleAnnotatorPoolBasedQueryStrategy`)
 
 - The `query` function returns:
 
