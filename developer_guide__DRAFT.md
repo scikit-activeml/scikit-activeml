@@ -121,57 +121,60 @@ $ git push
 ### Pool-based Query Strategies(TEST)
 
 - All query strategies are stored in a file `skactiveml/pool/_query_strategy.py`
-
 - Every class inherits from `SingleAnnotatorPoolBasedQueryStrategy`
-
 - The class must implement the `__init__` function for initialization and a `query` function
 
 #### `__init__` function
 
 For typical class parameters we use standard names:
 
-  | Parameter | Description |
-  | :-: | --- |
-  | `prior` | Prior probabilities for the distribution of probabilistic strategies |
-  | `random_state` | Number or np.random.RandomState like sklearn |
-  | `method` | String for classes that implement multiple methods |
-  | `cost_matrix` | Cost matrix defining the cost of predicting instances wrong |
+| Parameter | Description |
+| :-: | --- |
+| `prior` | Prior probabilities for the distribution of probabilistic strategies |
+| `random_state` | Number or np.random.RandomState like sklearn |
+| `method` | String for classes that implement multiple methods |
+| `cost_matrix` | Cost matrix defining the cost of predicting instances wrong |
 
 #### `query` function
 
-Typical parameters of the query function are:
+Typical parameters of the `query` function are:
 
-  | Parameter | Description |
-  | :-: | --- |
-  | `X_cand` | Set of candidate instances, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
-  | `clf` | The classifier used by the strategy |
-  | `X` | Set of labeled and unlabeled instances |
-  | `y` | (unknown) labels of `X` |
-  | `sample_weight` | Weights of training samples in `X` |
-  | `sample_weight_cand` | Weights of samples in `X_cand` |
-  | `batch_size` | Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
-  | `return_utilities` | Inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
+| Parameter | Description |
+| :-: | --- |
+| `X_cand` | Set of candidate instances, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
+| `clf` | The classifier used by the strategy |
+| `X` | Set of labeled and unlabeled instances |
+| `y` | (unknown) labels of `X` |
+| `sample_weight` | Weights of training samples in `X` |
+| `sample_weight_cand` | Weights of samples in `X_cand` |
+| `batch_size` | Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
+| `return_utilities` | Inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
 
 The `query` function returns:
 
-  - `query_indices` (Indices of the best instances)
-  - `utilities` (Utilities of all candidate instances, only if `return_utilities` is `True`)
+| Parameter | Description |
+| :-: | --- |
+| `query_indices` | Indices of the best instances |
+| `utilities` | Utilities of all candidate instances, only if `return_utilities` is `True` |
 
-#### General advice for the query code:
+#### General advice for the query code
 
-  - use `self._validate_data` function (Is implemented in superclass)
-  - check the input `X` and `y` only once
-  - fit classifier if it is not yet fitted (May use `fit_if_not_fitted` form utils)
-  - calculate utilities (In an extra function)
-  - use `simple_batch` function from utils for return value
+- use `self._validate_data` function (Is implemented in superclass)
+- check the input `X` and `y` only once
+- fit classifier if it is not yet fitted (May use `fit_if_not_fitted` form utils)
+- calculate utilities (In an extra function)
+- use `simple_batch` function from utils for return value
 
-- All query strategies are tested by a general unittest (`test_pool.py`):
-  - Querying of every method is tested with standard configurations with 0, 1, and 5 initial labels.
-  - For every class `ExampleQueryStrategy` that inherits from `SingleAnnotPoolBasedQueryStrategy` (stored in `_example.py`), it is automatically tested if there exists a file `test/test_example.py`. It is necessary that both filenames are the same. Moreover, the test class must be called `TestExampleQueryStrategy(unittest.TestCase)`
-  - Every parameter in `__init__()` will be tested if it is written the same as a class variable.
-  - Every parameter arg in `__init__()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_init_param_arg()`.
-  - Every parameter arg in `query()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_query_param_arg()`.
-  - Standard parameters `random_state`, `X_cand`, `batch_size` and `return_utilities` are tested and do not have to be tested in the specific tests.
+#### Testing
+
+All query strategies are tested by a general unittest (`test_pool.py`):
+
+- Querying of every method is tested with standard configurations with 0, 1, and 5 initial labels.
+- For every class `ExampleQueryStrategy` that inherits from `SingleAnnotPoolBasedQueryStrategy` (stored in `_example.py`), it is automatically tested if there exists a file `test/test_example.py`. It is necessary that both filenames are the same. Moreover, the test class must be called `TestExampleQueryStrategy(unittest.TestCase)`
+- Every parameter in `__init__()` will be tested if it is written the same as a class variable.
+- Every parameter arg in `__init__()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_init_param_arg()`.
+- Every parameter arg in `query()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_query_param_arg()`.
+- Standard parameters `random_state`, `X_cand`, `batch_size` and `return_utilities` are tested and do not have to be tested in the specific tests.
 
 ### Pool-based Query Strategies
 
