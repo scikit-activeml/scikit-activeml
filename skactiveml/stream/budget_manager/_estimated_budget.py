@@ -430,7 +430,7 @@ class RandomVariableUncertaintyBudget(EstimatedBudget):
                 sample = False
             else:
 
-                eta = self.random_state.normal(1, self.delta)
+                eta = self.random_state_.normal(1, self.delta)
                 theta_random = tmp_theta * eta
                 sample = u < theta_random
                 # get the indices instances that should be queried
