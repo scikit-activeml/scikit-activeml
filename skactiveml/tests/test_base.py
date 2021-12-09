@@ -109,7 +109,7 @@ class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
         SingleAnnotStreamBasedQueryStrategy, __abstractmethods__=set()
     )
     def setUp(self):
-        self.qs = SingleAnnotStreamBasedQueryStrategy(budget_manager=None)
+        self.qs = SingleAnnotStreamBasedQueryStrategy(budget=None)
 
     def test_fit(self):
         self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
@@ -118,6 +118,4 @@ class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.qs.update, X_cand=None,
                           queried_indices=None)
 
-    def test_get_default_budget_manager(self):
-        self.assertRaises(NotImplementedError,
-                          self.qs.get_default_budget_manager)
+

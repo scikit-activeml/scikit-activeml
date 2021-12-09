@@ -4,7 +4,12 @@ import numpy as np
 from sklearn.datasets import make_classification
 
 from skactiveml.classifier import PWC
-from skactiveml.stream import FixedUncertainty, VariableUncertainty, Split
+from skactiveml.stream import (
+    FixedUncertainty,
+    VariableUncertainty,
+    Split,
+    RandomVariableUncertainty,
+)
 
 
 class TemplateTestUncertainty:
@@ -26,6 +31,15 @@ class TemplateTestUncertainty:
         self.kwargs = dict(
             X_cand=self.X_cand, clf=self.clf, X=self.X, y=self.y
         )
+
+    def test_init_param_budget(self):
+        # budget must be defined as a float greater than 0
+        query_strategy = self.get_query_strategy()(budget=[])
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = self.get_query_strategy()(budget="string")
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = self.get_query_strategy()(budget=-1)
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_budget_manager(self):
         # budget_manager must be defined as an object of an budget manager
@@ -220,3 +234,10 @@ class TestFixedUncertainty(TemplateTestUncertainty, unittest.TestCase):
 class TestVariableUncertainty(TemplateTestUncertainty, unittest.TestCase):
     def get_query_strategy(self):
         return VariableUncertainty
+
+
+class TestRandomVariableUncertainty(
+    TemplateTestUncertainty, unittest.TestCase
+):
+    def get_query_strategy(self):
+        return RandomVariableUncertainty

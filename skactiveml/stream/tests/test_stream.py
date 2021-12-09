@@ -118,16 +118,16 @@ class TestStream(unittest.TestCase):
             self.assertEqual(len(queried_indices), len(queried_indices2))
             budget_manager_param_dict1 = {"utilities": utilities}
             budget_manager_param_dict2 = {"utilities": utilities2}
-            query_strategy.update(
-                x_t.reshape([1, -1]),
-                queried_indices,
-                budget_manager_param_dict1
-            )
-            query_strategy2.update(
-                x_t.reshape([1, -1]),
-                queried_indices,
-                budget_manager_param_dict2
-            )
+            call_func(query_strategy.update,
+                      X_cand=x_t.reshape([1, -1]),
+                      queried_indices=queried_indices,
+                      budget_manager_param_dict=budget_manager_param_dict1
+                      )
+            call_func(query_strategy2.update,
+                      X_cand=x_t.reshape([1, -1]),
+                      queried_indices=queried_indices2,
+                      budget_manager_param_dict=budget_manager_param_dict2
+                      )
             X_train.append(x_t)
             if len(queried_indices):
                 y_train.append(y_t)

@@ -1,9 +1,15 @@
 import numpy as np
+import warnings
 
+from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
 
 from ..pool import cost_reduction
-from ..base import SingleAnnotStreamBasedQueryStrategy, SkactivemlClassifier
+from ..base import (
+    SingleAnnotStreamBasedQueryStrategy,
+    SkactivemlClassifier,
+    BudgetManager,
+)
 
 from ..utils import (
     fit_if_not_fitted,
@@ -11,6 +17,7 @@ from ..utils import (
     check_random_state,
     check_scalar,
     call_func,
+    check_budget_manager,
 )
 
 from .budget_manager import BIQF
@@ -26,10 +33,21 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
 
     Parameters
     ----------
-    budget_manager : BudgetManager
+    budget : float, default=None
+        The budget which models the budgeting constraint used in
+        the stream-based active learning setting.
+    budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None, BIQF will be
-        used by default.
+        the stream-based active learning setting. if set to None,
+        FixedUncertaintyBudget will be used by default. The budget_manager will
+        be initialized based on the following conditions:
+            If only a budget is given the default budget_manager is initialized
+            with the given budget.
+            If only a budget_manager is given use the budget_manager.
+            If both are not given the default budget_manager with the
+            default budget.
+            If both are given and the budget differs from budget_manager.budget
+            a warning is thrown.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the query strategy.
     prior : float
@@ -46,10 +64,15 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=None, random_state=None, prior=1.0e-3, m_max=2,
+        self,
+        budget_manager=None,
+        budget=None,
+        random_state=None,
+        prior=1.0e-3,
+        m_max=2,
     ):
+        super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
-        self.random_state = random_state
         self.prior = prior
         self.m_max = m_max
 
@@ -150,9 +173,18 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             PALS returns itself, after it is updated.
         """
         # check if a budget_manager is set
-        self._validate_budget_manager()
-        budget_manager_param_dict = ({} if budget_manager_param_dict is None
-                                     else budget_manager_param_dict)
+        if not hasattr(self, "budget_manager_"):
+            check_type(
+                self.budget_manager, "budget_manager_", BudgetManager, type(None)
+            )
+            self.budget_manager_ = check_budget_manager(
+                self.budget, self.budget_manager, BIQF
+            )
+        budget_manager_param_dict = (
+            {}
+            if budget_manager_param_dict is None
+            else budget_manager_param_dict
+        )
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
@@ -161,7 +193,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         )
         return self
 
-    def get_default_budget_manager(self):
+    def get_default_budget_manager(self, budget=None):
         """Provide the budget manager that will be used as default.
 
         Returns
@@ -169,7 +201,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         budget_manager : BudgetManager
             The BudgetManager that should be used by default.
         """
-        return BIQF()
+        return BIQF(budget=budget)
 
     def _validate_data(
         self,
@@ -232,6 +264,16 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         X_cand, return_utilities = super()._validate_data(
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
+        # check if a budget_manager is set
+
+        if not hasattr(self, "budget_manager_"):
+            check_type(
+                self.budget_manager, "budget_manager_", BudgetManager, type(None)
+            )
+            self.budget_manager_ = check_budget_manager(
+                self.budget, self.budget_manager, BIQF
+            )
+
         X, y, sample_weight = self._validate_X_y_sample_weight(
             X, y, sample_weight
         )

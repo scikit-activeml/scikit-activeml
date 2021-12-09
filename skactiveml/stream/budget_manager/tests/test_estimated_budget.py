@@ -5,6 +5,7 @@ from skactiveml.stream.budget_manager import (
     FixedUncertaintyBudget,
     VariableUncertaintyBudget,
     SplitBudget,
+    RandomVariableUncertaintyBudget,
 )
 
 
@@ -121,6 +122,61 @@ class TestVariableUncertaintyBudget(
             ValueError, budget_manager.query_by_utility, self.utilities
         )
         budget_manager = self.get_budget_manager()(s=-1.0)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+
+
+class TestRandomVariableUncertaintyBudget(
+    TemplateTestEstimatedBudget, unittest.TestCase
+):
+    def get_budget_manager(self):
+        return RandomVariableUncertaintyBudget
+
+    def test_init_param_theta(self):
+        # theta must be defined as a float
+        budget_manager = self.get_budget_manager()(theta="string")
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
+
+    def test_init_param_random_state(self):
+        # v must be defined as an float with a range of: 0 < v < 1
+        budget_manager = self.get_budget_manager()(random_state="string")
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+
+    def test_init_param_s(self):
+        # s must be defined as a float with a range of: 0 < s <= 1
+        budget_manager = self.get_budget_manager()(s="string")
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
+        budget_manager = self.get_budget_manager()(s=1.1)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+        budget_manager = self.get_budget_manager()(s=0.0)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+        budget_manager = self.get_budget_manager()(s=-1.0)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+
+    def test_init_param_delta(self):
+        # v must be defined as an float with a range of: 0 < delta
+        budget_manager = self.get_budget_manager()(delta="string")
+        self.assertRaises(
+            TypeError, budget_manager.query_by_utility, self.utilities
+        )
+        budget_manager = self.get_budget_manager()(delta=0.0)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+        budget_manager = self.get_budget_manager()(delta=-1.0)
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )

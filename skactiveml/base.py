@@ -13,14 +13,28 @@ from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.multiclass import type_of_target
 
-from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
-    check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
-    is_labeled, check_scalar, check_class_prior
+from .utils import (
+    MISSING_LABEL,
+    check_classifier_params,
+    check_random_state,
+    rand_argmin,
+    ExtLabelEncoder,
+    check_cost_matrix,
+    is_labeled,
+    check_scalar,
+    check_class_prior,
+)
 
-__all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
-           'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
-           'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
-           'ClassFrequencyEstimator', 'AnnotModelMixin']
+__all__ = [
+    "QueryStrategy",
+    "SingleAnnotPoolBasedQueryStrategy",
+    "MultiAnnotPoolBasedQueryStrategy",
+    "BudgetManager",
+    "SingleAnnotStreamBasedQueryStrategy",
+    "SkactivemlClassifier",
+    "ClassFrequencyEstimator",
+    "AnnotModelMixin",
+]
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -56,8 +70,9 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
         super().__init__(random_state=random_state)
 
     @abstractmethod
-    def query(self, X_cand, *args, batch_size=1, return_utilities=False,
-              **kwargs):
+    def query(
+        self, X_cand, *args, batch_size=1, return_utilities=False, **kwargs
+    ):
         """Determines which for which candidate samples labels are to be
         queried.
 
@@ -84,8 +99,15 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
         """
         raise NotImplementedError
 
-    def _validate_data(self, X_cand, return_utilities, batch_size,
-                       random_state, reset=True, **check_X_cand_params):
+    def _validate_data(
+        self,
+        X_cand,
+        return_utilities,
+        batch_size,
+        random_state,
+        reset=True,
+        **check_X_cand_params,
+    ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -123,22 +145,24 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
         self._check_n_features(X_cand, reset=reset)
 
         # Check return_utilities.
-        check_scalar(return_utilities, 'return_utilities', bool)
+        check_scalar(return_utilities, "return_utilities", bool)
 
         # Check batch size.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
+        check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
         batch_size = batch_size
         if len(X_cand) < batch_size:
             warnings.warn(
                 "'batch_size={}' is larger than number of candidate samples "
                 "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
+                    batch_size, len(X_cand)
+                )
+            )
             batch_size = len(X_cand)
 
         # Check random state.
-        random_state = check_random_state(random_state=self.random_state,
-                                          seed_multiplier=len(X_cand))
+        random_state = check_random_state(
+            random_state=self.random_state, seed_multiplier=len(X_cand)
+        )
 
         return X_cand, return_utilities, batch_size, random_state
 
@@ -154,13 +178,21 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     n_annotators : int,
         Sets the number of annotators if `A_cand is None`.
     """
+
     def __init__(self, n_annotators=None, random_state=None):
         super().__init__(random_state=random_state)
         self.n_annotators = n_annotators
 
     @abstractmethod
-    def query(self, X_cand, *args, A_cand=None, batch_size=1,
-              return_utilities=False, **kwargs):
+    def query(
+        self,
+        X_cand,
+        *args,
+        A_cand=None,
+        batch_size=1,
+        return_utilities=False,
+        **kwargs,
+    ):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
@@ -195,9 +227,17 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         """
         raise NotImplementedError
 
-    def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
-                       random_state, reset=True, adaptive=False,
-                       **check_X_cand_params):
+    def _validate_data(
+        self,
+        X_cand,
+        A_cand,
+        return_utilities,
+        batch_size,
+        random_state,
+        reset=True,
+        adaptive=False,
+        **check_X_cand_params,
+    ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
@@ -255,8 +295,12 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
                     "A_cand as the annotators matrix."
                 )
             else:
-                check_scalar(x=self.n_annotators, target_type=int,
-                             name='n_annotators', min_val=1)
+                check_scalar(
+                    x=self.n_annotators,
+                    target_type=int,
+                    name="n_annotators",
+                    min_val=1,
+                )
                 A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
         else:
             A_cand = check_array(A_cand, dtype=bool)
@@ -267,33 +311,40 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
         self._check_n_features(X_cand, reset=reset)
 
         # Check return_utilities.
-        check_scalar(return_utilities, 'return_utilities', bool)
+        check_scalar(return_utilities, "return_utilities", bool)
 
         # Check batch size.
         if isinstance(batch_size, str):
-            if batch_size != 'adaptive':
-                raise ValueError('If `batch_size` is a string, it '
-                                 'must be set to `adaptive`.')
+            if batch_size != "adaptive":
+                raise ValueError(
+                    "If `batch_size` is a string, it "
+                    "must be set to `adaptive`."
+                )
             elif not adaptive:
                 batch_size = 1
         elif isinstance(batch_size, int):
-            check_scalar(batch_size, target_type=int, name='batch_size',
-                         min_val=1)
+            check_scalar(
+                batch_size, target_type=int, name="batch_size", min_val=1
+            )
 
             n_queries = np.sum(A_cand)
             if n_queries < batch_size:
                 warnings.warn(
                     "'batch_size={}' is larger than number of candidate queries "
-                    "in 'A_cand'. Instead, 'batch_size={}' was set."
-                        .format(batch_size, n_queries))
+                    "in 'A_cand'. Instead, 'batch_size={}' was set.".format(
+                        batch_size, n_queries
+                    )
+                )
                 batch_size = int(n_queries)
         else:
-            raise TypeError('`batch_size` must be either a string or an '
-                            'integer.')
+            raise TypeError(
+                "`batch_size` must be either a string or an " "integer."
+            )
 
         # Check random state.
-        random_state = check_random_state(random_state=self.random_state,
-                                          seed_multiplier=len(X_cand))
+        random_state = check_random_state(
+            random_state=self.random_state, seed_multiplier=len(X_cand)
+        )
 
         return X_cand, A_cand, return_utilities, batch_size, random_state
 
@@ -360,8 +411,14 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = self.budget
         else:
             self.budget_ = 0.1
-        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
-                     min_inclusive=False)
+        check_scalar(
+            self.budget_,
+            "budget",
+            float,
+            min_val=0.0,
+            max_val=1.0,
+            min_inclusive=False,
+        )
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.
@@ -393,22 +450,19 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    budget_manager : BudgetManager
-        The BudgetManager which models the budgeting constraint used in
+    budget : float, default=None
+        The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager, random_state=None):
+    def __init__(self, budget, random_state=None):
         super().__init__(random_state=random_state)
-        self.budget_manager = budget_manager
+        self.budget = budget
 
     @abstractmethod
-    def query(
-        self, X_cand, *args, return_utilities=False, **kwargs
-    ):
+    def query(self, X_cand, *args, return_utilities=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         The query startegy determines the most useful instances in X_cand,
@@ -443,8 +497,14 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, queried_indices, *args,
-               budget_manager_param_dict=None, **kwargs):
+    def update(
+        self,
+        X_cand,
+        queried_indices,
+        *args,
+        budget_manager_param_dict=None,
+        **kwargs,
+    ):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
@@ -471,17 +531,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def get_default_budget_manager(self):
-        """Provide the budget manager that will be used as default.
-
-        Returns
-        -------
-        budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
-        """
-        raise NotImplementedError
-
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of
         np.random_state. If not create a new random state. See also
@@ -491,21 +540,13 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             self.random_state_ = deepcopy(self.random_state)
         self.random_state_ = check_random_state(self.random_state_)
 
-    def _validate_budget_manager(self):
-        """Validate if budget manager is a budget_manager class and create a
-        copy 'budget_manager_'.
-        """
-        if not hasattr(self, "budget_manager_"):
-            if self.budget_manager is None:
-                self.budget_manager_ = self.get_default_budget_manager()
-            else:
-                self.budget_manager_ = clone(self.budget_manager)
-        if not isinstance(self.budget_manager_, BudgetManager):
-            raise TypeError(
-                "{} is not a valid Type for budget_manager".format(
-                    type(self.budget_manager_)
-                )
-            )
+    def _validate_budget(self):
+        if self.budget is not None:
+            self.budget_ = self.budget
+        else:
+            self.budget_ = 0.1
+        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
+                     min_inclusive=False, )
 
     def _validate_data(
         self,
@@ -513,7 +554,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return_utilities,
         *args,
         reset=True,
-        **check_X_cand_params
+        **check_X_cand_params,
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -551,7 +592,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self._validate_random_state()
 
         # Check budget_manager.
-        self._validate_budget_manager()
+        self._validate_budget()
 
         return X_cand, return_utilities
 
@@ -587,8 +628,13 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         for a sample of class classes_[i].
     """
 
-    def __init__(self, classes=None, missing_label=MISSING_LABEL,
-                 cost_matrix=None, random_state=None):
+    def __init__(
+        self,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
+    ):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
@@ -680,14 +726,16 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
     def _validate_data(self, X, y, sample_weight=None):
         # Check common classifier parameters.
-        check_classifier_params(self.classes, self.missing_label,
-                                self.cost_matrix)
+        check_classifier_params(
+            self.classes, self.missing_label, self.cost_matrix
+        )
         # Store and check random state.
         self._random_state = check_random_state(self.random_state)
 
         # Create label encoder.
-        self._le = ExtLabelEncoder(classes=self.classes,
-                                   missing_label=self.missing_label)
+        self._le = ExtLabelEncoder(
+            classes=self.classes, missing_label=self.missing_label
+        )
 
         # Check input parameters.
         X = np.array(X)
@@ -699,8 +747,12 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             if len(y[is_lbdl]) > 0:
                 y_type = type_of_target(y[is_lbdl])
                 if y_type not in [
-                    'binary', 'multiclass', 'multiclass-multioutput',
-                    'multilabel-indicator', 'multilabel-sequences', 'unknown'
+                    "binary",
+                    "multiclass",
+                    "multiclass-multioutput",
+                    "multilabel-indicator",
+                    "multilabel-sequences",
+                    "unknown",
                 ]:
                     raise ValueError("Unknown label type: %r" % y_type)
 
@@ -719,20 +771,25 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         # Check classes.
         if sample_weight is not None:
-            sample_weight = check_array(sample_weight, ensure_2d=False,
-                                        force_all_finite=False)
+            sample_weight = check_array(
+                sample_weight, ensure_2d=False, force_all_finite=False
+            )
             if not np.array_equal(y.shape, sample_weight.shape):
                 raise ValueError(
-                    f'`y` has the shape {y.shape} and `sample_weight` has the '
-                    f'shape {sample_weight.shape}. Both need to have identical'
-                    f' shapes.'
+                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"shape {sample_weight.shape}. Both need to have identical"
+                    f" shapes."
                 )
 
         # Update cost matrix.
-        self.cost_matrix_ = 1 - np.eye(len(self.classes_)) \
-            if self.cost_matrix is None else self.cost_matrix
-        self.cost_matrix_ = check_cost_matrix(self.cost_matrix_,
-                                              len(self.classes_))
+        self.cost_matrix_ = (
+            1 - np.eye(len(self.classes_))
+            if self.cost_matrix is None
+            else self.cost_matrix
+        )
+        self.cost_matrix_ = check_cost_matrix(
+            self.cost_matrix_, len(self.classes_)
+        )
         if self.classes is not None:
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
@@ -786,6 +843,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
         class `classes_[j]` for a sample of class `classes_[i]`.
     """
+
     @abstractmethod
     def predict_freq(self, X):
         """Return class frequency estimates for the test samples X.
@@ -828,8 +886,9 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     def _validate_data(self, X, y, sample_weight=None):
         X, y, sample_weight = super()._validate_data(X, y, sample_weight)
         # Check class prior.
-        self.class_prior_ = check_class_prior(self.class_prior,
-                                              len(self.classes_))
+        self.class_prior_ = check_class_prior(
+            self.class_prior, len(self.classes_)
+        )
         return X, y, sample_weight
 
 

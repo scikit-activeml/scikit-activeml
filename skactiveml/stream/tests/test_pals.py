@@ -27,6 +27,15 @@ class TestPALS(unittest.TestCase):
             X_cand=self.X_cand, clf=self.clf, X=self.X, y=self.y
         )
 
+    def test_init_param_budget(self):
+        # budget must be defined as a float greater than 0
+        query_strategy = PALS(budget=[])
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = PALS(budget="string")
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = PALS(budget=-1)
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+
     def test_init_param_budget_manager(self):
         # budget_manager must be defined as an object of an budget manager
         # class
