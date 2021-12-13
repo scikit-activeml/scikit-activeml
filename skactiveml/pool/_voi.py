@@ -2,7 +2,6 @@
 Module implementing 'Value Of Information' active learning strategy.
 """
 # Author: Pascal Mergard <pascal.mergard@student.uni-kassel.de>
-import copy
 from copy import deepcopy
 
 import numpy as np
@@ -23,7 +22,7 @@ class VOI(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    cost_matrix : array-like, shape (n_classes, n_classes), default=None
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost/Risk matrix with C[i,j] defining the cost of predicting class j
         for a sample with the actual class i.
     labeling_cost : scalar or array-like, default=None
@@ -60,17 +59,17 @@ class VOI(SingleAnnotPoolBasedQueryStrategy):
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
+        X_cand : array-like of shape (n_candidate_samples, n_features)
             Candidate samples from which the strategy can select.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        X: array-like, shape (n_samples, n_features)
+        X: array-like of shape (n_samples, n_features)
             Complete training data set.
         y: array-like, shape (n_samples)
             Labels of the training data set.
-        sample_weight : array-like, shape (n_samples), Default=None
+        sample_weight : array-like of shape (n_samples), Default=None
             Weights of training samples in `X`.
-        sample_weight_cand : array-like, shape (n_candidate_samples),
+        sample_weight_cand : array-like of shape (n_candidate_samples),
         Default=None)
             Weights of candidate samples in `X_cand`.
         batch_size : int, optional (default=1)
@@ -80,11 +79,11 @@ class VOI(SingleAnnotPoolBasedQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of all candidate samples after each selected
             sample of the batch, e.g., `utilities[0]` indicates the utilities
             used for selecting the first sample (with index `query_indices[0]`)
@@ -125,13 +124,13 @@ def value_of_information(clf, X_cand, X, y, cost_matrix=None,
     ----------
     clf : skactiveml.base.SkactivemlClassifier
         Model implementing the methods `fit` and `predict_proba`.
-    X_cand : array-like, shape (n_candidate_samples, n_features)
+    X_cand : array-like of shape (n_candidate_samples, n_features)
         Candidate samples from which the strategy can select.
     X: array-like, shape (n_samples, n_features)
         Complete training data set.
     y: array-like, shape (n_samples)
         Labels of the training data set.
-    cost_matrix : array-like, shape (n_classes, n_classes), default=None
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost/Risk matrix with C[i,j] defining the cost of predicting class j
         for a sample with the actual class i.
     labeling_cost : scalar or array-like, default=None
@@ -140,7 +139,7 @@ def value_of_information(clf, X_cand, X, y, cost_matrix=None,
         are measured with the same currency. `labeling_cost` should be a scalar
         or an array-like with shape (len(X_cand), ), (1, n_classes) or
         (len(X_cand), n_classes).
-    sample_weight : array-like, shape (n_samples), Default=None
+    sample_weight : array-like of shape (n_samples), Default=None
         Weights of training samples in `X`.
     sample_weight_cand : array-like, shape (n_candidate_samples),
     Default=None)
@@ -151,7 +150,7 @@ def value_of_information(clf, X_cand, X, y, cost_matrix=None,
 
     Returns
     -------
-    voi : np.ndarray, shape (n_candidates)
+    voi : np.ndarray of shape (n_candidates)
         The value of information of all unlabeled instances.
 
     References
