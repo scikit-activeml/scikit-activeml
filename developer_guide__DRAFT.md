@@ -73,23 +73,21 @@ As this library conforms to the convention of [scikit-learn](https://scikit-lear
 
 ### Example for C3 (Code Contribution Cycle) and Pull Requests
 
-> TODO: Bitte beschreiben, wie das als Pull request bei uns auftaucht.
+1. Fork the repository using the Github `Fork` button.
 
-1. Fork the repository and clone your fork to your local machine:
-
+2. Then, clone your fork to your local machine:
+   
 ```bash
-git clone https://github.com/scikit-activeml/scikit-activeml.git
+git clone https://github.com/<your-username>/scikit-activeml.git
 ```
 
-1. Create a branch for the changes from the `master` branch:
-
-> Make sure that you create your branch from `master`.
+3. Create a new branch for your changes from the `master` branch:
 
 ```bash
-git checkout -b <feature, bug-fix, documentation>/<issue-no>-<short description>
+git checkout -b <branch-name>
 ```
 
-3. After you have finished implementing the feature, make sure that all the tests pass. The tests can be run as
+4. After you have finished implementing the feature, make sure that all the tests pass. The tests can be run as
 
 ```bash
 $ pytest
@@ -101,10 +99,10 @@ Make sure, you covered all lines by tests.
 $ pytest --cov=./skactiveml
 ```
 
-4. Commit and push the changes.
+5. Commit and push the changes.
 
 ```bash
-$ git add modified_files
+$ git add <modified-files>
 $ git commit -m "<commit-message>"
 $ git push
 ```
