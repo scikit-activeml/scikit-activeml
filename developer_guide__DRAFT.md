@@ -453,13 +453,7 @@ Check parameter `X` regarding its shape and check that the annotator model has b
 
 ## Testing and improving test coverage
 
-> TODO: Implement me
-
-- Codecov
-- How to run tests
-- Code conventions
-- Test conventions
-  - See Coding Conventions
+> TODO: Codecov?, How to run tests?
 
 ## Documentation (User guide and Developer guide)
 
@@ -469,7 +463,7 @@ In `Scikit-ActiveML`, the [guidelines](https://scikit-learn.org/stable/developer
 
 ### Building the documentation
 
-> TODO: Build the user guide and the developer guide?
+> TODO: How to build the user guide and developer guide?
 
 ## Issue Tracking
 
