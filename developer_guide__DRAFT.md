@@ -1,14 +1,12 @@
-# TODOS:
-
-- Method or Function?
-
 # Developer Guide
 
 **Scikit-ActiveML** is a library that implements the most important query strategies of active learning. It is built upon the well-known machine learning framework [scikit-learn](https://scikit-learn.org/stable/).
 
 ## Introduction
 
-> #TODO: Implement me
+### Thank you, contributors!
+
+A big thank you to all contributors who provide the **Scikit-ActiveML** project with new enhancements and bug fixes.
 
 ### Getting Help
 
@@ -64,11 +62,7 @@ After the pip installation was successful, we have to install `pandoc` and `ghos
 #### Example with MacOS (Homebrew)
 
 ```bash
-brew install pandoc
-```
-
-```bash
-brew install ghostscript
+brew install pandoc ghostscript
 ```
 
 ## Contributing Code
@@ -78,6 +72,8 @@ brew install ghostscript
 As this library conforms to the convention of [scikit-learn](https://scikit-learn.org/stable/developers/develop.html#coding-guidelines), the code should conform to [PEP 8](https://www.python.org/dev/peps/pep-0008/) Style Guide for Python Code. For linting, the use of [flake8](https://flake8.pycqa.org/en/latest/) is recommended.
 
 ### Example for C3 (Code Contribution Cycle) and Pull Requests
+
+> TODO: Bitte beschreiben, wie das als Pull request bei uns auftaucht.
 
 1. Fork the repository and clone your fork to your local machine:
 
@@ -106,10 +102,6 @@ $ pytest --cov=./skactiveml
 ```
 
 4. Commit and push the changes.
-
-> TODO: Bitte beschreiben, wie das als Pull request bei uns auftaucht.
-
-> TODO: Bitte hier noch schreiben, dass wir über alle contributions froh sind. Kurzer Satz dazu reicht.
 
 ```bash
 $ git add modified_files
@@ -160,7 +152,7 @@ The `query` function returns:
 
 ##### General advice
 
-Use `self._validate_data` function (Is implemented in superclass). Check the input `X` and `y` only once. Fit classifier if it is not yet fitted (May use `fit_if_not_fitted` form utils). Calculate utilities (In an extra function. Use `simple_batch` function from utils for return value.
+Use `self._validate_data` function (Is implemented in the superclass). Check the input `X` and `y` only once. Fit classifier if it is not yet fitted (May use `fit_if_not_fitted` form utils). Calculate utilities (In an extra function. Use `simple_batch` function from utils for return value.
 
 #### Testing
 
@@ -176,17 +168,17 @@ For typical class parameters we use standard names:
 
 | Paramter | Description |
 | :-: | --- |
-| `random_state` | integer that acts as random seed or `np.random.RandomState` like sklearn |
+| `random_state` | Integer that acts as random seed or `np.random.RandomState` like sklearn |
 | `budget` | % of labels that the strategy is allowed to query |
-| `budget_manager` | enforces the budget constraint |
+| `budget_manager` | Enforces the budget constraint |
 
 The class must implement the following functions:
 
 | Function | Description                                                    |
 | :------: | -------------------------------------------------------------- |
-|  `init`  | function for initialization                                    |
-| `query`  | identify the instances whose labels to select                  |
-| `update` | adapting the budget monitoring according to the queried labels |
+|  `init`  | Function for initialization                                    |
+| `query`  | Identify the instances whose labels to select                  |
+| `update` | Adapting the budget monitoring according to the queried labels |
 
 #### `query` function
 
@@ -197,23 +189,20 @@ Parameters of the `query` function are:
 | `X_cand` | Set of candidate instances, inherited from `SingleAnnotatorStreamBasedQueryStrategy` |
 | `clf` | The classifier used by the strategy |
 | `X` | Set of labeled and unlabeled instances |
-| `y` | labels of `X` (it may be set to `MISSING_LABEL` if `y` is unknown) |
-| `sample_weight` | weights for each instance in `X` or `None` if all are equally weighted |
-| `return_utilities` | inherited from SingleAnnotatorStreamBasedQueryStrategy |
+| `y` | Labels of `X` (it may be set to `MISSING_LABEL` if `y` is unknown) |
+| `sample_weight` | Weights for each instance in `X` or `None` if all are equally weighted |
+| `return_utilities` | Inherited from SingleAnnotatorStreamBasedQueryStrategy |
 
 The `query` function returns:
 
 | Parameter | Description |
 | :-: | --- |
-| `queried_indices` | indices of the best instances from `X_Cand` |
-| `utilities` | utilities of all candidate instances, only if `return_utilities` is `True` |
+| `queried_indices` | Indices of the best instances from `X_Cand` |
+| `utilities` | Utilities of all candidate instances, only if `return_utilities` is `True` |
 
 ##### General advice
 
-- the `query` function must not change the internal state of the `query` strategy (`budget` and `random_state` included) to allow for assessing multiple instances with the same state. Update the the internal state in the `update()` function
-- use `self._validate_data` function (is implemented in superclass)
-- check the input `X` and `y` only once
-- fit classifier if it is not yet fitted (may use `fit_if_not_fitted` from `utils`)
+The `query` function must not change the internal state of the `query` strategy (`budget` and `random_state` included) to allow for assessing multiple instances with the same state. Update the the internal state in the `update()` function. Use `self._validate_data` function (is implemented in superclass). Check the input `X` and `y` only once. Fit classifier if it is not yet fitted (may use `fit_if_not_fitted` from `utils`).
 
 #### `update` function
 
@@ -222,8 +211,8 @@ Typical parameters of the update function are:
 | Parameter | Description |
 | :-: | --- |
 | `X_cand` | Set of candidate instances, inherited from `SingleAnnotatorStreamBasedQueryStrategy` |
-| `queried_indices` | typically the return value of `query` |
-| `budget_manager_param_dict` | provides additional parameters to the `update` function of the `budget_manager` (only include if a `budget_manager` is used) |
+| `queried_indices` | Typically the return value of `query` |
+| `budget_manager_param_dict` | Provides additional parameters to the `update` function of the `budget_manager` (only include if a `budget_manager` is used) |
 
 ##### General advice
 
@@ -239,36 +228,37 @@ All budget managers are stored in `skactivml/stream/budget_manager/\*.py`.
 
 The class must implement the following functions:
 
-- `__init__`: function for initialization
-- `query_by_utilities`: identify which instances to query based on the assessed utility
-- `update`: adapting the budget monitoring according to the queried labels
+| Parameter | Description |
+| :-: | --- |
+| `__init__` | Function for initialization |
+| `query_by_utilities` | Identify which instances to query based on the assessed utility |
+| `update` | Adapting the budget monitoring according to the queried labels |
 
 The update function of the budget manager has the same functionality as the query strategy update. For typical class parameters we use standard names:
 
-- `budget`: % of labels that the strategy is allowed to query
-- `random_state`: integer that acts as random seed or `np.random.RandomState` like sklearn
+| Parameter | Description |
+| :-: | --- |
+| `budget` | % of labels that the strategy is allowed to query |
+| `random_state` | Integer that acts as random seed or `np.random.RandomState` like sklearn |
 
 Typical parameters of the `query_by_utilities` function are:
 
-- `utilities` (The `utilities` of `X_cand` calculated by the query strategy, inherited from `BudgetManager`)
+| Parameter | Description |
+| :-: | --- |
+| `utilities` | The `utilities` of `X_cand` calculated by the query strategy, inherited from `BudgetManager` |
 
-General advice for working with a `budget_manager`:
+#### General advice for working with a `budget_manager`:
 
-- If a `budget_manager` is used, the `_validate_data` of the query strategy needs to be adapted accordingly:
-  - If only a `budget` is given use the default `budget_manager` with the given budget
-  - If only a `budget_manager` is given use the `budget_manager`
-  - If both are not given use the default `budget_manager` with the default budget
-  - If both are given and the budget differs from `budget_manager.budget` throw an error
+If a `budget_manager` is used, the `_validate_data` of the query strategy needs to be adapted accordingly:
 
-All budget managers are tested by a general unittest (`stream/budget_manager/tests/test_budget_manager.py`):
+- If only a `budget` is given use the default `budget_manager` with the given budget
+- If only a `budget_manager` is given use the `budget_manager`
+- If both are not given use the default `budget_manager` with the default budget
+- If both are given and the budget differs from `budget_manager.budget` throw an error
 
-- For every class `ExampleBudgetManager` that inherits from `BudgetManager` (stored in `_example.py`), it is automatically tested if there exists a file `test/test_example.py`. It is necessary that both filenames are the same.
+All budget managers are tested by a general unittest (`stream/budget_manager/tests/test_budget_manager.py`). For every class `ExampleBudgetManager` that inherits from `BudgetManager` (stored in `_example.py`), it is automatically tested if there exists a file `test/test_example.py`. It is necessary that both filenames are the same.
 
-Moreover, the test class must be called `TestExampleBudgetManager` and inheriting from `unittest.TestCase`
-
-- Every parameter in `__init__()` will be tested if it is written the same as a class variable.
-- Every parameter `arg` in `__init__()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_init_param_arg()`.
-- Every parameter `arg` in `query_by_utility()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_query_by_utility` `_param_arg()`.
+Moreover, the test class must be called `TestExampleBudgetManager` and inheriting from `unittest.TestCase`. Every parameter in `__init__()` will be tested if it is written the same as a class variable. Every parameter `arg` in `__init__()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_init_param_arg()`. Every parameter `arg` in `query_by_utility()` will be evaluated if there exists a method in the testclass `TestExampleQueryStrategy` that is called `test_query_by_utility` `_param_arg()`.
 
 ### Multi-Annotator Pool-based Query Strategies
 
@@ -312,18 +302,16 @@ The query function returns:
 
 ##### General advice
 
-- use `self._validate_data function` (is implemented in superclass)
-- check the input `X` and `y` only once
-- fit classifier if it is not yet fitted (may use `fit_if_not_fitted` form `utils`)
-- if the strategy combines a single annotator query strategy with a performance estimate
+Use `self._validate_data function` (is implemented in superclass). Check the input `X` and `y` only once. Fit classifier if it is not yet fitted (may use `fit_if_not_fitted` form `utils`). If the strategy combines a single annotator query strategy with a performance estimate:
 
-  - define an aggregation function
-  - evaluate the performance for each annotator sample pair
-  - use the `MultiAnnotWrapper`
+- Define an aggregation function
+- Evaluate the performance for each annotator sample pair
+- Use the `MultiAnnotWrapper`
 
-- if the strategy is a `greedy` method regarding the utilities
-  - calculate utilities (in an extra function)
-  - use `simple_batch` function from utils for return value
+If the strategy is a `greedy` method regarding the utilities:
+
+- Calculate utilities (in an extra function)
+- Use `simple_batch` function from utils for return value
 
 ## Classifiers
 
