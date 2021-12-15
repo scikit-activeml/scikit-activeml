@@ -23,7 +23,7 @@ jobs:
         sudo apt-get install ghostscript
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install -r requirements-extra.txt
+        pip install -r requirements_extra.txt
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
