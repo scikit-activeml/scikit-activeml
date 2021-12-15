@@ -130,7 +130,7 @@ For typical class parameters we use standard names:
 
 #### `query` function
 
-Typical parameters of the `query` function are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -143,7 +143,7 @@ Typical parameters of the `query` function are:
 | `batch_size` | Number of instances for batch querying, inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
 | `return_utilities` | Inherited from `SingleAnnotatorPoolBasedQueryStrategy` |
 
-The `query` function returns:
+Returns:
 
 | Parameter | Description |
 | :-: | --- |
@@ -166,7 +166,7 @@ All query strategies are stored in a file `skactivml/stream/*.py`. Every query s
 
 For typical class parameters we use standard names:
 
-| Paramter | Description |
+| Parameter | Description |
 | :-: | --- |
 | `random_state` | Integer that acts as random seed or `np.random.RandomState` like sklearn |
 | `budget` | % of labels that the strategy is allowed to query |
@@ -182,7 +182,7 @@ The class must implement the following functions:
 
 #### `query` function
 
-Parameters of the `query` function are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -193,7 +193,7 @@ Parameters of the `query` function are:
 | `sample_weight` | Weights for each instance in `X` or `None` if all are equally weighted |
 | `return_utilities` | Inherited from SingleAnnotatorStreamBasedQueryStrategy |
 
-The `query` function returns:
+Returns:
 
 | Parameter | Description |
 | :-: | --- |
@@ -206,7 +206,7 @@ The `query` function must not change the internal state of the `query` strategy 
 
 #### `update` function
 
-Typical parameters of the update function are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -224,24 +224,28 @@ All stream query strategies are tested by a general unittest (`stream/tests/test
 
 #### General advice for the `budget_manager`
 
-All budget managers are stored in `skactivml/stream/budget_manager/\*.py`.
-
-The class must implement the following functions:
+All budget managers are stored in `skactivml/stream/budget_manager/\*.py`. The class must implement the following functions:
 
 | Parameter | Description |
 | :-: | --- |
 | `__init__` | Function for initialization |
-| `query_by_utilities` | Identify which instances to query based on the assessed utility |
 | `update` | Adapting the budget monitoring according to the queried labels |
+| `query_by_utilities` | Identify which instances to query based on the assessed utility |
 
-The update function of the budget manager has the same functionality as the query strategy update. For typical class parameters we use standard names:
+#### `update` function
+
+The update function of the budget manager has the same functionality as the query strategy update.
+
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
 | `budget` | % of labels that the strategy is allowed to query |
 | `random_state` | Integer that acts as random seed or `np.random.RandomState` like sklearn |
 
-Typical parameters of the `query_by_utilities` function are:
+#### `query_by_utilities` function
+
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -262,9 +266,7 @@ Moreover, the test class must be called `TestExampleBudgetManager` and inheritin
 
 ### Multi-Annotator Pool-based Query Strategies
 
-All query strategies are stored in a file `skactiveml/pool/multi/_query_strategy.py`. Every class inherits from `MultiAnnotatorPoolBasedQueryStrategy`.
-
-The class must implement the following functions:
+All query strategies are stored in a file `skactiveml/pool/multi/_query_strategy.py`. Every class inherits from `MultiAnnotatorPoolBasedQueryStrategy`. The class must implement the following functions:
 
 | Parameter  | Description                                                  |
 | :--------: | ------------------------------------------------------------ |
@@ -279,7 +281,7 @@ For typical class parameters we use standard names:
 
 #### `query` function
 
-Typical parameters of the `query` function are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -293,7 +295,7 @@ Typical parameters of the `query` function are:
 | `ybatch_size` | Number of instances for batch querying, inherited from `MultiAnnotatorPoolBasedQueryStrategy` |
 | `return_utilities` | Inherited from `MultiAnnotatorPoolBasedQueryStrategy` |
 
-The query function returns:
+Returns:
 
 | Parameter | Description |
 | :-: | --- |
@@ -319,7 +321,7 @@ Standard classifier implementations are part of the subpackage `skactiveml.class
 
 ### `init` function
 
-Typical `__init__` parameters are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -331,7 +333,7 @@ Typical `__init__` parameters are:
 
 ### `fit` function
 
-Required `fit` parameters are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -339,7 +341,7 @@ Required `fit` parameters are:
 | `y` | Contains the class labels of the training samples. Missing labels are represented through the attribute 'missing_label'. Usually, `y` is a column array except for multi-annotator classifiers which expect a matrix with columns containing the class labels provided by a specific annotator |
 | `sample_weight` | ontains the weights of the training samples' class labels. It must have the same shape as `y` |
 
-`fit` method returns:
+Returns:
 
 | Parameter | Description                  |
 | :-------: | ---------------------------- |
@@ -351,13 +353,13 @@ Use `self._validate_data` method (is implemented in superclass) to check standar
 
 ### `predict_proba` function
 
-Required `predict_proba` parameters are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
 | `X` | Is a matrix of feature values representing the samples, for which the classifier will make predictions |
 
-`predict_proba` method returns:
+Returns:
 
 | Parameter | Description                                             |
 | :-------: | ------------------------------------------------------- |
@@ -369,13 +371,13 @@ Check parameter `X` regarding its shape, i.e., use superclass method `self._chec
 
 ### `predict_freq` function
 
-Required `predict_freq` parameters are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
 | `X` | Is a matrix of feature values representing the samples, for which the classifier will make predictions |
 
-`predict_freq` method returns:
+Returns:
 
 | Parameter | Description |
 | :-: | --- |
@@ -387,13 +389,13 @@ Check parameter X regarding its shape, i.e., use superclass method `self._check_
 
 ### `predict` function
 
-Required `predict` parameters are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
 | `X` | Is a matrix of feature values representing the samples, for which the classifier will make predictions |
 
-`predict` method returns:
+Returns:
 
 | Parameter | Description                              |
 | :-------: | ---------------------------------------- |
@@ -405,7 +407,7 @@ Usually, this method is already implemented by the superclass through calling th
 
 ### `score` function
 
-Required `score` parameters are:
+Required Parameters:
 
 | Parameter | Description |
 | :-: | --- |
@@ -413,7 +415,7 @@ Required `score` parameters are:
 | `y` | Contains the true label of each sample |
 | `sample_weight` | Defines the importance of each sample when computing the accuracy of the classifier |
 
-`score` method returns:
+Returns:
 
 | Parameter | Description                                      |
 | :-------: | ------------------------------------------------ |
@@ -433,13 +435,13 @@ Annotator models are marked by implementing the interface `skactiveml.base.Annot
 
 ### `predict_annot_perf` function
 
-Required `predict_annot_perf` parameters are:
+Required Parameters:
 
 | Parameter | Description                                            |
 | :-------: | ------------------------------------------------------ |
 |    `X`    | Is a matrix of feature values representing the samples |
 
-The `predict_annot_perf` method returns:
+Returns:
 
 | Parameter | Description                                          |
 | :-------: | ---------------------------------------------------- |
@@ -490,14 +492,7 @@ Use the following labels to report an issue:
 
 | Label           | Usecase                              |
 | --------------- | ------------------------------------ |
-| `documentation` | Improvement or additions to document |
-| `enhancement`   | New feature                          |
-| `guideline`     | # TODO                               |
-| `question`      | # TODO                               |
 | `bug`           | Something isn't working              |
-| `upcoming`      | # TODO                               |
-| `classifier`    | # TODO                               |
-| `regressor`     | # TODO                               |
-| `stream`        | # TODO                               |
-| `pool`          | # TODO                               |
-| `test`          | # TODO                               |
+| `enhancement`   | New feature                          |
+| `documentation` | Improvement or additions to document |
+| `question`      | General questions                    |
