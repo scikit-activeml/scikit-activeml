@@ -289,8 +289,8 @@ class VariableUncertaintyBudget(EstimatedBudget):
 
         Returns
         -------
-        self : EstimatedBudget
-            The EstimatedBudget returns itself, after it is updated.
+        self : VariableUncertaintyBudget
+            The VariableUncertaintyBudget returns itself, after it is updated.
         """
         self._validate_data(np.array([]))
 
@@ -456,8 +456,8 @@ class RandomVariableUncertaintyBudget(EstimatedBudget):
 
         Returns
         -------
-        self : EstimatedBudget
-            The EstimatedBudget returns itself, after it is updated.
+        self : RandomVariableUncertaintyBudget
+            The RandomVariableUncertaintyBudget returns itself, after it is updated.
         """
         self._validate_data(np.array([]))
 
@@ -633,8 +633,8 @@ class SplitBudget(EstimatedBudget):
 
         Returns
         -------
-        self : EstimatedBudget
-            The EstimatedBudget returns itself, after it is updated.
+        self : SplitBudget
+            The SplitBudget returns itself, after it is updated.
         """
         self._validate_data(np.array([]))
 
