@@ -449,9 +449,9 @@ Returns:
 
 Check parameter `X` regarding its shape and check that the annotator model has been fitted. If no samples or class labels were provided during the previous call of the `fit` method, the maximum value of annotator performance should be outputted for each sample-annotator pair.
 
-## Testing and improving test coverage
+## Testing and code coverage
 
-> TODO: Codecov?, How to run tests?
+Please ensure test coverage is close to 100%. The current code coverage can be viewed [here](https://app.codecov.io/gh/scikit-activeml/scikit-activeml).
 
 ## Documentation (User guide and Developer guide)
 
