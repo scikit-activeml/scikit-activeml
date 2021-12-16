@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
 
-from skactiveml.classifier import PWC
+from skactiveml.classifier.multi import LogisticRegressionRY
 from skactiveml.pool.multi import IEThresh, IEAnnotModel
 
 
@@ -96,7 +96,7 @@ class TestIEThresh(unittest.TestCase):
         self.y[:, 1] = 1
         self.y[:, 0] = 0
         self.y[1:5, 2] = np.nan
-        self.clf = PWC()
+        self.clf = LogisticRegressionRY()
         self.A_cand = np.ones_like(self.y)
         self.sample_weight = np.ones_like(self.y)
 
@@ -167,9 +167,9 @@ class TestIEThresh(unittest.TestCase):
                           X=np.ones((10, 10)), X_cand=self.X, clf=self.clf,
                           y=self.y, A_cand=self.A_cand)
         self.assertRaises(ValueError, ie_thresh.query,
-                          X=np.ones(10), X_cand=self.X, clf=self.clf,  y=self.y,
+                          X=np.ones(10), X_cand=self.X, clf=self.clf, y=self.y,
                           A_cand=self.A_cand)
-        self.assertRaises(TypeError, ie_thresh.query,
+        self.assertRaises(ValueError, ie_thresh.query,
                           X='test', X_cand=self.X, clf=self.clf, y=self.y,
                           A_cand=self.A_cand)
 
@@ -233,7 +233,8 @@ class TestIEThresh(unittest.TestCase):
         actual_batch_sizes = [self.A_cand.shape[1], 40, 1, 7]
         n_samples = [1, 10, 1, 2]
         for b_in, b_act, n in zip(batch_sizes, actual_batch_sizes, n_samples):
-            query_indices, utilities = ie_thresh.query(X_cand=self.X, clf=PWC(),
+            query_indices, utilities = ie_thresh.query(X_cand=self.X,
+                                                       clf=LogisticRegressionRY(),
                                                        X=self.X, y=self.y,
                                                        A_cand=self.A_cand,
                                                        return_utilities=True,
@@ -246,19 +247,23 @@ class TestIEThresh(unittest.TestCase):
             for b in range(len(utilities)):
                 self.assertEqual(b, np.sum(np.isnan(utilities[b])))
             self.assertEqual(len(np.unique(query_indices[:, 0])), n)
-            query_indices = ie_thresh.query(X_cand=self.X, clf=PWC(), X=self.X,
+            query_indices = ie_thresh.query(X_cand=self.X,
+                                            clf=LogisticRegressionRY(),
+                                            X=self.X,
                                             y=self.y, A_cand=self.A_cand,
                                             batch_size=b_in)
             np.testing.assert_array_equal(query_indices.shape, [b_act, 2])
 
         A_cand = np.zeros_like(self.y)
         query_indices, utilities = ie_thresh.query(X_cand=self.X, X=self.X,
-                                                   clf=PWC(), y=self.y,
+                                                   clf=LogisticRegressionRY(),
+                                                   y=self.y,
                                                    A_cand=A_cand,
                                                    return_utilities=True)
         self.assertEqual(len(query_indices), 0)
         self.assertEqual(len(utilities), 0)
-        query_indices = ie_thresh.query(X_cand=self.X, X=self.X, clf=PWC(),
+        query_indices = ie_thresh.query(X_cand=self.X, X=self.X,
+                                        clf=LogisticRegressionRY(),
                                         y=self.y, A_cand=A_cand)
         self.assertEqual(len(query_indices), 0)
 
@@ -275,13 +280,14 @@ class TestIEThresh(unittest.TestCase):
                            [1.0, 1.0],
                            [1.0, 0.0]])
 
-        query_indices, utilities = ie_thresh.query(X_cand=X_cand, clf=PWC(),
+        query_indices, utilities = ie_thresh.query(X_cand=X_cand,
+                                                   clf=LogisticRegressionRY(),
                                                    X=self.X, y=self.y,
                                                    A_cand=A_cand,
                                                    return_utilities=True,
                                                    batch_size=7)
 
-        for index in range(len(query_indices)-1):
+        for index in range(len(query_indices) - 1):
             self.assertGreaterEqual(n_a_annotators[query_indices[index, 0]],
-                                    n_a_annotators[query_indices[index+1, 0]])
-
+                                    n_a_annotators[
+                                        query_indices[index + 1, 0]])

@@ -1,17 +1,19 @@
 import os
 import unittest
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
 from sklearn.datasets import make_classification
 
 from skactiveml import visualization
 from skactiveml.classifier import PWC
+from skactiveml.classifier.multi import MultiAnnotEnsemble
 from skactiveml.pool.multi import IEThresh
 from skactiveml.utils import check_bound, majority_vote
-from skactiveml.visualization.multi import plot_ma_data_set, plot_ma_utility, plot_ma_decision_boundary, \
+from skactiveml.visualization.multi import plot_ma_data_set, plot_ma_utility, \
+    plot_ma_decision_boundary, \
     plot_ma_current_state
 
 
@@ -34,6 +36,12 @@ class TestFeatureSpace(unittest.TestCase):
 
         self.y = (self.y_true.reshape(-1, 1) + noise) % 2
 
+        estimators = []
+        for a in range(self.n_annotators):
+            estimators.append((f'pwc_{a}', PWC(random_state=0)))
+        self.clf_multi = MultiAnnotEnsemble(
+            estimators=estimators, voting='soft'
+        )
         self.clf = PWC(random_state=0)
         self.ma_qs = IEThresh(random_state=0, n_annotators=self.n_annotators)
 
@@ -70,9 +78,11 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_ma_plot_data_set_mc(self):
-        X_prime, y_true_prime = make_classification(n_features=2, n_redundant=0,
+        X_prime, y_true_prime = make_classification(n_features=2,
+                                                    n_redundant=0,
                                                     n_clusters_per_class=1,
-                                                    n_classes=4, random_state=0)
+                                                    n_classes=4,
+                                                    random_state=0)
         rng = np.random.default_rng(seed=0)
 
         noise = np.sum(rng.multinomial(n=1, pvals=[.7, .1, .1, .1],
@@ -100,8 +110,10 @@ class TestFeatureSpace(unittest.TestCase):
         bound = check_bound(X=self.X)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
                           maqs_arg_dict, feature_bound=bound)
-        maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y,
-                         'A_cand': np.ones((self.n_samples, self.n_annotators))}
+        maqs_arg_dict = {
+            'clf': self.clf, 'X': self.X, 'y': self.y,
+            'A_cand': np.ones((self.n_samples, self.n_annotators))
+        }
         bound = check_bound(X=self.X)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
                           maqs_arg_dict, feature_bound=bound)
@@ -120,7 +132,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_ma_plot_utility(self):
         y = np.array(self.y, dtype=float)
         y[np.arange(5), np.arange(5)] = np.nan
-        maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
+        maqs_arg_dict = {'clf': self.clf_multi, 'X': self.X, 'y': self.y}
         bound = check_bound(X=self.X)
         fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, feature_bound=bound,
                               title='utility', fig_size=(20, 5))
@@ -134,7 +146,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_ma_plot_utility_with_X(self):
-        maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
+        maqs_arg_dict = {'clf': self.clf_multi, 'X': self.X, 'y': self.y}
         A_cand = np.ones((self.n_samples, self.n_annotators))
         fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, X_cand=self.X,
                               A_cand=A_cand)
@@ -177,9 +189,9 @@ class TestFeatureSpace(unittest.TestCase):
         fig.tight_layout()
         fig.savefig(self.path_prefix +
                     'ma_plot_current_state_returned_result.pdf')
-        comparison = compare_images(self.path_prefix +
-                                    'ma_plot_current_state_expected_result.pdf',
-                                    self.path_prefix +
-                                    'ma_plot_current_state_returned_result.pdf',
-                                    tol=0)
+        comparison = compare_images(
+            self.path_prefix + 'ma_plot_current_state_expected_result.pdf',
+            self.path_prefix + 'ma_plot_current_state_returned_result.pdf',
+            tol=0
+        )
         self.assertIsNone(comparison)

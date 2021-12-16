@@ -71,7 +71,7 @@ Functions
    average_kl_divergence
    vote_entropy
 
-:mod:`skactiveml.pool.multi`: Multi Annotator Pool-based strategies
+:mod:`skactiveml.pool.multi`: Multi-annotator pool-based strategies
 ===================================================================
 
 .. automodule:: skactiveml.pool.multi
@@ -101,6 +101,9 @@ Classes
 
 .. currentmodule:: skactiveml.classifier
 
+Classes
+-------
+
 .. autosummary::
    :nosignatures:
    :toctree: generated/api
@@ -109,7 +112,25 @@ Classes
    PWC
    CMM
    SklearnClassifier
-   MultiAnnotClassifier
+
+:mod:`skactiveml.classifier.multi`: Multi-annotator classifier
+==============================================================
+
+.. automodule:: skactiveml.classifier.multi
+    :no-members:
+    :no-inherited-members:
+
+.. currentmodule:: skactiveml.classifier.multi
+
+Classes
+-------
+
+.. autosummary::
+   :nosignatures:
+   :toctree: generated/api
+   :template: class.rst
+
+   MultiAnnotEnsemble
    LogisticRegressionRY
 
 :mod:`skactiveml.visualization`: Visualization functions
