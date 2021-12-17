@@ -60,7 +60,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
         super().__init__(random_state=random_state)
         self.missing_label = missing_label
 
-    def _validate_data(self, X, y, X_cand, batch_size, return_utilities,
+    def _validate_data(self, X, y, candidates, batch_size, return_utilities,
                        missing_label, random_state, reset=True,
                        check_X_dict=None):
         """Validate input data and set or check the `n_features_in_` attribute.
@@ -73,19 +73,19 @@ class PoolBasedQueryStrategy(QueryStrategy):
         y : array-like of shape (n_samples, *)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        X_cand : None or array-like of shape (n_candidates), dtype=int or
+        candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
-            If X_cand is None, the unlabeled samples from (X,y) are considered
-            as candidates.
-            If X_cand is of shape (n_candidates) and of type int, X_cand is
-            considered as the indices of the samples in (X,y).
-            If X_cand is of shape (n_candidates, n_features), the candidates
-            are directly given in X_cand (not necessarily contained in X). This
-            is not supported by all query strategies.
-        batch_size : int,
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool,
+        return_utilities : bool
             If true, also return the utilities based on the query strategy.
         random_state : numeric or np.random.RandomState
             The random state to use.
@@ -102,8 +102,8 @@ class PoolBasedQueryStrategy(QueryStrategy):
             Checked training data set.
         y : np.ndarray of shape (n_samples, *)
             Checked labels of the training data set.
-        X_cand : np.ndarray of shape (n_candidates), dtype=int or np.ndarray
-            of shape (n_candidates, n_features)
+        candidates : None or np.ndarray of shape (n_candidates), dtype=int or
+            np.ndarray of shape (n_candidates, n_features)
             Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
@@ -128,11 +128,11 @@ class PoolBasedQueryStrategy(QueryStrategy):
         # Check missing_label
         missing_label = check_missing_label(missing_label)
 
-        # Check X_cand
-        if X_cand is not None:
-            X_cand = check_array(X_cand, **check_X_dict)
-            self._check_n_features(X_cand, reset=False)
-            seed_mult = len(X_cand)
+        # Check candidates
+        if candidates is not None:
+            candidates = check_array(candidates, **check_X_dict)
+            self._check_n_features(candidates, reset=False)
+            seed_mult = len(candidates)
         else:
             seed_mult = np.sum(is_unlabeled(y, missing_label=missing_label))
 
@@ -147,8 +147,8 @@ class PoolBasedQueryStrategy(QueryStrategy):
         random_state = check_random_state(random_state=self.random_state,
                                           seed_multiplier=seed_mult)
 
-        return X, y, X_cand, batch_size, return_utilities, missing_label, \
-               random_state
+        return X, y, candidates, batch_size, return_utilities, missing_label, \
+            random_state
 
 
 class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
@@ -168,7 +168,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         self.missing_label = missing_label
 
     @abstractmethod
-    def query(self, X, y, *args, X_cand=None, batch_size=1,
+    def query(self, X, y, *args, candidates=None, batch_size=1,
               return_utilities=False, **kwargs):
         """Determines which for which candidate samples labels are to be
         queried.
@@ -181,16 +181,16 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        X_cand : None or array-like of shape (n_candidates), dtype=int or
+        candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
-            If X_cand is None, the unlabeled samples from (X,y) are considered
-            as candidates.
-            If X_cand is of shape (n_candidates) and of type int, X_cand is
-            considered as the indices of the samples in (X,y).
-            If X_cand is of shape (n_candidates, n_features), the candidates
-            are directly given in X_cand (not necessarily contained in X). This
-            is not supported by all query strategies.
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -202,20 +202,20 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If X_cand is None or of shape (n_candidates), the indexing refers
-            to samples in X.
-            If X_cand is of shape (n_candidates, n_features), the indexing
-            refers to samples in X_cand.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or
             numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If X_cand is None or of shape (n_candidates), the indexing refers
-            to samples in X.
-            If X_cand is of shape (n_candidates, n_features), the indexing
-            refers to samples in X_cand.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
         raise NotImplementedError
 
@@ -232,19 +232,19 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        X_cand : None or array-like of shape (n_candidates), dtype=int or
+        candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
-            If X_cand is None, the unlabeled samples from (X,y) are considered
-            as candidates.
-            If X_cand is of shape (n_candidates) and of type int, X_cand is
-            considered as the indices of the samples in (X,y).
-            If X_cand is of shape (n_candidates, n_features), the candidates
-            are directly given in X_cand (not necessarily contained in X). This
-            is not supported by all query strategies.
-        batch_size : int,
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool,
+        return_utilities : bool
             If true, also return the utilities based on the query strategy.
         random_state : numeric or np.random.RandomState
             The random state to use.
@@ -261,8 +261,8 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Checked training data set.
         y : np.ndarray of shape (n_samples)
             Checked labels of the training data set.
-        X_cand : np.ndarray of shape (n_candidates), dtype=int or np.ndarray
-            of shape (n_candidates, n_features)
+        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or 
+            np.ndarray of shape (n_candidates, n_features)
             Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
@@ -275,9 +275,9 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         """
 
         X, y, candidates, batch_size, return_utilities, missing_label, \
-        random_state = super()._validate_data(
-            X, y, candidates, batch_size, return_utilities, missing_label,
-            random_state, reset, check_X_dict)
+            random_state = super()._validate_data(
+                X, y, candidates, batch_size, return_utilities, missing_label,
+                random_state, reset, check_X_dict)
 
         if candidates is None:
             n_candidates = \
@@ -287,46 +287,58 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         if n_candidates < batch_size:
             warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(candidates)))
+                f"'batch_size={batch_size}' is larger than number of "
+                f"candidates. Instead, 'batch_size={n_candidates}' was set.")
             batch_size = n_candidates
 
         return X, y, candidates, batch_size, return_utilities, missing_label, \
-               random_state
+            random_state
 
-    def _transform_X_cand(self, candidates, X, y, enforce_mapping=False):
+    def _transform_candidates(self, candidates, X, y, enforce_mapping=False):
         """
-        Transforms the `X_cand` parameter into a sample array and the
-        corresponding index array mapping `mapping` to the samples in `X`
-        such that `X[mapping] = X_cand`. ``
+        Transforms the `candidates` parameter into a sample array and the
+        corresponding index array `mapping` such that `X_cand = X[mapping]`.
 
         Parameters
         ----------
-        X_cand : np.ndarray
-        X
-        y
-        enforce_mapping
+        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
+            np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        X : np.ndarray of shape (n_samples, n_features)
+            Checked training data set.
+        y : np.ndarray of shape (n_samples)
+            Checked labels of the training data set.
+        enforce_mapping : bool, default=False
+            If True, an exception is raised when no exact mapping can be 
+            determined (i.e., `mapping` is None).
 
         Returns
         -------
-
+        X_cand : np.ndarray of shape (n_candidates, n_features)
+            Candidate samples from which the strategy can query the label.
+        mapping : np.ndarray of shape (n_candidates) or None
+            Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
         """
-        if X_cand is None:
+        if candidates is None:
             ulbd_idx = unlabeled_indices(y)
             return X[ulbd_idx], ulbd_idx
-        elif X_cand.ndim == 1:
-            return X[X_cand], X_cand
+        elif candidates.ndim == 1:
+            return X[candidates], candidates
         else:
             if enforce_mapping:
-                raise ValueError(f'Mapping `X` to `X_cand` is not posssible'
-                                 f'but `enforce_mapping` is True. Use index'
-                                 f'array for `X_cand` instead.')
+                raise ValueError('Mapping `X_cand` to `X` is not posssible'
+                                 'but `enforce_mapping` is True. Use index'
+                                 'array for `candidates` instead.')
             else:
-                return X_cand, None
+                return candidates, None
 
-
-def check_equal_missing_label():
 
 class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     """Base class for all pool-based active learning query strategies with

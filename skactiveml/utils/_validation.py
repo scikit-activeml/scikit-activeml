@@ -7,6 +7,8 @@ import sklearn
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
+from ._label import is_unlabeled
+
 # Define constant for missing label used throughout the package.
 MISSING_LABEL = np.nan
 
@@ -121,6 +123,28 @@ def check_missing_label(missing_label, target_type=None, name=None):
                 "'missing_label' has type '{}' and is not compatible to the "
                 "type '{}' of '{}'.".format(
                     type(missing_label), target_type, name))
+
+
+def check_equal_missing_label(missing_label1, missing_label2):
+    """Check whether two missing label values are equal to each other.
+
+    Parameters
+    ----------
+    missing_label1 : number | str | None | np.nan
+        Symbol to represent a missing label.
+    missing_label2 : number | str | None | np.nan
+        Other symbol to represent a missing label.
+
+    Raises
+    -------
+    ValueError
+        If the parameter's value violates the given bounds.
+    """
+    if not is_unlabeled([missing_label1], missing_label=missing_label2)[0]:
+        raise ValueError(
+            f"missing_label1={missing_label1} and "
+            f"missing_label2={missing_label2} must be equal."
+        )
 
 
 def check_classes(classes):
