@@ -14,9 +14,10 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_array, check_consistent_length, \
     column_or_1d
 
-from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
+from .utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
-    is_labeled, check_scalar, check_class_prior
+    is_labeled, check_scalar, check_class_prior, unlabeled_indices, \
+    check_missing_label, is_unlabeled
 
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
@@ -29,7 +30,7 @@ class QueryStrategy(ABC, BaseEstimator):
 
     Parameters
     ----------
-    random_state : int, RandomState instance, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
@@ -43,87 +44,97 @@ class QueryStrategy(ABC, BaseEstimator):
         raise NotImplementedError
 
 
-class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
-    """Base class for all pool-based active learning query strategies with a
-    single annotator in scikit-activeml.
+class PoolBasedQueryStrategy(QueryStrategy):
+    """Base class for all pool-based active learning query strategies in
+    scikit-activeml.
 
     Parameters
     ----------
-    random_state : int, RandomState instance, default=None
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, random_state=None):
+    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(random_state=random_state)
+        self.missing_label = missing_label
 
-    @abstractmethod
-    def query(self, X_cand, *args, batch_size=1, return_utilities=False,
-              **kwargs):
-        """Determines which for which candidate samples labels are to be
-        queried.
-
-        Parameters
-        ----------
-        X_cand : array-like, shape (n_samples, n_features)
-            Candidate samples from which the strategy can select.
-        batch_size : int, optional (default=1)
-            The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
-
-        Returns
-        -------
-        query_indices : numpy.ndarray, shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
-        """
-        raise NotImplementedError
-
-    def _validate_data(self, X_cand, return_utilities, batch_size,
-                       random_state, reset=True, check_X_cand_dict=None):
+    def _validate_data(self, X, y, X_cand, batch_size, return_utilities,
+                       missing_label, random_state, reset=True,
+                       check_X_dict=None):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
-            Candidate samples.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples, *)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        X_cand : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If X_cand is None, the unlabeled samples from (X,y) are considered
+            as candidates.
+            If X_cand is of shape (n_candidates) and of type int, X_cand is
+            considered as the indices of the samples in (X,y).
+            If X_cand is of shape (n_candidates, n_features), the candidates
+            are directly given in X_cand (not necessarily contained in X). This
+            is not supported by all query strategies.
         batch_size : int,
             The number of samples to be selected in one AL cycle.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        random_state : numeric | np.random.RandomState, optional
+        random_state : numeric or np.random.RandomState
             The random state to use.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
-        **check_X_cand_params : kwargs
+        **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+        X : np.ndarray of shape (n_samples, n_features)
+            Checked training data set.
+        y : np.ndarray of shape (n_samples, *)
+            Checked labels of the training data set.
+        X_cand : np.ndarray of shape (n_candidates), dtype=int or np.ndarray
+            of shape (n_candidates, n_features)
+            Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
+        missing_label : scalar or string or np.nan or None
+            Checked value to represent a missing label.
         random_state : np.random.RandomState,
             Checked random state to use.
         """
-        # Check candidate instances.
-        if check_X_cand_dict is None:
-            check_X_cand_dict = {'allow_nd': True}
-        X_cand = check_array(X_cand, **check_X_cand_dict)
+        # Check samples.
+        if check_X_dict is None:
+            check_X_dict = {'allow_nd': True}
+        X = check_array(X, **check_X_dict)
 
         # Check number of features.
-        self._check_n_features(X_cand, reset=reset)
+        self._check_n_features(X, reset=reset)
+
+        # Check labels
+        check_consistent_length(X, y)
+
+        # Check missing_label
+        missing_label = check_missing_label(missing_label)
+
+        # Check X_cand
+        if X_cand is not None:
+            X_cand = check_array(X_cand, **check_X_dict)
+            self._check_n_features(X_cand, reset=False)
+            seed_mult = len(X_cand)
+        else:
+            seed_mult = np.sum(is_unlabeled(y, missing_label=missing_label))
 
         # Check return_utilities.
         check_scalar(return_utilities, 'return_utilities', bool)
@@ -131,20 +142,191 @@ class SingleAnnotPoolBasedQueryStrategy(QueryStrategy):
         # Check batch size.
         check_scalar(batch_size, target_type=int, name='batch_size',
                      min_val=1)
-        batch_size = batch_size
-        if len(X_cand) < batch_size:
-            warnings.warn(
-                "'batch_size={}' is larger than number of candidate samples "
-                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
-                    batch_size, len(X_cand)))
-            batch_size = len(X_cand)
 
         # Check random state.
         random_state = check_random_state(random_state=self.random_state,
-                                          seed_multiplier=len(X_cand))
+                                          seed_multiplier=seed_mult)
 
-        return X_cand, return_utilities, batch_size, random_state
+        return X, y, X_cand, batch_size, return_utilities, missing_label, \
+               random_state
 
+
+class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
+    """Base class for all pool-based active learning query strategies with a
+    single annotator in scikit-activeml.
+
+    Parameters
+    ----------
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
+    """
+
+    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
+        super().__init__(random_state=random_state)
+        self.missing_label = missing_label
+
+    @abstractmethod
+    def query(self, X, y, *args, X_cand=None, batch_size=1,
+              return_utilities=False, **kwargs):
+        """Determines which for which candidate samples labels are to be
+        queried.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        X_cand : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If X_cand is None, the unlabeled samples from (X,y) are considered
+            as candidates.
+            If X_cand is of shape (n_candidates) and of type int, X_cand is
+            considered as the indices of the samples in (X,y).
+            If X_cand is of shape (n_candidates, n_features), the candidates
+            are directly given in X_cand (not necessarily contained in X). This
+            is not supported by all query strategies.
+        batch_size : int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
+
+        Returns
+        -------
+        query_indices : numpy.ndarray of shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+            If X_cand is None or of shape (n_candidates), the indexing refers
+            to samples in X.
+            If X_cand is of shape (n_candidates, n_features), the indexing
+            refers to samples in X_cand.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If X_cand is None or of shape (n_candidates), the indexing refers
+            to samples in X.
+            If X_cand is of shape (n_candidates, n_features), the indexing
+            refers to samples in X_cand.
+        """
+        raise NotImplementedError
+
+    def _validate_data(self, X, y, candidates, batch_size, return_utilities,
+                       missing_label, random_state,
+                       reset=True, check_X_dict=None):
+        """Validate input data.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        X_cand : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If X_cand is None, the unlabeled samples from (X,y) are considered
+            as candidates.
+            If X_cand is of shape (n_candidates) and of type int, X_cand is
+            considered as the indices of the samples in (X,y).
+            If X_cand is of shape (n_candidates, n_features), the candidates
+            are directly given in X_cand (not necessarily contained in X). This
+            is not supported by all query strategies.
+        batch_size : int,
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            If true, also return the utilities based on the query strategy.
+        random_state : numeric or np.random.RandomState
+            The random state to use.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute.
+            If False, the input will be checked for consistency with data
+            provided when reset was last True.
+        **check_X_dict : kwargs
+            Parameters passed to :func:`sklearn.utils.check_array`.
+
+        Returns
+        -------
+        X : np.ndarray of shape (n_samples, n_features)
+            Checked training data set.
+        y : np.ndarray of shape (n_samples)
+            Checked labels of the training data set.
+        X_cand : np.ndarray of shape (n_candidates), dtype=int or np.ndarray
+            of shape (n_candidates, n_features)
+            Checked candidate samples.
+        batch_size : int
+            Checked number of samples to be selected in one AL cycle.
+        return_utilities : bool,
+            Checked boolean value of `return_utilities`.
+        missing_label : scalar or string or np.nan or None
+            Checked value to represent a missing label.
+        random_state : np.random.RandomState,
+            Checked random state to use.
+        """
+
+        X, y, candidates, batch_size, return_utilities, missing_label, \
+        random_state = super()._validate_data(
+            X, y, candidates, batch_size, return_utilities, missing_label,
+            random_state, reset, check_X_dict)
+
+        if candidates is None:
+            n_candidates = \
+                is_unlabeled(y, missing_label=self.missing_label).sum()
+        else:
+            n_candidates = len(candidates)
+
+        if n_candidates < batch_size:
+            warnings.warn(
+                "'batch_size={}' is larger than number of candidate samples "
+                "in 'X_cand'. Instead, 'batch_size={}' was set ".format(
+                    batch_size, len(candidates)))
+            batch_size = n_candidates
+
+        return X, y, candidates, batch_size, return_utilities, missing_label, \
+               random_state
+
+    def _transform_X_cand(self, candidates, X, y, enforce_mapping=False):
+        """
+        Transforms the `X_cand` parameter into a sample array and the
+        corresponding index array mapping `mapping` to the samples in `X`
+        such that `X[mapping] = X_cand`. ``
+
+        Parameters
+        ----------
+        X_cand : np.ndarray
+        X
+        y
+        enforce_mapping
+
+        Returns
+        -------
+
+        """
+        if X_cand is None:
+            ulbd_idx = unlabeled_indices(y)
+            return X[ulbd_idx], ulbd_idx
+        elif X_cand.ndim == 1:
+            return X[X_cand], X_cand
+        else:
+            if enforce_mapping:
+                raise ValueError(f'Mapping `X` to `X_cand` is not posssible'
+                                 f'but `enforce_mapping` is True. Use index'
+                                 f'array for `X_cand` instead.')
+            else:
+                return X_cand, None
+
+
+def check_equal_missing_label():
 
 class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
     """Base class for all pool-based active learning query strategies with
@@ -152,7 +334,7 @@ class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    random_state : int, RandomState instance, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
     n_annotators : int,
         Sets the number of annotators if `A_cand is None`.
