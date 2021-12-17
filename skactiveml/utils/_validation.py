@@ -7,8 +7,6 @@ import sklearn
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
-from ._label import is_unlabeled
-
 # Define constant for missing label used throughout the package.
 MISSING_LABEL = np.nan
 

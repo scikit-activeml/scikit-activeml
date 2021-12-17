@@ -73,10 +73,7 @@ The following code implements an active learning cycle with 20 iterations using 
     # Execute active learning cycle.
     n_cycles = 20
     for c in range(n_cycles):
-        clf.fit(X, y)
-        unlbld_idx = unlabeled_indices(y)
-        X_cand = X[unlbld_idx]
-        query_idx = unlbld_idx[qs.query(X_cand=X_cand, clf=clf)]
+        query_idx = qs.query(X=X, y=y, clf=clf)
         y[query_idx] = y_true[query_idx]
     print(f'Accuracy: {clf.fit(X, y).score(X, y_true)}')
 

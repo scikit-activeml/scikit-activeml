@@ -61,9 +61,9 @@ class PoolBasedQueryStrategy(QueryStrategy):
         self.missing_label = missing_label
 
     def _validate_data(self, X, y, candidates, batch_size, return_utilities,
-                       missing_label, random_state, reset=True,
-                       check_X_dict=None):
-        """Validate input data and set or check the `n_features_in_` attribute.
+                       reset=True, check_X_dict=None):
+        """Validate input data, all attributes and set or check the
+        `n_features_in_` attribute.
 
         Parameters
         ----------
@@ -87,8 +87,6 @@ class PoolBasedQueryStrategy(QueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool
             If true, also return the utilities based on the query strategy.
-        random_state : numeric or np.random.RandomState
-            The random state to use.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -109,10 +107,6 @@ class PoolBasedQueryStrategy(QueryStrategy):
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        missing_label : scalar or string or np.nan or None
-            Checked value to represent a missing label.
-        random_state : np.random.RandomState,
-            Checked random state to use.
         """
         # Check samples.
         if check_X_dict is None:
@@ -126,7 +120,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
         check_consistent_length(X, y)
 
         # Check missing_label
-        missing_label = check_missing_label(missing_label)
+        self.missing_label_ = check_missing_label(self.missing_label)
 
         # Check candidates
         if candidates is not None:
@@ -134,7 +128,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
             self._check_n_features(candidates, reset=False)
             seed_mult = len(candidates)
         else:
-            seed_mult = np.sum(is_unlabeled(y, missing_label=missing_label))
+            seed_mult = np.sum(is_unlabeled(y, self.missing_label_))
 
         # Check return_utilities.
         check_scalar(return_utilities, 'return_utilities', bool)
@@ -144,11 +138,9 @@ class PoolBasedQueryStrategy(QueryStrategy):
                      min_val=1)
 
         # Check random state.
-        random_state = check_random_state(random_state=self.random_state,
-                                          seed_multiplier=seed_mult)
+        self.random_state_ = check_random_state(self.random_state, seed_mult)
 
-        return X, y, candidates, batch_size, return_utilities, missing_label, \
-            random_state
+        return X, y, candidates, batch_size, return_utilities
 
 
 class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
@@ -170,8 +162,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
     @abstractmethod
     def query(self, X, y, *args, candidates=None, batch_size=1,
               return_utilities=False, **kwargs):
-        """Determines which for which candidate samples labels are to be
-        queried.
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
@@ -220,9 +211,9 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         raise NotImplementedError
 
     def _validate_data(self, X, y, candidates, batch_size, return_utilities,
-                       missing_label, random_state,
                        reset=True, check_X_dict=None):
-        """Validate input data.
+        """Validate input data, all attributes and set or check the
+        `n_features_in_` attribute.
 
         Parameters
         ----------
@@ -246,8 +237,6 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool
             If true, also return the utilities based on the query strategy.
-        random_state : numeric or np.random.RandomState
-            The random state to use.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -261,27 +250,24 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Checked training data set.
         y : np.ndarray of shape (n_samples)
             Checked labels of the training data set.
-        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or 
+        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
             np.ndarray of shape (n_candidates, n_features)
             Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        missing_label : scalar or string or np.nan or None
-            Checked value to represent a missing label.
-        random_state : np.random.RandomState,
-            Checked random state to use.
         """
 
-        X, y, candidates, batch_size, return_utilities, missing_label, \
-            random_state = super()._validate_data(
-                X, y, candidates, batch_size, return_utilities, missing_label,
-                random_state, reset, check_X_dict)
+        X, y, candidates, batch_size, return_utilities = \
+            super()._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset,
+                check_X_dict
+            )
 
         if candidates is None:
             n_candidates = \
-                is_unlabeled(y, missing_label=self.missing_label).sum()
+                is_unlabeled(y, missing_label=self.missing_label_).sum()
         else:
             n_candidates = len(candidates)
 
@@ -291,8 +277,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                 f"candidates. Instead, 'batch_size={n_candidates}' was set.")
             batch_size = n_candidates
 
-        return X, y, candidates, batch_size, return_utilities, missing_label, \
-            random_state
+        return X, y, candidates, batch_size, return_utilities
 
     def _transform_candidates(self, candidates, X, y, enforce_mapping=False):
         """
@@ -327,7 +312,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
         """
         if candidates is None:
-            ulbd_idx = unlabeled_indices(y)
+            ulbd_idx = unlabeled_indices(y, self.missing_label_)
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
             return X[candidates], candidates

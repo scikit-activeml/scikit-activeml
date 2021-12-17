@@ -6,11 +6,12 @@ Module implementing various uncertainty based query strategies.
 #          Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
+from sklearn import clone
 from sklearn.utils.validation import check_array
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
-from ..utils import check_cost_matrix, simple_batch, check_classes, \
-    fit_if_not_fitted, check_type
+from ..utils import MISSING_LABEL, check_cost_matrix, simple_batch, \
+    check_classes, check_type
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
@@ -25,24 +26,14 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     method : string (default='least_confident')
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
-    cost_matrix : array-like, shape (n_classes, n_classes)
+    cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with cost_matrix[i,j] defining the cost of predicting class
         j for a sample with the actual class i. Only supported for
         `least_confident` and `margin_sampling` variant.
-    random_state : numeric | np.random.RandomState
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : numeric or np.random.RandomState
         The random state to use.
-
-    Attributes
-    ----------
-    method : string
-        The method to calculate the uncertainty. Only entropy, least_confident,
-        margin_sampling and expected_average_precision.
-    cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i, j] defining the cost of predicting class j for a
-        sample with the actual class i. Only supported for least confident
-        variant.
-    random_state : numeric | np.random.RandomState
-        Random state to use.
 
     References
     ----------
@@ -58,30 +49,42 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
     """
 
     def __init__(self, method='least_confident', cost_matrix=None,
-                 random_state=None):
-        super().__init__(random_state=random_state)
+                 missing_label=MISSING_LABEL, random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.method = method
         self.cost_matrix = cost_matrix
 
-    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
-              batch_size=1,
-              return_utilities=False):
-        """
-        Queries the next instance to be labeled.
+    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
+              candidates=None, batch_size=1, return_utilities=False):
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        X: array-like, shape (n_samples, n_features), optional (default=None)
-            Complete training data set.
-        y: array-like, shape (n_samples), optional (default=None)
-            Labels of the training data set.
-        sample_weight: array-like, shape (n_samples), optional
-        (default=None)
+        fit_clf : bool, default=True
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -89,20 +92,31 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
         # Validate input parameters.
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset=True
+            )
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
@@ -113,7 +127,8 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
                             'expected'.format(type(self.method), str))
 
         # Fit the classifier.
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
 
         # Predict class-membership probabilities.
         probas = clf.predict_proba(X_cand)
@@ -122,20 +137,26 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         with np.errstate(divide='ignore'):
             if self.method in ['least_confident', 'margin_sampling',
                                'entropy']:
-                utilities = uncertainty_scores(
+                utilities_cand = uncertainty_scores(
                     probas=probas, method=self.method,
                     cost_matrix=self.cost_matrix
                 )
             elif self.method == 'expected_average_precision':
                 classes = clf.classes_
-                utilities = expected_average_precision(classes, probas)
+                utilities_cand = expected_average_precision(classes, probas)
             else:
                 raise ValueError(
                     "The given method {} is not valid. Supported methods are "
                     "'entropy', 'least_confident', 'margin_sampling' and "
                     "'expected_average_precision'".format(self.method))
 
-        return simple_batch(utilities, random_state,
+        if mapping is None:
+            utilities = utilities_cand
+        else:
+            utilities = np.full(np.nan, len(X))
+            utilities[mapping] = utilities_cand
+
+        return simple_batch(utilities, self.random_state_,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
@@ -300,4 +321,4 @@ def _f(n, t, p, f_arr, g_arr):
     if t == 0 and n == 0:
         return 1
     return p[n - 1] * f_arr[n - 1, t - 1] + p[n - 1] * t * \
-           g_arr[n - 1, t - 1] / n + (1 - p[n - 1]) * f_arr[n - 1, t]
+        g_arr[n - 1, t - 1] / n + (1 - p[n - 1]) * f_arr[n - 1, t]
