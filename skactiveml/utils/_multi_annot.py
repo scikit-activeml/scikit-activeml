@@ -3,7 +3,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.utils.validation import check_consistent_length, column_or_1d, \
     check_array
 
-from ._label import MISSING_LABEL, ExtLabelEncoder
+from . import MISSING_LABEL, ExtLabelEncoder
 
 
 def ext_confusion_matrix(y_true, y_pred, classes=None,

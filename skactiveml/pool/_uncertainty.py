@@ -121,6 +121,9 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
 
+        # Validate classifier type.
+        check_type(fit_clf, 'fit_clf', bool)
+
         # Validate method.
         if not isinstance(self.method, str):
             raise TypeError('{} is an invalid type for method. Type {} is '
@@ -153,7 +156,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         if mapping is None:
             utilities = utilities_cand
         else:
-            utilities = np.full(np.nan, len(X))
+            utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
         return simple_batch(utilities, self.random_state_,

@@ -7,8 +7,7 @@ import sklearn
 from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length
 
-# Define constant for missing label used throughout the package.
-MISSING_LABEL = np.nan
+from ._label import MISSING_LABEL, check_missing_label
 
 
 def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
@@ -87,62 +86,6 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
         if cost_matrix is not None:
             raise ValueError("You cannot specify 'cost_matrix' without "
                              "specifying 'classes'.")
-
-
-def check_missing_label(missing_label, target_type=None, name=None):
-    """Check whether a missing label is compatible to a given target type.
-
-    Parameters
-    ----------
-    missing_label : number | str | None | np.nan
-        Symbol to represent a missing label.
-    target_type : type or tuple
-        Acceptable data types for the parameter 'missing_label'.
-    name : str
-        The name of the variable to which 'missing_label' is not compatible.
-        The name will be printed in error messages.
-    """
-    is_None = missing_label is None
-    is_character = np.issubdtype(type(missing_label), np.character)
-    is_number = np.issubdtype(type(missing_label), np.number)
-    if not is_number and not is_character and not is_None:
-        raise TypeError(
-            "'missing_label' has type '{}', but must be a either a number, "
-            "a string, np.nan, or None.".format(type(missing_label)))
-    if target_type is not None:
-        is_object_type = np.issubdtype(target_type, np.object_)
-        is_character_type = np.issubdtype(target_type, np.character)
-        is_number_type = np.issubdtype(target_type, np.number)
-        if (is_character_type and is_number) or (
-                is_number_type and is_character) or (
-                is_object_type and not is_None):
-            name = 'target object' if name is None else str(name)
-            raise TypeError(
-                "'missing_label' has type '{}' and is not compatible to the "
-                "type '{}' of '{}'.".format(
-                    type(missing_label), target_type, name))
-
-
-def check_equal_missing_label(missing_label1, missing_label2):
-    """Check whether two missing label values are equal to each other.
-
-    Parameters
-    ----------
-    missing_label1 : number | str | None | np.nan
-        Symbol to represent a missing label.
-    missing_label2 : number | str | None | np.nan
-        Other symbol to represent a missing label.
-
-    Raises
-    -------
-    ValueError
-        If the parameter's value violates the given bounds.
-    """
-    if not is_unlabeled([missing_label1], missing_label=missing_label2)[0]:
-        raise ValueError(
-            f"missing_label1={missing_label1} and "
-            f"missing_label2={missing_label2} must be equal."
-        )
 
 
 def check_classes(classes):

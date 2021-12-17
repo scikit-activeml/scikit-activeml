@@ -1,8 +1,10 @@
 import numpy as np
 
-from ._selection import rand_argmax
-from ._label import ExtLabelEncoder, is_labeled
 from sklearn.utils import check_array, check_consistent_length
+
+from ._selection import rand_argmax
+from ._label import is_labeled
+from ._label_encoder import ExtLabelEncoder
 
 
 def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):

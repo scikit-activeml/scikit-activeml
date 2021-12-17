@@ -79,7 +79,7 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
         if mapping is None:
             utilities = self.random_state_.random_sample(len(X_cand))
         else:
-            utilities = np.full(np.nan, len(X))
+            utilities = np.full(len(X), np.nan)
             utilities[mapping] = self.random_state_.random_sample(len(mapping))
 
         return simple_batch(utilities, self.random_state_,

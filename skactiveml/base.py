@@ -120,7 +120,8 @@ class PoolBasedQueryStrategy(QueryStrategy):
         check_consistent_length(X, y)
 
         # Check missing_label
-        self.missing_label_ = check_missing_label(self.missing_label)
+        check_missing_label(self.missing_label)
+        self.missing_label_ = self.missing_label
 
         # Check candidates
         if candidates is not None:
@@ -128,7 +129,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
             self._check_n_features(candidates, reset=False)
             seed_mult = len(candidates)
         else:
-            seed_mult = np.sum(is_unlabeled(y, self.missing_label_))
+            seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
 
         # Check return_utilities.
         check_scalar(return_utilities, 'return_utilities', bool)
