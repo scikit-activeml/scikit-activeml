@@ -36,19 +36,20 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
     References
     ----------
-    [1] Settles, Burr. "Active learning literature survey." University of
-        Wisconsin, Madison 52.55-66 (2010): 11.
-    [2] Joshi, A. J., Porikli, F., & Papanikolopoulos, N. (2009, June).
-        Multi-class active learning for image classification.
-        In 2009 IEEE Conference on Computer Vision and Pattern Recognition
-        (pp. 2372-2379). IEEE.
-    [3] Margineantu, D. D. (2005, July). Active cost-sensitive learning.
+    [1] Roy, N., & McCallum, A. (2001). Toward optimal active learning through
+        monte carlo estimation of error reduction. ICML, (pp. 441-448).
+    [2] Joshi, A. J., Porikli, F., & Papanikolopoulos, N. P. (2012).
+        Scalable active learning for multiclass image classification.
+        IEEE TrPAMI, 34(11), pp. 2259-2273.
+    [3] Margineantu, D. D. (2005). Active cost-sensitive learning.
         In IJCAI (Vol. 5, pp. 1622-1623).
     """
 
-    EMR = 'emr'
-    CSL = 'csl'
-    LOG_LOSS = 'log_loss'
+    LOG_LOSS = 'log_loss' # [1] eval on X (ind. of X_cand)
+    ZERO_ONE = 'zero_one' # [1] eval on X (ind. of X_cand)
+    EMR = 'emr' # [2] eval on X without x_cand (mapping req.), vgl. Kapoor
+                    # (diff: exclude_labeled_samples)
+    CSL = 'csl' # [3] eval on labeled in X,y (ind. of X_cand)
 
     def __init__(self, method=EMR, cost_matrix=None, ignore_partial_fit=False,
                  random_state=None):
@@ -57,26 +58,35 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.cost_matrix = cost_matrix
         self.ignore_partial_fit = ignore_partial_fit
 
-    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
-              sample_weight_cand=None, batch_size=1, return_utilities=False):
-        """Query the next instance to be labeled.
+    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
+              candidates=None, batch_size=1, return_utilities=False):
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        X : array-like, shape (n_samples, n_features), optional (default=None)
-            Complete training data set.
-        y : array-like, shape (n_samples), optional (default=None)
-            Labels of the training data set.
-        sample_weight : array-like, shape (n_samples), optional
-        (default=None)
+        fit_clf : bool, default=True
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
-        sample_weight_cand : array-like, shape (n_candidate_samples), optional
-        (default=None)
-            Weights of candidate samples in `X_cand`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -84,20 +94,32 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
         # Validate input parameters.
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset=True
+            )
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        sample_weight_cand = sample_weight[mapping]
 
         # Calculate utilities
         utilities = expected_error_reduction(

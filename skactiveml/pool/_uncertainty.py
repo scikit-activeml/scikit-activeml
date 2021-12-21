@@ -129,6 +129,8 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             raise TypeError('{} is an invalid type for method. Type {} is '
                             'expected'.format(type(self.method), str))
 
+        # sample_weight is checked by clf when fitted
+
         # Fit the classifier.
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)

@@ -125,9 +125,12 @@ class PoolBasedQueryStrategy(QueryStrategy):
 
         # Check candidates
         if candidates is not None:
-            candidates = check_array(candidates, **check_X_dict)
-            self._check_n_features(candidates, reset=False)
+            check_candidates_dict = deepcopy(check_X_dict)
+            check_candidates_dict['ensure_2d'] = False
+            candidates = check_array(candidates, **check_candidates_dict)
             seed_mult = len(candidates)
+            if candidates.ndim == 2:
+                self._check_n_features(candidates, reset=False)
         else:
             seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
 
@@ -268,7 +271,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         if candidates is None:
             n_candidates = \
-                is_unlabeled(y, missing_label=self.missing_label_).sum()
+                int(np.sum(is_unlabeled(y, missing_label=self.missing_label_)))
         else:
             n_candidates = len(candidates)
 

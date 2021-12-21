@@ -69,7 +69,7 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
     utilities = check_array(utilities, ensure_2d=False, dtype=float,
                             force_all_finite='allow-nan', allow_nd=True)
     check_scalar(batch_size, target_type=int, name='batch_size', min_val=1)
-    max_batch_size = np.sum(~np.isnan(utilities))
+    max_batch_size = np.sum(~np.isnan(utilities), dtype=int)
     if max_batch_size < batch_size:
         warnings.warn(
             "'batch_size={}' is larger than number of candidate samples "

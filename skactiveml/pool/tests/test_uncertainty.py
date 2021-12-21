@@ -77,6 +77,15 @@ class TestUncertaintySampling(unittest.TestCase):
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=np.empty((len(self.X) + 1)))
 
+    def test_query_param_fit_clf(self):
+        selector = UncertaintySampling()
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          fit_clf='string')
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          fit_clf=self.X_cand)
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          fit_clf=None)
+
     def test_query(self):
         compare_list = []
         clf = SklearnClassifier(estimator=GaussianProcessClassifier(),
