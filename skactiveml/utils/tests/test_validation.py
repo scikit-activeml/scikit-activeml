@@ -3,8 +3,8 @@ import warnings
 
 import numpy as np
 
-from skactiveml.utils import check_cost_matrix, check_classes, \
-    check_missing_label, check_scalar, check_X_y, check_type, check_bound
+from skactiveml.utils import check_cost_matrix, check_classifier_params, \
+    check_classes, check_scalar, check_X_y, check_type, check_bound
 from skactiveml.utils import check_random_state, check_class_prior
 
 
@@ -22,6 +22,34 @@ class TestValidation(unittest.TestCase):
                           min_val=6, name='x')
         self.assertRaises(ValueError, check_scalar, x=x, target_type=int,
                           min_inclusive=False, min_val=5, name='x')
+
+    def test_check_classifier_params(self):
+        self.assertRaises(ValueError, check_classifier_params,
+                          classes=[0, 1 ,2], missing_label=np.nan,
+                          cost_matrix=[[1, 1], [2, 0]])
+        self.assertRaises(TypeError, check_classifier_params,
+                          classes=['a', 'b'], missing_label=2,
+                          cost_matrix=[[1, 1], [2, 0]])
+        # TODO: @Marek should the following work?
+        #self.assertRaises(TypeError, check_classifier_params, classes=[0, 1],
+        #                  missing_label='nan', cost_matrix=[[1, 1], [2, 0]])
+        self.assertRaises(ValueError, check_classifier_params, classes=None,
+                          missing_label=np.nan, cost_matrix=[[1, 1], [2, 0]])
+
+    def test_check_classes(self):
+        self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
+        self.assertRaises(TypeError, check_classes, classes=['2', 1, 2])
+        self.assertRaises(TypeError, check_classes, classes=2)
+        self.assertRaises(ValueError, check_classes, classes=[1, 2, 2])
+
+    def test_check_class_prior(self):
+        self.assertRaises(TypeError, check_class_prior, None, 1)
+        self.assertRaises(TypeError, check_class_prior, 1, None)
+        self.assertRaises(ValueError, check_class_prior, 1, 0)
+        self.assertRaises(ValueError, check_class_prior, -2, 2)
+        self.assertRaises(ValueError, check_class_prior, [0, 1, -1], 3)
+        self.assertRaises(ValueError, check_class_prior, [1, 2, 3], 2)
+        np.testing.assert_array_equal(check_class_prior(1, 3), [1, 1, 1])
 
     def test_check_cost_matrix(self):
         self.assertRaises(ValueError, check_cost_matrix,
@@ -48,34 +76,14 @@ class TestValidation(unittest.TestCase):
             check_cost_matrix(cost_matrix=[[0, 0], [0, 0]], n_classes=2)
             assert len(w) == 3
 
-    def test_check_classes(self):
-        self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
-        self.assertRaises(TypeError, check_classes, classes=['2', 1, 2])
-        self.assertRaises(TypeError, check_classes, classes=2)
-
-    def test_check_class_prior(self):
-        self.assertRaises(TypeError, check_class_prior, None, 1)
-        self.assertRaises(TypeError, check_class_prior, 1, None)
-        self.assertRaises(ValueError, check_class_prior, 1, 0)
-        self.assertRaises(ValueError, check_class_prior, -2, 2)
-        self.assertRaises(ValueError, check_class_prior, [0, 1, -1], 3)
-        self.assertRaises(ValueError, check_class_prior, [1, 2, 3], 2)
-        np.testing.assert_array_equal(check_class_prior(1, 3), [1, 1, 1])
-
-    def test_check_missing_label(self):
-        self.assertRaises(TypeError, check_missing_label, missing_label=[2])
-        self.assertRaises(TypeError, check_missing_label, missing_label=self)
-        self.assertRaises(TypeError, check_missing_label, missing_label=np.nan,
-                          target_type=str)
-        self.assertRaises(TypeError, check_missing_label, missing_label=2,
-                          target_type=str)
-        self.assertRaises(TypeError, check_missing_label, missing_label='2',
-                          target_type=int)
-
     def test_check_X_y(self):
         X = [[1, 2], [3, 4]]
         y = [1, 0]
         X_cand = [[5, 6]]
+        X, y, sample_weight = check_X_y(X, y)
+        np.testing.assert_array_equal(sample_weight, np.array([1., 1.]))
+        X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(X, y, X_cand)
+        np.testing.assert_array_equal(sample_weight_cand, np.array([1.]))
         sample_weight = [0.4, 0.6]
         X, y, X_cand, sample_weight, _ = check_X_y(X, y, X_cand, sample_weight)
         self.assertTrue(isinstance(X, np.ndarray))

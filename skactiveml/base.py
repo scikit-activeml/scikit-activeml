@@ -117,6 +117,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
         self._check_n_features(X, reset=reset)
 
         # Check labels
+        y = column_or_1d(y, warn=True)
         check_consistent_length(X, y)
 
         # Check missing_label

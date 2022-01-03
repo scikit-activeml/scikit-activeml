@@ -252,19 +252,23 @@ class TestGeneral(unittest.TestCase):
 
     def _test_query_param_X(self, qs_class, clf):
         qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
-        for X in [None, [], np.ones(5)]:
+        for X in [None, 'str', [], np.ones(5)]:
             self.assertRaises(
                 ValueError, call_func, qs_mdl.query, clf=clf,
-                X=self.X, y=self.y, ensemble=self.ensemble
+                X=X, y=self.y, ensemble=self.ensemble
             )
 
     def _test_query_param_y(self, qs_class, clf):
         qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
-        for y in [None, [], np.ones([5,2])]:
+        for y in [None, 'str', [], np.ones([5,2])]:
             self.assertRaises(
                 ValueError, call_func, qs_mdl.query, clf=clf,
-                X=self.X, y=self.y, ensemble=self.ensemble
+                X=self.X, y=y, ensemble=self.ensemble
             )
+        self.assertRaises(
+            ValueError, call_func, qs_mdl.query, clf=clf,
+            X=self.X, y=self.y[:-2], ensemble=self.ensemble
+        )
 
     def _test_query_param_candidates(self, qs_class, clf):
         qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
@@ -274,6 +278,11 @@ class TestGeneral(unittest.TestCase):
                 candidates=candidates, clf=clf, X=self.X, y=self.y,
                 ensemble=self.ensemble
             )
+        self.assertRaises(
+            (TypeError, ValueError), call_func, qs_mdl.query,
+            candidates=self.X[:,:1], clf=clf, X=self.X, y=self.y,
+            ensemble=self.ensemble
+        )
 
     def _test_query_param_batch_size(self, qs_class, clf):
         qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))

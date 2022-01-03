@@ -95,6 +95,7 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
         return best_indices
 
 
+# TODO: To be removed
 def fit_if_not_fitted(estimator, X, y, sample_weight=None, print_warning=True):
     """
     This functions fits an estimator if it is not already fitted.

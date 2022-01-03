@@ -232,8 +232,13 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return -np.abs(costs[:, 0] - costs[:, 1])
     elif method == 'entropy':
-        with np.errstate(divide='ignore', invalid='ignore'):
-            return np.nansum(-probas * np.log(probas), axis=1)
+        if cost_matrix is None:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                return np.nansum(-probas * np.log(probas), axis=1)
+        else:
+            raise ValueError(
+                f"Method `entropy` does not support cost matrices but "
+                f"`cost_matrix` was not None.")
     else:
         raise ValueError(
             "Supported methods are ['least_confident', 'margin_sampling', "
