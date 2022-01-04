@@ -23,7 +23,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    method : string (default='least_confident')
+    method : string, default='least_confident'
         The method to calculate the uncertainty, entropy, least_confident,
         margin_sampling, and expected_average_precision  are possible.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -73,7 +73,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight: array-like of shape (n_samples), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -85,9 +85,9 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
