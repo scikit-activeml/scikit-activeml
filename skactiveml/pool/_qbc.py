@@ -1,12 +1,14 @@
 """
 Query-by-committee strategies.
 """
+
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 #         Marek Herde <marek.herde@uni-kassel.de>
 
 from copy import deepcopy
 
 import numpy as np
+from sklearn import clone
 from sklearn.utils.validation import check_array, _is_arraylike
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
@@ -22,11 +24,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    method : {'KL_divergence', 'vote_entropy'}, optional
-    (default='KL_divergence')
-        The method to calculate the disagreement.
-    random_state: numeric | np.random.RandomState, optional (default=None)
-        Random state for annotator selection.
+    method : string, default='KL_divergence'
+        The method to calculate the disagreement. KL_divergence or
+        vote_entropy are possible.
+    random_state: numeric or np.random.RandomState, default=None
+        The random state to use.
 
     References
     ----------
@@ -42,48 +44,75 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         super().__init__(random_state=random_state)
         self.method = method
 
-    def query(self, X_cand, ensemble, X=None, y=None, sample_weight=None,
-              batch_size=1, return_utilities=False):
-        """Queries the next instance to be labeled.
+    def query(self, X, y, ensemble, fit_ensemble=True, sample_weight=None,
+              candidates=None, batch_size=1, return_utilities=False):
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
-        ensemble : {skactiveml.base.SkactivemlClassifier, array-like}
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        ensemble : array-like of shape (n_estimators) or SkactivemlClassifier
             If `ensemble` is a `SkactivemlClassifier`, it must have
             `n_estimators` and `estimators_` after fitting as attribute. Then,
             its estimators will be used as committee. If `ensemble` is
             array-like, each element of this list must be
             `SkactivemlClassifier` and will be used as committee member.
-        X: array-like, shape (n_samples, n_features), optional (default=None)
-            Complete training data set.
-        y: array-like, shape (n_samples), optional (default=None)
-            Labels of the training data set.
-        sample_weight: array-like, shape (n_samples), optional
-        (default=None)
+        fit_ensemble : bool, default=True
+            Defines whether the ensemble should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight: array-like of shape (n_samples), default=None
             Weights of training samples in `X`.
-        batch_size : int, optional (default=1)
+        sample_weight: array-like of shape (n_samples), default=None
+            Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+                array-like of shape (n_candidates, n_features), default=None
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+                numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
         # Validate input parameters.
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset=True
+            )
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+
+        # Validate classifier type.
+        check_type(fit_ensemble, 'fit_ensemble', bool)
 
         # Check attributed `method`.
         if self.method not in ['KL_divergence', 'vote_entropy']:
@@ -95,9 +124,9 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         if isinstance(ensemble, SkactivemlClassifier) and \
                 (hasattr(ensemble, 'n_estimators')
                  or hasattr(ensemble, 'estimators')):
-            ensemble = fit_if_not_fitted(
-                ensemble, X, y, sample_weight=sample_weight
-            )
+            # Fit the ensemble.
+            if fit_ensemble:
+                ensemble = clone(ensemble).fit(X, y, sample_weight)
             classes = ensemble.classes_
             if hasattr(ensemble, 'estimators_'):
                 est_arr = ensemble.estimators_
@@ -111,9 +140,10 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             est_arr = deepcopy(ensemble)
             for i in range(len(est_arr)):
                 check_type(est_arr[i], f'ensemble[{i}]', SkactivemlClassifier)
-                est_arr[i] = fit_if_not_fitted(
-                    est_arr[i], X, y, sample_weight=sample_weight
-                )
+                # Fit the ensemble.
+                if fit_ensemble:
+                    est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+
                 if i > 0:
                     np.testing.assert_array_equal(
                         est_arr[i - 1].classes_, est_arr[i].classes_,
@@ -133,12 +163,18 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         # Compute utilities.
         if self.method == 'KL_divergence':
             probas = np.array([est.predict_proba(X_cand) for est in est_arr])
-            utilities = average_kl_divergence(probas)
+            utilities_cand = average_kl_divergence(probas)
         elif self.method == 'vote_entropy':
             votes = np.array([est.predict(X_cand) for est in est_arr]).T
-            utilities = vote_entropy(votes, classes)
+            utilities_cand = vote_entropy(votes, classes)
 
-        return simple_batch(utilities, random_state,
+        if mapping is None:
+            utilities = utilities_cand
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = utilities_cand
+
+        return simple_batch(utilities, self.random_state_,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
