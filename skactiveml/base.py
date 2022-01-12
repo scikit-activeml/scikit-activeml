@@ -312,8 +312,8 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             return X[candidates], candidates
         else:
             if enforce_mapping:
-                raise ValueError('Mapping `X_cand` to `X` is not posssible'
-                                 'but `enforce_mapping` is True. Use index'
+                raise ValueError('Mapping `X_cand` to `X` is not posssible '
+                                 'but `enforce_mapping` is True. Use index '
                                  'array for `candidates` instead.')
             else:
                 return candidates, None
