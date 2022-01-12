@@ -2,11 +2,13 @@ import itertools
 
 import numpy as np
 from scipy.special import factorial, gammaln
+from sklearn import clone
 from sklearn.utils.validation import check_array
 
 from ..base import ClassFrequencyEstimator
 from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..utils import check_scalar, simple_batch, check_type, fit_if_not_fitted
+from ..utils import MISSING_LABEL, check_scalar, simple_batch, check_type, \
+    check_equal_missing_label
 
 
 class McPAL(SingleAnnotPoolBasedQueryStrategy):
@@ -21,6 +23,8 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         Prior probabilities for the Dirichlet distribution of the samples.
     m_max: int, optional (default=1)
         Maximum number of hypothetically acquired labels.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
 
@@ -32,30 +36,50 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         pages 586-594. IOS Press, 2016
     """
 
-    def __init__(self, prior=1, m_max=1, random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, prior=1, m_max=1, missing_label=MISSING_LABEL,
+                 random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
-              utility_weight=None, batch_size=1, return_utilities=False):
+    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
+              utility_weight=None, candidates=None, batch_size=1,
+              return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
         clf : skactiveml.base.ClassFrequencyEstimator
-            Model implementing the methods `fit` and `predict_proba`.
-        X: array-like, shape (n_samples, n_features), optional (default=None)
-            Complete training data set.
-        y: array-like, shape (n_samples), optional (default=None)
-            Labels of the training data set.
-        sample_weight: array-like, shape (n_samples), optional (default=None)
+            Model implementing the methods `fit` and `predict_freq`.
+        fit_clf : bool, default=True
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
-        utility_weight: array-like (n_candidate_samples), optional
-        (default=None)
-            Densities for each sample in `X`.
+        utility_weight: array-like, optional (default=None)
+            Weight for each candidate (multiplied with utilities). Usually,
+            this is to be the density of a candidate in McPAL. The length of
+            `utility_weight` is usually n_samples, except for the case when
+            candidates contains samples (ndim >= 2). Then the length is
+            `n_candidates`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -74,45 +98,54 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
             of the batch.
         """
         # Validate input parameters.
-        X_cand, return_utilities, batch_size, utility_weight, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                utility_weight, self.random_state, reset=True)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset=True
+            )
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Check the classifier's type.
         check_type(clf, 'clf', ClassFrequencyEstimator)
-
-        # Fit the classifier and predict frequencies.
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
-        k_vec = clf.predict_freq(X_cand)
-
-        # Calculate utilities and return the output.
-        utilities = utility_weight * cost_reduction(k_vec, prior=self.prior,
-                                                    m_max=self.m_max)
-
-        return simple_batch(utilities, random_state,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
-
-    def _validate_data(self, X_cand, return_utilities, batch_size,
-                       utility_weight, random_state, reset=True):
-        X_cand, return_utilities, batch_size, random_state = \
-            super()._validate_data(X_cand, return_utilities, batch_size,
-                                   self.random_state, reset=True)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
 
         # Check `utility_weight`.
         if utility_weight is None:
-            utility_weight = np.ones(len(X_cand))
+            if mapping is None:
+                utility_weight = np.ones(len(X_cand))
+            else:
+                utility_weight = np.ones(len(X))
         utility_weight = check_array(utility_weight, ensure_2d=False)
 
-        # Check if `X_cand` and `utility_weight` have the same length.
-        if not len(X_cand) == len(utility_weight):
+        if mapping is None and not len(X_cand) == len(utility_weight):
             raise ValueError(
-                "'X_cand' and 'utility_weight' must have the same length."
+                f"'utility_weight' must have length 'n_candidates' but "
+                f"{len(X_cand)} != {len(utility_weight)}."
+            )
+        if mapping is not None and not len(X) == len(utility_weight):
+            raise ValueError(
+                f"'utility_weight' must have length 'n_samples' but "
+                f"{len(X)} != {len(utility_weight)}."
             )
 
-        return X_cand, return_utilities, batch_size, utility_weight, \
-            random_state
+        # Fit the classifier and predict frequencies.
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
+        k_vec = clf.predict_freq(X_cand)
 
+        # Calculate utilities and return the output.
+        utilities_cand = \
+            cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
+
+        if mapping is None:
+            utilities = utilities_cand
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = utilities_cand
+        utilities *= utility_weight
+
+        return simple_batch(utilities, self.random_state_,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
 
 def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     """Calculate the expected cost reduction.
