@@ -151,18 +151,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
 class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
     """Base class for all pool-based active learning query strategies with a
     single annotator in scikit-activeml.
-
-    Parameters
-    ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label.
-    random_state : int or RandomState instance, default=None
-        Controls the randomness of the estimator.
     """
-
-    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
-        super().__init__(random_state=random_state)
-        self.missing_label = missing_label
 
     @abstractmethod
     def query(self, X, y, *args, candidates=None, batch_size=1,
