@@ -7,7 +7,7 @@ from scipy.stats import rankdata
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
 
-from ...utils import rand_argmax, check_type
+from ...utils import rand_argmax, check_type, MISSING_LABEL
 from ...utils._aggregation import majority_vote
 from ...utils._validation import check_random_state, check_array, check_scalar
 
@@ -40,9 +40,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, strategy, y_aggregate=None,
+    def __init__(self, strategy, y_aggregate=None, missing_label=MISSING_LABEL,
                  random_state=None):
-        super().__init__(random_state=random_state)
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.strategy = strategy
         self.y_aggregate = y_aggregate
 
@@ -288,12 +288,12 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         if mapping is None:
             return re_val
         elif return_utilities:
-            w_utilities, w_indices = re_val
+            w_indices, w_utilities = re_val
             utilities = np.full((batch_size, n_samples, n_annotators), np.nan)
             utilities[:, mapping, :] = w_utilities
             indices = np.zeros_like(w_indices)
-            indices[:, 0] = mapping[w_indices[0]]
-            indices[:, 1] = w_indices[1]
+            indices[:, 0] = mapping[w_indices[:, 0]]
+            indices[:, 1] = w_indices[:, 1]
             return indices, utilities
         else:
             w_indices = re_val

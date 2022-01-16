@@ -418,7 +418,8 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         raise NotImplementedError
 
     def _validate_data(self, X, y, candidates, annotators, batch_size,
-                       return_utilities, reset=True, check_X_dict=None):
+                       return_utilities, reset=True, check_X_dict=None,
+                       adaptive=True):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
 
@@ -459,9 +460,9 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             n_avl_annotators) the annotator sample pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
             considered as candidate sample pairs.
-        batch_size : int, optional (default=1)
+        batch_size : int or string, optional (default=1)
             The number of annotators sample pairs to be selected in one AL
-            cycle.
+            cycle. If `adaptive = True` `batch_size = 'adaptive'` is allowed.
         return_utilities : bool
             If true, also return the utilities based on the query strategy.
         reset : bool, default=True
@@ -470,6 +471,9 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             provided when reset was last True.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
+        adaptive : bool, default=False
+            Whether an adaptive batch size is allowed, allowing `batch_size`
+            to have value `'adaptive'`.
 
         Returns
         -------
@@ -489,11 +493,18 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
+        if adaptive and batch_size == 'adaptive':
+            batch_size = 1
+            adaptive = None
+
         X, y, candidates, batch_size, return_utilities = \
             super()._validate_data(
                 X, y, candidates, batch_size, return_utilities, reset,
                 check_X_dict
             )
+
+        if adaptive is None:
+            batch_size = 'adaptive'
 
         check_array(y, ensure_2d=True, force_all_finite='allow-nan')
         n_annotators = y.shape[1]
@@ -527,7 +538,7 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             annotators = check_array(annotators, dtype=bool)
             n_candidate_pairs = int(np.sum(annotators))
 
-        if n_candidate_pairs < batch_size:
+        if 'adaptive' != batch_size and n_candidate_pairs < batch_size:
             warnings.warn(
                 f"'batch_size={batch_size}' is larger than number of "
                 f"candidates pairs. Instead, 'batch_size={n_candidate_pairs}'"

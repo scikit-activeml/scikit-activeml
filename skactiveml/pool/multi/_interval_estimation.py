@@ -7,11 +7,12 @@ from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_array,\
     check_random_state, check_is_fitted
 
+from . import MultiAnnotWrapper
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier, AnnotModelMixin
 from ...utils import rand_argmax, check_scalar, compute_vote_vectors, \
     MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type
-from ...pool._uncertainty import uncertainty_scores
+from ...pool._uncertainty import uncertainty_scores, UncertaintySampling
 from ...utils._functions import simple_batch, fit_if_not_fitted
 
 
@@ -192,35 +193,57 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         Discovery and Data Mining, pp. 259-268. 2009.
     """
 
-    def __init__(self, epsilon=0.9, alpha=0.05, n_annotators=None,
-                 random_state=None):
-        super().__init__(n_annotators=n_annotators, random_state=random_state)
+    def __init__(self, epsilon=0.9, alpha=0.05, random_state=None,
+                 missing_label=MISSING_LABEL):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.epsilon = epsilon
         self.alpha = alpha
 
-    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
-              A_cand=None, batch_size='adaptive', return_utilities=False):
+    def query(self, X, y, clf, candidates=None, annotators=None,
+              sample_weight=None, batch_size='adaptive',
+              return_utilities=False):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_cand_samples, n_features)
-            Candidate samples from which the strategy can select.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples, n_annotators)
+            Labels of the training data set for each annotator (possibly
+            including unlabeled ones indicated by self.MISSING_LABEL), meaning
+            that `y[i, j]` contains the label annotated by annotator `i` for
+            sample `j`.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        X : matrix-like, shape (n_samples, n_features), optional (default=None)
-            The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples, n_annotators), optional (default=None)
-            It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
-        A_cand : array-like, shape (n_cand_samples, n_features)
-            Boolean matrix where `A_cand[i,j] = True` indicates that
-            annotator `j` can be selected for annotating sample `X_cand[i]`,
-            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`. If A_cand=None, each
-            annotator is assumed to be available for labeling each sample.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If `candidates` is None, the samples from (X,y), for which an
+            annotator exists such that the annotator sample pairs is
+            unlabeled are considered as sample candidates.
+            If `candidates` is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the sample candidates in
+            (X,y).
+            If `candidates` is of shape (n_candidates, n_features), the
+            sample candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        annotators : array-like, shape (n_candidates, n_annotators), optional
+        (default=None)
+            If `annotators` is None, all annotators are considered as available
+            annotators.
+            If `annotators` is of shape (n_avl_annotators) and of type int,
+            `annotators` is considered as the indices of the available
+            annotators.
+            If candidate samples and available annotators are specified:
+            The annotator sample pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered as
+            candidate annotator sample pairs.
+            If `annotators` is a boolean array of shape (n_candidates,
+            n_avl_annotators) the annotator sample pairs, for which the sample
+            is a candidate sample and the boolean matrix has entry `True` are
+            considered as candidate sample pairs.
         sample_weight : array-like, (n_samples, n_annotators)
             It contains the weights of the training samples' class labels.
             It must have the same shape as y.
@@ -247,9 +270,9 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         """
 
         # base check
-        X_cand, A_cand, return_utilities, batch_size, random_state = \
-            super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
-                                   self.random_state, reset=True, adaptive=True)
+        X, y, candidates, annotators, batch_size, return_utilities = \
+            super()._validate_data(X, y, candidates, annotators, batch_size,
+                                   return_utilities, reset=True, adaptive=True)
 
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
@@ -262,23 +285,6 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
                      max_val=1, min_inclusive=False, max_inclusive=False)
 
-        n_annotators = A_cand.shape[1]
-
-        # Check whether unlabeled data exists
-        if not np.all(A_cand):
-            warnings.warn("Not all annotators are available for all values in "
-                          "X_cand. The IEThresh strategy assumes this to be "
-                          "the case and is not defined otherwise. "
-                          "To deal with this case non the less value-annotator "
-                          "pairs are first ranked according to the amount of "
-                          "annotators available for the given value in X_cand "
-                          "and are than ranked according to IEThresh")
-
-        # Fit classifier and compute uncertainties on candidate samples.
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
-        P = clf.predict_proba(X_cand)
-        uncertainties = uncertainty_scores(probas=P, method='least_confident')
-
         # Fit annotator model and compute performance estimates.
         ie_model = IEAnnotModel(classes=clf.classes_,
                                 missing_label=clf.missing_label,
@@ -287,28 +293,10 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         ie_model.fit(X=X, y=y, sample_weight=sample_weight)
         A_perf = ie_model.A_perf_
 
-        # Compute utilities.
-
-        # combine the values of A_perf and uncertainties
-        A_perf = A_perf[:, 2] + 1
-        A_perf = A_perf[np.newaxis]
-        max_range = np.max(A_perf) + 1
-        uncertainties = rankdata(uncertainties, method='ordinal') * max_range
-        uncertainties = np.tile(uncertainties, (n_annotators, 1)).T
-        init_utilities = uncertainties + A_perf
-
-        # include the amount of available annotators into the utilities for
-        # the samples
-        annotators_per_sample = np.sum(A_cand, axis=1)
-        max_uncertainty = np.max(init_utilities) + 1
-        annotators_per_sample_ranks = rankdata(annotators_per_sample,
-                                               method='dense') \
-                                      * max_uncertainty - max_uncertainty
-        init_utilities = init_utilities + \
-                         annotators_per_sample_ranks[:, np.newaxis]
-
-        # exclude not available annotators
-        init_utilities[~A_cand] = np.nan
+        wrapper = MultiAnnotWrapper(
+            strategy=UncertaintySampling(method='least_confident'),
+            random_state=self.random_state_,
+            missing_label=self.missing_label)
 
         # Determine actual batch size.
         if batch_size == 'adaptive':
@@ -317,7 +305,9 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         else:
             actual_batch_size = batch_size
 
-        # Perform selection based on previously computed utilities.
-        return simple_batch(init_utilities, random_state,
-                            batch_size=actual_batch_size,
-                            return_utilities=return_utilities)
+        query_params_dict = {'clf': clf, 'sample_weight': sample_weight}
+        return wrapper.query(X, y, candidates=candidates, annotators=annotators,
+                             batch_size=actual_batch_size, A_perf=A_perf,
+                             n_annotators_per_sample=actual_batch_size,
+                             query_params_dict=query_params_dict,
+                             return_utilities=return_utilities)
