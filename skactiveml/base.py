@@ -24,6 +24,8 @@ __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
            'ClassFrequencyEstimator', 'AnnotModelMixin']
 
+from .utils._validation import check_indices
+
 
 class QueryStrategy(ABC, BaseEstimator):
     """Base class for all query strategies in scikit-activeml.
@@ -91,6 +93,8 @@ class PoolBasedQueryStrategy(QueryStrategy):
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
+        ravel_y : bool, default=True
+            Whether y should be raveld into a 1D array or not.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
@@ -117,7 +121,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
         self._check_n_features(X, reset=reset)
 
         # Check labels
-        y = column_or_1d(y, warn=True)
+        y = check_array(y, ensure_2d=False, force_all_finite='allow-nan')
         check_consistent_length(X, y)
 
         # Check missing_label
@@ -269,6 +273,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                 X, y, candidates, batch_size, return_utilities, reset,
                 check_X_dict
             )
+        y = column_or_1d(y, warn=True)
 
         if candidates is None:
             n_candidates = \
@@ -330,159 +335,282 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                 return candidates, None
 
 
-class MultiAnnotPoolBasedQueryStrategy(QueryStrategy):
+class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
     """Base class for all pool-based active learning query strategies with
     multiple annotators in scikit-activeml.
 
     Parameters
     ----------
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
-    n_annotators : int,
-        Sets the number of annotators if `A_cand is None`.
     """
-    def __init__(self, n_annotators=None, random_state=None):
-        super().__init__(random_state=random_state)
-        self.n_annotators = n_annotators
 
     @abstractmethod
-    def query(self, X_cand, *args, A_cand=None, batch_size=1,
+    def query(self, X, y, *args, candidates=None, annotators=None, batch_size=1,
               return_utilities=False, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_samples, n_features)
-            Candidate samples from which the strategy can select.
-        A_cand : array-like, shape (n_samples, n_annotators), optional
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples, n_annotators)
+            Labels of the training data set for each annotator (possibly
+            including unlabeled ones indicated by self.MISSING_LABEL), meaning
+            that `y[i, j]` contains the label annotated by annotator `i` for
+            sample `j`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If `candidates` is None, the samples from (X,y), for which an
+            annotator exists such that the annotator sample pairs is
+            unlabeled are considered as sample candidates.
+            If `candidates` is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the sample candidates in
+            (X,y).
+            If `candidates` is of shape (n_candidates, n_features), the
+            sample candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        annotators : array-like, shape (n_candidates, n_annotators), optional
         (default=None)
-            Boolean matrix where `A_cand[i,j] = True` indicates that
-            annotator `j` can be selected for annotating sample `X_cand[i]`,
-            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`. If A_cand=None, each
-            annotator is assumed to be available for labeling each sample.
+            If `annotators` is None, all annotators are considered as available
+            annotators.
+            If `annotators` is of shape (n_avl_annotators) and of type int,
+            `annotators` is considered as the indices of the available
+            annotators.
+            If candidate samples and available annotators are specified:
+            The annotator sample pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered as
+            candidate annotator sample pairs.
+            If `annotators` is a boolean array of shape (n_candidates,
+            n_avl_annotators) the annotator sample pairs, for which the sample
+            is a candidate sample and the boolean matrix has entry `True` are
+            considered as candidate sample pairs.
         batch_size : int, optional (default=1)
-            The number of samples to be selected in one AL cycle.
+            The number of annotators sample pairs to be selected in one AL
+            cycle.
         return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size, 2)
-            The query_indices indicate which candidate sample is to be
-            annotated by which annotator, e.g., `query_indices[:, 0]`
-            indicates the selected candidate samples and `query_indices[:, 1]`
-            indicates the respectively selected annotators.
-        utilities: numpy.ndarray, shape (batch_size, n_samples, n_annotators)
+        query_indices : np.ndarray of shape (batchsize, 2)
+            The query_indices indicate which candidate sample pairs are to be
+            queried is, i. e. which candidate sample is to be annotated by which
+            annotator, e.g., `query_indices[:, 0]` indicates the selected
+            candidate samples and `query_indices[:, 1]` indicates the
+            respectively selected annotators.
+        utilities: numpy.ndarray, shape (batch_size, n_samples, n_annotators) or
+            numpy.ndarray of shape (batch_size, n_candidates, n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator pair (with indices `query_indices[0]`).
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
         raise NotImplementedError
 
-    def _validate_data(self, X_cand, A_cand, return_utilities, batch_size,
-                       random_state, reset=True, adaptive=False,
-                       **check_X_cand_params):
-        """Validate input data and set or check the `n_features_in_` attribute.
+    def _validate_data(self, X, y, candidates, annotators, batch_size,
+                       return_utilities, reset=True, check_X_dict=None):
+        """Validate input data, all attributes and set or check the
+        `n_features_in_` attribute.
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
-            Candidate samples.
-        A_cand : array-like, shape (n_candidates, n_annotators), optional
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples, n_annotators)
+            Labels of the training data set for each annotator (possibly
+            including unlabeled ones indicated by self.MISSING_LABEL), meaning
+            that `y[i, j]` contains the label annotated by annotator `i` for
+            sample `j`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If `candidates` is None, the samples from (X,y), for which an
+            annotator exists such that the annotator sample pairs is
+            unlabeled are considered as sample candidates.
+            If `candidates` is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the sample candidates in
+            (X,y).
+            If `candidates` is of shape (n_candidates, n_features), the
+            sample candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        annotators : array-like, shape (n_candidates, n_annotators), optional
         (default=None)
-            Boolean matrix where `A_cand[i,j] = True` indicates that
-            annotator `j` can be selected for annotating sample `X_cand[i]`,
-            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`. If A_cand=None, each
-            annotator is assumed to be available for labeling each sample.
-        batch_size : 'adaptive'|int,
-            The number of samples to be selected in one AL cycle. If 'adaptive'
-            is set, the `batch_size` is determined by the query strategy or set
-            to 1 by default.
-        return_utilities : bool,
+            If `annotators` is None, all annotators are considered as available
+            annotators.
+            If `annotators` is of shape (n_avl_annotators) and of type int,
+            `annotators` is considered as the indices of the available
+            annotators.
+            If candidate samples and available annotators are specified:
+            The annotator sample pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered as
+            candidate annotator sample pairs.
+            If `annotators` is a boolean array of shape (n_candidates,
+            n_avl_annotators) the annotator sample pairs, for which the sample
+            is a candidate sample and the boolean matrix has entry `True` are
+            considered as candidate sample pairs.
+        batch_size : int, optional (default=1)
+            The number of annotators sample pairs to be selected in one AL
+            cycle.
+        return_utilities : bool
             If true, also return the utilities based on the query strategy.
-        random_state : numeric | np.random.RandomState, optional
-            The random state to use.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
-        adaptive : bool, default=False
-            Whether the query strategy implements an adaptive batch size or not.
-            If False and batch_size is set to adaptive, the batch_size will be
-            set to one.
-        **check_X_cand_params : kwargs
+        **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        A_cand: np.ndarray, shape (n_candidates, n_annotators)
+        X : np.ndarray of shape (n_samples, n_features)
+            Checked training data set.
+        y : np.ndarray of shape (n_samples, n_annotators)
+            Checked labels of the training data set.
+        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
+            np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
+        annotators : None or np.ndarray of shape (n_avl_annotators), dtype=int
+            or np.ndarray of shape (n_candidates, n_annotators)
+            Checked annotator boolean array
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
         """
 
-        # Check candidate instances.
-        X_cand = check_array(X_cand, **check_X_cand_params)
+        X, y, candidates, batch_size, return_utilities = \
+            super()._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset,
+                check_X_dict
+            )
 
-        # Check annotator instances.
-        if A_cand is None:
-            if self.n_annotators is None:
-                raise TypeError(
-                    "The number of annotators can not be determined. "
-                    "Pass n_annotators in the Initialization or pass "
-                    "A_cand as the annotators matrix."
-                )
+        check_array(y, ensure_2d=True, force_all_finite='allow-nan')
+        n_annotators = y.shape[1]
+        unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
+
+        if annotators is not None and annotators.ndim == 1:
+            annotators = check_indices(annotators, y, dim=1)
+        elif annotators is not None and annotators.ndim == 2:
+            if candidates is None or candidates.ndim == 1:
+                check_consistent_length(X, annotators)
             else:
-                check_scalar(x=self.n_annotators, target_type=int,
-                             name='n_annotators', min_val=1)
-                A_cand = np.full((X_cand.shape[0], self.n_annotators), True)
+                check_consistent_length(candidates, annotators)
+            check_consistent_length(y.T, annotators.T)
+
+        if candidates is None and annotators is None:
+            n_candidate_pairs = int(np.sum(unlabeled_pairs))
+        elif candidates is None and annotators.ndim == 1:
+            n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
+        elif candidates.ndim == 1 and annotators is None:
+            candidates = check_indices(candidates, y, dim=0)
+            n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates, :]))
+        elif candidates.ndim == 1 and annotators.ndim == 1:
+            candidates = check_indices(candidates, y, dim=0)
+            n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates,
+                                                           annotators]))
+        elif candidates.ndim == 2 and annotators is None:
+            n_candidate_pairs = len(candidates)*n_annotators
+        elif candidates.ndim == 2 and annotators.ndim == 1:
+            n_candidate_pairs = len(candidates)*len(annotators)
         else:
-            A_cand = check_array(A_cand, dtype=bool)
+            annotators = check_array(annotators, dtype=bool)
+            n_candidate_pairs = int(np.sum(annotators))
 
-        check_consistent_length(X_cand, A_cand)
+        if n_candidate_pairs < batch_size:
+            warnings.warn(
+                f"'batch_size={batch_size}' is larger than number of "
+                f"candidates pairs. Instead, 'batch_size={n_candidate_pairs}'"
+                f" was set.")
+            batch_size = n_candidate_pairs
 
-        # Check number of features.
-        self._check_n_features(X_cand, reset=reset)
+        return X, y, candidates, annotators, batch_size, return_utilities
 
-        # Check return_utilities.
-        check_scalar(return_utilities, 'return_utilities', bool)
+    def _transform_cand_annot(self, candidates, annotators, X, y,
+                              enforce_mapping=False):
+        """
+        Transforms the `candidates` parameter into a sample array and the
+        corresponding index array `mapping` such that `X_cand = X[mapping]`,
+        and transforms `annotators` into a boolean array such that `A_cand`
+        represents the available annotator sample pairs for the samples of
+        X_cand.
 
-        # Check batch size.
-        if isinstance(batch_size, str):
-            if batch_size != 'adaptive':
-                raise ValueError('If `batch_size` is a string, it '
-                                 'must be set to `adaptive`.')
-            elif not adaptive:
-                batch_size = 1
-        elif isinstance(batch_size, int):
-            check_scalar(batch_size, target_type=int, name='batch_size',
-                         min_val=1)
+        Parameters
+        ----------
+        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
+            np.ndarray of shape (n_candidates, n_features)
+            Checked candidate samples.
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        X : np.ndarray of shape (n_samples, n_features)
+            Checked training data set.
+        y : np.ndarray of shape (n_samples)
+            Checked labels of the training data set.
+        enforce_mapping : bool, default=False
+            If True, an exception is raised when no exact mapping can be
+            determined (i.e., `mapping` is None).
 
-            n_queries = np.sum(A_cand)
-            if n_queries < batch_size:
-                warnings.warn(
-                    "'batch_size={}' is larger than number of candidate queries "
-                    "in 'A_cand'. Instead, 'batch_size={}' was set."
-                        .format(batch_size, n_queries))
-                batch_size = int(n_queries)
+        Returns
+        -------
+        X_cand : np.ndarray of shape (n_candidates, n_features)
+            Candidate samples from which the strategy can query the label.
+        mapping : np.ndarray of shape (n_candidates) or None
+            Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
+        A_cand : np.ndarray of shape(n_candidates, n_annotators)
+            Available annotator sample pair with respect to `X_cand`.
+        """
+        unlbd_pairs = is_unlabeled(y, self.missing_label_)
+        unlbd_sample_indices = np.argwhere(np.any(unlbd_pairs, axis=1))\
+            .flatten()
+        n_annotators = y.shape[1]
+
+        if candidates is not None and candidates.ndim == 2:
+            n_candidates = len(candidates)
+            if annotators is None:
+                A_cand = np.full((n_candidates, n_annotators), True)
+            elif annotators.ndim == 1:
+                A_cand = np.full((n_candidates, n_annotators), False)
+                A_cand[:, annotators] = True
+            else:
+                A_cand = annotators
+
+            if enforce_mapping:
+                raise ValueError('Mapping `X_cand` to `X` is not posssible'
+                                 'but `enforce_mapping` is True. Use index'
+                                 'array for `candidates` instead.')
+            else:
+                return candidates, None, A_cand
+
+        if candidates is None:
+            candidates = unlbd_sample_indices
         else:
-            raise TypeError('`batch_size` must be either a string or an '
-                            'integer.')
+            candidates = np.intersect1d(candidates, unlbd_sample_indices)
 
-        # Check random state.
-        random_state = check_random_state(random_state=self.random_state,
-                                          seed_multiplier=len(X_cand))
+        if annotators is None:
+            A_cand = unlbd_pairs[candidates, :]
+        elif annotators.ndim == 1:
+            available_pairs = np.full_like(y, False)
+            available_pairs[:, annotators] = True
+            A_cand = (unlbd_pairs & available_pairs)[candidates, :]
+        else:
+            A_cand = annotators
 
-        return X_cand, A_cand, return_utilities, batch_size, random_state
+        return X[candidates], candidates, A_cand
 
 
 class BudgetManager(ABC, BaseEstimator):

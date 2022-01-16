@@ -6,13 +6,13 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from skactiveml.classifier import SklearnClassifier, CMM
 from skactiveml.pool import UncertaintySampling, RandomSampler
 from skactiveml.pool.multi._wrapper import MultiAnnotWrapper
+from skactiveml.utils import MISSING_LABEL
 from skactiveml.utils._aggregation import majority_vote
 
 
 class TestMultiAnnotWrapper(unittest.TestCase):
 
     def setUp(self):
-        self.random_state = 1
         self.X_cand = np.array([[7, 1], [9, 1], [5, 1], [3, 4], [9, 12]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 0, 1, 1])
@@ -22,6 +22,7 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                                 [True, False, False],
                                 [True, True, True],
                                 [True, False, False]])
+        self.random_state = 0
 
     def test_init_param_strategy(self):
         wrapper = MultiAnnotWrapper(CMM())
@@ -161,12 +162,13 @@ class TestMultiAnnotWrapper(unittest.TestCase):
                                     random_state=self.random_state)
 
         X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3, 4]])
-        y = np.array([[1, 0], [0, 1], [1, 1], [0, 0], [0, 1]])
+        y = np.array([[1, 0, 1], [0, 1, 1], [1, 1, 1], [0, 0, 0], [0, 1, 0]])
 
-        query_params_dict = {'X': X, 'y': y, 'clf': clf}
-        re_val = wrapper.query(self.X_cand, query_params_dict,
-                               A_cand=self.A_cand, return_utilities=True,
-                               batch_size='adaptive')
+        query_params_dict = {'clf': clf}
+        re_val = wrapper.query(X, y, candidates=self.X_cand,
+                               annotators=self.A_cand, return_utilities=True,
+                               query_params_dict=query_params_dict,
+                               batch_size=1)
 
         best_cand_indices, utilities = re_val
         self.assertEqual((1, 2), best_cand_indices.shape)
@@ -176,12 +178,15 @@ class TestMultiAnnotWrapper(unittest.TestCase):
 
         # test functionality with random sampler, larger batch size,
         # return_utilities set to false
-        random = RandomSampler(self.random_state)
+        random = RandomSampler(random_state=self.random_state)
 
-        wrapper = MultiAnnotWrapper(random, self.random_state)
+        y = np.array([[MISSING_LABEL, 0, 1], [0, MISSING_LABEL, 1],
+                      [MISSING_LABEL, 1, 1], [0, 0, 0], [0, 1, 0]])
 
-        best_cand_indices = wrapper.query(self.X_cand, A_cand=self.A_cand,
-                                          return_utilities=False)
+        wrapper = MultiAnnotWrapper(random, random_state=self.random_state)
+        print(self.random_state)
+        best_cand_indices = wrapper.query(X, y)
+        print(best_cand_indices)
         self.assertEqual((1, 2), best_cand_indices.shape)
         self.check_availability(best_cand_indices, self.A_cand)
 

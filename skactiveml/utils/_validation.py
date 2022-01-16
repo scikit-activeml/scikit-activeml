@@ -424,6 +424,53 @@ def check_random_state(random_state, seed_multiplier=None):
     return np.random.RandomState(seed)
 
 
+def check_indices(indices, A, dim=0):
+    """Check if indices fit to array.
+
+    Parameters
+    ----------
+    indices : array-like
+        The considered indices.
+    A : array-like
+        The considered array.
+    dim : int or tuple of ints
+        The dimensions of the index.
+
+    Returns
+    -------
+    indices: tuple of np.ndarrays or np.ndarray
+        The validated indices.
+    """
+    indices = check_array(indices, allow_nd=True, dtype=int)
+    A = check_array(A, allow_nd=True)
+    check_type(dim, 'dim', int, tuple)
+    if isinstance(dim, tuple):
+        for n in dim:
+            check_type(n, 'entry of `dim`', int)
+        if A.ndim <= max(dim):
+            raise ValueError(f'`dim` contains entry of value {max(dim)}, but all'
+                             f'entries of dim must be smaller than {A.ndim}.')
+        if len(dim) != indices.shape[0]:
+            raise ValueError(f'shape of `indices` along dimension 0 is '
+                             f'{indices.shape[0]}, but must be {len(dim)}')
+        indices = tuple(indices)
+        for (i, n) in enumerate(indices):
+            if np.any(indices[i] >= A.shape[dim[i]]):
+                raise ValueError(f'`indices[{i}]` contains index of value '
+                                 f'{np.max(indices[i])} but all indices must be'
+                                 f' less than {A.shape[dim[i]]}.')
+        return indices
+    else:
+        if A.ndim <= dim:
+            raise ValueError(f'`dim` has value {dim}, but must be smaller than '
+                             f'{A.ndim}.')
+        if np.any(indices >= A.shape[dim]):
+            raise ValueError(f'`indices` contains index of value '
+                             f'{np.max(indices)} but all indices must be'
+                             f' less than {A.shape[dim]}.')
+        return indices
+
+
 def check_type(obj, name, *target_types):
     """Check if obj is one of the given types.
 

@@ -291,3 +291,25 @@ class TestIEThresh(unittest.TestCase):
             self.assertGreaterEqual(n_a_annotators[query_indices[index, 0]],
                                     n_a_annotators[
                                         query_indices[index + 1, 0]])
+
+    def test_query_with_variant_avadilable_annotators(self):
+
+        y = np.nan*self.y
+
+        ie_thresh = IEThresh(epsilon=1.0)
+        A_cand = np.array([[True, True, True, True],
+                           [True, False, False, False],
+                           [True, True, True, False]])
+
+        n_a_annotators = np.sum(A_cand, axis=1)
+
+        X_cand = np.array([[0.0, 1.0],
+                           [1.0, 1.0],
+                           [1.0, 0.0]])
+
+        query_indices, utilities = ie_thresh.query(X_cand=X_cand,
+                                                   clf=LogisticRegressionRY(),
+                                                   X=self.X, y=y,
+                                                   A_cand=A_cand,
+                                                   return_utilities=True,
+                                                   batch_size=7)
