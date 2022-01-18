@@ -1,5 +1,4 @@
 import numpy as np
-import warnings
 
 from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
@@ -11,8 +10,8 @@ from ..base import (
     BudgetManager,
 )
 
+
 from ..utils import (
-    fit_if_not_fitted,
     check_type,
     check_random_state,
     check_scalar,
@@ -83,6 +82,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         X=None,
         y=None,
         sample_weight=None,
+        fit_clf=False,
         utility_weight=None,
         return_utilities=False,
     ):
@@ -107,6 +107,8 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+        fit_clf : bool,
+            If true, refit the classifier also requires X and y to be given.
         utility_weight: array-like of shape (n_candidate_samples), optional
         (default=None)
             Densities for each sample in `X_cand`.
@@ -130,6 +132,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             X,
             y,
             sample_weight,
+            fit_clf,
             utility_weight,
             return_utilities,
         ) = self._validate_data(
@@ -138,6 +141,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             X=X,
             y=y,
             sample_weight=sample_weight,
+            fit_clf=fit_clf,
             utility_weight=utility_weight,
             return_utilities=return_utilities,
         )
@@ -210,6 +214,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         sample_weight,
+        fit_clf,
         utility_weight,
         return_utilities,
         reset=True,
@@ -229,6 +234,8 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+        fit_clf : bool,
+            If true, refit the classifier also requires X and y to be given.
         utility_weight: array-like of shape (n_candidate_samples), optional
         (default=None)
             Densities for each sample in `X_cand`.
@@ -253,6 +260,8 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             Checked training labels
         sampling_weight: np.ndarray, shape (n_candidates)
             Checked training sample weight
+        fit_clf : bool,
+            Checked boolean value of `fit_clf`
         utility_weight: array-like of shape (n_candidate_samples), optional
         (default=None)
             Checked densities for each sample in `X_cand`.
@@ -277,7 +286,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         X, y, sample_weight = self._validate_X_y_sample_weight(
             X, y, sample_weight
         )
-        clf = self._validate_clf(clf, X, y, sample_weight)
+        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
         utility_weight = self._validate_utility_weight(utility_weight, X_cand)
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
@@ -291,6 +300,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             X,
             y,
             sample_weight,
+            fit_clf,
             utility_weight,
             return_utilities,
         )
@@ -325,7 +335,7 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
             check_consistent_length(X, y)
         return X, y, sample_weight
 
-    def _validate_clf(self, clf, X, y, sample_weight):
+    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
         """Validate if clf is a valid SkactivemlClassifier. If clf is
         untrained, clf is trained using X, y and sample_weight.
 
@@ -333,6 +343,12 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         ----------
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
         Returns
         -------
         clf : SkactivemlClassifier
@@ -340,7 +356,10 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         """
         # Check if the classifier and its arguments are valid.
         check_type(clf, "clf", SkactivemlClassifier)
-        return fit_if_not_fitted(clf, X, y, sample_weight)
+        check_type(fit_clf, "fit_clf", bool)
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
+        return clf
 
     def _validate_utility_weight(self, utility_weight, X_cand):
         """Validate if utility_weight is numeric and of equal length as X_cand.

@@ -111,6 +111,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=1,
             y=self.y,
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -119,6 +120,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=None,
             y=self.y,
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -127,6 +129,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=np.ones(5),
             y=self.y,
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -135,6 +138,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=self.X[1:],
             y=self.y,
+            fit_clf=True
         )
 
     def test_query_param_y(self):
@@ -148,6 +152,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=self.X,
             y=1,
+            fit_clf=True
         )
         self.assertRaises(
             TypeError,
@@ -156,6 +161,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=self.X,
             y=None,
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -164,6 +170,7 @@ class TemplateTestUncertainty:
             clf=self.clf,
             X=self.X,
             y=self.y[1:],
+            fit_clf=True
         )
 
     def test_query_param_sample_weight(self):
@@ -178,6 +185,7 @@ class TemplateTestUncertainty:
             X=self.X,
             y=self.y[1:],
             sample_weight="string",
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -187,6 +195,7 @@ class TemplateTestUncertainty:
             X=self.X,
             y=self.y[1:],
             sample_weight=["string", "numbers", "test"],
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -196,6 +205,29 @@ class TemplateTestUncertainty:
             X=self.X,
             y=self.y[1:],
             sample_weight=[1],
+            fit_clf=True
+        )
+
+    def test_query_param_fit_clf(self):
+        # fit_clf needs to be a boolean
+        query_strategy = self.get_query_strategy()()
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            fit_clf="string",
+        )
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            fit_clf=1,
         )
 
     def test_query_param_return_utilities(self):

@@ -1,6 +1,7 @@
 import numpy as np
 
 from sklearn.utils import check_array, check_consistent_length
+from sklearn.base import clone
 
 from ..base import (
     BudgetManager,
@@ -8,7 +9,6 @@ from ..base import (
     SkactivemlClassifier,
 )
 from ..utils import (
-    fit_if_not_fitted,
     check_type,
     call_func,
     check_budget_manager,
@@ -65,7 +65,7 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
-
+    # fit_clf = False fit_ifnotfittet rausnehmen und einfach fit aufrufen
     def query(
         self,
         X_cand,
@@ -73,6 +73,7 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         X=None,
         y=None,
         sample_weight=None,
+        fit_clf=False,
         return_utilities=False,
     ):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -95,6 +96,8 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,), optional
             Sample weights for X, used to fit the clf.
+        fit_clf : bool,
+            If true, refit the classifier also requires X and y to be given.
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
@@ -115,6 +118,7 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
         ) = self._validate_data(
             X_cand,
@@ -122,6 +126,7 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
             X=X,
             y=y,
             sample_weight=sample_weight,
+            fit_clf=fit_clf,
             return_utilities=return_utilities,
         )
 
@@ -176,6 +181,7 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         X,
         y,
         sample_weight,
+        fit_clf,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -197,6 +203,8 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
             Sample weights for X, used to fit the clf.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
+        fit_clf : bool,
+            If true, refit the classifier also requires X and y to be given.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -216,6 +224,8 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
             Checked training labels
         sampling_weight: np.ndarray, shape (n_candidates)
             Checked training sample weight
+        fit_clf : bool,
+            Checked boolean value of `fit_clf`
         X_cand: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
         return_utilities : bool,
@@ -228,11 +238,11 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         X, y, sample_weight = _validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
-        clf = self._validate_clf(clf, X, y, sample_weight)
+        clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
 
-        return X_cand, clf, X, y, sample_weight, return_utilities
+        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
 
-    def _validate_clf(self, clf, X, y, sample_weight):
+    def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
         """Validate if clf is a valid SkactivemlClassifier. If clf is
         untrained, clf is trained using X, y and sample_weight.
 
@@ -240,6 +250,14 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         ----------
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+        fit_clf : bool,
+            If true, refit the classifier also requires X and y to be given.
         Returns
         -------
         clf : SkactivemlClassifier
@@ -247,7 +265,10 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         """
         # Check if the classifier and its arguments are valid.
         check_type(clf, "clf", SkactivemlClassifier)
-        return fit_if_not_fitted(clf, X, y, sample_weight)
+        check_type(fit_clf, "fit_clf", bool)
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
+        return clf
 
 
 class FixedUncertainty(UncertaintyZliobaite):
@@ -339,6 +360,7 @@ class FixedUncertainty(UncertaintyZliobaite):
         X,
         y,
         sample_weight,
+        fit_clf,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -390,6 +412,7 @@ class FixedUncertainty(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
         ) = super()._validate_data(
             X_cand,
@@ -397,6 +420,7 @@ class FixedUncertainty(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
             reset,
             **check_X_cand_params
@@ -412,7 +436,7 @@ class FixedUncertainty(UncertaintyZliobaite):
                 self.budget, self.budget_manager, FixedUncertaintyBudget
             )
 
-        return X_cand, clf, X, y, sample_weight, return_utilities
+        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
 
 
 class VariableUncertainty(UncertaintyZliobaite):
@@ -502,6 +526,7 @@ class VariableUncertainty(UncertaintyZliobaite):
         X,
         y,
         sample_weight,
+        fit_clf,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -553,6 +578,7 @@ class VariableUncertainty(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
         ) = super()._validate_data(
             X_cand,
@@ -560,6 +586,7 @@ class VariableUncertainty(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
             reset,
             **check_X_cand_params
@@ -575,7 +602,7 @@ class VariableUncertainty(UncertaintyZliobaite):
                 self.budget, self.budget_manager, VariableUncertaintyBudget
             )
 
-        return X_cand, clf, X, y, sample_weight, return_utilities
+        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
 
 
 class RandomVariableUncertainty(UncertaintyZliobaite):
@@ -669,6 +696,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
         X,
         y,
         sample_weight,
+        fit_clf,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -720,6 +748,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
         ) = super()._validate_data(
             X_cand,
@@ -727,9 +756,9 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
             reset,
-            **check_X_cand_params
         )
         if not hasattr(self, "budget_manager_"):
             check_type(
@@ -745,7 +774,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
                 {"random_state": budget_manager_seed}
             )
 
-        return X_cand, clf, X, y, sample_weight, return_utilities
+        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
 
 
 class Split(UncertaintyZliobaite):
@@ -831,6 +860,7 @@ class Split(UncertaintyZliobaite):
         X,
         y,
         sample_weight,
+        fit_clf,
         return_utilities,
         reset=True,
         **check_X_cand_params
@@ -882,6 +912,7 @@ class Split(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
         ) = super()._validate_data(
             X_cand,
@@ -889,9 +920,9 @@ class Split(UncertaintyZliobaite):
             X,
             y,
             sample_weight,
+            fit_clf,
             return_utilities,
             reset,
-            **check_X_cand_params
         )
         if not hasattr(self, "budget_manager_"):
             check_type(
@@ -906,7 +937,7 @@ class Split(UncertaintyZliobaite):
                 {"random_state": budget_manager_seed}
             )
 
-        return X_cand, clf, X, y, sample_weight, return_utilities
+        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
 
 
 def _validate_X_y_sample_weight(X, y, sample_weight):
