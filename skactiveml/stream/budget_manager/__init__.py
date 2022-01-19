@@ -4,20 +4,21 @@ which are capable of modeling the budget constraints in stream-based active
 learning settings.
 """
 
-from ._fixed_threshold_budget import FixedThresholdBudget
+
 from ._biqf import BIQF
 from ._estimated_budget import (
     EstimatedBudget,
     FixedUncertaintyBudget,
     VariableUncertaintyBudget,
     SplitBudget,
+    RandomVariableUncertaintyBudget,
 )
 
 __all__ = [
-    "FixedThresholdBudget",
     "EstimatedBudget",
     "FixedUncertaintyBudget",
     "VariableUncertaintyBudget",
     "SplitBudget",
     "BIQF",
+    "RandomVariableUncertaintyBudget",
 ]

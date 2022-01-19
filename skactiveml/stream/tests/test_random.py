@@ -21,34 +21,23 @@ class TemplateTestRandom:
         self.X = X[[train_init_size], :]
         self.X_cand = X[train_init_size:, :]
         self.y = y[:train_init_size]
-        self.kwargs = dict(
-            X_cand=self.X_cand
-        )
+        self.kwargs = dict(X_cand=self.X_cand)
 
-    def test_init_param_budget_manager(self):
-        # budget_manager must be defined as an object of an budget manager
-        # class
-        query_strategy = self.get_query_strategy()(budget_manager=[])
+    def test_init_param_budget(self):
+        # budget must be defined as a float greater than 0
+        query_strategy = self.get_query_strategy()(budget=[])
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = self.get_query_strategy()(budget="string")
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = self.get_query_strategy()(budget=-1)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_query_param_X_cand(self):
         # X_cand must be defined as a two dimensinal array
         query_strategy = self.get_query_strategy()()
-        self.assertRaises(
-            ValueError,
-            query_strategy.query,
-            X_cand=1
-        )
-        self.assertRaises(
-            ValueError,
-            query_strategy.query,
-            X_cand=None
-        )
-        self.assertRaises(
-            ValueError,
-            query_strategy.query,
-            X_cand=np.ones(5)
-        )
+        self.assertRaises(ValueError, query_strategy.query, X_cand=1)
+        self.assertRaises(ValueError, query_strategy.query, X_cand=None)
+        self.assertRaises(ValueError, query_strategy.query, X_cand=np.ones(5))
 
     def test_init_param_random_state(self):
         query_strategy = self.get_query_strategy()(random_state="string",)
@@ -78,6 +67,15 @@ class TemplateTestRandom:
 class TestRandomSampler(TemplateTestRandom, unittest.TestCase):
     def get_query_strategy(self):
         return RandomSampler
+
+    def test_init_param_allow_exceeding_budget(self):
+        # budget must be defined as a float greater than 0
+        query_strategy = self.get_query_strategy()(
+            allow_exceeding_budget="string"
+        )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = self.get_query_strategy()(allow_exceeding_budget=-1)
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
 
 class TestPeriodicSampler(TemplateTestRandom, unittest.TestCase):
