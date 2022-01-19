@@ -65,7 +65,7 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
-    # fit_clf = False fit_ifnotfittet rausnehmen und einfach fit aufrufen
+
     def query(
         self,
         X_cand,
