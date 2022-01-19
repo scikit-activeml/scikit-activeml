@@ -11,7 +11,7 @@ from sklearn.utils.validation import check_array
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..utils import MISSING_LABEL, check_cost_matrix, simple_batch, \
-    check_classes, check_type
+    check_classes, check_type, check_equal_missing_label
 
 
 class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
@@ -120,6 +120,7 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
 
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
 
         # Validate classifier type.
         check_type(fit_clf, 'fit_clf', bool)

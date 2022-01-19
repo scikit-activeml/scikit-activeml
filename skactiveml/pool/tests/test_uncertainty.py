@@ -56,6 +56,12 @@ class TestUncertaintySampling(unittest.TestCase):
                           sample_weight=np.empty((len(self.X) + 1)))
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=np.ones((len(self.X) + 1)))
+        self.assertRaises(ValueError, selector.query, X=self.X, y=self.y,
+                          candidates=None, clf=self.clf,
+                          sample_weight=np.ones((len(self.X) + 1)))
+        self.assertRaises(ValueError, selector.query, X=self.X, y=self.y,
+                          candidates=[0], clf=self.clf,
+                          sample_weight=np.ones(2))
 
     def test_query_param_fit_clf(self):
         selector = UncertaintySampling()
