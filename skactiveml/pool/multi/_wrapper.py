@@ -25,17 +25,14 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
     ----------
     strategy : SingleAnnotPoolBasedQueryStrategy
         An active learning strategy for a single annotator.
-    n_annotators : int,
-        Sets the number of annotators if `A is None`.
     y_aggregate : callable, default=None
-        `y_aggregate` is used, if the given `strategy` depends on y-values as
-        labels for samples. These y-values are passed to `query_params_dict`
-        when calling `query`.
-        `y_aggregate` is in this case used to transform `y` as a matrix of shape
+        `y_aggregate` is used to transform `y` as a matrix of shape
         (n_samples, n_annotators) into a vector of shape (n_samples) during
-        the querying process and then passed to the given `strategy`.
+        the querying process and is then passed to the given `strategy`.
         If `y_aggregate is None` and `y` is used in the strategy,
         majority_vote is used as `y_aggregate`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
@@ -158,8 +155,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                                    return_utilities, reset=True)
 
         X_cand, mapping, A_cand = self._transform_cand_annot(candidates,
-                                                             annotators,
-                                                             X, y)
+                                                             annotators, X, y)
 
         random_state = self.random_state_
 
@@ -301,7 +297,6 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             indices[:, 0] = mapping[w_indices[:, 0]]
             indices[:, 1] = w_indices[:, 1]
             return indices
-
 
     def _query_annotators(self, A_cand, batch_size, sample_utilities,
                           annotator_utilities, return_utilities,

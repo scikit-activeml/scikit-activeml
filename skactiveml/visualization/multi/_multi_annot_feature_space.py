@@ -5,7 +5,7 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array, check_consistent_length
 
 from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
-from skactiveml.utils import is_labeled, check_scalar
+from skactiveml.utils import is_labeled, check_scalar, is_unlabeled
 from .._feature_space import plot_decision_boundary
 from ...utils._validation import check_type
 from .._auxiliary_functions import mesh, check_bound, _get_contour_args, \
@@ -72,7 +72,7 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
 
     bound = check_bound(bound, X, epsilon=epsilon)
 
-    fig = plot_ma_utility(fig_size=fig_size, ma_qs=ma_qs,
+    fig = plot_ma_utility(fig_size=fig_size, ma_qs=ma_qs, X=X, y=y,
                           ma_qs_arg_dict=ma_qs_arg_dict, feature_bound=bound,
                           title=title, fontsize=fontsize, res=5,
                           contour_dict=contour_dict, tick_dict=tick_dict)
@@ -208,8 +208,9 @@ def plot_ma_data_set(X, y, y_true, fig=None, feature_bound=None, title=None,
     return fig
 
 
-def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
-                    fig_size=None, feature_bound=None, title=None, res=21,
+def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
+                    ma_qs_arg_dict=None, fig=None, fig_size=None,
+                    feature_bound=None, title=None, res=21,
                     fontsize=15, contour_dict=None, tick_dict=None):
     """Plots the utilities for the different annotators of the given
     multi-annotator query strategy.
@@ -218,6 +219,41 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     ----------
     ma_qs: MultiAnnotPoolBasedQueryStrategy
         The multi-annotator query strategy.
+    X : array-like of shape (n_samples, n_features)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples, n_annotators)
+        Labels of the training data set for each annotator (possibly
+        including unlabeled ones indicated by self.MISSING_LABEL), meaning
+        that `y[i, j]` contains the label annotated by annotator `i` for
+        sample `j`.
+    candidates : None or array-like of shape (n_candidates), dtype=int or
+        array-like of shape (n_candidates, n_features),
+        optional (default=None)
+        If `candidates` is None, the samples from (X,y), for which an
+        annotator exists such that the annotator sample pairs is
+        unlabeled are considered as sample candidates.
+        If `candidates` is of shape (n_candidates) and of type int,
+        candidates is considered as the indices of the sample candidates in
+        (X,y).
+        If `candidates` is of shape (n_candidates, n_features), the
+        sample candidates are directly given in candidates (not necessarily
+        contained in X). This is not supported by all query strategies.
+    annotators : array-like, shape (n_candidates, n_annotators), optional
+    (default=None)
+        If `annotators` is None, all annotators are considered as available
+        annotators.
+        If `annotators` is of shape (n_avl_annotators) and of type int,
+        `annotators` is considered as the indices of the available
+        annotators.
+        If candidate samples and available annotators are specified:
+        The annotator sample pairs, for which the sample is a candidate
+        sample and the annotator is an available annotator are considered as
+        candidate annotator sample pairs.
+        If `annotators` is a boolean array of shape (n_candidates,
+        n_avl_annotators) the annotator sample pairs, for which the sample
+        is a candidate sample and the boolean matrix has entry `True` are
+        considered as candidate sample pairs.
     ma_qs_arg_dict: dict
         The argument dictionary for the multiple annotator query strategy.
     fig: matplotlib.figure.Figure, optional (default=None)
@@ -227,15 +263,6 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
         of the figure is set to 8 x 5 inches.
     feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
-    X_cand : array-like, shape (n_samples, n_features)
-        Candidate samples from which the strategy can select.
-    A_cand : array-like, shape (n_samples, n_annotators), optional
-             (default=None)
-        Boolean matrix where `A_cand[i,j] = True` indicates that
-        annotator `j` can be selected for annotating sample `X_cand[i]`,
-        while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-        selected for annotating sample `X_cand[i]`. If A_cand=None, each
-        annotator is assumed to be available for labeling each sample.
     title : str, optional
         The title for the figure.
     res: int
@@ -256,42 +283,15 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     # check arguments
     check_type(ma_qs, 'ma_qs', MultiAnnotPoolBasedQueryStrategy)
     check_type(ma_qs_arg_dict, 'ma_qs_arg_dict', dict)
-    if 'X_cand' in ma_qs_arg_dict.keys():
-        raise ValueError("'X_cand' must be given as separate argument.")
-    if 'A_cand' in ma_qs_arg_dict.keys():
-        raise ValueError("'A_cand' must be given as separate argument.")
+    for var in ['candidates', 'annotators', 'X', 'y']:
+        if 'candidates' in ma_qs_arg_dict.keys():
+            raise ValueError(f"'{var}' must be given as a separate argument.")
 
-    n_annotators = None
-    if fig is None:
-        if A_cand is not None:
-            check_array(A_cand)
-            n_annotators = A_cand.shape[1]
-        elif ma_qs.n_annotators is not None:
-            check_scalar(ma_qs.n_annotators, "ma_qs.n_annotators",
-                         target_type=int)
-            n_annotators = ma_qs.n_annotators
-        else:
-            raise ValueError("`A_cand`, `fig` or `n_annotators` must be set in "
-                             "the multi annotator query strategy, to determine "
-                             "the number of annotators.")
-    elif fig is not None and A_cand is not None:
-        check_array(A_cand)
-        if A_cand.shape[0] != len(fig.get_axes()):
-            raise ValueError(f"`A_cand.shape[0]` must equal "
-                             f"`len(fig.get_axes())`, but "
-                             f"`A_cand.shape[0] == {A_cand.shape[0]})` and "
-                             f"`len(fig.get_axes()) == {len(fig.get_axes())}`.")
+    y = check_array(y)
 
-    elif fig is not None and ma_qs.n_annotators is not None:
-        check_scalar(ma_qs.n_annotators, "ma_qs.n_annotators", target_type=int)
-        qs_n_a = ma_qs.n_annotators
-        if qs_n_a != len(fig.get_axes()):
-            raise ValueError(f"`ma_qs.n_annotators` must equal "
-                             f"`len(fig.get_axes())`, but "
-                             f"`ma_qs.n_annotators == {qs_n_a})` and "
-                             f"`len(fig.get_axes()) == {len(fig.get_axes())}`.")
+    n_annotators = len(y.T)
 
-    feature_bound = check_bound(feature_bound, X_cand)
+    feature_bound = check_bound(feature_bound, X)
     contour_args = _get_contour_args(contour_dict)
     tick_args = _get_tick_args(tick_dict)
     fig = _get_figure_for_ma(fig, fig_size=fig_size, title=title,
@@ -301,9 +301,10 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
     # plot the utilities
     X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
-    if X_cand is None:
-        _, utilities = ma_qs.query(mesh_instances, A_cand=A_cand,
-                                   **ma_qs_arg_dict, return_utilities=True,
+    if candidates is None:
+        _, utilities = ma_qs.query(X=X, y=y, candidates=mesh_instances,
+                                   annotators=annotators, **ma_qs_arg_dict,
+                                   return_utilities=True,
                                    batch_size=1)
 
         for a, ax in enumerate(fig.get_axes()):
@@ -311,8 +312,15 @@ def plot_ma_utility(ma_qs, ma_qs_arg_dict, X_cand=None, A_cand=None, fig=None,
             a_utilities_mesh = a_utilities.reshape(X_mesh.shape)
             ax.contourf(X_mesh, Y_mesh, a_utilities_mesh, **contour_args)
     else:
-        _, utilities = ma_qs.query(X_cand, A_cand=A_cand, **ma_qs_arg_dict,
+        _, utilities = ma_qs.query(X=X, y=y, candidates=candidates,
+                                   annotators=annotators, **ma_qs_arg_dict,
                                    return_utilities=True, batch_size=1)
+        if candidates.ndim == 1:
+            unlbld_indices = np.argwhere(np.any(is_unlabeled(y), axis=1))\
+                .flatten()
+            X_cand = X[np.intersect1d(candidates, unlbld_indices)]
+        else:
+            X_cand = candidates
 
         for a, ax in enumerate(fig.get_axes()):
             utilities_a = utilities[0, :, a]

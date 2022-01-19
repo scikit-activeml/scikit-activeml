@@ -418,8 +418,7 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         raise NotImplementedError
 
     def _validate_data(self, X, y, candidates, annotators, batch_size,
-                       return_utilities, reset=True, check_X_dict=None,
-                       adaptive=True):
+                       return_utilities, reset=True, check_X_dict=None):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
 
@@ -471,9 +470,6 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             provided when reset was last True.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        adaptive : bool, default=False
-            Whether an adaptive batch size is allowed, allowing `batch_size`
-            to have value `'adaptive'`.
 
         Returns
         -------
@@ -493,22 +489,17 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
-        if adaptive and batch_size == 'adaptive':
-            batch_size = 1
-            adaptive = None
-
         X, y, candidates, batch_size, return_utilities = \
             super()._validate_data(
                 X, y, candidates, batch_size, return_utilities, reset,
                 check_X_dict
             )
 
-        if adaptive is None:
-            batch_size = 'adaptive'
-
         check_array(y, ensure_2d=True, force_all_finite='allow-nan')
-        n_annotators = y.shape[1]
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
+
+        if annotators is not None:
+            annotators = check_array(annotators, ensure_2d=False)
 
         if annotators is not None and annotators.ndim == 1:
             annotators = check_indices(annotators, y, dim=1)
@@ -531,14 +522,14 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates,
                                                            annotators]))
         elif candidates.ndim == 2 and annotators is None:
-            n_candidate_pairs = len(candidates)*n_annotators
+            n_candidate_pairs = len(candidates)*len(y.T)
         elif candidates.ndim == 2 and annotators.ndim == 1:
             n_candidate_pairs = len(candidates)*len(annotators)
         else:
             annotators = check_array(annotators, dtype=bool)
             n_candidate_pairs = int(np.sum(annotators))
 
-        if 'adaptive' != batch_size and n_candidate_pairs < batch_size:
+        if n_candidate_pairs < batch_size:
             warnings.warn(
                 f"'batch_size={batch_size}' is larger than number of "
                 f"candidates pairs. Instead, 'batch_size={n_candidate_pairs}'"
@@ -568,6 +559,21 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
+        annotators : array-like, shape (n_candidates, n_annotators), optional
+        (default=None)
+            If `annotators` is None, all annotators are considered as available
+            annotators.
+            If `annotators` is of shape (n_avl_annotators) and of type int,
+            `annotators` is considered as the indices of the available
+            annotators.
+            If candidate samples and available annotators are specified:
+            The annotator sample pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered as
+            candidate annotator sample pairs.
+            If `annotators` is a boolean array of shape (n_candidates,
+            n_avl_annotators) the annotator sample pairs, for which the sample
+            is a candidate sample and the boolean matrix has entry `True` are
+            considered as candidate sample pairs.
         X : np.ndarray of shape (n_samples, n_features)
             Checked training data set.
         y : np.ndarray of shape (n_samples)

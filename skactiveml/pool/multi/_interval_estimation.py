@@ -3,17 +3,16 @@ import warnings
 
 from scipy.stats import t, rankdata
 
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, clone
 from sklearn.utils.validation import check_array,\
     check_random_state, check_is_fitted
 
-from . import MultiAnnotWrapper
+from ._wrapper import MultiAnnotWrapper
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier, AnnotModelMixin
 from ...utils import rand_argmax, check_scalar, compute_vote_vectors, \
-    MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type
-from ...pool._uncertainty import uncertainty_scores, UncertaintySampling
-from ...utils._functions import simple_batch, fit_if_not_fitted
+    MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type, check_X_y, simple_batch
+from ...pool._uncertainty import UncertaintySampling, uncertainty_scores
 
 
 class IEAnnotModel(BaseEstimator, AnnotModelMixin):
@@ -179,8 +178,6 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         selection.
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
-    n_annotators : int,
-        Sets the number of annotators if `A_cand is None`.r
     random_state : None|int|numpy.random.RandomState, optional (default=None)
         The random state used for deciding on majority vote labels in case of
         ties.
@@ -199,7 +196,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         self.epsilon = epsilon
         self.alpha = alpha
 
-    def query(self, X, y, clf, candidates=None, annotators=None,
+    def query(self, X, y, clf, fit_clf=True, candidates=None, annotators=None,
               sample_weight=None, batch_size='adaptive',
               return_utilities=False):
         """Determines which candidate sample is to be annotated by which
@@ -217,6 +214,9 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
             sample `j`.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
+        fit_clf : bool, default=True
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
@@ -270,12 +270,85 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         """
 
         # base check
-        X, y, candidates, annotators, batch_size, return_utilities = \
-            super()._validate_data(X, y, candidates, annotators, batch_size,
-                                   return_utilities, reset=True, adaptive=True)
+        X, y, candidates, annotators, _, return_utilities = \
+            super()._validate_data(X, y, candidates, annotators, 1,
+                                   return_utilities, reset=True)
+
+        X_cand, mapping, A_cand = self._transform_cand_annot(candidates,
+                                                             annotators, X, y)
 
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
+
+        # Check whether epsilon is float in [0, 1].
+        check_scalar(x=self.epsilon, target_type=float, name='epsilon',
+                     min_val=0, max_val=1)
+
+        # Check whether alpha is float in (0, 1).
+        check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
+                     max_val=1, min_inclusive=False, max_inclusive=False)
+
+        n_annotators = y.shape[1]
+        # Check whether unlabeled data exists
+        A_cand = np.all(A_cand, axis=1)
+
+        # Fit classifier and compute uncertainties on candidate samples.
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
+
+        P = clf.predict_proba(X_cand)
+        uncertainties = uncertainty_scores(probas=P, method='least_confident')
+
+        # Fit annotator model and compute performance estimates.
+        ie_model = IEAnnotModel(classes=clf.classes_,
+                                missing_label=clf.missing_label,
+                                alpha=self.alpha, mode='upper')
+
+        ie_model.fit(X=X, y=y, sample_weight=sample_weight)
+        A_perf = ie_model.A_perf_
+
+        # Compute utilities.
+
+        # combine the values of A_perf and uncertainties
+        A_perf = A_perf[:, 2] + 1
+        A_perf = A_perf[np.newaxis]
+        max_range = np.max(A_perf) + 1
+        uncertainties = rankdata(uncertainties, method='ordinal') * max_range
+        uncertainties = np.tile(uncertainties, (n_annotators, 1)).T
+        utilities = uncertainties + A_perf
+
+        # exclude not available annotators
+        utilities[~A_cand] = np.nan
+
+        # Determine actual batch size.
+        if batch_size == 'adaptive':
+            required_perf = self.epsilon * np.max(A_perf)
+            actual_batch_size = int(np.sum(A_perf >= required_perf))
+        else:
+            actual_batch_size = batch_size
+
+        if mapping is not None:
+            w_utilities = utilities
+            utilities = np.full((batch_size, len(X), n_annotators), np.nan)
+            utilities[:, mapping, :] = w_utilities
+
+        # Perform selection based on previously computed utilities.
+        return simple_batch(utilities, self.random_state_,
+                            batch_size=actual_batch_size,
+                            return_utilities=return_utilities)
+
+        """
+        # base check
+        X, y, candidates, annotators, _, return_utilities = \
+            super()._validate_data(X, y, candidates, annotators, 1,
+                                   return_utilities, reset=True)
+
+        # Validate classifier type.
+        check_type(clf, 'clf', SkactivemlClassifier)
+
+        # Fit the classifier.
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
 
         # Check whether epsilon is float in [0, 1].
         check_scalar(x=self.epsilon, target_type=float, name='epsilon',
@@ -292,6 +365,7 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
 
         ie_model.fit(X=X, y=y, sample_weight=sample_weight)
         A_perf = ie_model.A_perf_
+        A_perf = A_perf[:, 2]
 
         wrapper = MultiAnnotWrapper(
             strategy=UncertaintySampling(method='least_confident'),
@@ -311,3 +385,5 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
                              n_annotators_per_sample=actual_batch_size,
                              query_params_dict=query_params_dict,
                              return_utilities=return_utilities)
+        """
+
