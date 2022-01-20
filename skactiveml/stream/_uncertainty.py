@@ -24,9 +24,9 @@ from .budget_manager import (
 
 class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
     """The UncertaintyZliobaite (Utility calculation in [1]) query strategy
-    samples instances based on the classifiers uncertainty assessed based on the
-    classifier's predictions. The instance is queried when the probability of
-    the most likely class exceeds a threshold calculated based on the budget
+    samples instances based on the classifiers uncertainty assessed based on
+    the classifier's predictions. The instance is queried when the probability
+    of the most likely class exceeds a threshold calculated based on the budget
     and the number of classes. It is used as the base class for uncertainty
     strategies provided by Zliobaite in [1].
 
