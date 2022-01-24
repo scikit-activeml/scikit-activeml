@@ -13,7 +13,7 @@ from sklearn.utils.validation import check_array, _is_arraylike
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..utils import simple_batch, fit_if_not_fitted, check_type, \
-    compute_vote_vectors
+    compute_vote_vectors, MISSING_LABEL, check_equal_missing_label
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
@@ -27,6 +27,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
     method : string, default='KL_divergence'
         The method to calculate the disagreement. KL_divergence or
         vote_entropy are possible.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     random_state: numeric or np.random.RandomState, default=None
         The random state to use.
 
@@ -40,8 +42,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         Learning (ICML), pages 1-9. Morgan Kaufmann, 1998.
     """
 
-    def __init__(self, method='KL_divergence', random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, method='KL_divergence', missing_label=MISSING_LABEL,
+                 random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.method = method
 
     def query(self, X, y, ensemble, fit_ensemble=True, sample_weight=None,
@@ -124,6 +129,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         if isinstance(ensemble, SkactivemlClassifier) and \
                 (hasattr(ensemble, 'n_estimators')
                  or hasattr(ensemble, 'estimators')):
+            check_equal_missing_label(ensemble.missing_label,
+                                      self.missing_label_)
             # Fit the ensemble.
             if fit_ensemble:
                 ensemble = clone(ensemble).fit(X, y, sample_weight)
@@ -140,6 +147,8 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             est_arr = deepcopy(ensemble)
             for i in range(len(est_arr)):
                 check_type(est_arr[i], f'ensemble[{i}]', SkactivemlClassifier)
+                check_equal_missing_label(est_arr[i].missing_label,
+                                          self.missing_label_)
                 # Fit the ensemble.
                 if fit_ensemble:
                     est_arr[i] = est_arr[i].fit(X, y, sample_weight)
