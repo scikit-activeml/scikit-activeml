@@ -15,7 +15,7 @@ from sklearn.linear_model._logistic import _logistic_loss
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..classifier import SklearnClassifier, PWC
 from ..utils import is_labeled, check_X_y, simple_batch, check_scalar, \
-    fit_if_not_fitted, check_type
+    fit_if_not_fitted, check_type, MISSING_LABEL, check_equal_missing_label
 
 
 class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
@@ -29,6 +29,8 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
     precompute : boolean, default=False
         Whether the epistemic uncertainty should be precomputed.
         Only for PWC significant.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     random_state : numeric or np.random.RandomState
         The random state to use.
 
@@ -39,8 +41,11 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         Discovery Science. Springer, Cham, 2019.
     """
 
-    def __init__(self, precompute=False, random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, precompute=False, missing_label=MISSING_LABEL,
+                 random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.precompute = precompute
 
     def query(self, X, y, clf, fit_clf=True, sample_weight=None,
@@ -108,11 +113,14 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         # Validate sample_weight
         if sample_weight is None:
             sample_weight = np.ones(y.shape)
+        else:
+            sample_weight = np.asarray(sample_weight)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
 
         # Validate classifier type.
         check_type(fit_clf, 'fit_clf', bool)
