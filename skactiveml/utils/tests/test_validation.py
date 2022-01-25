@@ -32,7 +32,7 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_classifier_params,
                           classes=['a', 'b'], missing_label=2,
                           cost_matrix=[[1, 1], [2, 0]])
-        self.assertRaises(TypeError, check_classifier_params, classes=[0, 1],
+        self.assertRaises(ValueError, check_classifier_params, classes=[0, 1],
                           missing_label='nan', cost_matrix=[[1, 1], [2, 0]])
         self.assertRaises(ValueError, check_classifier_params, classes=None,
                           missing_label=np.nan, cost_matrix=[[1, 1], [2, 0]])
