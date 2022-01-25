@@ -8,13 +8,14 @@ import warnings
 import numpy as np
 from scipy.interpolate import griddata
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
+from sklearn import clone
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model._logistic import _logistic_loss
 
-from ..base import SingleAnnotPoolBasedQueryStrategy
+from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..classifier import SklearnClassifier, PWC
 from ..utils import is_labeled, check_X_y, simple_batch, check_scalar, \
-    fit_if_not_fitted
+    fit_if_not_fitted, check_type, MISSING_LABEL, check_equal_missing_label
 
 
 class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
@@ -25,10 +26,12 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    precompute : boolean (default=False)
+    precompute : boolean, default=False
         Whether the epistemic uncertainty should be precomputed.
         Only for PWC significant.
-    random_state : numeric | np.random.RandomState
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : numeric or np.random.RandomState
         The random state to use.
 
     References
@@ -38,55 +41,95 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
         Discovery Science. Springer, Cham, 2019.
     """
 
-    def __init__(self, precompute=False, random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, precompute=False, missing_label=MISSING_LABEL,
+                 random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.precompute = precompute
 
-    def query(self, X_cand, clf, X, y, sample_weight=None, batch_size=1,
-              return_utilities=False):
-        """
-        Queries the next instance to be labeled.
+    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
+              candidates=None, batch_size=1, return_utilities=False):
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
-        clf : {SkactivemlClassifier, PWC}
-            Only the PWC and a wrapped logistic regression are supported as
-            classifiers.
-        X : array-like, shape (n_samples, n_features),
-            Complete training data set.
-        y : array-like, shape (n_samples),
-            Labels of the training data set.
-        sample_weight : array-like, shape (n_samples), optional (default=None)
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        clf : skactiveml.classifier.PWC or
+                sklearn.linear_model.LogisticRegression
+            Only the skactiveml PWC and a wrapped sklearn logistic regression
+            are supported as classifiers.
+        fit_clf : bool, default=True
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight : array-like of shape (n_samples), default=None
             Weights of training samples in `X`.
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
         # Validate input parameters.
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
-        if X is None or y is None:
-            raise ValueError('`X` and `y` cannot be None.')
-        X, y, sample_weight = check_X_y(X, y, sample_weight=sample_weight)
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset=True
+            )
+
+        # Validate sample_weight
+        if sample_weight is None:
+            sample_weight = np.ones(y.shape)
+        else:
+            sample_weight = np.asarray(sample_weight)
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+
+        # Validate classifier type.
+        check_type(clf, 'clf', SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
+
+        # Validate classifier type.
+        check_type(fit_clf, 'fit_clf', bool)
+
+        # sample_weight is checked by clf when fitted
 
         # Fit the classifier.
-        clf = fit_if_not_fitted(clf, X, y, sample_weight, print_warning=False)
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
 
         # Chose the correct method for the given classifier.
         if isinstance(clf, PWC):
@@ -101,12 +144,12 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                 self._precompute_array = np.full((2, 2), np.nan)
 
             freq = clf.predict_freq(X_cand)
-            utilities, self._precompute_array = _epistemic_uncertainty_pwc(
+            utilities_cand, self._precompute_array = _epistemic_uncertainty_pwc(
                 freq, self._precompute_array)
         elif isinstance(clf, SklearnClassifier) and \
                 isinstance(clf.estimator_, LogisticRegression):
             mask_labeled = is_labeled(y, clf.missing_label)
-            utilities = _epistemic_uncertainty_logreg(
+            utilities_cand = _epistemic_uncertainty_logreg(
                 X_cand=X_cand, X=X[mask_labeled], y=y[mask_labeled], clf=clf,
                 sample_weight=sample_weight[mask_labeled]
             )
@@ -115,7 +158,13 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                             f"a wrapped `LogisticRegression` classifier. "
                             f"The given is of type {type(clf)}.")
 
-        return simple_batch(utilities, random_state,
+        if mapping is None:
+            utilities = utilities_cand
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = utilities_cand
+
+        return simple_batch(utilities, self.random_state_,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
@@ -130,7 +179,7 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
     ----------
     freq : np.ndarray of shape (n_samples, 2)
         The class frequency estimates.
-    precompute_array : np.ndarray of a quadratic shape (default=None)
+    precompute_array : np.ndarray of a quadratic shape, default=None
         Used to interpolate and speed up the calculation. Will be enlarged if
         necessary. All entries that are 'np.nan' will be filled.
 
@@ -138,7 +187,8 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
     -------
     utilities : np.ndarray of shape (n_samples,)
         The calculated epistemic uncertainty scores.
-    precompute_array : quadratic np.nparray of lenght int(np.max(freq) + 1)
+    precompute_array : np.nparray of quadratic shape with length
+            int(np.max(freq) + 1)
         The enlarged precompute_array. Will be None if the given is None.
 
     References
