@@ -127,7 +127,7 @@ class TestExpectedErrorReduction(unittest.TestCase):
                         return_utilities=True
                     )
                     self.assertEqual(utilities.shape, (1, len(X)))
-                    self.assertEqual(len(np.unique(utilities)), 1)
+                    self.assertEqual(len(np.unique(utilities)), 3)
 
             _, utilities = eer.query(
                 X_cand=X, X=X, y=[0, 1, MISSING_LABEL], clf=self.clf,

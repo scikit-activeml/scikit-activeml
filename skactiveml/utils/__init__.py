@@ -11,12 +11,13 @@ from ._multi_annot import ext_confusion_matrix
 from ._selection import rand_argmax, rand_argmin
 from ._validation import check_classes, check_scalar, check_cost_matrix, \
     check_classifier_params, check_X_y, check_random_state, \
-    check_class_prior, check_type, check_bound
+    check_class_prior, check_type, check_bound, check_budget_manager
 
 __all__ = ['rand_argmax', 'rand_argmin', 'compute_vote_vectors',
-           'majority_vote', 'is_unlabeled', 'is_labeled', 'check_classes',
-           'check_cost_matrix', 'check_scalar', 'check_classifier_params',
-           'check_X_y', 'check_random_state', 'call_func', 'simple_batch',
+           'majority_vote', 'is_unlabeled', 'is_labeled', 'ExtLabelEncoder',
+           'check_classes', 'check_missing_label', 'check_cost_matrix',
+           'check_scalar', 'check_classifier_params', 'check_X_y',
+           'check_random_state', 'MISSING_LABEL', 'call_func', 'simple_batch',
            'check_class_prior', 'ext_confusion_matrix', 'fit_if_not_fitted',
            'labeled_indices', 'unlabeled_indices', 'check_type', 'check_bound',
-           'check_equal_missing_label', 'ExtLabelEncoder']
+           'check_equal_missing_label', 'check_budget_manager']

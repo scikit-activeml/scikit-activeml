@@ -3,9 +3,11 @@ import warnings
 
 import numpy as np
 
-from skactiveml.utils import check_cost_matrix, check_classifier_params, \
-    check_classes, check_scalar, check_X_y, check_type, check_bound
+from skactiveml.utils import check_cost_matrix, check_classes, \
+    check_scalar, check_X_y, check_type, check_bound, check_budget_manager, \
+    check_classifier_params
 from skactiveml.utils import check_random_state, check_class_prior
+from skactiveml.stream.budget_manager import SplitBudget
 
 
 class TestValidation(unittest.TestCase):
@@ -30,9 +32,8 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_classifier_params,
                           classes=['a', 'b'], missing_label=2,
                           cost_matrix=[[1, 1], [2, 0]])
-        # TODO: @Marek should the following work?
-        #self.assertRaises(TypeError, check_classifier_params, classes=[0, 1],
-        #                  missing_label='nan', cost_matrix=[[1, 1], [2, 0]])
+        self.assertRaises(TypeError, check_classifier_params, classes=[0, 1],
+                          missing_label='nan', cost_matrix=[[1, 1], [2, 0]])
         self.assertRaises(ValueError, check_classifier_params, classes=None,
                           missing_label=np.nan, cost_matrix=[[1, 1], [2, 0]])
 
@@ -157,3 +158,9 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(ValueError, check_bound)
         self.assertRaises(ValueError, check_bound, X=X,
                           bound_must_be_given=True)
+
+    def test_check_budget_manager(self):
+
+        self.assertIsNotNone(check_budget_manager(0.1, None, SplitBudget))
+        with self.assertWarns(Warning):
+            check_budget_manager(0.1, SplitBudget(budget=0.2), SplitBudget)
