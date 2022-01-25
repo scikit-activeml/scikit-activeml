@@ -137,10 +137,189 @@ class ExpectedErrorReduction_old(SingleAnnotPoolBasedQueryStrategy):
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
-class ExpectedErrorReduction():
+class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
-    def _predict_prob_new(self, ):
+    def __init__(self, enforce_mapping, cost_matrix=None,
+                 missing_label=MISSING_LABEL, random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
+        self.cost_matrix = cost_matrix
+        self._enforce_mapping = enforce_mapping
+
+    def query(self, X, y, clf, sample_weight=None,
+              fit_clf=True, ignore_partial_fit=True,
+              candidates=None, sample_weight_candidates=None,
+              X_eval=None, sample_weight_eval=None,
+              batch_size=1, return_utilities=False):
+
+        (
+            X, y, sample_weight, clf, candidates, sample_weight_candidates,
+            X_eval, sample_weight_eval, batch_size, return_utilities
+        ) = self._validate_data(
+            X, y, sample_weight, clf, candidates, sample_weight_candidates,
+            X_eval, sample_weight_eval, batch_size, return_utilities,
+            reset=True, check_X_dict=None
+        )
+
+        self._validate_input_params()
+
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, enforce_mapping=self._enforce_mapping
+        )
+
+        X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval = \
+            self._concatenate_samples(X, y, sample_weight,
+                                      candidates, sample_weight_candidates,
+                                      X_eval, sample_weight_eval)
+
+        # Initialize classifier that works with indices to improve readability
+        uclf = UpdateIndexClassifier(
+            clf, X_full, y_full, w_full, fit_clf=fit_clf,
+            ignore_partial_fit=ignore_partial_fit
+        )
+
+        # Fit the classifier.
+        uclf = self._precompute_and_fit_clf(uclf, X_full, y_full, idx_train,
+                                            idx_cand, idx_eval)
+        # Compute class-membership probabilities of candidate samples
+        probs_cand = uclf.predict_proba(idx_cand)
+
+        # Check cost matrix.
+        classes = uclf.get_classes()
+        self._validate_cost_matrix(len(classes))
+
+        # Storage for computed errors per candidate sample
+        errors = np.zeros([len(X_cand), len(classes)])
+
+        # Iterate over candidate samples
+        for i_cx, idx_cx in enumerate(idx_cand):
+            # Simulate acquisition of label for each candidate sample and class
+            for i_cy, cy in enumerate(classes):
+                errors[i_cx, i_cy] = self._estimate_error_for_candidate(
+                    uclf, [idx_cx], [cy], idx_train, idx_cand, idx_eval, w_eval
+                )
+
+        utilities_cand = np.sum(probs_cand * errors, axis=1)
+
+        if mapping is None:
+            utilities = utilities_cand
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = utilities_cand
+
+        return simple_batch(utilities, self.random_state_,
+                            batch_size=batch_size,
+                            return_utilities=return_utilities)
+
+    def _validate_input_params(self):
         pass
+
+    def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
+                                idx_eval):
+        uclf.fit(idx_train)
+        return uclf
+
+    def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
+                                      idx_cand, idx_eval, w_eval):
+        raise NotImplementedError('') #TODO
+
+    def _validate_data(self, X, y, sample_weight, clf, candidates,
+                       sample_weight_candidates, X_eval, sample_weight_eval,
+                       batch_size, return_utilities, reset=True,
+                       check_X_dict=None):
+
+        # Validate input parameters.
+        X, y, candidates, batch_size, return_utilities = \
+            super()._validate_data(
+                X, y, candidates, batch_size, return_utilities, reset=reset,
+                check_X_dict=check_X_dict
+            )
+
+        # Validate classifier type.
+        check_type(clf, 'clf', SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
+
+        # Validate method.
+        if not isinstance(self.method, str):
+            raise TypeError('{} is an invalid type for method. Type {} is '
+                            'expected'.format(type(self.method), str))
+
+        # Check if candidates are samples if sample_weight_candidates is set
+        if (candidates is None or candidates.ndim == 1) and \
+                sample_weight_candidates is not None:
+            raise ValueError('Attribute `sample_weight_candidates` can only'
+                             'be None if `candidates` consists of samples.')
+
+        # Check if X_eval is set if sample_weight_eval is set
+        if X_eval is None and sample_weight_eval is not None:
+            raise ValueError('If `X_eval` is None, `sample_weight_eval` must'
+                             'also be None')
+
+        # TODO: test sample weight_eval - length + column
+
+
+        return X, y, sample_weight, clf, candidates, sample_weight_candidates,\
+               X_eval, sample_weight_eval, batch_size, return_utilities,
+
+
+    def _validate_cost_matrix(self, n_classes):
+
+        cost_matrix = 1 - np.eye(n_classes) if self.cost_matrix is None \
+            else self.cost_matrix
+        self.cost_matrix_ = check_cost_matrix(cost_matrix, n_classes)
+
+    def _concatenate_samples(self, X, y, sample_weight,
+                             candidates, sample_weight_candidates,
+                             X_eval, sample_weight_eval):
+
+        # Concatenate samples
+        X_full = X
+        y_full = y
+        w_full = sample_weight
+        idx_train = np.arange(len(X))
+        idx_unld = unlabeled_indices(y, self.missing_label_)
+
+        if candidates is None:
+            idx_cand = idx_unld
+        elif candidates.ndim == 1:
+            idx_cand = candidates
+        else:
+            X_full = np.concatenate([X_full, candidates], axis=0)
+            y_full = np.concatenate([y_full, np.full(len(candidates), np.nan)],
+                                    axis=0)
+            if not (w_full is None and sample_weight_candidates is None):
+                w_full = np.concatenate([w_full, sample_weight_candidates],
+                                        axis=0)
+            idx_cand = np.arange(len(X), len(X_full))
+
+        if X_eval is None:
+            idx_eval = idx_train
+            if sample_weight_eval is None:
+                w_eval = np.ones(len(X_full))
+            else:
+                if len(sample_weight_eval) != len(idx_eval):
+                    raise ValueError('If `sample_weight_eval` is set but '
+                                     '`X_eval` is None, then it should have '
+                                     'same size as `X`')
+                w_eval = np.zeros(len(X_full))
+                w_eval[idx_eval] = sample_weight_eval
+        else:
+            X_full = np.concatenate([X_full, X_eval], axis=0)
+            y_full = np.concatenate([y_full, np.full(len(X_eval), np.nan)],
+                                    axis=0)
+            idx_eval = np.arange(len(X_full) - len(X_eval), len(X_full))
+            if sample_weight_eval is None:
+                w_eval = np.ones(len(X_full))
+            else:
+                if len(sample_weight_eval) != len(idx_eval):
+                    raise ValueError('If `sample_weight_eval` and `X_eval` '
+                                     'are set, then `sample_weight_eval` '
+                                     'should have len(X_eval)')
+                w_eval = np.ones(len(X_full))
+                w_eval[idx_eval] = sample_weight_eval
+
+        return X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval
 
     def _risk_estimation(self, prob_true, prob_pred, cost_matrix,
                          sample_weight):
@@ -163,215 +342,200 @@ class ExpectedErrorReduction():
     def _logloss_estimation(self, prob_true, prob_pred):
         return -np.sum(prob_true * np.log(prob_pred + np.finfo(float).eps))
 
-    def _clf_refit(self, clf, X, y, w, cx, cy, cw, partial_fit):
-        # Create sample array for the retraining of the classifier.
-        X_new = np.vstack((X, [cx])) if not partial_fit else np.array([cx])
-        # Create label array for the retraining of the classifier.
-        y_new = np.append(y, [[cy]]) if not partial_fit else np.array([cy])
-        # Create sample_weight for the retraining of the classifier.
-        if w is not None and cw is not None:
-            w_new = np.append(w, [[cw]]) if not partial_fit else np.array([cw])
-            args = [w_new]
-        elif w is None and cw is None:
-            args = []
-        else:
-            raise ValueError('`sample_weight` must be either None or set '
-                             'for all samples')
 
-        # Check whether sample weights are used.
-        if partial_fit:
-            return deepcopy(clf).partial_fit(X_new, y_new, *args)
-        else:
-            return clone(clf).fit(X_new, y_new, *args)
-
-
-class MonteCarloEER(SingleAnnotPoolBasedQueryStrategy, ExpectedErrorReduction):
+class MonteCarloEER(ExpectedErrorReduction):
     """
     Roy McCallum
     """
     def __init__(self, method='misclassification_loss', cost_matrix=None,
                  missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            enforce_mapping=False,
+            cost_matrix=cost_matrix,
+            missing_label=missing_label,
+            random_state=random_state,
         )
         self.method = method
-        self.cost_matrix = cost_matrix
 
-    def query(self, X, y, clf, sample_weight=None,
-              fit_clf=True, ignore_partial_fit=True,
-              candidates=None, sample_weight_candidates=None,
-              X_eval=None, sample_weight_eval=None,
-              batch_size=1, return_utilities=False):
+    def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
+                                      idx_cand, idx_eval, w_eval):
+        uclf.fit_add_cand(idx_cx, cy)
+        probs = uclf.predict_proba(idx_eval)
 
-        enforce_mapping = False
-        reset = True
-
-        # Validate input parameters.
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-                X, y, candidates, batch_size, return_utilities, reset=reset
+        if self.method == 'misclassification_loss':
+            preds = np.argmin(np.dot(probs, self.cost_matrix_), axis=1)
+            err = self._risk_estimation(probs, preds,
+                                        self.cost_matrix_, w_eval[idx_eval])
+        elif self.method == 'log_loss':
+            err = self._logloss_estimation(probs, probs)
+        else:
+            raise ValueError(
+                f"Supported methods are `misclassification_loss`, or"
+                f"`log_loss` the given one is: {self.method}"
             )
 
-        X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=enforce_mapping
+        return err
+
+    def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
+                                idx_eval):
+        uclf.precompute(idx_train, idx_cand)
+        uclf.precompute(idx_train, idx_eval)
+        uclf.precompute(idx_cand, idx_eval)
+        uclf = super()._precompute_and_fit_clf(
+            uclf, X_full, y_full, idx_train, idx_cand, idx_eval
         )
+        return uclf
 
-        # Validate classifier type.
-        check_type(clf, 'clf', SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
 
-        # Validate method.
-        if not isinstance(self.method, str):
-            raise TypeError('{} is an invalid type for method. Type {} is '
-                            'expected'.format(type(self.method), str))
+class ValueOfInformationEER(ExpectedErrorReduction):
+    """
+    Joshi https://ieeexplore.ieee.org/document/6127880
+    """
+    def __init__(self, method='misclassification_loss', cost_matrix=None,
+                 missing_label=MISSING_LABEL, random_state=None):
+        super().__init__(
+            enforce_mapping=True,
+            cost_matrix=cost_matrix,
+            missing_label=missing_label,
+            random_state=random_state,
+        )
+        self.method = method
 
-        # Fit the classifier.
-        if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+    def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
+                                      idx_cand, idx_eval, w_eval):
+        uclf.fit_add_cand(idx_cx, cy)
+        idx_eval_ = np.setdiff1d(idx_cand, idx_cx, assume_unique=True)
+
+        # Handle problem that if only one candidate is remaining, this should
+        # be the one to be selected although the error cannot be estimated
+        # as there are no instances left for estimating
+        if len(idx_eval_) == 0:
+            err = 0
         else:
-            check_is_fitted(clf)
-            clf = deepcopy(clf)
+            probs = uclf.predict_proba(idx_eval_)
+            if self.method == 'misclassification_loss':
+                err = self._risk_estimation(
+                    probs, probs, self.cost_matrix_, w_eval[idx_eval_]
+                )
+            elif self.method == 'log_loss':
+                err = self._logloss_estimation(probs, probs)
+            else:
+                raise ValueError(
+                    f"Supported methods are `misclassification_loss`, or"
+                    f"`log_loss` the given one is: {self.method}"
+                )
 
-        # determine existing classes
-        classes = clf.classes_
-        n_classes = len(classes)
+        return err
 
-        # Check cost matrix.
-        cost_matrix = 1 - np.eye(n_classes) if self.cost_matrix is None \
-            else self.cost_matrix
-        cost_matrix = check_cost_matrix(cost_matrix, n_classes)
+    def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
+                                idx_eval):
+        uclf.precompute(idx_cand, idx_cand)
+        uclf.precompute(idx_train, idx_cand)
+        uclf = super()._precompute_and_fit_clf(
+            uclf, X_full, y_full, idx_train, idx_cand, idx_eval
+        )
+        return uclf
 
-        # Check if candidates are samples if sample_weight_candidates is set
-        if (candidates is None or candidates.ndim == 1) and \
-                sample_weight_candidates is not None:
-            raise ValueError('Attribute `sample_weight_candidates` can only'
-                             'be None if `candidates` consists of samples.')
 
-        # Check if X_eval is set if sample_weight_eval is set
-        if X_eval is None and sample_weight_eval is not None:
-            raise ValueError('If `X_eval` is None, `sample_weight_eval` must'
-                             'also be None')
 
-        # TODO: test sample weight_eval - length + column
+
+
+class UpdateIndexClassifier():
+    def __init__(self, clf, X, y, sample_weight,
+                 fit_clf=True, ignore_partial_fit=True):
+        self.clf = clf
+        self.X = X
+        self.y = y
+        self.sample_weight = sample_weight
+
+        self.fit_clf = fit_clf
+
+        # TODO check fit_clf and ignore_partial_fit
 
         # use partial fit if applicable
         check_type(ignore_partial_fit, 'ignore_partial_fit', bool)
         partial_fit = hasattr(clf, 'partial_fit') and not ignore_partial_fit
 
-        # METHOD SPECIFIC
-
-        X_full = X
-        y_full = y
-        w_full = sample_weight
-        idx_train = np.arange(len(X))
-        idx_lbld = labeled_indices(y)
-        idx_unld = unlabeled_indices(y)
-
-        if candidates is None:
-            idx_cand = idx_unld
-        elif candidates.ndim == 1:
-            idx_cand = candidates
-        else:
-            X_full = np.concatenate([X_full, candidates], axis=0)
-            y_full = np.concatenate([y_full, np.full(len(candidates), np.nan)],
-                                    axis=0)
-            if not (w_full is None and sample_weight_candidates is None):
-                w_full = np.concatenate([w_full, sample_weight_candidates],
-                                        axis=0)
-            idx_cand = np.arange(len(X), len(X_full))
-
-        if X_eval is None:
-            idx_eval = idx_train
-            if sample_weight_eval is None:
-                w_eval = np.ones(len(idx_eval))
-            else:
-                if len(sample_weight_eval) == len(X):
-                    w_eval = sample_weight_eval
-                else:
-                    raise ValueError('If `sample_weight_eval` is set but '
-                                     '`X_eval` is None, then it should have '
-                                     'same size as `X`')
-        else:
-            X_full = np.concatenate([X_full, X_eval], axis=0)
-            y_full = np.concatenate([y_full, np.full(len(X_eval), np.nan)],
-                                    axis=0)
-            idx_eval = np.arange(len(X_full) - len(X_eval), len(X_full))
-            if sample_weight_eval is None:
-                w_eval = np.ones(len(X_eval))
-
-        # sample_weight is checked by clf when fitted
-
-        # Compute class-membership probabilities of candidate samples.
-        probs_cand = clf.predict_proba(X_cand)
+        self.use_partial_fit = \
+            hasattr(clf, 'partial_fit') and not ignore_partial_fit
 
         # precompute PWC
-        if isinstance(clf, PWC):
-            metric = clf.metric
-            metric_dict = {} if clf.metric_dict is None else clf.metric_dict
-            clf.metric = 'precomputed'
-            clf.metric_dict = {}
+        if isinstance(self.clf, PWC):
+            if not hasattr(self, 'clf_'):
+                self.clf_ = clone(self.clf)
+            else:
+                self.clf_ = clone(self.clf_)
 
-            K = np.full([len(X_full), len(idx_eval)], np.nan)
-            train_idx = np.concatenate([idx_lbld, idx_cand], axis=0)
-            K[train_idx, :] = \
-                pairwise_kernels(X_full[train_idx], X_full[idx_eval],
-                                 metric, **metric_dict)
+            self.pwc_metric_ = self.clf.metric
+            self.pwc_metric_dict_ = \
+                {} if self.clf.metric_dict is None else self.clf.metric_dict
+            self.clf_.metric = 'precomputed'
+            self.clf_.metric_dict = {}
 
-        # Storage for computed errors per candidate sample.
-        errors = np.zeros([len(X_cand), n_classes])
+            self.pwc_K_ = np.full([len(self.X), len(self.X)], np.nan)
 
-        # Iterate over candidate samples
-        for i_cx, idx_cx in enumerate(idx_cand):
-            idx_add = np.concatenate([idx_train, [idx_cx]])
-            X_add = X_full[idx_add]
-            # Simulate acquisition of label for each candidate sample and class.
-            for i_cy, cy in enumerate(classes):
+    def get_classes(self):
+        return self.clf_.classes_
 
-                y_add = np.concatenate([y_full[idx_train], [cy]])
-                if w_full is None:
-                    w_add = None
-                else:
-                    w_add = w_full[idx_add]
+    def precompute(self, idx_train, idx_eval):
 
-                if partial_fit:
-                    clf_new = deepcopy(clf).partial_fit(X_add, y_add, w_add)
-                else:
-                    clf_new = clf.fit(X_add, y_add, w_add) # TODO clone deletes classes
+        # precompute PWC
+        if isinstance(self.clf, PWC):
+            self.pwc_K_[np.ix_(idx_train, idx_eval)] = \
+                pairwise_kernels(self.X[idx_train], self.X[idx_eval],
+                                 self.pwc_metric_, **self.pwc_metric_dict_)
 
-                ### clf_new, X_full, y_full, w_full, w_eval, K, idx1,2,3
-                # self.cost_matrix_, self.method, self.
 
-                if isinstance(clf, PWC):
-                    probs = clf_new.predict_proba(K[idx_add, :].T)
-                else:
-                    probs = clf_new.predict_proba(X_full[idx_eval, :])
+    def fit(self, idx, set_train_idx=True):
+        if set_train_idx:
+            self.train_idx_ = idx
+        self.idx_ = idx
 
-                if self.method == 'misclassification_loss':
-                    preds = np.argmax(np.dot(probs, cost_matrix), axis=1)
-                    err = self._risk_estimation(probs, preds, cost_matrix,
-                                                sample_weight_eval)
-                elif self.method == 'log_loss':
-                    err = self._logloss_estimation(probs, probs)
-                else:
-                    raise ValueError(
-                        f"Supported methods are `misclassification_loss`, or"
-                        f"`log_loss` the given one is: {self.method}"
-                    )
-                ###
+        if not hasattr(self, 'clf_'):
+            self.clf_ = self.clf
 
-                errors[i_cx, i_cy] = err
-
-        utilities_cand = np.sum(probs_cand * errors, axis=1)
-
-        if mapping is None:
-            utilities = utilities_cand
+        if self.fit_clf:
+            self.clf_ = clone(self.clf_)
+            if self.sample_weight is None:
+                self.clf_.fit(self.X[idx], self.y[idx])
+            else:
+                self.clf_.fit(self.X[idx], self.y[idx],
+                              self.sample_weight[idx])
         else:
-            utilities = np.full(len(X), np.nan)
-            utilities[mapping] = utilities_cand
+            check_is_fitted(self.clf_)
+            self.clf_ = deepcopy(self.clf_)
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return self.clf_
 
+    def fit_add_cand(self, c_idx, y):
+
+        if self.use_partial_fit:
+            if self.sample_weight is None:
+                self.clf_ = deepcopy(self.clf).partial_fit(self.X[c_idx], y)
+            else:
+                self.clf_ = deepcopy(self.clf).partial_fit(
+                    self.X[c_idx], y, self.sample_weight[c_idx]
+                )
+        else:
+            new_idx = np.concatenate([self.train_idx_, c_idx], axis=0)
+            y_new = np.concatenate([self.y[self.train_idx_], y], axis=0)
+            if self.sample_weight is None:
+                self.clf_ = clone(self.clf_).fit(self.X[new_idx], y_new)
+                self.idx_ = new_idx
+            else:
+                self.clf_ = clone(self.clf_).fit(self.X[new_idx], y_new,
+                                              self.sample_weight[new_idx])
+                self.idx_ = new_idx
+
+    def predict_proba(self, idx):
+
+        if hasattr(self, 'pwc_K_'):
+            # check if results contain NAN
+            return self.clf_.predict_proba(
+                self.pwc_K_[self.idx_, :][:, idx].T
+            )
+        else:
+            return self.clf_.predict_proba(self.X[idx])
 
 
 def expected_error_reduction(clf, X_cand, X=None, y=None, cost_matrix=None,
