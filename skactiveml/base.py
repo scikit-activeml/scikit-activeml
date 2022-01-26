@@ -155,18 +155,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
 class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
     """Base class for all pool-based active learning query strategies with a
     single annotator in scikit-activeml.
-
-    Parameters
-    ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label.
-    random_state : int or RandomState instance, default=None
-        Controls the randomness of the estimator.
     """
-
-    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
-        super().__init__(random_state=random_state)
-        self.missing_label = missing_label
 
     @abstractmethod
     def query(self, X, y, *args, candidates=None, batch_size=1,
@@ -328,8 +317,8 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             return X[candidates], candidates
         else:
             if enforce_mapping:
-                raise ValueError('Mapping `X_cand` to `X` is not posssible'
-                                 'but `enforce_mapping` is True. Use index'
+                raise ValueError('Mapping `X_cand` to `X` is not posssible '
+                                 'but `enforce_mapping` is True. Use index '
                                  'array for `candidates` instead.')
             else:
                 return candidates, None
@@ -692,8 +681,14 @@ class BudgetManager(ABC, BaseEstimator):
             self.budget_ = self.budget
         else:
             self.budget_ = 0.1
-        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
-                     min_inclusive=False)
+        check_scalar(
+            self.budget_,
+            "budget",
+            float,
+            min_val=0.0,
+            max_val=1.0,
+            min_inclusive=False,
+        )
 
     def _validate_data(self, utilities, *args, **kwargs):
         """Validate input data.
@@ -725,22 +720,19 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    budget_manager : BudgetManager
-        The BudgetManager which models the budgeting constraint used in
+    budget : float, default=None
+        The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager, random_state=None):
+    def __init__(self, budget, random_state=None):
         super().__init__(random_state=random_state)
-        self.budget_manager = budget_manager
+        self.budget = budget
 
     @abstractmethod
-    def query(
-        self, X_cand, *args, return_utilities=False, **kwargs
-    ):
+    def query(self, X_cand, *args, return_utilities=False, **kwargs):
         """Ask the query strategy which instances in X_cand to acquire.
 
         The query startegy determines the most useful instances in X_cand,
@@ -775,8 +767,14 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, queried_indices, *args,
-               budget_manager_param_dict=None, **kwargs):
+    def update(
+        self,
+        X_cand,
+        queried_indices,
+        *args,
+        budget_manager_param_dict=None,
+        **kwargs,
+    ):
         """Update the query strategy with the decisions taken.
 
         This function should be used in conjunction with the query function,
@@ -803,17 +801,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def get_default_budget_manager(self):
-        """Provide the budget manager that will be used as default.
-
-        Returns
-        -------
-        budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
-        """
-        raise NotImplementedError
-
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of
         np.random_state. If not create a new random state. See also
@@ -823,21 +810,13 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             self.random_state_ = deepcopy(self.random_state)
         self.random_state_ = check_random_state(self.random_state_)
 
-    def _validate_budget_manager(self):
-        """Validate if budget manager is a budget_manager class and create a
-        copy 'budget_manager_'.
-        """
-        if not hasattr(self, "budget_manager_"):
-            if self.budget_manager is None:
-                self.budget_manager_ = self.get_default_budget_manager()
-            else:
-                self.budget_manager_ = clone(self.budget_manager)
-        if not isinstance(self.budget_manager_, BudgetManager):
-            raise TypeError(
-                "{} is not a valid Type for budget_manager".format(
-                    type(self.budget_manager_)
-                )
-            )
+    def _validate_budget(self):
+        if self.budget is not None:
+            self.budget_ = self.budget
+        else:
+            self.budget_ = 0.1
+        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
+                     min_inclusive=False, )
 
     def _validate_data(
         self,
@@ -845,7 +824,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return_utilities,
         *args,
         reset=True,
-        **check_X_cand_params
+        **check_X_cand_params,
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -883,7 +862,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self._validate_random_state()
 
         # Check budget_manager.
-        self._validate_budget_manager()
+        self._validate_budget()
 
         return X_cand, return_utilities
 

@@ -555,3 +555,24 @@ def check_bound(bound=None, X=None, ndim=2, epsilon=0,
         return bound
     else:
         raise ValueError("`X` or `bound` must not be None.")
+
+
+def check_budget_manager(budget, budget_manager, default_budget_manager_class,
+                         default_budget_manager_dict=None):
+    """Validate if budget manager is a budget_manager class and create a
+        copy 'budget_manager_'.
+        """
+    if default_budget_manager_dict is None:
+        default_budget_manager_dict = {}
+    if budget_manager is None:
+        budget_manager_ = default_budget_manager_class(
+            budget=budget, **default_budget_manager_dict)
+    else:
+        if budget is not None and budget != budget_manager.budget:
+            warnings.warn(
+                "budget_manager is already given such that the budget "
+                "is not used. The given budget differs from the "
+                "budget_managers budget."
+            )
+        budget_manager_ = copy.deepcopy(budget_manager)
+    return budget_manager_

@@ -1,9 +1,7 @@
 import numpy as np
 
 from ..base import SingleAnnotStreamBasedQueryStrategy
-
-from .budget_manager import FixedThresholdBudget
-from ..utils import call_func
+from ..utils import check_scalar
 
 
 class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
@@ -16,20 +14,25 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
 
     Parameters
     ----------
-    budget_manager : BudgetManager
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        FixedThresholdBudget will be used by default.
+    budget : float, default=None
+        The budget which models the budgeting constraint used in
+        the stream-based active learning setting.
+
+    allow_exceeding_budget : bool, default=True
+        If True, the query strategy is allowed to exceed it's budget as long as
+        the average number of queries will be within the budget. If False,
+        queries are not allowed if the budget is exhausted.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager=None,
+    def __init__(self, budget=None, allow_exceeding_budget=True,
                  random_state=None):
         super().__init__(
-            budget_manager=budget_manager, random_state=random_state
+            budget=budget, random_state=random_state
         )
+        self.allow_exceeding_budget = allow_exceeding_budget
 
     def query(self, X_cand, return_utilities=False):
         """Ask the query strategy which instances in X_cand to acquire.
@@ -59,25 +62,50 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        X_Cand, return_utilities = self._validate_data(
+        X_cand, return_utilities = self._validate_data(
             X_cand, return_utilities
         )
 
         # copy random state in case of simulating the query
-        prior_random_state_state = self.random_state_.get_state()
+        prior_random_state = self.random_state_.get_state()
 
         utilities = self.random_state_.random_sample(len(X_cand))
 
-        self.random_state_.set_state(prior_random_state_state)
+        self.random_state_.set_state(prior_random_state)
 
-        queried_indices = self.budget_manager_.query_by_utility(utilities)
+        # keep record if the instance is queried and if there was budget left,
+        # when assessing the corresponding utilities
+        queried = np.full(len(utilities), False)
+
+        # keep the internal state to reset it later if simulate is true
+        tmp_observed_instances = self.observed_instances_
+        tmp_queried_instances = self.queried_instances_
+        # check for each sample separately if budget is left and the utility is
+        # high enough
+        for i, utility in enumerate(utilities):
+            tmp_observed_instances += 1
+            available_budget = (
+                tmp_observed_instances
+                * self.budget_
+                - tmp_queried_instances
+            )
+            queried[i] = (
+                (self.allow_exceeding_budget or available_budget > 1)
+                and (utility >= 1 - self.budget_)
+            )
+            tmp_queried_instances += queried[i]
+
+        # get the indices instances that should be queried
+        queried_indices = np.where(queried)[0]
+
+        # queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -99,31 +127,16 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
             The RandomSampler returns itself, after it is updated.
         """
         # check if a random state is set
-        self._validate_random_state()
-        # check if a budget_manager is set
-        self._validate_budget_manager()
-        budget_manager_param_dict = ({} if budget_manager_param_dict is None
-                                     else budget_manager_param_dict)
+        self._validate_data([[0]], False)
+        # update observed instances and queried instances
+        queried = np.zeros(len(X_cand))
+        queried[queried_indices] = 1
+        self.observed_instances_ += X_cand.shape[0]
+        self.queried_instances_ += np.sum(queried)
         # update the random state assuming, that query(..., simulate=True) was
         # used
         self.random_state_.random_sample(len(X_cand))
-        call_func(
-            self.budget_manager_.update,
-            X_cand=X_cand,
-            queried_indices=queried_indices,
-            **budget_manager_param_dict
-        )
         return self
-
-    def get_default_budget_manager(self):
-        """Provide the budget manager that will be used as default.
-
-        Returns
-        -------
-        budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
-        """
-        return FixedThresholdBudget()
 
     def _validate_data(
         self, X_cand, return_utilities, reset=True, **check_X_cand_params
@@ -151,6 +164,16 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        # check if counting of instances has begun
+        if not hasattr(self, "observed_instances_"):
+            self.observed_instances_ = 0
+        if not hasattr(self, "queried_instances_"):
+            self.queried_instances_ = 0
+
+        check_scalar(
+            self.allow_exceeding_budget, "allow_exceeding_budget", bool
+        )
+
         X_cand, return_utilities = super()._validate_data(
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
@@ -172,19 +195,17 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
 
     Parameters
     ----------
-    budget_manager : BudgetManager
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        FixedThresholdBudget will be used by default.
+    budget : float, default=None
+        The budget which models the budgeting constraint used in
+        the stream-based active learning setting.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget_manager=None,
-                 random_state=None):
+    def __init__(self, budget=None, random_state=None):
         super().__init__(
-            budget_manager=budget_manager, random_state=random_state
+            budget=budget, random_state=random_state
         )
 
     def query(self, X_cand, return_utilities=False):
@@ -224,29 +245,34 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
             )
 
         utilities = np.zeros(X_cand.shape[0])
-        budget = getattr(self.budget_manager_, "budget_", 0)
+
+        # keep record if the instance is queried and if there was budget left,
+        # when assessing the corresponding utilities
+        queried = np.full(len(X_cand), False)
 
         tmp_observed_instances = self.observed_instances_
         tmp_queried_instances = self.queried_instances_
         for i, x in enumerate(X_cand):
             tmp_observed_instances += 1
             remaining_budget = (
-                tmp_observed_instances * budget - tmp_queried_instances
+                tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
-            if remaining_budget >= 1:
+            queried[i] = (remaining_budget >= 1)
+            if queried[i]:
                 utilities[i] = 1
-                tmp_queried_instances += 1
-            else:
-                utilities[i] = 0
+            tmp_queried_instances += queried[i]
 
-        queried_indices = self.budget_manager_.query_by_utility(utilities)
+        # get the indices instances that should be queried
+        queried_indices = np.where(queried)[0]
+
+        # queried_indices = self.budget_manager_.query_by_utility(utilities)
 
         if return_utilities:
             return queried_indices, utilities
         else:
             return queried_indices
 
-    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
+    def update(self, X_cand, queried_indices):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -269,30 +295,11 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
         """
         # check if a budget_manager is set
         self._validate_data(np.array([[0]]), False)
-        budget_manager_param_dict = ({} if budget_manager_param_dict is None
-                                     else budget_manager_param_dict)
-        call_func(
-            self.budget_manager_.update,
-            X_cand=X_cand,
-            queried_indices=queried_indices,
-            **budget_manager_param_dict
-        )
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
         self.observed_instances_ += len(queried)
         self.queried_instances_ += np.sum(queried)
-        # print("queried_instances_", self.queried_instances_)
         return self
-
-    def get_default_budget_manager(self):
-        """Provide the budget manager that will be used as default.
-
-        Returns
-        -------
-        budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
-        """
-        return FixedThresholdBudget()
 
     def _validate_data(
         self, X_cand, return_utilities, reset=True, **check_X_cand_params

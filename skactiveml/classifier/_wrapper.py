@@ -224,9 +224,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             warnings.warn(
                 f"{self.estimator} does not support `sample_weight`. "
                 f"Therefore, this parameter will be ignored.")
-        self.estimator_ = deepcopy(self.estimator)
-
-        # Count labels per class.
+        if hasattr(self, "estimator_"):
+            if fit_function != "partial_fit":
+                self.estimator_ = deepcopy(self.estimator)
+        else:
+            self.estimator_ = deepcopy(self.estimator)
+        # count labels per class
         is_lbld = ~np.isnan(y)
         self._label_counts = [np.sum(y[is_lbld] == c) for c in
                               range(len(self._le.classes_))]
