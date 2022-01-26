@@ -289,3 +289,14 @@ class TestIEThresh(unittest.TestCase):
                                                    batch_size=7)
 
         self.assertEqual(len(query_indices), 4)
+
+    def test_query_with_mapping(self):
+
+        ie_thresh = IEThresh()
+        mapping = np.arange(2)
+
+        query_indices = ie_thresh.query(candidates=mapping,
+                                        clf=LogisticRegressionRY(),
+                                        X=self.X, y=self.y)
+
+        self.assertEqual(len(query_indices), 0)

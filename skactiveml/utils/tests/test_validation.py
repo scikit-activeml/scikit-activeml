@@ -6,6 +6,7 @@ import numpy as np
 from skactiveml.utils import check_cost_matrix, check_classifier_params, \
     check_classes, check_scalar, check_X_y, check_type, check_bound
 from skactiveml.utils import check_random_state, check_class_prior
+from skactiveml.utils._validation import check_indices
 
 
 class TestValidation(unittest.TestCase):
@@ -133,6 +134,16 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool)
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool, map, list)
         check_type(10, 'a', int)
+
+    def test_check_indices(self):
+        A = np.array([[4, 5], [6, 1], [3, 4]])
+        ind = np.array([0, 2])
+        self.assertRaises(ValueError, check_indices, 'a', ind)
+        self.assertRaises(TypeError, check_indices, 42, ind)
+        self.assertRaises(ValueError, check_indices, A, 'b')
+        self.assertRaises(TypeError, check_indices, A, 7)
+
+
 
     def test_check_bound(self):
         self.assertRaises(ValueError, check_bound, X=7)

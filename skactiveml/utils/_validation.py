@@ -429,8 +429,9 @@ def check_indices(indices, A, dim=0):
 
     Parameters
     ----------
-    indices : array-like
-        The considered indices.
+    indices : array-like of shape (n_indices, n_dim) or (n_indices,)
+        The considered indices, where, if the number of dimensions of indices is
+        greater than 1, indices[i
     A : array-like
         The considered array.
     dim : int or tuple of ints
@@ -441,8 +442,8 @@ def check_indices(indices, A, dim=0):
     indices: tuple of np.ndarrays or np.ndarray
         The validated indices.
     """
-    indices = check_array(indices, allow_nd=True, dtype=int)
-    A = check_array(A, allow_nd=True)
+    indices = check_array(indices, dtype=int, ensure_2d=False)
+    A = check_array(A, allow_nd=True, force_all_finite=False, ensure_2d=False)
     check_type(dim, 'dim', int, tuple)
     if isinstance(dim, tuple):
         for n in dim:
@@ -453,7 +454,7 @@ def check_indices(indices, A, dim=0):
         if len(dim) != indices.shape[0]:
             raise ValueError(f'shape of `indices` along dimension 0 is '
                              f'{indices.shape[0]}, but must be {len(dim)}')
-        indices = tuple(indices)
+        indices = tuple(indices.T)
         for (i, n) in enumerate(indices):
             if np.any(indices[i] >= A.shape[dim[i]]):
                 raise ValueError(f'`indices[{i}]` contains index of value '

@@ -11,7 +11,7 @@ from ._wrapper import MultiAnnotWrapper
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier, AnnotModelMixin
 from ...utils import rand_argmax, check_scalar, compute_vote_vectors, \
-    MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type, check_X_y, simple_batch
+    MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type, check_X_y, simple_batch, majority_vote
 from ...pool._uncertainty import UncertaintySampling, uncertainty_scores
 
 
@@ -93,27 +93,19 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixin):
         if self.mode not in ['lower', 'mean', 'upper']:
             raise ValueError("`mode` must be in `['lower', 'mean', `upper`].`")
 
-        # Check random state.
-        random_state = check_random_state(self.random_state)
-
-        # Encode class labels from `0` to `n_classes-1`.
-        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
-                                        classes=self.classes).fit(y)
-        self.classes_ = label_encoder.classes_
-        y = label_encoder.transform(y)
-
         # Check shape of labels.
         if y.ndim != 2:
             raise ValueError("`y` but must be a 2d array with shape "
                              "`(n_samples, n_annotators)`.")
 
         # Compute majority vote labels.
-        V = compute_vote_vectors(y=y, w=sample_weight, classes=self.classes_)
-        y_mv = rand_argmax(V, axis=1, random_state=random_state)
+        y_mv = majority_vote(y=y, w=sample_weight, classes=self.classes,
+                             random_state=self.random_state,
+                             missing_label=self.missing_label)
 
         # Number of annotators.
         self.n_annotators_ = y.shape[1]
-        is_lbld = is_labeled(y, missing_label=np.nan)
+        is_lbld = is_labeled(y, missing_label=self.missing_label)
         self.A_perf_ = np.zeros((self.n_annotators_, 3))
         for a_idx in range(self.n_annotators_):
             is_correct = np.equal(y_mv[is_lbld[:, a_idx]],
@@ -321,69 +313,25 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         utilities[~A_cand] = np.nan
 
         # Determine actual batch size.
-        if batch_size == 'adaptive':
+        if isinstance(batch_size, str) and batch_size != 'adaptive':
+            raise ValueError(f"If `batch_size` is of type `string`, "
+                             f"it must equal `'adaptive'`.")
+        elif batch_size == 'adaptive':
             required_perf = self.epsilon * np.max(A_perf)
-            actual_batch_size = int(np.sum(A_perf >= required_perf))
+            actl_batch_size = int(np.sum(A_perf >= required_perf))
+        elif isinstance(batch_size, int):
+            actl_batch_size = batch_size
         else:
-            actual_batch_size = batch_size
+            raise TypeError(f"`batch_size` is of type `{type(batch_size)}` "
+                            f"but must equal `'adaptive'` or be of type "
+                            f"`int`.")
 
         if mapping is not None:
             w_utilities = utilities
-            utilities = np.full((batch_size, len(X), n_annotators), np.nan)
+            utilities = np.full((actl_batch_size, len(X), n_annotators), np.nan)
             utilities[:, mapping, :] = w_utilities
 
         # Perform selection based on previously computed utilities.
         return simple_batch(utilities, self.random_state_,
-                            batch_size=actual_batch_size,
+                            batch_size=actl_batch_size,
                             return_utilities=return_utilities)
-
-        """
-        # base check
-        X, y, candidates, annotators, _, return_utilities = \
-            super()._validate_data(X, y, candidates, annotators, 1,
-                                   return_utilities, reset=True)
-
-        # Validate classifier type.
-        check_type(clf, 'clf', SkactivemlClassifier)
-
-        # Fit the classifier.
-        if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
-
-        # Check whether epsilon is float in [0, 1].
-        check_scalar(x=self.epsilon, target_type=float, name='epsilon',
-                     min_val=0, max_val=1)
-
-        # Check whether alpha is float in (0, 1).
-        check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
-                     max_val=1, min_inclusive=False, max_inclusive=False)
-
-        # Fit annotator model and compute performance estimates.
-        ie_model = IEAnnotModel(classes=clf.classes_,
-                                missing_label=clf.missing_label,
-                                alpha=self.alpha, mode='upper')
-
-        ie_model.fit(X=X, y=y, sample_weight=sample_weight)
-        A_perf = ie_model.A_perf_
-        A_perf = A_perf[:, 2]
-
-        wrapper = MultiAnnotWrapper(
-            strategy=UncertaintySampling(method='least_confident'),
-            random_state=self.random_state_,
-            missing_label=self.missing_label)
-
-        # Determine actual batch size.
-        if batch_size == 'adaptive':
-            required_perf = self.epsilon * np.max(A_perf)
-            actual_batch_size = int(np.sum(A_perf >= required_perf))
-        else:
-            actual_batch_size = batch_size
-
-        query_params_dict = {'clf': clf, 'sample_weight': sample_weight}
-        return wrapper.query(X, y, candidates=candidates, annotators=annotators,
-                             batch_size=actual_batch_size, A_perf=A_perf,
-                             n_annotators_per_sample=actual_batch_size,
-                             query_params_dict=query_params_dict,
-                             return_utilities=return_utilities)
-        """
-
