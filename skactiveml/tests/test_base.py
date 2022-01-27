@@ -13,6 +13,7 @@ from skactiveml.base import (
     BudgetManager,
     SingleAnnotStreamBasedQueryStrategy,
 )
+from skactiveml.utils import MISSING_LABEL
 
 
 class QueryStrategyTest(unittest.TestCase):
@@ -42,9 +43,57 @@ class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
                     __abstractmethods__=set())
     def setUp(self):
         self.qs = MultiAnnotPoolBasedQueryStrategy()
+        self.qs.missing_label_ = MISSING_LABEL
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+        self.assertRaises(NotImplementedError, self.qs.query,
+                          X=np.array([[1, 2]]), y=np.array([[1, ]]))
+
+    def test_transform_cand_annot(self):
+        self.assertRaises(ValueError, self.qs._transform_cand_annot,
+                          candidates=np.array([[0, 2]]), annotators=None,
+                          X=np.array([[1, 2]]), y=np.array([[1, ]]),
+                          enforce_mapping=True)
+        re_val = self.qs._transform_cand_annot(candidates=np.arange(2),
+                                               annotators=np.arange(2),
+                                               X=np.array([[1, 2], [0, 1]]),
+                                               y=np.array([[1, MISSING_LABEL],
+                                                           [2, 3]]))
+        X_cand, mapping, A_cand = re_val
+        np.testing.assert_array_equal(X_cand, np.array([[1, 2]]))
+
+        re_val = self.qs._transform_cand_annot(candidates=None,
+                                               annotators=np.array(
+                                                   [[False, True], [True, True]]
+                                               ),
+                                               X=np.array([[1, 2], [0, 1]]),
+                                               y=np.array([[1, MISSING_LABEL],
+                                                           [2, 3]]))
+        X_cand, mapping, A_cand = re_val
+        np.testing.assert_array_equal(A_cand, np.array([[False, True],
+                                                        [True, True]]))
+
+        re_val = self.qs._validate_data(candidates=None,
+                                        annotators=[1],
+                                        X=np.array([[1, 2], [0, 1]]),
+                                        y=np.array([[1, MISSING_LABEL],
+                                                    [2, 3]]),
+                                        batch_size=2,
+                                        return_utilities=False)
+
+        X, y, candidates, annotators, batch_size, return_utilities = re_val
+        self.assertEqual(1, batch_size)
+
+        re_val = self.qs._validate_data(candidates=[1],
+                                        annotators=[1],
+                                        X=np.array([[1, 2], [0, 1]]),
+                                        y=np.array([[1, MISSING_LABEL],
+                                                    [2, 3]]),
+                                        batch_size=2,
+                                        return_utilities=False)
+
+        X, y, candidates, annotators, batch_size, return_utilities = re_val
+        self.assertEqual(0, batch_size)
 
 
 class SkactivemlClassifierTest(unittest.TestCase):

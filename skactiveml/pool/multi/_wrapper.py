@@ -86,6 +86,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             The annotator sample pairs, for which the sample is a candidate
             sample and the annotator is an available annotator are considered as
             candidate annotator sample pairs.
+            If `annotators` is None and `candidates` is of shape (n_candidates),
+            all annotator sample pairs, for which the sample is is indexed by
+            `candidates` are considered as candidate annotator sample pairs.
             If `annotators` is a boolean array of shape (n_candidates,
             n_avl_annotators) the annotator sample pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are

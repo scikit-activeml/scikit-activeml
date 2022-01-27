@@ -6,10 +6,11 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.utils import check_array
 
 from ..base import QueryStrategy
 from ..utils import check_scalar
-from ..utils._validation import check_type
+from ..utils._validation import check_type, check_indices
 from ._auxiliary_functions import mesh, check_bound, _get_boundary_args, \
     _get_confidence_args, _get_contour_args, _get_cmap
 
@@ -120,20 +121,27 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     return ax
 
 
-def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
-                 contour_dict=None):
+def plot_utility(qs, X, y, candidates=None, qs_dict=None, feature_bound=None,
+                 ax=None, res=21, contour_dict=None):
     """ Plot the utility for the given query strategy.
 
     Parameters
     ----------
     qs: QueryStrategy
         The query strategy for which the utility is plotted.
+    X : array-like of shape (n_samples, n_features)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples)
+        Labels of the training data set (possibly including unlabeled ones
+        indicated by self.MISSING_LABEL.
     qs_dict: dict
         Dictionary with the parameters for the qs.query method.
-    X_cand: array-like, shape(n_candidates, n_features)
-        Unlabeled candidate instances. If X_cand is given, the utility is
-        calculated only for these instances and is interpolated. Otherwise, the
-        utility is calculated for every point in the given area.
+    candidates: array-like, shape(n_candidates, n_features)
+        Unlabeled candidate instances. If `candidates` is not `None`, the
+        utility is calculated only for the selected instances and is
+        interpolated. Otherwise, the utility is calculated for every point in
+        the given area.
     feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted. If X_cand is not
         given, bound must not be None. Otherwise, the bound is determined based
@@ -150,11 +158,31 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
     matplotlib.axes.Axes: The axis on which the utility was plotted.
     """
     check_type(qs, 'qs', QueryStrategy)
+    if qs_dict is None:
+        qs_dict = {}
     check_type(qs_dict, 'qs_dict', dict)
-    if 'X_cand' in qs_dict.keys():
-        raise ValueError("'X_cand' must be given as separate argument.")
+    if 'candidates' in qs_dict.keys():
+        raise ValueError("'candidates' must be given as separate argument.")
+    for key, value in [('X', X), ('y', y)]:
+        qs_dict[key] = value
 
-    feature_bound = check_bound(bound=feature_bound, X=X_cand)
+    if candidates is None:
+        X_cand = None
+    else:
+        candidates = check_array(candidates, allow_nd=True, ensure_2d=False,
+                                 force_all_finite='allow-nan')
+        if candidates.ndim == 2:
+            X_cand = candidates
+        else:
+            check_indices(candidates, X)
+            X_cand = X[candidates]
+
+    if X_cand is None:
+        X_check = X
+    else:
+        X_check = np.append(X, X_cand, axis=0)
+
+    feature_bound = check_bound(bound=feature_bound, X=X_check)
 
     if ax is None:
         ax = plt.gca()
@@ -166,12 +194,17 @@ def plot_utility(qs, qs_dict, X_cand=None, feature_bound=None, ax=None, res=21,
     contour_args = _get_contour_args(contour_dict)
 
     if X_cand is None:
-        _, utilities = qs.query(mesh_instances, **qs_dict,
+        _, utilities = qs.query(candidates=mesh_instances, **qs_dict,
                                 return_utilities=True)
         utilities = utilities.reshape(X_mesh.shape)
         ax.contourf(X_mesh, Y_mesh, utilities, **contour_args)
     else:
-        _, utilities = qs.query(X_cand, **qs_dict, return_utilities=True)
+        _, utilities = qs.query(candidates=candidates, **qs_dict,
+                                return_utilities=True)
+
+        # if utilities refers to `X`
+        if candidates.ndim == 1:
+            utilities = utilities[0, candidates]
         utilities = utilities.reshape(-1)
         neighbors = KNeighborsRegressor(n_neighbors=1)
         neighbors.fit(X_cand, utilities)

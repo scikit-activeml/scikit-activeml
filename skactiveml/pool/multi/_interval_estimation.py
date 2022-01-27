@@ -232,6 +232,9 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
             The annotator sample pairs, for which the sample is a candidate
             sample and the annotator is an available annotator are considered as
             candidate annotator sample pairs.
+            If `annotators` is None and `candidates` is of shape (n_candidates),
+            all annotator sample pairs, for which the sample is is indexed by
+            `candidates` are considered as candidate annotator sample pairs.
             If `annotators` is a boolean array of shape (n_candidates,
             n_avl_annotators) the annotator sample pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
@@ -282,7 +285,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
 
         n_annotators = y.shape[1]
         # Check whether unlabeled data exists
-        A_cand = np.all(A_cand, axis=1)
+        A_cand = np.repeat(np.all(A_cand, axis=1).reshape(-1, 1), n_annotators,
+                           axis=1)
 
         # Fit classifier and compute uncertainties on candidate samples.
         if fit_clf:
@@ -328,8 +332,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
 
         if mapping is not None:
             w_utilities = utilities
-            utilities = np.full((actl_batch_size, len(X), n_annotators), np.nan)
-            utilities[:, mapping, :] = w_utilities
+            utilities = np.full((len(X), n_annotators), np.nan)
+            utilities[mapping, :] = w_utilities
 
         # Perform selection based on previously computed utilities.
         return simple_batch(utilities, self.random_state_,

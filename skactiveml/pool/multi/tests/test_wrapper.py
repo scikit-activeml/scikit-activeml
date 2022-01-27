@@ -6,7 +6,7 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from skactiveml.classifier import SklearnClassifier, CMM
 from skactiveml.pool import UncertaintySampling, RandomSampler
 from skactiveml.pool.multi._wrapper import MultiAnnotWrapper
-from skactiveml.utils._label import MISSING_LABEL
+from skactiveml.utils._label import MISSING_LABEL, is_unlabeled
 from skactiveml.utils._aggregation import majority_vote
 
 
@@ -193,7 +193,8 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         best_cand_indices = wrapper.query(X, y)
         print(best_cand_indices)
         self.assertEqual((1, 2), best_cand_indices.shape)
-        self.check_availability(best_cand_indices, self.A_cand)
+        A = is_unlabeled(y)
+        self.check_availability(best_cand_indices, A)
 
     def test_query_one_annotator_per_sample_batch_size_five(self):
         random = RandomSampler(self.random_state)
@@ -359,6 +360,28 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertTrue(np.all((utilities[:, :, 1] == utilities[:, :, 0])
                                | np.isnan(utilities[:, :, 1])
                                | np.isnan(utilities[:, :, 0])))
+
+    def test_query_indexed_annotator_sample_candidates(self):
+
+        random = RandomSampler(self.random_state)
+        wrapper = MultiAnnotWrapper(random, random_state=self.random_state)
+
+        candidates = np.array([[7, 1], [9, 1]])
+        annotators = np.array([0, 1])
+        A_cand = np.full((2, 3), False)
+        A_cand[:, annotators] = True
+
+        re_val = wrapper.query(self.X, self.y, candidates=candidates,
+                               batch_size=6, n_annotators_per_sample=3,
+                               annotators=annotators, return_utilities=True)
+
+        best_cand_indices, utilities = re_val
+        self.check_availability(best_cand_indices, A_cand)
+        self.assertEqual((4, 2), best_cand_indices.shape)
+        self.assertEqual((4, 2, 3), utilities.shape)
+        self.check_max(best_cand_indices, utilities)
+
+
 
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]

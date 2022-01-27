@@ -43,7 +43,7 @@ class TestFeatureSpace(unittest.TestCase):
             estimators=estimators, voting='soft'
         )
         self.clf = PWC(random_state=0)
-        self.ma_qs = IEThresh(random_state=0, n_annotators=self.n_annotators)
+        self.ma_qs = IEThresh(random_state=0)
 
         testing.set_font_settings_for_testing()
         testing.set_reproducibility_for_testing()
@@ -74,7 +74,7 @@ class TestFeatureSpace(unittest.TestCase):
                                     'data_set_expected_result.pdf',
                                     self.path_prefix +
                                     'data_set_returned_result.pdf',
-                                    tol=0)
+                                    tol=0.0)
         self.assertIsNone(comparison)
 
     def test_ma_plot_data_set_mc(self):
@@ -105,36 +105,35 @@ class TestFeatureSpace(unittest.TestCase):
     def test_ma_plot_utility_args(self):
         y = np.array(self.y, dtype=float)
         y[np.arange(5), np.arange(5)] = np.nan
-        maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y,
-                         'X_cand': self.X}
+        ma_qs_arg_dict = {'clf': self.clf}
+        bound = check_bound(X=self.X)
+        self.assertRaises(ValueError, plot_ma_utility, ma_qs=self.ma_qs,
+                          X=self.X, y=self.y, ma_qs_arg_dict=ma_qs_arg_dict,
+                          feature_bound=bound)
         bound = check_bound(X=self.X)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, feature_bound=bound)
-        maqs_arg_dict = {
-            'clf': self.clf, 'X': self.X, 'y': self.y,
-            'A_cand': np.ones((self.n_samples, self.n_annotators))
-        }
-        bound = check_bound(X=self.X)
+                          X=self.X, y=self.y, ma_qs_arg_dict=ma_qs_arg_dict,
+                          feature_bound=bound)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, feature_bound=bound)
-        maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
-        self.ma_qs.n_annotators = None
-        self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, feature_bound=bound)
+                          X=self.X, y=self.y, ma_qs_arg_dict=ma_qs_arg_dict,
+                          feature_bound=bound)
         fig, _ = plt.subplots(ncols=7)
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, A_cand=np.ones((100, 5)), fig=fig,
+                          X=self.X, y=self.y, ma_qs_arg_dict=ma_qs_arg_dict,
+                          annotators=np.ones((100, 5)), fig=fig,
                           feature_bound=bound)
-        self.ma_qs.n_annotators = 5
         self.assertRaises(ValueError, plot_ma_utility, self.ma_qs,
-                          maqs_arg_dict, fig=fig, feature_bound=bound)
+                          ma_qs_arg_dict={'clf': self.clf, 'candidates':None},
+                          feature_bound=bound, X=self.X, y=self.y,
+                          title='utility', fig_size=(20, 5))
 
     def test_ma_plot_utility(self):
         y = np.array(self.y, dtype=float)
         y[np.arange(5), np.arange(5)] = np.nan
-        maqs_arg_dict = {'clf': self.clf_multi, 'X': self.X, 'y': self.y}
+        ma_qs_arg_dict = {'clf': self.clf_multi}
         bound = check_bound(X=self.X)
-        fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, feature_bound=bound,
+        fig = plot_ma_utility(self.ma_qs, ma_qs_arg_dict=ma_qs_arg_dict,
+                              feature_bound=bound, X=self.X, y=self.y,
                               title='utility', fig_size=(20, 5))
         fig.tight_layout()
         fig.savefig(self.path_prefix + 'plot_utility_returned_result.pdf')
@@ -144,12 +143,25 @@ class TestFeatureSpace(unittest.TestCase):
                                     'plot_utility_returned_result.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
+        ma_qs = IEThresh(random_state=0)
+        fig = plot_ma_utility(ma_qs, ma_qs_arg_dict=ma_qs_arg_dict,
+                              feature_bound=bound, X=self.X, y=self.y,
+                              title='utility', fig_size=(20, 5),
+                              candidates=np.arange(10))
+        fig.tight_layout()
+        fig.savefig(self.path_prefix + 'plot_utility_2_returned_result.pdf')
+        comparison = compare_images(self.path_prefix +
+                                    'plot_utility_2_expected_result.pdf',
+                                    self.path_prefix +
+                                    'plot_utility_2_returned_result.pdf',
+                                    tol=0)
+        self.assertIsNone(comparison)
 
     def test_ma_plot_utility_with_X(self):
-        maqs_arg_dict = {'clf': self.clf_multi, 'X': self.X, 'y': self.y}
-        A_cand = np.ones((self.n_samples, self.n_annotators))
-        fig = plot_ma_utility(self.ma_qs, maqs_arg_dict, X_cand=self.X,
-                              A_cand=A_cand)
+        maqs_arg_dict = {'clf': self.clf_multi}
+        fig = plot_ma_utility(self.ma_qs, ma_qs_arg_dict=maqs_arg_dict,
+                              X=self.X, y=self.y,
+                              candidates=self.X)
         fig.tight_layout()
         fig.savefig(self.path_prefix + 'plot_utility_X_returned_result.pdf')
         comparison = compare_images(self.path_prefix +
@@ -182,7 +194,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_ma_plot_current_state(self):
-        maqs_arg_dict = {'clf': self.clf, 'X': self.X, 'y': self.y}
+        maqs_arg_dict = {'clf': self.clf, 'fit_clf': False}
         self.clf.fit(self.X, majority_vote(self.y, random_state=0))
         fig = plot_ma_current_state(self.X, self.y, self.y_true, self.ma_qs,
                                     self.clf, maqs_arg_dict)

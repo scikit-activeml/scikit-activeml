@@ -4,7 +4,7 @@ from matplotlib.lines import Line2D
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array, check_consistent_length
 
-from skactiveml.base import MultiAnnotPoolBasedQueryStrategy
+from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from skactiveml.utils import is_labeled, check_scalar, is_unlabeled
 from .._feature_space import plot_decision_boundary
 from ...utils._validation import check_type
@@ -287,7 +287,7 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
         if 'candidates' in ma_qs_arg_dict.keys():
             raise ValueError(f"'{var}' must be given as a separate argument.")
 
-    y = check_array(y)
+    y = check_array(y, force_all_finite='allow-nan')
 
     n_annotators = len(y.T)
 
@@ -316,9 +316,8 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
                                    annotators=annotators, **ma_qs_arg_dict,
                                    return_utilities=True, batch_size=1)
         if candidates.ndim == 1:
-            unlbld_indices = np.argwhere(np.any(is_unlabeled(y), axis=1))\
-                .flatten()
-            X_cand = X[np.intersect1d(candidates, unlbld_indices)]
+            X_cand = X[candidates]
+            utilities = utilities[:, candidates, :]
         else:
             X_cand = candidates
 

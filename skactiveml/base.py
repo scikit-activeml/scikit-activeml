@@ -93,8 +93,6 @@ class PoolBasedQueryStrategy(QueryStrategy):
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
-        ravel_y : bool, default=True
-            Whether y should be raveld into a 1D array or not.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
@@ -444,6 +442,9 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             The annotator sample pairs, for which the sample is a candidate
             sample and the annotator is an available annotator are considered as
             candidate annotator sample pairs.
+            If `annotators` is None and `candidates` is of shape (n_candidates),
+            all annotator sample pairs, for which the sample is is indexed by
+            `candidates` are considered as candidate annotator sample pairs.
             If `annotators` is a boolean array of shape (n_candidates,
             n_avl_annotators) the annotator sample pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
@@ -505,7 +506,7 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
         elif candidates.ndim == 1 and annotators is None:
             candidates = check_indices(candidates, y, dim=0)
-            n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates, :]))
+            n_candidate_pairs = len(candidates)*len(y.T)
         elif candidates.ndim == 1 and annotators.ndim == 1:
             candidates = check_indices(candidates, y, dim=0)
             n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates,
@@ -559,6 +560,9 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             The annotator sample pairs, for which the sample is a candidate
             sample and the annotator is an available annotator are considered as
             candidate annotator sample pairs.
+            If `annotators` is None and `candidates` is of shape (n_candidates),
+            all annotator sample pairs, for which the sample is is indexed by
+            `candidates` are considered as candidate annotator sample pairs.
             If `annotators` is a boolean array of shape (n_candidates,
             n_avl_annotators) the annotator sample pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
@@ -604,13 +608,19 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         if candidates is None:
             candidates = unlbd_sample_indices
-        else:
+            only_candidates = False
+        elif annotators is not None:
             candidates = np.intersect1d(candidates, unlbd_sample_indices)
+            only_candidates = False
+        else:
+            only_candidates = True
 
-        if annotators is None:
+        if only_candidates:
+            A_cand = np.full((len(candidates), n_annotators), True)
+        elif annotators is None:
             A_cand = unlbd_pairs[candidates, :]
         elif annotators.ndim == 1:
-            available_pairs = np.full_like(y, False)
+            available_pairs = np.full_like(y, False, dtype=bool)
             available_pairs[:, annotators] = True
             A_cand = (unlbd_pairs & available_pairs)[candidates, :]
         else:

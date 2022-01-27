@@ -299,4 +299,4 @@ class TestIEThresh(unittest.TestCase):
                                         clf=LogisticRegressionRY(),
                                         X=self.X, y=self.y)
 
-        self.assertEqual(len(query_indices), 0)
+        self.assertEqual(len(query_indices), 2)
