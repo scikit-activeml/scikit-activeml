@@ -135,6 +135,7 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool, map, list)
         check_type(10, 'a', int)
         check_type('number', 'a', 'number')
+        self.assertRaises(TypeError, check_type, 10, 'a', str, 12)
 
     def test_check_indices_single_dimension(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])

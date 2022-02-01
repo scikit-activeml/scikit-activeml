@@ -513,26 +513,28 @@ def check_type(obj, name, *target_types):
         `type` `obj` is allowed to equal the target_val.
 
     """
-    target_vals = (target_val for target_val in target_types
-                   if not isinstance(target_val, type))
-    target_types = (target_type for target_type in target_types
-                    if isinstance(target_type, type))
+    target_vals = [target_val for target_val in target_types
+                   if not isinstance(target_val, type)]
+    target_types = [target_type for target_type in target_types
+                    if isinstance(target_type, type)]
 
     if all(not isinstance(obj, target_type) for target_type in target_types) \
             and obj not in target_vals:
 
         error_str = f'`{name}` has type `{type(obj)}` but must have '
         if len(target_types) == 1:
-            error_str += f'type `{target_types[0]}`,'
+            error_str += f'type `{target_types[0]}`'
         elif len(target_types) <= 3:
             error_str += 'type '
             for i in range(len(target_types) - 1):
                 error_str += f'`{target_types[i]}`,'
-            error_str += f'or `{target_types[len(target_types) - 1]}`,'
+            error_str += f' or `{target_types[len(target_types) - 1]}`'
         else:
-            error_str += f'one of the following types: {set(target_types)},'
-        error_str += f'or equal one of the following values: {set(target_vals)}'
-        raise TypeError(error_str)
+            error_str += f'one of the following types: {set(target_types)}'
+
+        if len(list(target_vals)) >= 1:
+            error_str += f' or equal one of the following values: {set(target_vals)}'
+        raise TypeError(error_str + '.')
 
 
 def check_bound(bound=None, X=None, ndim=2, epsilon=0,
