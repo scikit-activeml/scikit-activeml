@@ -34,7 +34,8 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
         self.qs = SingleAnnotPoolBasedQueryStrategy()
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+        self.assertRaises(NotImplementedError, self.qs.query, X=None, y=None,
+                          X_cand=None)
 
 
 class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):

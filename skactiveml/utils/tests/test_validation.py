@@ -134,16 +134,39 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool)
         self.assertRaises(TypeError, check_type, 10, 'a', str, bool, map, list)
         check_type(10, 'a', int)
+        check_type('number', 'a', 'number')
 
-    def test_check_indices(self):
+    def test_check_indices_single_dimension(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])
         ind = np.array([0, 2])
         self.assertRaises(ValueError, check_indices, 'a', ind)
         self.assertRaises(TypeError, check_indices, 42, ind)
         self.assertRaises(ValueError, check_indices, A, 'b')
         self.assertRaises(TypeError, check_indices, A, 7)
+        self.assertRaises(ValueError, check_indices, A, ind, dim=2)
+        ind_out_of_range = np.array([0, 3])
+        self.assertRaises(ValueError, check_indices, ind_out_of_range, A)
+        ind_not_unique = np.array([0, 0])
+        self.assertRaises(ValueError, check_indices, ind_not_unique, A,
+                          unique='check_unique')
+        indices_now_unique = check_indices(ind_not_unique, A, unique=True)
+        self.assertEqual(len(indices_now_unique), 1)
 
-
+    def test_check_indices_n_dimensions(self):
+        A = np.array([[4, 5], [6, 1], [3, 4]])
+        ind = np.array([[0, 1], [2, 0]])
+        self.assertRaises(ValueError, check_indices, A, ind, dim=(0, 1, 2))
+        self.assertRaises(ValueError, check_indices, A, ind, dim=(0,))
+        self.assertRaises(TypeError, check_indices, A, ind, dim=(0, (0, 1)))
+        ind_out_of_range = np.array([[0, 3]])
+        self.assertRaises(ValueError, check_indices, ind_out_of_range, A)
+        ind_not_unique = np.array([[0, 0], [0, 0]])
+        self.assertRaises(ValueError, check_indices, ind_not_unique, A,
+                          unique='check_unique')
+        indices_now_unique = check_indices(ind_not_unique, A, unique=True)
+        self.assertEqual(2, len(indices_now_unique))
+        for i in [0, 1]:
+            self.assertEqual(1, len(indices_now_unique[i]))
 
     def test_check_bound(self):
         self.assertRaises(ValueError, check_bound, X=7)

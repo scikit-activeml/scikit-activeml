@@ -1,6 +1,8 @@
 import copy
 import warnings
+from collections import defaultdict
 from collections.abc import Iterable
+from itertools import chain
 
 import numpy as np
 import sklearn
@@ -186,9 +188,9 @@ def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
     if n_classes != 1 and np.sum(cost_matrix_new != 0) == 0:
         if contains_non_zero:
             raise ValueError(
-                    "'cost_matrix' must contain at least one non-zero cost "
-                    "entry."
-                )
+                "'cost_matrix' must contain at least one non-zero cost "
+                "entry."
+            )
         else:
             warnings.warn(
                 "'cost_matrix' contains contains no non-zero cost entry."
@@ -424,18 +426,24 @@ def check_random_state(random_state, seed_multiplier=None):
     return np.random.RandomState(seed)
 
 
-def check_indices(indices, A, dim=0):
+def check_indices(indices, A, dim='adaptive', unique=True):
     """Check if indices fit to array.
 
     Parameters
     ----------
     indices : array-like of shape (n_indices, n_dim) or (n_indices,)
-        The considered indices, where, if the number of dimensions of indices is
-        greater than 1, indices[i
+        The considered indices, where for every `i = 0, ..., n_indices - 1`
+        `indices[i]` is interpreted as an index to the array `A`.
     A : array-like
-        The considered array.
+        The array that is indexed.
     dim : int or tuple of ints
-        The dimensions of the index.
+        The dimensions of the array that are indexed.
+        If `dim` equals `'adaptive'`, `dim` is set to first indices corresponding
+        to the shape of `indices`. E.g., if `indices` is of shape (n_indices,),
+        `dim` is set `0`.
+    unique: bool or `check_unique`
+        If `unique` is `True` unique indices are returned. If `unique` is
+        `'check_unique'` an exception is raised if the indices are not unique.
 
     Returns
     -------
@@ -444,15 +452,34 @@ def check_indices(indices, A, dim=0):
     """
     indices = check_array(indices, dtype=int, ensure_2d=False)
     A = check_array(A, allow_nd=True, force_all_finite=False, ensure_2d=False)
-    check_type(dim, 'dim', int, tuple)
+    if unique == 'check_unique':
+        if indices.ndim == 1:
+            n_unique_indices = len(np.unique(indices))
+        else:
+            n_unique_indices = len(np.unique(indices, axis=0))
+        if n_unique_indices < len(indices):
+            raise ValueError(f'`indices` contains two different indices of the '
+                             f'same value.')
+    elif unique:
+        if indices.ndim == 1:
+            indices = np.unique(indices)
+        else:
+            indices = np.unique(indices, axis=0)
+    check_type(dim, 'dim', int, tuple, 'adaptive')
+    if dim == 'adaptive':
+        if indices.ndim == 1:
+            dim = 0
+        else:
+            dim = tuple(range(indices.shape[1]))
+
     if isinstance(dim, tuple):
         for n in dim:
             check_type(n, 'entry of `dim`', int)
         if A.ndim <= max(dim):
             raise ValueError(f'`dim` contains entry of value {max(dim)}, but all'
                              f'entries of dim must be smaller than {A.ndim}.')
-        if len(dim) != indices.shape[0]:
-            raise ValueError(f'shape of `indices` along dimension 0 is '
+        if len(dim) != indices.shape[1]:
+            raise ValueError(f'shape of `indices` along dimension 1 is '
                              f'{indices.shape[0]}, but must be {len(dim)}')
         indices = tuple(indices.T)
         for (i, n) in enumerate(indices):
@@ -481,25 +508,31 @@ def check_type(obj, name, *target_types):
         The object to be checked.
     name: str
         The variable name of the object.
-    target_types : iterable of types
-        The possible types.
+    target_types : iterable
+        The possible types. If a target_val in `target_types` is not of type
+        `type` `obj` is allowed to equal the target_val.
+
     """
-    if all(not isinstance(obj, target_type) for target_type in target_types):
+    target_vals = (target_val for target_val in target_types
+                   if not isinstance(target_val, type))
+    target_types = (target_type for target_type in target_types
+                    if isinstance(target_type, type))
+
+    if all(not isinstance(obj, target_type) for target_type in target_types) \
+            and obj not in target_vals:
+
+        error_str = f'`{name}` has type `{type(obj)}` but must have '
         if len(target_types) == 1:
-            raise TypeError(
-                f'`{name}` has type `{type(obj)}` but must have type '
-                f'`{target_types[0]}`.')
+            error_str += f'type `{target_types[0]}`,'
         elif len(target_types) <= 3:
-            error_str = f'`{name}` has type `{type(obj)}` but must have type '
+            error_str += 'type '
             for i in range(len(target_types) - 1):
                 error_str += f'`{target_types[i]}`,'
-            error_str = error_str[:-1]
-            error_str += f'or `{target_types[len(target_types) - 1]}`.'
-            raise TypeError(error_str)
+            error_str += f'or `{target_types[len(target_types) - 1]}`,'
         else:
-            raise TypeError(
-                f'`{name}` has type `{type(obj)}` but must be one of the '
-                f'following types: {target_types}.')
+            error_str += f'one of the following types: {set(target_types)},'
+        error_str += f'or equal one of the following values: {set(target_vals)}'
+        raise TypeError(error_str)
 
 
 def check_bound(bound=None, X=None, ndim=2, epsilon=0,
