@@ -17,14 +17,12 @@ from sklearn.utils.validation import check_array, check_consistent_length, \
 from .utils import MISSING_LABEL, check_classifier_params, \
     check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
     is_labeled, check_scalar, check_class_prior, unlabeled_indices, \
-    check_missing_label, is_unlabeled
+    check_missing_label, is_unlabeled, check_indices
 
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
            'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
            'ClassFrequencyEstimator', 'AnnotModelMixin']
-
-from .utils._validation import check_indices
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -32,7 +30,7 @@ class QueryStrategy(ABC, BaseEstimator):
 
     Parameters
     ----------
-    random_state : int or RandomState instance, default=None
+    random_state : int or RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
     """
 
@@ -52,9 +50,10 @@ class PoolBasedQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
         Value to represent a missing label.
-    random_state : int or RandomState instance, default=None
+    random_state : int or RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
     """
 
