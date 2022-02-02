@@ -1116,6 +1116,16 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
         class `classes_[j]` for a sample of class `classes_[i]`.
     """
+
+    def __init__(self, class_prior=0, classes=None,
+                 missing_label=MISSING_LABEL,
+                 cost_matrix=None, random_state=None):
+        super().__init__(
+            classes=classes, missing_label=missing_label,
+            cost_matrix=cost_matrix, random_state=random_state
+        )
+        self.class_prior = class_prior
+
     @abstractmethod
     def predict_freq(self, X):
         """Return class frequency estimates for the test samples `X`.
