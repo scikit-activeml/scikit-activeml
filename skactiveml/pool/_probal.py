@@ -107,6 +107,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
         # Check the classifier's type.
         check_type(clf, 'clf', ClassFrequencyEstimator)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
+        check_type(fit_clf, 'fit_clf', bool)
 
         # Check `utility_weight`.
         if utility_weight is None:
