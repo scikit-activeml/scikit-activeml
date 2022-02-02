@@ -4,53 +4,54 @@ from matplotlib.lines import Line2D
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.utils import check_array, check_consistent_length
 
-from skactiveml.base import MultiAnnotPoolBasedQueryStrategy, SkactivemlClassifier
-from skactiveml.utils import is_labeled, check_scalar, is_unlabeled
-from .._feature_space import plot_decision_boundary
-from ...utils._validation import check_type
 from .._auxiliary_functions import mesh, check_bound, _get_contour_args, \
     _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
+from .._feature_space import plot_decision_boundary
+from ...base import MultiAnnotPoolBasedQueryStrategy
+from ...utils import is_labeled, check_scalar, check_type
 
 
 def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
                           bound=None, epsilon=1, title=None, fontsize=15,
                           fig_size=None, plot_legend=True, legend_dict=None,
                           contour_dict=None, boundary_dict=None,
-                          confidence_dict=None, tick_dict=None):
+                          confidence_dict=None, tick_dict=None,
+                          marker_size=10, res=21):
     """Shows the annotations from the different annotators, the decision
     boundary of the given classifier and the utilities expected of querying
     a sample from a given region based on the query strategy.
 
     Parameters
     ----------
-    X : matrix-like, shape (n_samples, 2)
-        The sample matrix X is the feature matrix representing the samples.
-        The feature space must be two dimensional.
-    y : array-like, shape (n_samples, n_annotators)
+    X : matrix-like of shape (n_samples, 2)
+        The sample matrix `X` is the feature matrix representing the samples.
+        The feature space must be two-dimensional.
+    y : array-like of shape (n_samples, n_annotators)
         It contains the annotated values for each sample.
         The number of class labels may be variable for the samples, where
-        missing labels are represented the attribute 'missing_label'.
-    y_true : array-like, shape (n_samples,)
-        The correct labels
+        missing labels are represented the attribute `missing_label`.
+    y_true : array-like of shape (n_samples,)
+        The correct labels.
     ma_qs: MultiAnnotPoolBasedQueryStrategy
         The multi-annotator query strategy.
     clf: sklearn classifier
         The classifier whose decision boundary is plotted.
     ma_qs_arg_dict: dict
         The argument dictionary for the multiple annotator query strategy.
-    bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    bound: array-like of shape [[xmin, ymin], [xmax, ymax]],
+    optional (default=None)
         Determines the area in which the boundary is plotted.
     epsilon: float, optional (default=1)
         The minimal distance between the returned bound and the values of `X`,
         if `bound` is not specified.
     title : str, optional
         The title for the figure.
-    fontsize: int
+    fontsize: int, optional (default=15)
         The fontsize of the labels.
-    fig_size: tuple, shape (width, height) (default=None)
+    fig_size: tuple of shape (width, height), optional (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
-    plot_legend: bool
+    plot_legend: bool, optional (default=True)
         Whether to plot the legend.
     legend_dict: dict, optional (default=None)
         Additional parameters for the legend.
@@ -60,25 +61,29 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
         Additional parameters for the boundary contour.
     confidence_dict: dict, optional (default=None)
         Additional parameters for the confidence contour. Must not contain a
-        colormap because cmap is used.
+        colormap because `cmap` is used.
     tick_dict: dict, optional (default=None):
         Additional parameters for the ticks of the plots.
+    marker_size: int, optional (default=10)
+        The size of the markers on the plot.
+    res: int, optional (default=21)
+        The resolution of the plot.
 
     Returns
     ----------
     fig: matplotlib.figure.Figure
-        The figure onto which the current state is plotted
+        The figure onto which the current state is plotted.
     """
 
     bound = check_bound(bound, X, epsilon=epsilon)
 
     fig = plot_ma_utility(fig_size=fig_size, ma_qs=ma_qs, X=X, y=y,
                           ma_qs_arg_dict=ma_qs_arg_dict, feature_bound=bound,
-                          title=title, fontsize=fontsize, res=5,
+                          title=title, fontsize=fontsize, res=res,
                           contour_dict=contour_dict, tick_dict=tick_dict)
     plot_ma_data_set(fig=fig, X=X, y=y, y_true=y_true, feature_bound=bound,
                      plot_legend=plot_legend, legend_dict=legend_dict,
-                     tick_dict=tick_dict)
+                     tick_dict=tick_dict, marker_size=marker_size)
     plot_ma_decision_boundary(clf, fig=fig, feature_bound=bound,
                               boundary_dict=boundary_dict,
                               confidence_dict=confidence_dict,
@@ -91,32 +96,33 @@ def plot_ma_data_set(X, y, y_true, fig=None, feature_bound=None, title=None,
                      fontsize=15, fig_size=None, plot_legend=True,
                      cmap='coolwarm', legend_dict=None, tick_dict=None,
                      marker_size=10):
-    """Plots the annotations of a binary classification problem, differentiating
-    between correctly and incorrectly labeled data.
+    """Plots the annotations of a binary classification problem,
+    differentiating between correctly and incorrectly labeled data.
 
     Parameters
     ----------
-    X : array-like, shape (n_samples, 2)
-        The sample matrix X is the feature matrix representing the samples.
-        The feature space must be two dimensional.
-    y_true : array-like, shape (n_samples,)
-        The correct labels
-    y : array-like, shape (n_samples, n_annotators)
+    X : array-like of shape (n_samples, 2)
+        The sample matrix `X` is the feature matrix representing the samples.
+        The feature space must be two-dimensional.
+    y_true : array-like of shape (n_samples,)
+        The correct labels.
+    y : array-like of shape (n_samples, n_annotators)
         It contains the annotated values for each sample.
         The number of class labels may be variable for the samples, where
-        missing labels are represented the attribute 'missing_label'.
+        missing labels are represented the attribute `missing_label`.
     fig: matplotlib.figure.Figure, optional (default=None)
         The figure to which axes the utilities will be plotted.
-    fig_size: tuple, shape (width, height) (default=None)
+    fig_size: tuple of shape (width, height), optional (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
-    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like of shape [[xmin, ymin], [xmax, ymax]], optional
+    (default=None)
         Determines the area in which the boundary is plotted.
-    title : str, optional
+    title : str, optional (default=none)
         The title for the figure.
-    fontsize: int
+    fontsize: int, optional (default=15)
         The fontsize of the labels.
-    plot_legend: bool
+    plot_legend: bool, optional (default=True)
         Whether to plot the legend.
     legend_dict: dict, optional (default=None)
         Additional parameters for the legend.
@@ -124,17 +130,16 @@ def plot_ma_data_set(X, y, y_true, fig=None, feature_bound=None, title=None,
         Additional parameters for the ticks.
     cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
         The colormap for the confidence levels.
-    marker_size: int
+    marker_size: int, optional (default=15)
         The size of the markers on the plot.
 
     Returns
-    ----------
+    -------
     fig: matplotlib.figure.Figure
         The figure onto which the data set is plotted
     """
 
     # check input values
-
     X = check_array(X)
     if X.shape[1] != 2:
         raise ValueError(f"`X` along axis 1 must be of length two."
@@ -220,7 +225,7 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
     ma_qs: MultiAnnotPoolBasedQueryStrategy
         The multi-annotator query strategy.
     X : array-like of shape (n_samples, n_features)
-        Training data set, usually complete, i.e. including the labeled and
+        Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
     y : array-like of shape (n_samples, n_annotators)
         Labels of the training data set for each annotator (possibly
@@ -239,7 +244,7 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
         If `candidates` is of shape (n_candidates, n_features), the
         sample candidates are directly given in candidates (not necessarily
         contained in X). This is not supported by all query strategies.
-    annotators : array-like, shape (n_candidates, n_annotators), optional
+    annotators : array-like of shape (n_candidates, n_annotators), optional
     (default=None)
         If `annotators` is None, all annotators are considered as available
         annotators.
@@ -254,20 +259,21 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
         n_avl_annotators) the annotator sample pairs, for which the sample
         is a candidate sample and the boolean matrix has entry `True` are
         considered as candidate sample pairs.
-    ma_qs_arg_dict: dict
+    ma_qs_arg_dict: dict, optional (default=None)
         The argument dictionary for the multiple annotator query strategy.
     fig: matplotlib.figure.Figure, optional (default=None)
         The figure to which axes the utilities will be plotted
     fig_size: tuple, shape (width, height) (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
-    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like of shape [[xmin, ymin], [xmax, ymax]], optional
+    (default=None)
         Determines the area in which the boundary is plotted.
-    title : str, optional
+    title : str, optional (default=None)
         The title for the figure.
-    res: int
+    res: int, optional (default=21)
         The resolution of the plot.
-    fontsize: int
+    fontsize: int, optional (default=15)
         The fontsize of the labels.
     contour_dict: dict, optional (default=None)
         Additional parameters for the utility contour.
@@ -275,7 +281,7 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
         Additional parameters for the ticks.
 
     Returns
-    ----------
+    -------
     fig: matplotlib.figure.Figure
         The figure onto which the utilities are plotted
     """
@@ -342,7 +348,7 @@ def plot_ma_decision_boundary(clf, feature_bound, n_annotators=None, fig=None,
     ----------
     clf: sklearn classifier
         The classifier whose decision boundary is plotted.
-    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound: array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
     n_annotators: int, optional (default=None)
         The number of annotators for which the decision boundary will be
@@ -350,7 +356,7 @@ def plot_ma_decision_boundary(clf, feature_bound, n_annotators=None, fig=None,
     fig: matplotlib.figure.Figure, optional (default=None)
         The figure to which axes the decision boundary will be plotted.
         `n_annotators` or `fig` have to be passed as an argument.
-    confidence: scalar | None, optional (default=0.5)
+    confidence: scalar | None, optional (default=0.75)
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None.
     title : str, optional
@@ -360,7 +366,7 @@ def plot_ma_decision_boundary(clf, feature_bound, n_annotators=None, fig=None,
     fig_size: tuple, shape (width, height) (default=None)
         The size of the figure in inches. If `fig_size` is None, the size
         of the figure is set to 8 x 5 inches.
-    fontsize: int
+    fontsize: int, optional (default=15)
         The fontsize of the labels
     cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
         The colormap for the confidence levels.
@@ -373,7 +379,7 @@ def plot_ma_decision_boundary(clf, feature_bound, n_annotators=None, fig=None,
         Additional parameters for the ticks.
 
     Returns
-    ----------
+    -------
     fig: matplotlib.figure.Figure
         The figure onto which the decision boundaries are plotted.
     """
