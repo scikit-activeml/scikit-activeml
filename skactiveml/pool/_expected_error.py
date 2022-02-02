@@ -9,7 +9,7 @@ from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..classifier import PWC
 from ..utils import check_type, is_labeled, simple_batch, \
     fit_if_not_fitted, check_cost_matrix, check_X_y, MISSING_LABEL, \
-    check_equal_missing_label, labeled_indices, unlabeled_indices
+    check_equal_missing_label, labeled_indices, unlabeled_indices, is_unlabeled
 
 
 class ExpectedErrorReduction_old(SingleAnnotPoolBasedQueryStrategy):
@@ -162,7 +162,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             reset=True, check_X_dict=None
         )
 
-        self._validate_input_params()
+        self._validate_init_params()
 
         X_cand, mapping = self._transform_candidates(
             candidates, X, y, enforce_mapping=self._enforce_mapping
@@ -212,7 +212,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
-    def _validate_input_params(self):
+    def _validate_init_params(self):
         pass
 
     def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
@@ -239,11 +239,6 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         # Validate classifier type.
         check_type(clf, 'clf', SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
-
-        # Validate method.
-        if not isinstance(self.method, str):
-            raise TypeError('{} is an invalid type for method. Type {} is '
-                            'expected'.format(type(self.method), str))
 
         # Check if candidates are samples if sample_weight_candidates is set
         if (candidates is None or candidates.ndim == 1) and \
@@ -357,6 +352,17 @@ class MonteCarloEER(ExpectedErrorReduction):
         )
         self.method = method
 
+    def _validate_init_params(self):
+        # Validate method.
+        if not isinstance(self.method, str):
+            raise TypeError('{} is an invalid type for method. Type {} is '
+                            'expected'.format(type(self.method), str))
+        if self.method not in ['misclassification_loss', 'log_loss']:
+            raise ValueError(
+                f"Supported methods are `misclassification_loss`, or"
+                f"`log_loss` the given one is: {self.method}"
+            )
+
     def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
         uclf.fit_add_cand(idx_cx, cy)
@@ -389,9 +395,14 @@ class MonteCarloEER(ExpectedErrorReduction):
 
 class ValueOfInformationEER(ExpectedErrorReduction):
     """
+    Kapour
     Joshi https://ieeexplore.ieee.org/document/6127880
+    Margeniantu
+
+    only MCL.
     """
-    def __init__(self, method='misclassification_loss', cost_matrix=None,
+    def __init__(self, cost_matrix=None, consider_unlabeled=True,
+                 consider_labeled=True, candidate_to_labeled=True,
                  missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
             enforce_mapping=True,
@@ -399,38 +410,76 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             missing_label=missing_label,
             random_state=random_state,
         )
-        self.method = method
+        self.consider_unlabeled = consider_unlabeled
+        self.consider_labeled = consider_labeled
+        self.candidate_to_labeled = candidate_to_labeled
+
+    def _validate_init_params(self):
+        check_type(self.consider_unlabeled, 'consider_unlabeled', bool)
+        check_type(self.consider_labeled, 'consider_labeled', bool)
+        check_type(self.candidate_to_labeled, 'candidate_to_labeled', bool)
+
+    def query(self, X, y, clf, sample_weight=None,
+              fit_clf=True, ignore_partial_fit=True,
+              candidates=None, batch_size=1, return_utilities=False):
+
+        # TODO check if candidates are only unlabeled ones if given
+
+        return super().query(X, y, clf, sample_weight=sample_weight,
+                             fit_clf=fit_clf,
+                             ignore_partial_fit=ignore_partial_fit,
+                             candidates=candidates,
+                             sample_weight_candidates=None,
+                             X_eval=None, sample_weight_eval=None,
+                             batch_size=batch_size,
+                             return_utilities=return_utilities)
 
     def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
         uclf.fit_add_cand(idx_cx, cy)
-        idx_eval_ = np.setdiff1d(idx_cand, idx_cx, assume_unique=True)
 
         # Handle problem that if only one candidate is remaining, this should
         # be the one to be selected although the error cannot be estimated
         # as there are no instances left for estimating
-        if len(idx_eval_) == 0:
-            err = 0
-        else:
-            probs = uclf.predict_proba(idx_eval_)
-            if self.method == 'misclassification_loss':
-                err = self._risk_estimation(
-                    probs, probs, self.cost_matrix_, w_eval[idx_eval_]
+
+        le = uclf.get_label_encoder()
+        y_eval = uclf.get_y(idx_eval)
+        idx_labeled = idx_train[is_labeled(y_eval)]
+        y_labeled = uclf.get_y(idx_labeled)
+        idx_unlabeled = idx_train[is_unlabeled(y_eval)]
+
+        if self.candidate_to_labeled:
+            idx_labeled = np.concatenate([idx_labeled, idx_cx], axis=0)
+            y_labeled = np.concatenate([y_labeled, cy], axis=0)
+            idx_unlabeled = np.setdiff1d(idx_unlabeled, idx_cx,
+                                         assume_unique=True)
+
+        y_labeled_c_id = le.transform(y_labeled)
+
+        err = 0
+        if self.consider_labeled:
+            if len(idx_labeled) > 0:
+                probs = uclf.predict_proba(idx_labeled)
+                err += self._risk_estimation(
+                    y_labeled_c_id, probs, self.cost_matrix_,
+                    w_eval[idx_labeled]
                 )
-            elif self.method == 'log_loss':
-                err = self._logloss_estimation(probs, probs)
-            else:
-                raise ValueError(
-                    f"Supported methods are `misclassification_loss`, or"
-                    f"`log_loss` the given one is: {self.method}"
+
+        if self.consider_unlabeled:
+            if len(idx_unlabeled) > 0:
+                probs = uclf.predict_proba(idx_unlabeled)
+                err += self._risk_estimation(
+                    probs, probs, self.cost_matrix_, w_eval[idx_unlabeled]
                 )
 
         return err
 
     def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
                                 idx_eval):
-        uclf.precompute(idx_cand, idx_cand)
-        uclf.precompute(idx_train, idx_cand)
+        # TODO: distinguish cases
+        uclf.precompute(idx_eval, idx_eval)
+        #uclf.precompute(idx_cand, idx_train)
+        #uclf.precompute(idx_train, idx_cand)
         uclf = super()._precompute_and_fit_clf(
             uclf, X_full, y_full, idx_train, idx_cand, idx_eval
         )
@@ -476,6 +525,15 @@ class UpdateIndexClassifier():
 
     def get_classes(self):
         return self.clf_.classes_
+
+    def get_X(self, idx):
+        return self.X[idx]
+
+    def get_y(self, idx):
+        return self.y[idx]
+
+    def get_label_encoder(self):
+        return self.clf_._le
 
     def precompute(self, idx_train, idx_eval):
 
@@ -531,9 +589,13 @@ class UpdateIndexClassifier():
 
         if hasattr(self, 'pwc_K_'):
             # check if results contain NAN
-            return self.clf_.predict_proba(
-                self.pwc_K_[self.idx_, :][:, idx].T
-            )
+            res = self.clf_.predict_proba(self.pwc_K_[self.idx_, :][:, idx].T)
+            if np.isnan(res).any():
+                raise ValueError('Error in defining what should be '
+                                 'pre-computed. Not all necessary information '
+                                 'is available which results in NaNs in '
+                                 '`predict_proba`.')
+            return res
         else:
             return self.clf_.predict_proba(self.X[idx])
 

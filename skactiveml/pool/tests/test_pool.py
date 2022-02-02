@@ -128,7 +128,7 @@ class TestGeneral(unittest.TestCase):
                     random_state=np.random.RandomState(0)
                 )
 
-                unld_idx = unlabeled_indices(y)
+                unld_idx = unlabeled_indices(y, self.MISSING_LABEL)
                 ids1, u1 = call_func(
                     qs.query, X=self.X, y=y, clf=clf, X_eval=self.X,
                     ensemble=self.ensemble, return_utilities=True
@@ -254,7 +254,7 @@ class TestGeneral(unittest.TestCase):
         qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
         for X in [None, 'str', [], np.ones(5)]:
             self.assertRaises(
-                ValueError, call_func, qs_mdl.query, clf=clf,
+                (TypeError, ValueError), call_func, qs_mdl.query, clf=clf,
                 X=X, y=self.y, ensemble=self.ensemble
             )
 
@@ -262,7 +262,7 @@ class TestGeneral(unittest.TestCase):
         qs_mdl = call_func(qs_class, classes=np.unique(self.y_true))
         for y in [None, 'str', [], np.ones([5,2])]:
             self.assertRaises(
-                ValueError, call_func, qs_mdl.query, clf=clf,
+                (TypeError, ValueError), call_func, qs_mdl.query, clf=clf,
                 X=self.X, y=y, ensemble=self.ensemble
             )
         self.assertRaises(

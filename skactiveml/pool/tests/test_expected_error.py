@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import PWC, SklearnClassifier
-from skactiveml.pool import ExpectedErrorReduction as EER
+from skactiveml.pool import MonteCarloEER as EER
 from skactiveml.utils import MISSING_LABEL
 
 

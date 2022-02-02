@@ -22,7 +22,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     """
     check_missing_label(missing_label)
     if len(y) == 0:
-        raise ValueError("'y' is not allowed to be empty.")
+        return np.array(y, dtype=bool)
     if not isinstance(y, np.ndarray):
         types = set(
             t.__qualname__ for t in set(type(v) for v in deepflatten(y)))

@@ -16,7 +16,7 @@ from sklearn.utils.validation import check_is_fitted, check_array, \
     has_fit_parameter
 
 from ..base import SkactivemlClassifier
-from ..utils import rand_argmin, MISSING_LABEL
+from ..utils import rand_argmin, MISSING_LABEL, is_labeled
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -230,7 +230,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             self.estimator_ = deepcopy(self.estimator)
         # count labels per class
-        is_lbld = ~np.isnan(y)
+        is_lbld = is_labeled(y, missing_label=-1)
         self._label_counts = [np.sum(y[is_lbld] == c) for c in
                               range(len(self._le.classes_))]
         try:

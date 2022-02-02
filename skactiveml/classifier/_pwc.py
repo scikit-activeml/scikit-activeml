@@ -130,7 +130,8 @@ class PWC(ClassFrequencyEstimator):
             self.V_ = 0
         else:
             self.V_ = compute_vote_vectors(
-                y=y, w=sample_weight, classes=np.arange(len(self.classes_))
+                y=y, w=sample_weight, classes=np.arange(len(self.classes_)),
+                missing_label=-1
             )
 
         return self

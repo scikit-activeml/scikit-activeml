@@ -140,7 +140,8 @@ class CMM(ClassFrequencyEstimator):
 
             # Counts number of votes per class label for each sample.
             V = compute_vote_vectors(
-                y=y, w=sample_weight, classes=np.arange(len(self.classes_))
+                y=y, w=sample_weight, classes=np.arange(len(self.classes_)),
+                missing_label=-1
             )
 
             # Stores responsibility for every given sample of training set.

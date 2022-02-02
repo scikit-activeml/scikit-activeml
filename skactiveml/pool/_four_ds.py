@@ -78,7 +78,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
+            If True, also return the utilities based on the query strategy.
 
         Returns
         -------

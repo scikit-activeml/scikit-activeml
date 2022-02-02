@@ -245,7 +245,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         # Init Mu (i.e., estimates of true labels) with (weighted) majority
         # voting.
         Mu = compute_vote_vectors(y=y, classes=np.arange(n_classes),
-                                  missing_label=MISSING_LABEL, w=sample_weight)
+                                  missing_label=-1, w=sample_weight)
         Mu_sum = np.sum(Mu, axis=1)
         is_zero = (Mu_sum == 0)
         Mu[~is_zero] /= Mu_sum[~is_zero, np.newaxis]
@@ -259,6 +259,7 @@ class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):
         y_majority = rand_argmax(Mu, random_state=self.random_state, axis=1)
         self.Alpha_ = ext_confusion_matrix(y_true=y_majority, y_pred=y,
                                            normalize='true',
+                                           missing_label=-1,
                                            classes=np.arange(n_classes))
 
         # Initialize first expectation to infinity such that

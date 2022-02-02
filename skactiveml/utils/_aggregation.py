@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.utils import check_array, check_consistent_length
 
 from ._selection import rand_argmax
-from ._label import is_labeled
+from ._label import is_labeled, is_unlabeled
 from ._label_encoder import ExtLabelEncoder
 
 
@@ -32,7 +32,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     y = le.fit_transform(y)
     n_classes = len(le.classes_)
     y = y if y.ndim == 2 else y.reshape((-1, 1))
-    is_unlabeled_y = np.isnan(y)
+    is_unlabeled_y = is_unlabeled(y, missing_label=-1)
     y[is_unlabeled_y] = 0
     y = y.astype(int)
 
@@ -112,6 +112,7 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan,
         # perform voting
         vote_matrix = compute_vote_vectors(y_labeled_transformed,
                                            w=w[is_labeled_y],
+                                           missing_label=-1,
                                            classes=np.arange(max_value_y_l_t+1))
 
         vote_vector = rand_argmax(vote_matrix, random_state, axis=1)

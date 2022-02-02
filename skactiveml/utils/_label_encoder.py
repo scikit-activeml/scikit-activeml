@@ -89,9 +89,9 @@ class ExtLabelEncoder(TransformerMixin, BaseEstimator):
         y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         y = np.asarray(y)
-        y_enc = np.empty_like(y, dtype=float)
+        y_enc = np.empty_like(y, dtype=int)
         y_enc[is_lbld] = self._le.transform(y[is_lbld].ravel())
-        y_enc[~is_lbld] = np.nan
+        y_enc[~is_lbld] = -1
         return y_enc
 
     def inverse_transform(self, y):
@@ -108,10 +108,10 @@ class ExtLabelEncoder(TransformerMixin, BaseEstimator):
         """
         check_is_fitted(self, attributes=['classes_'])
         y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
-        is_lbld = is_labeled(y, missing_label=np.nan)
+        is_lbld = is_labeled(y, missing_label=-1)
         y = np.asarray(y)
         y_dec = np.empty_like(y, dtype=self._dtype)
         y_dec[is_lbld] = self._le.inverse_transform(
-            np.array(y[is_lbld].ravel(), dtype=int))
+            np.array(y[is_lbld].ravel()))
         y_dec[~is_lbld] = self.missing_label
         return y_dec

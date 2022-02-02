@@ -123,7 +123,7 @@ class MultiAnnotEnsemble(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
 
         # Fit each estimator
         for i, est in enumerate(self.estimators_):
-            est[1].set_params(missing_label=np.nan)
+            est[1].set_params(missing_label=-1)
             if self.classes is None or est[1].classes is None:
                 est[1].set_params(classes=np.arange(len(self.classes_)))
             if sample_weight is None:
