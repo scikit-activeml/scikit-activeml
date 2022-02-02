@@ -3,11 +3,11 @@ import warnings
 
 import numpy as np
 
+from skactiveml.stream.budget_manager import SplitBudget
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_scalar, check_X_y, check_type, check_bound, check_budget_manager, \
     check_classifier_params, check_indices
 from skactiveml.utils import check_random_state, check_class_prior
-from skactiveml.stream.budget_manager import SplitBudget
 
 
 class TestValidation(unittest.TestCase):
@@ -32,7 +32,7 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_classifier_params,
                           classes=['a', 'b'], missing_label=2,
                           cost_matrix=[[1, 1], [2, 0]])
-        self.assertRaises(ValueError, check_classifier_params, classes=[0, 1],
+        self.assertRaises(TypeError, check_classifier_params, classes=[0, 1],
                           missing_label='nan', cost_matrix=[[1, 1], [2, 0]])
         self.assertRaises(ValueError, check_classifier_params, classes=None,
                           missing_label=np.nan, cost_matrix=[[1, 1], [2, 0]])

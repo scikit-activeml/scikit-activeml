@@ -1,18 +1,13 @@
 import numpy as np
-import warnings
-
 from scipy.stats import t, rankdata
-
 from sklearn.base import BaseEstimator, clone
-from sklearn.utils.validation import check_array,\
-    check_random_state, check_is_fitted
+from sklearn.utils.validation import check_array, check_is_fitted
 
-from ._wrapper import MultiAnnotWrapper
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier, AnnotModelMixin
-from ...utils import rand_argmax, check_scalar, compute_vote_vectors, \
-    MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type, check_X_y, simple_batch, majority_vote
-from ...pool._uncertainty import UncertaintySampling, uncertainty_scores
+from ...pool._uncertainty import uncertainty_scores
+from ...utils import check_scalar, MISSING_LABEL, is_labeled, check_type, \
+    simple_batch, majority_vote
 
 
 class IEAnnotModel(BaseEstimator, AnnotModelMixin):
@@ -26,13 +21,14 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixin):
 
     Parameters
     ----------
-    classes : array-like, shape (n_classes), default=None
+    classes : array-like, shape (n_classes), optional (default=None)
         Holds the label for each class.
-    missing_label : scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
         Value to represent a missing label.
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
-    mode : {'lower', 'mean', 'upper'}, optional (default='upper')
+    mode : 'lower' or 'mean' or 'upper', optional (default='upper')
         Mode of the estimated annotation performance.
     random_state : None|int|numpy.random.RandomState, optional (default=None)
         The random state used for deciding on majority vote labels in case of
@@ -159,9 +155,9 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
     labeled by the annotators whose estimated annotation performances are equal
     or greater than an adaptive threshold.
     The strategy assumes all annotators to be available and is not defined
-    otherwise. To deal with this case non the less value-annotator pairs are
+    otherwise. To deal with this case nonetheless value-annotator pairs are
     first ranked according to the amount of annotators available for the given
-    value in X_cand and are than ranked according to IEThresh"
+    value in `X_cand` and are than ranked according to `IEThresh`."
 
     Parameters
     ----------
@@ -170,7 +166,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         selection.
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
-    random_state : None|int|numpy.random.RandomState, optional (default=None)
+    random_state : None or int or numpy.random.RandomState, optional
+    (default=None)
         The random state used for deciding on majority vote labels in case of
         ties.
 
@@ -197,8 +194,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
@@ -215,12 +212,12 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
             If `candidates` is None, the samples from (X,y), for which an
             annotator exists such that the annotator sample pairs is
             unlabeled are considered as sample candidates.
-            If `candidates` is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the sample candidates in
-            (X,y).
+            If `candidates` is of shape (n_candidates,) and of type int,
+            `candidates` is considered as the indices of the sample candidates
+            in (X,y).
             If `candidates` is of shape (n_candidates, n_features), the
-            sample candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            sample candidates are directly given in `candidates` (not
+            necessarily contained in `X`).
         annotators : array-like, shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
@@ -230,19 +227,20 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
             annotators.
             If candidate samples and available annotators are specified:
             The annotator sample pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered as
-            candidate annotator sample pairs.
-            If `annotators` is None and `candidates` is of shape (n_candidates),
-            all annotator sample pairs, for which the sample is is indexed by
-            `candidates` are considered as candidate annotator sample pairs.
-            If `annotators` is a boolean array of shape (n_candidates,
-            n_avl_annotators) the annotator sample pairs, for which the sample
-            is a candidate sample and the boolean matrix has entry `True` are
-            considered as candidate sample pairs.
-        sample_weight : array-like, (n_samples, n_annotators)
+            sample and the annotator is an available annotator are considered
+            as candidate annotator sample pairs.
+            If `annotators` is None and `candidates` is of shape
+            (n_candidates,), all annotator sample pairs, for which the sample
+            is indexed by `candidates` are considered as candidate annotator
+            sample pairs. If `annotators` is a boolean array of shape
+            (n_candidates, n_avl_annotators) the annotator sample pairs, for
+            which the sample is a candidate sample and the boolean matrix has
+            entry `True` are considered as candidate sample pairs.
+        sample_weight : array-like, (n_samples, n_annotators), optional
+        (default=None)
             It contains the weights of the training samples' class labels.
             It must have the same shape as y.
-        batch_size : 'adaptive'|int, optional (default=1)
+        batch_size : 'adaptive' or int, optional (default=1)
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is determined based on the annotation
             performances and the parameter `epsilon`.
@@ -251,12 +249,12 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size, 2)
+        query_indices : numpy.ndarray of shape (batch_size, 2)
             The query_indices indicate which candidate sample is to be
             annotated by which annotator, e.g., `query_indices[:, 0]`
             indicates the selected candidate samples and `query_indices[:, 1]`
             indicates the respectively selected annotators.
-        utilities: numpy.ndarray, shape (batch_size, n_cand_samples,
+        utilities: numpy.ndarray of shape (batch_size, n_cand_samples,
          n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,

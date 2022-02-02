@@ -1,37 +1,37 @@
 from inspect import signature, Parameter
 
 import numpy as np
-import sklearn.utils.validation
 from scipy.stats import rankdata
+from sklearn.utils.validation import check_array, _is_arraylike
 
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
-
-from ...utils import rand_argmax, check_type, MISSING_LABEL
-from ...utils._aggregation import majority_vote
-from ...utils._validation import check_random_state, check_array, check_scalar
+from ...utils import rand_argmax, check_type, MISSING_LABEL, majority_vote, \
+    check_random_state, check_scalar
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
     """MultiAnnotWrapper
 
-    Implementation of a wrapper class for scikit-learn pool-based active
+    Implementation of a wrapper class for pool-based active
     learning query strategies with a single annotator such that it transforms
     the query strategy for the single annotator into a query strategy for
-    multiple annotators by randomly choosing an annotator and setting the
-    labeled matrix to a labeled vector by an aggregation function.
+    multiple annotators by choosing an annotator randomly or according to the
+    parameter `A_pef` and setting the labeled matrix to a labeled vector by an
+    aggregation function, e.g., majority voting.
 
     Parameters
     ----------
     strategy : SingleAnnotPoolBasedQueryStrategy
         An active learning strategy for a single annotator.
-    y_aggregate : callable, default=None
+    y_aggregate : callable, optional (default=None)
         `y_aggregate` is used to transform `y` as a matrix of shape
         (n_samples, n_annotators) into a vector of shape (n_samples) during
         the querying process and is then passed to the given `strategy`.
         If `y_aggregate is None` and `y` is used in the strategy,
         majority_vote is used as `y_aggregate`.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
         Value to represent a missing label.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -212,7 +212,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
                          target_type=int, min_val=1)
             pref_n_annotators = n_annotators_per_sample * \
                                 np.ones(batch_size_sq)
-        elif sklearn.utils.validation._is_arraylike(n_annotators_per_sample):
+        elif _is_arraylike(n_annotators_per_sample):
             pref_n_annotators = check_array(n_annotators_per_sample,
                                             ensure_2d=False)
 
@@ -239,7 +239,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         if A_perf is None:
             annotator_utilities = random_state.rand(1, n_candidates, n_annotators) \
                 .repeat(batch_size_sq, axis=0)
-        elif sklearn.utils.validation._is_arraylike(A_perf):
+        elif _is_arraylike(A_perf):
             A_perf = check_array(A_perf, ensure_2d=False)
             # ensure A_perf lies in [0, 1)
             if A_perf.min() != A_perf.max():

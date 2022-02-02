@@ -34,7 +34,7 @@ class TestCMM(unittest.TestCase):
             missing_label='nan', mixture_model=mixture, classes=[1, 2],
             cost_matrix=1 - np.eye(3)
         )
-        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
         cmm = CMM(
             missing_label='nan', mixture_model=mixture,
             cost_matrix=1 - np.eye(3)

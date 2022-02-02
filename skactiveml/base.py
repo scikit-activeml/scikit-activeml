@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin, clone
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_array, check_consistent_length, \
@@ -328,23 +328,24 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
     Parameters
     ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
         Value to represent a missing label.
-    random_state : int or RandomState instance, default=None
+    random_state : int or RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
     """
 
     @abstractmethod
-    def query(self, X, y, *args, candidates=None, annotators=None, batch_size=1,
-              return_utilities=False, **kwargs):
+    def query(self, X, y, *args, candidates=None, annotators=None,
+              batch_size=1, return_utilities=False, **kwargs):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
@@ -356,25 +357,26 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             If `candidates` is None, the samples from (X,y), for which an
             annotator exists such that the annotator sample pairs is
             unlabeled are considered as sample candidates.
-            If `candidates` is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the sample candidates in
-            (X,y).
+            If `candidates` is of shape (n_candidates,) and of type int,
+            `candidates` is considered as the indices of the sample candidates
+            in (X,y).
             If `candidates` is of shape (n_candidates, n_features), the
-            sample candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        annotators : array-like, shape (n_candidates, n_annotators), optional
+            sample candidates are directly given in `candidates` (not
+            necessarily contained in `X`). This is not supported by all query
+            strategies.
+        annotators : array-like of shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
             annotators.
-            If `annotators` is of shape (n_avl_annotators) and of type int,
+            If `annotators` is of shape (n_avl_annotators), and of type int,
             `annotators` is considered as the indices of the available
             annotators.
             If candidate samples and available annotators are specified:
-            The annotator sample pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered as
-            candidate annotator sample pairs.
+            The annotator-sample-pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered
+            as candidate annotator-sample-pairs.
             If `annotators` is a boolean array of shape (n_candidates,
-            n_avl_annotators) the annotator sample pairs, for which the sample
+            n_avl_annotators) the annotator-sample-pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
             considered as candidate sample pairs.
         batch_size : int, optional (default=1)
@@ -387,20 +389,20 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         -------
         query_indices : np.ndarray of shape (batchsize, 2)
             The query_indices indicate which candidate sample pairs are to be
-            queried is, i. e. which candidate sample is to be annotated by which
-            annotator, e.g., `query_indices[:, 0]` indicates the selected
+            queried is, i.e., which candidate sample is to be annotated by
+            which annotator, e.g., `query_indices[:, 0]` indicates the selected
             candidate samples and `query_indices[:, 1]` indicates the
             respectively selected annotators.
-        utilities: numpy.ndarray, shape (batch_size, n_samples, n_annotators) or
-            numpy.ndarray of shape (batch_size, n_candidates, n_annotators)
+        utilities: numpy.ndarray of shape (batch_size, n_samples, n_annotators)
+         or numpy.ndarray of shape (batch_size, n_candidates, n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,
             `utilities[0, :, j]` indicates the utilities used for selecting
-            the first sample-annotator pair (with indices `query_indices[0]`).
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+            the first sample-annotator-pair (with indices `query_indices[0]`).
+            If `candidates is None` or of shape (n_candidates), the indexing
+            refers to samples in `X`.
+            If `candidates` is of shape (n_candidates, n_features), the
+            indexing refers to samples in `candidates`.
         """
         raise NotImplementedError
 
@@ -412,8 +414,8 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
@@ -425,28 +427,26 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             If `candidates` is None, the samples from (X,y), for which an
             annotator exists such that the annotator sample pairs is
             unlabeled are considered as sample candidates.
-            If `candidates` is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the sample candidates in
-            (X,y).
+            If `candidates` is of shape (n_candidates,) and of type int,
+            `candidates` is considered as the indices of the sample candidates
+            in (X,y).
             If `candidates` is of shape (n_candidates, n_features), the
-            sample candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        annotators : array-like, shape (n_candidates, n_annotators), optional
+            sample candidates are directly given in `candidates` (not
+            necessarily contained in `X`). This is not supported by all query
+            strategies.
+        annotators : array-like of shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
             annotators.
-            If `annotators` is of shape (n_avl_annotators) and of type int,
+            If `annotators` is of shape (n_avl_annotators), and of type int,
             `annotators` is considered as the indices of the available
             annotators.
             If candidate samples and available annotators are specified:
-            The annotator sample pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered as
-            candidate annotator sample pairs.
-            If `annotators` is None and `candidates` is of shape (n_candidates),
-            all annotator sample pairs, for which the sample is is indexed by
-            `candidates` are considered as candidate annotator sample pairs.
+            The annotator-sample-pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered
+            as candidate annotator-sample-pairs.
             If `annotators` is a boolean array of shape (n_candidates,
-            n_avl_annotators) the annotator sample pairs, for which the sample
+            n_avl_annotators) the annotator-sample-pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
             considered as candidate sample pairs.
         batch_size : int or string, optional (default=1)
@@ -539,40 +539,40 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         Parameters
         ----------
-        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
-            np.ndarray of shape (n_candidates, n_features)
-            Checked candidate samples.
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        annotators : array-like, shape (n_candidates, n_annotators), optional
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If `candidates` is None, the samples from (X,y), for which an
+            annotator exists such that the annotator sample pairs is
+            unlabeled are considered as sample candidates.
+            If `candidates` is of shape (n_candidates,) and of type int,
+            `candidates` is considered as the indices of the sample candidates
+            in (X,y).
+            If `candidates` is of shape (n_candidates, n_features), the
+            sample candidates are directly given in `candidates` (not
+            necessarily contained in `X`). This is not supported by all query
+            strategies.
+        annotators : array-like of shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
             annotators.
-            If `annotators` is of shape (n_avl_annotators) and of type int,
+            If `annotators` is of shape (n_avl_annotators), and of type int,
             `annotators` is considered as the indices of the available
             annotators.
             If candidate samples and available annotators are specified:
-            The annotator sample pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered as
-            candidate annotator sample pairs.
-            If `annotators` is None and `candidates` is of shape (n_candidates),
-            all annotator sample pairs, for which the sample is is indexed by
-            `candidates` are considered as candidate annotator sample pairs.
+            The annotator-sample-pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered
+            as candidate annotator-sample-pairs.
             If `annotators` is a boolean array of shape (n_candidates,
-            n_avl_annotators) the annotator sample pairs, for which the sample
+            n_avl_annotators) the annotator-sample-pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
             considered as candidate sample pairs.
         X : np.ndarray of shape (n_samples, n_features)
             Checked training data set.
-        y : np.ndarray of shape (n_samples)
+        y : np.ndarray of shape (n_samples,)
             Checked labels of the training data set.
-        enforce_mapping : bool, default=False
-            If True, an exception is raised when no exact mapping can be
+        enforce_mapping : bool, optional (default=False)
+            If `True`, an exception is raised when no exact mapping can be
             determined (i.e., `mapping` is None).
 
         Returns
