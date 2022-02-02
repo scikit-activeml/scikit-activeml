@@ -308,6 +308,9 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         mapping : np.ndarray of shape (n_candidates) or None
             Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
         """
+        # TODO check if candidates are only unlabeled ones if given as another
+        #  option
+
         if candidates is None:
             ulbd_idx = unlabeled_indices(y, self.missing_label_)
             return X[ulbd_idx], ulbd_idx
