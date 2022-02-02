@@ -1,8 +1,6 @@
 import copy
 import warnings
-from collections import defaultdict
 from collections.abc import Iterable
-from itertools import chain
 
 import numpy as np
 import sklearn
@@ -80,7 +78,7 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
     check_missing_label(missing_label)
     if classes is not None:
         check_classes(classes)
-        dtype = np.append(classes, missing_label).dtype
+        dtype = np.array(classes).dtype
         check_missing_label(missing_label, target_type=dtype, name='classes')
         if cost_matrix is not None:
             check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
