@@ -33,20 +33,21 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
     missing_label : scalar or string or np.nan or None, optional
     (default=np.nan)
         Value to represent a missing label.
-    random_state : int, RandomState instance, default=None
+    random_state : int or RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
     """
 
     def __init__(self, strategy, y_aggregate=None, missing_label=MISSING_LABEL,
                  random_state=None):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         self.strategy = strategy
         self.y_aggregate = y_aggregate
 
     def query(self, X, y, candidates=None, annotators=None, batch_size=1,
               query_params_dict=None, n_annotators_per_sample=1, A_perf=None,
               return_utilities=False):
-
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
         strategy as if one unspecified annotator where to annotate the sample.
@@ -56,8 +57,8 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
@@ -75,7 +76,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             If `candidates` is of shape (n_candidates, n_features), the
             sample candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
-        annotators : array-like, shape (n_candidates, n_annotators), optional
+        annotators : array-like of shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
             annotators.
@@ -84,11 +85,12 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             annotators.
             If candidate samples and available annotators are specified:
             The annotator sample pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered as
-            candidate annotator sample pairs.
-            If `annotators` is None and `candidates` is of shape (n_candidates),
-            all annotator sample pairs, for which the sample is is indexed by
-            `candidates` are considered as candidate annotator sample pairs.
+            sample and the annotator is an available annotator are considered
+            as candidate annotator-sample-pairs.
+            If `annotators` is None and `candidates` is of shape
+            (n_candidates), all annotator sample pairs, for which the sample is
+            indexed by `candidates` are considered as candidate
+            annotator-sample-pairs.
             If `annotators` is a boolean array of shape (n_candidates,
             n_avl_annotators) the annotator sample pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
@@ -96,29 +98,29 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         batch_size : int, optional (default=1)
             The number of annotators sample pairs to be selected in one AL
             cycle.
-        query_params_dict : dict, default=None
+        query_params_dict : dict, optional (default=None)
             Dictionary for the parameters of the query method besides `X` and
             the transformed `y`.
         A_perf : array-like, shape (n_samples, n_annotators) or
                   (n_annotators,) optional (default=None)
             The performance based ranking of each annotator.
             1.) If `A_perf` is of shape (n_samples, n_annotators) for each
-             sample `i` the value-annotators pair `(i, j)` is chosen over
+             sample `i` the value-annotators pair `(i, j)` is chosen
              over the pair `(i, k)` if `A_perf[i, j]` is greater or
              equal to `A_perf[i, k]`.
             2.) If `A_perf` is of shape (n_annotators,) for each sample
              `i` the value-annotators pair `(i, j)` is chosen over
-             over the pair `(i, k)` if `A_perf[j]` is greater or
+              the pair `(i, k)` if `A_perf[j]` is greater or
              equal to `A_perf[k]`.
             3.) If `A_perf` is None, the annotators are chosen at random, with
              a different distribution for each sample.
         return_utilities : bool, optional (default=False)
             If true, also returns the utilities based on the query strategy.
         n_annotators_per_sample : int, array-like, optional (default=1)
-        array-like, shape (k,), k <= n_samples
+        array-like of shape (k,), k <= n_samples
             If `n_annotators_per_sample` is an int, the value indicates
-            the number of annotators that are preferably assigned to a candidate
-            sample, selected by the query_strategy.
+            the number of annotators that are preferably assigned to a
+            candidate sample, selected by the query_strategy.
             `Preferably` in this case means depending on how many annotators
             can be assigned to a given candidate sample and how many
             annotator-sample pairs should be assigned considering the
@@ -141,16 +143,16 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
             annotator, e.g., `query_indices[:, 0]` indicates the selected
             candidate samples and `query_indices[:, 1]` indicates the
             respectively selected annotators.
-        utilities: np.ndarray, shape (batch_size, n_samples, n_annotators) or
+        utilities: np.ndarray of shape (batch_size, n_samples, n_annotators) or
             np.ndarray of shape (batch_size, n_candidates, n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,
             `utilities[0, :, j]` indicates the utilities used for selecting
-            the first sample-annotator pair (with indices `query_indices[0]`).
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+            the first sample-annotator-pair (with indices `query_indices[0]`).
+            If `candidates` is None or of shape (n_candidates,), the indexing
+            refers to samples in `X`.
+            If `candidates` is of shape (n_candidates, n_features), the
+            indexing refers to samples in candidates.
         """
 
         X, y, candidates, annotators, batch_size, return_utilities = \
@@ -237,8 +239,9 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
 
         # check A_perf and set annotator_utilities
         if A_perf is None:
-            annotator_utilities = random_state.rand(1, n_candidates, n_annotators) \
-                .repeat(batch_size_sq, axis=0)
+            annotator_utilities = random_state.rand(
+                1, n_candidates, n_annotators
+            ).repeat(batch_size_sq, axis=0)
         elif _is_arraylike(A_perf):
             A_perf = check_array(A_perf, ensure_2d=False)
             # ensure A_perf lies in [0, 1)
