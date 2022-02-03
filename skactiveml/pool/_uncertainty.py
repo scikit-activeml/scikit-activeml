@@ -70,10 +70,10 @@ class UncertaintySampling(SingleAnnotPoolBasedQueryStrategy):
             indicated by self.MISSING_LABEL.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        fit_clf : bool, default=True
+        fit_clf : bool, optional (default=True)
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), default=None
+        sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),

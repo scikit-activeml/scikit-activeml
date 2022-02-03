@@ -7,32 +7,44 @@ from sklearn.utils.validation import check_is_fitted
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..classifier import PWC
-from ..utils import check_type, is_labeled, simple_batch, \
-    fit_if_not_fitted, check_cost_matrix, check_X_y, MISSING_LABEL, \
-    check_equal_missing_label, labeled_indices, unlabeled_indices, is_unlabeled
+from ..utils import check_type, is_labeled, simple_batch, check_cost_matrix, \
+    MISSING_LABEL, check_equal_missing_label, unlabeled_indices, is_unlabeled
+
 
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
-    """Expected Error Reduction
+    """Abstract class for Expected Error Reduction (EER) algorithms
 
-    TODO: This class implements the expected error reduction algorithm with
-    different loss functions:
+    This class implements the basic workflow of EER algorithms containing:
+     - determining ever candidates x label pair and simulate its outcome
+       in the classifier by simulating it
+     - determining some kind of risk for the new classifier
+
+    These structure has been used by e.g.:
+     - Roy, N., & McCallum, A. (2001). Toward optimal active learning through
+       monte carlo estimation of error reduction. ICML, pp. 441-448.
+     - Kapoor, A., Horvitz, E., & Basu, S. (2007). Selective Supervision:
+       Guiding Supervised Learning with Decision-Theoretic Active Learning.
+       IJCAI, pp. 877-882.
+     - Margineantu, D. D. (2005). Active cost-sensitive learning.
+       IJCAI, pp. 1622-1623.
+     - Joshi, A. J., Porikli, F., & Papanikolopoulos, N. P. (2012). Scalable
+       active learning for multiclass image classification.
+       IEEE TrPAMI, 34(11), pp. 2259-2273.
 
     Parameters
     ----------
-    method: {'log_loss', 'emr', 'csl'}, optional (default='emr')
-        Variant of expected error reduction to be used: 'log_loss' is
-        cost-insensitive, while 'emr' and 'csl' are cost-sensitive variants.
+    enforce_mapping : bool
+        If True, an exception is raised when no exact mapping between
+        instances in `X` and instances in `candidates` can be determined.
     cost_matrix: array-like, shape (n_classes, n_classes), optional
     (default=None)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`.
-        Only supported for least confident
-        variant.
-    ignore_partial_fit: bool, optional (default=False)
-        If false, the classifier will be refitted through `partial_fit` if
-        available. Otherwise, the use of `fit` is enforced.
-    random_state: numeric | np.random.RandomState, optional (default=None)
-        Random state for annotator selection.
+        Used for misclassification loss and ignored for log loss.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : numeric or np.random.RandomState
+        The random state to use.
 
     References
     ----------
@@ -53,14 +65,13 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         self.cost_matrix = cost_matrix
         self._enforce_mapping = enforce_mapping
 
-    def query(self, X, y, clf, sample_weight=None,
-              fit_clf=True, ignore_partial_fit=True,
+    def query(self, X, y, clf, fit_clf=True, ignore_partial_fit=True,
+              sample_weight=None,
               candidates=None, sample_weight_candidates=None,
               X_eval=None, sample_weight_eval=None,
               batch_size=1, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
 
-        TODO
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
@@ -71,10 +82,13 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             indicated by self.MISSING_LABEL.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        fit_clf : bool, default=True
+        fit_clf : bool, optional (default=True)
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        ignore_partial_fit : bool, optional (default=True)
+            Relevant in cases where `clf` implements `partial_fit`. If True,
+            the `partial_fit` function is ignored and `fit` is used instead.
+        sample_weight : array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -86,6 +100,19 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
+        sample_weight_candidates : array-like of shape (n_candidates),
+            optional (default=None)
+            Weights of candidates samples in `candidates` if candidates are
+            directly given (i.e., candidates.ndim > 1). Otherwise weights for
+            candidates are given in `sample_weight`.
+        X_eval : array-like of shape (n_eval_samples, n_features),
+            optional (default=None).
+            Unlabeled evalaution data set that is used for estimating the risk.
+            Not applicable for all EER methods.
+        sample_weight_eval : array-like of shape (n_eval_samples),
+            optional (default=None)
+            Weights of evaluation samples in `X_eval` if given. Used to weight
+            the importance of samples when estimating the risk.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -135,7 +162,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         # Initialize classifier that works with indices to improve readability
         uclf = UpdateIndexClassifier(
             clf, X_full, y_full, w_full, fit_clf=fit_clf,
-            ignore_partial_fit=ignore_partial_fit
+            ignore_partial_fit=ignore_partial_fit,
+            missing_label=self.missing_label_
         )
 
         # Fit the classifier.
@@ -172,6 +200,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                             return_utilities=return_utilities)
 
     def _validate_init_params(self):
+        """Function used to evaluate parameters of the `__init__` function that
+        are not part of the abstract class to avoid redundancies.
+        """
         pass
 
     def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
@@ -181,7 +212,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
     def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
-        raise NotImplementedError('') #TODO
+        raise NotImplementedError('Error estimation method must be implemented'
+                                  'by the query strategy.')
 
     def _validate_data(self, X, y, sample_weight, clf, candidates,
                        sample_weight_candidates, X_eval, sample_weight_eval,
@@ -211,7 +243,6 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                              'also be None')
 
         # TODO: test sample weight_eval - length + column
-
 
         return X, y, sample_weight, clf, candidates, sample_weight_candidates,\
                X_eval, sample_weight_eval, batch_size, return_utilities,
@@ -312,6 +343,8 @@ class MonteCarloEER(ExpectedErrorReduction):
         self.method = method
 
     def _validate_init_params(self):
+        # TODO check if cost_matrix is None for log_loss
+
         # Validate method.
         if not isinstance(self.method, str):
             raise TypeError('{} is an invalid type for method. Type {} is '
@@ -435,10 +468,26 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
     def _precompute_and_fit_clf(self, uclf, X_full, y_full, idx_train, idx_cand,
                                 idx_eval):
-        # TODO: distinguish cases
-        uclf.precompute(idx_eval, idx_eval)
-        #uclf.precompute(idx_cand, idx_train)
-        #uclf.precompute(idx_train, idx_cand)
+        # for cond_prob
+        uclf.precompute(idx_train, idx_cand,
+                        fit_params='labeled', pred_params='all')
+        # for risk estimation
+        if self.consider_labeled:
+            uclf.precompute(idx_train, idx_eval,
+                            fit_params='labeled', pred_params='labeled')
+            uclf.precompute(idx_cand, idx_eval,
+                            fit_params='all', pred_params='labeled')
+            if self.candidate_to_labeled:
+                # idx_train ('labeled'), idx_cand ('all') exists above
+                # TODO: consider only equal instances would be sufficient
+                uclf.precompute(idx_cand, idx_cand,
+                                fit_params='all', pred_params='all')
+        if self.consider_unlabeled:
+            uclf.precompute(idx_train, idx_eval,
+                            fit_params='labeled', pred_params='unlabeled')
+            uclf.precompute(idx_cand, idx_eval,
+                            fit_params='all', pred_params='unlabeled')
+
         uclf = super()._precompute_and_fit_clf(
             uclf, X_full, y_full, idx_train, idx_cand, idx_eval
         )
@@ -447,13 +496,17 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
 class UpdateIndexClassifier():
     def __init__(self, clf, X, y, sample_weight,
-                 fit_clf=True, ignore_partial_fit=True):
+                 fit_clf=True, ignore_partial_fit=True,
+                 missing_label=MISSING_LABEL):
         self.clf = clf
         self.X = X
         self.y = y
         self.sample_weight = sample_weight
 
         self.fit_clf = fit_clf
+
+        self.missing_label = missing_label
+        self.missing_label_ = self.missing_label # TODO
 
         # TODO check fit_clf and ignore_partial_fit
 
@@ -491,13 +544,45 @@ class UpdateIndexClassifier():
     def get_label_encoder(self):
         return self.clf_._le
 
-    def precompute(self, idx_train, idx_eval):
+    def precompute(self, idx_fit, idx_pred, fit_params='all',
+                   pred_params='all'):
 
         # precompute PWC
         if isinstance(self.clf, PWC):
-            self.pwc_K_[np.ix_(idx_train, idx_eval)] = \
-                pairwise_kernels(self.X[idx_train], self.X[idx_eval],
-                                 self.pwc_metric_, **self.pwc_metric_dict_)
+            if fit_params == 'all':
+                idx_fit_ = idx_fit
+            elif fit_params == 'labeled':
+                idx_fit_ = \
+                    idx_fit[is_labeled(
+                        self.y[idx_fit], missing_label=self.missing_label_
+                    )]
+            elif fit_params == 'unlabeled':
+                idx_fit_ = \
+                    idx_fit[is_unlabeled(
+                        self.y[idx_fit], missing_label=self.missing_label_
+                    )]
+            else:
+                raise ValueError(f'`fit_params`== {fit_params} not defined')
+
+            if pred_params == 'all':
+                idx_pred_ = idx_pred
+            elif pred_params == 'labeled':
+                idx_pred_ = \
+                    idx_pred[is_labeled(
+                        self.y[idx_pred], missing_label=self.missing_label_
+                    )]
+            elif pred_params == 'unlabeled':
+                idx_pred_ = \
+                    idx_pred[is_unlabeled(
+                        self.y[idx_pred], missing_label=self.missing_label_
+                    )]
+            else:
+                raise ValueError(f'`pred_params`== {pred_params} not defined')
+
+            if len(idx_fit_) > 0 and len(idx_pred_) > 0:
+                self.pwc_K_[np.ix_(idx_fit_, idx_pred_)] = \
+                    pairwise_kernels(self.X[idx_fit_], self.X[idx_pred_],
+                                     self.pwc_metric_, **self.pwc_metric_dict_)
 
 
     def fit(self, idx, set_train_idx=True):
