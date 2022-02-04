@@ -15,7 +15,7 @@ from sklearn.linear_model._logistic import _logistic_loss
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..classifier import SklearnClassifier, PWC
 from ..utils import is_labeled, check_X_y, simple_batch, check_scalar, \
-    fit_if_not_fitted, check_type, MISSING_LABEL, check_equal_missing_label
+    check_type, MISSING_LABEL, check_equal_missing_label
 
 
 class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):

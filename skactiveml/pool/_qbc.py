@@ -12,8 +12,8 @@ from sklearn import clone
 from sklearn.utils.validation import check_array, _is_arraylike
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
-from ..utils import simple_batch, fit_if_not_fitted, check_type, \
-    compute_vote_vectors, MISSING_LABEL, check_equal_missing_label
+from ..utils import simple_batch, check_type, compute_vote_vectors, \
+    MISSING_LABEL, check_equal_missing_label
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
