@@ -59,10 +59,14 @@ class TestEpistemicUncertainty(unittest.TestCase):
 
     def test_query_param_y(self):
         selector = EpistemicUncertainty()
-        y_list = [None, 'string', [], self.y[0:-1]]
-        for y in y_list:
+        for y in ['string', [], self.y[0:-1]]:
             self.assertRaises(
                 ValueError, selector.query, candidates=self.candidates,
+                clf=self.clf, X=self.X, y=y
+            )
+        for y in [None]:
+            self.assertRaises(
+                TypeError, selector.query, candidates=self.candidates,
                 clf=self.clf, X=self.X, y=y
             )
 
