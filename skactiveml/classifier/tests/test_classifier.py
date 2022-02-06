@@ -72,9 +72,11 @@ class TestClassifier(unittest.TestCase):
         for clf in self.classifiers:
             self.y = self.y_single
             self.y_missing_label = self.y_single_missing_label
+            self.y_shape = self.y_multi
             if self.is_multi[clf]:
                 self.y = self.y_multi
                 self.y_missing_label = self.y_multi_missing_label
+                self.y_shape = self.y_single
             self._test_single_classifier(clf)
 
     def _test_single_classifier(self, clf):
@@ -106,6 +108,11 @@ class TestClassifier(unittest.TestCase):
             if hasattr(clf_mdl, 'predict_annot_perf'):
                 P = clf_mdl.predict_annot_perf(X=self.X)
                 np.testing.assert_array_equal(P, np.ones((len(self.X), 1)) / 3)
+
+        with self.subTest(msg='Labels Shape Test', clf_name=clf):
+            self.assertRaises(
+                ValueError, clf_mdl.fit, X=self.X, y=self.y_shape
+            )
 
         # Test classifier on data with only missing labels.
         with self.subTest(msg="Missing Label Test", clf_name=clf):
@@ -141,11 +148,13 @@ class TestClassifier(unittest.TestCase):
         for clf in self.classifiers:
             self.y = self.y_single
             self.y_missing_label = self.y_single_missing_label
+            self.y_shape = self.y_multi
             mod = 'skactiveml.classifier.tests.test'
             if self.is_multi[clf]:
                 self.y = self.y_multi
                 mod = 'skactiveml.classifier.multi.tests.test'
                 self.y_missing_label = self.y_multi_missing_label
+                self.y_shape = self.y_single
             self._test_single_classifier(clf)
             with self.subTest(msg=f"Parameter/Method Test", clf=clf):
                 # Get initial parameters.
