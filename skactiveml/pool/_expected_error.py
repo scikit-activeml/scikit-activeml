@@ -512,7 +512,6 @@ class UpdateIndexClassifier():
 
         # use partial fit if applicable
         check_type(ignore_partial_fit, 'ignore_partial_fit', bool)
-        partial_fit = hasattr(clf, 'partial_fit') and not ignore_partial_fit
 
         self.use_partial_fit = \
             hasattr(clf, 'partial_fit') and not ignore_partial_fit
@@ -583,7 +582,6 @@ class UpdateIndexClassifier():
                 self.pwc_K_[np.ix_(idx_fit_, idx_pred_)] = \
                     pairwise_kernels(self.X[idx_fit_], self.X[idx_pred_],
                                      self.pwc_metric_, **self.pwc_metric_dict_)
-
 
     def fit(self, idx, set_train_idx=True):
         if set_train_idx:

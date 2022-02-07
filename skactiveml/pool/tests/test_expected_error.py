@@ -7,17 +7,19 @@ from sklearn.gaussian_process import GaussianProcessClassifier, \
     GaussianProcessRegressor
 from sklearn.naive_bayes import GaussianNB
 
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error import UpdateIndexClassifier
-from skactiveml.utils import MISSING_LABEL, call_func
+from skactiveml.utils import MISSING_LABEL, call_func, labeled_indices
 
 
 class TemplateTestEER:
     def setUp(self):
         self.Strategy = self.get_query_strategy()
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.candidates = np.array([[8, 4], [5, 4]])
+        self.X_cand = np.array([[8, 4], [5, 4], [1, 2]])
+        self.candidates = np.array([2, 1, 0], dtype=int)
         self.X_eval = np.array([[2, 1], [3, 7]])
         self.y = [0, 1, 2, 1]
         self.classes = [0, 1, 2]
@@ -52,9 +54,10 @@ class TemplateTestEER:
 
     def test_query_param_sample_weight(self):
         qs = self.Strategy()
-        for sw in ['string', self.candidates, np.empty((len(self.X) - 1))]:
-            self.assertRaises(ValueError, qs.query, **self.kwargs,
-                              sample_weight=sw)
+        for sw in ['string', self.X_cand, np.empty((len(self.X) - 1))]:
+            with self.subTest(msg=f'sample_weight={sw}'):
+                self.assertRaises(ValueError, qs.query, **self.kwargs,
+                                  sample_weight=sw)
 
     def test_query_param_fit_clf(self):
         qs = self.Strategy()
@@ -68,36 +71,6 @@ class TemplateTestEER:
             TypeError, qs.query, candidates=self.candidates, X=self.X, y=self.y,
             clf=self.clf, ignore_partial_fit=None
         )
-
-    def test_query_param_X_eval(self):
-        qs = self.Strategy()
-        for X_eval in ['str', [], np.ones(5)]:
-            with self.subTest(msg=f'X_eval={X_eval}', X_eval=X_eval):
-                self.assertRaises(
-                    ValueError, qs.query, **self.kwargs, X_eval=X_eval,
-                )
-
-    def test_query_param_sample_weight_eval(self):
-        qs = self.Strategy()
-        for swe in ['string', self.candidates, None,
-                    np.empty((len(self.candidates) - 1))]:
-            with self.assertRaises(ValueError, msg=f'sample_weight_eval={swe}'):
-                call_func(
-                    qs.query,
-                    **self.kwargs,
-                    X_eval=self.X_eval,
-                    sample_weight=np.ones(len(self.X)),
-                    sample_weight_candidates=np.ones(len(self.candidates)),
-                    sample_weight_eval=swe,
-                )
-
-        with self.assertRaises(ValueError, msg=f'sample_weight_eval={swe}'):
-            call_func(
-                qs.query,
-                **self.kwargs,
-                X_eval=self.X_eval,
-                sample_weight_eval=np.ones(len(self.X_eval))
-            )
 
     def test_query(self):
         qs = self.Strategy()
@@ -133,14 +106,46 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
                               sample_weight_candidates=swc)
 
         for swc in [np.empty((len(self.candidates) - 1))]:
-            self.assertRaises(IndexError, qs.query, **self.kwargs,
-                              sample_weight=np.ones(len(self.X)),
-                              sample_weight_candidates=swc)
+            with self.subTest(msg=f'sample_weight_candidates={swc}'):
+                self.assertRaises(IndexError, qs.query, **self.kwargs,
+                                  sample_weight=np.ones(len(self.X)),
+                                  sample_weight_candidates=swc)
 
         self.assertRaises(
             ValueError, qs.query, **self.kwargs,
             sample_weight_candidates=np.ones(len(self.candidates))
         )
+
+    def test_query_param_sample_weight_eval(self):
+        qs = self.Strategy()
+        for swe in ['string', self.candidates, None,
+                    np.empty((len(self.candidates) - 1))]:
+            with self.assertRaises(ValueError, msg=f'sample_weight_eval={swe}'):
+                qs.query(
+                    **self.kwargs,
+                    X_eval=self.X_eval,
+                    sample_weight=np.ones(len(self.X)),
+                    sample_weight_candidates=np.ones(len(self.candidates)),
+                    sample_weight_eval=swe,
+                )
+
+        with self.assertRaises(
+                ValueError,
+                msg=f'sample_weight_eval={np.ones(len(self.X_eval))}'
+        ):
+            qs.query(
+                **self.kwargs,
+                X_eval=self.X_eval,
+                sample_weight_eval=np.ones(len(self.X_eval))
+            )
+
+    def test_query_param_X_eval(self):
+        qs = self.Strategy()
+        for X_eval in ['str', [], np.ones(5)]:
+            with self.subTest(msg=f'X_eval={X_eval}', X_eval=X_eval):
+                self.assertRaises(
+                    ValueError, qs.query, **self.kwargs, X_eval=X_eval,
+                )
 
     def test_query(self):
         super().test_query()
@@ -153,6 +158,67 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
 
     def test_query(self):
         super().test_query()
+
+        # Kapoor tests.
+        class DummyClf(SkactivemlClassifier):
+            def fit(self, X, y, sample_weight=None):
+                self.classes_ = np.unique(y[labeled_indices(y)])
+                return self
+
+            def predict_proba(self, X):
+                return np.full(shape=(len(X), len(self.classes_)),
+                               fill_value=0.5)
+        classes = [0, 1]
+        X_cand = np.array([[8, 1], [9, 1]])
+        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        y = np.array([MISSING_LABEL, 0, 1, MISSING_LABEL])
+        cost_matrix = 1 - np.eye(2)
+        clf_partial = SklearnClassifier(
+            GaussianNB(), classes=classes
+        ).fit(X, y)
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            random_state=self.random_state,
+            classes=classes
+        )
+        # query
+        qs = ValueOfInformationEER(consider_unlabeled=True,
+                                   consider_labeled=True,
+                                   candidate_to_labeled=True)
+        qs.query(candidates=X_cand, clf=clf_partial, X=X, y=y)
+
+        # labeling_cost
+        #labeling_cost = 2.345
+        #qs = ValueOfInformationEER(cost_matrix=cost_matrix,
+        #                           labeling_cost=labeling_cost)
+        #idxs, utils = qs.query(candidates=X_cand, clf=DummyClf(), X=X, y=y,
+        #                       return_utilities=True)
+        #np.testing.assert_array_equal(utils[0], [-labeling_cost, -labeling_cost])
+        #
+        #labeling_cost = np.array([2.346, 6.234])
+        #qs = ValueOfInformationEER(cost_matrix=cost_matrix,
+        #                           labeling_cost=labeling_cost)
+        #idxs, utils = qs.query(candidates=X_cand, clf=DummyClf(), X=X, y=y,
+        #                       return_utilities=True)
+        #np.testing.assert_array_equal(utils[0], -labeling_cost)
+        #
+        #labeling_cost = np.array([[2.346, 6.234]])
+        #expected = [-labeling_cost.mean(), -labeling_cost.mean()]
+        #qs = ValueOfInformationEER(cost_matrix=cost_matrix,
+        #                           labeling_cost=labeling_cost)
+        #idxs, utils = qs.query(candidates=X_cand, clf=DummyClf(), X=X, y=y,
+        #                       return_utilities=True)
+        #np.testing.assert_array_equal(utils[0], expected)
+        #
+        #labeling_cost = np.array([[2.346, 6.234],
+        #                          [3.876, 3.568]])
+        #expected = -labeling_cost.mean(axis=1)
+        #qs = ValueOfInformationEER(cost_matrix=cost_matrix,
+        #                           labeling_cost=labeling_cost)
+        #idxs, utils = qs.query(candidates=X_cand, clf=DummyClf(), X=X, y=y,
+        #                       return_utilities=True)
+        #np.testing.assert_array_equal(utils[0], expected)
+
 
 
 class TestUpdateIndexClassifier(unittest.TestCase):
