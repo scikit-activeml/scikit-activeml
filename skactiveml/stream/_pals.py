@@ -197,16 +197,6 @@ class PALS(SingleAnnotStreamBasedQueryStrategy):
         )
         return self
 
-    def get_default_budget_manager(self, budget=None):
-        """Provide the budget manager that will be used as default.
-
-        Returns
-        -------
-        budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
-        """
-        return BIQF(budget=budget)
-
     def _validate_data(
         self,
         X_cand,

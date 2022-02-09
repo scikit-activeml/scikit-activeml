@@ -6,8 +6,8 @@ learning settings.
 
 
 from ._biqf import BIQF
-from ._estimated_budget import (
-    EstimatedBudget,
+from ._estimated_budget_zliobaite import (
+    EstimatedBudgetZliobaite,
     FixedUncertaintyBudget,
     VariableUncertaintyBudget,
     SplitBudget,
@@ -15,7 +15,7 @@ from ._estimated_budget import (
 )
 
 __all__ = [
-    "EstimatedBudget",
+    "EstimatedBudgetZliobaite",
     "FixedUncertaintyBudget",
     "VariableUncertaintyBudget",
     "SplitBudget",

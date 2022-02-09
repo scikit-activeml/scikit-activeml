@@ -18,18 +18,10 @@ class RandomSampler(SingleAnnotStreamBasedQueryStrategy):
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
 
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudget will be used by default. The budget_manager will
-        be initialized based on the following conditions:
-            If only a budget is given the default budget_manager is initialized
-            with the given budget.
-            If only a budget_manager is given use the budget_manager.
-            If both are not given the default budget_manager with the
-            default budget.
-            If both are given and the budget differs from budget_manager.budget
-            a warning is thrown.
+    allow_exceeding_budget : bool, default=True
+        If True, the query strategy is allowed to exceed it's budget as long as
+        the average number of queries will be within the budget. If False,
+        queries are not allowed if the budget is exhausted.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
@@ -206,19 +198,6 @@ class PeriodicSampler(SingleAnnotStreamBasedQueryStrategy):
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
-    budget_manager : BudgetManager, default=None
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudget will be used by default. The budget_manager will
-        be initialized based on the following conditions:
-            If only a budget is given the default budget_manager is initialized
-            with the given budget.
-            If only a budget_manager is given use the budget_manager.
-            If both are not given the default budget_manager with the
-            default budget.
-            If both are given and the budget differs from budget_manager.budget
-            a warning is thrown.
 
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.

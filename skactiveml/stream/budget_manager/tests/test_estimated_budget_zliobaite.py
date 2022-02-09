@@ -9,7 +9,7 @@ from skactiveml.stream.budget_manager import (
 )
 
 
-class TemplateTestEstimatedBudget:
+class TemplateTestEstimatedBudgetZliobaite:
     def setUp(self):
         # initialise var for sampled var tests
         self.utilities = np.array([True, False])
@@ -71,7 +71,7 @@ class TemplateTestEstimatedBudget:
 
 
 class TestFixedUncertaintyBudget(
-    TemplateTestEstimatedBudget, unittest.TestCase
+    TemplateTestEstimatedBudgetZliobaite, unittest.TestCase
 ):
     def get_budget_manager(self):
         return FixedUncertaintyBudget
@@ -95,7 +95,7 @@ class TestFixedUncertaintyBudget(
 
 
 class TestVariableUncertaintyBudget(
-    TemplateTestEstimatedBudget, unittest.TestCase
+    TemplateTestEstimatedBudgetZliobaite, unittest.TestCase
 ):
     def get_budget_manager(self):
         return VariableUncertaintyBudget
@@ -128,7 +128,7 @@ class TestVariableUncertaintyBudget(
 
 
 class TestRandomVariableUncertaintyBudget(
-    TemplateTestEstimatedBudget, unittest.TestCase
+    TemplateTestEstimatedBudgetZliobaite, unittest.TestCase
 ):
     def get_budget_manager(self):
         return RandomVariableUncertaintyBudget

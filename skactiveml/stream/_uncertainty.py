@@ -24,9 +24,9 @@ from .budget_manager import (
 
 class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
     """The UncertaintyZliobaite (Utility calculation in [1]) query strategy
-    samples instances based on the classifiers uncertainty assessed based on the
-    classifier's predictions. The instance is queried when the probability of
-    the most likely class exceeds a threshold calculated based on the budget
+    samples instances based on the classifiers uncertainty assessed based on
+    the classifier's predictions. The instance is queried when the probability
+    of the most likely class exceeds a threshold calculated based on the budget
     and the number of classes. It is used as the base class for uncertainty
     strategies provided by Zliobaite in [1].
 
@@ -161,11 +161,26 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         self : UncertaintyZliobaite
             The UncertaintyZliobaite returns itself, after it is updated.
         """
+        # check if a budget_manager is set
+        if not hasattr(self, "budget_manager_"):
+            check_type(
+                self.budget_manager,
+                "budget_manager_",
+                BudgetManager,
+                type(None),
+            )
+            self.budget_manager_ = check_budget_manager(
+                self.budget,
+                self.budget_manager,
+                self._get_default_budget_manager()
+            )
+
         budget_manager_param_dict = (
             {}
             if budget_manager_param_dict is None
             else budget_manager_param_dict
         )
+
         call_func(
             self.budget_manager_.update,
             X_cand=X_cand,
@@ -235,10 +250,24 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
             X_cand, return_utilities, reset=reset, **check_X_cand_params
         )
         self._validate_random_state()
-        X, y, sample_weight = _validate_X_y_sample_weight(
+        X, y, sample_weight = self._validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+
+        # check if a budget_manager is set
+        if not hasattr(self, "budget_manager_"):
+            check_type(
+                self.budget_manager,
+                "budget_manager_",
+                BudgetManager,
+                type(None),
+            )
+            self.budget_manager_ = check_budget_manager(
+                self.budget,
+                self.budget_manager,
+                self._get_default_budget_manager()
+            )
 
         return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
 
@@ -269,6 +298,37 @@ class UncertaintyZliobaite(SingleAnnotStreamBasedQueryStrategy):
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
         return clf
+
+    def _validate_X_y_sample_weight(self, X, y, sample_weight):
+        """Validate if X, y and sample_weight are numeric and of equal length.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Input samples used to fit the classifier.
+
+        y : array-like of shape (n_samples)
+            Labels of the input samples 'X'. There may be missing labels.
+
+        sample_weight : array-like of shape (n_samples,) (default=None)
+            Sample weights for X, used to fit the clf.
+
+        Returns
+        -------
+        X : array-like of shape (n_samples, n_features)
+            Checked Input samples.
+        y : array-like of shape (n_samples)
+            Checked Labels of the input samples 'X'. Converts y to a numpy
+            array
+        """
+        if sample_weight is not None:
+            sample_weight = np.array(sample_weight)
+            check_consistent_length(sample_weight, y)
+        if X is not None and y is not None:
+            X = check_array(X)
+            y = np.array(y)
+            check_consistent_length(X, y)
+        return X, y, sample_weight
 
 
 class FixedUncertainty(UncertaintyZliobaite):
@@ -308,135 +368,15 @@ class FixedUncertainty(UncertaintyZliobaite):
 
     """
 
-    def __init__(
-        self, budget_manager=None, budget=None, random_state=None,
-    ):
-        super().__init__(
-            budget=budget,
-            random_state=random_state,
-            budget_manager=budget_manager,
-        )
-
-    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
-        """Updates the budget manager and the count for seen and queried
-        instances
-
-        Parameters
-        ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been queried.
-
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budget_manager.
+    def _get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
 
         Returns
         -------
-        self : FixedUncertainty
-            The FixedUncertainty returns itself, after it is updated.
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
         """
-
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, FixedUncertaintyBudget
-            )
-        super().update(X_cand, queried_indices, budget_manager_param_dict)
-        return self
-
-    def _validate_data(
-        self,
-        X_cand,
-        clf,
-        X,
-        y,
-        sample_weight,
-        fit_clf,
-        return_utilities,
-        reset=True,
-        **check_X_cand_params
-    ):
-        """Validate input data and set or check the `n_features_in_` attribute.
-
-        Parameters
-        ----------
-        X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        **check_X_cand_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array`.
-
-        Returns
-        -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        clf : SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        X: np.ndarray, shape (n_samples, n_features)
-            Checked training samples
-        y: np.ndarray, shape (n_candidates)
-            Checked training labels
-        sampling_weight: np.ndarray, shape (n_candidates)
-            Checked training sample weight
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        """
-        (
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-        ) = super()._validate_data(
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-            reset,
-            **check_X_cand_params
-        )
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, FixedUncertaintyBudget
-            )
-
-        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
+        return FixedUncertaintyBudget
 
 
 class VariableUncertainty(UncertaintyZliobaite):
@@ -477,132 +417,15 @@ class VariableUncertainty(UncertaintyZliobaite):
 
     """
 
-    def __init__(
-        self, budget_manager=None, budget=None, random_state=None,
-    ):
-        super().__init__(budget=budget, random_state=random_state)
-        self.budget_manager = budget_manager
-
-    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
-        """Updates the budget manager and the count for seen and queried
-        instances
-
-        Parameters
-        ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been queried.
-
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budget_manager.
+    def _get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
 
         Returns
         -------
-        self : VariableUncertainty
-            The VariableUncertainty returns itself, after it is updated.
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
         """
-
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, VariableUncertaintyBudget
-            )
-        super().update(X_cand, queried_indices, budget_manager_param_dict)
-        return self
-
-    def _validate_data(
-        self,
-        X_cand,
-        clf,
-        X,
-        y,
-        sample_weight,
-        fit_clf,
-        return_utilities,
-        reset=True,
-        **check_X_cand_params
-    ):
-        """Validate input data and set or check the `n_features_in_` attribute.
-
-        Parameters
-        ----------
-        X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        **check_X_cand_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array`.
-
-        Returns
-        -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        clf : SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        X: np.ndarray, shape (n_samples, n_features)
-            Checked training samples
-        y: np.ndarray, shape (n_candidates)
-            Checked training labels
-        sampling_weight: np.ndarray, shape (n_candidates)
-            Checked training sample weight
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        """
-        (
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-        ) = super()._validate_data(
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-            reset,
-            **check_X_cand_params
-        )
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, VariableUncertaintyBudget
-            )
-
-        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
+        return VariableUncertaintyBudget
 
 
 class RandomVariableUncertainty(UncertaintyZliobaite):
@@ -644,137 +467,15 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
 
     """
 
-    def __init__(
-        self, budget_manager=None, budget=None, random_state=None,
-    ):
-        super().__init__(budget=budget, random_state=random_state)
-        self.budget_manager = budget_manager
-
-    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
-        """Updates the budget manager and the count for seen and queried
-        instances
-
-        Parameters
-        ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been queried.
-
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budget_manager.
+    def _get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
 
         Returns
         -------
-        self : RandomVariableUncertainty
-            The RandomVariableUncertainty returns itself, after it is updated.
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
         """
-
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            budget_manager_seed = self.random_state_.randint(2**31-1)
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager,
-                RandomVariableUncertaintyBudget,
-                {"random_state": budget_manager_seed}
-            )
-        super().update(X_cand, queried_indices, budget_manager_param_dict)
-        return self
-
-    def _validate_data(
-        self,
-        X_cand,
-        clf,
-        X,
-        y,
-        sample_weight,
-        fit_clf,
-        return_utilities,
-        reset=True,
-        **check_X_cand_params
-    ):
-        """Validate input data and set or check the `n_features_in_` attribute.
-
-        Parameters
-        ----------
-        X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        **check_X_cand_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array`.
-
-        Returns
-        -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        clf : SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        X: np.ndarray, shape (n_samples, n_features)
-            Checked training samples
-        y: np.ndarray, shape (n_candidates)
-            Checked training labels
-        sampling_weight: np.ndarray, shape (n_candidates)
-            Checked training sample weight
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        """
-        (
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-        ) = super()._validate_data(
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-            reset,
-        )
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            budget_manager_seed = self.random_state_.randint(2**31-1)
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager,
-                RandomVariableUncertaintyBudget,
-                {"random_state": budget_manager_seed}
-            )
-
-        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
+        return RandomVariableUncertaintyBudget
 
 
 class Split(UncertaintyZliobaite):
@@ -811,161 +512,5 @@ class Split(UncertaintyZliobaite):
 
     """
 
-    def __init__(self, budget_manager=None, budget=None, random_state=None):
-        super().__init__(budget=budget, random_state=random_state)
-        self.budget_manager = budget_manager
-
-    def update(self, X_cand, queried_indices, budget_manager_param_dict=None):
-        """Updates the budget manager and the count for seen and queried
-        instances
-
-        Parameters
-        ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from X_cand have been queried.
-
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budget_manager.
-
-        Returns
-        -------
-        self : Split
-            The Split returns itself, after it is updated.
-        """
-
-        # check if a budget_manager is set
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            budget_manager_seed = self.random_state_.randint(2**31-1)
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, SplitBudget,
-                {"random_state": budget_manager_seed}
-            )
-        super().update(X_cand, queried_indices, budget_manager_param_dict)
-        return self
-
-    def _validate_data(
-        self,
-        X_cand,
-        clf,
-        X,
-        y,
-        sample_weight,
-        fit_clf,
-        return_utilities,
-        reset=True,
-        **check_X_cand_params
-    ):
-        """Validate input data and set or check the `n_features_in_` attribute.
-
-        Parameters
-        ----------
-        X_cand: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        **check_X_cand_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array`.
-
-        Returns
-        -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        clf : SkactivemlClassifier
-            Checked model implementing the methods `fit` and `predict_freq`.
-        X: np.ndarray, shape (n_samples, n_features)
-            Checked training samples
-        y: np.ndarray, shape (n_candidates)
-            Checked training labels
-        sampling_weight: np.ndarray, shape (n_candidates)
-            Checked training sample weight
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        """
-        (
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-        ) = super()._validate_data(
-            X_cand,
-            clf,
-            X,
-            y,
-            sample_weight,
-            fit_clf,
-            return_utilities,
-            reset,
-        )
-        if not hasattr(self, "budget_manager_"):
-            check_type(
-                self.budget_manager,
-                "budget_manager_",
-                BudgetManager,
-                type(None),
-            )
-            budget_manager_seed = self.random_state_.randint(2**31-1)
-            self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, SplitBudget,
-                {"random_state": budget_manager_seed}
-            )
-
-        return X_cand, clf, X, y, sample_weight, fit_clf, return_utilities
-
-
-def _validate_X_y_sample_weight(X, y, sample_weight):
-    """Validate if X, y and sample_weight are numeric and of equal lenght.
-
-    Parameters
-    ----------
-    X : array-like of shape (n_samples, n_features)
-        Input samples used to fit the classifier.
-
-    y : array-like of shape (n_samples)
-        Labels of the input samples 'X'. There may be missing labels.
-
-    sample_weight : array-like of shape (n_samples,) (default=None)
-        Sample weights for X, used to fit the clf.
-
-    Returns
-    -------
-    X : array-like of shape (n_samples, n_features)
-        Checked Input samples.
-    y : array-like of shape (n_samples)
-        Checked Labels of the input samples 'X'. Converts y to a numpy array
-    """
-    if sample_weight is not None:
-        sample_weight = np.array(sample_weight)
-        check_consistent_length(sample_weight, y)
-    if X is not None and y is not None:
-        X = check_array(X)
-        y = np.array(y)
-        check_consistent_length(X, y)
-    return X, y, sample_weight
+    def _get_default_budget_manager(self):
+        return SplitBudget

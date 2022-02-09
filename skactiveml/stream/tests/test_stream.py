@@ -62,6 +62,17 @@ class TestStream(unittest.TestCase):
                 training_size,
                 qs_name
             )
+            self._test_update_before_query(
+                rand.randint(2 ** 31 - 1),
+                qs_class,
+                clf,
+                X_init,
+                y_init,
+                X_stream,
+                y_stream,
+                training_size,
+                qs_name
+            )
 
     def _test_query_strategy(
         self,
@@ -126,6 +137,65 @@ class TestStream(unittest.TestCase):
             call_func(query_strategy2.update,
                       X_cand=x_t.reshape([1, -1]),
                       queried_indices=queried_indices2,
+                      budget_manager_param_dict=budget_manager_param_dict2
+                      )
+            X_train.append(x_t)
+            if len(queried_indices):
+                y_train.append(y_t)
+            else:
+                y_train.append(clf.missing_label)
+            clf.fit(X_train, y_train)
+
+    def _test_update_before_query(
+        self,
+        rand_seed,
+        query_strategy_class,
+        clf,
+        X_init,
+        y_init,
+        X_stream,
+        y_stream,
+        training_size,
+        qs_name
+    ):
+        rand = check_random_state(rand_seed)
+        random_state = rand.randint(2 ** 31 - 1)
+        query_strategy = query_strategy_class(
+            random_state=random_state
+        )
+
+        query_strategy2 = query_strategy_class(
+            random_state=random_state
+        )
+
+        X_train = deque(maxlen=training_size)
+        X_train.extend(X_init)
+        y_train = deque(maxlen=training_size)
+        y_train.extend(y_init)
+
+        for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
+            return_utilities = t % 2 == 0
+            qs_output = call_func(query_strategy.query,
+                                    X_cand=x_t.reshape([1, -1]),
+                                    clf=clf,
+                                    return_utilities=return_utilities
+                                    )
+
+            if return_utilities:
+                queried_indices, utilities = qs_output
+            else:
+                queried_indices = qs_output
+                utilities = [0.5]
+            budget_manager_param_dict1 = {"utilities": utilities}
+            budget_manager_param_dict2 = {"utilities": utilities}
+            call_func(query_strategy.update,
+                      X_cand=x_t.reshape([1, -1]),
+                      queried_indices=queried_indices,
+                      budget_manager_param_dict=budget_manager_param_dict1
+                      )
+            call_func(query_strategy2.update,
+                      X_cand=x_t.reshape([1, -1]),
+                      queried_indices=queried_indices,
                       budget_manager_param_dict=budget_manager_param_dict2
                       )
             X_train.append(x_t)

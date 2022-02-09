@@ -5,7 +5,7 @@ from ...base import BudgetManager
 from ...utils import check_random_state, check_scalar
 
 
-class EstimatedBudget(BudgetManager):
+class EstimatedBudgetZliobaite(BudgetManager):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget.
@@ -42,8 +42,8 @@ class EstimatedBudget(BudgetManager):
 
         Returns
         -------
-        self : EstimatedBudget
-            The EstimatedBudget returns itself, after it is updated.
+        self : EstimatedBudgetZliobaite
+            The EstimatedBudgetZliobaite returns itself, after it is updated.
         """
         queried = np.zeros(len(X_cand))
         queried[queried_indices] = 1
@@ -77,13 +77,13 @@ class EstimatedBudget(BudgetManager):
         return utilities
 
 
-class FixedUncertaintyBudget(EstimatedBudget):
+class FixedUncertaintyBudget(EstimatedBudgetZliobaite):
     """Budget manager which is optimized for FixedUncertainty and checks,
     whether the specified budget has been exhausted already. If not, an
     instance is queried, when the utility is higher than the specified budget
     and the probability of the most likely class exceeds a threshold
     calculated based on the budget and the number of classes.
-    See also :class:`.EstimatedBudget`
+    See also :class:`.EstimatedBudgetZliobaite`
 
     Parameters
     ----------
@@ -159,8 +159,8 @@ class FixedUncertaintyBudget(EstimatedBudget):
 
         Returns
         -------
-        self : EstimatedBudget
-            The EstimatedBudget returns itself, after it is updated.
+        self : FixedUncertaintyBudget
+            The FixedUncertaintyBudget returns itself, after it is updated.
         """
         super().update(X_cand, queried_indices)
         return self
@@ -193,7 +193,7 @@ class FixedUncertaintyBudget(EstimatedBudget):
         return utilities
 
 
-class VariableUncertaintyBudget(EstimatedBudget):
+class VariableUncertaintyBudget(EstimatedBudgetZliobaite):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
@@ -209,6 +209,7 @@ class VariableUncertaintyBudget(EstimatedBudget):
     u is the estimate of how many true lables were queried within the last
     w steps. The recursive funktion,
     u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    See also :class:`.EstimatedBudgetZliobaite`
 
     Parameters
     ----------
@@ -343,7 +344,7 @@ class VariableUncertaintyBudget(EstimatedBudget):
             self.theta_ = self.theta
 
 
-class RandomVariableUncertaintyBudget(EstimatedBudget):
+class RandomVariableUncertaintyBudget(EstimatedBudgetZliobaite):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
@@ -359,6 +360,7 @@ class RandomVariableUncertaintyBudget(EstimatedBudget):
     u is the estimate of how many true lables were queried within the last
     w steps. The recursive funktion,
     u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    See also :class:`.EstimatedBudgetZliobaite`
 
     Parameters
     ----------
@@ -457,7 +459,8 @@ class RandomVariableUncertaintyBudget(EstimatedBudget):
         Returns
         -------
         self : RandomVariableUncertaintyBudget
-            The RandomVariableUncertaintyBudget returns itself, after it is updated.
+            The RandomVariableUncertaintyBudget returns itself, after it is
+            updated.
         """
         self._validate_data(np.array([]))
 
@@ -524,7 +527,7 @@ class RandomVariableUncertaintyBudget(EstimatedBudget):
         self.random_state_ = check_random_state(self.random_state_)
 
 
-class SplitBudget(EstimatedBudget):
+class SplitBudget(EstimatedBudgetZliobaite):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget. 100*v% of instances will be queried
@@ -538,6 +541,7 @@ class SplitBudget(EstimatedBudget):
     u is the estimate of how many true lables were queried within the last
     w steps. The recursive funktion,
     u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    See also :class:`.EstimatedBudgetZliobaite`
 
     Parameters
     ----------

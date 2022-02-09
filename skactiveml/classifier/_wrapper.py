@@ -268,12 +268,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
-        # Transform in case of 2-dimensional array of class labels.
-        if y.ndim == 2:
-            X = np.repeat(X, np.size(y, axis=1), axis=0)
-            y = y.ravel()
-            if sample_weight is not None:
-                sample_weight = sample_weight.ravel()
         # count labels per class
         is_lbld = ~np.isnan(y)
         self._label_counts = [
