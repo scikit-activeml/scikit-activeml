@@ -50,12 +50,8 @@ unlabeled data. An overview of our repository's structure is given in the image 
 Each node represents a class or interface. The arrows illustrate the inheritance
 hierarchy among them. The functionality of a dashed node is not yet available in our library.
 
-|
-
 .. image:: docs/logos/scikit-activeml-structure.png
    :width: 1000
-
-|
 
 In our package ``skactiveml``, there three major components, i.e., ``SkactivemlClassifier``,
 ``QueryStrategy``, and the not yet supported ``SkactivemlRegressor``.
@@ -91,7 +87,8 @@ Quick Start
 ===========
 In the following, there are two simple examples illustrating the straightforwardness
 of implementing active learning cycles with our Python package ``skactiveml``.
-For more in-depth examples, we refer to our
+For more in-depth examples, we refer to our tutorials:
+
 `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/>`_.
 
 Pool-based Active Learning
@@ -151,17 +148,13 @@ As output of this code snippet, we obtain the actively trained Gaussian process 
 including a visualization of its decision boundary and the sample utilities computed with
 uncertainty sampling.
 
-|
-
 .. image:: docs/logos/pal-example-output.png
    :width: 400
 
-|
-
-.. examples_end
-
 Stream-based Active Learning
 ############################
+
+.. examples_end
 
 Citing
 ======
