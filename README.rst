@@ -19,7 +19,7 @@
 
 |
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
+.. image:: docs/logos/scikit-activeml-logo.png
    :width: 200
 
 |
@@ -52,7 +52,7 @@ hierarchy among them. The functionality of a dashed node is not yet available in
 
 |
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
+.. image:: docs/logos/scikit-activeml-structure.png
    :width: 1000
 
 |
@@ -87,8 +87,8 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
 .. examples_start
 
-Examples
-========
+Quick Start
+===========
 In the following, there are two simple examples illustrating the straightforwardness
 of implementing active learning cycles with our Python package ``skactiveml``.
 For more in-depth examples, we refer to our
@@ -97,7 +97,7 @@ For more in-depth examples, we refer to our
 Pool-based Active Learning
 ##########################
 
-The following code implements an active learning cycle with 20 iterations using a logistic regression
+The following code implements an active learning cycle with 20 iterations using a Gaussian process
 classifier and uncertainty sampling. To use other classifiers, you can simply wrap classifiers from
 ``sklearn`` or use classifiers provided by ``skactiveml``. Note that the main difficulty using
 active learning with ``sklearn`` is the ability to handle unlabeled data, which we denote as a specific value
@@ -106,23 +106,25 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
 .. code-block:: python
     
     import numpy as np
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.datasets import make_classification
+    import matplotlib.pyplot as plt
+    from sklearn.gaussian_process import GaussianProcessClassifier
+    from sklearn.datasets import make_blobs
     from skactiveml.pool import UncertaintySampling
     from skactiveml.utils import unlabeled_indices, MISSING_LABEL
-    from skactiveml.classifier import SklearnClassifier 
+    from skactiveml.classifier import SklearnClassifier
+    from skactiveml.visualization import plot_decision_boundary, plot_utility
 
     # Generate data set.
-    X, y_true = make_classification(random_state=0)
+    X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
     y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
-    # LogisticRegression needs initial training data otherwise a warning will 
-    # be raised by SklearnClassifier. Therfore, the first 10 instances are used as
+    # GaussianProcessClassifier needs initial training data otherwise a warning will
+    # be raised by SklearnClassifier. Therefore, the first 10 instances are used as
     # training data.
     y[:10] = y_true[:10]
 
     # Create classifier and query strategy.
-    clf = SklearnClassifier(LogisticRegression(), classes=np.unique(y_true))
+    clf = SklearnClassifier(GaussianProcessClassifier(random_state=0),classes=np.unique(y_true), random_state=0)
     qs = UncertaintySampling(method='entropy')
 
     # Execute active learning cycle.
@@ -130,7 +132,31 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
     for c in range(n_cycles):
         query_idx = qs.query(X=X, y=y, clf=clf)
         y[query_idx] = y_true[query_idx]
-    print(f'Accuracy: {clf.fit(X, y).score(X, y_true)}')
+
+    # Fit final classifier.
+    clf.fit(X, y)
+
+    # Visualize resulting classifier and current utilities.
+    bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
+    unlbld_idx = unlabeled_indices(y)
+    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+    ax.set_title(f'Accuracy score: {clf.score(X,y_true)}.', fontsize=15)
+    plot_utility(qs, X=X, y=y, qs_dict={'clf': clf}, feature_bound=bound, ax=ax)
+    plot_decision_boundary(clf, feature_bound=bound, confidence=0.6)
+    plt.scatter(X[unlbld_idx,0], X[unlbld_idx,1], c='gray')
+    plt.scatter(X[:,0], X[:,1], c=y, cmap='jet')
+    plt.show()
+
+As output of this code snippet, we obtain the actively trained Gaussian process classifier
+including a visualization of its decision boundary and the sample utilities computed with
+uncertainty sampling.
+
+|
+
+.. image:: docs/logos/pal-example-output.png
+   :width: 400
+
+|
 
 .. examples_end
 
