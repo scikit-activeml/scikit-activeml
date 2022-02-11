@@ -1,15 +1,17 @@
 from copy import deepcopy
 
 import numpy as np
+from sklearn.utils.validation import _is_arraylike, check_random_state
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlRegressor
 from skactiveml.utils import simple_batch
 
 
 class QBC(SingleAnnotPoolBasedQueryStrategy):
-    """Greedy Sampling on the feature space
+    """Regression based on Query by Committee
 
-    This class implements query by committee
+    This class implements an Regression adaption of Query by Committee. It
+    tries to estimate the model variance by a Committee of estimators.
 
     Parameters
     ----------
@@ -17,13 +19,21 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         Random state for candidate selection.
     k_bootstraps: int, optional (default=1)
         The number of members in a committee.
+
+    References
+    ----------
+    [1] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active learning
+        for regression based on query by committee. International conference on
+        intelligent data engineering and automated learning, pages 209--218,
+        2007.
+
     """
 
     def __init__(self, random_state=None, k_bootstraps=5):
         super().__init__(random_state=random_state)
         self.k_bootstraps = k_bootstraps
 
-    def query(self, X_cand, reg, X, y, batch_size=1,
+    def query(self, X_cand, ensemble, X, y, batch_size=1,
               return_utilities=False):
         """Query the next instance to be labeled.
 
@@ -33,7 +43,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             Unlabeled candidate samples.
         X: array-like, shape (n_samples, n_features)
             Complete training data set.
-        reg: SkactivemlRegressor
+        ensemble: {SkactivemlRegressor, array-like}
             Regressor to predict the data.
         y: array-like, shape (n_samples)
             Values of the training data set.
@@ -51,23 +61,39 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             (only returned if return_utilities is True).
         """
 
-        rng = np.random.default_rng(self.random_state)
+        if isinstance(ensemble, SkactivemlRegressor) and \
+                hasattr(ensemble, 'n_estimators'):
+            if hasattr(ensemble, 'estimators_'):
+                est_arr = ensemble.estimators_
+            else:
+                est_arr = [ensemble] * ensemble.n_estimators
+        elif _is_arraylike(ensemble):
+            est_arr = deepcopy(ensemble)
+        else:
+            raise TypeError(
+                f'`ensemble` must either be a `{SkactivemlRegressor} '
+                f'with the attribute `n_esembles` and `estimators_` after '
+                f'fitting or a list of {SkactivemlRegressor} objects.'
+            )
+
+        random_state = check_random_state(self.random_state)
         n_samples = len(X)
         k = min(n_samples, self.k_bootstraps)
-        learners = [deepcopy(reg) for _ in range(k)]
         sample_indices = np.arange(n_samples)
-        subsets_indices = [rng.choice(sample_indices, size=n_samples*(k-1)//k)
-                           for _ in range(k)]
+        random_state.shuffle(sample_indices)
+        subsets_indices = np.array_split(sample_indices, k)
 
-        for learner, subset_indices in zip(learners, subsets_indices):
+        for learner, subset_indices in zip(est_arr, subsets_indices):
             X_for_learner = X[subset_indices]
             y_for_learner = y[subset_indices]
             learner.fit(X_for_learner, y_for_learner)
 
-        results = np.array([learner.predict(X_cand) for learner in learners])
+        results = np.array([learner.predict(X_cand) for learner in est_arr])
         utilities = np.std(results, axis=0)
 
         return simple_batch(utilities, return_utilities=return_utilities)
+
+    # TODO: https://aclanthology.org/D08-1112.pdf
 
 
 

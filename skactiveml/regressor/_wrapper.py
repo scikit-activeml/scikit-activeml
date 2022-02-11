@@ -5,6 +5,7 @@ from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.utils.validation import has_fit_parameter
 
 from skactiveml.base import SkactivemlRegressor
+from skactiveml.utils._label import is_all_labeled
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -49,7 +50,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         self.estimator_ = deepcopy(self.estimator)
 
-        labeled_indices = ~np.isnan(y)
+        labeled_indices = is_all_labeled(y)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]
         estimator_parameters = {}

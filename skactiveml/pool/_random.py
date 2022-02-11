@@ -43,6 +43,8 @@ class RandomSampler(SingleAnnotPoolBasedQueryStrategy):
 
         utilities = random_state.random_sample(len(X_cand))
 
+        print(utilities.shape)
+
         return simple_batch(utilities, random_state,
                             batch_size=batch_size,
                             return_utilities=return_utilities)

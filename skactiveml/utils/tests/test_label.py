@@ -5,6 +5,7 @@ from sklearn.exceptions import NotFittedError
 
 from skactiveml.utils import ExtLabelEncoder, is_labeled, is_unlabeled, \
     labeled_indices, unlabeled_indices
+from skactiveml.utils._label import is_all_labeled
 
 
 class TestLabel(unittest.TestCase):
@@ -91,6 +92,11 @@ class TestLabel(unittest.TestCase):
                                       is_labeled(self.y6, missing_label=None))
         np.testing.assert_array_equal(~np.array([0, 0, 0, 1], dtype=bool),
                                       is_labeled(self.y6, missing_label='nan'))
+
+    def test_is_any_labeled(self):
+        y = np.array([[0, np.nan], [1, 0], [np.nan, np.nan]])
+        mask = is_all_labeled(y)
+        np.testing.assert_array_equal(mask, [False, True, False])
 
     def test_unlabeled_indices(self):
         unlbld_indices = unlabeled_indices(self.y3, missing_label=None)

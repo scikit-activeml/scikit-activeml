@@ -5,13 +5,15 @@ import numpy as np
 from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..pool import RandomSampler
 from ..regressor.estimator._ngke import NormalGammaKernelEstimator
+from ..regressor.estimator._nwke import NormalInverseWishartKernelEstimator
 from ..utils import rand_argmax
 
 
-class RegxPal(SingleAnnotPoolBasedQueryStrategy):
-    """Probablistic Active Learning Approach for Regression
+class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
+    """Probablistic Active Learning Approach for Regression for multiple
+    dimensions
 
-    This class implements xPal for Regresssion.
+    This class implements xPal for Regresssion for mutliple dimensions.
 
     Parameters
     ----------
@@ -28,7 +30,7 @@ class RegxPal(SingleAnnotPoolBasedQueryStrategy):
                  n_monte_carlo_samples=10):
         super().__init__(random_state=random_state)
         if post_est is None:
-            self.posterior_estimator = NormalGammaKernelEstimator()
+            self.posterior_estimator = NormalInverseWishartKernelEstimator()
         else:
             self.posterior_estimator = post_est
         self.n_monte_carlo_samples = n_monte_carlo_samples
@@ -48,7 +50,7 @@ class RegxPal(SingleAnnotPoolBasedQueryStrategy):
             Evaluation set.
         X: array-like, shape (n_samples, n_features)
             Complete training data set.
-        y: array-like, shape (n_samples)
+        y: array-like, shape (n_samples, n_targets)
             Values of the training data set.
         batch_size: int, optional (default=1)
             The number of instances to be selected.
@@ -94,7 +96,8 @@ class RegxPal(SingleAnnotPoolBasedQueryStrategy):
 
         for idx, (x_c, my_c, var_c) in enumerate(zip(X_cand, My_cand, Var_cand)):
             E = np.array([x_c])
-            perf = self.x_perf_assume_linear(reg, E, x_c, my_c, var_c**(1/2), X, y)
+            sigma_v = (var_c.diagonal())**(1/2)
+            perf = self.x_perf_assume_linear(reg, E, x_c, my_c, sigma_v, X, y)
             utilities[idx] = perf
 
         if return_utilities:
@@ -133,8 +136,8 @@ class RegxPal(SingleAnnotPoolBasedQueryStrategy):
         y_pred_old = reg_old.predict(E)
         y_pred_new = reg_new.predict(E)
 
-        error_old = (y_pred_old - my) ** 2
-        error_new = (y_pred_new - my) ** 2
+        error_old = np.sum((y_pred_old - my) ** 2)
+        error_new = np.sum((y_pred_new - my) ** 2)
 
         return np.average(error_old - error_new)
 
@@ -157,14 +160,15 @@ class RegxPal(SingleAnnotPoolBasedQueryStrategy):
         y_pred_old = reg_old.predict(E)
         y_pred_new_s = [reg_new.predict(E) for reg_new in reg_new_s]
 
-        error_old = (y_pred_old - my_s[1]) ** 2
-        error_new = (y_pred_new_s[1] - my_s[1]) ** 2
+        error_old = np.sum((y_pred_old - my_s[1]) ** 2)
+        error_new = np.sum((y_pred_new_s[1] - my_s[1]) ** 2)
 
-        var_new = 1/2*(((my_s[2] - my_s[1]) - (y_pred_new_s[2] - y_pred_new_s[1]))**2
-                       + ((my_s[0] - my_s[1]) - (y_pred_new_s[0] - y_pred_new_s[1]))**2)
+        var_new = 1/2*(np.sum(((my_s[2] - my_s[1])
+                               - (y_pred_new_s[2] - y_pred_new_s[1]))**2)
+                       + np.sum(((my_s[0] - my_s[1])
+                                 - (y_pred_new_s[0] - y_pred_new_s[1]))**2))
 
-        var_old = 1/2*((my_s[2] - my_s[1])**2 + (my_s[0] - my_s[1])**2)
+        var_old = 1/2*(np.sum((my_s[2] - my_s[1])**2)
+                       + np.sum((my_s[0] - my_s[1])**2))
 
         return np.average((error_old - error_new) + (var_old - var_new))
-
-

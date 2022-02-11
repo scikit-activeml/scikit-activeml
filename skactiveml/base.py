@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from copy import deepcopy
-from sklearn.base import BaseEstimator, ClassifierMixin, clone
+from sklearn.base import BaseEstimator, ClassifierMixin, clone, RegressorMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils import check_array, check_consistent_length
 from sklearn.utils.multiclass import type_of_target
@@ -20,6 +20,7 @@ from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
            'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
+           'SkactivemlRegressor', 'SkactivemlContinuousEstimator',
            'ClassFrequencyEstimator', 'AnnotModelMixin']
 
 
@@ -556,60 +557,6 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         return X_cand, return_utilities
 
 
-class SkactivemlRegressor(BaseEstimator, ABC):
-    """SkactivemlRegressor
-
-    Bass class for scikit-activeml regressor.
-
-    Parameters
-    __________
-    random_state : int, RandomState instance or None, optional (default=None)
-        Determines random number for 'predict' method. Pass an int for
-        reproducible results across multiple method calls.
-
-    Attributes
-    ----------
-    """
-
-    def __init__(self, random_state=None):
-        self.random_state = random_state
-
-    @abstractmethod
-    def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
-
-        Parameters
-        ----------
-        X : matrix-like, shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_targets)
-            Contains the values of the samples, where
-            missing values are represented the attribute 'np.nan'.
-        sample_weight : array-like, shape (n_samples)
-            It contains the weights of the training samples' values.
-
-        Returns
-        -------
-        self: SkactivemlEstimator,
-            The SkactivemlEstimator is fitted on the training data.
-        """
-        raise NotImplementedError
-
-    def predict(self, X):
-        """Return value predictions for the test samples X.
-
-        Parameters
-        ----------
-        X :  array-like, shape (n_samples, n_features)
-            Input samples.
-        Returns
-        -------
-        y : numpy.ndarray, shape (n_samples) or (n_samples, n_targets)
-            Predicted values of the test samples 'X'.
-        """
-        raise NotImplementedError
-
-
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
     """SkactivemlClassifier
 
@@ -885,6 +832,102 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         self.class_prior_ = check_class_prior(self.class_prior,
                                               len(self.classes_))
         return X, y, sample_weight
+
+
+class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
+    """SkactivemlRegressor
+
+    Bass class for scikit-activeml regressor.
+
+    Parameters
+    __________
+    random_state : int, RandomState instance or None, optional (default=None)
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+
+    Attributes
+    ----------
+    """
+
+    def __init__(self, random_state=None):
+        self.random_state = random_state
+
+    @abstractmethod
+    def fit(self, X, y, sample_weight=None):
+        """Fit the model using X as training data and y as class labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_targets)
+            Contains the values of the samples, where
+            missing values are represented the attribute 'np.nan'.
+        sample_weight : array-like, shape (n_samples)
+            It contains the weights of the training samples' values.
+
+        Returns
+        -------
+        self: SkactivemlEstimator,
+            The SkactivemlEstimator is fitted on the training data.
+        """
+        raise NotImplementedError
+
+    def predict(self, X):
+        """Return value predictions for the test samples X.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+        Returns
+        -------
+        y : numpy.ndarray, shape (n_samples) or (n_samples, n_targets)
+            Predicted values of the test samples 'X'.
+        """
+        raise NotImplementedError
+
+
+class SkactivemlContinuousEstimator(SkactivemlRegressor):
+    """SkactivemlContinuousEstimator
+
+    Bass class for scikit-activeml continuous posterior estimator.
+
+    """
+
+    @abstractmethod
+    def estimate_mu_cov(self, X):
+        """Return estimated mu and var conditioned on test samples X.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+        Returns
+        -------
+        mu, var : numpy.ndarray, shape (n_samples), (n_samples) or
+        (n_samples, n_targets), (n_samples, n_targets, n_targets)
+            Predicted mu and var conditioned on the test samples 'X'.
+        """
+        raise NotImplementedError
+
+    def estimate_random_variates(self, X, n_rvs):
+        """Return random variate samples from the posterior distribution
+        conditioned on the test samples X.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+        n_rvs: int,
+            Number of random variate samples to be drawn.
+        Returns
+        -------
+        Y_rv : numpy.ndarray, shape (n_samples, ) or
+        (n_samples, n_targets), (n_samples, n_targets, n_targets)
+            Predicted mu and var conditioned on the test samples 'X'.
+        """
+        raise NotImplementedError
 
 
 class AnnotModelMixin(ABC):

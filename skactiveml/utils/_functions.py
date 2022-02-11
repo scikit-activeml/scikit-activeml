@@ -88,6 +88,7 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
     # Check whether utilities are to be returned.
     if utilities.ndim == 1:
         best_indices = best_indices.flatten()
+        batch_utilities = batch_utilities.flatten()
 
     if return_utilities:
         return best_indices, batch_utilities
@@ -132,3 +133,6 @@ def fit_if_not_fitted(estimator, X, y, sample_weight=None, print_warning=True):
     except NotFittedError:
         estimator = clone(estimator).fit(X, y, sample_weight)
     return estimator
+
+def is_scalar(x):
+    return isinstance(x, (float, int))
