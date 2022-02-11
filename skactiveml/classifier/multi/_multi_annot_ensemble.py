@@ -10,8 +10,8 @@ import numpy as np
 from sklearn.ensemble._base import _BaseHeterogeneousEnsemble
 from sklearn.utils.validation import check_array, check_is_fitted
 
-from skactiveml.base import SkactivemlClassifier
-from skactiveml.utils import MISSING_LABEL, compute_vote_vectors, is_labeled
+from ...base import SkactivemlClassifier
+from ...utils import MISSING_LABEL, is_labeled, compute_vote_vectors
 
 
 class MultiAnnotEnsemble(_BaseHeterogeneousEnsemble, SkactivemlClassifier):

@@ -14,10 +14,10 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_array, check_consistent_length, \
     column_or_1d
 
-from .utils import MISSING_LABEL, check_classifier_params, \
-    check_random_state, rand_argmin, ExtLabelEncoder, check_cost_matrix, \
-    is_labeled, check_scalar, check_class_prior, unlabeled_indices, \
-    check_missing_label, is_unlabeled, check_indices
+from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled, \
+    unlabeled_indices, ExtLabelEncoder, rand_argmin, check_classifier_params, \
+    check_random_state, check_cost_matrix, check_scalar, check_class_prior, \
+    check_missing_label, check_indices
 
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',

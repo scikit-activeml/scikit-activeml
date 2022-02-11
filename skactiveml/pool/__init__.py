@@ -4,6 +4,7 @@ pool-based active learning.
 """
 
 from . import multi
+from . import utils
 from ._alce import ALCE
 from ._epistemic_uncertainty import EpistemicUncertainty
 from ._expected_error import MonteCarloEER, ValueOfInformationEER
@@ -14,7 +15,7 @@ from ._random import RandomSampler
 from ._uncertainty import UncertaintySampling, uncertainty_scores, \
     expected_average_precision
 
-__all__ = ['multi', 'RandomSampler', 'McPAL', 'cost_reduction',
+__all__ = ['multi', 'utils', 'RandomSampler', 'McPAL', 'cost_reduction',
            'UncertaintySampling', 'uncertainty_scores',
            'expected_average_precision', 'EpistemicUncertainty',
            'MonteCarloEER', 'ValueOfInformationEER', 'QBC',

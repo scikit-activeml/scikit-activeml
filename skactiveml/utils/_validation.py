@@ -3,9 +3,9 @@ import warnings
 from collections.abc import Iterable
 
 import numpy as np
-import sklearn
 from sklearn.utils.validation import check_array, column_or_1d, \
-    assert_all_finite, check_consistent_length
+    assert_all_finite, check_consistent_length, \
+    check_random_state as check_random_state_sklearn
 
 from ._label import MISSING_LABEL, check_missing_label
 
@@ -413,12 +413,12 @@ def check_random_state(random_state, seed_multiplier=None):
         The validated random state.
     """
     if random_state is None or seed_multiplier is None:
-        return sklearn.utils.check_random_state(random_state)
+        return check_random_state_sklearn(random_state)
 
     check_scalar(seed_multiplier, name='seed_multiplier', target_type=int,
                  min_val=1)
     random_state = copy.deepcopy(random_state)
-    random_state = sklearn.utils.check_random_state(random_state)
+    random_state = check_random_state_sklearn(random_state)
 
     seed = (random_state.randint(1, 2 ** 31) * seed_multiplier) % (2 ** 31)
     return np.random.RandomState(seed)

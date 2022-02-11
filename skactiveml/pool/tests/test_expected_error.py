@@ -9,7 +9,7 @@ from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
-from skactiveml.pool._expected_error import UpdateIndexClassifier
+from skactiveml.pool._expected_error import IndexClassifierWrapper
 from skactiveml.utils import MISSING_LABEL, call_func
 
 
@@ -176,7 +176,7 @@ class TestUpdateIndexClassifier(unittest.TestCase):
                 self.X[fit_idx], self.y[fit_idx], sample_weight[fit_idx]
             )
             probas_clf = clf.predict_proba(self.X)
-            UIclf = UpdateIndexClassifier(clf, self.X, self.y, sample_weight)
+            UIclf = IndexClassifierWrapper(clf, self.X, self.y, sample_weight)
             UIclf.fit(fit_idx)
             probas_UIclf = UIclf.predict_proba(range(len(self.X)))
             np.testing.assert_allclose(probas_clf, probas_UIclf)
@@ -187,7 +187,7 @@ class TestUpdateIndexClassifier(unittest.TestCase):
         clf = deepcopy(self.clf_partial).partial_fit(
             self.X[fit_idx], self.y[fit_idx], sample_weight[fit_idx]
         )
-        UIclf = UpdateIndexClassifier(clf, self.X, self.y, sample_weight)
+        UIclf = IndexClassifierWrapper(clf, self.X, self.y, sample_weight)
         UIclf.fit(fit_idx)
         probas_clf = clf.predict_proba(self.X)
         probas_UIclf = UIclf.predict_proba(range(len(self.X)))
