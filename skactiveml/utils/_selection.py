@@ -51,7 +51,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
         Determines random number generation for shuffling the data. Pass an int
         for reproducible results across multiple function calls.
     argmax_kwargs: dict-like
-        Keyword argument passed to numpy function argmin.
+        Keyword argument passed to numpy function argmax.
 
     Returns
     -------

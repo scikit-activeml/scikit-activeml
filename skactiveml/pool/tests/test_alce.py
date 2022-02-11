@@ -14,7 +14,7 @@ class TestALCE(unittest.TestCase):
     def setUp(self):
         self.X_cand = np.zeros((100, 2))
         self.X = np.zeros((6, 2))
-        self.y = [0, 1, 1, 0, 2, 1]
+        self.y = [0, 1, np.nan, np.nan, 2, 1]
         self.classes = [0, 1, 2]
         self.cost_matrix = np.array([[0, 2, 3], [4, 0, 6], [7, 8, 0]])
         self.regressor = SVR()
@@ -25,75 +25,75 @@ class TestALCE(unittest.TestCase):
         alce = ALCE(classes=self.classes, base_regressor=self.pwc,
                     cost_matrix=self.cost_matrix)
         self.assertTrue(hasattr(alce, 'base_regressor'))
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(TypeError, alce.query, self.X, self.y)
 
     def test_init_param_cost_matrix(self):
         alce = ALCE(classes=self.classes, cost_matrix='A')
         self.assertTrue(hasattr(alce, 'cost_matrix'))
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(ValueError, alce.query, self.X, self.y)
 
         zero_cost_matrix = np.zeros((len(self.classes), len(self.classes)))
         alce = ALCE(classes=self.classes, cost_matrix=zero_cost_matrix)
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(ValueError, alce.query, self.X, self.y)
 
     def test_init_param_classes(self):
         alce = ALCE(classes=[0, 1], cost_matrix=self.cost_matrix)
         self.assertTrue(hasattr(alce, 'classes'))
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(ValueError, alce.query, self.X, self.y)
 
     def test_init_param_embed_dim(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     embed_dim=1.5)
         self.assertTrue(hasattr(alce, 'embed_dim'))
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(TypeError, alce.query, self.X, self.y)
 
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     embed_dim=0)
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(ValueError, alce.query, self.X, self.y)
 
     def test_init_param_missing_label(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     missing_label=[1, 2, 3])
         self.assertTrue(hasattr(alce, 'missing_label'))
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(TypeError, alce.query, self.X, self.y)
 
     def test_init_param_mds_params(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     mds_params=0)
         self.assertTrue(hasattr(alce, 'mds_params'))
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(TypeError, alce.query, self.X, self.y)
 
     def test_init_param_nn_params(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix,
                     nn_params=0)
         self.assertTrue(hasattr(alce, 'nn_params'))
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y)
+        self.assertRaises(TypeError, alce.query, self.X, self.y)
 
     # Test query parameters
     def test_query_param_X(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
-                          X=np.ones((5, 3)), y=self.y)
-        _, result = alce.query(self.X_cand, X=self.X,
+        self.assertRaises(ValueError, alce.query, X=np.ones((5, 3)), y=self.y)
+        _, result = alce.query(X=self.X,
                                y=[MISSING_LABEL]*len(self.X),
+                               candidates=self.X_cand,
                                return_utilities=True)
         np.testing.assert_array_equal(result, np.ones((1, len(self.X_cand))))
 
     def test_query_param_y(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
+        self.assertRaises(ValueError, alce.query,
                           X=self.X, y=[0, 1, 4, 0, 2, 1])
 
     def test_query_param_sample_weight(self):
         alce = ALCE(classes=self.classes, cost_matrix=self.cost_matrix)
-        self.assertRaises(ValueError, alce.query, X_cand=self.X_cand,
-                          X=self.X, y=self.y, sample_weight='string')
+        self.assertRaises(ValueError, alce.query, X=self.X, y=self.y,
+                          sample_weight='string')
 
     def test_query_param_batch_size(self):
         alce = ALCE(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(TypeError, alce.query, self.X_cand, self.X, self.y,
+        self.assertRaises(TypeError, alce.query, self.X, self.y,
                           batch_size=1.0)
-        self.assertRaises(ValueError, alce.query, self.X_cand, self.X, self.y,
+        self.assertRaises(ValueError, alce.query, self.X, self.y,
                           batch_size=0)
 
     def test_query_param_return_utilities(self):
@@ -107,30 +107,32 @@ class TestALCE(unittest.TestCase):
 
     def test_query(self):
         alce = ALCE(base_regressor=self.regressor, classes=[0, 1])
-        query_indices = alce.query([[0], [100], [200]], [[0], [200]], [0, 1])
+        query_indices = alce.query([[0], [200]], [0, 1],
+                                   candidates=[[0], [100], [200]])
         np.testing.assert_array_equal(query_indices, [1])
 
     def test_mds_params(self):
         np.random.seed(14)
         X = np.random.random((10, 2))
         y = np.random.randint(0, 2, 10)
-        X_cand = np.random.random((15, 2))
+        candidates = np.random.random((15, 2))
 
         alce = ALCE(self.classes, self.regressor, self.cost_matrix,
                     random_state=14, mds_params={'n_jobs': 1, 'verbose': 2})
-        cand1 = alce.query(X_cand, X, y)
+        cand1 = alce.query(X, y, candidates=candidates)
         alce = ALCE(self.classes, self.regressor, self.cost_matrix,
                     random_state=14, mds_params={'n_jobs': 2})
-        cand2 = alce.query(X_cand, X, y)
+        cand2 = alce.query(X, y, candidates=candidates)
         np.testing.assert_array_equal(cand1, cand2)
 
         alce = ALCE(self.classes, self.regressor, self.cost_matrix,
                     mds_params={'dissimilarity': 'wrong'})
-        self.assertRaises(ValueError, alce.query, X_cand, X, y)
+        self.assertRaises(ValueError, alce.query, X, y, candidates=candidates)
 
         alce = ALCE(base_regressor=self.regressor, classes=[0, 1],
                     mds_params={'dissimilarity': 'precomputed'})
-        query_indices = alce.query([[0], [100], [200]], [[0], [200]], [0, 1])
+        query_indices = alce.query([[0], [200]], [0, 1],
+                                   candidates=[[0], [100], [200]])
         np.testing.assert_array_equal(query_indices, [1])
 
     def test_MDS(self):

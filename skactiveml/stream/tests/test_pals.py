@@ -1,6 +1,6 @@
 import unittest
-import numpy as np
 
+import numpy as np
 from sklearn.datasets import make_classification
 
 from skactiveml.classifier import PWC
@@ -26,6 +26,15 @@ class TestPALS(unittest.TestCase):
         self.kwargs = dict(
             X_cand=self.X_cand, clf=self.clf, X=self.X, y=self.y
         )
+
+    def test_init_param_budget(self):
+        # budget must be defined as a float greater than 0
+        query_strategy = PALS(budget=[])
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = PALS(budget="string")
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = PALS(budget=-1)
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_budget_manager(self):
         # budget_manager must be defined as an object of an budget manager
@@ -117,9 +126,10 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=1,
             y=self.y,
+            fit_clf=True
         )
         self.assertRaises(
-            TypeError,
+            ValueError,
             query_strategy.query,
             X_cand=self.X_cand,
             clf=self.clf,
@@ -133,6 +143,7 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=np.ones(5),
             y=self.y,
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -141,6 +152,7 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=self.X[1:],
             y=self.y,
+            fit_clf=True
         )
 
     def test_query_param_y(self):
@@ -154,6 +166,7 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=1,
+            fit_clf=True
         )
         self.assertRaises(
             TypeError,
@@ -162,6 +175,7 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=None,
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -170,6 +184,7 @@ class TestPALS(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=self.y[1:],
+            fit_clf=True
         )
 
     def test_query_param_sample_weight(self):
@@ -184,6 +199,7 @@ class TestPALS(unittest.TestCase):
             X=self.X,
             y=self.y,
             sample_weight="string",
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -193,6 +209,7 @@ class TestPALS(unittest.TestCase):
             X=self.X,
             y=self.y,
             sample_weight=["string", "numbers", "test"],
+            fit_clf=True
         )
         self.assertRaises(
             ValueError,
@@ -202,6 +219,7 @@ class TestPALS(unittest.TestCase):
             X=self.X,
             y=self.y,
             sample_weight=[1],
+            fit_clf=True
         )
 
     def test_query_param_utility_weight(self):
@@ -256,4 +274,26 @@ class TestPALS(unittest.TestCase):
             X=self.X,
             y=self.y,
             return_utilities=1,
+        )
+
+    def test_query_param_fit_clf(self):
+        # fit_clf needs to be a boolean
+        query_strategy = PALS()
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            fit_clf="string",
+        )
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            X_cand=self.X_cand,
+            clf=self.clf,
+            X=self.X,
+            y=self.y,
+            fit_clf=1,
         )

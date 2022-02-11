@@ -13,13 +13,13 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def setUp(self):
         self.random_state = 1
-        self.X_cand = np.array([[8, 1], [9, 1], [5, 1]])
+        self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 0, 1, 1])
         self.classes = np.array([0, 1])
         self.clf = PWC()
-        self.kwargs = dict(X_cand=self.X_cand, clf=self.clf,
-                           X=self.X, y=self.y)
+        self.kwargs = dict(X=self.X, y=self.y, candidates=self.candidates,
+                           clf=self.clf)
 
     def test_init_param_method(self):
         selector = UncertaintySampling()
@@ -41,41 +41,36 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_clf(self):
         selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
+        self.assertRaises(TypeError, selector.query, candidates=self.candidates,
                           clf=GaussianProcessClassifier(), X=self.X, y=self.y)
-
-    def test_query_param_X(self):
-        selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=None, y=self.y)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X='string', y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=[], y=self.y)
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X[0:-1], y=self.y)
-
-    def test_query_param_y(self):
-        selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y=None)
-        self.assertRaises(TypeError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y='string')
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y=[])
-        self.assertRaises(ValueError, selector.query, X_cand=self.X_cand,
-                          clf=self.clf, X=self.X, y=self.y[0:-1])
 
     def test_query_param_sample_weight(self):
         selector = UncertaintySampling()
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight='string')
         self.assertRaises(ValueError, selector.query, **self.kwargs,
-                          sample_weight=self.X_cand)
+                          sample_weight=self.candidates)
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=np.empty((len(self.X) - 1)))
         self.assertRaises(ValueError, selector.query, **self.kwargs,
                           sample_weight=np.empty((len(self.X) + 1)))
+        self.assertRaises(ValueError, selector.query, **self.kwargs,
+                          sample_weight=np.ones((len(self.X) + 1)))
+        self.assertRaises(ValueError, selector.query, X=self.X, y=self.y,
+                          candidates=None, clf=self.clf,
+                          sample_weight=np.ones((len(self.X) + 1)))
+        self.assertRaises(ValueError, selector.query, X=self.X, y=self.y,
+                          candidates=[0], clf=self.clf,
+                          sample_weight=np.ones(2))
+
+    def test_query_param_fit_clf(self):
+        selector = UncertaintySampling()
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          fit_clf='string')
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          fit_clf=self.candidates)
+        self.assertRaises(TypeError, selector.query, **self.kwargs,
+                          fit_clf=None)
 
     def test_query(self):
         compare_list = []
@@ -99,33 +94,33 @@ class TestUncertaintySampling(unittest.TestCase):
 
         # query
         selector = UncertaintySampling(method='entropy')
-        selector.query(X_cand=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
         compare_list.append(selector.query(**self.kwargs))
 
         selector = UncertaintySampling(method='margin_sampling')
-        selector.query(X_cand=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
         compare_list.append(selector.query(**self.kwargs))
 
         selector = UncertaintySampling(method='least_confident')
-        selector.query(X_cand=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
         compare_list.append(selector.query(**self.kwargs))
 
         selector = UncertaintySampling(method='margin_sampling',
                                        cost_matrix=[[0, 1], [1, 0]])
-        selector.query(X_cand=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
 
         selector = UncertaintySampling(method='least_confident',
                                        cost_matrix=[[0, 1], [1, 0]])
-        selector.query(X_cand=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
 
         for x in compare_list:
             self.assertEqual(compare_list[0], x)
 
         selector = UncertaintySampling(method='expected_average_precision')
-        selector.query(X_cand=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
         best_indices, utilities = selector.query(**self.kwargs,
                                                  return_utilities=True)
-        self.assertEqual(utilities.shape, (1, len(self.X_cand)))
+        self.assertEqual(utilities.shape, (1, len(self.candidates)))
         self.assertEqual(best_indices.shape, (1,))
 
 

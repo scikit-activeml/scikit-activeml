@@ -1,8 +1,8 @@
 import unittest
 
 import numpy as np
-from sklearn.ensemble import BaggingClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import BaggingClassifier, RandomForestClassifier, \
+    VotingClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.classifier import PWC, SklearnClassifier
@@ -14,7 +14,7 @@ class TestQBC(unittest.TestCase):
 
     def setUp(self):
         self.random_state = 41
-        self.X_cand = [[8, 1, 6, 8], [9, 1, 6, 5], [5, 1, 6, 5]]
+        self.candidates = [[8, 1, 6, 8], [9, 1, 6, 5], [5, 1, 6, 5]]
         self.X = [[1, 2, 5, 9], [5, 8, 4, 6], [8, 4, 5, 9], [5, 4, 8, 5]]
         self.y = [0., 0., 1., 1.]
         self.classes = [0, 1]
@@ -29,7 +29,7 @@ class TestQBC(unittest.TestCase):
         for method in ['test', 0]:
             selector = QBC(method=method)
             self.assertRaises(
-                ValueError, selector.query, X_cand=self.X_cand, X=self.X,
+                ValueError, selector.query, candidates=self.candidates, X=self.X,
                 y=self.y, ensemble=self.ensemble
             )
 
@@ -42,7 +42,7 @@ class TestQBC(unittest.TestCase):
         ]
         for ensemble in ensemble_list:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.X_cand, X=self.X,
+                TypeError, selector.query, X_cand=self.candidates, X=self.X,
                 y=self.y, ensemble=ensemble
             )
 
@@ -50,12 +50,12 @@ class TestQBC(unittest.TestCase):
         selector = QBC()
         for X in [None, np.nan]:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.X_cand, X=X, y=self.y,
+                ValueError, selector.query, candidates=self.candidates, X=X, y=self.y,
                 ensemble=self.ensemble
             )
         for X in [[], self.X[:3]]:
             self.assertRaises(
-                ValueError, selector.query, X_cand=self.X_cand, X=X, y=self.y,
+                ValueError, selector.query, candidates=self.candidates, X=X, y=self.y,
                 ensemble=self.ensemble
             )
 
@@ -63,26 +63,38 @@ class TestQBC(unittest.TestCase):
         selector = QBC()
         for y in [None, np.nan]:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.X_cand, X=self.X, y=y,
+                TypeError, selector.query, X_cand=self.candidates, X=self.X, y=y,
                 ensemble=self.ensemble
             )
         for y in [[], self.y[:3]]:
             self.assertRaises(
-                ValueError, selector.query, X_cand=self.X_cand, X=self.X, y=y,
+                ValueError, selector.query, candidates=self.candidates, X=self.X, y=y,
                 ensemble=self.ensemble
             )
 
     def test_query_param_sample_weight(self):
         selector = QBC()
         sample_weight_list = [
-            'test', self.X_cand, np.empty((len(self.X) - 1)),
-            np.empty((len(self.X) + 1))
+            'test', self.candidates, np.empty((len(self.X) - 1)),
+            np.empty((len(self.X) + 1)), np.ones((len(self.X) + 1))
         ]
         for sample_weight in sample_weight_list:
             self.assertRaises(
-                ValueError, selector.query, X_cand=self.X_cand, X=self.X,
+                ValueError, selector.query, candidates=self.candidates, X=self.X,
                 y=self.y, ensemble=self.ensemble, sample_weight=sample_weight
             )
+
+    def test_query_param_fit_ensemble(self):
+        selector = QBC()
+        self.assertRaises(TypeError, selector.query, candidates=self.candidates,
+                          X=self.X, y=self.y, ensemble=self.ensemble,
+                          fit_ensemble='string')
+        self.assertRaises(TypeError, selector.query, candidates=self.candidates,
+                          X=self.X, y=self.y, ensemble=self.ensemble,
+                          fit_ensemble=self.candidates)
+        self.assertRaises(TypeError, selector.query, candidates=self.candidates,
+                          X=self.X, y=self.y, ensemble=self.ensemble,
+                          fit_ensemble=None)
 
     def test_query(self):
         ensemble_classifiers = [
@@ -101,12 +113,18 @@ class TestQBC(unittest.TestCase):
             estimator=BaggingClassifier(base_estimator=gpc),
             classes=self.classes
         )
-        ensemble_list = [self.ensemble, ensemble_classifiers, ensemble_bagging]
+        ensemble_voting = SklearnClassifier(
+            VotingClassifier(estimators=ensemble_classifiers, voting='soft')
+        )
+        ensemble_list = [
+            self.ensemble, ensemble_classifiers, ensemble_bagging,
+            ensemble_voting
+        ]
         for ensemble in ensemble_list:
             for method in ['KL_divergence', 'vote_entropy']:
                 selector = QBC(method=method)
                 idx, u = selector.query(
-                    X_cand=self.X_cand, ensemble=ensemble, X=self.X, y=self.y,
+                    candidates=self.candidates, ensemble=ensemble, X=self.X, y=self.y,
                     return_utilities=True
                 )
                 self.assertEqual(len(idx), 1)

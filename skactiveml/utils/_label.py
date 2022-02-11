@@ -1,11 +1,8 @@
 import numpy as np
 from iteration_utilities import deepflatten
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import LabelEncoder
-from sklearn.utils.validation import check_is_fitted, check_array
 
-from ..utils._validation import check_classifier_params, check_missing_label, \
-    MISSING_LABEL
+# Define constant for missing label used throughout the package.
+MISSING_LABEL = np.nan
 
 
 def is_unlabeled(y, missing_label=MISSING_LABEL):
@@ -25,7 +22,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     """
     check_missing_label(missing_label)
     if len(y) == 0:
-        raise ValueError("'y' is not allowed to be empty.")
+        return np.array(y, dtype=bool)
     if not isinstance(y, np.ndarray):
         types = set(
             t.__qualname__ for t in set(type(v) for v in deepflatten(y)))
@@ -132,111 +129,57 @@ def labeled_indices(y, missing_label=MISSING_LABEL):
     return lbld_indices[:, 0] if is_lbld.ndim == 1 else lbld_indices
 
 
-class ExtLabelEncoder(TransformerMixin, BaseEstimator):
-    """Encode class labels with value between 0 and classes-1.
-    This transformer should be used to encode class labels, *i.e.* `y`, and
-    not the input `X`.
+def check_missing_label(missing_label, target_type=None, name=None):
+    """Check whether a missing label is compatible to a given target type.
 
     Parameters
     ----------
-    classes: array-like, shape (n_classes), default=None
-        Holds the label for each class.
-    missing_label: scalar|string|np.nan|None, default=np.nan
-        Value to represent a missing label.
-
-    Attributes
-    ----------
-    classes_: array-like, shape (n_classes)
-        Holds the label for each class.
+    missing_label : number | str | None | np.nan
+        Symbol to represent a missing label.
+    target_type : type or tuple
+        Acceptable data types for the parameter 'missing_label'.
+    name : str
+        The name of the variable to which 'missing_label' is not compatible.
+        The name will be printed in error messages.
     """
+    is_None = missing_label is None
+    is_character = np.issubdtype(type(missing_label), np.character)
+    is_number = np.issubdtype(type(missing_label), np.number)
+    if not is_number and not is_character and not is_None:
+        raise TypeError(
+            "'missing_label' has type '{}', but must be a either a number, "
+            "a string, np.nan, or None.".format(type(missing_label)))
+    if target_type is not None:
+        is_object_type = np.issubdtype(target_type, np.object_)
+        is_character_type = np.issubdtype(target_type, np.character)
+        is_number_type = np.issubdtype(target_type, np.number)
+        if (is_character_type and is_number) or (
+                is_number_type and is_character) or (
+                is_object_type and not is_None):
+            name = 'target object' if name is None else str(name)
+            raise TypeError(
+                "'missing_label' has type '{}' and is not compatible to the "
+                "type '{}' of '{}'.".format(
+                    type(missing_label), target_type, name))
 
-    def __init__(self, classes=None, missing_label=MISSING_LABEL):
-        self.classes = classes
-        self.missing_label = missing_label
 
-    def fit(self, y):
-        """Fit label encoder.
+def check_equal_missing_label(missing_label1, missing_label2):
+    """Check whether two missing label values are equal to each other.
 
-        Parameters
-        ----------
-        y: array-like, shape (n_samples) or (n_samples, n_outputs)
-            Class labels.
+    Parameters
+    ----------
+    missing_label1 : number | str | None | np.nan
+        Symbol to represent a missing label.
+    missing_label2 : number | str | None | np.nan
+        Other symbol to represent a missing label.
 
-        Returns
-        -------
-        self: returns an instance of self.
-        """
-        check_classifier_params(classes=self.classes,
-                                missing_label=self.missing_label)
-        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
-        self._le = LabelEncoder()
-        if self.classes is None:
-            y = np.asarray(y)
-            is_lbld = is_labeled(y, missing_label=self.missing_label)
-            self._dtype = np.append(y, self.missing_label).dtype
-            self._le.fit(y[is_lbld])
-        else:
-            self._dtype = np.append(self.classes, self.missing_label).dtype
-            self._le.fit(self.classes)
-            self.classes_ = self._le.classes_
-        self.classes_ = self._le.classes_
-
-        return self
-
-    def fit_transform(self, y):
-        """Fit label encoder and return encoded labels.
-
-        Parameters
-        ----------
-        y: array-like, shape (n_samples) or (n_samples, n_outputs)
-            Class labels.
-
-        Returns
-        -------
-        y: array-like, shape (n_samples) or (n_samples, n_outputs)
-            Class labels.
-        """
-        return self.fit(y).transform(y)
-
-    def transform(self, y):
-        """Transform labels to normalized encoding.
-
-        Parameters
-        ----------
-        y : array-like of shape (n_samples)
-            Target values.
-
-        Returns
-        -------
-        y_enc : array-like of shape (n_samples
-        """
-        check_is_fitted(self, attributes=['classes_'])
-        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
-        is_lbld = is_labeled(y, missing_label=self.missing_label)
-        y = np.asarray(y)
-        y_enc = np.empty_like(y, dtype=float)
-        y_enc[is_lbld] = self._le.transform(y[is_lbld].ravel())
-        y_enc[~is_lbld] = np.nan
-        return y_enc
-
-    def inverse_transform(self, y):
-        """Transform labels back to original encoding.
-
-        Parameters
-        ----------
-        y : numpy array of shape [n_samples]
-            Target values.
-
-        Returns
-        -------
-        y_dec : numpy array of shape [n_samples]
-        """
-        check_is_fitted(self, attributes=['classes_'])
-        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
-        is_lbld = is_labeled(y, missing_label=np.nan)
-        y = np.asarray(y)
-        y_dec = np.empty_like(y, dtype=self._dtype)
-        y_dec[is_lbld] = self._le.inverse_transform(
-            np.array(y[is_lbld].ravel(), dtype=int))
-        y_dec[~is_lbld] = self.missing_label
-        return y_dec
+    Raises
+    -------
+    ValueError
+        If the parameter's value violates the given bounds.
+    """
+    if not is_unlabeled([missing_label1], missing_label=missing_label2)[0]:
+        raise ValueError(
+            f"missing_label1={missing_label1} and "
+            f"missing_label2={missing_label2} must be equal."
+        )

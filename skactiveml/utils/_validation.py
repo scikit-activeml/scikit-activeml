@@ -3,12 +3,11 @@ import warnings
 from collections.abc import Iterable
 
 import numpy as np
-import sklearn
 from sklearn.utils.validation import check_array, column_or_1d, \
-    assert_all_finite, check_consistent_length
+    assert_all_finite, check_consistent_length, \
+    check_random_state as check_random_state_sklearn
 
-# Define constant for missing label used throughout the package.
-MISSING_LABEL = np.nan
+from ._label import MISSING_LABEL, check_missing_label
 
 
 def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
@@ -79,7 +78,7 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
     check_missing_label(missing_label)
     if classes is not None:
         check_classes(classes)
-        dtype = np.append(classes, missing_label).dtype
+        dtype = np.array(classes).dtype
         check_missing_label(missing_label, target_type=dtype, name='classes')
         if cost_matrix is not None:
             check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
@@ -87,40 +86,6 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
         if cost_matrix is not None:
             raise ValueError("You cannot specify 'cost_matrix' without "
                              "specifying 'classes'.")
-
-
-def check_missing_label(missing_label, target_type=None, name=None):
-    """Check whether a missing label is compatible to a given target type.
-
-    Parameters
-    ----------
-    missing_label : number | str | None | np.nan
-        Symbol to represent a missing label.
-    target_type : type or tuple
-        Acceptable data types for the parameter 'missing_label'.
-    name : str
-        The name of the variable to which 'missing_label' is not compatible.
-        The name will be printed in error messages.
-    """
-    is_None = missing_label is None
-    is_character = np.issubdtype(type(missing_label), np.character)
-    is_number = np.issubdtype(type(missing_label), np.number)
-    if not is_number and not is_character and not is_None:
-        raise TypeError(
-            "'missing_label' has type '{}', but must be a either a number, "
-            "a string, np.nan, or None.".format(type(missing_label)))
-    if target_type is not None:
-        is_object_type = np.issubdtype(target_type, np.object_)
-        is_character_type = np.issubdtype(target_type, np.character)
-        is_number_type = np.issubdtype(target_type, np.number)
-        if (is_character_type and is_number) or (
-                is_number_type and is_character) or (
-                is_object_type and not is_None):
-            name = 'target object' if name is None else str(name)
-            raise TypeError(
-                "'missing_label' has type '{}' and is not compatible to the "
-                "type '{}' of '{}'.".format(
-                    type(missing_label), target_type, name))
 
 
 def check_classes(classes):
@@ -221,9 +186,9 @@ def check_cost_matrix(cost_matrix, n_classes, only_non_negative=False,
     if n_classes != 1 and np.sum(cost_matrix_new != 0) == 0:
         if contains_non_zero:
             raise ValueError(
-                    "'cost_matrix' must contain at least one non-zero cost "
-                    "entry."
-                )
+                "'cost_matrix' must contain at least one non-zero cost "
+                "entry."
+            )
         else:
             warnings.warn(
                 "'cost_matrix' contains contains no non-zero cost entry."
@@ -448,20 +413,199 @@ def check_random_state(random_state, seed_multiplier=None):
         The validated random state.
     """
     if random_state is None or seed_multiplier is None:
-        return sklearn.utils.check_random_state(random_state)
+        return check_random_state_sklearn(random_state)
 
     check_scalar(seed_multiplier, name='seed_multiplier', target_type=int,
                  min_val=1)
     random_state = copy.deepcopy(random_state)
-    random_state = sklearn.utils.check_random_state(random_state)
+    random_state = check_random_state_sklearn(random_state)
 
     seed = (random_state.randint(1, 2 ** 31) * seed_multiplier) % (2 ** 31)
     return np.random.RandomState(seed)
 
 
-def check_type(obj, target_type, name):
-    if not isinstance(obj, target_type):
-        raise TypeError(
-            f'`{name}` has type `{type(obj)}` but must have type '
-            f'`{target_type}`.'
-        )
+def check_indices(indices, A, dim='adaptive', unique=True):
+    """Check if indices fit to array.
+
+    Parameters
+    ----------
+    indices : array-like of shape (n_indices, n_dim) or (n_indices,)
+        The considered indices, where for every `i = 0, ..., n_indices - 1`
+        `indices[i]` is interpreted as an index to the array `A`.
+    A : array-like
+        The array that is indexed.
+    dim : int or tuple of ints
+        The dimensions of the array that are indexed.
+        If `dim` equals `'adaptive'`, `dim` is set to first indices corresponding
+        to the shape of `indices`. E.g., if `indices` is of shape (n_indices,),
+        `dim` is set `0`.
+    unique: bool or `check_unique`
+        If `unique` is `True` unique indices are returned. If `unique` is
+        `'check_unique'` an exception is raised if the indices are not unique.
+
+    Returns
+    -------
+    indices: tuple of np.ndarrays or np.ndarray
+        The validated indices.
+    """
+    indices = check_array(indices, dtype=int, ensure_2d=False)
+    A = check_array(A, allow_nd=True, force_all_finite=False, ensure_2d=False)
+    if unique == 'check_unique':
+        if indices.ndim == 1:
+            n_unique_indices = len(np.unique(indices))
+        else:
+            n_unique_indices = len(np.unique(indices, axis=0))
+        if n_unique_indices < len(indices):
+            raise ValueError(f'`indices` contains two different indices of the '
+                             f'same value.')
+    elif unique:
+        if indices.ndim == 1:
+            indices = np.unique(indices)
+        else:
+            indices = np.unique(indices, axis=0)
+    check_type(dim, 'dim', int, tuple, 'adaptive')
+    if dim == 'adaptive':
+        if indices.ndim == 1:
+            dim = 0
+        else:
+            dim = tuple(range(indices.shape[1]))
+
+    if isinstance(dim, tuple):
+        for n in dim:
+            check_type(n, 'entry of `dim`', int)
+        if A.ndim <= max(dim):
+            raise ValueError(f'`dim` contains entry of value {max(dim)}, but all'
+                             f'entries of dim must be smaller than {A.ndim}.')
+        if len(dim) != indices.shape[1]:
+            raise ValueError(f'shape of `indices` along dimension 1 is '
+                             f'{indices.shape[0]}, but must be {len(dim)}')
+        indices = tuple(indices.T)
+        for (i, n) in enumerate(indices):
+            if np.any(indices[i] >= A.shape[dim[i]]):
+                raise ValueError(f'`indices[{i}]` contains index of value '
+                                 f'{np.max(indices[i])} but all indices must be'
+                                 f' less than {A.shape[dim[i]]}.')
+        return indices
+    else:
+        if A.ndim <= dim:
+            raise ValueError(f'`dim` has value {dim}, but must be smaller than '
+                             f'{A.ndim}.')
+        if np.any(indices >= A.shape[dim]):
+            raise ValueError(f'`indices` contains index of value '
+                             f'{np.max(indices)} but all indices must be'
+                             f' less than {A.shape[dim]}.')
+        return indices
+
+
+def check_type(obj, name, *target_types):
+    """Check if obj is one of the given types.
+
+    Parameters
+    ----------
+    obj: object
+        The object to be checked.
+    name: str
+        The variable name of the object.
+    target_types : iterable
+        The possible types. If a target_val in `target_types` is not of type
+        `type` `obj` is allowed to equal the target_val.
+
+    """
+    target_vals = [target_val for target_val in target_types
+                   if not isinstance(target_val, type)]
+    target_types = [target_type for target_type in target_types
+                    if isinstance(target_type, type)]
+
+    if all(not isinstance(obj, target_type) for target_type in target_types) \
+            and obj not in target_vals:
+
+        error_str = f'`{name}` has type `{type(obj)}` but must have '
+        if len(target_types) == 1:
+            error_str += f'type `{target_types[0]}`'
+        elif len(target_types) <= 3:
+            error_str += 'type '
+            for i in range(len(target_types) - 1):
+                error_str += f'`{target_types[i]}`,'
+            error_str += f' or `{target_types[len(target_types) - 1]}`'
+        else:
+            error_str += f'one of the following types: {set(target_types)}'
+
+        if len(list(target_vals)) >= 1:
+            error_str += f' or equal one of the following values: {set(target_vals)}'
+        raise TypeError(error_str + '.')
+
+
+def check_bound(bound=None, X=None, ndim=2, epsilon=0,
+                bound_must_be_given=False):
+    """ Validates bound and returns the bound of X if bound is None.
+    `bound` and `X` must not be None.
+
+    Parameters
+    ----------
+    bound: array-like, shape (2, ndim), optional (default=None)
+        The given bound of shape
+        [[x1_min, x2_min, ..., xndim_min], [x1_max, x2_max, ..., xndim_max]]
+    X: matrix-like, shape (n_samples, ndim), optional (default=None)
+        The sample matrix X is the feature matrix representing samples.
+    ndim: int, optional (default=2)
+        The number of dimensions.
+    epsilon: float, optional (default=0)
+        The minimal distance between the returned bound and the values of `X`,
+        if `bound` is not specified.
+    bound_must_be_given: bool, optional (default=False)
+        Whether it is allowed for the bound to be `None` and to be inferred by
+        `X`.
+
+    Returns
+    -------
+    bound: array-like, shape (2, ndim), optional (default=None)
+        The given bound or bound of X.
+    """
+
+    if X is not None:
+        X = check_array(X)
+        if X.shape[1] != ndim:
+            raise ValueError(f"`X` along axis 1 must be of length {ndim}. "
+                             f"`X` along axis 1 is of length {X.shape[1]}.")
+    if bound is not None:
+        bound = check_array(bound)
+        if bound.shape != (2, ndim):
+            raise ValueError(f"Shape of `bound` must be (2, {ndim}). "
+                             f"Shape of `bound` is {bound.shape}.")
+    elif bound_must_be_given:
+        raise ValueError("`bound` must not be `None`.")
+
+    if bound is None and X is not None:
+        minima = np.nanmin(X, axis=0) - epsilon
+        maxima = np.nanmax(X, axis=0) + epsilon
+        bound = np.append(minima.reshape(1, -1), maxima.reshape(1, -1), axis=0)
+        return bound
+    elif bound is not None and X is not None:
+        if np.any(np.logical_or(bound[0] > X, X > bound[1])):
+            warnings.warn("`X` contains values not within range of `bound`.")
+        return bound
+    elif bound is not None:
+        return bound
+    else:
+        raise ValueError("`X` or `bound` must not be None.")
+
+
+def check_budget_manager(budget, budget_manager, default_budget_manager_class,
+                         default_budget_manager_dict=None):
+    """Validate if budget manager is a budget_manager class and create a
+        copy 'budget_manager_'.
+        """
+    if default_budget_manager_dict is None:
+        default_budget_manager_dict = {}
+    if budget_manager is None:
+        budget_manager_ = default_budget_manager_class(
+            budget=budget, **default_budget_manager_dict)
+    else:
+        if budget is not None and budget != budget_manager.budget:
+            warnings.warn(
+                "budget_manager is already given such that the budget "
+                "is not used. The given budget differs from the "
+                "budget_managers budget."
+            )
+        budget_manager_ = copy.deepcopy(budget_manager)
+    return budget_manager_

@@ -22,25 +22,25 @@ class PWC(ClassFrequencyEstimator):
 
     Parameters
     ----------
-    classes : array-like, shape (n_classes), default=None
+    classes : array-like of shape (n_classes), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
-    missing_label : {scalar, string, np.nan, None}, default=np.nan
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    cost_matrix : array-like, shape (n_classes, n_classes)
+    cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
-        `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        classes is not none.
-    class_prior : float | array-like, shape (n_classes), optional (default=0)
+        `classes[j]` for a sample of class `classes[i]`. Can be only set, if
+        `classes` is not none.
+    class_prior : float or array-like of shape (n_classes,), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
         prior number of samples belonging to class `classes_[i]`. If
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
-    metric : str | callable,
+    metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function 
         `sklearn.metrics.pairwise.pairwise_kernels`.
-    n_neighbors : int,
+    n_neighbors : int or None, default=None
         Number of nearest neighbours. Default is None, which means all 
         available samples are considered.
     metric_dict : dict,
@@ -48,27 +48,27 @@ class PWC(ClassFrequencyEstimator):
 
     Attributes
     ----------
-    classes_ : array-like, shape (n_classes)
+    classes_ : array-like of shape (n_classes,)
         Holds the label for each class after fitting.
-    class_prior : np.ndarray, shape (n_classes)
+    class_prior : np.ndarray of shape (n_classes)
         Prior observations of the class frequency estimates. The entry
         `class_prior_[i]` indicates the non-negative prior number of samples
         belonging to class `classes_[i]`.
-    cost_matrix_ : np.ndarray, shape (classes, classes)
+    cost_matrix_ : np.ndarray of shape (classes, classes)
         Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
         class `classes_[j]` for a sample of class `classes_[i]`.
-    X_ : array-like, shape (n_samples, n_features)
-        The sample matrix X is the feature matrix representing the samples.
-    V_ : array-like, shape (n_samples, classes)
+    X_ : np.ndarray of shape (n_samples, n_features)
+        The sample matrix `X` is the feature matrix representing the samples.
+    V_ : np.ndarray of shape (n_samples, classes)
         The class labels are represented by counting vectors. An entry `V[i,j]`
-        indicates how many class labels of class j were provided for training 
-        sample `X_[i]`.
+        indicates how many class labels of `classes[j]` were provided for
+        training sample `X_[i]`.
 
     References
     ----------
-    [1] O. Chapelle, "Active Learning for Parzen Window Classifier",
-        Proceedings of the Tenth International Workshop Artificial Intelligence
-        and Statistics, 2005.
+    .. [1] `O. Chapelle, "Active Learning for Parzen Window Classifier",
+       Proceedings of the Tenth International Workshop Artificial Intelligence
+       and Statistics, 2005.`_
     """
     METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
@@ -87,13 +87,12 @@ class PWC(ClassFrequencyEstimator):
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_outputs)
+        X : array-like of shape (n_samples, n_features)
+            The sample matrix `X` is the feature matrix representing the
+            samples.
+        y : array-like of shape (n_samples)
             It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where 
-            missing labels are represented the attribute 'missing_label'.
-        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+        sample_weight : array-like of shape (n_samples)
             It contains the weights of the training samples' class labels.
             It must have the same shape as y.
 
@@ -131,7 +130,8 @@ class PWC(ClassFrequencyEstimator):
             self.V_ = 0
         else:
             self.V_ = compute_vote_vectors(
-                y=y, w=sample_weight, classes=np.arange(len(self.classes_))
+                y=y, w=sample_weight, classes=np.arange(len(self.classes_)),
+                missing_label=-1
             )
 
         return self
@@ -141,26 +141,26 @@ class PWC(ClassFrequencyEstimator):
 
         Parameters
         ----------
-        X: array-like, shape (n_samples, n_features) or shape
+        X: array-like or shape (n_samples, n_features) or shape
         (n_samples, m_samples) if metric == 'precomputed'
             Input samples.
 
         Returns
         -------
-        F: array-like, shape (n_samples, classes)
+        F: array-like of shape (n_samples, classes)
             The class frequency estimates of the input samples. Classes are
-            ordered according to classes_.
+            ordered according to `classes_`.
         """
         check_is_fitted(self)
-        X = check_array(X)
+        X = check_array(X, force_all_finite=False)
 
         # Predict zeros because of missing training data.
-        if np.sum(self.V_) == 0:
+        if self.n_features_in_ is None:
             return np.zeros((len(X), len(self.classes_)))
 
         # Compute kernel (metric) matrix.
         if self.metric == 'precomputed':
-            K = np.asarray(X)
+            K = X
             if np.size(K, 0) != np.size(X, 0) or \
                     np.size(K, 1) != np.size(self.X_, 0):
                 raise ValueError("The kernel matrix 'X' must have the shape "
