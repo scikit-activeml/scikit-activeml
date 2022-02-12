@@ -15,9 +15,9 @@ from scipy.stats import multivariate_normal as multi_normal
 from sklearn.utils.validation import check_array, check_is_fitted, \
     column_or_1d
 
-from skactiveml.base import SkactivemlClassifier, AnnotModelMixin
-from skactiveml.utils import MISSING_LABEL, compute_vote_vectors, \
-    ext_confusion_matrix, rand_argmax
+from ...base import SkactivemlClassifier, AnnotModelMixin
+from ...utils import MISSING_LABEL, compute_vote_vectors, rand_argmax, \
+    ext_confusion_matrix
 
 
 class LogisticRegressionRY(SkactivemlClassifier, AnnotModelMixin):

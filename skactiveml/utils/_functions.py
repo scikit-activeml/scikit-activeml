@@ -2,9 +2,8 @@ import inspect
 import warnings
 
 import numpy as np
-from sklearn.base import clone
-from sklearn.utils.validation import check_array, check_is_fitted, \
-    NotFittedError
+
+from sklearn.utils.validation import check_array
 
 from ._selection import rand_argmax
 from ._validation import check_scalar
