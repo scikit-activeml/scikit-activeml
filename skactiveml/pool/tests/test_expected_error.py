@@ -180,7 +180,7 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
                               return_utilities=True)
 
         expected_utils = np.full(shape=(1, len(candidates)),
-                                 fill_value=0.5*np.log(0.5)*len(classes))
+                                 fill_value=-0.5*np.log(0.5)*len(classes)*len(X))
         np.testing.assert_array_equal(expected_utils, utils[:, 0:2])
 
 
