@@ -201,19 +201,21 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
             GaussianNB(), classes=classes
         ).fit(X, y)
 
-        params_list = [['kapoor', True, True, True, [[0, 0]]],
-                       ['Margeniantu', False, True, False,
+        params_list = [['kapoor', True, True, True, True, [[0, 0]]],
+                       ['Margeniantu', False, True, False, False,
                         np.full(shape=(1, len(candidates)),
                                 fill_value=0.25 * (len(classes) - 1) * len(classes) * len(candidates))],
-                       ['Joshi', True, False, True, [[0, 0]]]]
+                       ['Joshi', True, False, True, False, [[0, 0]]]]
 
         for msg, consider_unlabeled, consider_labeled, \
-            candidate_to_labeled, expected_utils in params_list:
+            candidate_to_labeled, substract_current, \
+            expected_utils in params_list:
             with self.subTest(msg=msg):
                 qs = ValueOfInformationEER(
                     consider_unlabeled=consider_unlabeled,
                     consider_labeled=consider_labeled,
                     candidate_to_labeled=candidate_to_labeled,
+                    substract_current=substract_current,
                     cost_matrix=cost_matrix
                 )
                 qs.query(candidates=candidates, clf=clf_partial, X=X, y=y)

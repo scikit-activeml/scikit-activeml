@@ -179,6 +179,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         classes = id_clf.classes_
         self._validate_cost_matrix(len(classes))
 
+        # precomputating values before the loop
+        self._precompute_loop(id_clf, idx_train, idx_cand, idx_eval, w_eval)
+
         # Storage for computed errors per candidate sample
         errors = np.zeros([len(X_cand), len(classes)])
 
@@ -216,6 +219,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         else:
             id_clf.fit(idx_train)
         return id_clf
+
+    def _precompute_loop(self, id_clf, idx_train, idx_cand, idx_eval, w_eval):
+        pass
 
     def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
@@ -403,6 +409,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
     """
     def __init__(self, cost_matrix=None, consider_unlabeled=True,
                  consider_labeled=True, candidate_to_labeled=True,
+                 substract_current=False,
                  missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
             enforce_mapping=True,
@@ -413,26 +420,39 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         self.consider_unlabeled = consider_unlabeled
         self.consider_labeled = consider_labeled
         self.candidate_to_labeled = candidate_to_labeled
+        self.substract_current = substract_current
 
     def _validate_init_params(self):
         check_type(self.consider_unlabeled, 'consider_unlabeled', bool)
         check_type(self.consider_labeled, 'consider_labeled', bool)
         check_type(self.candidate_to_labeled, 'candidate_to_labeled', bool)
+        check_type(self.substract_current, 'substract_current', bool)
 
     def query(self, X, y, clf, sample_weight=None,
               fit_clf=True, ignore_partial_fit=True,
               candidates=None, batch_size=1, return_utilities=False):
 
         # TODO check if candidates are only unlabeled ones if given
+        if self.substract_current and return_utilities == True:
+            idx, utils = super().query(X, y, clf, sample_weight=sample_weight,
+                                       fit_clf=fit_clf,
+                                       ignore_partial_fit=ignore_partial_fit,
+                                       candidates=candidates,
+                                       sample_weight_candidates=None,
+                                       X_eval=None, sample_weight_eval=None,
+                                       batch_size=batch_size,
+                                       return_utilities=return_utilities)
+            return idx, utils - self.err_current_
 
-        return super().query(X, y, clf, sample_weight=sample_weight,
-                             fit_clf=fit_clf,
-                             ignore_partial_fit=ignore_partial_fit,
-                             candidates=candidates,
-                             sample_weight_candidates=None,
-                             X_eval=None, sample_weight_eval=None,
-                             batch_size=batch_size,
-                             return_utilities=return_utilities)
+        else:
+            return super().query(X, y, clf, sample_weight=sample_weight,
+                                 fit_clf=fit_clf,
+                                 ignore_partial_fit=ignore_partial_fit,
+                                 candidates=candidates,
+                                 sample_weight_candidates=None,
+                                 X_eval=None, sample_weight_eval=None,
+                                 batch_size=batch_size,
+                                 return_utilities=return_utilities)
 
     def _estimate_error_for_candidate(self, id_clf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
@@ -474,6 +494,35 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
         return err
 
+    def _precompute_loop(self, id_clf, idx_train, idx_cand, idx_eval, w_eval):
+        # estimate current utility score if required
+        if self.substract_current:
+            le = id_clf._le
+            y_eval = id_clf.get_y(idx_eval)
+            idx_labeled = idx_train[is_labeled(y_eval)]
+            y_labeled = id_clf.get_y(idx_labeled)
+            idx_unlabeled = idx_train[is_unlabeled(y_eval)]
+
+            y_labeled_c_id = le.transform(y_labeled)
+
+            err = 0
+            if self.consider_labeled:
+                if len(idx_labeled) > 0:
+                    probs = id_clf.predict_proba(idx_labeled)
+                    err += self._risk_estimation(
+                        y_labeled_c_id, probs, self.cost_matrix_,
+                        w_eval[idx_labeled]
+                    )
+
+            if self.consider_unlabeled:
+                if len(idx_unlabeled) > 0:
+                    probs = id_clf.predict_proba(idx_unlabeled)
+                    err += self._risk_estimation(
+                        probs, probs, self.cost_matrix_,
+                        w_eval[idx_unlabeled]
+                    )
+            self.err_current_ = err
+
     def _precompute_and_fit_clf(self, id_clf, X_full, y_full,
                                 idx_train, idx_cand, idx_eval, fit_clf):
         # for cond_prob
@@ -500,4 +549,5 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             id_clf, X_full, y_full, idx_train, idx_cand, idx_eval,
             fit_clf=fit_clf
         )
+
         return id_clf
