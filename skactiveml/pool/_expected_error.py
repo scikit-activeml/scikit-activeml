@@ -6,6 +6,7 @@ from ..utils import check_type, is_labeled, simple_batch, check_cost_matrix, \
     MISSING_LABEL, check_equal_missing_label, unlabeled_indices, is_unlabeled
 from .utils import IndexClassifierWrapper
 
+
 class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
     """Abstract class for Expected Error Reduction (EER) algorithms
 
@@ -50,6 +51,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         IEEE TrPAMI, 34(11), pp. 2259-2273.
     [3] Margineantu, D. D. (2005). Active cost-sensitive learning.
         In IJCAI (Vol. 5, pp. 1622-1623).
+    [4] Kapoor, Ashish, Eric Horvitz, and Sumit Basu. "Selective Supervision:
+        Guiding Supervised Learning with Decision-Theoretic Active Learning."
+        IJCAI. Vol. 7. 2007.
     """
 
     def __init__(self, enforce_mapping, cost_matrix=None,

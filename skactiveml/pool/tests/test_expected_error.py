@@ -11,7 +11,8 @@ from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error import IndexClassifierWrapper
-from skactiveml.utils import MISSING_LABEL, call_func, labeled_indices
+from skactiveml.utils import MISSING_LABEL, call_func, labeled_indices, \
+    ExtLabelEncoder
 
 
 class TemplateTestEER:
@@ -30,6 +31,18 @@ class TemplateTestEER:
         ).fit(self.X, self.y)
         self.kwargs = dict(X=self.X, y=self.y, candidates=self.candidates,
                            clf=self.clf)
+
+        class DummyClf(SkactivemlClassifier):
+            def fit(self, X, y, sample_weight=None):
+                self.classes_ = np.unique(y[labeled_indices(y)])
+                self._le = ExtLabelEncoder(classes=self.classes_,
+                                           missing_label=MISSING_LABEL).fit(y)
+                return self
+
+            def predict_proba(self, X):
+                return np.full(shape=(len(X), len(self.classes_)),
+                               fill_value=0.5)
+        self.DummyClf = DummyClf
 
     def test_init_param_cost_matrix(self):
         for cost_matrix in [np.ones((2, 3)), 'string', np.ones((2, 2))]:
@@ -149,6 +162,26 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
 
     def test_query(self):
         super().test_query()
+        classes = [0, 1]
+        candidates = [0, 1]
+        X_cand = np.array([[8, 1], [9, 1]])
+        X = np.array([[8, 1], [9, 1], [1, 2], [5, 8], [8, 4]])
+        y = np.array([MISSING_LABEL, MISSING_LABEL, 0, 1, MISSING_LABEL])
+        cost_matrix = 1 - np.eye(2)
+
+        X = [[1], [2], [3]]
+        y = [0, 1, MISSING_LABEL]
+        clf = PWC(classes=[0, 1])
+        qs = MonteCarloEER(method='log_loss', cost_matrix=cost_matrix,
+                           random_state=42)
+        idx, utils = qs.query(X, y, self.DummyClf(), fit_clf=True,
+                              ignore_partial_fit=True,
+                              candidates=candidates,
+                              return_utilities=True)
+
+        expected_utils = np.full(shape=(1, len(candidates)),
+                                 fill_value=0.5*np.log(0.5)*len(classes))
+        np.testing.assert_array_equal(expected_utils, utils[:, 0:2])
 
 
 class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
@@ -158,36 +191,74 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
 
     def test_query(self):
         super().test_query()
-
-        # Kapoor tests.
-        class DummyClf(SkactivemlClassifier):
-            def fit(self, X, y, sample_weight=None):
-                self.classes_ = np.unique(y[labeled_indices(y)])
-                return self
-
-            def predict_proba(self, X):
-                return np.full(shape=(len(X), len(self.classes_)),
-                               fill_value=0.5)
         classes = [0, 1]
+        candidates = [0, 1]
         X_cand = np.array([[8, 1], [9, 1]])
-        X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        y = np.array([MISSING_LABEL, 0, 1, MISSING_LABEL])
+        X = np.array([[8, 1], [9, 1], [1, 2], [5, 8], [8, 4]])
+        y = np.array([MISSING_LABEL, MISSING_LABEL, 0, 1, MISSING_LABEL])
         cost_matrix = 1 - np.eye(2)
         clf_partial = SklearnClassifier(
             GaussianNB(), classes=classes
         ).fit(X, y)
-        clf = SklearnClassifier(
-            estimator=GaussianProcessClassifier(),
-            random_state=self.random_state,
-            classes=classes
-        )
-        # query
-        qs = ValueOfInformationEER(consider_unlabeled=True,
-                                   consider_labeled=True,
-                                   candidate_to_labeled=True)
-        qs.query(candidates=X_cand, clf=clf_partial, X=X, y=y)
+
+        params_list = [['kapoor', True, True, True, [[0, 0]]],
+                       ['Margeniantu', False, True, False,
+                        np.full(shape=(1, len(candidates)),
+                                fill_value=0.25 * (len(classes) - 1) * len(classes) * len(candidates))],
+                       ['Joshi', True, False, True, [[0, 0]]]]
+
+        for msg, consider_unlabeled, consider_labeled, \
+            candidate_to_labeled, expected_utils in params_list:
+            with self.subTest(msg=msg):
+                qs = ValueOfInformationEER(
+                    consider_unlabeled=consider_unlabeled,
+                    consider_labeled=consider_labeled,
+                    candidate_to_labeled=candidate_to_labeled,
+                    cost_matrix=cost_matrix
+                )
+                qs.query(candidates=candidates, clf=clf_partial, X=X, y=y)
+
+                idxs, utils = qs.query(candidates=candidates, clf=self.DummyClf(),
+                                       X=X, y=y,
+                                       return_utilities=True)
+                np.testing.assert_array_equal(expected_utils, utils[:, 0:2])
+
+        # Test Margeniantu
+        #qs = ValueOfInformationEER(consider_unlabeled=True,
+        #                           consider_labeled=True,  # TODO
+        #                           candidate_to_labeled=True,
+        #                           cost_matrix=cost_matrix)
+        #qs.query(candidates=candidates, clf=clf_partial, X=X, y=y)
+#
+        #idxs, utils = qs.query(candidates=candidates, clf=self.DummyClf(), X=X, y=y,
+        #                       return_utilities=True)
+        #u = 0.25*(len(classes)-1)*len(classes)*len(candidates)
+        #np.testing.assert_array_equal([[u, u]], utils[:, 0:2])
+
+
+        # Test Kapoor
+        #qs = ValueOfInformationEER(consider_unlabeled=True,
+        #                           consider_labeled=True,
+        #                           candidate_to_labeled=True,
+        #                           cost_matrix=cost_matrix)
+        #qs.query(candidates=candidates, clf=clf_partial, X=X, y=y)
+
+        #idxs, utils = qs.query(candidates=candidates, clf=self.DummyClf(), X=X, y=y,
+        #                       return_utilities=True)
+        #np.testing.assert_array_equal([[0, 0]], utils[:, 0:2])
+
+
 
         # labeling_cost
+        #class DummyClf(SkactivemlClassifier):
+        #    def fit(self, X, y, sample_weight=None):
+        #        self.classes_ = np.unique(y[labeled_indices(y)])
+        #        return self
+        #
+        #    def predict_proba(self, X):
+        #        return np.full(shape=(len(X), len(self.classes_)),
+        #                       fill_value=0.5)
+
         #labeling_cost = 2.345
         #qs = ValueOfInformationEER(cost_matrix=cost_matrix,
         #                           labeling_cost=labeling_cost)
