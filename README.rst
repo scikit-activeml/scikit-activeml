@@ -154,6 +154,56 @@ uncertainty sampling.
 Stream-based Active Learning
 ############################
 
+The following code implements an active learning cycle with 200 data points and
+the default budget of 10% using a pwc classifier and split uncertainty sampling. 
+Like in the pool-based example you can wrap other classifiers from ``sklearn``,
+``sklearn`` compatible classifieres or like the example classifiers provided by ``skactiveml``. 
+
+.. code-block:: python
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.ndimage import gaussian_filter1d
+    from sklearn.datasets import make_blobs
+    from skactiveml.classifier import PWC
+    from skactiveml.stream import Split
+    from skactiveml.utils import MISSING_LABEL
+
+    # Generate data set.
+    X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
+
+    # Create classifier and query strategy.
+    clf = PWC(random_state=0, classes=np.unique(y_true))
+    qs = Split(random_state=0)
+
+    # initializing the training data as an empty array
+    X_train = []
+    y_train = []
+
+    # initialize the list that stores the result of the classifier's prediction
+    correct_classifications = []
+
+    # Execute active learning cycle
+    for x_t, y_t in zip(X, y_true):
+        X_cand = x_t.reshape([1, -1])
+        y_cand = y_t
+        clf.fit(X_train, y_train)
+        correct_classifications.append(clf.predict(X_cand)[0] == y_cand)
+        sampled_indices = qs.query(X_cand=X_cand, clf=clf)
+        qs.update(X_cand=X_cand, queried_indices=sampled_indices)
+        X_train.append(x_t)
+        y_train.append(y_cand if len(sampled_indices) > 0 else MISSING_LABEL)
+
+    # plot the classifiers learning accuracy
+    plt.plot(gaussian_filter1d(np.array(correct_classifications, dtype=float), 4))
+    plt.show()
+
+As output of this code snippet, we obtain the actively trained pwc classifier incuding
+a visualization of its accuracy over the 200 samples.
+
+.. image:: docs/logos/stream-example-output.png
+   :width: 400
+
 .. examples_end
 
 Citing
