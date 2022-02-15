@@ -248,7 +248,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         if (candidates is None or candidates.ndim == 1) and \
                 sample_weight_candidates is not None:
             raise ValueError('Attribute `sample_weight_candidates` can only'
-                             'be None if `candidates` consists of samples.')
+                             'be set if `candidates` consists of samples.')
 
         # Check if X_eval is set if sample_weight_eval is set
         if X_eval is None and sample_weight_eval is not None:
@@ -409,7 +409,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
     """
     def __init__(self, cost_matrix=None, consider_unlabeled=True,
                  consider_labeled=True, candidate_to_labeled=True,
-                 substract_current=False,
+                 subtract_current=False,
                  missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
             enforce_mapping=True,
@@ -420,20 +420,20 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         self.consider_unlabeled = consider_unlabeled
         self.consider_labeled = consider_labeled
         self.candidate_to_labeled = candidate_to_labeled
-        self.substract_current = substract_current
+        self.subtract_current = subtract_current
 
     def _validate_init_params(self):
         check_type(self.consider_unlabeled, 'consider_unlabeled', bool)
         check_type(self.consider_labeled, 'consider_labeled', bool)
         check_type(self.candidate_to_labeled, 'candidate_to_labeled', bool)
-        check_type(self.substract_current, 'substract_current', bool)
+        check_type(self.subtract_current, 'subtract_current', bool)
 
     def query(self, X, y, clf, sample_weight=None,
               fit_clf=True, ignore_partial_fit=True,
               candidates=None, batch_size=1, return_utilities=False):
 
         # TODO check if candidates are only unlabeled ones if given
-        if self.substract_current and return_utilities == True:
+        if self.subtract_current and return_utilities == True:
             idx, utils = super().query(X, y, clf, sample_weight=sample_weight,
                                        fit_clf=fit_clf,
                                        ignore_partial_fit=ignore_partial_fit,
@@ -496,7 +496,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
     def _precompute_loop(self, id_clf, idx_train, idx_cand, idx_eval, w_eval):
         # estimate current utility score if required
-        if self.substract_current:
+        if self.subtract_current:
             le = id_clf._le
             y_eval = id_clf.get_y(idx_eval)
             idx_labeled = idx_train[is_labeled(y_eval)]

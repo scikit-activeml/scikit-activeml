@@ -38,22 +38,15 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
                           X_cand=None)
 
     def test__transform_candidates(self):
-        for args in [(np.array([[2]]), np.array([[1]]), np.array([0]), True)]:
-            with self.assertRaises(ValueError, msg=f'args: {args}'):
-                self.qs._transform_candidates(*args)
+        self.assertRaises(ValueError, self.qs._transform_candidates,
+                          np.array([[3]]), np.array([[2]]), np.array([0]),
+                          True)
 
-        self.qs._transform_candidates(candidates=np.array([[2]]),
-                                      X=np.array([[2]]),
-                                      y=np.array([0]),
-                                      enforce_mapping=True)
-
+        X = np.array([[2], [3]])
         X_cand, mapping = self.qs._transform_candidates(
-            candidates=np.array([[1]]),
-            X=np.array([[2]]),
-            y=np.array([0]),
-            enforce_mapping=False
+            candidates=np.array([0]), X=X, y=np.array([0, 1]),
         )
-        np.testing.assert_array_equal(X_cand, np.array([[1]]))
+        np.testing.assert_array_equal(X_cand, X[mapping])
 
 
 class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
