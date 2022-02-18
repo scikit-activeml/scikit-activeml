@@ -20,7 +20,7 @@ from skactiveml.utils import MISSING_LABEL, check_classifier_params, \
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
            'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
-           'SkactivemlRegressor', 'SkactivemlContinuousEstimator',
+           'SkactivemlRegressor', 'SkactivemlConditionalEstimator',
            'ClassFrequencyEstimator', 'AnnotModelMixin']
 
 
@@ -845,8 +845,6 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
 
-    Attributes
-    ----------
     """
 
     def __init__(self, random_state=None):
@@ -888,16 +886,34 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         raise NotImplementedError
 
 
-class SkactivemlContinuousEstimator(SkactivemlRegressor):
-    """SkactivemlContinuousEstimator
+class SkactivemlConditionalEstimator(SkactivemlRegressor):
+    """SkactivemlConditionalEstimator
 
-    Bass class for scikit-activeml continuous posterior estimator.
+    Bass class for scikit-activeml continuous conditional posterior estimators.
 
     """
 
     @abstractmethod
-    def estimate_mu_cov(self, X):
-        """Return estimated mu and var conditioned on test samples X.
+    def estimate_conditional_distribution(self, X):
+        """Returns the estimated target distribution conditioned on the test
+        samples `X`.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+
+        Returns
+        -------
+        dist : scipy.stats.rv_continuous
+
+        """
+        return NotImplementedError
+
+    def predict(self, X, return_std=False, return_entropy=False):
+        """Returns the mean, std (optional) and differential entropy (optional)
+        of the estimated target distribution conditioned on the test samples
+        'X'.
 
         Parameters
         ----------
@@ -905,13 +921,24 @@ class SkactivemlContinuousEstimator(SkactivemlRegressor):
             Input samples.
         Returns
         -------
-        mu, var : numpy.ndarray, shape (n_samples), (n_samples) or
-        (n_samples, n_targets), (n_samples, n_targets, n_targets)
-            Predicted mu and var conditioned on the test samples 'X'.
+        mu : numpy.ndarray, shape (n_samples)
+            Predicted mu conditioned on `X`.
+        std : numpy.ndarray, shape (n_samples), optional
+            Predicted std conditioned on `X`.
+        entropy : numpy..ndarray, optional
+            Predicted differential entropy conditioned on `X`.
         """
-        raise NotImplementedError
+        rv = self.estimate_conditional_distribution(X)
+        result = (rv.mean(),)
+        if return_std:
+            result += (rv.std(),)
+        if return_entropy:
+            result += (rv.entropy(),)
+        if len(result) == 1:
+            result = result[0]
+        return result
 
-    def estimate_random_variates(self, X, n_rvs):
+    def sample_y(self, X, n_rv_samples=1, random_state=None):
         """Return random variate samples from the posterior distribution
         conditioned on the test samples X.
 
@@ -919,15 +946,17 @@ class SkactivemlContinuousEstimator(SkactivemlRegressor):
         ----------
         X :  array-like, shape (n_samples, n_features)
             Input samples.
-        n_rvs: int,
+        n_rv_samples: int,
             Number of random variate samples to be drawn.
         Returns
         -------
-        Y_rv : numpy.ndarray, shape (n_samples, ) or
-        (n_samples, n_targets), (n_samples, n_targets, n_targets)
-            Predicted mu and var conditioned on the test samples 'X'.
+        y_samples : numpy.ndarray, shape (n_samples, n_rv_samples)
+            Drawn random variate samples.
         """
-        raise NotImplementedError
+        rv = self.estimate_conditional_distribution(X)
+        rv_samples = rv.rvs(size=(n_rv_samples, len(X)),
+                            random_state=random_state)
+        return rv_samples.T
 
 
 class AnnotModelMixin(ABC):

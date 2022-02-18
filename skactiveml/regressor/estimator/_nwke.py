@@ -1,12 +1,12 @@
 import numpy as np
 from sklearn.metrics import pairwise_kernels
 
-from skactiveml.base import SkactivemlContinuousEstimator
+from skactiveml.base import SkactivemlConditionalEstimator
 from skactiveml.utils._functions import is_scalar
 from skactiveml.utils._label import is_all_labeled
 
 
-class NormalInverseWishartKernelEstimator(SkactivemlContinuousEstimator):
+class NormalInverseWishartKernelEstimator(SkactivemlConditionalEstimator):
 
     def __init__(self, metric='rbf', metric_dict=None, kappa_0=0.1,
                  nu_0='d', mu_0=0.0, S_0=1.0, random_state=None):

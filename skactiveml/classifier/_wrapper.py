@@ -23,7 +23,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """SklearnClassifier
 
     Implementation of a wrapper class for scikit-learn classifiers such that
-    missing labels can be handled and multiple labels per sample. Therefor,
+    missing labels can be handled and multiple labels per sample. Therefore,
     samples with missing labels are filtered and samples with n assigned labels
     are duplicated n times, i.e., one duplicate for each label.
 
@@ -151,6 +151,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
+    def sample(self, x):
+        return self.estimator.sample
+
     @if_delegate_has_method(delegate='estimator')
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
@@ -169,6 +172,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             The class probabilities of the input samples. Classes are ordered
             by lexicographic order.
         """
+
         check_is_fitted(self)
         X = check_array(X)
         self._check_n_features(X, reset=False)

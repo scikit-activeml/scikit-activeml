@@ -4,7 +4,7 @@ import numpy as np
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..pool import RandomSampler
-from ..regressor.estimator._ngke import NormalGammaKernelEstimator
+from ..regressor.estimator._nichke import NormalInverseChiKernelEstimator
 from ..regressor.estimator._nwke import NormalInverseWishartKernelEstimator
 from ..utils import rand_argmax
 

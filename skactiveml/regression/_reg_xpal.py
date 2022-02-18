@@ -4,7 +4,7 @@ import numpy as np
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..pool import RandomSampler
-from ..regressor.estimator._ngke import NormalGammaKernelEstimator
+from ..regressor.estimator._nichke import NormalInverseChiKernelEstimator
 from ..utils import rand_argmax
 
 
@@ -28,7 +28,7 @@ class RegxPal(SingleAnnotPoolBasedQueryStrategy):
                  n_monte_carlo_samples=10):
         super().__init__(random_state=random_state)
         if post_est is None:
-            self.posterior_estimator = NormalGammaKernelEstimator()
+            self.posterior_estimator = NormalInverseChiKernelEstimator()
         else:
             self.posterior_estimator = post_est
         self.n_monte_carlo_samples = n_monte_carlo_samples
