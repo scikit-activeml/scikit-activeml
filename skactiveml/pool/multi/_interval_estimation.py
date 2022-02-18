@@ -1,18 +1,13 @@
 import numpy as np
-import warnings
-
 from scipy.stats import t, rankdata
-
-from sklearn.base import BaseEstimator
-from sklearn.utils.validation import check_array,\
-    check_random_state, check_is_fitted
+from sklearn.base import BaseEstimator, clone
+from sklearn.utils.validation import check_array, check_is_fitted
 
 from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SkactivemlClassifier, AnnotModelMixin
-from ...utils import rand_argmax, check_scalar, compute_vote_vectors, \
-    MISSING_LABEL, ExtLabelEncoder, is_labeled, check_type
 from ...pool._uncertainty import uncertainty_scores
-from ...utils._functions import simple_batch, fit_if_not_fitted
+from ...utils import check_scalar, MISSING_LABEL, is_labeled, check_type, \
+    simple_batch, majority_vote
 
 
 class IEAnnotModel(BaseEstimator, AnnotModelMixin):
@@ -26,13 +21,14 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixin):
 
     Parameters
     ----------
-    classes : array-like, shape (n_classes), default=None
+    classes : array-like, shape (n_classes), optional (default=None)
         Holds the label for each class.
-    missing_label : scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
         Value to represent a missing label.
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
-    mode : {'lower', 'mean', 'upper'}, optional (default='upper')
+    mode : 'lower' or 'mean' or 'upper', optional (default='upper')
         Mode of the estimated annotation performance.
     random_state : None|int|numpy.random.RandomState, optional (default=None)
         The random state used for deciding on majority vote labels in case of
@@ -93,27 +89,19 @@ class IEAnnotModel(BaseEstimator, AnnotModelMixin):
         if self.mode not in ['lower', 'mean', 'upper']:
             raise ValueError("`mode` must be in `['lower', 'mean', `upper`].`")
 
-        # Check random state.
-        random_state = check_random_state(self.random_state)
-
-        # Encode class labels from `0` to `n_classes-1`.
-        label_encoder = ExtLabelEncoder(missing_label=self.missing_label,
-                                        classes=self.classes).fit(y)
-        self.classes_ = label_encoder.classes_
-        y = label_encoder.transform(y)
-
         # Check shape of labels.
         if y.ndim != 2:
             raise ValueError("`y` but must be a 2d array with shape "
                              "`(n_samples, n_annotators)`.")
 
         # Compute majority vote labels.
-        V = compute_vote_vectors(y=y, w=sample_weight, classes=self.classes_)
-        y_mv = rand_argmax(V, axis=1, random_state=random_state)
+        y_mv = majority_vote(y=y, w=sample_weight, classes=self.classes,
+                             random_state=self.random_state,
+                             missing_label=self.missing_label)
 
         # Number of annotators.
         self.n_annotators_ = y.shape[1]
-        is_lbld = is_labeled(y, missing_label=np.nan)
+        is_lbld = is_labeled(y, missing_label=self.missing_label)
         self.A_perf_ = np.zeros((self.n_annotators_, 3))
         for a_idx in range(self.n_annotators_):
             is_correct = np.equal(y_mv[is_lbld[:, a_idx]],
@@ -167,9 +155,9 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
     labeled by the annotators whose estimated annotation performances are equal
     or greater than an adaptive threshold.
     The strategy assumes all annotators to be available and is not defined
-    otherwise. To deal with this case non the less value-annotator pairs are
+    otherwise. To deal with this case nonetheless value-annotator pairs are
     first ranked according to the amount of annotators available for the given
-    value in X_cand and are than ranked according to IEThresh"
+    value in `X_cand` and are than ranked according to `IEThresh`."
 
     Parameters
     ----------
@@ -178,9 +166,8 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         selection.
     alpha : float, interval=(0, 1), optional (default=0.05)
         Half of the confidence level for student's t-distribution.
-    n_annotators : int,
-        Sets the number of annotators if `A_cand is None`.r
-    random_state : None|int|numpy.random.RandomState, optional (default=None)
+    random_state : None or int or numpy.random.RandomState, optional
+    (default=None)
         The random state used for deciding on majority vote labels in case of
         ties.
 
@@ -192,39 +179,68 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         Discovery and Data Mining, pp. 259-268. 2009.
     """
 
-    def __init__(self, epsilon=0.9, alpha=0.05, n_annotators=None,
-                 random_state=None):
-        super().__init__(n_annotators=n_annotators, random_state=random_state)
+    def __init__(self, epsilon=0.9, alpha=0.05, random_state=None,
+                 missing_label=MISSING_LABEL):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.epsilon = epsilon
         self.alpha = alpha
 
-    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
-              A_cand=None, batch_size='adaptive', return_utilities=False):
+    def query(self, X, y, clf, fit_clf=True, candidates=None, annotators=None,
+              sample_weight=None, batch_size='adaptive',
+              return_utilities=False):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_cand_samples, n_features)
-            Candidate samples from which the strategy can select.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples, n_annotators)
+            Labels of the training data set for each annotator (possibly
+            including unlabeled ones indicated by self.MISSING_LABEL), meaning
+            that `y[i, j]` contains the label annotated by annotator `i` for
+            sample `j`.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        X : matrix-like, shape (n_samples, n_features), optional (default=None)
-            The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples, n_annotators), optional (default=None)
-            It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
-        A_cand : array-like, shape (n_cand_samples, n_features)
-            Boolean matrix where `A_cand[i,j] = True` indicates that
-            annotator `j` can be selected for annotating sample `X_cand[i]`,
-            while `A_cand[i,j] = False` indicates that annotator `j` cannot be
-            selected for annotating sample `X_cand[i]`. If A_cand=None, each
-            annotator is assumed to be available for labeling each sample.
-        sample_weight : array-like, (n_samples, n_annotators)
+        fit_clf : bool, default=True
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If `candidates` is None, the samples from (X,y), for which an
+            annotator exists such that the annotator sample pairs is
+            unlabeled are considered as sample candidates.
+            If `candidates` is of shape (n_candidates,) and of type int,
+            `candidates` is considered as the indices of the sample candidates
+            in (X,y).
+            If `candidates` is of shape (n_candidates, n_features), the
+            sample candidates are directly given in `candidates` (not
+            necessarily contained in `X`).
+        annotators : array-like, shape (n_candidates, n_annotators), optional
+        (default=None)
+            If `annotators` is None, all annotators are considered as available
+            annotators.
+            If `annotators` is of shape (n_avl_annotators) and of type int,
+            `annotators` is considered as the indices of the available
+            annotators.
+            If candidate samples and available annotators are specified:
+            The annotator sample pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered
+            as candidate annotator sample pairs.
+            If `annotators` is None and `candidates` is of shape
+            (n_candidates,), all annotator sample pairs, for which the sample
+            is indexed by `candidates` are considered as candidate annotator
+            sample pairs. If `annotators` is a boolean array of shape
+            (n_candidates, n_avl_annotators) the annotator sample pairs, for
+            which the sample is a candidate sample and the boolean matrix has
+            entry `True` are considered as candidate sample pairs.
+        sample_weight : array-like, (n_samples, n_annotators), optional
+        (default=None)
             It contains the weights of the training samples' class labels.
             It must have the same shape as y.
-        batch_size : 'adaptive'|int, optional (default=1)
+        batch_size : 'adaptive' or int, optional (default=1)
             The number of samples to be selected in one AL cycle. If 'adaptive'
             is set, the `batch_size` is determined based on the annotation
             performances and the parameter `epsilon`.
@@ -233,12 +249,12 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size, 2)
+        query_indices : numpy.ndarray of shape (batch_size, 2)
             The query_indices indicate which candidate sample is to be
             annotated by which annotator, e.g., `query_indices[:, 0]`
             indicates the selected candidate samples and `query_indices[:, 1]`
             indicates the respectively selected annotators.
-        utilities: numpy.ndarray, shape (batch_size, n_cand_samples,
+        utilities: numpy.ndarray of shape (batch_size, n_cand_samples,
          n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,
@@ -247,12 +263,15 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         """
 
         # base check
-        X_cand, A_cand, return_utilities, batch_size, random_state = \
-            super()._validate_data(X_cand, A_cand, return_utilities, batch_size,
-                                   self.random_state, reset=True, adaptive=True)
+        X, y, candidates, annotators, _, return_utilities = \
+            super()._validate_data(X, y, candidates, annotators, 1,
+                                   return_utilities, reset=True)
+
+        X_cand, mapping, A_cand = self._transform_cand_annot(candidates,
+                                                             annotators, X, y)
 
         # Validate classifier type.
-        check_type(clf, SkactivemlClassifier, 'clf')
+        check_type(clf, 'clf', SkactivemlClassifier)
 
         # Check whether epsilon is float in [0, 1].
         check_scalar(x=self.epsilon, target_type=float, name='epsilon',
@@ -262,20 +281,15 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
                      max_val=1, min_inclusive=False, max_inclusive=False)
 
-        n_annotators = A_cand.shape[1]
-
+        n_annotators = y.shape[1]
         # Check whether unlabeled data exists
-        if not np.all(A_cand):
-            warnings.warn("Not all annotators are available for all values in "
-                          "X_cand. The IEThresh strategy assumes this to be "
-                          "the case and is not defined otherwise. "
-                          "To deal with this case non the less value-annotator "
-                          "pairs are first ranked according to the amount of "
-                          "annotators available for the given value in X_cand "
-                          "and are than ranked according to IEThresh")
+        A_cand = np.repeat(np.all(A_cand, axis=1).reshape(-1, 1), n_annotators,
+                           axis=1)
 
         # Fit classifier and compute uncertainties on candidate samples.
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
+
         P = clf.predict_proba(X_cand)
         uncertainties = uncertainty_scores(probas=P, method='least_confident')
 
@@ -295,29 +309,31 @@ class IEThresh(MultiAnnotPoolBasedQueryStrategy):
         max_range = np.max(A_perf) + 1
         uncertainties = rankdata(uncertainties, method='ordinal') * max_range
         uncertainties = np.tile(uncertainties, (n_annotators, 1)).T
-        init_utilities = uncertainties + A_perf
-
-        # include the amount of available annotators into the utilities for
-        # the samples
-        annotators_per_sample = np.sum(A_cand, axis=1)
-        max_uncertainty = np.max(init_utilities) + 1
-        annotators_per_sample_ranks = rankdata(annotators_per_sample,
-                                               method='dense') \
-                                      * max_uncertainty - max_uncertainty
-        init_utilities = init_utilities + \
-                         annotators_per_sample_ranks[:, np.newaxis]
+        utilities = uncertainties + A_perf
 
         # exclude not available annotators
-        init_utilities[~A_cand] = np.nan
+        utilities[~A_cand] = np.nan
 
         # Determine actual batch size.
-        if batch_size == 'adaptive':
+        if isinstance(batch_size, str) and batch_size != 'adaptive':
+            raise ValueError(f"If `batch_size` is of type `string`, "
+                             f"it must equal `'adaptive'`.")
+        elif batch_size == 'adaptive':
             required_perf = self.epsilon * np.max(A_perf)
-            actual_batch_size = int(np.sum(A_perf >= required_perf))
+            actl_batch_size = int(np.sum(A_perf >= required_perf))
+        elif isinstance(batch_size, int):
+            actl_batch_size = batch_size
         else:
-            actual_batch_size = batch_size
+            raise TypeError(f"`batch_size` is of type `{type(batch_size)}` "
+                            f"but must equal `'adaptive'` or be of type "
+                            f"`int`.")
+
+        if mapping is not None:
+            w_utilities = utilities
+            utilities = np.full((len(X), n_annotators), np.nan)
+            utilities[mapping, :] = w_utilities
 
         # Perform selection based on previously computed utilities.
-        return simple_batch(init_utilities, random_state,
-                            batch_size=actual_batch_size,
+        return simple_batch(utilities, self.random_state_,
+                            batch_size=actl_batch_size,
                             return_utilities=return_utilities)

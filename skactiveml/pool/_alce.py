@@ -38,10 +38,10 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
         Cost matrix with C[i,j] defining the cost of predicting class j for a
         sample with the actual class i. Only supported for least confident
         variant.
-    random_state: numeric | np.random.RandomState, optional (default=None)
-        Random state for annotator selection.
     missing_label: str | numeric, optional (default=MISSING_LABEL)
         Specifies the symbol that represents a missing label
+    random_state: numeric | np.random.RandomState, optional (default=None)
+        Random state for annotator selection.
     embed_dim : int, optional (default=None)
         If is None, embed_dim = n_classes
     mds_params : dict, optional (default=None)
@@ -63,11 +63,13 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
                  base_regressor=None,
                  cost_matrix=None,
                  embed_dim=None,
-                 missing_label=MISSING_LABEL,
                  mds_params=None,
                  nn_params=None,
+                 missing_label=MISSING_LABEL,
                  random_state=None):
-        super().__init__(random_state=random_state)
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.classes = classes
         self.base_regressor = base_regressor
         self.cost_matrix = cost_matrix
@@ -77,95 +79,80 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
         self.mds_params = mds_params
         self.nn_params = nn_params
 
-    def query(self, X_cand, X, y, sample_weight=None, batch_size=1,
+    def query(self, X, y, sample_weight=None, candidates=None, batch_size=1,
               return_utilities=False):
         """Query the next instance to be labeled.
 
         Parameters
         ----------
-        X_cand: array-like, shape (n_candidates, n_features)
-            Unlabeled candidate samples.
-        X: array-like, shape (n_samples, n_features)
-            Complete data set.
-        y: array-like, shape (n_samples)
-            Labels of the data set.
-        sample_weight: array-like, shape (n_samples), optional (default=None)
-            Weights for uncertain annotators.
-        batch_size: int, optional (default=1)
-            The number of instances to be selected.
-        return_utilities: bool, optional (default=False)
-            If True, the utilities are additionally returned.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        sample_weight: array-like of shape (n_samples), optional (default=None)
+            Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, optional (default=False)
+            If True, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices: np.ndarray, shape (batch_size)
-            The index of the queried instance.
-        utilities: np.ndarray, shape (batch_size, n_candidates)
-            The utilities of all instances in X_cand
-            (only returned if return_utilities is True).
+        query_indices : numpy.ndarray of shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
-        # Validate input
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size)
+        # Check standard parameters.
+        X, y, candidates, batch_size, return_utilities = \
+            super()._validate_data(
+                X=X, y=y, candidates=candidates, batch_size=batch_size,
+                return_utilities=return_utilities, reset=True,
+            )
 
-        utilities = _alce(X_cand, X, y, self.base_regressor, self.cost_matrix,
+        # Obtain candidates plus mapping.
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+
+        util_cand = _alce(X_cand, X, y, self.base_regressor, self.cost_matrix,
                           self.classes, self.embed_dim, sample_weight,
-                          self.missing_label, self.random_state,
+                          self.missing_label, self.random_state_,
                           self.mds_params, self.nn_params)
 
-        return simple_batch(utilities, random_state,
+        if mapping is None:
+            utilities = util_cand
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = util_cand
+
+        return simple_batch(utilities, self.random_state_,
                             batch_size=batch_size,
                             return_utilities=return_utilities)
-
-    def _validate_data(self, X_cand, return_utilities, batch_size, reset=True,
-                       **check_X_cand_params):
-        """Validate input data and set or check the `n_features_in_` attribute.
-
-        Parameters
-        ----------
-        X_cand: array-like, shape (n_candidates, n_features)
-            Candidate samples.
-        batch_size : int,
-            The number of samples to be selected in one AL cycle.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        random_state : numeric | np.random.RandomState, optional
-            The random state to use.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        **check_X_cand_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array`.
-
-        Returns
-        -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
-        batch_size : int
-            Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
-            Checked boolean value of `return_utilities`.
-        random_state : np.random.RandomState,
-            Checked random state to use.
-        """
-        # Check candidate instances.
-        X_cand = check_array(X_cand, **check_X_cand_params)
-
-        # Check number of features.
-        self._check_n_features(X_cand, reset=reset)
-
-        # Check return_utilities.
-        check_scalar(return_utilities, 'return_utilities', bool)
-
-        # Check batch size.
-        check_scalar(batch_size, 'batch_size', int, min_val=1)
-
-        # Check random state.
-        random_state = check_random_state(random_state=self.random_state,
-                                          seed_multiplier=len(X_cand))
-
-        return X_cand, return_utilities, batch_size, random_state
 
 
 def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,

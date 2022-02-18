@@ -10,12 +10,12 @@ import numpy as np
 from sklearn.ensemble._base import _BaseHeterogeneousEnsemble
 from sklearn.utils.validation import check_array, check_is_fitted
 
-from ..base import SkactivemlClassifier
-from ..utils import MISSING_LABEL, compute_vote_vectors, is_labeled
+from ...base import SkactivemlClassifier
+from ...utils import MISSING_LABEL, is_labeled, compute_vote_vectors
 
 
-class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
-    """MultiAnnotClassifier
+class MultiAnnotEnsemble(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
+    """MultiAnnotEnsemble
 
     This strategy consists of fitting one classifier per annotator.
 
@@ -30,26 +30,26 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
         Else if 'soft', predicts the class label based on the argmax of
         the sums of the predicted probabilities, which is recommended for
         an ensemble of well-calibrated classifiers.
-    classes : array-like, shape (n_classes), default=None
+    classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
-    missing_label : {scalar, string, np.nan, None}, default=np.nan
+    missing_label : scalar or str or np.nan or None}, default=np.nan
         Value to represent a missing label.
-    cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] indicating cost of predicting class
-        classes[j]  for a sample of class classes[i]. Can be only set, if
+    cost_matrix : array-like of shape (n_classes, n_classes)
+        Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
+        `classes[j]`  for a sample of class `classes[i]. Can be only set, if
         classes is not none.
-    random_state : int, RandomState instance or None, optional (default=None)
+    random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_ : array-like, shape (n_classes)
+    classes_ : np.ndarray of shape (n_classes,)
         Holds the label for each class after fitting.
-    cost_matrix_ : array-like, shape (classes, classes)
-        Cost matrix with C[i,j] indicating cost of predicting class classes_[j]
-        for a sample of class classes_[i].
+    cost_matrix_ : np.ndarray of shape (classes, classes)
+        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+        class `classes_[j]`  for a sample of class `classes_[i].
     estimators_ : list of estimators
         The elements of the estimators parameter, having been fitted on the
         training data. If an estimator has been set to `'drop'`, it will not
@@ -60,10 +60,10 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
                  missing_label=MISSING_LABEL, cost_matrix=None,
                  random_state=None):
         _BaseHeterogeneousEnsemble.__init__(self, estimators=estimators)
-        SkactivemlClassifier.__init__(self, classes=classes,
-                                      missing_label=missing_label,
-                                      cost_matrix=cost_matrix,
-                                      random_state=random_state)
+        SkactivemlClassifier.__init__(
+            self, classes=classes, missing_label=missing_label,
+            cost_matrix=cost_matrix, random_state=random_state
+        )
         self.voting = voting
 
     def fit(self, X, y, sample_weight=None):
@@ -71,46 +71,65 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_estimators)
+        y : array-like of shape (n_samples, n_estimators)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
-        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+            missing labels are represented the attribute `missing_label`.
+        sample_weight : array-like of shape (n_samples, n_estimators)
             It contains the weights of the training samples' class labels.
-            It must have the same shape as y.
+            It must have the same shape as `y`.
 
         Returns
         -------
-        self: MultiAnnotClassifier,
-            The MultiAnnotClassifier is fitted on the training data.
+        self: skactiveml.classifier.multi.MultiAnnotEnsemble,
+            The `MultiAnnotEnsemble` object fitted on the training data.
         """
+        # Check estimators.
         self._validate_estimators()
+
+        # Check input parameters.
+        self.check_X_dict_ = {
+            'ensure_min_samples': 0, 'ensure_min_features': 0,
+            'allow_nd': True, 'dtype': None
+        }
         X, y, sample_weight = self._validate_data(
-            X=X, y=y, sample_weight=sample_weight
+            X=X, y=y, sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_, y_ensure_1d=False
         )
-        if self.voting not in ('soft', 'hard'):
-            raise ValueError("Voting must be 'soft' or 'hard'; got (voting={})"
-                             .format(self.voting))
         self._check_n_features(X, reset=True)
+
+        # Copy estimators
         self.estimators_ = deepcopy(self.estimators)
 
         # Check for empty training data.
-        if len(X) == 0:
+        if self.n_features_in_ is None:
             return self
 
-        # Fit each estimator.
+        # Check number of estimators.
+        error_msg = f"'y' must have shape (n_samples={len(y)}, n_estimators=" \
+                    f"{len(self.estimators)}) but has shape {y.shape}."
+        if self.named_estimators is not None and \
+                y.ndim <= 1 or y.shape[1] != len(self.estimators):
+            raise ValueError(error_msg)
+
+        # Check voting scheme.
+        if self.voting not in ('soft', 'hard'):
+            raise ValueError(
+                f"Voting must be 'soft' or 'hard'; "
+                f"got `voting='{self.voting}'`)"
+            )
+
+        # Fit each estimator
         for i, est in enumerate(self.estimators_):
-            est[1].set_params(missing_label=np.nan)
+            est[1].set_params(missing_label=-1)
             if self.classes is None or est[1].classes is None:
                 est[1].set_params(classes=np.arange(len(self.classes_)))
             if sample_weight is None:
                 est[1].fit(X=X, y=y[:, i])
             else:
-                w = sample_weight[:, i] if sample_weight.ndim > 1 else \
-                    sample_weight
-                est[1].fit(X=X, y=y[:, i], sample_weight=w)
+                est[1].fit(X=X, y=y[:, i], sample_weight=sample_weight[:, i])
         return self
 
     def predict_proba(self, X):
@@ -118,18 +137,17 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features) or
-        shape (n_samples, m_samples) if metric == 'precomputed'
+        X : array-like of shape (n_samples, n_features)
             Test samples.
 
         Returns
         -------
-        P : array-like, shape (n_samples, classes)
+        P : np.ndarray of shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to classes_.
+            according to `classes_`.
         """
         check_is_fitted(self)
-        X = check_array(X)
+        X = check_array(X, **self.check_X_dict_)
         self._check_n_features(X, reset=False)
         if self.n_features_in_ is None:
             return np.ones((len(X), len(self.classes_))) / len(self.classes_)
@@ -177,15 +195,3 @@ class MultiAnnotClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
             if not classes_none and not est_classes_none and \
                     not np.array_equal(self.classes, est.classes):
                 raise ValueError(error_msg)
-
-    def _validate_data(self, X, y, sample_weight):
-        X, y, sample_weight = SkactivemlClassifier. \
-            _validate_data(self, X=X, y=y, sample_weight=sample_weight)
-        error_msg = f"'y' must have shape (n_samples={len(y)}, n_estimators=" \
-                    f"{len(self.estimators)}) but has shape {y.shape}."
-        if len(X) > 0:
-            if y.ndim <= 1 and len(self.estimators) == 1:
-                y = y.reshape(len(X), len(self.estimators))
-            if y.ndim <= 1 or y.shape[1] != len(self.estimators):
-                raise ValueError(error_msg)
-        return X, y, sample_weight

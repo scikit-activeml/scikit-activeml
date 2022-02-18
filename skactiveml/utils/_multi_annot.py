@@ -3,7 +3,8 @@ from sklearn.metrics import confusion_matrix
 from sklearn.utils.validation import check_consistent_length, column_or_1d, \
     check_array
 
-from ._label import MISSING_LABEL, ExtLabelEncoder
+from ._label import MISSING_LABEL, is_labeled, is_unlabeled
+from ._label_encoder import ExtLabelEncoder
 
 
 def ext_confusion_matrix(y_true, y_pred, classes=None,
@@ -68,7 +69,7 @@ def ext_confusion_matrix(y_true, y_pred, classes=None,
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     y = np.column_stack((y_true, y_pred))
     y = le.fit_transform(y)
-    if np.sum(np.isnan(y[:, 0])):
+    if np.sum(is_unlabeled(y[:, 0], missing_label=-1)):
         raise ValueError("'y_true' is not allowed to contain missing labels.")
     n_classes = len(le.classes_)
     n_annotators = y_pred.shape[1]
@@ -76,7 +77,7 @@ def ext_confusion_matrix(y_true, y_pred, classes=None,
     # Determine confusion matrix for each annotator.
     conf_matrices = np.zeros((n_annotators, n_classes, n_classes))
     for a in range(n_annotators):
-        is_not_nan_a = ~np.isnan(y[:, a+1])
+        is_not_nan_a = is_labeled(y[:, a+1], missing_label=-1)
         if np.sum(is_not_nan_a) > 0:
             cm = confusion_matrix(y_true=y[is_not_nan_a, 0],
                                   y_pred=y[is_not_nan_a, a+1],

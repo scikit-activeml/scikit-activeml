@@ -3,8 +3,7 @@ from copy import deepcopy
 import numpy as np
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.regression._gsx import GSx
-from skactiveml.utils import fit_if_not_fitted, rand_argmax
+from skactiveml.utils import rand_argmax
 
 
 class EMC(SingleAnnotPoolBasedQueryStrategy):

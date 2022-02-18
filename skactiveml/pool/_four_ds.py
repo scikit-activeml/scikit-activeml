@@ -5,11 +5,13 @@ Module implementing 4DS active learning strategy.
 
 
 import numpy as np
-from sklearn.utils.validation import check_array, check_scalar, column_or_1d
+from sklearn.base import clone
+from sklearn.utils.validation import check_scalar
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
 from ..classifier import CMM
-from ..utils import rand_argmax, is_labeled, fit_if_not_fitted, check_type
+from ..utils import rand_argmax, is_labeled, check_type, MISSING_LABEL, \
+    check_equal_missing_label
 
 
 class FourDS(SingleAnnotPoolBasedQueryStrategy):
@@ -24,6 +26,9 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         For the selection of more than one sample within each query round, 4DS
         uses a diversity measure to avoid the selection of redundant samples
         whose influence is regulated by the weighting factor 'lmbda'.
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
+        Value to represent a missing label.
     random_state : numeric | np.random.RandomState, optional (default=None)
         The random state to use.
 
@@ -34,58 +39,79 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         4DS. Information Sciences, 230, 106-131.
     """
 
-    def __init__(self, lmbda=None, random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, lmbda=None, missing_label=MISSING_LABEL,
+                 random_state=None):
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.lmbda = lmbda
 
-    def query(self, X_cand, clf, X=None, y=None, sample_weight=None,
-              return_utilities=False, batch_size=1):
-        """Ask the query strategy which sample in 'X_cand' to query.
+    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
+              candidates=None, return_utilities=False, batch_size=1):
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
-        X_cand : array-like, shape (n_candidate_samples, n_features)
-            Candidate samples from which the strategy can select.
+        X: array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y: array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
         clf : skactiveml.classifier.CMM
             GMM-based classifier to be trained.
-        X: array-like, shape (n_samples, n_features), optional (default=None)
-            Complete training data set.
-        y: array-like, shape (n_samples), optional (default=None)
-            Labels of the training data set.
-        sample_weight: array-like, shape (n_samples), optional (default=None)
+        fit_clf : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
+            If True, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
-        # Validate input.
-        X_cand, return_utilities, batch_size, random_state = \
-            self._validate_data(X_cand, return_utilities, batch_size,
-                                self.random_state, reset=True)
-
-        # Check input training data.
-        X = check_array(X, ensure_min_samples=0)
-        self._check_n_features(X, reset=False)
-        y = column_or_1d(y)
+        # Check standard parameters.
+        X, y, candidates, batch_size, return_utilities = \
+            super()._validate_data(
+                X=X, y=y, candidates=candidates, batch_size=batch_size,
+                return_utilities=return_utilities, reset=True,
+            )
 
         # Check classifier type.
-        check_type(clf, CMM, 'clf')
-
-        # Storage for query indices.
-        query_indices = np.full(batch_size, fill_value=-1, dtype=int)
+        check_type(clf, 'clf', CMM)
+        check_type(fit_clf, 'fit_clf', bool)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
 
         # Check lmbda.
         lmbda = self.lmbda
@@ -94,8 +120,15 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         check_scalar(lmbda, target_type=float, name='lmbda', min_val=0,
                      max_val=1)
 
+        # Obtain candidates plus mapping.
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+
+        # Storage for query indices.
+        query_indices_cand = np.full(batch_size, fill_value=-1, dtype=int)
+
         # Fit the classifier and get the probabilities.
-        clf = fit_if_not_fitted(clf, X, y, sample_weight)
+        if fit_clf:
+            clf = clone(clf).fit(X, y, sample_weight)
         P_cand = clf.predict_proba(X_cand)
         R_cand = clf.mixture_model_.predict_proba(X_cand)
         is_lbld = is_labeled(y, missing_label=clf.missing_label)
@@ -138,13 +171,15 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         beta = 1 - rho - alpha
 
         # Compute utilities to select sample.
-        utilities = np.empty((batch_size, len(X_cand)), dtype=float)
-        utilities[0] = alpha * (
+        utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
+        utilities_cand[0] = alpha * (
                 1 - distance_cand) + beta * density_cand + \
-                          rho * distribution_cand
-        query_indices[0] = rand_argmax(utilities[0], random_state)
+                            rho * distribution_cand
+        query_indices_cand[0] = rand_argmax(
+            utilities_cand[0], self.random_state_
+        )
         is_selected = np.zeros(len(X_cand), dtype=bool)
-        is_selected[query_indices[0]] = True
+        is_selected[query_indices_cand[0]] = True
 
         if batch_size > 1:
             # Compute e_us according to Eq. 14  in [1].
@@ -161,7 +196,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
                 # Update distributions according to Eq. 11 in [1].
                 R_sum = R_cand + np.sum(R_cand[is_selected], axis=0,
                                         keepdims=True) + R_lbld_sum
-                R_mean = R_sum / (len(R_lbld) + len(query_indices) + 1)
+                R_mean = R_sum / (len(R_lbld) + len(query_indices_cand) + 1)
                 distribution_cand = clf.mixture_model_.weights_ - R_mean
                 distribution_cand = np.maximum(
                     np.zeros_like(distribution_cand), distribution_cand)
@@ -170,18 +205,29 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
                 # Compute diversity according to Eq. 12 in [1].
                 diversity_cand = - np.log(
                     density_cand + np.sum(density_cand[is_selected])) / (
-                                         len(query_indices) + 1)
+                                         len(query_indices_cand) + 1)
                 diversity_cand = (diversity_cand - np.min(diversity_cand)) / (
                         np.max(diversity_cand) - np.min(diversity_cand))
 
                 # Compute utilities to select sample.
-                utilities[i] = alpha * (
+                utilities_cand[i] = alpha * (
                         1 - distance_cand) + beta * density_cand + \
-                                  lmbda * diversity_cand \
-                                  + rho * distribution_cand
-                utilities[i, is_selected] = np.nan
-                query_indices[i] = rand_argmax(utilities[i], random_state)
-                is_selected[query_indices[i]] = True
+                                    lmbda * diversity_cand \
+                                    + rho * distribution_cand
+                utilities_cand[i, is_selected] = np.nan
+                query_indices_cand[i] = rand_argmax(
+                    utilities_cand[i], self.random_state_
+                )
+                is_selected[query_indices_cand[i]] = True
+
+        # Remapping of utilities and query indices if required.
+        if mapping is None:
+            utilities = utilities_cand
+            query_indices = query_indices_cand
+        if mapping is not None:
+            utilities = np.full((batch_size, len(X)), np.nan)
+            utilities[:, mapping] = utilities_cand
+            query_indices = mapping[query_indices_cand]
 
         # Check whether utilities are to be returned.
         if return_utilities:
