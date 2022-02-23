@@ -240,6 +240,7 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
         clf_partial = SklearnClassifier(
             GaussianNB(), classes=classes
         ).fit(X, y)
+        clf = PWC(classes=[0, 1])
 
         params_list = [
             ['kapoor', True, True, True, True, [[0, 0]]],
@@ -254,10 +255,26 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
              np.full(shape=(1, len(candidates)), fill_value=
              -0.25 * np.sum(cost_matrix))]]
 
+        # Test with zero labels.
         for msg, consider_unlabeled, consider_labeled, \
             candidate_to_labeled, substract_current, \
             expected_utils in params_list:
-            with self.subTest(msg=msg):
+            with self.subTest(msg=msg + ": Scenario"):
+                qs = ValueOfInformationEER(
+                    consider_unlabeled=consider_unlabeled,
+                    consider_labeled=consider_labeled,
+                    candidate_to_labeled=candidate_to_labeled,
+                    subtract_current=substract_current,
+                    cost_matrix=cost_matrix
+                )
+                qs.query(candidates=candidates, clf=clf, X=X,
+                         y=np.full(shape=len(X), fill_value=np.nan))
+
+        # Test Scenario.
+        for msg, consider_unlabeled, consider_labeled, \
+            candidate_to_labeled, substract_current, \
+            expected_utils in params_list:
+            with self.subTest(msg=msg + ": Scenario"):
                 qs = ValueOfInformationEER(
                     consider_unlabeled=consider_unlabeled,
                     consider_labeled=consider_labeled,
