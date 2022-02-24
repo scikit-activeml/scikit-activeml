@@ -1,5 +1,5 @@
 """
-The :mod:`skactiveml.classifier` module # TODO.
+The :mod:`skactiveml.classifier` module.
 """
 from ._cmm import CMM
 from ._pwc import PWC

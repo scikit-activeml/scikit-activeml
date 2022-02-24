@@ -46,6 +46,8 @@ class TestSklearnClassifier(unittest.TestCase):
                                 classes=['tokyo', 'paris', 'new york'],
                                 missing_label='nan')
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
+        clf.fit(self.X, self.y1, sample_weight=np.ones_like(self.y1))
+        self.assertTrue(clf.is_fitted_)
         clf.fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, 'kernel_'))

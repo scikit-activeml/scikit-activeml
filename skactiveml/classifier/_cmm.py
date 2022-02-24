@@ -77,9 +77,9 @@ class CMM(ClassFrequencyEstimator):
     def __init__(self, mixture_model=None, weight_mode='responsibilities',
                  classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
                  class_prior=0.0, random_state=None):
-        super().__init__(classes=classes, missing_label=missing_label,
-                         cost_matrix=cost_matrix, random_state=random_state)
-        self.class_prior = class_prior
+        super().__init__(classes=classes, class_prior=class_prior,
+                         missing_label=missing_label, cost_matrix=cost_matrix,
+                         random_state=random_state)
         self.mixture_model = mixture_model
         self.weight_mode = weight_mode
 

@@ -75,9 +75,9 @@ class PWC(ClassFrequencyEstimator):
     def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
                  classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
                  class_prior=0.0, random_state=None):
-        super().__init__(classes=classes, missing_label=missing_label,
-                         cost_matrix=cost_matrix, random_state=random_state)
-        self.class_prior = class_prior
+        super().__init__(classes=classes, class_prior=class_prior,
+                         missing_label=missing_label, cost_matrix=cost_matrix,
+                         random_state=random_state)
         self.metric = metric
         self.n_neighbors = n_neighbors
         self.metric_dict = metric_dict
@@ -152,7 +152,7 @@ class PWC(ClassFrequencyEstimator):
             ordered according to `classes_`.
         """
         check_is_fitted(self)
-        X = check_array(X, force_all_finite=False)
+        X = check_array(X, force_all_finite=(self.metric != 'precomputed'))
 
         # Predict zeros because of missing training data.
         if self.n_features_in_ is None:

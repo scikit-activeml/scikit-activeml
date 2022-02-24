@@ -38,9 +38,14 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
                           X_cand=None)
 
     def test__transform_candidates(self):
+        self.qs.missing_label_ = MISSING_LABEL
         self.assertRaises(ValueError, self.qs._transform_candidates,
                           np.array([[3]]), np.array([[2]]), np.array([0]),
                           True)
+
+        self.assertRaises(ValueError, self.qs._transform_candidates,
+                          np.array([0]), np.array([[2]]), np.array([0]),
+                          True, allow_only_unlabeled=True)
 
         X = np.array([[2], [3]])
         X_cand, mapping = self.qs._transform_candidates(
@@ -61,7 +66,7 @@ class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.qs.query,
                           X=np.array([[1, 2]]), y=np.array([[1, ]]))
 
-    def test_transform_cand_annot(self):
+    def test__transform_cand_annot(self):
         self.assertRaises(ValueError, self.qs._transform_cand_annot,
                           candidates=np.array([[0, 2]]), annotators=None,
                           X=np.array([[1, 2]]), y=np.array([[1, ]]),

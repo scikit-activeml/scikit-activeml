@@ -127,11 +127,14 @@ class PoolBasedQueryStrategy(QueryStrategy):
 
         # Check candidates
         if candidates is not None:
-            check_candidates_dict = deepcopy(check_X_dict)
-            check_candidates_dict['ensure_2d'] = False
-            candidates = check_array(candidates, **check_candidates_dict)
+            candidates = np.array(candidates)
             seed_mult = len(candidates)
-            if candidates.ndim == 2:
+            if candidates.ndim == 1:
+                candidates = check_indices(candidates, y, dim=0)
+            else:
+                check_candidates_dict = deepcopy(check_X_dict)
+                check_candidates_dict['ensure_2d'] = False
+                candidates = check_array(candidates, **check_candidates_dict)
                 self._check_n_features(candidates, reset=False)
         else:
             seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
@@ -275,7 +278,8 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         return X, y, candidates, batch_size, return_utilities
 
-    def _transform_candidates(self, candidates, X, y, enforce_mapping=False):
+    def _transform_candidates(self, candidates, X, y, enforce_mapping=False,
+                              allow_only_unlabeled=False):
         """
         Transforms the `candidates` parameter into a sample array and the
         corresponding index array `mapping` such that `X_cand = X[mapping]`.
@@ -299,6 +303,9 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         enforce_mapping : bool, default=False
             If True, an exception is raised when no exact mapping can be 
             determined (i.e., `mapping` is None).
+        allow_only_unlabeled : bool, default=False
+            If True, an exception is raised when indices of candidates contain
+            labeled samples.
 
         Returns
         -------
@@ -307,13 +314,15 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         mapping : np.ndarray of shape (n_candidates) or None
             Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
         """
-        # TODO check if candidates are only unlabeled ones if given as another
-        #  option
 
         if candidates is None:
             ulbd_idx = unlabeled_indices(y, self.missing_label_)
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
+            if allow_only_unlabeled:
+                if is_labeled(y[candidates], self.missing_label_).any():
+                    raise ValueError('Candidates must not contain labeled '
+                                     'samples.')
             return X[candidates], candidates
         else:
             if enforce_mapping:
@@ -493,32 +502,35 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         if annotators is not None:
             annotators = check_array(annotators, ensure_2d=False)
 
-        if annotators is not None and annotators.ndim == 1:
-            annotators = check_indices(annotators, y, dim=1)
-        elif annotators is not None and annotators.ndim == 2:
-            if candidates is None or candidates.ndim == 1:
-                check_consistent_length(X, annotators)
+            if annotators.ndim == 1:
+                annotators = check_indices(annotators, y, dim=1)
+            elif annotators.ndim == 2:
+                annotators = check_array(annotators, dtype=bool)
+                if candidates is None or candidates.ndim == 1:
+                    check_consistent_length(X, annotators)
+                else:
+                    check_consistent_length(candidates, annotators)
+                check_consistent_length(y.T, annotators.T)
             else:
-                check_consistent_length(candidates, annotators)
-            check_consistent_length(y.T, annotators.T)
+                raise ValueError("`annotators` must be either None, 1d or 2d "
+                                 "array-like.")
 
-        if candidates is None and annotators is None:
-            n_candidate_pairs = int(np.sum(unlabeled_pairs))
-        elif candidates is None and annotators.ndim == 1:
-            n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
-        elif candidates.ndim == 1 and annotators is None:
-            candidates = check_indices(candidates, y, dim=0)
-            n_candidate_pairs = len(candidates)*len(y.T)
-        elif candidates.ndim == 1 and annotators.ndim == 1:
-            candidates = check_indices(candidates, y, dim=0)
-            n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates,
-                                                           annotators]))
-        elif candidates.ndim == 2 and annotators is None:
-            n_candidate_pairs = len(candidates)*len(y.T)
-        elif candidates.ndim == 2 and annotators.ndim == 1:
-            n_candidate_pairs = len(candidates)*len(annotators)
+        if annotators is None:
+            if candidates is None:
+                n_candidate_pairs = int(np.sum(unlabeled_pairs))
+            elif candidates.ndim == 1:
+                n_candidate_pairs = len(candidates)*len(y.T)
+            else:
+                n_candidate_pairs = len(candidates)*len(y.T)
+        elif annotators.ndim == 1:
+            if candidates is None:
+                n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
+            elif candidates.ndim == 1:
+                n_candidate_pairs = \
+                    int(np.sum(unlabeled_pairs[candidates][:, annotators]))
+            else:
+                n_candidate_pairs = len(candidates)*len(annotators)
         else:
-            annotators = check_array(annotators, dtype=bool)
             n_candidate_pairs = int(np.sum(annotators))
 
         if n_candidate_pairs < batch_size:
@@ -587,8 +599,8 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Available annotator sample pair with respect to `X_cand`.
         """
         unlbd_pairs = is_unlabeled(y, self.missing_label_)
-        unlbd_sample_indices = np.argwhere(np.any(unlbd_pairs, axis=1))\
-            .flatten()
+        unlbd_sample_indices = \
+            np.argwhere(np.any(unlbd_pairs, axis=1)).flatten()
         n_annotators = y.shape[1]
 
         if candidates is not None and candidates.ndim == 2:

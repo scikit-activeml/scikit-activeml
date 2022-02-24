@@ -137,6 +137,7 @@ def plot_utility(qs, X, y, candidates=None, qs_dict=None, feature_bound=None,
         indicated by self.MISSING_LABEL.
     qs_dict: dict
         Dictionary with the parameters for the qs.query method.
+    TODO: introduce flag enabling call_func
     candidates: array-like, shape(n_candidates, n_features)
         Unlabeled candidate instances. If `candidates` is not `None`, the
         utility is calculated only for the selected instances and is
