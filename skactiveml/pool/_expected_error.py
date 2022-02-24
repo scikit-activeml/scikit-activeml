@@ -194,7 +194,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
                     w_eval
                 )
 
-        utilities_cand = np.sum(probs_cand * errors, axis=1)
+        # utils are maximized, errors minimized: hence multiply by (-1)
+        utilities_cand = -1 * np.sum(probs_cand * errors, axis=1)
 
         if mapping is None:
             utilities = utilities_cand
@@ -217,7 +218,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         if not fit_clf:
             check_is_fitted(id_clf, ['le_'])
         else:
-            id_clf.fit(idx_train)
+            id_clf.fit(idx_train, set_base_clf=True)
         return id_clf
 
     def _precompute_loop(self, id_clf, idx_train, idx_cand, idx_eval, w_eval):
@@ -370,7 +371,7 @@ class MonteCarloEER(ExpectedErrorReduction):
 
     def _estimate_error_for_candidate(self, uclf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
-        uclf.partial_fit(idx_cx, cy)
+        uclf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
         probs = uclf.predict_proba(idx_eval)
 
         if self.method == 'misclassification_loss':
@@ -456,7 +457,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
     def _estimate_error_for_candidate(self, id_clf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):
-        id_clf.partial_fit(idx_cx, cy)
+        id_clf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
 
         # Handle problem that if only one candidate is remaining, this should
         # be the one to be selected although the error cannot be estimated

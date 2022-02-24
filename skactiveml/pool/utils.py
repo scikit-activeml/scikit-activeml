@@ -173,7 +173,7 @@ class IndexClassifierWrapper:
                     **self.pwc_metric_dict_,
                 )
 
-    def fit(self, idx, set_base_clf=False):
+    def fit(self, idx, y=None, set_base_clf=False):
         """Fit the model using `self.X[idx]` as training data and `self.y[idx]`
         as class labels.
 
@@ -193,6 +193,10 @@ class IndexClassifierWrapper:
         """
         idx = check_array(idx, ensure_2d=False, dtype=int)
         self.idx_ = idx
+        if y is None:
+            self.y_ = self.y[idx]
+        else:
+            self.y_ = y
 
         self.clf_.fit(
             self.get_X(idx), self.get_y(idx), self.get_sample_weight(idx)
@@ -200,6 +204,7 @@ class IndexClassifierWrapper:
 
         if set_base_clf:
             self.base_idx_ = self.idx_.copy()
+            self.base_y_ = self.y_.copy()
             self.base_clf_ = deepcopy(self.clf_)
 
         return self
@@ -231,38 +236,43 @@ class IndexClassifierWrapper:
 
         """
         if use_base_clf:
-            if not hasattr(self, self.base_clf_):
+            if not hasattr(self, 'base_clf_'):
                 raise ValueError('Base classifier has not been initialized. '
                                  'Please set `set_base_clf=True` in `__init__`,'
                                  '`fit`, or `partial_fit`.')
-            ref_idx = np.concatenate([self.base_fit_idx, idx], axis=0)
+            ref_idx = self.base_idx_
         else:
-            ref_idx = np.concatenate([self.idx_, idx], axis=0)
+            ref_idx = self.idx_
         self.idx_ = np.concatenate([ref_idx, idx], axis=0)
 
         if y is None:
-            y = self.get_y(idx)
+            y_add = self.get_y(idx)
+        else:
+            y_add = y
 
+        # TODO: store y with new label to realize sequential partial fits
         if self.use_partial_fit:
             if use_base_clf:
                 self.clf_ = deepcopy(self.base_clf_).partial_fit(
-                    self.get_X(idx), y, self.get_sample_weight(idx)
+                    self.get_X(idx), y_add, self.get_sample_weight(idx)
                 )
             else:
                 self.clf_ = self.clf_.partial_fit(
-                    self.get_X(idx), y, self.get_sample_weight(idx)
+                    self.get_X(idx), y_add, self.get_sample_weight(idx)
                 )
         else:
             if use_base_clf:
                 self.clf_ = clone(self.base_clf_)
+                self.y_ = self.base_y_
 
-            y_new = np.concatenate([self.get_y(ref_idx), y], axis=0)
+            self.y_ = np.concatenate([self.y_, y_add], axis=0)
             self.clf_ = self.clf_.fit(
-                self.get_X(self.idx_), y_new, self.get_sample_weight(self.idx_)
+                self.get_X(self.idx_), self.y_, self.get_sample_weight(self.idx_)
             )
 
         if set_base_clf:
             self.base_idx_ = self.idx_.copy()
+            self.base_y_ = self.y_.copy()
             self.base_clf_ = self.clf_
 
         return self
