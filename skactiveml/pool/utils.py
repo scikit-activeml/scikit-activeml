@@ -10,6 +10,9 @@ from ..classifier import PWC
 from ..utils import MISSING_LABEL, is_labeled, is_unlabeled, \
     check_missing_label, check_equal_missing_label, check_type
 
+# '__all__' is necessary to create the sphinx docs.
+__all__ = ['IndexClassifierWrapper']
+
 
 class IndexClassifierWrapper:
     """

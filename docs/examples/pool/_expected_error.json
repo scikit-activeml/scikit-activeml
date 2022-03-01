@@ -1,6 +1,6 @@
 [
   {
-    "class" : "ExpectedErrorReduction",
+    "class" : "ValueOfInformationEER",
     "method" : "Expected Misclassification Risk",
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
@@ -12,15 +12,19 @@
     "text_0" : "",
     "bp_add_imports" : [],
     "init_params" : {
-      "method" : "'emr'"
+      "consider_unlabeled" : "True",
+      "consider_labeled" : "False",
+      "candidate_to_labeled" : "True",
+      "subtract_current" : "True"
     },
     "query_params" : {
-      "clf" : "clf"
+      "clf" : "clf",
+      "ignore_partial_fit" : "True"
     },
-    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
   },
   {
-    "class" : "ExpectedErrorReduction",
+    "class" : "ValueOfInformationEER",
     "method" : "Cost-sensitive Expected Error Reduction",
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
@@ -32,15 +36,43 @@
     "text_0" : "",
     "bp_add_imports" : [],
     "init_params" : {
-      "method" : "'csl'"
+      "consider_unlabeled" : "False",
+      "consider_labeled" : "True",
+      "candidate_to_labeled" : "False",
+      "subtract_current" : "False"
     },
     "query_params" : {
-      "clf" : "clf"
+      "clf" : "clf",
+      "ignore_partial_fit" : "True"
     },
-    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
   },
   {
-    "class" : "ExpectedErrorReduction",
+    "class" : "ValueOfInformationEER",
+    "method" : "Selective Supervision",
+    "categories" : {
+      "Settles2012" : "Expected Error Reduction"
+    },
+    "tags" : ["pool"],
+    "title" : "Selective Supervision",
+    "refs" : ["kapoor2007selective"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "consider_unlabeled" : "True",
+      "consider_labeled" : "True",
+      "candidate_to_labeled" : "True",
+      "subtract_current" : "True"
+    },
+    "query_params" : {
+      "clf" : "clf",
+      "ignore_partial_fit" : "True"
+    },
+    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
+  },
+  {
+    "class" : "MonteCarloEER",
     "method" : "Log Loss Expected Error Reduction",
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
@@ -55,8 +87,9 @@
       "method" : "'log_loss'"
     },
     "query_params" : {
-      "clf" : "clf"
+      "clf" : "clf",
+      "ignore_partial_fit" : "True"
     },
-    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y}, X_cand=X, feature_bound=feature_bound, ax=ax)"
+    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
   }
 ]

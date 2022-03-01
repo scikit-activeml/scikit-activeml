@@ -19,6 +19,7 @@ from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled, \
     check_random_state, check_cost_matrix, check_scalar, check_class_prior, \
     check_missing_label, check_indices
 
+# '__all__' is necessary to create the sphinx docs.
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
            'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
            'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
