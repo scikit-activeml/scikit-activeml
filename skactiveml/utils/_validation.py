@@ -508,7 +508,7 @@ def check_type(obj, name, *target_types):
         The variable name of the object.
     target_types : iterable
         The possible types. If a target_val in `target_types` is not of type
-        `type` `obj` is allowed to equal the target_val.
+        `type` `obj` is allowed to be equal to the target_val.
 
     """
     target_vals = [target_val for target_val in target_types
@@ -531,7 +531,8 @@ def check_type(obj, name, *target_types):
             error_str += f'one of the following types: {set(target_types)}'
 
         if len(list(target_vals)) >= 1:
-            error_str += f' or equal one of the following values: {set(target_vals)}'
+            error_str += \
+                f' or equal one of the following values: {set(target_vals)}'
         raise TypeError(error_str + '.')
 
 

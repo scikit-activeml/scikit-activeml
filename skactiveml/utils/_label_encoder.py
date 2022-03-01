@@ -9,7 +9,8 @@ from ._validation import check_classifier_params
 
 
 class ExtLabelEncoder(TransformerMixin, BaseEstimator):
-    """Encode class labels with value between 0 and classes-1.
+    """Encode class labels with value between 0 and classes-1 and uses -1 for
+    unlabeled samples.
     This transformer should be used to encode class labels, *i.e.* `y`, and
     not the input `X`.
 

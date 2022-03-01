@@ -107,13 +107,12 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan,
     if np.any(is_labeled_y):
         # transform labels
         y_labeled_transformed = le.transform(y_labeled)
-        max_value_y_l_t = np.nanmax(y_labeled_transformed)
 
         # perform voting
         vote_matrix = compute_vote_vectors(y_labeled_transformed,
                                            w=w[is_labeled_y],
                                            missing_label=-1,
-                                           classes=np.arange(max_value_y_l_t+1))
+                                           classes=np.arange(len(le.classes_)))
 
         vote_vector = rand_argmax(vote_matrix, random_state, axis=1)
 
