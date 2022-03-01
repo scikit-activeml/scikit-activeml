@@ -1,4 +1,6 @@
 import inspect
+import os
+import shutil
 import unittest
 import warnings
 import json
@@ -15,6 +17,8 @@ from skactiveml.classifier import PWC, CMM, SklearnClassifier
 from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL, is_labeled, \
     unlabeled_indices
 from skactiveml.utils._label import check_equal_missing_label
+
+from docs.generate import generate_examples
 
 
 class TestGeneral(unittest.TestCase):
@@ -306,18 +310,34 @@ class TestGeneral(unittest.TestCase):
 class TestExamples(unittest.TestCase):
 
     def setUp(self):
-        pass
+        self.skaml_path = path.abspath(os.curdir).split('skactiveml')[0]
+        self.json_path = path.join(self.skaml_path, 'docs', 'examples', 'pool')
+        self.exceptions = []
+        self.working_dir = os.curdir
+
+    def test_pool_example_files(self):
+        # Temporary generate the examples from the json files.
+        examples_path = path.join(self.skaml_path, 'docs', 'temp_examples_pool')
+        generate_examples(examples_path, pool, self.json_path)
+
+        # Execute the examples.
+        pool_examples_path = path.join(examples_path, 'examples', 'pool')
+        for filename in listdir(pool_examples_path):
+            if filename.endswith('.py'):
+                with self.subTest(msg=filename):
+                    file_path = path.join(pool_examples_path, filename)
+                    exec(open(file_path, 'r').read(), locals())
+
+        # Remove the created examples from disk.
+        shutil.rmtree(examples_path)
 
     def test_json(self):
-        exceptions = []
-        json_path = path.abspath('docs/examples/pool')
-
         # Collect all strategies for which an example exists
         strats_with_json = []
-        for filename in listdir(json_path):
+        for filename in listdir(self.json_path):
             if not filename.endswith('.json'):
                 continue
-            with open(path.join(json_path, filename)) as file:
+            with open(path.join(self.json_path, filename)) as file:
                 for example in json.load(file):
                     if example['class'] not in strats_with_json:
                         strats_with_json.append(example['class'])
@@ -326,16 +346,16 @@ class TestExamples(unittest.TestCase):
         for item in pool.__all__:
             with self.subTest(msg="JSON Test", qs_name=item):
                 item_missing = inspect.isclass(getattr(pool, item)) \
-                               and not item in exceptions \
+                               and not item in self.exceptions \
                                and item not in strats_with_json
                 self.assertFalse(item_missing,
                                  f'No json example found for "{item}". Please '
                                  f'add an example in\n'
-                                 f'{json_path}.\n'
+                                 f'{self.json_path}.\n'
                                  f'For information how to create one, see the '
                                  f'Developers Guide. If {item} is not an '
                                  f'AL-strategy, add "{item}" to the '
-                                 f'"exceptions" list in this test function.')
+                                 f'"exceptions" list in this test class.')
 
 
 class Dummy:

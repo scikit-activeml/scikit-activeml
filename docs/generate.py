@@ -1,4 +1,5 @@
 import inspect
+import importlib
 import json
 import os
 from pybtex.database import parse_file
@@ -8,6 +9,9 @@ import numpy as np
 import skactiveml
 import warnings
 import distutils.dir_util
+
+for module in skactiveml.__all__:
+    importlib.import_module('skactiveml.' + module)
 
 warnings.filterwarnings("ignore")
 
@@ -48,6 +52,10 @@ def automodule(module, level=0):
     constants = []
 
     for item in module.__all__:
+        try:
+            importlib.import_module(module.__name__ + "." + item)
+        except ModuleNotFoundError:
+            pass
         if inspect.ismodule(getattr(module, item)):
             modules.append(item)
         if inspect.isclass(getattr(module, item)):
@@ -356,7 +364,7 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     dir_path : string
         The directory path in which to save the python example file.
     data : dict
-        The data from the jason example file for the example.
+        The data from the json example file for the example.
     package : module
         The '__init__' module of the package for which the examples should be
         created.

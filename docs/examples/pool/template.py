@@ -1,9 +1,8 @@
-import os
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
 
-from skactiveml.utils import MISSING_LABEL, unlabeled_indices, labeled_indices
+from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
 from skactiveml.visualization import plot_utility, plot_decision_boundary
 
 #_ import
@@ -35,19 +34,17 @@ for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
 
-    # Set X_cand to the unlabeled instances.
-    unlbld_idx = unlabeled_indices(y)
-    X_cand = X[unlbld_idx]
+    # Get labeled instances.
     X_labeled = X[labeled_indices(y)]
 
     # Query the next instance/s.
     query_params = "#_query_params"
-    query_idx = unlbld_idx[qs.query(X_cand, **query_params)]
+    query_idx = qs.query(**query_params)
 
     # Plot the labeled data.
     coll_old = list(ax.collections)
     title = ax.text(
-        0.5, 1.05, f"Decision boundry after acquring {c} labels",
+        0.5, 1.05, f"Decision boundary after acquring {c} labels",
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )

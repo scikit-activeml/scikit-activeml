@@ -14,9 +14,9 @@
     "init_params" : {},
     "query_params" : {
       "clf" : "clf",
-      "utility_weight" : "dens[unlbld_idx]"
+      "utility_weight" : "dens"
     },
-    "bp_utilities" : "ax = plot_utility(qs, {'clf': clf, 'X': X, 'y': y, 'utility_weight': dens}, X_cand=X, feature_bound=feature_bound, ax=ax)",
+    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'utility_weight': dens}, candidates=X, feature_bound=feature_bound, ax=ax)",
     "bp_preproc" : ["dens_est = clf.fit(X, np.zeros(len(X)))",
                     "dens = clf.predict_freq(X)[:,0]"]
   }
