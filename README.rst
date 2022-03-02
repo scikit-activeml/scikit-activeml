@@ -83,13 +83,19 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
 .. examples_start
 
-Quick Start
-===========
+Examples
+========
 In the following, there are two simple examples illustrating the straightforwardness
 of implementing active learning cycles with our Python package ``skactiveml``.
-For more in-depth examples, we refer to our tutorials:
+For more in-depth examples, we refer to our
+`tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/>`_ offering
+a broad overview of different use-cases:
 
-`tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/>`_.
+- `pool-based active learning -- getting started <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/00_pool_getting_started.ipynb>`_,
+- `deep pool-based active learning -- scikit-activeml with skorch <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/01_deep_pool_al_with_skorch.ipynb>`_,
+- `multi-annotator pool-based active learning -- getting started <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/10_multiple_annotators_getting_started.ipynb>`_,
+- `stream-based active learning -- getting started <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/20_stream_getting_started.ipynb>`_,
+- and `batch stream-based active learning with pool-based query strategies <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/21_stream_batch_with_pool_al.ipynb>`_.
 
 Pool-based Active Learning
 ##########################
@@ -137,7 +143,7 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
     bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
     unlbld_idx = unlabeled_indices(y)
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    ax.set_title(f'Accuracy score: {clf.score(X,y_true)}.', fontsize=15)
+    ax.set_title(f'Accuracy score: {clf.score(X,y_true)}', fontsize=15)
     plot_utility(qs, X=X, y=y, qs_dict={'clf': clf}, feature_bound=bound, ax=ax)
     plot_decision_boundary(clf, feature_bound=bound, confidence=0.6)
     plt.scatter(X[unlbld_idx,0], X[unlbld_idx,1], c='gray')
@@ -157,7 +163,7 @@ Stream-based Active Learning
 The following code implements an active learning cycle with 200 data points and
 the default budget of 10% using a pwc classifier and split uncertainty sampling. 
 Like in the pool-based example you can wrap other classifiers from ``sklearn``,
-``sklearn`` compatible classifieres or like the example classifiers provided by ``skactiveml``. 
+``sklearn`` compatible classifiers or like the example classifiers provided by ``skactiveml``.
 
 .. code-block:: python
 
@@ -176,14 +182,14 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
     clf = PWC(random_state=0, classes=np.unique(y_true))
     qs = Split(random_state=0)
 
-    # initializing the training data as an empty array
+    # Initializing the training data as an empty array.
     X_train = []
     y_train = []
 
-    # initialize the list that stores the result of the classifier's prediction
+    # Initialize the list that stores the result of the classifier's prediction.
     correct_classifications = []
 
-    # Execute active learning cycle
+    # Execute active learning cycle.
     for x_t, y_t in zip(X, y_true):
         X_cand = x_t.reshape([1, -1])
         y_cand = y_t
@@ -194,8 +200,12 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
         X_train.append(x_t)
         y_train.append(y_cand if len(sampled_indices) > 0 else MISSING_LABEL)
 
-    # plot the classifiers learning accuracy
-    plt.plot(gaussian_filter1d(np.array(correct_classifications, dtype=float), 4))
+    # Plot the classifier's learning accuracy.
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    ax.set_title(f'Learning curve', fontsize=15)
+    ax.set_xlabel('number of learning cycles')
+    ax.set_ylabel('accuracy')
+    ax.plot(gaussian_filter1d(np.array(correct_classifications, dtype=float), 4))
     plt.show()
 
 As output of this code snippet, we obtain the actively trained pwc classifier incuding
