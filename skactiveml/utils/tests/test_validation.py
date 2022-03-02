@@ -27,7 +27,7 @@ class TestValidation(unittest.TestCase):
 
     def test_check_classifier_params(self):
         self.assertRaises(ValueError, check_classifier_params,
-                          classes=[0, 1 ,2], missing_label=np.nan,
+                          classes=[0, 1, 2], missing_label=np.nan,
                           cost_matrix=[[1, 1], [2, 0]])
         self.assertRaises(TypeError, check_classifier_params,
                           classes=['a', 'b'], missing_label=2,
@@ -36,6 +36,18 @@ class TestValidation(unittest.TestCase):
                           missing_label='nan', cost_matrix=[[1, 1], [2, 0]])
         self.assertRaises(ValueError, check_classifier_params, classes=None,
                           missing_label=np.nan, cost_matrix=[[1, 1], [2, 0]])
+        self.assertRaises(
+            ValueError, check_classifier_params, classes=[np.nan, 1],
+            missing_label=np.nan
+        )
+        self.assertRaises(
+            ValueError, check_classifier_params, classes=[-1, 1],
+            missing_label=-1
+        )
+        self.assertRaises(
+            ValueError, check_classifier_params, classes=['a', 'b'],
+            missing_label='a'
+        )
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])

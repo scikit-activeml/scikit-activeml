@@ -7,7 +7,7 @@ from sklearn.utils.validation import check_array, column_or_1d, \
     assert_all_finite, check_consistent_length, \
     check_random_state as check_random_state_sklearn
 
-from ._label import MISSING_LABEL, check_missing_label
+from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
 
 
 def check_scalar(x, name, target_type, min_inclusive=True, max_inclusive=True,
@@ -80,6 +80,12 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
         check_classes(classes)
         dtype = np.array(classes).dtype
         check_missing_label(missing_label, target_type=dtype, name='classes')
+        n_labeled = is_unlabeled(y=classes, missing_label=missing_label).sum()
+        if n_labeled > 0:
+            raise ValueError(
+                f'`classes={classes}` contains '
+                f'`missing_label={missing_label}.`'
+            )
         if cost_matrix is not None:
             check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
     else:
