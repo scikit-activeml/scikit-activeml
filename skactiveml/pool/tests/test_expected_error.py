@@ -70,15 +70,10 @@ class TemplateTestEER:
 
     def test_query_param_sample_weight(self):
         qs = self.Strategy()
-        for sw in [self.X_cand, np.empty((len(self.X) - 1))]:
+        for sw in [self.X_cand, np.empty((len(self.X) - 1)), 'string']:
             with self.subTest(msg=f'sample_weight={sw}'):
-                self.assertRaises(IndexError, qs.query, **self.kwargs,
-                                  sample_weight=sw)
-
-        for sw in ['string']:
-            with self.subTest(msg=f'sample_weight={sw}'):
-                self.assertRaises(TypeError, qs.query, **self.kwargs,
-                                  sample_weight=sw)
+                self.assertRaises((IndexError, TypeError, ValueError),
+                                  qs.query, **self.kwargs, sample_weight=sw)
 
     def test_query_param_fit_clf(self):
         qs = self.Strategy()
@@ -124,24 +119,20 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
 
     def test_query_param_sample_weight_candidates(self):
         qs = self.Strategy()
-        for swc in ['string']:
+        for swc in ['string', np.empty((len(self.X_cand) - 1))]:
             with self.subTest(msg=f'sample_weight_candidates={swc}'):
-                self.assertRaises(ValueError, qs.query, X=self.X, y=self.y,
+                self.assertRaises((ValueError, TypeError),
+                                  qs.query, X=self.X, y=self.y,
                                   clf=self.clf, candidates=self.X_cand,
                                   sample_weight=np.ones(len(self.X)),
                                   sample_weight_candidates=swc)
 
-        for swc in [np.empty((len(self.X_cand) - 1))]:
-            with self.subTest(msg=f'sample_weight_candidates={swc}'):
-                self.assertRaises(IndexError, qs.query, X=self.X, y=self.y,
-                                  clf=self.clf, candidates=self.X_cand,
-                                  sample_weight=np.ones(len(self.X)),
-                                  sample_weight_candidates=swc)
-
+        # TODO: sample weights should be of size X_cand
+        #  (why is error not raised?):
         self.assertRaises(
             ValueError, qs.query, X=self.X, y=self.y,
             clf=self.clf, candidates=self.X_cand,
-            sample_weight_candidates=np.ones(len(self.candidates))
+            sample_weight_candidates=np.ones(len(self.X_cand))
         )
 
     def test_query_param_sample_weight_eval(self):
@@ -170,34 +161,36 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
     def test_query(self):
         super().test_query()
         classes = [0, 1]
-        candidates = [0, 1]
-        X_cand = np.array([[8, 1], [9, 1]])
-        X = np.array([[8, 1], [9, 1], [1, 2], [5, 8], [8, 4]])
-        y = np.array([MISSING_LABEL, MISSING_LABEL, 0, 1, MISSING_LABEL])
+        X = [[0], [0], [0], [0]]
+        y = [0, MISSING_LABEL, MISSING_LABEL, 1]
+        cand = [1, 2]
         cost_matrix = 1 - np.eye(2)
 
-        X = [[1], [2], [3]]
-        y = [0, 1, MISSING_LABEL]
         clf = self.DummyClf() #PWC(classes=[0, 1])
 
         params_list = [
-            ['log_loss', np.full(
-                shape=(1, len(candidates)),
-                fill_value=-0.5 * np.log(0.5) * len(classes) * len(X))
-             ], ['misclassification_loss', np.full(
-                shape=(1, len(candidates)),
-                fill_value=0.5 * len(X))
-                 ]]
+            [
+                'log_loss',
+                np.full(shape=(1, len(cand)),
+                        fill_value=0.5 * np.log(0.5) * len(classes) * len(X))
+            ],
+            [
+                'misclassification_loss',
+                np.full(shape=(1, len(cand)), fill_value=-0.5 * len(X))
+            ]
+        ]
 
         for method, expected_utils in params_list:
             with self.subTest(msg=method):
                 qs = MonteCarloEER(method=method, cost_matrix=cost_matrix)
                 idx, utils = qs.query(X, y, clf, fit_clf=True,
                                       ignore_partial_fit=True,
-                                      candidates=candidates,
+                                      candidates=cand,
                                       return_utilities=True)
 
-                np.testing.assert_allclose(expected_utils, utils[:, 0:2])
+                np.testing.assert_allclose(expected_utils, utils[:, cand])
+
+        # TODO: PWC Test
 
 
 class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
@@ -235,28 +228,39 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
     def test_query(self):
         super().test_query()
         classes = [0, 1]
-        candidates = [0, 1]
-        X = np.array([[8, 1], [9, 1], [1, 2], [5, 8], [8, 4]])
-        y = np.array([MISSING_LABEL, MISSING_LABEL, 0, 1, MISSING_LABEL])
+        X = [[0], [0], [0], [0]]
+        y = [0, MISSING_LABEL, MISSING_LABEL, 1]
+        cand = [1, 2]
         cost_matrix = 1 - np.eye(2)
-        clf_partial = SklearnClassifier(
-            GaussianNB(), classes=classes
-        ).fit(X, y)
-        clf = PWC(classes=[0, 1])
-        clf = self.DummyClf()
+        # clf_partial = SklearnClassifier(
+        #     GaussianNB(), classes=classes
+        # ).fit(X, y)
+
 
         params_list = [
-            ['kapoor', True, True, True, True, [[0, 0]]],
-            ['kapoor', True, True, True, False,
-             np.full(shape=(1, len(candidates)), fill_value=-0.5*len(X))],
-            ['Margeniantu', False, True, False, False,
-             np.full(shape=(1, len(candidates)), fill_value=
-             0.25 * (len(classes) - 1) * len(classes) * len(candidates))],
-            ['Joshi', True, False, True, True,
-             np.full(shape=(1, len(candidates)), fill_value=0)],
-            ['Joshi', True, False, True, False,
-             np.full(shape=(1, len(candidates)), fill_value=
-             -0.25 * np.sum(cost_matrix))]]
+            [
+                'kapoor-sub', True, True, True, True,
+                [[0, 0]]
+            ],
+            [
+                'kapoor', True, True, True, False,
+                np.full(shape=(1, len(cand)), fill_value=-0.5*len(X))
+            ],
+            [
+                'Margeniantu', False, True, False, False,
+                np.full(shape=(1, len(cand)), fill_value=
+                        0.25 * (len(classes) - 1) * len(classes) * len(cand))
+            ],
+            [
+                'Joshi-sub', True, False, True, True,
+                np.full(shape=(1, len(cand)), fill_value=0)
+            ],
+            [
+                'Joshi', True, False, True, False,
+                np.full(shape=(1, len(cand)),
+                        fill_value=-0.25 * np.sum(cost_matrix))
+            ]
+        ]
 
         # Test with zero labels.
         for msg, consider_unlabeled, consider_labeled, \
@@ -270,7 +274,8 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
                     subtract_current=substract_current,
                     cost_matrix=cost_matrix
                 )
-                qs.query(candidates=candidates, clf=clf, X=X,
+                clf = PWC(classes=classes)
+                qs.query(candidates=cand, clf=clf, X=X,
                          y=np.full(shape=len(X), fill_value=np.nan))
 
         # Test Scenario.
@@ -285,13 +290,14 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
                     subtract_current=substract_current,
                     cost_matrix=cost_matrix
                 )
-                qs.query(candidates=candidates, clf=clf_partial, X=X, y=y)
+                clf = self.DummyClf()
+                qs.query(candidates=cand, clf=clf, X=X, y=y)
 
-                idxs, utils = qs.query(candidates=candidates,
+                idxs, utils = qs.query(candidates=cand,
                                        clf=self.DummyClf(),
                                        X=X, y=y,
                                        return_utilities=True)
-                np.testing.assert_array_equal(expected_utils, utils[:, 0:2])
+                np.testing.assert_array_equal(expected_utils, utils[:, cand])
 
         # Test Kapoor
         # qs = ValueOfInformationEER(consider_unlabeled=True,
@@ -344,41 +350,3 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
         # idxs, utils = qs.query(candidates=X_cand, clf=DummyClf(), X=X, y=y,
         #                       return_utilities=True)
         # np.testing.assert_array_equal(utils[0], expected)
-
-
-class TestUpdateIndexClassifier(unittest.TestCase):
-    def setUp(self):
-        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
-        self.y = np.array([0, 1, 2, 1])
-        self.sample_weight = np.ones(len(self.X))
-        self.classes = [0, 1, 2]
-        self.clf = PWC(classes=self.classes)
-        self.clf_partial = SklearnClassifier(
-            GaussianNB(), classes=self.classes
-        ).fit([[5, 6], [1, -1], [9, 9]], [0, 1, 2])
-
-    def test_fit(self):
-        fit_idx = [1, 3]
-        sample_weight = np.random.random_sample(len(self.X))
-        for clf in [self.clf, self.clf_partial]:
-            clf = clone(clf).fit(
-                self.X[fit_idx], self.y[fit_idx], sample_weight[fit_idx]
-            )
-            probas_clf = clf.predict_proba(self.X)
-            UIclf = IndexClassifierWrapper(clf, self.X, self.y, sample_weight)
-            UIclf.fit(fit_idx)
-            probas_UIclf = UIclf.predict_proba(range(len(self.X)))
-            np.testing.assert_allclose(probas_clf, probas_UIclf)
-
-    def test_fit_as_cand(self):
-        fit_idx = [1, 3]
-        sample_weight = np.random.random_sample(len(self.X))
-        clf = deepcopy(self.clf_partial).partial_fit(
-            self.X[fit_idx], self.y[fit_idx], sample_weight[fit_idx]
-        )
-        UIclf = IndexClassifierWrapper(clf, self.X, self.y, sample_weight)
-        UIclf.fit(fit_idx)
-        probas_clf = clf.predict_proba(self.X)
-        probas_UIclf = UIclf.predict_proba(range(len(self.X)))
-        np.testing.assert_allclose(probas_clf, probas_UIclf)

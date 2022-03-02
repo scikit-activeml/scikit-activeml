@@ -163,9 +163,9 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
         # Initialize classifier that works with indices to improve readability
         id_clf = IndexClassifierWrapper(
-            clf, X_full, y_full, w_full, set_base_clf=True,
-            ignore_partial_fit=ignore_partial_fit, use_speed_up=True,
-            missing_label=self.missing_label_
+            clf, X_full, y_full, w_full, set_base_clf=not fit_clf,
+            ignore_partial_fit=ignore_partial_fit, enforce_unique_samples=True,
+            use_speed_up=True, missing_label=self.missing_label_
         )
 
         # Fit the classifier.
@@ -215,9 +215,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
     def _precompute_and_fit_clf(self, id_clf, X_full, y_full,
                                 idx_train, idx_cand, idx_eval, fit_clf=True):
-        if not fit_clf:
-            check_is_fitted(id_clf, ['le_'])
-        else:
+        if fit_clf:
             id_clf.fit(idx_train, set_base_clf=True)
         return id_clf
 
@@ -443,7 +441,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
                                        X_eval=None, sample_weight_eval=None,
                                        batch_size=batch_size,
                                        return_utilities=return_utilities)
-            return idx, utils - self.err_current_
+            return idx, utils
 
         else:
             return super().query(X, y, clf, sample_weight=sample_weight,
@@ -464,9 +462,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         # as there are no instances left for estimating
 
         le = id_clf._le
-        y_eval = id_clf.get_y(idx_eval)
+        y_eval = id_clf.y[idx_eval]
         idx_labeled = idx_train[is_labeled(y_eval)]
-        y_labeled = id_clf.get_y(idx_labeled)
+        y_labeled = id_clf.y[idx_labeled]
         idx_unlabeled = idx_train[is_unlabeled(y_eval)]
 
         if self.candidate_to_labeled:
@@ -493,15 +491,18 @@ class ValueOfInformationEER(ExpectedErrorReduction):
                     probs, probs, self.cost_matrix_, w_eval[idx_unlabeled]
                 )
 
+        if self.subtract_current:
+            err -= self.err_current_
+
         return err
 
     def _precompute_loop(self, id_clf, idx_train, idx_cand, idx_eval, w_eval):
         # estimate current utility score if required
         if self.subtract_current:
             le = id_clf._le
-            y_eval = id_clf.get_y(idx_eval)
+            y_eval = id_clf.y[idx_eval]
             idx_labeled = idx_train[is_labeled(y_eval)]
-            y_labeled = id_clf.get_y(idx_labeled)
+            y_labeled = id_clf.y[idx_labeled]
             idx_unlabeled = idx_train[is_unlabeled(y_eval)]
 
             y_labeled_c_id = le.transform(y_labeled)
@@ -526,6 +527,10 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
     def _precompute_and_fit_clf(self, id_clf, X_full, y_full,
                                 idx_train, idx_cand, idx_eval, fit_clf):
+        # TODO: test rem
+        id_clf.precompute(idx_eval, idx_eval,
+                          fit_params='all', pred_params='all')
+
         # for cond_prob
         id_clf.precompute(idx_train, idx_cand,
                           fit_params='labeled', pred_params='all')
