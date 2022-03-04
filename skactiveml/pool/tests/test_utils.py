@@ -465,20 +465,3 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X)
                     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -14,10 +14,11 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_array, check_consistent_length, \
     column_or_1d
 
-from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled, \
+from .utils import MISSING_LABEL, is_labeled, is_unlabeled, \
     unlabeled_indices, ExtLabelEncoder, rand_argmin, check_classifier_params, \
     check_random_state, check_cost_matrix, check_scalar, check_class_prior, \
     check_missing_label, check_indices
+from .exceptions import MappingError
 
 # '__all__' is necessary to create the sphinx docs.
 __all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
@@ -325,9 +326,9 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             return X[candidates], candidates
         else:
             if enforce_mapping:
-                raise ValueError('Mapping `candidates` to `X` is not '
-                                 'possible but `enforce_mapping` is True. '
-                                 'Use index array for `candidates` instead.')
+                raise MappingError('Mapping `candidates` to `X` is not '
+                                   'possible but `enforce_mapping` is True. '
+                                   'Use index array for `candidates` instead.')
             else:
                 return candidates, None
 

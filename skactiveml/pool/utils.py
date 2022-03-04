@@ -13,7 +13,6 @@ from ..classifier import PWC
 from ..utils import MISSING_LABEL, is_labeled, is_unlabeled, \
     check_missing_label, check_equal_missing_label, check_type, check_indices
 
-# '__all__' is necessary to create the sphinx docs.
 __all__ = ['IndexClassifierWrapper']
 
 
@@ -36,7 +35,7 @@ class IndexClassifierWrapper:
     y : array-like of shape (n_samples)
         Labels of the training data set (possibly including unlabeled ones
         indicated by self.missing_label.
-    sample_weight: array-like of shape (n_samples), optional (default=None)
+    sample_weight : array-like of shape (n_samples), optional (default=None)
         Weights of training samples in `X`.
     set_base_clf : bool, default=False
         If True, the base classifier will be set to the newly fitted
@@ -84,7 +83,6 @@ class IndexClassifierWrapper:
 
         if self.sample_weight is not None:
             check_consistent_length(self.X, self.sample_weight)
-
 
         check_type(set_base_clf, 'set_base_clf', bool)
 
@@ -260,6 +258,7 @@ class IndexClassifierWrapper:
         if sample_weight is None:
             sample_weight = \
                 self._copy_sw(self._get_sw(self.sample_weight, idx=idx))
+            # TODO deepcopy
         else:
             sample_weight = check_array(sample_weight, ensure_2d=False)
             check_consistent_length(sample_weight, y)
@@ -343,22 +342,22 @@ class IndexClassifierWrapper:
 
         # check y
         if y is None:
-            add_y = self.y[idx]
+            add_y = self.y[add_idx]
             if is_unlabeled(add_y, missing_label=self.missing_label_).all():
                 warnings.warn('All labels are of `missing_label` in '
                               '`partial_fit`.')
         else:
             add_y = check_array(y, ensure_2d=False,
                                 force_all_finite='allow-nan')
-            check_consistent_length(idx, add_y)
+            check_consistent_length(add_idx, add_y)
 
         # check sample_weight
         if sample_weight is None:
             add_sample_weight = \
-                self._copy_sw(self._get_sw(self.sample_weight, idx=idx))
+                self._copy_sw(self._get_sw(self.sample_weight, idx=add_idx))
         else:
             add_sample_weight = check_array(sample_weight, ensure_2d=False)
-            check_consistent_length(add_sample_weight, y)
+            check_consistent_length(add_idx, add_sample_weight)
 
         # handle case when partial fit of clf is used
         if self.use_partial_fit:

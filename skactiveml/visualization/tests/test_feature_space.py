@@ -96,38 +96,29 @@ class TestFeatureSpace(unittest.TestCase):
     # Tests for plot_utility function
     def test_utility_qs(self):
         self.assertRaises(TypeError, plot_utility, qs=self.clf, X=self.X,
-                          y=self.y, qs_dict=self.qs_dict,
+                          y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
-
-    def test_utility_qs_dict(self):
-        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, qs_dict={0, 1, 2}, feature_bound=self.bound)
-
-        qs_dict = self.qs_dict
-        qs_dict['candidates'] = []
-        self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, qs_dict=qs_dict, feature_bound=self.bound)
 
     def test_utility_candidates(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, qs_dict=self.qs_dict, candidates=[100])
-        plot_utility(qs=self.qs, X=self.X, y=self.y, qs_dict=self.qs_dict,
+                          y=self.y, **self.qs_dict, candidates=[100])
+        plot_utility(qs=self.qs, X=self.X, y=self.y, **self.qs_dict,
                      candidates=[99])
 
     def test_utility_res(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, qs_dict=self.qs_dict,
+                          y=self.y, **self.qs_dict,
                           feature_bound=self.bound, res=-3)
 
     def test_utility_ax(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, qs_dict=self.qs_dict, feature_bound=self.bound, ax=2)
+                          y=self.y, **self.qs_dict, feature_bound=self.bound, ax=2)
 
     def test_utility_contour_dict(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, qs_dict=self.qs_dict,
+                          y=self.y, **self.qs_dict,
                           feature_bound=self.bound, contour_dict='string')
-        plot_utility(qs=self.qs, qs_dict=self.qs_dict, X=self.X,
+        plot_utility(qs=self.qs, **self.qs_dict, X=self.X,
                           y=self.y, feature_bound=self.bound,
                      contour_dict={'linestyles': '.'})
 
@@ -153,7 +144,7 @@ class TestFeatureSpace(unittest.TestCase):
     def test_with_candidates(self):
         fig, ax = plt.subplots()
         plot_utility(qs=self.qs, X=self.X_train, y=self.y_train,
-                     qs_dict=self.qs_dict, candidates=self.X_cand, ax=ax)
+                     **self.qs_dict, candidates=self.X_cand, ax=ax)
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
@@ -180,7 +171,7 @@ class TestFeatureSpace(unittest.TestCase):
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
         fig, ax = plt.subplots()
-        plot_utility(qs=qs, X=X_train, y=y_train, qs_dict={'clf': clf},
+        plot_utility(qs=qs, X=X_train, y=y_train, clf=clf,
                      feature_bound=bound, ax=ax)
         ax.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
         ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
@@ -199,7 +190,7 @@ class TestFeatureSpace(unittest.TestCase):
         svc.fit(self.X_train, self.y_train)
 
         fig, ax = plt.subplots()
-        plot_utility(qs=self.qs, qs_dict=self.qs_dict, X=self.X_train,
+        plot_utility(qs=self.qs, **self.qs_dict, X=self.X_train,
                      y=self.y_train, candidates=self.X_cand, ax=ax)
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
