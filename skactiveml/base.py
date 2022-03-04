@@ -127,9 +127,9 @@ class PoolBasedQueryStrategy(QueryStrategy):
         self.missing_label_ = self.missing_label
 
         # Check candidates
+        seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
         if candidates is not None:
             candidates = np.array(candidates)
-            seed_mult = len(candidates)
             if candidates.ndim == 1:
                 candidates = check_indices(candidates, y, dim=0)
             else:
@@ -137,8 +137,6 @@ class PoolBasedQueryStrategy(QueryStrategy):
                 check_candidates_dict['ensure_2d'] = False
                 candidates = check_array(candidates, **check_candidates_dict)
                 self._check_n_features(candidates, reset=False)
-        else:
-            seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
 
         # Check return_utilities.
         check_scalar(return_utilities, 'return_utilities', bool)

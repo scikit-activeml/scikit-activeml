@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from skactiveml import pool
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.classifier import PWC, CMM, SklearnClassifier
+from skactiveml.pool import FourDS
 from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL, is_labeled, \
     unlabeled_indices
 from skactiveml.utils._label import check_equal_missing_label, labeled_indices
@@ -144,10 +145,23 @@ class TestGeneral(unittest.TestCase):
                 )
                 np.testing.assert_array_equal(u1, u2)
 
+                if not isinstance(qs, FourDS):
+                    unld_idx = unlabeled_indices(y, self.MISSING_LABEL)[:2]
+                    ids1, u1 = call_func(
+                        qs.query, X=self.X, y=y, clf=clf, X_eval=self.X,
+                        ensemble=self.ensemble, return_utilities=True
+                    )
+                    ids2, u2 = call_func(
+                        qs.query, X=self.X, y=y, clf=clf, X_eval=self.X,
+                        candidates=unld_idx,
+                        ensemble=self.ensemble, return_utilities=True
+                    )
+                    np.testing.assert_allclose(u1[0][unld_idx], u2[0][unld_idx])
+
                 try:
-                    ld_idx = labeled_indices(y, self.MISSING_LABEL)
+                    unld_idx = unlabeled_indices(y, self.MISSING_LABEL)
                     ids3, u3 = call_func(
-                        qs.query, X=self.X[ld_idx], y=y, clf=clf, X_eval=self.X,
+                        qs.query, X=self.X, y=y, clf=clf, X_eval=self.X,
                         candidates=self.X[unld_idx],
                         ensemble=self.ensemble, return_utilities=True
                     )

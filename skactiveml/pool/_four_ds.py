@@ -172,8 +172,8 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
 
         # Compute utilities to select sample.
         utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
-        utilities_cand[0] = alpha * (
-                1 - distance_cand) + beta * density_cand + \
+        utilities_cand[0] = alpha * (1 - distance_cand) + \
+                            beta * density_cand + \
                             rho * distribution_cand
         query_indices_cand[0] = rand_argmax(
             utilities_cand[0], self.random_state_

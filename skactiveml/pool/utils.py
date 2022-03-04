@@ -108,6 +108,9 @@ class IndexClassifierWrapper:
         )
 
         check_type(self.enforce_unique_samples, 'enforce_unique_samples', bool)
+        self.enforce_unique_samples = \
+            'check_unique' if enforce_unique_samples else False
+        # TODO better change check_indices function
 
         if self.use_partial_fit and self.enforce_unique_samples:
             warnings.warn('The `partial_fit` function by sklearn might not '

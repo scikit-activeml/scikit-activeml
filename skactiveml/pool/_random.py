@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..utils import MISSING_LABEL, simple_batch
+from ..utils import MISSING_LABEL, simple_batch, is_unlabeled
 
 
 class RandomSampler(SingleAnnotPoolBasedQueryStrategy):

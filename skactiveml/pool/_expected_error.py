@@ -520,9 +520,6 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
     def _precompute_and_fit_clf(self, id_clf, X_full, y_full,
                                 idx_train, idx_cand, idx_eval, fit_clf):
-        # TODO: test rem
-        id_clf.precompute(idx_eval, idx_eval,
-                          fit_params='all', pred_params='all')
 
         # for cond_prob
         id_clf.precompute(idx_train, idx_cand,

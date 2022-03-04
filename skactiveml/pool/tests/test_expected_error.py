@@ -364,7 +364,7 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
         for msg, consider_unlabeled, consider_labeled, \
             candidate_to_labeled, substract_current, \
             expected_utils in params_list:
-            with self.subTest(msg=msg + ": Scenario"):
+            with self.subTest(msg=msg + ": Scenario (zero labels)"):
                 qs = ValueOfInformationEER(
                     consider_unlabeled=consider_unlabeled,
                     consider_labeled=consider_labeled,
