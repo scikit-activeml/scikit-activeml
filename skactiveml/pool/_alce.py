@@ -31,19 +31,20 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    classes: array-like, shape(n_classes)
+    classes: array-like of shape(n_classes,)
     base_regressor : sklearn regressor, optional (default=None)
-    cost_matrix: array-like, shape (n_classes, n_classes),
-                 optional (default=None)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a
-        sample with the actual class i. Only supported for least confident
-        variant.
-    missing_label: str | numeric, optional (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    cost_matrix: array-like of shape (n_classes, n_classes),
+    optional (default=None)
+        Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
+        class j for a sample with the actual class i. Only supported for least
+        confident variant.
+    missing_label: str or numeric, optional (default=MISSING_LABEL)
+        Specifies the symbol that represents a missing label.
+    random_state: numeric or np.random.RandomState, optional
+    (default=None)
         Random state for annotator selection.
     embed_dim : int, optional (default=None)
-        If is None, embed_dim = n_classes
+        If is None, `embed_dim = n_classes`.
     mds_params : dict, optional (default=None)
         For further information, see
         https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
@@ -86,12 +87,13 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+            indicated by self.MISSING_LABEL).
+        sample_weight: array-like of shape (n_samples,), optional
+        (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -110,7 +112,7 @@ class ALCE(SingleAnnotPoolBasedQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size,)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.

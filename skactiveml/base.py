@@ -126,8 +126,8 @@ class PoolBasedQueryStrategy(QueryStrategy):
         check_missing_label(self.missing_label)
         self.missing_label_ = self.missing_label
 
-        # Check candidates
-        seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
+        # Check candidates (+1 to avoid zero multiplier).
+        seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_))) + 1
         if candidates is not None:
             candidates = np.array(candidates)
             if candidates.ndim == 1:

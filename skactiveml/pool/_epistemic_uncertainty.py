@@ -14,7 +14,7 @@ from sklearn.linear_model._logistic import _logistic_loss
 
 from ..base import SingleAnnotPoolBasedQueryStrategy, SkactivemlClassifier
 from ..classifier import SklearnClassifier, PWC
-from ..utils import is_labeled, check_X_y, simple_batch, check_scalar, \
+from ..utils import is_labeled, simple_batch, check_scalar, \
     check_type, MISSING_LABEL, check_equal_missing_label
 
 
@@ -26,10 +26,11 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
     Parameters
     ----------
-    precompute : boolean, default=False
+    precompute : boolean, optional (default=False)
         Whether the epistemic uncertainty should be precomputed.
         Only for PWC significant.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None, optional
+    (default=MISSING_LABEL)
         Value to represent a missing label.
     random_state : numeric or np.random.RandomState
         The random state to use.
@@ -110,12 +111,6 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                 X, y, candidates, batch_size, return_utilities, reset=True
             )
 
-        # Validate sample_weight
-        if sample_weight is None:
-            sample_weight = np.ones(y.shape)
-        else:
-            sample_weight = np.asarray(sample_weight)
-
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate classifier type.
@@ -124,8 +119,6 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
 
         # Validate classifier type.
         check_type(fit_clf, 'fit_clf', bool)
-
-        # sample_weight is checked by clf when fitted
 
         # Fit the classifier.
         if fit_clf:
@@ -148,10 +141,15 @@ class EpistemicUncertainty(SingleAnnotPoolBasedQueryStrategy):
                 freq, self._precompute_array)
         elif isinstance(clf, SklearnClassifier) and \
                 isinstance(clf.estimator_, LogisticRegression):
-            mask_labeled = is_labeled(y, clf.missing_label)
+            mask_labeled = is_labeled(y, self.missing_label_)
+            if sample_weight is None:
+                sample_weight_masked = None
+            else:
+                sample_weight = np.asarray(sample_weight)
+                sample_weight_masked = sample_weight[mask_labeled]
             utilities_cand = _epistemic_uncertainty_logreg(
                 X_cand=X_cand, X=X[mask_labeled], y=y[mask_labeled], clf=clf,
-                sample_weight=sample_weight[mask_labeled]
+                sample_weight=sample_weight_masked
             )
         else:
             raise TypeError(f"`clf` must be of type `PWC` or "

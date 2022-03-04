@@ -148,6 +148,7 @@ class McPAL(SingleAnnotPoolBasedQueryStrategy):
                             batch_size=batch_size,
                             return_utilities=return_utilities)
 
+
 def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     """Calculate the expected cost reduction.
 

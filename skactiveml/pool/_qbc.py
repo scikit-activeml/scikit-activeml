@@ -165,7 +165,7 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
         else:
             raise TypeError(
                 f'`ensemble` must either be a `{SkactivemlClassifier} '
-                f'with the attribute `n_esembles` and `estimators_` after '
+                f'with the attribute `n_ensembles` and `estimators_` after '
                 f'fitting or a list of {SkactivemlClassifier} objects.'
             )
 

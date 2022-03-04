@@ -27,9 +27,9 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         uses a diversity measure to avoid the selection of redundant samples
         whose influence is regulated by the weighting factor 'lmbda'.
     missing_label : scalar or string or np.nan or None, optional
-    (default=np.nan)
+    (default=MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional (default=None)
+    random_state : numeric or np.random.RandomState, optional (default=None)
         The random state to use.
 
     References
