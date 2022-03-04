@@ -106,7 +106,7 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             candidates are given in `sample_weight`.
         X_eval : array-like of shape (n_eval_samples, n_features),
             optional (default=None).
-            Unlabeled evalaution data set that is used for estimating the risk.
+            Unlabeled evaluation data set that is used for estimating the risk.
             Not applicable for all EER methods.
         sample_weight_eval : array-like of shape (n_eval_samples),
             optional (default=None)
@@ -256,9 +256,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
         # TODO: test sample weight_eval - length + column
 
-        return X, y, sample_weight, clf, candidates, sample_weight_candidates,\
+        return X, y, sample_weight, clf, candidates, sample_weight_candidates, \
                X_eval, sample_weight_eval, batch_size, return_utilities,
-
 
     def _validate_cost_matrix(self, n_classes):
 
@@ -286,6 +285,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             y_full = np.concatenate([y_full, np.full(len(candidates), np.nan)],
                                     axis=0)
             if not (w_full is None and sample_weight_candidates is None):
+                if w_full is None:
+                    w_full = np.ones(len(X))
                 w_full = np.concatenate([w_full, sample_weight_candidates],
                                         axis=0)
             idx_cand = np.arange(len(X), len(X_full))
@@ -306,15 +307,16 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             y_full = np.concatenate([y_full, np.full(len(X_eval), np.nan)],
                                     axis=0)
             idx_eval = np.arange(len(X_full) - len(X_eval), len(X_full))
-            if sample_weight_eval is None:
-                w_eval = np.ones(len(X_full))
-            else:
+            w_eval = np.ones(len(X_full))
+            if sample_weight_eval is not None:
                 if len(sample_weight_eval) != len(idx_eval):
                     raise ValueError('If `sample_weight_eval` and `X_eval` '
                                      'are set, then `sample_weight_eval` '
                                      'should have len(X_eval)')
-                w_eval = np.ones(len(X_full))
                 w_eval[idx_eval] = sample_weight_eval
+            if w_full is not None:
+                w_full = np.concatenate([w_full, sample_weight_eval], axis=0)
+
 
         return X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval
 
@@ -332,7 +334,8 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
             return np.sum(sample_weight[:, np.newaxis] *
                           prob_true * cost_est[np.newaxis, :])
         else:
-            prob_mat = prob_true[:, :, np.newaxis]@prob_pred[:, np.newaxis, :]
+            prob_mat = prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis,
+                                                     :]
             return np.sum(sample_weight[:, np.newaxis, np.newaxis] *
                           prob_mat * cost_matrix[np.newaxis, :, :])
 
@@ -344,6 +347,7 @@ class MonteCarloEER(ExpectedErrorReduction):
     """
     Roy McCallum
     """
+
     def __init__(self, method='misclassification_loss', cost_matrix=None,
                  missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
@@ -406,6 +410,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
     only MCL.
     """
+
     def __init__(self, cost_matrix=None, consider_unlabeled=True,
                  consider_labeled=True, candidate_to_labeled=True,
                  subtract_current=False,
@@ -432,26 +437,14 @@ class ValueOfInformationEER(ExpectedErrorReduction):
               candidates=None, batch_size=1, return_utilities=False):
 
         # TODO check if candidates are only unlabeled ones if given
-        if self.subtract_current and return_utilities == True:
-            idx, utils = super().query(X, y, clf, sample_weight=sample_weight,
-                                       fit_clf=fit_clf,
-                                       ignore_partial_fit=ignore_partial_fit,
-                                       candidates=candidates,
-                                       sample_weight_candidates=None,
-                                       X_eval=None, sample_weight_eval=None,
-                                       batch_size=batch_size,
-                                       return_utilities=return_utilities)
-            return idx, utils
-
-        else:
-            return super().query(X, y, clf, sample_weight=sample_weight,
-                                 fit_clf=fit_clf,
-                                 ignore_partial_fit=ignore_partial_fit,
-                                 candidates=candidates,
-                                 sample_weight_candidates=None,
-                                 X_eval=None, sample_weight_eval=None,
-                                 batch_size=batch_size,
-                                 return_utilities=return_utilities)
+        return super().query(X, y, clf, sample_weight=sample_weight,
+                             fit_clf=fit_clf,
+                             ignore_partial_fit=ignore_partial_fit,
+                             candidates=candidates,
+                             sample_weight_candidates=None,
+                             X_eval=None, sample_weight_eval=None,
+                             batch_size=batch_size,
+                             return_utilities=return_utilities)
 
     def _estimate_error_for_candidate(self, id_clf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):

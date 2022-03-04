@@ -33,10 +33,12 @@ class TemplateTestEER:
                            clf=self.clf)
 
         class DummyClf(SkactivemlClassifier):
+            def __init__(self, classes=None):
+                super().__init__(classes=classes)
+
             def fit(self, X, y, sample_weight=None):
-                self.classes_ = np.unique(y[labeled_indices(y)])
-                self._le = ExtLabelEncoder(classes=self.classes_,
-                                           missing_label=MISSING_LABEL).fit(y)
+                X, y, sample_weight = self._validate_data(
+                    X=X, y=y, sample_weight=sample_weight)
                 return self
 
             def predict_proba(self, X):
@@ -88,6 +90,95 @@ class TemplateTestEER:
             y=self.y,
             clf=self.clf, ignore_partial_fit=None
         )
+
+    def test__concatenate_samples(self):
+        X = np.array([[1], [2], [3], [4]])
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
+        ld_idx = np.array([0, 1])
+        uld_idx = np.array([2, 3])
+        sample_weight = np.array([0.1, 0.2, 0.3, 0.4])
+        sample_weight_cand = np.array([0.1, 0.2])
+        X_eval = np.array([[5], [6], [7], [8]])
+        sample_weight_eval = np.array([0.5, 0.6, 0.7, 0.8])
+
+        qs = self.get_query_strategy()()
+        qs.missing_label_ = MISSING_LABEL
+
+        cand = None
+        X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval = \
+            qs._concatenate_samples(X, y, sample_weight,
+                             cand, sample_weight_cand,
+                             X_eval, sample_weight_eval)
+
+        np.testing.assert_equal(len(X_full), len(y_full))
+        np.testing.assert_equal(len(X_full), len(w_full))
+        np.testing.assert_equal(len(X_full), len(w_eval))
+
+        np.testing.assert_array_equal(X, X_full[idx_train])
+        np.testing.assert_array_equal(y, y_full[idx_train])
+        np.testing.assert_array_equal(sample_weight, w_full[idx_train])
+
+        np.testing.assert_array_equal(X_eval, X_full[idx_eval])
+        np.testing.assert_array_equal(sample_weight_eval, w_full[idx_eval])
+        np.testing.assert_array_equal(sample_weight_eval, w_eval[idx_eval])
+
+        np.testing.assert_array_equal(X[uld_idx], X_full[idx_cand])
+        np.testing.assert_array_equal(y[uld_idx], y_full[idx_cand])
+        np.testing.assert_array_equal(sample_weight[uld_idx], w_full[idx_cand])
+
+        cand = np.array([2])
+        X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval = \
+            qs._concatenate_samples(X, y, None,
+                             cand, None,
+                             None, None)
+
+        np.testing.assert_array_equal(X, X_full[idx_train])
+        np.testing.assert_array_equal(y, y_full[idx_train])
+
+
+        cand = np.array([2])
+        X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval = \
+            qs._concatenate_samples(
+                X, y, sample_weight, cand, sample_weight_cand,
+                X_eval, sample_weight_eval)
+
+        np.testing.assert_equal(len(X_full), len(y_full))
+        np.testing.assert_equal(len(X_full), len(w_full))
+        np.testing.assert_equal(len(X_full), len(w_eval))
+
+        np.testing.assert_array_equal(X, X_full[idx_train])
+        np.testing.assert_array_equal(y, y_full[idx_train])
+        np.testing.assert_array_equal(sample_weight, w_full[idx_train])
+
+        np.testing.assert_array_equal(X_eval, X_full[idx_eval])
+        np.testing.assert_array_equal(sample_weight_eval, w_full[idx_eval])
+        np.testing.assert_array_equal(sample_weight_eval, w_eval[idx_eval])
+
+        np.testing.assert_array_equal(X[cand], X_full[idx_cand])
+        np.testing.assert_array_equal(y[cand], y_full[idx_cand])
+        np.testing.assert_array_equal(sample_weight[cand], w_full[idx_cand])
+
+        cand = np.array([[0], [9]])
+        X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval = \
+            qs._concatenate_samples(
+                X, y, sample_weight, cand, sample_weight_cand,
+                X_eval, sample_weight_eval)
+
+        np.testing.assert_equal(len(X_full), len(y_full))
+        np.testing.assert_equal(len(X_full), len(w_full))
+        np.testing.assert_equal(len(X_full), len(w_eval))
+
+        np.testing.assert_array_equal(X, X_full[idx_train])
+        np.testing.assert_array_equal(y, y_full[idx_train])
+        np.testing.assert_array_equal(sample_weight, w_full[idx_train])
+
+        np.testing.assert_array_equal(X_eval, X_full[idx_eval])
+        np.testing.assert_array_equal(sample_weight_eval, w_full[idx_eval])
+        np.testing.assert_array_equal(sample_weight_eval, w_eval[idx_eval])
+
+        np.testing.assert_array_equal(cand, X_full[idx_cand])
+        np.testing.assert_array_equal(np.full((len(cand)), np.nan), y_full[idx_cand])
+        np.testing.assert_array_equal(sample_weight_cand, w_full[idx_cand])
 
     def test_query(self):
         """
@@ -166,7 +257,8 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
         cand = [1, 2]
         cost_matrix = 1 - np.eye(2)
 
-        clf = self.DummyClf() #PWC(classes=[0, 1])
+        clf = self.DummyClf(classes=classes)
+        #clf = PWC(classes=classes)
 
         params_list = [
             [
@@ -183,6 +275,11 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
         for method, expected_utils in params_list:
             with self.subTest(msg=method):
                 qs = MonteCarloEER(method=method, cost_matrix=cost_matrix)
+                qs.query(X, y=np.full(shape=len(X), fill_value=np.nan),
+                         clf=clf, fit_clf=True,
+                         ignore_partial_fit=True,
+                         candidates=cand,
+                         return_utilities=True)
                 idx, utils = qs.query(X, y, clf, fit_clf=True,
                                       ignore_partial_fit=True,
                                       candidates=cand,
@@ -249,7 +346,8 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
             [
                 'Margeniantu', False, True, False, False,
                 np.full(shape=(1, len(cand)), fill_value=
-                        0.25 * (len(classes) - 1) * len(classes) * len(cand))
+#                        0.25 * (len(classes) - 1) * len(classes) * len(cand))
+                        -0.25 * (len(classes) - 1) * len(classes) * len(X))
             ],
             [
                 'Joshi-sub', True, False, True, True,
