@@ -521,6 +521,11 @@ class ValueOfInformationEER(ExpectedErrorReduction):
     def _precompute_and_fit_clf(self, id_clf, X_full, y_full,
                                 idx_train, idx_cand, idx_eval, fit_clf):
 
+        # TODO:
+        id_clf.precompute(idx_train, idx_train,
+                          fit_params='all', pred_params='all')
+
+
         # for cond_prob
         id_clf.precompute(idx_train, idx_cand,
                           fit_params='labeled', pred_params='all')

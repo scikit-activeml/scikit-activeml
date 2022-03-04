@@ -12,7 +12,7 @@ from skactiveml.classifier import PWC, SklearnClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error import IndexClassifierWrapper
 from skactiveml.utils import MISSING_LABEL, labeled_indices, \
-    ExtLabelEncoder
+    ExtLabelEncoder, is_labeled
 
 
 class TemplateTestEER:
@@ -218,8 +218,7 @@ class TestMonteCarloEER(TemplateTestEER, unittest.TestCase):
                                   sample_weight=np.ones(len(self.X)),
                                   sample_weight_candidates=swc)
 
-        # TODO: sample weights should be of size X_cand
-        #  (why is error not raised?):
+        # sample_weight missing
         self.assertRaises(
             ValueError, qs.query, X=self.X, y=self.y,
             clf=self.clf, candidates=self.X_cand,
@@ -346,12 +345,13 @@ class TestValueOfInformationEER(TemplateTestEER, unittest.TestCase):
             [
                 'Margeniantu', False, True, False, False,
                 np.full(shape=(1, len(cand)), fill_value=
-#                        0.25 * (len(classes) - 1) * len(classes) * len(cand))
-                        -0.25 * (len(classes) - 1) * len(classes) * len(X))
+                        -0.25 * (len(classes) - 1) * len(classes) *
+                        np.sum(is_labeled(y, missing_label=MISSING_LABEL)))
             ],
             [
                 'Joshi-sub', True, False, True, True,
                 np.full(shape=(1, len(cand)), fill_value=0)
+                # TODO Normalize each term individually
             ],
             [
                 'Joshi', True, False, True, False,
