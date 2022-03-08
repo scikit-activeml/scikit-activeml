@@ -54,7 +54,6 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
         Guiding Supervised Learning with Decision-Theoretic Active Learning."
         IJCAI. Vol. 7. 2007.
     """
-
     def __init__(self, enforce_mapping, cost_matrix=None,
                  missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
@@ -355,11 +354,33 @@ class ExpectedErrorReduction(SingleAnnotPoolBasedQueryStrategy):
 
 
 class MonteCarloEER(ExpectedErrorReduction):
-    """
-    Roy McCallum
+    """This class implements the expected error method from [1] that uses a
+    Monte-Carlo approach to estimate the error.
 
-    # TODO docs
-    """
+    Therefore, it implements the following two steps:
+     - determining ever candidates x label pair and simulate its outcome
+       in the classifier by simulating it
+     - determining some kind of risk for the new classifier
+
+    Parameters
+    ----------
+    method : string, optional (default='misclassification_loss')
+        The optimization method. Possible values are 'misclassification_loss'
+        and 'log_loss'.
+    cost_matrix: array-like, shape (n_classes, n_classes), optional
+    (default=None)
+        Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
+        class `j` for a sample with the actual class `i`.
+        Used for misclassification loss and ignored for log loss.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : numeric or np.random.RandomState
+        The random state to use.
+
+    References
+    ----------
+    [1] Roy, N., & McCallum, A. (2001). Toward optimal active learning through
+        monte carlo estimation of error reduction. ICML, (pp. 441-448)."""
 
     def __init__(self, method='misclassification_loss', cost_matrix=None,
                  missing_label=MISSING_LABEL, random_state=None):
@@ -417,16 +438,54 @@ class MonteCarloEER(ExpectedErrorReduction):
 
 
 class ValueOfInformationEER(ExpectedErrorReduction):
+    """This class implements the expected error method from [1] that estimates
+    the value of information. This method can be extended in a way that it also
+    implements [2] and [3]. The default parameters describe [1].
+
+    Therefore, it implements the following two steps:
+     - determining ever candidates x label pair and simulate its outcome
+       in the classifier by simulating it
+     - determining some kind of risk for the new classifier
+
+    Parameters
+    ----------
+    cost_matrix: array-like, shape (n_classes, n_classes), optional
+    (default=None)
+        Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
+        class `j` for a sample with the actual class `i`.
+        Used for misclassification loss and ignored for log loss.
+    consider_unlabeled : bool, optional (default=True)
+        If True, the error is estimated on the unlabeled samples.
+    consider_labeled : bool, optional (default=True)
+        If True, the error is estimated on the labeled samples.
+    candidate_to_labeled : bool, optional (default=True)
+        If True, the candidate with the simulated label is added to the labeled
+        set. As this label is considered to be correct, it will be evaluated
+        under the `consider_labeled` flag then.
+    subtract_current : bool, optional (default=False)
+        If True, the current error estimate is subtracted from the simulated
+        score. This might be helpful to define a stopping criterion as in [2].
+    normalize : bool, optional (default=False)
+        If True the error terms are normalized by the number of evaluation
+        samples such that the errors represent the average error instead of the
+        summed error. This will be done independently for the simulated and the
+        current error.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : numeric or np.random.RandomState
+        The random state to use.
+
+    References
+    ----------
+    [1] Kapoor, Ashish, Eric Horvitz, and Sumit Basu. "Selective Supervision:
+        Guiding Supervised Learning with Decision-Theoretic Active Learning."
+        IJCAI. Vol. 7. 2007.
+    [2] Joshi, A. J., Porikli, F., & Papanikolopoulos, N. P. (2012).
+        Scalable active learning for multiclass image classification.
+        IEEE TrPAMI, 34(11), pp. 2259-2273.
+    [3] Margineantu, D. D. (2005). Active cost-sensitive learning.
+        In IJCAI (Vol. 5, pp. 1622-1623).
     """
-    Kapour
-    Joshi https://ieeexplore.ieee.org/document/6127880
-    Margeniantu
-
-    only MCL.
-
-    # TODO docs
-    """
-
     def __init__(self, cost_matrix=None, consider_unlabeled=True,
                  consider_labeled=True, candidate_to_labeled=True,
                  subtract_current=False, normalize=False,
@@ -454,8 +513,62 @@ class ValueOfInformationEER(ExpectedErrorReduction):
     def query(self, X, y, clf, sample_weight=None,
               fit_clf=True, ignore_partial_fit=True,
               candidates=None, batch_size=1, return_utilities=False):
-        # TODO docs
+        """Determines for which candidate samples labels are to be queried.
 
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
+        y : array-like of shape (n_samples)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        fit_clf : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        ignore_partial_fit : bool, optional (default=True)
+            Relevant in cases where `clf` implements `partial_fit`. If True,
+            the `partial_fit` function is ignored and `fit` is used instead.
+        sample_weight : array-like of shape (n_samples), optional (default=None)
+            Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int, optional (default=1)
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, optional (default=False)
+            If true, also return the utilities based on the query strategy.
+
+        Returns
+        -------
+        query_indices : numpy.ndarray of shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        """
         # TODO check if candidates are only unlabeled ones if given
         return super().query(X, y, clf, sample_weight=sample_weight,
                              fit_clf=fit_clf,
