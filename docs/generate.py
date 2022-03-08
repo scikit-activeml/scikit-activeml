@@ -510,14 +510,6 @@ def format_plot(data, template_path):
     -------
     string : The formatted string for the example script.
     """
-    # Collect the expected parameters for the query method.
-    if 'X' not in data['query_params'].keys() and \
-            'X' in inspect.signature(data["qs"].query).parameters:
-        data['query_params']['"X"'] = 'X'
-    if 'y' not in data['query_params'].keys() and \
-            'y' in inspect.signature(data["qs"].query).parameters:
-        data['query_params']['"y"'] = 'y'
-
     block_str = ''
     with open(template_path, "r") as template:
         for line in template:
@@ -555,9 +547,16 @@ def format_plot(data, template_path):
                            dict_to_str(data['query_params'], allocator=': ',
                                        key_as_string=True) + '}\n'
                 elif '"#_n_cycles"' in line:
-                    start = line.find('"#_n_cycles"')
                     n_cycles = os.getenv('N_CYCLES', default='2')
-                    line = line[:start] + n_cycles + '\n'
+                    line = line.replace('"#_n_cycles"', n_cycles) + '\n'
+                elif '"#_n_samples"' in line:
+                    n_samples = os.getenv('N_SAMPLES', default='10')
+                    line = line.replace('"#_n_samples"', n_samples) + '\n'
+                    # line = line[:start] + n_cycles + '\n'
+                elif '"#_res"' in line:
+                    res = os.getenv('RES', default='3')
+                    line = line.replace('"#_res"', res) + '\n'
+                    # line = line[:start] + n_cycles + '\n'
                 elif '#_bp' in line:
                     try:
                         s = line.find('#_')

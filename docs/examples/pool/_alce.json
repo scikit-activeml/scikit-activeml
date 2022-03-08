@@ -14,7 +14,6 @@
     "init_params" : {
       "classes" : "[0, 1]"
     },
-    "query_params" : {},
-    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, feature_bound=feature_bound, ax=ax)"
+    "query_params" : {}
   }
 ]

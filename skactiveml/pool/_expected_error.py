@@ -409,7 +409,8 @@ class MonteCarloEER(ExpectedErrorReduction):
     def _estimate_current_error(self, id_clf, idx_train, idx_cand,
                                 idx_eval, w_eval):
         # TODO: implement
-        return 0.0
+        return super()._estimate_current_error(id_clf, idx_train,
+                                               idx_cand, idx_eval, w_eval)
 
     def _estimate_error_for_candidate(self, id_clf, idx_cx, cy, idx_train,
                                       idx_cand, idx_eval, w_eval):

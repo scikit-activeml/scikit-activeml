@@ -20,8 +20,7 @@
     "query_params" : {
       "clf" : "clf",
       "ignore_partial_fit" : "True"
-    },
-    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
+    }
   },
   {
     "class" : "ValueOfInformationEER",
@@ -44,8 +43,7 @@
     "query_params" : {
       "clf" : "clf",
       "ignore_partial_fit" : "True"
-    },
-    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
+    }
   },
   {
     "class" : "ValueOfInformationEER",
@@ -68,12 +66,11 @@
     "query_params" : {
       "clf" : "clf",
       "ignore_partial_fit" : "True"
-    },
-    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
+    }
   },
   {
     "class" : "MonteCarloEER",
-    "method" : "Log Loss Expected Error Reduction",
+    "method" : "Monte-Carlo EER (Log-Loss)",
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
     },
@@ -89,7 +86,26 @@
     "query_params" : {
       "clf" : "clf",
       "ignore_partial_fit" : "True"
+    }
+  },
+  {
+    "class" : "MonteCarloEER",
+    "method" : "Monte-Carlo EER (Misclassification-Loss)",
+    "categories" : {
+      "Settles2012" : "Expected Error Reduction"
     },
-    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf, 'ignore_partial_fit': True}, candidates=X, feature_bound=feature_bound, ax=ax)"
+    "tags" : ["pool"],
+    "title" : "Log Loss Expected Error Reduction",
+    "refs" : ["roy2001toward"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "method" : "'misclassification_loss'"
+    },
+    "query_params" : {
+      "clf" : "clf",
+      "ignore_partial_fit" : "True"
+    }
   }
 ]

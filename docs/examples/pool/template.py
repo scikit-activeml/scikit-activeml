@@ -11,7 +11,7 @@ from skactiveml.visualization import plot_utility, plot_decision_boundary
 random_state = np.random.RandomState(0)
 
 # Build a dataset.
-X, y_true = make_blobs(n_samples=100, n_features=2,
+X, y_true = make_blobs(n_samples="#_n_samples", n_features=2,
                        centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
                        cluster_std=.7, random_state=random_state)
 y_true = y_true % 2
@@ -39,7 +39,7 @@ for c in range(n_cycles):
 
     # Query the next instance/s.
     query_params = "#_query_params"
-    query_idx = qs.query(**query_params)
+    query_idx = qs.query(X=X, y=y, **query_params)
 
     # Plot the labeled data.
     coll_old = list(ax.collections)
@@ -48,7 +48,7 @@ for c in range(n_cycles):
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )
-    #_bp_utilities Break point for ...
+    ax = plot_utility(qs, X=X, y=y, **query_params, res="#_res", feature_bound=feature_bound, ax=ax)
     ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2)
     ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8, marker=".", s=300)
     ax = plot_decision_boundary(clf, feature_bound, ax=ax)

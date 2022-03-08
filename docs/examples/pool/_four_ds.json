@@ -18,7 +18,6 @@
     "init_params" : {},
     "query_params" : {
       "clf" : "clf"
-    },
-    "bp_utilities" : "ax = plot_utility(qs, X=X, y=y, qs_dict={'clf': clf}, feature_bound=feature_bound, ax=ax)"
+    }
   }
 ]
