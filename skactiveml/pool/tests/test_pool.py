@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from skactiveml import pool
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.classifier import PWC, CMM, SklearnClassifier
+from skactiveml.exceptions import MappingError
 from skactiveml.pool import FourDS
 from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL, is_labeled, \
     unlabeled_indices
@@ -166,7 +167,7 @@ class TestGeneral(unittest.TestCase):
                         ensemble=self.ensemble, return_utilities=True
                     )
                     np.testing.assert_array_equal(u1[0][unld_idx], u3[0])
-                except ValueError:
+                except MappingError:
                     pass
 
             for init_budget in [5, 1, 0]:

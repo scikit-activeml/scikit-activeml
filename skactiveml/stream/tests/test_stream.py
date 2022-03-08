@@ -27,9 +27,9 @@ class TestStream(unittest.TestCase):
     def test_selection_strategies(self):
         # Create data set for testing.
         rand = np.random.RandomState(0)
-        stream_length = 1000
+        stream_length = 100
         train_init_size = 10
-        training_size = 100
+        training_size = 50
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
             random_state=rand.randint(2 ** 31 - 1),

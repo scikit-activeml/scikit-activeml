@@ -13,6 +13,7 @@ from skactiveml.base import (
     BudgetManager,
     SingleAnnotStreamBasedQueryStrategy,
 )
+from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -39,7 +40,7 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
     def test__transform_candidates(self):
         self.qs.missing_label_ = MISSING_LABEL
-        self.assertRaises(ValueError, self.qs._transform_candidates,
+        self.assertRaises(MappingError, self.qs._transform_candidates,
                           np.array([[3]]), np.array([[2]]), np.array([0]),
                           True)
 
@@ -67,6 +68,18 @@ class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
                           X=np.array([[1, 2]]), y=np.array([[1, ]]))
 
     def test__transform_cand_annot(self):
+        # TODO separate _validate_data() testing
+        self.assertRaises(ValueError, self.qs._validate_data,
+                          candidates=np.array([[1, 2], [0, 1]]),
+                          annotators=np.array(
+                              [[False, True], [True, True]]
+                          ).reshape(2,2,1),
+                          X=np.array([[1, 2], [0, 1]]),
+                          y=np.array([[1, MISSING_LABEL],
+                                      [2, 3]]),
+                          batch_size=2,
+                          return_utilities=False)
+
         self.assertRaises(ValueError, self.qs._transform_cand_annot,
                           candidates=np.array([[0, 2]]), annotators=None,
                           X=np.array([[1, 2]]), y=np.array([[1, ]]),
@@ -100,6 +113,32 @@ class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
         X, y, candidates, annotators, batch_size, return_utilities = re_val
         self.assertEqual(1, batch_size)
+
+        re_val = self.qs._validate_data(candidates=None,
+                                        annotators=np.array(
+                                            [[False, True], [True, True]]
+                                        ),
+                                        X=np.array([[1, 2], [0, 1]]),
+                                        y=np.array([[1, MISSING_LABEL],
+                                                    [2, 3]]),
+                                        batch_size=2,
+                                        return_utilities=False)
+
+        X, y, candidates, annotators, batch_size, return_utilities = re_val
+        self.assertEqual(2, batch_size)
+
+        re_val = self.qs._validate_data(candidates=np.array([[1, 2], [0, 1]]),
+                                        annotators=np.array(
+                                            [[False, True], [True, True]]
+                                        ),
+                                        X=np.array([[1, 2], [0, 1]]),
+                                        y=np.array([[1, MISSING_LABEL],
+                                                    [2, 3]]),
+                                        batch_size=2,
+                                        return_utilities=False)
+
+        X, y, candidates, annotators, batch_size, return_utilities = re_val
+        self.assertEqual(2, batch_size)
 
         re_val = self.qs._validate_data(candidates=[1],
                                         annotators=[1],

@@ -11,7 +11,8 @@ from sklearn.svm import LinearSVC
 
 from skactiveml.classifier import PWC
 from skactiveml import visualization
-from skactiveml.pool import UncertaintySampling, RandomSampler
+from skactiveml.pool import UncertaintySampling, RandomSampler, \
+    ValueOfInformationEER
 from skactiveml.visualization._feature_space import plot_decision_boundary, \
     plot_utility
 
@@ -26,6 +27,8 @@ class TestFeatureSpace(unittest.TestCase):
                                              random_state=0)
         train_indices = np.random.randint(0, len(self.X), size=20)
         cand_indices = np.setdiff1d(np.arange(len(self.X)), train_indices)
+        self.y_active = np.full_like(self.y, np.nan, dtype=float)
+        self.y_active[cand_indices] = self.y[cand_indices]
         self.X_train = self.X[train_indices]
         self.y_train = self.y[train_indices]
         self.X_cand = self.X[cand_indices]
@@ -99,11 +102,39 @@ class TestFeatureSpace(unittest.TestCase):
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
+    def test_utility_X(self):
+        self.assertRaises(ValueError, plot_utility, qs=self.qs,
+                          X=np.ones([len(self.X), 3]),
+                          y=self.y, **self.qs_dict,
+                          feature_bound=self.bound)
+
+    def test_utility_y(self):
+        self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
+                          y=np.zeros(len(self.y) + 1), **self.qs_dict,
+                          feature_bound=self.bound)
+
     def test_utility_candidates(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
                           y=self.y, **self.qs_dict, candidates=[100])
         plot_utility(qs=self.qs, X=self.X, y=self.y, **self.qs_dict,
                      candidates=[99])
+
+    def test_utility_replace_nan(self):
+        plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=[1],
+                     **self.qs_dict,
+                     replace_nan=None, feature_bound=self.bound)
+
+    def test_utility_ignore_undefined_query_params(self):
+        plot_utility(qs=ValueOfInformationEER(),
+                     X=self.X, y=self.y_active,
+                     **self.qs_dict, ignore_undefined_query_params=True,
+                     feature_bound=self.bound)
+        plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=None,
+                     **self.qs_dict, ignore_undefined_query_params=True,
+                     feature_bound=self.bound)
+        plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=[1],
+                     **self.qs_dict, ignore_undefined_query_params=True,
+                     feature_bound=self.bound)
 
     def test_utility_res(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
@@ -203,7 +234,6 @@ class TestFeatureSpace(unittest.TestCase):
                                     self.path_prefix + 'dec_bound_svc.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
-
 
 class TestClassifier(ClassifierMixin):
     pass

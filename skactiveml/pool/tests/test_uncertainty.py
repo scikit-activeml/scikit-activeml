@@ -39,6 +39,10 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling(cost_matrix=np.ones((3, 3)))
         self.assertRaises(ValueError, selector.query, **self.kwargs)
 
+        selector = UncertaintySampling(method='entropy',
+                                       cost_matrix=np.ones([2,2])-np.eye(2))
+        self.assertRaises(ValueError, selector.query, **self.kwargs)
+
     def test_query_param_clf(self):
         selector = UncertaintySampling()
         self.assertRaises(TypeError, selector.query, candidates=self.candidates,

@@ -42,34 +42,34 @@ class TestQBC(unittest.TestCase):
         ]
         for ensemble in ensemble_list:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.candidates, X=self.X,
-                y=self.y, ensemble=ensemble
+                TypeError, selector.query, X=self.X, y=self.y,
+                ensemble=ensemble, candidates=self.candidates
             )
 
     def test_query_param_X(self):
         selector = QBC()
         for X in [None, np.nan]:
             self.assertRaises(
-                ValueError, selector.query, candidates=self.candidates, X=X, y=self.y,
-                ensemble=self.ensemble
+                ValueError, selector.query, X=X, y=self.y,
+                ensemble=self.ensemble, candidates=self.candidates
             )
         for X in [[], self.X[:3]]:
             self.assertRaises(
-                ValueError, selector.query, candidates=self.candidates, X=X, y=self.y,
-                ensemble=self.ensemble
+                ValueError, selector.query, X=X, y=self.y,
+                ensemble=self.ensemble, candidates=self.candidates
             )
 
     def test_query_param_y(self):
         selector = QBC()
         for y in [None, np.nan]:
             self.assertRaises(
-                TypeError, selector.query, X_cand=self.candidates, X=self.X, y=y,
-                ensemble=self.ensemble
+                TypeError, selector.query, X=self.X, y=y,
+                ensemble=self.ensemble, candidates=self.candidates
             )
         for y in [[], self.y[:3]]:
             self.assertRaises(
-                ValueError, selector.query, candidates=self.candidates, X=self.X, y=y,
-                ensemble=self.ensemble
+                ValueError, selector.query, X=self.X, y=y,
+                ensemble=self.ensemble, candidates=self.candidates
             )
 
     def test_query_param_sample_weight(self):
@@ -80,8 +80,9 @@ class TestQBC(unittest.TestCase):
         ]
         for sample_weight in sample_weight_list:
             self.assertRaises(
-                ValueError, selector.query, candidates=self.candidates, X=self.X,
-                y=self.y, ensemble=self.ensemble, sample_weight=sample_weight
+                ValueError, selector.query, X=self.X,
+                y=self.y, ensemble=self.ensemble, sample_weight=sample_weight,
+                candidates=self.candidates
             )
 
     def test_query_param_fit_ensemble(self):

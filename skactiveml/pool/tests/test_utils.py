@@ -236,6 +236,10 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         iclf.fit([0, 1])
         self.assertEqual(iclf.clf_.classes, iclf.classes)
 
+    def test__concat_sw(self):
+        iclf = IndexClassifierWrapper(clf=PWC(), X=self.X, y=self.y)
+        self.assertRaises(ValueError, iclf._concat_sw, [1], None)
+
     def test_fit(self):
         iclf = IndexClassifierWrapper(clf=PWC(), X=self.X, y=self.y)
         #self.assertWarns(Warning, iclf.fit, [2, 3])

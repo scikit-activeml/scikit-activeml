@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.utils import check_array
+from sklearn.utils import check_array, check_consistent_length
 
 from ._auxiliary_functions import mesh, check_bound, _get_boundary_args, \
     _get_confidence_args, _get_contour_args, _get_cmap
@@ -180,6 +180,10 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
     X = check_array(X, allow_nd=False, ensure_2d=True)
     if X.shape[1] != 2:
         raise ValueError('Samples in `X` must have 2 features.')
+
+    # Check labels
+    y = check_array(y, ensure_2d=False, force_all_finite='allow-nan')
+    check_consistent_length(X, y)
 
     # ensure that utilities are returned
     kwargs['return_utilities'] = True

@@ -500,7 +500,7 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
-            annotators = check_array(annotators, ensure_2d=False)
+            annotators = check_array(annotators, ensure_2d=False, allow_nd=True)
 
             if annotators.ndim == 1:
                 annotators = check_indices(annotators, y, dim=1)
