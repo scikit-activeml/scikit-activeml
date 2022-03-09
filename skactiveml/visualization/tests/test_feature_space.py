@@ -175,35 +175,28 @@ class TestFeatureSpace(unittest.TestCase):
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=values, replace_nan=nan)
 
-    def test_plot_contour_for_samples_replace_feature_bound(self):
+    def test_plot_contour_for_samples_feature_bound(self):
         test_cases = [(np.nan, ValueError), ('s', ValueError),
                       ((2, 1), ValueError)]
         for b, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=self.utilities, feature_bound=b)
 
-    def test_plot_contour_for_samples_replace_ax(self):
-        test_cases = [(np.nan, ValueError), ('s', ValueError),
-                      ((2, 1), ValueError)]
-        for b, err in test_cases:
-            self.assertRaises(err, plot_contour_for_samples, X=self.X,
-                              values=self.utilities, feature_bound=b)
-
-    def test_plot_contour_for_samples_replace_ax(self):
+    def test_plot_contour_for_samples_ax(self):
         test_cases = [(np.nan, AttributeError), ('s', AttributeError),
                       ((2, 1), AttributeError)]
         for ax, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=self.utilities, ax=ax)
 
-    def test_plot_contour_for_samples_replace_res(self):
+    def test_plot_contour_for_samples_res(self):
         test_cases = [(np.nan, TypeError), ('s', TypeError),
                       ((2, 1), TypeError), (-1, ValueError)]
         for res, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=self.utilities, res=res)
 
-    def test_plot_contour_for_samples_replace_contour_dict(self):
+    def test_plot_contour_for_samples_contour_dict(self):
         test_cases = [(np.nan, TypeError), ('s', TypeError),
                       ((2, 1), TypeError), (-1, TypeError)]
         for cont, err in test_cases:
