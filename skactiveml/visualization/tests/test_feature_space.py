@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
-from sklearn.base import ClassifierMixin
+from sklearn.base import ClassifierMixin, clone
 from sklearn.datasets import make_classification
 from sklearn.svm import LinearSVC
 
@@ -14,7 +14,7 @@ from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, RandomSampling, \
     ValueOfInformationEER
 from skactiveml.visualization._feature_space import plot_decision_boundary, \
-    plot_utility
+    plot_utility, plot_contour_for_samples
 
 
 class TestFeatureSpace(unittest.TestCase):
@@ -36,6 +36,9 @@ class TestFeatureSpace(unittest.TestCase):
         self.clf.fit(self.X_train, self.y_train)
         self.qs = UncertaintySampling()
         self.qs_dict = {'clf': self.clf}
+        self.utilities = clone(self.qs).query(X=self.X, y=self.y, clf=self.clf,
+                                              candidates=self.X,
+                                              return_utilities=True)[1][0]
 
         x1_min = min(self.X[:, 0])
         x1_max = max(self.X[:, 0])
@@ -97,34 +100,34 @@ class TestFeatureSpace(unittest.TestCase):
                                confidence_dict={'linestyles': ':'})
 
     # Tests for plot_utility function
-    def test_utility_qs(self):
+    def test_plot_utility_qs(self):
         self.assertRaises(TypeError, plot_utility, qs=self.clf, X=self.X,
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_utility_X(self):
+    def test_plot_utility_X(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs,
                           X=np.ones([len(self.X), 3]),
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_utility_y(self):
+    def test_plot_utility_y(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
                           y=np.zeros(len(self.y) + 1), **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_utility_candidates(self):
+    def test_plot_utility_candidates(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
                           y=self.y, **self.qs_dict, candidates=[100])
         plot_utility(qs=self.qs, X=self.X, y=self.y, **self.qs_dict,
                      candidates=[99])
 
-    def test_utility_replace_nan(self):
+    def test_plot_utility_replace_nan(self):
         plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=[1],
                      **self.qs_dict,
                      replace_nan=None, feature_bound=self.bound)
 
-    def test_utility_ignore_undefined_query_params(self):
+    def test_plot_utility_ignore_undefined_query_params(self):
         plot_utility(qs=ValueOfInformationEER(),
                      X=self.X, y=self.y_active,
                      **self.qs_dict, ignore_undefined_query_params=True,
@@ -136,29 +139,86 @@ class TestFeatureSpace(unittest.TestCase):
                      **self.qs_dict, ignore_undefined_query_params=True,
                      feature_bound=self.bound)
 
-    def test_utility_res(self):
+    def test_plot_utility_res(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, **self.qs_dict,
+                          y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, res=-3)
 
-    def test_utility_ax(self):
-        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, **self.qs_dict, feature_bound=self.bound, ax=2)
+    def test_plot_utility_ax(self):
+        self.assertRaises(AttributeError, plot_utility, qs=self.qs, X=self.X,
+                          y=self.y_active, **self.qs_dict,
+                          feature_bound=self.bound, ax=2)
 
-    def test_utility_contour_dict(self):
+    def test_plot_utility_contour_dict(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
-                          y=self.y, **self.qs_dict,
+                          y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, contour_dict='string')
         plot_utility(qs=self.qs, **self.qs_dict, X=self.X,
-                          y=self.y, feature_bound=self.bound,
+                     y=self.y, feature_bound=self.bound,
                      contour_dict={'linestyles': '.'})
+
+    def test_plot_contour_for_samples_X(self):
+        for X in [None, 1, np.arange(10)]:
+            self.assertRaises(ValueError, plot_contour_for_samples, X=X,
+                              values=self.utilities)
+
+    def test_plot_contour_for_samples_values(self):
+        test_cases = [(None, TypeError), (1, TypeError),
+                      (np.arange(10), ValueError)]
+        for values, err in test_cases:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=values)
+
+    def test_plot_contour_for_samples_replace_nan(self):
+        values = np.full_like(self.utilities, np.nan)
+        for nan, err in [(np.nan, ValueError), ('s', TypeError)]:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=values, replace_nan=nan)
+
+    def test_plot_contour_for_samples_replace_feature_bound(self):
+        test_cases = [(np.nan, ValueError), ('s', ValueError),
+                      ((2, 1), ValueError)]
+        for b, err in test_cases:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=self.utilities, feature_bound=b)
+
+    def test_plot_contour_for_samples_replace_ax(self):
+        test_cases = [(np.nan, ValueError), ('s', ValueError),
+                      ((2, 1), ValueError)]
+        for b, err in test_cases:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=self.utilities, feature_bound=b)
+
+    def test_plot_contour_for_samples_replace_ax(self):
+        test_cases = [(np.nan, AttributeError), ('s', AttributeError),
+                      ((2, 1), AttributeError)]
+        for ax, err in test_cases:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=self.utilities, ax=ax)
+
+    def test_plot_contour_for_samples_replace_res(self):
+        test_cases = [(np.nan, TypeError), ('s', TypeError),
+                      ((2, 1), TypeError), (-1, ValueError)]
+        for res, err in test_cases:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=self.utilities, res=res)
+
+    def test_plot_contour_for_samples_replace_contour_dict(self):
+        test_cases = [(np.nan, TypeError), ('s', TypeError),
+                      ((2, 1), TypeError), (-1, TypeError)]
+        for cont, err in test_cases:
+            self.assertRaises(err, plot_contour_for_samples, X=self.X,
+                              values=self.utilities, contour_dict=cont)
+        plot_contour_for_samples(X=self.X, values=self.utilities,
+                                 contour_dict={'linestyles': '.'})
 
     # Graphical tests
 
-    def test_no_qs_dict(self):
+    def test_without_candidates(self):
         fig, ax = plt.subplots()
-        qs = RandomSampling()
-        plot_utility(qs=qs, X=np.zeros((1, 2)), y=[np.nan], feature_bound=self.bound, ax=ax)
+        qs = RandomSampling(random_state=0)
+        plot_utility(qs=qs, X=np.zeros((1, 2)), y=[np.nan],
+                     feature_bound=self.bound, ax=ax)
 
         ax.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
@@ -167,7 +227,7 @@ class TestFeatureSpace(unittest.TestCase):
 
         fig.savefig(self.path_prefix + 'dec_bound_wo_cand.pdf')
         comparison = compare_images(self.path_prefix +
-                                    'dec_bound_wo_cand_base.pdf',
+                                    'dec_bound_wo_cand_expected.pdf',
                                     self.path_prefix + 'dec_bound_wo_cand.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
@@ -183,22 +243,23 @@ class TestFeatureSpace(unittest.TestCase):
 
         fig.savefig(self.path_prefix + 'dec_bound_w_cand.pdf')
         comparison = compare_images(self.path_prefix +
-                                    'dec_bound_w_cand_base.pdf',
+                                    'dec_bound_w_cand_expected.pdf',
                                     self.path_prefix + 'dec_bound_w_cand.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
 
     def test_multi_class(self):
+        random_state = np.random.RandomState(0)
         X, y = make_classification(n_features=2, n_redundant=0, random_state=0,
                                    n_classes=3, n_clusters_per_class=1)
-        train_indices = np.random.randint(0, len(X), size=20)
+        train_indices = random_state.randint(0, len(X), size=20)
         cand_indices = np.setdiff1d(np.arange(len(X)), train_indices)
         X_train = X[train_indices]
         y_train = y[train_indices]
         X_cand = X[cand_indices]
         clf = ParzenWindowClassifier()
         clf.fit(X_train, y_train)
-        qs = UncertaintySampling()
+        qs = UncertaintySampling(random_state=0)
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
         fig, ax = plt.subplots()
@@ -210,9 +271,9 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(clf, bound, ax=ax, res=101, cmap=self.cmap)
         fig.savefig(self.path_prefix + 'dec_bound_multiclass.pdf')
         comparison = compare_images(self.path_prefix +
-                                    'dec_bound_multiclass_base.pdf',
-                                    self.path_prefix +
                                     'dec_bound_multiclass.pdf',
+                                    self.path_prefix +
+                                    'dec_bound_multiclass_expected.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
 
@@ -230,10 +291,11 @@ class TestFeatureSpace(unittest.TestCase):
 
         fig.savefig(self.path_prefix + 'dec_bound_svc.pdf')
         comparison = compare_images(self.path_prefix +
-                                    'dec_bound_svc_base.pdf',
+                                    'dec_bound_svc_expected.pdf',
                                     self.path_prefix + 'dec_bound_svc.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
+
 
 class TestClassifier(ClassifierMixin):
     pass
