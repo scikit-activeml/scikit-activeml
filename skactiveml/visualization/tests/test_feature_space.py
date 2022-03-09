@@ -53,26 +53,26 @@ class TestFeatureSpace(unittest.TestCase):
         testing.setup()
 
     # Tests for plot_decision_boundary function
-    def test_decision_boundary_clf(self):
+    def test_decision_boundary_param_clf(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.qs,
                           feature_bound=self.bound)
         clf = TestClassifier()
         self.assertRaises(AttributeError, plot_decision_boundary, clf=clf,
                           feature_bound=self.bound)
 
-    def test_decision_boundary_bound(self):
+    def test_decision_boundary_param_bound(self):
         self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
                           feature_bound=[0, 0, 1, 1])
 
-    def test_decision_boundary_res(self):
+    def test_decision_boundary_param_res(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, res='string')
 
-    def test_decision_boundary_ax(self):
+    def test_decision_boundary_param_ax(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, ax=3)
 
-    def test_decision_boundary_confidence(self):
+    def test_decision_boundary_param_confidence(self):
         self.assertRaises(ValueError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, confidence=0.0)
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
@@ -83,51 +83,51 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertWarns(Warning, plot_decision_boundary, clf=svc,
                          feature_bound=self.bound, confidence=0.75)
 
-    def test_decision_boundary_cmap(self):
+    def test_decision_boundary_param_cmap(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, cmap=4)
 
-    def test_decision_boundary_boundary_dict(self):
+    def test_decision_boundary_param_boundary_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, boundary_dict='string')
         plot_decision_boundary(clf=self.clf, feature_bound=self.bound,
                                boundary_dict={'colors': 'r'})
 
-    def test_decision_boundary_confidence_dict(self):
+    def test_decision_boundary_param_confidence_dict(self):
         self.assertRaises(TypeError, plot_decision_boundary, clf=self.clf,
                           feature_bound=self.bound, confidence_dict='string')
         plot_decision_boundary(clf=self.clf, feature_bound=self.bound,
                                confidence_dict={'linestyles': ':'})
 
     # Tests for plot_utility function
-    def test_plot_utility_qs(self):
+    def test_plot_utility_param_qs(self):
         self.assertRaises(TypeError, plot_utility, qs=self.clf, X=self.X,
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_plot_utility_X(self):
+    def test_plot_utility_param_X(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs,
                           X=np.ones([len(self.X), 3]),
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_plot_utility_y(self):
+    def test_plot_utility_param_y(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
                           y=np.zeros(len(self.y) + 1), **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_plot_utility_candidates(self):
+    def test_plot_utility_param_candidates(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
                           y=self.y, **self.qs_dict, candidates=[100])
         plot_utility(qs=self.qs, X=self.X, y=self.y, **self.qs_dict,
                      candidates=[99])
 
-    def test_plot_utility_replace_nan(self):
+    def test_plot_utility_param_replace_nan(self):
         plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=[1],
                      **self.qs_dict,
                      replace_nan=None, feature_bound=self.bound)
 
-    def test_plot_utility_ignore_undefined_query_params(self):
+    def test_plot_utility_param_ignore_undefined_query_params(self):
         plot_utility(qs=ValueOfInformationEER(),
                      X=self.X, y=self.y_active,
                      **self.qs_dict, ignore_undefined_query_params=True,
@@ -139,17 +139,22 @@ class TestFeatureSpace(unittest.TestCase):
                      **self.qs_dict, ignore_undefined_query_params=True,
                      feature_bound=self.bound)
 
-    def test_plot_utility_res(self):
+    def test_plot_utility_param_res(self):
         self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, res=-3)
 
-    def test_plot_utility_ax(self):
-        self.assertRaises(AttributeError, plot_utility, qs=self.qs, X=self.X,
+    def test_plot_utility_param_ax(self):
+        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, ax=2)
 
-    def test_plot_utility_contour_dict(self):
+    def test_plot_utility_param_axes(self):
+        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
+                          y=self.y_active, **self.qs_dict,
+                          feature_bound=self.bound, axes=2)
+
+    def test_plot_utility_param_contour_dict(self):
         self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, contour_dict='string')
@@ -157,46 +162,46 @@ class TestFeatureSpace(unittest.TestCase):
                      y=self.y, feature_bound=self.bound,
                      contour_dict={'linestyles': '.'})
 
-    def test_plot_contour_for_samples_X(self):
+    def test_plot_contour_for_samples_param_X(self):
         for X in [None, 1, np.arange(10)]:
             self.assertRaises(ValueError, plot_contour_for_samples, X=X,
                               values=self.utilities)
 
-    def test_plot_contour_for_samples_values(self):
+    def test_plot_contour_for_samples_param_values(self):
         test_cases = [(None, TypeError), (1, TypeError),
                       (np.arange(10), ValueError)]
         for values, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=values)
 
-    def test_plot_contour_for_samples_replace_nan(self):
+    def test_plot_contour_for_samples_param_replace_nan(self):
         values = np.full_like(self.utilities, np.nan)
         for nan, err in [(np.nan, ValueError), ('s', TypeError)]:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=values, replace_nan=nan)
 
-    def test_plot_contour_for_samples_feature_bound(self):
+    def test_plot_contour_for_samples_param_feature_bound(self):
         test_cases = [(np.nan, ValueError), ('s', ValueError),
                       ((2, 1), ValueError)]
         for b, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=self.utilities, feature_bound=b)
 
-    def test_plot_contour_for_samples_ax(self):
+    def test_plot_contour_for_samples_param_ax(self):
         test_cases = [(np.nan, AttributeError), ('s', AttributeError),
                       ((2, 1), AttributeError)]
         for ax, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=self.utilities, ax=ax)
 
-    def test_plot_contour_for_samples_res(self):
+    def test_plot_contour_for_samples_param_res(self):
         test_cases = [(np.nan, TypeError), ('s', TypeError),
                       ((2, 1), TypeError), (-1, ValueError)]
         for res, err in test_cases:
             self.assertRaises(err, plot_contour_for_samples, X=self.X,
                               values=self.utilities, res=res)
 
-    def test_plot_contour_for_samples_contour_dict(self):
+    def test_plot_contour_for_samples_param_contour_dict(self):
         test_cases = [(np.nan, TypeError), ('s', TypeError),
                       ((2, 1), TypeError), (-1, TypeError)]
         for cont, err in test_cases:

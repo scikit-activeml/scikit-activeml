@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 import warnings
 
 import numpy as np
@@ -151,11 +152,15 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
         If True, query parameters that are not defined in the query function
         are ignored and will not raise an exception.
     feature_bound : array-like, [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If candidates is not
-        given, bound must not be None. Otherwise, the bound is determined based
-        on the data.
-    axes : matplotlib.axes.Axes, optional (default=None)
-        The axis on which the utility is plotted.
+        Determines the area in which the boundary is plotted. If candidates is
+        not given, bound must not be None. Otherwise, the bound is determined
+        based on the data.
+    ax : matplotlib.axes.Axes, optional (default=None)
+        The axis on which the utility is plotted. Only if y.ndim = 1 (single
+        annotator).
+    axes : array-like of matplotlib.axes.Axes, optional (default=None)
+        The axes on which the utilities for the annotators are plotted. Only if
+        y.ndim = 2 (multi annotator).
     res : int, optional (default=21)
         The resolution of the plot.
     contour_dict : dict, optional (default=None)
@@ -171,11 +176,13 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
 
     replace_nan = kwargs.pop('replace_nan', 0.0)
     feature_bound = kwargs.pop('feature_bound', None)
+    ax = kwargs.pop('ax', None)
     axes = kwargs.pop('axes', None)
     res = kwargs.pop('res', 21)
     contour_dict = kwargs.pop('contour_dict', None)
     ignore_undefined_query_params = \
         kwargs.pop('ignore_undefined_query_params', False)
+    plot_annotators = kwargs.pop('plot_annotators', None)
 
     check_type(qs, 'qs', QueryStrategy)
     X = check_array(X, allow_nd=False, ensure_2d=True)
@@ -187,17 +194,43 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
     check_consistent_length(X, y)
 
     if y.ndim == 2:
-        n_annotators = y.shape[1]
+        if plot_annotators is None:
+            n_annotators = y.shape[1]
+            plot_annotators = np.arange(n_annotators)
+        else:
+            plot_annotators = check_array(plot_annotators, ensure_2d=False)
+            check_indices(plot_annotators, y, dim=1)
+            n_annotators = len(plot_annotators)
     else:
         n_annotators = None
-
-    if axes is None:
-        if n_annotators is None or n_annotators == 1:
-            axes = plt.subplots(1, 1)[1]
+        if plot_annotators is not None:
+            # TODO
+            raise ValueError('')
         else:
+            plot_annotators = np.arange(1)
+    if n_annotators is None:
+        if axes is not None:
+            # TODO
+            raise ValueError('')
+        if ax is None:
+            axes = np.array([plt.subplots(1, 1)[1]])
+        else:
+            check_type(ax, 'ax', Axes)
+            axes = np.array([ax])
+    else:
+        if ax is not None:
+            # TODO
+            raise ValueError('')
+        if axes is None:
             axes = plt.subplots(1, n_annotators)[1]
-    if not _is_arraylike(axes):
-        axes = np.array([axes])
+        else:
+            [check_type(ax_, 'ax', Axes) for ax_ in axes]
+
+    # TODO
+    if n_annotators is None and len(axes) != 1:
+        raise ValueError('')
+    elif n_annotators is not None and len(axes) != n_annotators:
+        raise ValueError('')
 
     # ensure that utilities are returned
     kwargs['return_utilities'] = True
@@ -220,9 +253,11 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
                 _, utilities = qs.query(X=X, y=y, candidates=mesh_instances,
                                         **kwargs)
 
-            for a_idx, ax in enumerate(axes):
+            for a_idx, ax in zip(plot_annotators, axes):
                 if n_annotators is not None:
                     utilities_a_idx = utilities[0, :, a_idx]
+                else:
+                    utilities_a_idx = utilities[0, :]
                 utilities_a_idx = utilities_a_idx.reshape(X_mesh.shape)
                 ax.contourf(X_mesh, Y_mesh, utilities_a_idx, **contour_args)
 
@@ -230,11 +265,11 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
 
         except MappingError:
             candidates = unlabeled_indices(y, missing_label=qs.missing_label)
-        except BaseException as err:
-            warnings.warn(f'Unable to create utility plot with mesh because '
-                          f'of the following error. Trying plotting over '
-                          f'candidates. \n\n Unexpected {err.__repr__()}')
-            candidates = unlabeled_indices(y, missing_label=qs.missing_label)
+        # except BaseException as err:
+        #     warnings.warn(f'Unable to create utility plot with mesh because '
+        #                   f'of the following error. Trying plotting over '
+        #                   f'candidates. \n\n Unexpected {err.__repr__()}')
+        #     candidates = unlabeled_indices(y, missing_label=qs.missing_label)
 
     candidates = check_array(candidates, allow_nd=False, ensure_2d=False,
                              force_all_finite='allow-nan')
@@ -252,10 +287,11 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
         _, utilities = qs.query(X=X, y=y, candidates=candidates,
                                 **kwargs)
 
-    for a_idx, ax in enumerate(axes):
+    for a_idx, ax in zip(plot_annotators, axes):
         if n_annotators is not None:
             utilities_a_idx = utilities[0, :, a_idx]
-        utilities_a_idx = utilities_a_idx.reshape(X_mesh.shape)
+        else:
+            utilities_a_idx = utilities[0, :]
         plot_contour_for_samples(
             X_utils,
             utilities_a_idx,
@@ -266,7 +302,10 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
             contour_dict=contour_dict
         )
 
-    return ax
+    if n_annotators is None:
+        return axes[0]
+    else:
+        return axes
 
 
 def plot_contour_for_samples(X, values, replace_nan=0.0, feature_bound=None,
