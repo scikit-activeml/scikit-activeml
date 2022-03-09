@@ -3,7 +3,7 @@ import warnings
 
 import numpy as np
 
-from skactiveml.stream.budget_manager import SplitBudget
+from skactiveml.stream.budgetmanager import SplitBudgetManager
 from skactiveml.utils import check_cost_matrix, check_classes, \
     check_scalar, check_X_y, check_type, check_bound, check_budget_manager, \
     check_classifier_params, check_indices
@@ -207,6 +207,6 @@ class TestValidation(unittest.TestCase):
 
     def test_check_budget_manager(self):
 
-        self.assertIsNotNone(check_budget_manager(0.1, None, SplitBudget))
+        self.assertIsNotNone(check_budget_manager(0.1, None, SplitBudgetManager))
         with self.assertWarns(Warning):
-            check_budget_manager(0.1, SplitBudget(budget=0.2), SplitBudget)
+            check_budget_manager(0.1, SplitBudgetManager(budget=0.2), SplitBudgetManager)

@@ -5,13 +5,13 @@ import numpy as np
 
 from skactiveml.base import (
     QueryStrategy,
-    SingleAnnotPoolBasedQueryStrategy,
-    MultiAnnotPoolBasedQueryStrategy,
+    SingleAnnotatorPoolQueryStrategy,
+    MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
     ClassFrequencyEstimator,
-    AnnotModelMixin,
+    AnnotatorModelMixin,
     BudgetManager,
-    SingleAnnotStreamBasedQueryStrategy,
+    SingleAnnotatorStreamQueryStrategy,
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL
@@ -24,19 +24,19 @@ class QueryStrategyTest(unittest.TestCase):
         self.qs = QueryStrategy()
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+        self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
 
 
 class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
-    @patch.multiple(SingleAnnotPoolBasedQueryStrategy,
+    @patch.multiple(SingleAnnotatorPoolQueryStrategy,
                     __abstractmethods__=set())
     def setUp(self):
-        self.qs = SingleAnnotPoolBasedQueryStrategy()
+        self.qs = SingleAnnotatorPoolQueryStrategy()
 
     def test_fit(self):
         self.assertRaises(NotImplementedError, self.qs.query, X=None, y=None,
-                          X_cand=None)
+                          candidates=None)
 
     def test__transform_candidates(self):
         self.qs.missing_label_ = MISSING_LABEL
@@ -55,12 +55,12 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
         np.testing.assert_array_equal(X_cand, X[mapping])
 
 
-class MultiAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
+class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
 
-    @patch.multiple(MultiAnnotPoolBasedQueryStrategy,
+    @patch.multiple(MultiAnnotatorPoolQueryStrategy,
                     __abstractmethods__=set())
     def setUp(self):
-        self.qs = MultiAnnotPoolBasedQueryStrategy()
+        self.qs = MultiAnnotatorPoolQueryStrategy()
         self.qs.missing_label_ = MISSING_LABEL
 
     def test_fit(self):
@@ -183,18 +183,18 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.clf.predict_freq, X=None)
 
 
-class AnnotModelMixinTest(unittest.TestCase):
+class AnnotatorModelMixinTest(unittest.TestCase):
 
-    @patch.multiple(AnnotModelMixin, __abstractmethods__=set())
+    @patch.multiple(AnnotatorModelMixin, __abstractmethods__=set())
     def setUp(self):
-        self.clf = AnnotModelMixin()
+        self.clf = AnnotatorModelMixin()
 
-    def test_predict_annot_proba(self):
-        self.assertRaises(NotImplementedError, self.clf.predict_annot_perf,
+    def test_predict_annotator_perf(self):
+        self.assertRaises(NotImplementedError, self.clf.predict_annotator_perf,
                           X=None)
 
 
-class BudgetManagerTest(unittest.TestCase):
+class TestBudgetManager(unittest.TestCase):
     @patch.multiple(BudgetManager, __abstractmethods__=set())
     def setUp(self):
         self.bm = BudgetManager()
@@ -207,23 +207,23 @@ class BudgetManagerTest(unittest.TestCase):
         self.assertRaises(
             NotImplementedError,
             self.bm.update,
-            X_cand=None,
+            candidates=None,
             queried_indices=None,
         )
 
 
-class SingleAnnotStreamBasedQueryStrategyTest(unittest.TestCase):
+class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
     @patch.multiple(
-        SingleAnnotStreamBasedQueryStrategy, __abstractmethods__=set()
+        SingleAnnotatorStreamQueryStrategy, __abstractmethods__=set()
     )
     def setUp(self):
-        self.qs = SingleAnnotStreamBasedQueryStrategy(budget=None)
+        self.qs = SingleAnnotatorStreamQueryStrategy(budget=None)
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.qs.query, X_cand=None)
+        self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
 
     def test_update(self):
-        self.assertRaises(NotImplementedError, self.qs.update, X_cand=None,
+        self.assertRaises(NotImplementedError, self.qs.update, candidates=None,
                           queried_indices=None)
 
 

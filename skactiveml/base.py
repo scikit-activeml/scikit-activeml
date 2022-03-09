@@ -14,17 +14,17 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_array, check_consistent_length, \
     column_or_1d
 
+from .exceptions import MappingError
 from .utils import MISSING_LABEL, is_labeled, is_unlabeled, \
     unlabeled_indices, ExtLabelEncoder, rand_argmin, check_classifier_params, \
     check_random_state, check_cost_matrix, check_scalar, check_class_prior, \
     check_missing_label, check_indices
-from .exceptions import MappingError
 
 # '__all__' is necessary to create the sphinx docs.
-__all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
-           'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
-           'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
-           'ClassFrequencyEstimator', 'AnnotModelMixin']
+__all__ = ['QueryStrategy', 'SingleAnnotatorPoolQueryStrategy',
+           'MultiAnnotatorPoolQueryStrategy', 'BudgetManager',
+           'SingleAnnotatorStreamQueryStrategy', 'SkactivemlClassifier',
+           'ClassFrequencyEstimator', 'AnnotatorModelMixin']
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -46,7 +46,7 @@ class QueryStrategy(ABC, BaseEstimator):
         raise NotImplementedError
 
 
-class PoolBasedQueryStrategy(QueryStrategy):
+class PoolQueryStrategy(QueryStrategy):
     """Base class for all pool-based active learning query strategies in
     scikit-activeml.
 
@@ -152,7 +152,7 @@ class PoolBasedQueryStrategy(QueryStrategy):
         return X, y, candidates, batch_size, return_utilities
 
 
-class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
+class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with a
     single annotator in scikit-activeml.
     """
@@ -282,7 +282,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                               allow_only_unlabeled=False):
         """
         Transforms the `candidates` parameter into a sample array and the
-        corresponding index array `mapping` such that `X_cand = X[mapping]`.
+        corresponding index array `mapping` such that `candidates = X[mapping]`.
 
         Parameters
         ----------
@@ -309,10 +309,10 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         Returns
         -------
-        X_cand : np.ndarray of shape (n_candidates, n_features)
+        candidates : np.ndarray of shape (n_candidates, n_features)
             Candidate samples from which the strategy can query the label.
         mapping : np.ndarray of shape (n_candidates) or None
-            Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
+            Index array that maps `candidates` to `X`. (`candidates = X[mapping]`)
         """
 
         if candidates is None:
@@ -333,7 +333,7 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                 return candidates, None
 
 
-class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
+class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with
     multiple annotators in scikit-activeml.
 
@@ -546,10 +546,10 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                               enforce_mapping=False):
         """
         Transforms the `candidates` parameter into a sample array and the
-        corresponding index array `mapping` such that `X_cand = X[mapping]`,
+        corresponding index array `mapping` such that `candidates = X[mapping]`,
         and transforms `annotators` into a boolean array such that `A_cand`
         represents the available annotator sample pairs for the samples of
-        X_cand.
+        candidates.
 
         Parameters
         ----------
@@ -591,12 +591,12 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         Returns
         -------
-        X_cand : np.ndarray of shape (n_candidates, n_features)
+        candidates : np.ndarray of shape (n_candidates, n_features)
             Candidate samples from which the strategy can query the label.
         mapping : np.ndarray of shape (n_candidates) or None
-            Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
+            Index array that maps `candidates` to `X`. (`candidates = X[mapping]`)
         A_cand : np.ndarray of shape(n_candidates, n_annotators)
-            Available annotator sample pair with respect to `X_cand`.
+            Available annotator sample pair with respect to `candidates`.
         """
         unlbd_pairs = is_unlabeled(y, self.missing_label_)
         unlbd_sample_indices = \
@@ -614,7 +614,7 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                 A_cand = annotators
 
             if enforce_mapping:
-                raise ValueError('Mapping `X_cand` to `X` is not posssible'
+                raise ValueError('Mapping `candidates` to `X` is not posssible'
                                  'but `enforce_mapping` is True. Use index'
                                  'array for `candidates` instead.')
             else:
@@ -679,16 +679,16 @@ class BudgetManager(ABC, BaseEstimator):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, queried_indices, *args, **kwargs):
+    def update(self, candidates, queried_indices, *args, **kwargs):
         """Updates the BudgetManager.
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : array-like
-            Indicates which instances from X_cand have been queried.
+            Indicates which instances from candidates have been queried.
 
         Returns
         -------
@@ -738,7 +738,7 @@ class BudgetManager(ABC, BaseEstimator):
         return utilities
 
 
-class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
+class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
        scikit-activeml.
 
@@ -756,12 +756,12 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self.budget = budget
 
     @abstractmethod
-    def query(self, X_cand, *args, return_utilities=False, **kwargs):
-        """Ask the query strategy which instances in X_cand to acquire.
+    def query(self, candidates, *args, return_utilities=False, **kwargs):
+        """Ask the query strategy which instances in candidates to acquire.
 
-        The query startegy determines the most useful instances in X_cand,
+        The query startegy determines the most useful instances in candidates,
         which can be acquired within the budgeting constraint specified by the
-        budget_manager.
+        budgetmanager.
         Please note that, when the decisions from this function
         may differ from the final sampling, simulate=True can set, so that the
         query strategy can be updated later with update(...) with the final
@@ -770,7 +770,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
@@ -781,7 +781,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         Returns
         -------
         queried_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
+            The indices of instances in candidates which should be sampled, with
             0 <= n_sampled_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
@@ -793,7 +793,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
     @abstractmethod
     def update(
         self,
-        X_cand,
+        candidates,
         queried_indices,
         *args,
         budget_manager_param_dict=None,
@@ -809,15 +809,15 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         queried_indices : array-like
-            Indicates which instances from X_cand have been queried.
+            Indicates which instances from candidates have been queried.
 
         budget_manager_param_dict : kwargs, optional
-            Optional kwargs for budget_manager.
+            Optional kwargs for budgetmanager.
         Returns
         -------
         self : StreamBasedQueryStrategy
@@ -844,17 +844,17 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
     def _validate_data(
         self,
-        X_cand,
+        candidates,
         return_utilities,
         *args,
         reset=True,
-        **check_X_cand_params,
+        **check_candidates_params,
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
         ----------
-        X_cand: array-like of shape (n_candidates, n_features)
+        candidates: array-like of shape (n_candidates, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
@@ -863,21 +863,21 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
-        **check_X_cand_params : kwargs
+        **check_candidates_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
+        candidates: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
         # Check candidate instances.
-        X_cand = check_array(X_cand, **check_X_cand_params)
+        candidates = check_array(candidates, **check_candidates_params)
 
         # Check number of features.
-        self._check_n_features(X_cand, reset=reset)
+        self._check_n_features(candidates, reset=reset)
 
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
@@ -885,10 +885,10 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         # Check random state.
         self._validate_random_state()
 
-        # Check budget_manager.
+        # Check budgetmanager.
         self._validate_budget()
 
-        return X_cand, return_utilities
+        return candidates, return_utilities
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
@@ -1191,15 +1191,15 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return X, y, sample_weight
 
 
-class AnnotModelMixin(ABC):
-    """AnnotModelMixin
+class AnnotatorModelMixin(ABC):
+    """AnnotatorModelMixin
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.
     """
 
     @abstractmethod
-    def predict_annot_perf(self, X):
+    def predict_annotator_perf(self, X):
         """Calculates the performance of an annotator to provide the true label
         for a given sample.
 

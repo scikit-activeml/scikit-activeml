@@ -150,7 +150,7 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
         If True, query parameters that are not defined in the query function
         are ignored and will not raise an exception.
     feature_bound : array-like, [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If X_cand is not
+        Determines the area in which the boundary is plotted. If candidates is not
         given, bound must not be None. Otherwise, the bound is determined based
         on the data.
     ax : matplotlib.axes.Axes, optional (default=None)
@@ -264,7 +264,7 @@ def plot_contour_for_samples(X, values, replace_nan=0.0, feature_bound=None,
         If numeric, nan-values in `values` will be replaced by this number.
         If None, these samples will be ignored.
     feature_bound : array-like, [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted. If X_cand is not
+        Determines the area in which the boundary is plotted. If candidates is not
         given, bound must not be None. Otherwise, the bound is determined based
         on the data.
     ax : matplotlib.axes.Axes, optional (default=None)

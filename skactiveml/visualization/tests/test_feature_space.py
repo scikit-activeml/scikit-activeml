@@ -1,7 +1,7 @@
-import unittest
-import numpy as np
 import os
+import unittest
 
+import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
@@ -9,9 +9,9 @@ from sklearn.base import ClassifierMixin
 from sklearn.datasets import make_classification
 from sklearn.svm import LinearSVC
 
-from skactiveml.classifier import PWC
 from skactiveml import visualization
-from skactiveml.pool import UncertaintySampling, RandomSampler, \
+from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.pool import UncertaintySampling, RandomSampling, \
     ValueOfInformationEER
 from skactiveml.visualization._feature_space import plot_decision_boundary, \
     plot_utility
@@ -32,7 +32,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.X_train = self.X[train_indices]
         self.y_train = self.y[train_indices]
         self.X_cand = self.X[cand_indices]
-        self.clf = PWC()
+        self.clf = ParzenWindowClassifier()
         self.clf.fit(self.X_train, self.y_train)
         self.qs = UncertaintySampling()
         self.qs_dict = {'clf': self.clf}
@@ -157,7 +157,7 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_no_qs_dict(self):
         fig, ax = plt.subplots()
-        qs = RandomSampler()
+        qs = RandomSampling()
         plot_utility(qs=qs, X=np.zeros((1, 2)), y=[np.nan], feature_bound=self.bound, ax=ax)
 
         ax.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
@@ -196,7 +196,7 @@ class TestFeatureSpace(unittest.TestCase):
         X_train = X[train_indices]
         y_train = y[train_indices]
         X_cand = X[cand_indices]
-        clf = PWC()
+        clf = ParzenWindowClassifier()
         clf.fit(X_train, y_train)
         qs = UncertaintySampling()
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]

@@ -23,11 +23,11 @@ This is an overview of the API.
    :template: class.rst
 
    QueryStrategy
-   SingleAnnotPoolBasedQueryStrategy
-   MultiAnnotPoolBasedQueryStrategy
+   SingleAnnotatorPoolQueryStrategy
+   MultiAnnotatorPoolQueryStrategy
    SkactivemlClassifier
    ClassFrequencyEstimator
-   AnnotModelMixin
+   AnnotatorModelMixin
 
 
 :mod:`skactiveml.pool`: Pool-based strategies
@@ -47,14 +47,14 @@ Classes
    :toctree: generated/api
    :template: class.rst
 
-   RandomSampler
-   McPAL
+   RandomSampling
+   ProbabilisticAL
    UncertaintySampling
-   EpistemicUncertainty
+   EpistemicUncertaintySampling
    ExpectedErrorReduction
-   QBC
-   FourDS
-   ALCE
+   QueryByCommittee
+   FourDs
+   CostEmbeddingAL
 
 Functions
 ---------
@@ -88,9 +88,9 @@ Classes
    :toctree: generated/api
    :template: class.rst
 
-   IEThresh
-   IEAnnotModel
-   MultiAnnotWrapper
+   IntervalEstimationThreshold
+   IntervalEstimationAnnotModel
+   SingleAnnotWrapper
 
 :mod:`skactiveml.classifier`: Classifier
 ========================================
@@ -109,8 +109,8 @@ Classes
    :toctree: generated/api
    :template: class.rst
 
-   PWC
-   CMM
+   ParzenWindowClassifier
+   MixtureModelClassifier
    SklearnClassifier
 
 :mod:`skactiveml.classifier.multi`: Multi-annotator classifier
@@ -130,8 +130,8 @@ Classes
    :toctree: generated/api
    :template: class.rst
 
-   MultiAnnotEnsemble
-   LogisticRegressionRY
+   AnnotatorEnsembleClassifier
+   AnnotatorLogisticRegression
 
 :mod:`skactiveml.visualization`: Visualization functions
 ========================================================

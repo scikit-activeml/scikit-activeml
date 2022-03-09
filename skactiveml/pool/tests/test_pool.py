@@ -1,9 +1,9 @@
 import inspect
+import json
 import os
 import shutil
 import unittest
 import warnings
-import json
 from importlib import import_module
 from os import path, listdir
 
@@ -11,16 +11,17 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.ensemble import RandomForestClassifier
 
-from skactiveml import pool
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
-from skactiveml.classifier import PWC, CMM, SklearnClassifier
-from skactiveml.exceptions import MappingError
-from skactiveml.pool import FourDS
-from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL, is_labeled, \
-    unlabeled_indices
-from skactiveml.utils._label import check_equal_missing_label, labeled_indices
-
 from docs.generate import generate_examples
+from skactiveml import pool
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy
+from skactiveml.classifier import ParzenWindowClassifier, \
+    MixtureModelClassifier, SklearnClassifier
+from skactiveml.exceptions import MappingError
+from skactiveml.pool import FourDs
+from skactiveml.utils import call_func, is_unlabeled, MISSING_LABEL, \
+    is_labeled, \
+    unlabeled_indices
+from skactiveml.utils._label import check_equal_missing_label
 
 
 class TestGeneral(unittest.TestCase):
@@ -30,11 +31,11 @@ class TestGeneral(unittest.TestCase):
         self.X, self.y_true = make_blobs(n_samples=10, n_features=2, centers=2,
                                          cluster_std=1, random_state=1)
         self.budget = 5
-        self.clf = PWC(
+        self.clf = ParzenWindowClassifier(
             classes=np.unique(self.y_true), missing_label=MISSING_LABEL,
             random_state=0
         )
-        self.cmm = CMM(
+        self.cmm = MixtureModelClassifier(
             classes=np.unique(self.y_true), missing_label=MISSING_LABEL,
             random_state=0
         )
@@ -51,13 +52,13 @@ class TestGeneral(unittest.TestCase):
         for qs_name in pool.__all__:
             qs = getattr(pool, qs_name)
             if inspect.isclass(qs) and \
-                    issubclass(qs, SingleAnnotPoolBasedQueryStrategy):
+                    issubclass(qs, SingleAnnotatorPoolQueryStrategy):
                 self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())
 
     def test_al_cycle(self):
         for qs_name in self.query_strategies:
-            clf = self.cmm if qs_name == "FourDS" else self.clf
+            clf = self.cmm if qs_name == "FourDs" else self.clf
             with self.subTest(msg="Random State", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
                 qs = call_func(
@@ -146,7 +147,7 @@ class TestGeneral(unittest.TestCase):
                 )
                 np.testing.assert_array_equal(u1, u2)
 
-                if not isinstance(qs, FourDS):
+                if not isinstance(qs, FourDs):
                     unld_idx = unlabeled_indices(y, self.MISSING_LABEL)[:2]
                     ids1, u1 = call_func(
                         qs.query, X=self.X, y=y, clf=clf, X_eval=self.X,
@@ -194,7 +195,7 @@ class TestGeneral(unittest.TestCase):
         not_test = ['self', 'kwargs', 'missing_label', 'random_state',
                     'X', 'y', 'candidates', 'batch_size', 'return_utilities']
         for qs_name in self.query_strategies:
-            clf = self.cmm if qs_name == "FourDS" else self.clf
+            clf = self.cmm if qs_name == "FourDs" else self.clf
             with self.subTest(msg="Param Test", qs_name=qs_name):
                 # Get initial parameters.
                 qs_class = self.query_strategies[qs_name]

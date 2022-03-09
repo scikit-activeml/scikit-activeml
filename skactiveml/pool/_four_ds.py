@@ -8,16 +8,16 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.utils.validation import check_scalar
 
-from ..base import SingleAnnotPoolBasedQueryStrategy
-from ..classifier import CMM
+from ..base import SingleAnnotatorPoolQueryStrategy
+from ..classifier import MixtureModelClassifier
 from ..utils import rand_argmax, is_labeled, check_type, MISSING_LABEL, \
     check_equal_missing_label
 
 
-class FourDS(SingleAnnotPoolBasedQueryStrategy):
-    """FourDS
+class FourDs(SingleAnnotatorPoolQueryStrategy):
+    """FourDs
 
-    Implementation of the pool-based query strategy 4DS for training a CMM [1].
+    Implementation of the pool-based query strategy 4DS for training a MixtureModelClassifier [1].
 
     Parameters
     ----------
@@ -58,7 +58,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
         y: array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        clf : skactiveml.classifier.CMM
+        clf : skactiveml.classifier.MixtureModelClassifier
             GMM-based classifier to be trained.
         fit_clf : bool, optional (default=True)
             Defines whether the classifier should be fitted on `X`, `y`, and
@@ -109,7 +109,7 @@ class FourDS(SingleAnnotPoolBasedQueryStrategy):
             )
 
         # Check classifier type.
-        check_type(clf, 'clf', CMM)
+        check_type(clf, 'clf', MixtureModelClassifier)
         check_type(fit_clf, 'fit_clf', bool)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
 

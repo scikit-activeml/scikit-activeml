@@ -8,9 +8,9 @@ from matplotlib.testing.compare import compare_images
 from sklearn.datasets import make_classification
 
 from skactiveml import visualization
-from skactiveml.classifier import PWC
-from skactiveml.classifier.multi import MultiAnnotEnsemble
-from skactiveml.pool.multi import IEThresh
+from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
+from skactiveml.pool.multiannotator import IntervalEstimationThreshold
 from skactiveml.utils import check_bound, majority_vote
 from skactiveml.visualization.multi import plot_ma_data_set, plot_ma_utility, \
     plot_ma_decision_boundary, \
@@ -21,7 +21,7 @@ class TestFeatureSpace(unittest.TestCase):
 
     def setUp(self):
         self.path_prefix = os.path.dirname(visualization.__file__) + \
-                           '/multi/tests/images/'
+                           '/multiannotator/tests/images/'
 
         self.X, self.y_true = make_classification(n_features=2, n_redundant=0,
                                                   random_state=0)
@@ -38,12 +38,12 @@ class TestFeatureSpace(unittest.TestCase):
 
         estimators = []
         for a in range(self.n_annotators):
-            estimators.append((f'pwc_{a}', PWC(random_state=0)))
-        self.clf_multi = MultiAnnotEnsemble(
+            estimators.append((f'pwc_{a}', ParzenWindowClassifier(random_state=0)))
+        self.clf_multi = AnnotatorEnsembleClassifier(
             estimators=estimators, voting='soft'
         )
-        self.clf = PWC(random_state=0)
-        self.ma_qs = IEThresh(random_state=0)
+        self.clf = ParzenWindowClassifier(random_state=0)
+        self.ma_qs = IntervalEstimationThreshold(random_state=0)
 
         testing.set_font_settings_for_testing()
         testing.set_reproducibility_for_testing()
@@ -143,7 +143,7 @@ class TestFeatureSpace(unittest.TestCase):
                                     'plot_utility_returned_result.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
-        ma_qs = IEThresh(random_state=0)
+        ma_qs = IntervalEstimationThreshold(random_state=0)
         fig = plot_ma_utility(ma_qs, ma_qs_arg_dict=ma_qs_arg_dict,
                               feature_bound=bound, X=self.X, y=self.y,
                               title='utility', fig_size=(20, 5),

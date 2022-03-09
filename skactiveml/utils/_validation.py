@@ -224,7 +224,7 @@ def check_X_y(X=None, y=None, X_cand=None, sample_weight=None,
     Checks X and y for consistent length, enforces X to be 2D and y 1D. By
     default, X is checked to be non-empty and containing only finite values.
     Standard input checks are also applied to y, such as checking that y
-    does not have np.nan or np.inf targets. For multi-label y, set
+    does not have np.nan or np.inf targets. For multiannotator-label y, set
     multi_output=True to allow 2D and sparse y. If the dtype of X is
     object, attempt converting to float, raising on failure.
 
@@ -332,16 +332,16 @@ def check_X_y(X=None, y=None, X_cand=None, sample_weight=None,
     y_converted : object
         The converted and validated y.
 
-    X_cand : object
-        The converted and validated X_cand
-        Only returned if X_cand is not None.
+    candidates : object
+        The converted and validated candidates
+        Only returned if candidates is not None.
 
     sample_weight : np.ndarray
         The converted and validated sample_weight.
 
     sample_weight_cand : np.ndarray
         The converted and validated sample_weight_cand.
-        Only returned if X_cand is not None.
+        Only returned if candidates is not None.
     """
     if allow_nan is None:
         allow_nan = True if missing_label is np.nan else False
@@ -383,7 +383,7 @@ def check_X_y(X=None, y=None, X_cand=None, sample_weight=None,
                              ensure_min_features=ensure_min_features,
                              estimator=estimator)
         if X is not None and X_cand.shape[1] != X.shape[1]:
-            raise ValueError("The number of features of X_cand does not match"
+            raise ValueError("The number of features of candidates does not match"
                              "the number of features of X")
 
         if sample_weight_cand is None:
@@ -599,7 +599,7 @@ def check_bound(bound=None, X=None, ndim=2, epsilon=0,
 
 def check_budget_manager(budget, budget_manager, default_budget_manager_class,
                          default_budget_manager_dict=None):
-    """Validate if budget manager is a budget_manager class and create a
+    """Validate if budget manager is a budgetmanager class and create a
         copy 'budget_manager_'.
         """
     if default_budget_manager_dict is None:
@@ -610,7 +610,7 @@ def check_budget_manager(budget, budget_manager, default_budget_manager_class,
     else:
         if budget is not None and budget != budget_manager.budget:
             warnings.warn(
-                "budget_manager is already given such that the budget "
+                "budgetmanager is already given such that the budget "
                 "is not used. The given budget differs from the "
                 "budget_managers budget."
             )

@@ -6,7 +6,7 @@ from sklearn.exceptions import NotFittedError
 from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
 
-from skactiveml.classifier import PWC, SklearnClassifier
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool.utils import IndexClassifierWrapper
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, unlabeled_indices, \
     labeled_indices
@@ -19,7 +19,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
         self.y2 = np.array([0, 1, 0, 1])
         self.y3 = np.array([0, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
-        self.clf = PWC(classes=[0, 1])
+        self.clf = ParzenWindowClassifier(classes=[0, 1])
         self.kwargs = dict(X=self.X, y=self.y, clf=self.clf)
         self.iclf = \
             lambda **kw: IndexClassifierWrapper(self.clf, self.X, self.y, **kw)
@@ -230,22 +230,22 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises(ValueError, iclf.predict_freq, [1])
 
     def test_getattr(self):
-        clf = PWC(classes=[0, 1])
+        clf = ParzenWindowClassifier(classes=[0, 1])
         iclf = IndexClassifierWrapper(clf, self.X, self.y)
         self.assertEqual(iclf.clf.classes, iclf.classes)
         iclf.fit([0, 1])
         self.assertEqual(iclf.clf_.classes, iclf.classes)
 
     def test__concat_sw(self):
-        iclf = IndexClassifierWrapper(clf=PWC(), X=self.X, y=self.y)
+        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier(), X=self.X, y=self.y)
         self.assertRaises(ValueError, iclf._concat_sw, [1], None)
 
     def test_fit(self):
-        iclf = IndexClassifierWrapper(clf=PWC(), X=self.X, y=self.y)
+        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier(), X=self.X, y=self.y)
         #self.assertWarns(Warning, iclf.fit, [2, 3])
         self.assertRaises(ValueError, iclf.fit, [2, 3])
 
-        base_clfs = [lambda: PWC(classes=[0, 1]),
+        base_clfs = [lambda: ParzenWindowClassifier(classes=[0, 1]),
                      lambda: SklearnClassifier(GaussianNB(), classes=[0, 1])]
         speed_ups = [True, False]
         sample_weights = [None, np.linspace(.2, 1, 4)]
@@ -309,18 +309,18 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                           [0], use_base_clf=False)
         self.assertRaises(NotFittedError, iclf.partial_fit,
                           [0], use_base_clf=True)
-        iclf = IndexClassifierWrapper(clf=PWC().fit(self.X, self.y),
+        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier().fit(self.X, self.y),
                                       X=self.X, y=self.y, set_base_clf=True)
         self.assertRaises(NotFittedError, iclf.partial_fit,
                           [0], use_base_clf=False)
         self.assertRaises(NotFittedError, iclf.partial_fit,
                           [0], use_base_clf=True)
 
-        iclf = IndexClassifierWrapper(clf=PWC(), X=self.X, y=self.y)
+        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier(), X=self.X, y=self.y)
         iclf.fit([0, 1])
         self.assertWarns(Warning, iclf.partial_fit, [2, 3])
 
-        base_clfs = [lambda : PWC(classes=[0,1]),
+        base_clfs = [lambda : ParzenWindowClassifier(classes=[0, 1]),
                      lambda : SklearnClassifier(GaussianNB(), classes=[0,1])]
         speed_ups = [True, False]
         sample_weights = [None, np.linspace(.2, 1, 4)]
@@ -332,7 +332,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
 
-            with self.subTest(msg="PWC use base data", BaseClf=str(BaseClf()),
+            with self.subTest(msg="ParzenWindowClassifier use base data", BaseClf=str(BaseClf()),
                               speed_up=speed_up, sample_weight=sample_weight,
                               pred=pred, enforce_unique=enforce_unique):
                 iclf = IndexClassifierWrapper(
@@ -365,7 +365,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
 
-            with self.subTest(msg="PWC use fit data", BaseClf=str(BaseClf()),
+            with self.subTest(msg="ParzenWindowClassifier use fit data", BaseClf=str(BaseClf()),
                               speed_up=speed_up, sample_weight=sample_weight,
                               pred=pred, enforce_unique=enforce_unique):
                 iclf = IndexClassifierWrapper(
@@ -400,7 +400,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
 
-            with self.subTest(msg="PWC use fit data with base clf",
+            with self.subTest(msg="ParzenWindowClassifier use fit data with base clf",
                               BaseClf=str(BaseClf()),
                               speed_up=speed_up, sample_weight=sample_weight,
                               pred=pred, enforce_unique=enforce_unique):

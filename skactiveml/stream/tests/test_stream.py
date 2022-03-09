@@ -1,17 +1,17 @@
-from importlib import import_module
 import inspect
-from os import path
 import unittest
-import numpy as np
 from collections import deque
+from importlib import import_module
+from os import path
 
+import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.utils import check_random_state
 
 from skactiveml import stream
-from skactiveml.base import SingleAnnotStreamBasedQueryStrategy
+from skactiveml.base import SingleAnnotatorStreamQueryStrategy
+from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.utils import call_func
-from skactiveml.classifier import PWC
 
 
 class TestStream(unittest.TestCase):
@@ -20,9 +20,9 @@ class TestStream(unittest.TestCase):
         for qs_name in stream.__all__:
             qs = getattr(stream, qs_name)
             if inspect.isclass(qs) and \
-                    issubclass(qs, SingleAnnotStreamBasedQueryStrategy):
+                    issubclass(qs, SingleAnnotatorStreamQueryStrategy):
                 self.query_strategies[qs_name] = qs
-        self.clf = PWC()
+        self.clf = ParzenWindowClassifier()
 
     def test_selection_strategies(self):
         # Create data set for testing.
@@ -36,7 +36,7 @@ class TestStream(unittest.TestCase):
             shuffle=True,
         )
 
-        clf = PWC(classes=[0, 1], random_state=rand.randint(2 ** 31 - 1))
+        clf = ParzenWindowClassifier(classes=[0, 1], random_state=rand.randint(2 ** 31 - 1))
 
         X_init = X[:train_init_size, :]
         y_init = y[:train_init_size]
@@ -105,14 +105,14 @@ class TestStream(unittest.TestCase):
         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             return_utilities = t % 2 == 0
             qs_output = call_func(query_strategy.query,
-                                  X_cand=x_t.reshape([1, -1]),
+                                  candidates=x_t.reshape([1, -1]),
                                   clf=clf,
                                   return_utilities=return_utilities
                                   )
 
             for i in range(3):
                 qs_output2 = call_func(query_strategy2.query,
-                                       X_cand=x_t.reshape([1, -1]),
+                                       candidates=x_t.reshape([1, -1]),
                                        clf=clf,
                                        return_utilities=return_utilities
                                        )
@@ -130,12 +130,12 @@ class TestStream(unittest.TestCase):
             budget_manager_param_dict1 = {"utilities": utilities}
             budget_manager_param_dict2 = {"utilities": utilities2}
             call_func(query_strategy.update,
-                      X_cand=x_t.reshape([1, -1]),
+                      candidates=x_t.reshape([1, -1]),
                       queried_indices=queried_indices,
                       budget_manager_param_dict=budget_manager_param_dict1
                       )
             call_func(query_strategy2.update,
-                      X_cand=x_t.reshape([1, -1]),
+                      candidates=x_t.reshape([1, -1]),
                       queried_indices=queried_indices2,
                       budget_manager_param_dict=budget_manager_param_dict2
                       )
@@ -176,7 +176,7 @@ class TestStream(unittest.TestCase):
         for t, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             return_utilities = t % 2 == 0
             qs_output = call_func(query_strategy.query,
-                                    X_cand=x_t.reshape([1, -1]),
+                                    candidates=x_t.reshape([1, -1]),
                                     clf=clf,
                                     return_utilities=return_utilities
                                     )
@@ -189,12 +189,12 @@ class TestStream(unittest.TestCase):
             budget_manager_param_dict1 = {"utilities": utilities}
             budget_manager_param_dict2 = {"utilities": utilities}
             call_func(query_strategy.update,
-                      X_cand=x_t.reshape([1, -1]),
+                      candidates=x_t.reshape([1, -1]),
                       queried_indices=queried_indices,
                       budget_manager_param_dict=budget_manager_param_dict1
                       )
             call_func(query_strategy2.update,
-                      X_cand=x_t.reshape([1, -1]),
+                      candidates=x_t.reshape([1, -1]),
                       queried_indices=queried_indices,
                       budget_manager_param_dict=budget_manager_param_dict2
                       )

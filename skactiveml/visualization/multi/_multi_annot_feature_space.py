@@ -7,7 +7,7 @@ from sklearn.utils import check_array, check_consistent_length
 from .._auxiliary_functions import mesh, check_bound, _get_contour_args, \
     _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
 from .._feature_space import plot_decision_boundary
-from ...base import MultiAnnotPoolBasedQueryStrategy
+from ...base import MultiAnnotatorPoolQueryStrategy
 from ...utils import is_labeled, check_scalar, check_type
 
 
@@ -32,8 +32,8 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
         missing labels are represented the attribute `missing_label`.
     y_true : array-like of shape (n_samples,)
         The correct labels.
-    ma_qs: MultiAnnotPoolBasedQueryStrategy
-        The multi-annotator query strategy.
+    ma_qs: MultiAnnotatorPoolQueryStrategy
+        The multiannotator-annotator query strategy.
     clf: sklearn classifier
         The classifier whose decision boundary is plotted.
     ma_qs_arg_dict: dict
@@ -218,12 +218,12 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
                     feature_bound=None, title=None, res=21,
                     fontsize=15, contour_dict=None, tick_dict=None):
     """Plots the utilities for the different annotators of the given
-    multi-annotator query strategy.
+    multiannotator-annotator query strategy.
 
     Parameters
     ----------
-    ma_qs: MultiAnnotPoolBasedQueryStrategy
-        The multi-annotator query strategy.
+    ma_qs: MultiAnnotatorPoolQueryStrategy
+        The multiannotator-annotator query strategy.
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
@@ -287,7 +287,7 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
     """
 
     # check arguments
-    check_type(ma_qs, 'ma_qs', MultiAnnotPoolBasedQueryStrategy)
+    check_type(ma_qs, 'ma_qs', MultiAnnotatorPoolQueryStrategy)
     check_type(ma_qs_arg_dict, 'ma_qs_arg_dict', dict)
     for var in ['candidates', 'annotators', 'X', 'y']:
         if 'candidates' in ma_qs_arg_dict.keys():

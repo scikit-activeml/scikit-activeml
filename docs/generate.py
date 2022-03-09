@@ -1,14 +1,14 @@
-import inspect
+import distutils.dir_util
 import importlib
+import inspect
 import json
 import os
-from pybtex.database import parse_file
+import warnings
 
 import numpy as np
+from pybtex.database import parse_file
 
 import skactiveml
-import warnings
-import distutils.dir_util
 
 for module in skactiveml.__all__:
     importlib.import_module('skactiveml.' + module)
@@ -518,12 +518,12 @@ def format_plot(data, template_path):
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
                     if 'clf' not in data.keys() and \
                             'clf' not in data['init_params'].keys():
-                        line += 'from skactiveml.classifier import PWC\n'
+                        line += 'from skactiveml.classifier import ParzenWindowClassifier\n'
                 elif 'init_clf' in line:
                     # Decide which classifier to use, if clf is None.
                     if 'clf' not in data.keys():
                         if 'clf' not in data['init_params'].keys():
-                            clf = 'PWC(classes=[0, 1], random_state=random_state)'
+                            clf = 'ParzenWindowClassifier(classes=[0, 1], random_state=random_state)'
                         else:
                             clf = data['init_params']['clf']
                     else:

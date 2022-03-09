@@ -9,7 +9,7 @@ from sklearn.utils.validation import check_array, \
     check_consistent_length
 
 from ..base import SkactivemlClassifier
-from ..classifier import PWC
+from ..classifier import ParzenWindowClassifier
 from ..utils import MISSING_LABEL, is_labeled, is_unlabeled, \
     check_missing_label, check_equal_missing_label, check_type, check_indices
 
@@ -123,8 +123,8 @@ class IndexClassifierWrapper:
         self.missing_label_ = self.missing_label
         check_equal_missing_label(self.clf.missing_label, self.missing_label_)
 
-        # prepare PWC
-        if isinstance(self.clf, PWC) and self.use_speed_up:
+        # prepare ParzenWindowClassifier
+        if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
             self.pwc_metric_ = self.clf.metric
             self.pwc_metric_dict_ = (
                 {} if self.clf.metric_dict is None else self.clf.metric_dict
@@ -166,8 +166,8 @@ class IndexClassifierWrapper:
         idx_pred = check_array(idx_pred, ensure_2d=False, dtype=int)
         idx_pred = check_indices(idx_pred, self.X, dim=0)
 
-        # precompute PWC
-        if isinstance(self.clf, PWC) and self.use_speed_up:
+        # precompute ParzenWindowClassifier
+        if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
             if fit_params == 'all':
                 idx_fit_ = idx_fit
             elif fit_params == 'labeled':
@@ -418,14 +418,14 @@ class IndexClassifierWrapper:
         y : array-like, shape (n_sub_samples)
             Predicted class labels of the input samples.
         """
-        if isinstance(self.clf, PWC) and self.use_speed_up:
+        if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
             P = self.pwc_K_[self.idx_, :][:, idx].T
 
             # check if results contain NAN
             if np.isnan(P).any():
                 raise ValueError(
                     'Error in defining what should be '
-                    'pre-computed in PWC. Not all necessary '
+                    'pre-computed in ParzenWindowClassifier. Not all necessary '
                     'information is available which results in '
                     'NaNs in `predict_proba`.'
                 )
@@ -447,14 +447,14 @@ class IndexClassifierWrapper:
             The class probabilities of the input samples. Classes are ordered
             by lexicographic order.
         """
-        if isinstance(self.clf, PWC) and self.use_speed_up:
+        if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
             P = self.pwc_K_[self.idx_, :][:, idx].T
 
             # check if results contain NAN
             if np.isnan(P).any():
                 raise ValueError(
                     'Error in defining what should be '
-                    'pre-computed in PWC. Not all necessary '
+                    'pre-computed in ParzenWindowClassifier. Not all necessary '
                     'information is available which results in '
                     'NaNs in `predict_proba`.'
                 )
@@ -476,14 +476,14 @@ class IndexClassifierWrapper:
             The class frequency estimates of the input samples. Classes are
             ordered according to `classes_`.
         """
-        if isinstance(self.clf, PWC) and self.use_speed_up:
+        if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
             P = self.pwc_K_[self.idx_, :][:, idx].T
 
             # check if results contain NAN
             if np.isnan(P).any():
                 raise ValueError(
                     'Error in defining what should be '
-                    'pre-computed in PWC. Not all necessary '
+                    'pre-computed in ParzenWindowClassifier. Not all necessary '
                     'information is available which results in '
                     'NaNs in `predict_proba`.'
                 )
