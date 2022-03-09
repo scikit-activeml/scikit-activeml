@@ -5,14 +5,15 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
-from sklearn.utils import check_array, check_consistent_length
+from sklearn.utils.validation import check_array, check_consistent_length, \
+    _is_arraylike
 
 from ._auxiliary_functions import mesh, check_bound, _get_boundary_args, \
     _get_confidence_args, _get_contour_args, _get_cmap
 from ..base import QueryStrategy
 from ..exceptions import MappingError
-from ..utils import check_scalar, unlabeled_indices, call_func
-from ..utils._validation import check_type, check_indices
+from ..utils import check_scalar, unlabeled_indices, call_func, \
+    check_type, check_indices
 
 
 def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
@@ -153,7 +154,7 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
         Determines the area in which the boundary is plotted. If candidates is not
         given, bound must not be None. Otherwise, the bound is determined based
         on the data.
-    ax : matplotlib.axes.Axes, optional (default=None)
+    axes : matplotlib.axes.Axes, optional (default=None)
         The axis on which the utility is plotted.
     res : int, optional (default=21)
         The resolution of the plot.
@@ -170,7 +171,7 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
 
     replace_nan = kwargs.pop('replace_nan', 0.0)
     feature_bound = kwargs.pop('feature_bound', None)
-    ax = kwargs.pop('ax', None)
+    axes = kwargs.pop('axes', None)
     res = kwargs.pop('res', 21)
     contour_dict = kwargs.pop('contour_dict', None)
     ignore_undefined_query_params = \
@@ -185,18 +186,27 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
     y = check_array(y, ensure_2d=False, force_all_finite='allow-nan')
     check_consistent_length(X, y)
 
+    if y.ndim == 2:
+        n_annotators = y.shape[1]
+    else:
+        n_annotators = None
+
+    if axes is None:
+        if n_annotators is None or n_annotators == 1:
+            axes = plt.subplots(1, 1)[1]
+        else:
+            axes = plt.subplots(1, n_annotators)[1]
+    if not _is_arraylike(axes):
+        axes = np.array([axes])
+
     # ensure that utilities are returned
     kwargs['return_utilities'] = True
 
     if candidates is None:
         # plot mesh
         try:
-            feature_bound = check_bound(bound=feature_bound, X=X)
-
-            if ax is None:
-                ax = plt.gca()
-            check_type(ax, 'ax', Axes)
             check_scalar(res, 'res', int, min_val=1)
+            feature_bound = check_bound(bound=feature_bound, X=X)
 
             X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
 
@@ -210,8 +220,11 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
                 _, utilities = qs.query(X=X, y=y, candidates=mesh_instances,
                                         **kwargs)
 
-            utilities = utilities.reshape(X_mesh.shape)
-            ax.contourf(X_mesh, Y_mesh, utilities, **contour_args)
+            for a_idx, ax in enumerate(axes):
+                if n_annotators is not None:
+                    utilities_a_idx = utilities[0, :, a_idx]
+                utilities_a_idx = utilities_a_idx.reshape(X_mesh.shape)
+                ax.contourf(X_mesh, Y_mesh, utilities_a_idx, **contour_args)
 
             return ax
 
@@ -239,11 +252,19 @@ def plot_utility(qs, X, y, candidates=None, **kwargs):
         _, utilities = qs.query(X=X, y=y, candidates=candidates,
                                 **kwargs)
 
-    ax = plot_contour_for_samples(
-        X_utils, utilities[0], replace_nan=replace_nan,
-        feature_bound=feature_bound, ax=ax, res=res,
-        contour_dict=contour_dict
-    )
+    for a_idx, ax in enumerate(axes):
+        if n_annotators is not None:
+            utilities_a_idx = utilities[0, :, a_idx]
+        utilities_a_idx = utilities_a_idx.reshape(X_mesh.shape)
+        plot_contour_for_samples(
+            X_utils,
+            utilities_a_idx,
+            replace_nan=replace_nan,
+            feature_bound=feature_bound,
+            ax=ax,
+            res=res,
+            contour_dict=contour_dict
+        )
 
     return ax
 

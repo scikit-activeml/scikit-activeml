@@ -7,16 +7,92 @@ from sklearn.utils import check_array, check_consistent_length
 from .._auxiliary_functions import mesh, check_bound, _get_contour_args, \
     _get_tick_args, _get_legend_args, _get_cmap, _get_figure_for_ma
 from .._feature_space import plot_decision_boundary
-from ...base import MultiAnnotatorPoolQueryStrategy
-from ...utils import is_labeled, check_scalar, check_type
+from ...base import MultiAnnotatorPoolQueryStrategy, QueryStrategy
+from ...utils import is_labeled, check_scalar, check_type, call_func
 
 
-def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
-                          bound=None, epsilon=1, title=None, fontsize=15,
-                          fig_size=None, plot_legend=True, legend_dict=None,
-                          contour_dict=None, boundary_dict=None,
-                          confidence_dict=None, tick_dict=None,
-                          marker_size=10, res=21):
+def plot_multi_annotator_utility(qs, X, y, candidates, **kwargs):
+    replace_nan = kwargs.pop('replace_nan', 0.0)
+    feature_bound = kwargs.pop('feature_bound', None)
+    ax = kwargs.pop('ax', None)
+    res = kwargs.pop('res', 21)
+    contour_dict = kwargs.pop('contour_dict', None)
+    ignore_undefined_query_params = \
+        kwargs.pop('ignore_undefined_query_params', False)
+
+    check_type(qs, 'qs', QueryStrategy)
+    X = check_array(X, allow_nd=False, ensure_2d=True)
+    if X.shape[1] != 2:
+        raise ValueError('Samples in `X` must have 2 features.')
+
+    # Check labels
+    y = check_array(y, ensure_2d=False, force_all_finite='allow-nan')
+    check_consistent_length(X, y)
+
+    # ensure that utilities are returned
+    kwargs['return_utilities'] = True
+
+    if candidates is None:
+        # plot mesh
+        try:
+            feature_bound = check_bound(bound=feature_bound, X=X)
+
+            if ax is None:
+                ax = plt.gca()
+            check_type(ax, 'ax', Axes)
+            check_scalar(res, 'res', int, min_val=1)
+
+            X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+
+            contour_args = _get_contour_args(contour_dict)
+
+            if ignore_undefined_query_params:
+                _, utilities = \
+                    call_func(qs.query, X=X, y=y, candidates=mesh_instances,
+                              **kwargs)
+            else:
+                _, utilities = qs.query(X=X, y=y, candidates=mesh_instances,
+                                        **kwargs)
+            for a in range(annotator_indices):
+                utilities_a = utilities[0, :, a].reshape(X_mesh.shape)
+                axes[a].contourf(X_mesh, Y_mesh, utilities, **contour_args)
+
+            return ax
+
+        except MappingError:
+            candidates = unlabeled_indices(y, missing_label=qs.missing_label)
+        except BaseException as err:
+            warnings.warn(f'Unable to create utility plot with mesh because '
+                          f'of the following error. Trying plotting over '
+                          f'candidates. \n\n Unexpected {err.__repr__()}')
+            candidates = unlabeled_indices(y, missing_label=qs.missing_label)
+
+    candidates = check_array(candidates, allow_nd=False, ensure_2d=False,
+                             force_all_finite='allow-nan')
+    if candidates.ndim == 1:
+        X_utils = X
+        candidates = check_indices(candidates, X)
+    else:
+        X_utils = candidates
+
+    if ignore_undefined_query_params:
+        _, utilities = \
+            call_func(qs.query, X=X, y=y, candidates=candidates,
+                      **kwargs)
+    else:
+        _, utilities = qs.query(X=X, y=y, candidates=candidates,
+                                **kwargs)
+
+    ax = plot_contour_for_samples(
+        X_utils, utilities[0], replace_nan=replace_nan,
+        feature_bound=feature_bound, ax=ax, res=res,
+        contour_dict=contour_dict
+    )
+
+    return ax
+
+
+def plot_ma_current_state(qs, X, y, y_true, candidates, **kwargs):
     """Shows the annotations from the different annotators, the decision
     boundary of the given classifier and the utilities expected of querying
     a sample from a given region based on the query strategy.
@@ -33,7 +109,7 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
     y_true : array-like of shape (n_samples,)
         The correct labels.
     ma_qs: MultiAnnotatorPoolQueryStrategy
-        The multiannotator-annotator query strategy.
+        The multi-annotator query strategy.
     clf: sklearn classifier
         The classifier whose decision boundary is plotted.
     ma_qs_arg_dict: dict
@@ -74,20 +150,23 @@ def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
     fig: matplotlib.figure.Figure
         The figure onto which the current state is plotted.
     """
-
-    bound = check_bound(bound, X, epsilon=epsilon)
-
-    fig = plot_ma_utility(fig_size=fig_size, ma_qs=ma_qs, X=X, y=y,
-                          ma_qs_arg_dict=ma_qs_arg_dict, feature_bound=bound,
-                          title=title, fontsize=fontsize, res=res,
-                          contour_dict=contour_dict, tick_dict=tick_dict)
-    plot_ma_data_set(fig=fig, X=X, y=y, y_true=y_true, feature_bound=bound,
-                     plot_legend=plot_legend, legend_dict=legend_dict,
-                     tick_dict=tick_dict, marker_size=marker_size)
-    plot_ma_decision_boundary(clf, fig=fig, feature_bound=bound,
-                              boundary_dict=boundary_dict,
-                              confidence_dict=confidence_dict,
-                              tick_dict=tick_dict)
+    '''
+    def plot_ma_current_state(X, y, y_true, ma_qs, clf, ma_qs_arg_dict,
+                              bound=None, epsilon=1, title=None, fontsize=15,
+                              fig_size=None, plot_legend=True, legend_dict=None,
+                              contour_dict=None, boundary_dict=None,
+                              confidence_dict=None, tick_dict=None,
+                              marker_size=10, res=21):
+    '''
+    kwargs['qs'] = qs
+    kwargs['X'] = X
+    kwargs['y'] = y
+    kwargs['y_true'] = y_true
+    kwargs['candidates'] = candidates
+    fig = call_func(plot_ma_utility, **kwargs)
+    kwargs['fig'] = fig
+    call_func(plot_ma_data_set, **kwargs)
+    call_func(plot_ma_decision_boundary, **kwargs)
 
     return fig
 
@@ -218,12 +297,12 @@ def plot_ma_utility(ma_qs, X, y, candidates=None, annotators=None,
                     feature_bound=None, title=None, res=21,
                     fontsize=15, contour_dict=None, tick_dict=None):
     """Plots the utilities for the different annotators of the given
-    multiannotator-annotator query strategy.
+    multi-annotator query strategy.
 
     Parameters
     ----------
     ma_qs: MultiAnnotatorPoolQueryStrategy
-        The multiannotator-annotator query strategy.
+        The multi-annotator query strategy.
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.

@@ -14,7 +14,7 @@ from ..utils import MISSING_LABEL, check_scalar, simple_batch, check_type, \
 class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     """(Multi-class) Probabilistic Active Learning
 
-    This class implements multiannotator-class probabilistic active learning (McPAL) [1]
+    This class implements multi-class probabilistic active learning (McPAL) [1]
     strategy.
 
     Parameters

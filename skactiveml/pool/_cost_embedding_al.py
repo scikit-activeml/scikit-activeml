@@ -25,7 +25,7 @@ from ..utils import simple_batch, check_classifier_params, \
 class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
     """Active Learning with Cost Embedding (ALCE).
 
-    Cost sensitive multiannotator-class algorithm.
+    Cost sensitive multi-class algorithm.
     Assume each class has at least one sample in the labeled pool.
     This implementation is based on libact.
 

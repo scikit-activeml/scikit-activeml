@@ -224,7 +224,7 @@ def check_X_y(X=None, y=None, X_cand=None, sample_weight=None,
     Checks X and y for consistent length, enforces X to be 2D and y 1D. By
     default, X is checked to be non-empty and containing only finite values.
     Standard input checks are also applied to y, such as checking that y
-    does not have np.nan or np.inf targets. For multiannotator-label y, set
+    does not have np.nan or np.inf targets. For multi-label y, set
     multi_output=True to allow 2D and sparse y. If the dtype of X is
     object, attempt converting to float, raising on failure.
 
