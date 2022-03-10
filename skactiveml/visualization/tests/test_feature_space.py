@@ -15,8 +15,8 @@ from skactiveml.pool import UncertaintySampling, RandomSampling, \
     ValueOfInformationEER
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.visualization import plot_decision_boundary, plot_utilities, \
-    plot_contour_for_samples
-from .._feature_space import _general_plot_utilities, plot_annotator_utilities
+    plot_contour_for_samples, plot_annotator_utilities
+from skactiveml.visualization._feature_space import _general_plot_utilities
 
 
 class TestFeatureSpace(unittest.TestCase):
@@ -134,6 +134,15 @@ class TestFeatureSpace(unittest.TestCase):
                                 **self.qs_dict,
                                 replace_nan=None, feature_bound=self.bound)
 
+    def test__general_plot_utilities_param_plot_annotators(self):
+        self.assertRaises(TypeError, _general_plot_utilities, qs=self.qs,
+                          X=self.X, y=self.y, **self.qs_dict,
+                          plot_annotators=[4])
+        _, axes = plt.subplots(1,2)
+        self.assertRaises(ValueError, _general_plot_utilities, qs=self.qs,
+                          X=self.X, y=self.y_active_multi, **self.qs_dict,
+                          plot_annotators=[4], axes=axes)
+
     def test__general_plot_utilities_param_ignore_undefined_query_params(self):
         _general_plot_utilities(qs=ValueOfInformationEER(),
                                 X=self.X, y=self.y_active,
@@ -161,6 +170,10 @@ class TestFeatureSpace(unittest.TestCase):
                           X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, ax=2)
+        _, axes = plt.subplots(1,2)
+        self.assertRaises(ValueError, _general_plot_utilities, qs=self.qs,
+                          X=self.X, y=self.y_active_multi, **self.qs_dict,
+                          feature_bound=self.bound, ax=axes)
 
     def test__general_plot_utilities_param_axes(self):
         self.assertRaises(TypeError, _general_plot_utilities, qs=self.qs,
@@ -338,6 +351,22 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(self.path_prefix +
                                     'multi_without_axes_expected.pdf',
                                     self.path_prefix + 'multi_without_axes.pdf',
+                                    tol=0)
+        self.assertIsNone(comparison)
+
+    def test_multi_without_axes_cand(self):
+        qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
+        query_params_dict = {'clf': self.clf}
+        plot_annotator_utilities(qs=qs, X=self.X, candidates=[1,2,3],
+                                 y=self.y_active_multi,
+                                 feature_bound=self.bound,
+                                 query_params_dict=query_params_dict)
+
+        plt.savefig(self.path_prefix + 'multi_without_axes_cand.pdf')
+        comparison = compare_images(self.path_prefix +
+                                    'multi_without_axes_cand_expected.pdf',
+                                    self.path_prefix +
+                                    'multi_without_axes_cand.pdf',
                                     tol=0)
         self.assertIsNone(comparison)
 

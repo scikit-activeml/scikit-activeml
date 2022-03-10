@@ -179,13 +179,7 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
     check_scalar(res, 'res', int, min_val=1)
     if ax is None:
         ax = plt.gca()
-    check_type(ax, 'ax', Axes, list)
-    if isinstance(ax, list):
-        for ax_item in ax:
-            check_type(ax_item, 'one item of ax', Axes)
-        axs = ax
-    else:
-        axs = [ax, ]
+    check_type(ax, 'ax', Axes)
     feature_bound = check_bound(bound=feature_bound)
 
     # Check and convert the colormap
@@ -237,12 +231,10 @@ def plot_decision_boundary(clf, feature_bound, ax=None, res=21,
                                                   posterior_list[y2]], axis=0)
 
         posteriors = posteriors / (posteriors + posteriors_best_alternative)
-        for ax_item in axs:
-            ax_item.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
+        ax.contour(X_mesh, Y_mesh, posteriors, [.5], **boundary_args)
         if confidence is not None:
-            for ax_item in axs:
-                ax_item.contour(X_mesh, Y_mesh, posteriors, [confidence],
-                                colors=[cmap(norm(y))], **confidence_args)
+            ax.contour(X_mesh, Y_mesh, posteriors, [confidence],
+                       colors=[cmap(norm(y))], **confidence_args)
     return ax
 
 
