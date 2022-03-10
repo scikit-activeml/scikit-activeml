@@ -454,6 +454,11 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
 
         except MappingError:
             candidates = unlabeled_indices(y, missing_label=qs.missing_label)
+        except BaseException as err:
+            warnings.warn(f'Unable to create utility plot with mesh because '
+                          f'of the following error. Trying plotting over '
+                          f'candidates. \n\n Unexpected {err.__repr__()}')
+            candidates = unlabeled_indices(y, missing_label=qs.missing_label)
 
     candidates = check_array(candidates, allow_nd=False, ensure_2d=False,
                              force_all_finite='allow-nan')
