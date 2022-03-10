@@ -154,7 +154,7 @@ As output of this code snippet, we obtain the actively trained Gaussian process 
 including a visualization of its decision boundary and the sample utilities computed with
 uncertainty sampling.
 
-.. image:: docs/logos/pal-example-output.png
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/pal-example-output.png
    :width: 400
 
 Stream-based Active Learning
@@ -211,7 +211,7 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
 As output of this code snippet, we obtain the actively trained pwc classifier incuding
 a visualization of its accuracy over the 200 samples.
 
-.. image:: docs/logos/stream-example-output.png
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/stream-example-output.png
    :width: 400
 
 .. examples_end

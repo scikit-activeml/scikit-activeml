@@ -48,10 +48,13 @@ for c in range(n_cycles):
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )
-    ax = plot_utilities(qs, X=X, y=y, **query_params, res="#_res",
-                        feature_bound=feature_bound, ax=ax)
-    ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2)
-    ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8, marker=".", s=300)
+    ax = plot_utilities(qs, X=X, y=y, candidates="#_candidates",
+                        **query_params,
+                        res="#_res", feature_bound=feature_bound, ax=ax)
+    ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".",
+               zorder=2)
+    ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8,
+               marker=".", s=300)
     ax = plot_decision_boundary(clf, feature_bound, ax=ax)
 
     coll_new = list(ax.collections)

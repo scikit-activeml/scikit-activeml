@@ -63,16 +63,24 @@
       "Settles2012" : "Uncertainty Sampling"
     },
     "tags" : ["pool"],
-    "title" : "Expected Average Precision",
-    "refs" : ["wang2018uncertainty"],
-    "sequence" : ["title", "text_0", "plot", "refs"],
-    "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "method" : "'expected_average_precision'"
+    "title": "Expected Average Precision",
+    "refs": [
+      "wang2018uncertainty"
+    ],
+    "sequence": [
+      "title",
+      "text_0",
+      "plot",
+      "refs"
+    ],
+    "text_0": "",
+    "bp_add_imports": [],
+    "init_params": {
+      "method": "'expected_average_precision'"
     },
-    "query_params" : {
-      "clf" : "clf"
-    }
+    "query_params": {
+      "clf": "clf"
+    },
+    "use_candidate_plotting": true
   }
 ]

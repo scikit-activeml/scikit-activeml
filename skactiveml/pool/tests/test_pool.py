@@ -1,6 +1,7 @@
 import inspect
 import json
 import os
+import shutil
 import unittest
 import warnings
 from importlib import import_module
@@ -503,7 +504,7 @@ class TestExamples(unittest.TestCase):
                     exec(open(file_path, "r").read(), locals())
 
         # Remove the created examples from disk.
-        # shutil.rmtree(examples_path)
+        shutil.rmtree(examples_path)
 
     def test_json(self):
         # Collect all strategies for which an example exists

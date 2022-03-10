@@ -548,15 +548,19 @@ def format_plot(data, template_path):
                                        key_as_string=True) + '}\n'
                 elif '"#_n_cycles"' in line:
                     n_cycles = os.getenv('N_CYCLES', default='2')
-                    line = line.replace('"#_n_cycles"', n_cycles) + '\n'
+                    line = line.replace('"#_n_cycles"', n_cycles)
                 elif '"#_n_samples"' in line:
                     n_samples = os.getenv('N_SAMPLES', default='10')
-                    line = line.replace('"#_n_samples"', n_samples) + '\n'
-                    # line = line[:start] + n_cycles + '\n'
+                    line = line.replace('"#_n_samples"', n_samples)
                 elif '"#_res"' in line:
                     res = os.getenv('RES', default='3')
-                    line = line.replace('"#_res"', res) + '\n'
-                    # line = line[:start] + n_cycles + '\n'
+                    line = line.replace('"#_res"', res)
+                elif '"#_candidates"' in line:
+                    if 'use_candidate_plotting' not in data.keys():
+                        cand = 'None'
+                    else:
+                        cand = "np.arange(len(X))"
+                    line = line.replace('"#_candidates"', cand)
                 elif '#_bp' in line:
                     try:
                         s = line.find('#_')
