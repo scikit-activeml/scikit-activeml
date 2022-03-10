@@ -514,7 +514,7 @@ def format_plot(data, template_path):
     with open(template_path, "r") as template:
         for line in template:
             if '#_' in line:
-                if '#_ import' in line:
+                if '#_import' in line:
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
                     if 'clf' not in data.keys() and \
                             'clf' not in data['init_params'].keys():

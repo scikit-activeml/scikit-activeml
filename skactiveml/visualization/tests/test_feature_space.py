@@ -1,4 +1,5 @@
 import os
+from random import random
 import unittest
 
 import numpy as np
@@ -13,9 +14,10 @@ from skactiveml import visualization
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, RandomSampling, \
     ValueOfInformationEER
+from skactiveml.pool.multiannotator import SingleAnnotWrapper
 from skactiveml.visualization import plot_decision_boundary, plot_utilities, \
     plot_contour_for_samples
-from .._feature_space import _general_plot_utilities
+from .._feature_space import _general_plot_utilities, plot_annotator_utilities
 
 
 class TestFeatureSpace(unittest.TestCase):
@@ -30,12 +32,14 @@ class TestFeatureSpace(unittest.TestCase):
         cand_indices = np.setdiff1d(np.arange(len(self.X)), train_indices)
         self.y_active = np.full_like(self.y, np.nan, dtype=float)
         self.y_active[cand_indices] = self.y[cand_indices]
+        self.y_active_multi = np.tile(self.y_active, [5, 1]).T
         self.X_train = self.X[train_indices]
         self.y_train = self.y[train_indices]
+        self.y_train_multi = np.tile(self.y_train, [5, 1]).T
         self.X_cand = self.X[cand_indices]
-        self.clf = ParzenWindowClassifier()
+        self.clf = ParzenWindowClassifier(random_state=0)
         self.clf.fit(self.X_train, self.y_train)
-        self.qs = UncertaintySampling()
+        self.qs = UncertaintySampling(random_state=0)
         self.qs_dict = {'clf': self.clf}
         self.utilities = clone(self.qs).query(X=self.X, y=self.y, clf=self.clf,
                                               candidates=self.X,
@@ -222,6 +226,9 @@ class TestFeatureSpace(unittest.TestCase):
         plot_contour_for_samples(X=self.X, values=self.utilities,
                                  contour_dict={'linestyles': '.'})
 
+
+
+
     # Graphical tests
 
     def test_without_candidates(self):
@@ -306,6 +313,34 @@ class TestFeatureSpace(unittest.TestCase):
                                     tol=0)
         self.assertIsNone(comparison)
 
+    def test_multi_with_axes(self):
+        fig, axes = plt.subplots(1, 5, figsize=(10, 2))
+        qs = SingleAnnotWrapper(clone(self.qs), random_state=0)
+        query_params_dict = {'clf': self.clf}
+        plot_annotator_utilities(qs=qs, X=self.X, y=self.y_active_multi,
+                                 feature_bound=self.bound, axes=axes,
+                                 query_params_dict=query_params_dict)
+
+        fig.savefig(self.path_prefix + 'multi_with_axes.pdf')
+        comparison = compare_images(self.path_prefix +
+                                    'multi_with_axes_expected.pdf',
+                                    self.path_prefix + 'multi_with_axes.pdf',
+                                    tol=0)
+        self.assertIsNone(comparison)
+
+    def test_multi_without_axes(self):
+        qs = SingleAnnotWrapper(clone(self.qs), random_state=0)
+        query_params_dict = {'clf': self.clf}
+        plot_annotator_utilities(qs=qs, X=self.X, y=self.y_active_multi,
+                                 feature_bound=self.bound,
+                                 query_params_dict=query_params_dict)
+
+        plt.savefig(self.path_prefix + 'multi_without_axes.pdf')
+        comparison = compare_images(self.path_prefix +
+                                    'multi_without_axes_expected.pdf',
+                                    self.path_prefix + 'multi_without_axes.pdf',
+                                    tol=0)
+        self.assertIsNone(comparison)
 
 class TestClassifier(ClassifierMixin):
     pass
