@@ -375,7 +375,7 @@ class IndexClassifierWrapper:
         # handle case using regular fit from clf
         else:
             if not hasattr(self, 'idx_'):
-                raise NotFittedError('Fitted classifier from `init`cannot be '
+                raise NotFittedError('Fitted classifier from `init` cannot be '
                                      'used for `partial_fit` as it is unknown '
                                      'where it has been fitted on.')
             if use_base_clf:
