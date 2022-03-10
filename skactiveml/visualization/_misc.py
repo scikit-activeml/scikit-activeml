@@ -27,7 +27,7 @@ def mesh(bound, res):
         instances of the mesh grid
     """
 
-    check_scalar(res, 'res', int, min_val=1)
+    check_scalar(res, "res", int, min_val=1)
     check_bound(bound=bound, bound_must_be_given=True)
 
     xmin, ymin, xmax, ymax = np.ravel(bound)
@@ -42,30 +42,36 @@ def mesh(bound, res):
 def _get_cmap(cmap):
     if isinstance(cmap, str):
         cmap = plt.cm.get_cmap(cmap)
-    check_type(cmap, 'cmap', Colormap, str)
+    check_type(cmap, "cmap", Colormap, str)
     return cmap
 
 
 def _get_boundary_args(boundary_dict):
-    boundary_args = {'colors': 'k', 'linewidths': [2], 'zorder': 1}
+    boundary_args = {"colors": "k", "linewidths": [2], "zorder": 1}
     if boundary_dict is not None:
-        check_type(boundary_dict, 'boundary_dict', dict)
+        check_type(boundary_dict, "boundary_dict", dict)
         boundary_args.update(boundary_dict)
     return boundary_args
 
 
 def _get_confidence_args(confidence_dict):
-    confidence_args = {'linewidths': [2, 2], 'linestyles': '--', 'alpha': 0.9,
-                       'vmin': 0.2, 'vmax': 0.8, 'zorder': 1}
+    confidence_args = {
+        "linewidths": [2, 2],
+        "linestyles": "--",
+        "alpha": 0.9,
+        "vmin": 0.2,
+        "vmax": 0.8,
+        "zorder": 1,
+    }
     if confidence_dict is not None:
-        check_type(confidence_dict, 'confidence_dict', dict)
+        check_type(confidence_dict, "confidence_dict", dict)
         confidence_args.update(confidence_dict)
     return confidence_args
 
 
 def _get_contour_args(contour_dict):
-    contour_args = {'cmap': 'Greens', 'alpha': 0.75}
+    contour_args = {"cmap": "Greens", "alpha": 0.75}
     if contour_dict is not None:
-        check_type(contour_dict, 'contour_dict', dict)
+        check_type(contour_dict, "contour_dict", dict)
         contour_args.update(contour_dict)
     return contour_args

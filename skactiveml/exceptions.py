@@ -1,4 +1,5 @@
-__all__ = ['MappingError']
+__all__ = ["MappingError"]
+
 
 class MappingError(Exception):
     """

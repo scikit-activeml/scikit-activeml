@@ -5,7 +5,9 @@ learning settings.
 """
 
 
-from ._balanced_incremental_quantile_filter import BalancedIncrementalQuantileFilter
+from ._balanced_incremental_quantile_filter import (
+    BalancedIncrementalQuantileFilter,
+)
 from ._estimated_budget_zliobaite import (
     EstimatedBudgetZliobaite,
     FixedUncertaintyBudgetManager,

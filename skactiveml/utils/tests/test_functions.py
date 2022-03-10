@@ -4,7 +4,6 @@ from skactiveml.utils import call_func
 
 
 class TestFunctions(unittest.TestCase):
-
     def test_call_func(self):
         def dummy_function(a, b=2, c=3):
             return a * b * c

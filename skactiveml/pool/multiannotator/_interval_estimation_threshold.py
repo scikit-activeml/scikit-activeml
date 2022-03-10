@@ -3,11 +3,20 @@ from scipy.stats import t, rankdata
 from sklearn.base import BaseEstimator, clone
 from sklearn.utils.validation import check_array, check_is_fitted
 
-from ...base import MultiAnnotatorPoolQueryStrategy, \
-    SkactivemlClassifier, AnnotatorModelMixin
+from ...base import (
+    MultiAnnotatorPoolQueryStrategy,
+    SkactivemlClassifier,
+    AnnotatorModelMixin,
+)
 from ...pool._uncertainty_sampling import uncertainty_scores
-from ...utils import check_scalar, MISSING_LABEL, is_labeled, check_type, \
-    simple_batch, majority_vote
+from ...utils import (
+    check_scalar,
+    MISSING_LABEL,
+    is_labeled,
+    check_type,
+    simple_batch,
+    majority_vote,
+)
 
 
 class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
@@ -15,9 +24,9 @@ class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
 
     This annotator model relies on 'Interval Estimation Learning' (IELearning)
     for estimating the annotation performances, i.e., labeling accuracies,
-    of multiple annotators [1]. Therefore, it computes the mean accuracy and the
-    lower as well as the upper bound of the labeling accuracy per annotator.
-    (Weighted) majority vote is used as as estimated ground truth.
+    of multiple annotators [1]. Therefore, it computes the mean accuracy and
+    the lower as well as the upper bound of the labeling accuracy per
+    annotator. (Weighted) majority vote is used as estimated ground truth.
 
     Parameters
     ----------
@@ -54,8 +63,14 @@ class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
         Discovery and Data Mining, pp. 259-268. 2009.
     """
 
-    def __init__(self, classes=None, missing_label=MISSING_LABEL, alpha=0.05,
-                 mode='upper', random_state=None):
+    def __init__(
+            self,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            alpha=0.05,
+            mode="upper",
+            random_state=None,
+    ):
         self.classes = classes
         self.missing_label = missing_label
         self.alpha = alpha
@@ -82,30 +97,44 @@ class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
         """
 
         # Check whether alpha is float in (0, 1).
-        check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
-                     max_val=1, min_inclusive=False, max_inclusive=False)
+        check_scalar(
+            x=self.alpha,
+            target_type=float,
+            name="alpha",
+            min_val=0,
+            max_val=1,
+            min_inclusive=False,
+            max_inclusive=False,
+        )
 
         # Check mode.
-        if self.mode not in ['lower', 'mean', 'upper']:
+        if self.mode not in ["lower", "mean", "upper"]:
             raise ValueError("`mode` must be in `['lower', 'mean', `upper`].`")
 
         # Check shape of labels.
         if y.ndim != 2:
-            raise ValueError("`y` but must be a 2d array with shape "
-                             "`(n_samples, n_annotators)`.")
+            raise ValueError(
+                "`y` but must be a 2d array with shape "
+                "`(n_samples, n_annotators)`."
+            )
 
         # Compute majority vote labels.
-        y_mv = majority_vote(y=y, w=sample_weight, classes=self.classes,
-                             random_state=self.random_state,
-                             missing_label=self.missing_label)
+        y_mv = majority_vote(
+            y=y,
+            w=sample_weight,
+            classes=self.classes,
+            random_state=self.random_state,
+            missing_label=self.missing_label,
+        )
 
         # Number of annotators.
         self.n_annotators_ = y.shape[1]
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         self.A_perf_ = np.zeros((self.n_annotators_, 3))
         for a_idx in range(self.n_annotators_):
-            is_correct = np.equal(y_mv[is_lbld[:, a_idx]],
-                                  y[is_lbld[:, a_idx], a_idx])
+            is_correct = np.equal(
+                y_mv[is_lbld[:, a_idx]], y[is_lbld[:, a_idx], a_idx]
+            )
             is_correct = np.concatenate((is_correct, [0, 1]))
             mean = np.mean(is_correct)
             std = np.std(is_correct)
@@ -134,9 +163,9 @@ class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
         """
         check_is_fitted(self)
         X = check_array(X)
-        if self.mode == 'lower':
+        if self.mode == "lower":
             mode = 0
-        elif self.mode == 'mean':
+        elif self.mode == "mean":
             mode = 1
         else:
             mode = 2
@@ -180,15 +209,31 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         Discovery and Data Mining, pp. 259-268. 2009.
     """
 
-    def __init__(self, epsilon=0.9, alpha=0.05, random_state=None,
-                 missing_label=MISSING_LABEL):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+    def __init__(
+            self,
+            epsilon=0.9,
+            alpha=0.05,
+            random_state=None,
+            missing_label=MISSING_LABEL,
+    ):
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         self.epsilon = epsilon
         self.alpha = alpha
 
-    def query(self, X, y, clf, fit_clf=True, candidates=None, annotators=None,
-              sample_weight=None, batch_size='adaptive',
-              return_utilities=False):
+    def query(
+            self,
+            X,
+            y,
+            clf,
+            fit_clf=True,
+            candidates=None,
+            annotators=None,
+            sample_weight=None,
+            batch_size="adaptive",
+            return_utilities=False,
+    ):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
@@ -264,40 +309,64 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         """
 
         # base check
-        X, y, candidates, annotators, _, return_utilities = \
-            super()._validate_data(X, y, candidates, annotators, 1,
-                                   return_utilities, reset=True)
+        (
+            X,
+            y,
+            candidates,
+            annotators,
+            _,
+            return_utilities,
+        ) = super()._validate_data(
+            X, y, candidates, annotators, 1, return_utilities, reset=True
+        )
 
-        X_cand, mapping, A_cand = self._transform_cand_annot(candidates,
-                                                             annotators, X, y)
+        X_cand, mapping, A_cand = self._transform_cand_annot(
+            candidates, annotators, X, y
+        )
 
         # Validate classifier type.
-        check_type(clf, 'clf', SkactivemlClassifier)
+        check_type(clf, "clf", SkactivemlClassifier)
 
         # Check whether epsilon is float in [0, 1].
-        check_scalar(x=self.epsilon, target_type=float, name='epsilon',
-                     min_val=0, max_val=1)
+        check_scalar(
+            x=self.epsilon,
+            target_type=float,
+            name="epsilon",
+            min_val=0,
+            max_val=1,
+        )
 
         # Check whether alpha is float in (0, 1).
-        check_scalar(x=self.alpha, target_type=float, name='alpha', min_val=0,
-                     max_val=1, min_inclusive=False, max_inclusive=False)
+        check_scalar(
+            x=self.alpha,
+            target_type=float,
+            name="alpha",
+            min_val=0,
+            max_val=1,
+            min_inclusive=False,
+            max_inclusive=False,
+        )
 
         n_annotators = y.shape[1]
         # Check whether unlabeled data exists
-        A_cand = np.repeat(np.all(A_cand, axis=1).reshape(-1, 1), n_annotators,
-                           axis=1)
+        A_cand = np.repeat(
+            np.all(A_cand, axis=1).reshape(-1, 1), n_annotators, axis=1
+        )
 
         # Fit classifier and compute uncertainties on candidate samples.
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
 
         P = clf.predict_proba(X_cand)
-        uncertainties = uncertainty_scores(probas=P, method='least_confident')
+        uncertainties = uncertainty_scores(probas=P, method="least_confident")
 
         # Fit annotator model and compute performance estimates.
-        ie_model = IntervalEstimationAnnotModel(classes=clf.classes_,
-                                                missing_label=clf.missing_label,
-                                                alpha=self.alpha, mode='upper')
+        ie_model = IntervalEstimationAnnotModel(
+            classes=clf.classes_,
+            missing_label=clf.missing_label,
+            alpha=self.alpha,
+            mode="upper",
+        )
 
         ie_model.fit(X=X, y=y, sample_weight=sample_weight)
         A_perf = ie_model.A_perf_
@@ -308,7 +377,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         A_perf = A_perf[:, 2] + 1
         A_perf = A_perf[np.newaxis]
         max_range = np.max(A_perf) + 1
-        uncertainties = rankdata(uncertainties, method='ordinal') * max_range
+        uncertainties = rankdata(uncertainties, method="ordinal") * max_range
         uncertainties = np.tile(uncertainties, (n_annotators, 1)).T
         utilities = uncertainties + A_perf
 
@@ -316,18 +385,22 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         utilities[~A_cand] = np.nan
 
         # Determine actual batch size.
-        if isinstance(batch_size, str) and batch_size != 'adaptive':
-            raise ValueError(f"If `batch_size` is of type `string`, "
-                             f"it must equal `'adaptive'`.")
-        elif batch_size == 'adaptive':
+        if isinstance(batch_size, str) and batch_size != "adaptive":
+            raise ValueError(
+                f"If `batch_size` is of type `string`, "
+                f"it must equal `'adaptive'`."
+            )
+        elif batch_size == "adaptive":
             required_perf = self.epsilon * np.max(A_perf)
             actl_batch_size = int(np.sum(A_perf >= required_perf))
         elif isinstance(batch_size, int):
             actl_batch_size = batch_size
         else:
-            raise TypeError(f"`batch_size` is of type `{type(batch_size)}` "
-                            f"but must equal `'adaptive'` or be of type "
-                            f"`int`.")
+            raise TypeError(
+                f"`batch_size` is of type `{type(batch_size)}` "
+                f"but must equal `'adaptive'` or be of type "
+                f"`int`."
+            )
 
         if mapping is not None:
             w_utilities = utilities
@@ -335,6 +408,9 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             utilities[mapping, :] = w_utilities
 
         # Perform selection based on previously computed utilities.
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=actl_batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=actl_batch_size,
+            return_utilities=return_utilities,
+        )

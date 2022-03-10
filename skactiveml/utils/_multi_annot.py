@@ -1,14 +1,19 @@
 import numpy as np
 from sklearn.metrics import confusion_matrix
-from sklearn.utils.validation import check_consistent_length, column_or_1d, \
-    check_array
+from sklearn.utils.validation import (
+    check_consistent_length,
+    column_or_1d,
+    check_array,
+)
 
 from ._label import MISSING_LABEL, is_labeled, is_unlabeled
 from ._label_encoder import ExtLabelEncoder
 
 
-def ext_confusion_matrix(y_true, y_pred, classes=None,
-                         missing_label=MISSING_LABEL, normalize=None):
+def ext_confusion_matrix(
+        y_true, y_pred, classes=None, missing_label=MISSING_LABEL,
+        normalize=None
+):
     """Compute confusion matrix to evaluate the accuracy of a classification.
 
     This is an extension of the 'sklearn.metric.confusion_matrix function' by
@@ -58,14 +63,16 @@ def ext_confusion_matrix(y_true, y_pred, classes=None,
     """
     # Check input.
     y_true = column_or_1d(y_true)
-    y_pred = check_array(y_pred, force_all_finite=False, ensure_2d=False,
-                         dtype=None)
+    y_pred = check_array(
+        y_pred, force_all_finite=False, ensure_2d=False, dtype=None
+    )
     if y_pred.ndim == 1:
         y_pred = y_pred.reshape(-1, 1)
     check_consistent_length(y_true, y_pred)
-    if normalize not in ['true', 'pred', 'all', None]:
-        raise ValueError("'normalize' must be one of {'true', 'pred', 'all', "
-                         "None}.")
+    if normalize not in ["true", "pred", "all", None]:
+        raise ValueError(
+            "'normalize' must be one of {'true', 'pred', 'all', " "None}."
+        )
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     y = np.column_stack((y_true, y_pred))
     y = le.fit_transform(y)
@@ -77,21 +84,23 @@ def ext_confusion_matrix(y_true, y_pred, classes=None,
     # Determine confusion matrix for each annotator.
     conf_matrices = np.zeros((n_annotators, n_classes, n_classes))
     for a in range(n_annotators):
-        is_not_nan_a = is_labeled(y[:, a+1], missing_label=-1)
+        is_not_nan_a = is_labeled(y[:, a + 1], missing_label=-1)
         if np.sum(is_not_nan_a) > 0:
-            cm = confusion_matrix(y_true=y[is_not_nan_a, 0],
-                                  y_pred=y[is_not_nan_a, a+1],
-                                  labels=np.arange(n_classes))
+            cm = confusion_matrix(
+                y_true=y[is_not_nan_a, 0],
+                y_pred=y[is_not_nan_a, a + 1],
+                labels=np.arange(n_classes),
+            )
         else:
             cm = np.zeros((n_classes, n_classes))
-        with np.errstate(all='ignore'):
-            if normalize == 'true':
+        with np.errstate(all="ignore"):
+            if normalize == "true":
                 cm = cm / cm.sum(axis=1, keepdims=True)
                 conf_matrices[a] = np.nan_to_num(cm, nan=1 / n_classes)
-            elif normalize == 'pred':
+            elif normalize == "pred":
                 cm = cm / cm.sum(axis=0, keepdims=True)
                 conf_matrices[a] = np.nan_to_num(cm, nan=1 / n_classes)
-            elif normalize == 'all':
+            elif normalize == "all":
                 cm = cm / cm.sum()
                 conf_matrices[a] = np.nan_to_num(cm, nan=1 / cm.size)
 

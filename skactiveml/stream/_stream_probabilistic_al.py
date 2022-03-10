@@ -24,9 +24,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     Probabilistic Active Learning in Datastreams (StreamProbabilisticAL) is an
     extension to Multi-Class Probabilistic Active Learning (McPAL)
     (see pool.ProbabilisticAL). It assesses McPAL spatial to assess the spatial
-    utility. The Balanced Incremental Quantile Filter (BalancedIncrementalQuantileFilter), that is
-    implemented within the default budget manager, is used to evaluate the
-    temporal utility (see stream.budgetmanager.BalancedIncrementalQuantileFilter).
+    utility. The Balanced Incremental Quantile Filter
+    (BalancedIncrementalQuantileFilter), that is implemented within the
+    default budget manager, is used to evaluate the temporal utility
+    (see stream.budgetmanager.BalancedIncrementalQuantileFilter).
 
     Parameters
     ----------
@@ -36,21 +37,23 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budgetmanager will
-        be initialized based on the following conditions:
-            If only a budget is given the default budgetmanager is initialized
+        FixedUncertaintyBudgetManager will be used by default. The budget
+        manager will be initialized based on the following conditions:
+            If only a budget is given the default budget manager is initialized
             with the given budget.
-            If only a budgetmanager is given use the budgetmanager.
-            If both are not given the default budgetmanager with the
+            If only a budget manager is given use the budget manager.
+            If both are not given the default budget manager with the
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the query strategy.
     prior : float
-        The prior value that is passed onto ProbabilisticAL (see pool.ProbabilisticAL).
+        The prior value that is passed onto ProbabilisticAL
+        (see pool.ProbabilisticAL).
     m_max : float
-        The m_max value that is passed onto ProbabilisticAL (see pool.ProbabilisticAL).
+        The m_max value that is passed onto ProbabilisticAL
+        (see pool.ProbabilisticAL).
 
     References
     ----------
@@ -93,7 +96,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : SkactivemlClassifier
@@ -117,8 +121,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances in candidates which should be queried, with
-            0 <= n_queried_instances <= n_samples.
+            The indices of instances in candidates which should be queried,
+            with 0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -156,12 +160,15 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices, budget_manager_param_dict=None):
+    def update(
+            self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the budget manager
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : array-like of shape (n_samples,)
@@ -177,10 +184,15 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
             check_type(
-                self.budget_manager, "budget_manager_", BudgetManager, type(None)
+                self.budget_manager,
+                "budget_manager_",
+                BudgetManager,
+                type(None),
             )
             self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, BalancedIncrementalQuantileFilter
+                self.budget,
+                self.budget_manager,
+                BalancedIncrementalQuantileFilter,
             )
         budget_manager_param_dict = (
             {}
@@ -259,23 +271,33 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
         candidates, return_utilities = super()._validate_data(
-            candidates, return_utilities, reset=reset, **check_candidates_params
+            candidates,
+            return_utilities,
+            reset=reset,
+            **check_candidates_params
         )
         # check if a budgetmanager is set
 
         if not hasattr(self, "budget_manager_"):
             check_type(
-                self.budget_manager, "budget_manager_", BudgetManager, type(None)
+                self.budget_manager,
+                "budget_manager_",
+                BudgetManager,
+                type(None),
             )
             self.budget_manager_ = check_budget_manager(
-                self.budget, self.budget_manager, BalancedIncrementalQuantileFilter
+                self.budget,
+                self.budget_manager,
+                BalancedIncrementalQuantileFilter,
             )
 
         X, y, sample_weight = self._validate_X_y_sample_weight(
             X, y, sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
-        utility_weight = self._validate_utility_weight(utility_weight, candidates)
+        utility_weight = self._validate_utility_weight(
+            utility_weight, candidates
+        )
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
         )

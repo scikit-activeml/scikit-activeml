@@ -15,7 +15,7 @@ from ..utils import MISSING_LABEL, compute_vote_vectors
 
 class ParzenWindowClassifier(ClassFrequencyEstimator):
     """ParzenWindowClassifier
-    
+
     The Parzen window classifier (PWC) is a simple and
     probabilistic classifier. This classifier is based on a non-parametric
     density estimation obtained by applying a kernel function.
@@ -38,10 +38,10 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
     metric : str or callable, default='rbf'
-        The metric must a be a valid kernel defined by the function 
+        The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int or None, default=None
-        Number of nearest neighbours. Default is None, which means all 
+        Number of nearest neighbours. Default is None, which means all
         available samples are considered.
     metric_dict : dict,
         Any further parameters are passed directly to the kernel function.
@@ -70,14 +70,27 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
        Proceedings of the Tenth International Workshop Artificial Intelligence
        and Statistics, 2005.`_
     """
-    METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
 
-    def __init__(self, n_neighbors=None, metric='rbf', metric_dict=None,
-                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
-                 class_prior=0.0, random_state=None):
-        super().__init__(classes=classes, class_prior=class_prior,
-                         missing_label=missing_label, cost_matrix=cost_matrix,
-                         random_state=random_state)
+    METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
+
+    def __init__(
+            self,
+            n_neighbors=None,
+            metric="rbf",
+            metric_dict=None,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            class_prior=0.0,
+            random_state=None,
+    ):
+        super().__init__(
+            classes=classes,
+            class_prior=class_prior,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
+        )
         self.metric = metric
         self.n_neighbors = n_neighbors
         self.metric_dict = metric_dict
@@ -105,18 +118,27 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         # Check whether metric is available.
-        if self.metric not in ParzenWindowClassifier.METRICS and not callable(self.metric):
-            raise ValueError("The parameter 'metric' must be callable or "
-                             "in {}".format(KERNEL_PARAMS.keys()))
+        if self.metric not in ParzenWindowClassifier.METRICS and not callable(
+                self.metric
+        ):
+            raise ValueError(
+                "The parameter 'metric' must be callable or "
+                "in {}".format(KERNEL_PARAMS.keys())
+            )
 
         # Check number of neighbors which must be a positive integer.
         if self.n_neighbors is not None:
-            check_scalar(self.n_neighbors, name='n_neighbors', min_val=1,
-                         target_type=int)
+            check_scalar(
+                self.n_neighbors,
+                name="n_neighbors",
+                min_val=1,
+                target_type=int,
+            )
 
         # Ensure that metric_dict is a Python dictionary.
-        self.metric_dict_ = self.metric_dict if self.metric_dict is not None \
-            else {}
+        self.metric_dict_ = (
+            self.metric_dict if self.metric_dict is not None else {}
+        )
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
@@ -130,8 +152,10 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             self.V_ = 0
         else:
             self.V_ = compute_vote_vectors(
-                y=y, w=sample_weight, classes=np.arange(len(self.classes_)),
-                missing_label=-1
+                y=y,
+                w=sample_weight,
+                classes=np.arange(len(self.classes_)),
+                missing_label=-1,
             )
 
         return self
@@ -152,23 +176,27 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             ordered according to `classes_`.
         """
         check_is_fitted(self)
-        X = check_array(X, force_all_finite=(self.metric != 'precomputed'))
+        X = check_array(X, force_all_finite=(self.metric != "precomputed"))
 
         # Predict zeros because of missing training data.
         if self.n_features_in_ is None:
             return np.zeros((len(X), len(self.classes_)))
 
         # Compute kernel (metric) matrix.
-        if self.metric == 'precomputed':
+        if self.metric == "precomputed":
             K = X
-            if np.size(K, 0) != np.size(X, 0) or \
-                    np.size(K, 1) != np.size(self.X_, 0):
-                raise ValueError("The kernel matrix 'X' must have the shape "
-                                 "(n_test_samples, n_train_samples).")
+            if np.size(K, 0) != np.size(X, 0) or np.size(K, 1) != np.size(
+                    self.X_, 0
+            ):
+                raise ValueError(
+                    "The kernel matrix 'X' must have the shape "
+                    "(n_test_samples, n_train_samples)."
+                )
         else:
             self._check_n_features(X, reset=False)
-            K = pairwise_kernels(X, self.X_, metric=self.metric,
-                                 **self.metric_dict_)
+            K = pairwise_kernels(
+                X, self.X_, metric=self.metric, **self.metric_dict_
+            )
 
         # computing class frequency estimates
         if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:

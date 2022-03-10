@@ -2,7 +2,7 @@ import inspect
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
-    """ Calls a function with the given parameters given in kwargs if they
+    """Calls a function with the given parameters given in kwargs if they
     exist as parameters in f_callable.
 
     Parameters
@@ -21,11 +21,10 @@ def call_func(f_callable, only_mandatory=False, **kwargs):
     params = inspect.signature(f_callable).parameters
     param_keys = params.keys()
     if only_mandatory:
-        param_keys = list(filter(lambda k: params[k].default == inspect._empty,
-                                 param_keys))
+        param_keys = list(
+            filter(lambda k: params[k].default == inspect._empty, param_keys)
+        )
 
     vars = dict(filter(lambda e: e[0] in param_keys, kwargs.items()))
 
     return f_callable(**vars)
-
-

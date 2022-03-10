@@ -12,12 +12,15 @@ from scipy.optimize import minimize
 from scipy.special import softmax
 from scipy.stats import dirichlet
 from scipy.stats import multivariate_normal as multi_normal
-from sklearn.utils.validation import check_array, check_is_fitted, \
-    column_or_1d
+from sklearn.utils.validation import check_array, check_is_fitted, column_or_1d
 
 from ...base import SkactivemlClassifier, AnnotatorModelMixin
-from ...utils import MISSING_LABEL, compute_vote_vectors, rand_argmax, \
-    ext_confusion_matrix
+from ...utils import (
+    MISSING_LABEL,
+    compute_vote_vectors,
+    rand_argmax,
+    ext_confusion_matrix,
+)
 
 
 class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
@@ -113,13 +116,27 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
        Learning Research, 11(4).`_
     """
 
-    def __init__(self, tol=1.e-2, max_iter=100, fit_intercept=True,
-                 annot_prior_full=1, annot_prior_diag=0, weights_prior=1,
-                 solver='Newton-CG', solver_dict=None, classes=None,
-                 cost_matrix=None, missing_label=MISSING_LABEL,
-                 random_state=None):
-        super().__init__(classes=classes, missing_label=missing_label,
-                         cost_matrix=cost_matrix, random_state=random_state)
+    def __init__(
+            self,
+            tol=1.0e-2,
+            max_iter=100,
+            fit_intercept=True,
+            annot_prior_full=1,
+            annot_prior_diag=0,
+            weights_prior=1,
+            solver="Newton-CG",
+            solver_dict=None,
+            classes=None,
+            cost_matrix=None,
+            missing_label=MISSING_LABEL,
+            random_state=None,
+    ):
+        super().__init__(
+            classes=classes,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
+        )
         self.tol = tol
         self.max_iter = max_iter
         self.fit_intercept = fit_intercept
@@ -157,33 +174,48 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         # Ensure value of 'tol' to be positive.
         if not isinstance(self.tol, float):
-            raise TypeError('`tol` must be an instance of float, not {}.'
-                            .format(type(self.tol)))
+            raise TypeError(
+                "`tol` must be an instance of float, not {}.".format(
+                    type(self.tol)
+                )
+            )
         if self.tol <= 0:
-            raise ValueError('`tol`= {}, must be > 0.'.format(self.tol))
+            raise ValueError("`tol`= {}, must be > 0.".format(self.tol))
 
         # Ensure value of 'max_iter' to be positive.
         if not isinstance(self.max_iter, int):
-            raise TypeError('`max_iter` must be an instance of int, not {}.'
-                            .format(type(self.max_iter)))
+            raise TypeError(
+                "`max_iter` must be an instance of int, not {}.".format(
+                    type(self.max_iter)
+                )
+            )
         if self.max_iter <= 0:
-            raise ValueError('`max_iter`= {}, must be an integer >= 1.'
-                             .format(self.tol))
+            raise ValueError(
+                "`max_iter`= {}, must be an integer >= 1.".format(self.tol)
+            )
 
         if not isinstance(self.fit_intercept, bool):
-            raise TypeError("'fit_intercept' must be of type 'bool', got {}"
-                            .format(type(self.fit_intercept)))
+            raise TypeError(
+                "'fit_intercept' must be of type 'bool', got {}".format(
+                    type(self.fit_intercept)
+                )
+            )
 
-        solver_dict = {'maxiter': 5} if self.solver_dict is None \
-            else self.solver_dict
+        solver_dict = (
+            {"maxiter": 5} if self.solver_dict is None else self.solver_dict
+        )
 
         # Check weights prior.
         if not isinstance(self.weights_prior, (int, float)):
-            raise TypeError("'weights_prior' must be of a positive 'int' or "
-                            "'float', got {}".format(type(self.weights_prior)))
+            raise TypeError(
+                "'weights_prior' must be of a positive 'int' or "
+                "'float', got {}".format(type(self.weights_prior))
+            )
         if self.weights_prior < 0:
-            raise ValueError("'weights_prior' must be of a positive 'int' or "
-                             "'float', got {}".format(self.weights_prior))
+            raise ValueError(
+                "'weights_prior' must be of a positive 'int' or "
+                "'float', got {}".format(self.weights_prior)
+            )
 
         # Check for empty training data.
         if self.n_features_in_ is None:
@@ -191,8 +223,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         if len(y.shape) != 2:
             raise ValueError(
-                '`y` must be an array-like of shape '
-                '`(n_samples, n_annotators)`.'
+                "`y` must be an array-like of shape "
+                "`(n_samples, n_annotators)`."
             )
 
         # Insert bias, if 'fit_intercept' is set to 'True'.
@@ -217,18 +249,19 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         # Check input 'annot_prior_full' and 'annot_prior_diag'.
         annot_prior = []
-        for name, prior in [('annot_prior_full', self.annot_prior_full),
-                            ('annot_prior_diag', self.annot_prior_diag)]:
+        for name, prior in [
+            ("annot_prior_full", self.annot_prior_full),
+            ("annot_prior_diag", self.annot_prior_diag),
+        ]:
             if isinstance(prior, int or float):
                 prior_array = np.ones(self.n_annotators_) * prior
             else:
                 prior_array = column_or_1d(prior)
-            if name == 'annot_prior_full':
+            if name == "annot_prior_full":
                 is_invalid_prior = np.sum(prior_array <= 0)
             else:
                 is_invalid_prior = np.sum(prior_array < 0)
-            if len(prior_array) != self.n_annotators_ \
-                    or is_invalid_prior:
+            if len(prior_array) != self.n_annotators_ or is_invalid_prior:
                 raise ValueError(
                     "'{}' must be either 'int', 'float' or "
                     "array-like with positive values and shape "
@@ -244,10 +277,14 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         # Init Mu (i.e., estimates of true labels) with (weighted) majority
         # voting.
-        Mu = compute_vote_vectors(y=y, classes=np.arange(n_classes),
-                                  missing_label=-1, w=sample_weight)
+        Mu = compute_vote_vectors(
+            y=y,
+            classes=np.arange(n_classes),
+            missing_label=-1,
+            w=sample_weight,
+        )
         Mu_sum = np.sum(Mu, axis=1)
-        is_zero = (Mu_sum == 0)
+        is_zero = Mu_sum == 0
         Mu[~is_zero] /= Mu_sum[~is_zero, np.newaxis]
         Mu[is_zero] = 1 / n_classes
 
@@ -257,10 +294,13 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         # Use majority vote to initialize alpha, alpha_j is the confusion
         # matrix of annotator j.
         y_majority = rand_argmax(Mu, random_state=self.random_state, axis=1)
-        self.Alpha_ = ext_confusion_matrix(y_true=y_majority, y_pred=y,
-                                           normalize='true',
-                                           missing_label=-1,
-                                           classes=np.arange(n_classes))
+        self.Alpha_ = ext_confusion_matrix(
+            y_true=y_majority,
+            y_pred=y,
+            normalize="true",
+            missing_label=-1,
+            classes=np.arange(n_classes),
+        )
 
         # Initialize first expectation to infinity such that
         # |current - new| < tol is False.
@@ -273,12 +313,15 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
             P = softmax(X @ self.W_, axis=1)
             V = self._calc_V(y, self.Alpha_)
             Mu = self._calc_Mu(V, P)
-            new_expectation = self._calc_expectation(Mu, P, V, Gamma, A,
-                                                     self.Alpha_, self.W_)
+            new_expectation = self._calc_expectation(
+                Mu, P, V, Gamma, A, self.Alpha_, self.W_
+            )
 
             # Stop EM, if it converges (to a local maximum).
-            if current_expectation == new_expectation or \
-                    (new_expectation - current_expectation) < self.tol:
+            if (
+                    current_expectation == new_expectation
+                    or (new_expectation - current_expectation) < self.tol
+            ):
                 break
 
             # Update expectation value.
@@ -305,9 +348,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
                 P_W = softmax(X @ W, axis=1)
                 prior_W = 0
                 for c_idx in range(n_classes):
-                    prior_W += multi_normal.logpdf(x=W[:, c_idx],
-                                                   cov=Gamma_tmp,
-                                                   allow_singular=True)
+                    prior_W += multi_normal.logpdf(
+                        x=W[:, c_idx], cov=Gamma_tmp, allow_singular=True
+                    )
                 log = np.sum(Mu * np.log(P_W * V + np.finfo(float).eps))
                 log += prior_W
                 return -log / n_samples
@@ -354,23 +397,26 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
                         diagonal = P_W[:, j] * (I[k, j] - P_W[:, k])
                         D = np.diag(diagonal)
                         H_kj = X.T @ D @ X + Gamma
-                        H[k * n_features:(k + 1) * n_features,
-                        j * n_features:(j + 1) * n_features] \
-                            = H_kj
+                        H[
+                        k * n_features: (k + 1) * n_features,
+                        j * n_features: (j + 1) * n_features,
+                        ] = H_kj
                 return H / n_samples
 
             with warnings.catch_warnings():
                 warning_msg = ".*Method .* does not use Hessian information.*"
-                warnings.filterwarnings('ignore', message=warning_msg)
+                warnings.filterwarnings("ignore", message=warning_msg)
                 warning_msg = ".*Method .* does not use gradient information.*"
-                warnings.filterwarnings('ignore', message=warning_msg)
-                res = minimize(error,
-                               x0=self.W_.ravel(),
-                               method=self.solver,
-                               tol=self.tol,
-                               jac=grad,
-                               hess=hessian,
-                               options=solver_dict)
+                warnings.filterwarnings("ignore", message=warning_msg)
+                res = minimize(
+                    error,
+                    x0=self.W_.ravel(),
+                    method=self.solver,
+                    tol=self.tol,
+                    jac=grad,
+                    hess=hessian,
+                    options=solver_dict,
+                )
                 self.W_ = res.x.reshape((n_features, n_classes))
 
             self.n_iter_ += 1
@@ -433,8 +479,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         P = self.predict_proba(X)
 
         # Get correctness probabilities for each annotator per class.
-        diag_Alpha = np.array([np.diagonal(self._Alpha[j]) for j in
-                               range(self._Alpha.shape[0])])
+        diag_Alpha = np.array(
+            [np.diagonal(self._Alpha[j]) for j in range(self._Alpha.shape[0])]
+        )
 
         # Compute correctness probabilities for each annotator per sample.
         P_annot = P @ diag_Alpha.T
@@ -458,8 +505,11 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         out: numpy.ndarray
             Vector of shape (n_samples, n_classes).
         """
-        n_samples, n_annotators, n_classes = y.shape[0], y.shape[1], \
-                                             Alpha.shape[1]
+        n_samples, _, n_classes = (
+            y.shape[0],
+            y.shape[1],
+            Alpha.shape[1],
+        )
         V = np.ones((n_samples, n_classes))
 
         for c in range(n_classes):
@@ -490,7 +540,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         Returns
         ----------
-        new_Alpha : numpy..ndarray of shape (n_annotators, n_classes, n_classes)
+        new_Alpha : numpy.ndarray of shape
+        (n_annotators, n_classes, n_classes)
             This is a confusion matrix for each annotator, where each
             row is normalized. `new_Alpha[l,k,c]` describes the probability
             that annotator l provides the class label c for a sample belonging
@@ -508,9 +559,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         # Lazy normalization: (The real normalization factor
         # (sum_i=1^N mu_i,c + sum_k=0^K-1 A_j,c,k - K) is omitted here)
-        with np.errstate(all='ignore'):
+        with np.errstate(all="ignore"):
             new_Alpha = new_Alpha / new_Alpha.sum(axis=2, keepdims=True)
-            new_Alpha = np.nan_to_num(new_Alpha, nan=1. / n_classes)
+            new_Alpha = np.nan_to_num(new_Alpha, nan=1.0 / n_classes)
 
         return new_Alpha
 
@@ -535,7 +586,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         """
         new_Mu = P * V
         new_Mu_sum = np.sum(new_Mu, axis=1)
-        is_zero = (new_Mu_sum == 0)
+        is_zero = new_Mu_sum == 0
 
         new_Mu[~is_zero] /= new_Mu_sum[~is_zero, np.newaxis]
         new_Mu[is_zero] = 1 / P.shape[1]
@@ -567,15 +618,23 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         # Evaluate prior of weight vectors.
         all_zeroes = not np.any(Gamma)
         Gamma = Gamma if all_zeroes else np.linalg.inv(Gamma)
-        prior_W = np.sum([multi_normal.logpdf(x=W[:, k], cov=Gamma,
-                                              allow_singular=True)
-                          for k in range(W.shape[1])])
+        prior_W = np.sum(
+            [
+                multi_normal.logpdf(x=W[:, k], cov=Gamma, allow_singular=True)
+                for k in range(W.shape[1])
+            ]
+        )
 
         # Evaluate prior of alpha matrices.
         prior_Alpha = np.sum(
-            [[dirichlet.logpdf(x=Alpha[j, k, :], alpha=A[j, k, :])
-              for k in range(Alpha.shape[1])] for j in
-             range(Alpha.shape[0])])
+            [
+                [
+                    dirichlet.logpdf(x=Alpha[j, k, :], alpha=A[j, k, :])
+                    for k in range(Alpha.shape[1])
+                ]
+                for j in range(Alpha.shape[0])
+            ]
+        )
 
         # Evaluate log-likelihood for data.
         log_likelihood = np.sum(Mu * np.log(P * V + np.finfo(float).eps))

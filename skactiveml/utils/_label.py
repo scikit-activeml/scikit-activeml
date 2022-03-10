@@ -25,26 +25,31 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
         return np.array(y, dtype=bool)
     if not isinstance(y, np.ndarray):
         types = set(
-            t.__qualname__ for t in set(type(v) for v in deepflatten(y)))
+            t.__qualname__ for t in set(type(v) for v in deepflatten(y))
+        )
         types.add(type(missing_label).__qualname__)
         is_number = False
         is_character = False
         for t in types:
-            t = object if t == 'NoneType' else t
-            is_character = True \
-                if np.issubdtype(t, np.character) else is_character
+            t = object if t == "NoneType" else t
+            is_character = (
+                True if np.issubdtype(t, np.character) else is_character
+            )
             is_number = True if np.issubdtype(t, np.number) else is_number
             if is_character and is_number:
                 raise TypeError(
                     "'y' must be uniformly strings or numbers. "
-                    "'NoneType' is allowed. Got {}".format(types))
+                    "'NoneType' is allowed. Got {}".format(types)
+                )
         y = np.asarray(y)
     target_type = np.append(y.ravel(), missing_label).dtype
-    check_missing_label(missing_label, target_type=target_type, name='y')
+    check_missing_label(missing_label, target_type=target_type, name="y")
     if (y.ndim == 2 and np.size(y, axis=1) == 0) or y.ndim > 2:
-        raise ValueError("'y' must be of shape (n_samples) or '(n_samples, "
-                         "n_features)' with 'n_samples > 0' and "
-                         "'n_features > 0'.")
+        raise ValueError(
+            "'y' must be of shape (n_samples) or '(n_samples, "
+            "n_features)' with 'n_samples > 0' and "
+            "'n_features > 0'."
+        )
     if missing_label is np.nan:
         return np.isnan(y)
     else:
@@ -130,19 +135,24 @@ def check_missing_label(missing_label, target_type=None, name=None):
     if not is_number and not is_character and not is_None:
         raise TypeError(
             "'missing_label' has type '{}', but must be a either a number, "
-            "a string, np.nan, or None.".format(type(missing_label)))
+            "a string, np.nan, or None.".format(type(missing_label))
+        )
     if target_type is not None:
         is_object_type = np.issubdtype(target_type, np.object_)
         is_character_type = np.issubdtype(target_type, np.character)
         is_number_type = np.issubdtype(target_type, np.number)
-        if (is_character_type and is_number) or (
-                is_number_type and is_character) or (
-                is_object_type and not is_None):
-            name = 'target object' if name is None else str(name)
+        if (
+                (is_character_type and is_number)
+                or (is_number_type and is_character)
+                or (is_object_type and not is_None)
+        ):
+            name = "target object" if name is None else str(name)
             raise TypeError(
                 "'missing_label' has type '{}' and is not compatible to the "
                 "type '{}' of '{}'.".format(
-                    type(missing_label), target_type, name))
+                    type(missing_label), target_type, name
+                )
+            )
 
 
 def check_equal_missing_label(missing_label1, missing_label2):

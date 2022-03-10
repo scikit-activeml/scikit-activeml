@@ -63,7 +63,9 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_random_state(self):
-        query_strategy = StreamProbabilisticAL(random_state="string", )
+        query_strategy = StreamProbabilisticAL(
+            random_state="string",
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_query_param_candidates(self):
@@ -126,7 +128,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             clf=self.clf,
             X=1,
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -143,7 +145,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             clf=self.clf,
             X=np.ones(5),
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -152,7 +154,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             clf=self.clf,
             X=self.X[1:],
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
 
     def test_query_param_y(self):
@@ -166,7 +168,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=1,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             TypeError,
@@ -175,7 +177,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=None,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -184,7 +186,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             clf=self.clf,
             X=self.X,
             y=self.y[1:],
-            fit_clf=True
+            fit_clf=True,
         )
 
     def test_query_param_sample_weight(self):
@@ -199,7 +201,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             X=self.X,
             y=self.y,
             sample_weight="string",
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -209,7 +211,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             X=self.X,
             y=self.y,
             sample_weight=["string", "numbers", "test"],
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -219,7 +221,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             X=self.X,
             y=self.y,
             sample_weight=[1],
-            fit_clf=True
+            fit_clf=True,
         )
 
     def test_query_param_utility_weight(self):

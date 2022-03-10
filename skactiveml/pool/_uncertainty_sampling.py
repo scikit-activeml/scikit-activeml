@@ -10,8 +10,14 @@ from sklearn import clone
 from sklearn.utils.validation import check_array
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
-from ..utils import MISSING_LABEL, check_cost_matrix, simple_batch, \
-    check_classes, check_type, check_equal_missing_label
+from ..utils import (
+    MISSING_LABEL,
+    check_cost_matrix,
+    simple_batch,
+    check_classes,
+    check_type,
+    check_equal_missing_label,
+)
 
 
 class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
@@ -48,16 +54,30 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
 
-    def __init__(self, method='least_confident', cost_matrix=None,
-                 missing_label=MISSING_LABEL, random_state=None):
+    def __init__(
+            self,
+            method="least_confident",
+            cost_matrix=None,
+            missing_label=MISSING_LABEL,
+            random_state=None,
+    ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
         self.method = method
         self.cost_matrix = cost_matrix
 
-    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(
+            self,
+            X,
+            y,
+            clf,
+            fit_clf=True,
+            sample_weight=None,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -113,22 +133,24 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-                X, y, candidates, batch_size, return_utilities, reset=True
-            )
+            X, y, candidates, batch_size, return_utilities, reset=True
+        )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate classifier type.
-        check_type(clf, 'clf', SkactivemlClassifier)
+        check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
 
         # Validate classifier type.
-        check_type(fit_clf, 'fit_clf', bool)
+        check_type(fit_clf, "fit_clf", bool)
 
         # Validate method.
         if not isinstance(self.method, str):
-            raise TypeError('{} is an invalid type for method. Type {} is '
-                            'expected'.format(type(self.method), str))
+            raise TypeError(
+                "{} is an invalid type for method. Type {} is "
+                "expected".format(type(self.method), str)
+            )
 
         # sample_weight is checked by clf when fitted
 
@@ -140,21 +162,26 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         probas = clf.predict_proba(X_cand)
 
         # Choose the method and calculate corresponding utilities.
-        with np.errstate(divide='ignore'):
-            if self.method in ['least_confident', 'margin_sampling',
-                               'entropy']:
+        with np.errstate(divide="ignore"):
+            if self.method in [
+                "least_confident",
+                "margin_sampling",
+                "entropy",
+            ]:
                 utilities_cand = uncertainty_scores(
-                    probas=probas, method=self.method,
-                    cost_matrix=self.cost_matrix
+                    probas=probas,
+                    method=self.method,
+                    cost_matrix=self.cost_matrix,
                 )
-            elif self.method == 'expected_average_precision':
+            elif self.method == "expected_average_precision":
                 classes = clf.classes_
                 utilities_cand = expected_average_precision(classes, probas)
             else:
                 raise ValueError(
                     "The given method {} is not valid. Supported methods are "
                     "'entropy', 'least_confident', 'margin_sampling' and "
-                    "'expected_average_precision'".format(self.method))
+                    "'expected_average_precision'".format(self.method)
+                )
 
         if mapping is None:
             utilities = utilities_cand
@@ -162,12 +189,15 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
 
 
-def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
+def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]. For the least confident and
@@ -205,7 +235,7 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
     # Check probabilities.
     probas = check_array(probas)
 
-    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.e-3):
+    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3):
         raise ValueError(
             "'probas' are invalid. The sum over axis 1 must be one."
         )
@@ -217,14 +247,14 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
         cost_matrix = check_cost_matrix(cost_matrix, n_classes=n_classes)
 
     # Compute uncertainties.
-    if method == 'least_confident':
+    if method == "least_confident":
         if cost_matrix is None:
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return costs[:, 0]
-    elif method == 'margin_sampling':
+    elif method == "margin_sampling":
         if cost_matrix is None:
             probas = -(np.partition(-probas, 1, axis=1)[:, :2])
             return 1 - np.abs(probas[:, 0] - probas[:, 1])
@@ -232,14 +262,15 @@ def uncertainty_scores(probas, cost_matrix=None, method='least_confident'):
             costs = probas @ cost_matrix
             costs = np.partition(costs, 1, axis=1)[:, :2]
             return -np.abs(costs[:, 0] - costs[:, 1])
-    elif method == 'entropy':
+    elif method == "entropy":
         if cost_matrix is None:
-            with np.errstate(divide='ignore', invalid='ignore'):
+            with np.errstate(divide="ignore", invalid="ignore"):
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(
                 f"Method `entropy` does not support cost matrices but "
-                f"`cost_matrix` was not None.")
+                f"`cost_matrix` was not None."
+            )
     else:
         raise ValueError(
             "Supported methods are ['least_confident', 'margin_sampling', "
@@ -256,7 +287,8 @@ def expected_average_precision(classes, probas):
     classes : array-like, shape=(n_classes)
         Holds the label for each class.
     probas : np.ndarray, shape=(n_X_cand, n_classes)
-        The probabiliti estimation for each classes and all instance in candidates.
+        The probabilistic estimation for each classes and all instance in
+        candidates.
 
     Returns
     -------
@@ -270,23 +302,34 @@ def expected_average_precision(classes, probas):
         IJCAI International Joint Conference on Artificial Intelligence. 2018.
     """
     # Check if `probas` is valid.
-    probas = check_array(probas, accept_sparse=False,
-                         accept_large_sparse=True, dtype="numeric", order=None,
-                         copy=False, force_all_finite=True, ensure_2d=True,
-                         allow_nd=False, ensure_min_samples=1,
-                         ensure_min_features=1, estimator=None)
+    probas = check_array(
+        probas,
+        accept_sparse=False,
+        accept_large_sparse=True,
+        dtype="numeric",
+        order=None,
+        copy=False,
+        force_all_finite=True,
+        ensure_2d=True,
+        allow_nd=False,
+        ensure_min_samples=1,
+        ensure_min_features=1,
+        estimator=None,
+    )
 
     if (np.sum(probas, axis=1) - 1).all():
-        raise ValueError('probas are invalid. The sum over axis 1 must be '
-                         'one.')
+        raise ValueError(
+            "probas are invalid. The sum over axis 1 must be " "one."
+        )
 
     # Check if `classes` are valid.
     check_classes(classes)
     if len(classes) < 2:
-        raise ValueError('`classes` must contain at least 2 entries.')
+        raise ValueError("`classes` must contain at least 2 entries.")
     if len(classes) != probas.shape[1]:
-        raise ValueError('`classes` must have the same length as `probas` has '
-                         'columns.')
+        raise ValueError(
+            "`classes` must have the same length as `probas` has " "columns."
+        )
 
     score = np.zeros(len(probas))
     for i in range(len(classes)):
@@ -331,5 +374,8 @@ def _f(n, t, p, f_arr, g_arr):
         return 0
     if t == 0 and n == 0:
         return 1
-    return p[n - 1] * f_arr[n - 1, t - 1] + p[n - 1] * t * \
-        g_arr[n - 1, t - 1] / n + (1 - p[n - 1]) * f_arr[n - 1, t]
+    return (
+            p[n - 1] * f_arr[n - 1, t - 1]
+            + p[n - 1] * t * g_arr[n - 1, t - 1] / n
+            + (1 - p[n - 1]) * f_arr[n - 1, t]
+    )

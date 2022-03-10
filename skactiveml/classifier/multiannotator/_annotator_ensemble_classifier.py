@@ -15,8 +15,7 @@ from ...utils import MISSING_LABEL, is_labeled, compute_vote_vectors
 
 
 class AnnotatorEnsembleClassifier(
-    _BaseHeterogeneousEnsemble,
-    SkactivemlClassifier
+    _BaseHeterogeneousEnsemble, SkactivemlClassifier
 ):
     """AnnotatorEnsembleClassifier
 
@@ -59,13 +58,22 @@ class AnnotatorEnsembleClassifier(
         appear in `estimators_`.
     """
 
-    def __init__(self, estimators, voting='hard', classes=None,
-                 missing_label=MISSING_LABEL, cost_matrix=None,
-                 random_state=None):
+    def __init__(
+            self,
+            estimators,
+            voting="hard",
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            random_state=None,
+    ):
         _BaseHeterogeneousEnsemble.__init__(self, estimators=estimators)
         SkactivemlClassifier.__init__(
-            self, classes=classes, missing_label=missing_label,
-            cost_matrix=cost_matrix, random_state=random_state
+            self,
+            classes=classes,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
         )
         self.voting = voting
 
@@ -87,19 +95,25 @@ class AnnotatorEnsembleClassifier(
         Returns
         -------
         self: skactiveml.classifier.multiannotator.AnnotatorEnsembleClassifier,
-            The `AnnotatorEnsembleClassifier` object fitted on the training data.
+            The `AnnotatorEnsembleClassifier` object fitted on the training
+            data.
         """
         # Check estimators.
         self._validate_estimators()
 
         # Check input parameters.
         self.check_X_dict_ = {
-            'ensure_min_samples': 0, 'ensure_min_features': 0,
-            'allow_nd': True, 'dtype': None
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
         }
         X, y, sample_weight = self._validate_data(
-            X=X, y=y, sample_weight=sample_weight,
-            check_X_dict=self.check_X_dict_, y_ensure_1d=False
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+            y_ensure_1d=False,
         )
         self._check_n_features(X, reset=True)
 
@@ -111,14 +125,19 @@ class AnnotatorEnsembleClassifier(
             return self
 
         # Check number of estimators.
-        error_msg = f"'y' must have shape (n_samples={len(y)}, n_estimators=" \
-                    f"{len(self.estimators)}) but has shape {y.shape}."
-        if self.named_estimators is not None and \
-                y.ndim <= 1 or y.shape[1] != len(self.estimators):
+        error_msg = (
+            f"'y' must have shape (n_samples={len(y)}, n_estimators="
+            f"{len(self.estimators)}) but has shape {y.shape}."
+        )
+        if (
+                self.named_estimators is not None
+                and y.ndim <= 1
+                or y.shape[1] != len(self.estimators)
+        ):
             raise ValueError(error_msg)
 
         # Check voting scheme.
-        if self.voting not in ('soft', 'hard'):
+        if self.voting not in ("soft", "hard"):
             raise ValueError(
                 f"Voting must be 'soft' or 'hard'; "
                 f"got `voting='{self.voting}'`)"
@@ -154,14 +173,14 @@ class AnnotatorEnsembleClassifier(
         self._check_n_features(X, reset=False)
         if self.n_features_in_ is None:
             return np.ones((len(X), len(self.classes_))) / len(self.classes_)
-        elif self.voting == 'hard':
+        elif self.voting == "hard":
             y_pred = np.array(
-                [est.predict(X) for _, est in self.estimators_]).T
+                [est.predict(X) for _, est in self.estimators_]
+            ).T
             V = compute_vote_vectors(y=y_pred, classes=self.classes_)
             P = V / np.sum(V, axis=1, keepdims=True)
-        elif self.voting == 'soft':
-            P = np.array(
-                [est.predict_proba(X) for _, est in self.estimators_])
+        elif self.voting == "soft":
+            P = np.array([est.predict_proba(X) for _, est in self.estimators_])
             P = np.sum(P, axis=0)
             P /= np.sum(P, axis=1, keepdims=True)
         return P
@@ -170,31 +189,36 @@ class AnnotatorEnsembleClassifier(
         _BaseHeterogeneousEnsemble._validate_estimators(self)
         for name, est in self.estimators:
             if not isinstance(est, SkactivemlClassifier):
-                raise TypeError(
-                    f"'{est}' is not a 'SkactivemlClassifier'."
-                )
-            if self.voting == 'soft' and not hasattr(est, 'predict_proba'):
+                raise TypeError(f"'{est}' is not a 'SkactivemlClassifier'.")
+            if self.voting == "soft" and not hasattr(est, "predict_proba"):
                 raise ValueError(
                     f"If 'voting' is soft, each classifier must "
                     f"implement 'predict_proba' method. However, "
                     f"{est} does not do so."
                 )
-            error_msg = f"{est} of 'estimators' has 'missing_label=" \
-                        f"{est.missing_label}' as attribute being unequal " \
-                        f"to the given 'missing_label={self.missing_label}' " \
-                        f"as parameter."
+            error_msg = (
+                f"{est} of 'estimators' has 'missing_label="
+                f"{est.missing_label}' as attribute being unequal "
+                f"to the given 'missing_label={self.missing_label}' "
+                f"as parameter."
+            )
             try:
                 if is_labeled([self.missing_label], est.missing_label)[0]:
                     raise TypeError(error_msg)
             except TypeError:
                 raise TypeError(error_msg)
-            error_msg = f"{est} of 'estimators' has 'classes={est.classes}' " \
-                        f"as attribute being unequal to the given 'classes=" \
-                        f"{self.classes}' as parameter."
+            error_msg = (
+                f"{est} of 'estimators' has 'classes={est.classes}' "
+                f"as attribute being unequal to the given 'classes="
+                f"{self.classes}' as parameter."
+            )
             classes_none = self.classes is None
             est_classes_none = est.classes is None
             if classes_none and not est_classes_none:
                 raise ValueError(error_msg)
-            if not classes_none and not est_classes_none and \
-                    not np.array_equal(self.classes, est.classes):
+            if (
+                    not classes_none
+                    and not est_classes_none
+                    and not np.array_equal(self.classes, est.classes)
+            ):
                 raise ValueError(error_msg)

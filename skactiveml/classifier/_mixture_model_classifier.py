@@ -9,8 +9,11 @@ from copy import deepcopy
 import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.mixture import GaussianMixture, BayesianGaussianMixture
-from sklearn.utils.validation import check_array, \
-    check_is_fitted, NotFittedError
+from sklearn.utils.validation import (
+    check_array,
+    check_is_fitted,
+    NotFittedError,
+)
 
 from ..base import ClassFrequencyEstimator
 from ..utils import MISSING_LABEL, compute_vote_vectors
@@ -74,12 +77,24 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
         (Bayesian) Gaussian Mixture model that is trained with unsupervised
         algorithm on train data.
     """
-    def __init__(self, mixture_model=None, weight_mode='responsibilities',
-                 classes=None, missing_label=MISSING_LABEL, cost_matrix=None,
-                 class_prior=0.0, random_state=None):
-        super().__init__(classes=classes, class_prior=class_prior,
-                         missing_label=missing_label, cost_matrix=cost_matrix,
-                         random_state=random_state)
+
+    def __init__(
+            self,
+            mixture_model=None,
+            weight_mode="responsibilities",
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            class_prior=0.0,
+            random_state=None,
+    ):
+        super().__init__(
+            classes=classes,
+            class_prior=class_prior,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
+        )
         self.mixture_model = mixture_model
         self.weight_mode = weight_mode
 
@@ -100,7 +115,8 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
         Returns
         -------
         self: skactiveml.classifier.MixtureModelClassifier,
-            `skactiveml.classifier.MixtureModelClassifier` object fitted on the training data.
+            `skactiveml.classifier.MixtureModelClassifier` object fitted on the
+             training data.
         """
         # Check input parameters.
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
@@ -108,12 +124,16 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
 
         # Check mixture model.
         if self.mixture_model is None:
-            bgm = BayesianGaussianMixture(n_components=len(self.classes_),
-                                          random_state=self.random_state_)
+            bgm = BayesianGaussianMixture(
+                n_components=len(self.classes_),
+                random_state=self.random_state_,
+            )
             self.mixture_model_ = bgm
         else:
-            if not isinstance(self.mixture_model,
-                              (GaussianMixture, BayesianGaussianMixture)):
+            if not isinstance(
+                    self.mixture_model,
+                    (GaussianMixture, BayesianGaussianMixture)
+            ):
                 raise TypeError(
                     f"`mixture_model` is of the type `{self.mixture_model}` "
                     f"but must be of the type "
@@ -123,7 +143,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
             self.mixture_model_ = deepcopy(self.mixture_model)
 
         # Check weight mode.
-        if self.weight_mode not in ['responsibilities', 'similarities']:
+        if self.weight_mode not in ["responsibilities", "similarities"]:
             raise ValueError(
                 f"`weight_mode` must be either 'responsibilities' or "
                 f"'similarities', got {self.weight_mode} instead."
@@ -140,8 +160,10 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
 
             # Counts number of votes per class label for each sample.
             V = compute_vote_vectors(
-                y=y, w=sample_weight, classes=np.arange(len(self.classes_)),
-                missing_label=-1
+                y=y,
+                w=sample_weight,
+                classes=np.arange(len(self.classes_)),
+                missing_label=-1,
             )
 
             # Stores responsibility for every given sample of training set.
@@ -170,12 +192,20 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
         X = check_array(X)
         self._check_n_features(X, reset=False)
         if np.sum(self.F_components_) > 0:
-            if self.weight_mode == 'similarities':
-                S = np.exp(-np.array(
-                    [cdist(X, [self.mixture_model_.means_[j]],
-                           metric='mahalanobis',
-                           VI=self.mixture_model_.precisions_[j]).ravel()
-                     for j in range(self.mixture_model_.n_components)])).T
+            if self.weight_mode == "similarities":
+                S = np.exp(
+                    -np.array(
+                        [
+                            cdist(
+                                X,
+                                [self.mixture_model_.means_[j]],
+                                metric="mahalanobis",
+                                VI=self.mixture_model_.precisions_[j],
+                            ).ravel()
+                            for j in range(self.mixture_model_.n_components)
+                        ]
+                    )
+                ).T
             else:
                 S = self.mixture_model_.predict_proba(X)
             F = S @ self.F_components_

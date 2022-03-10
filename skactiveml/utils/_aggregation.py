@@ -1,10 +1,9 @@
 import numpy as np
-
 from sklearn.utils import check_array, check_consistent_length
 
-from ._selection import rand_argmax
 from ._label import is_labeled, is_unlabeled
 from ._label_encoder import ExtLabelEncoder
+from ._selection import rand_argmax
 
 
 def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
@@ -43,9 +42,13 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
             "None. "
         )
 
-    w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
-                                                      force_all_finite=False,
-                                                      dtype=float, copy=True)
+    w = (
+        np.ones_like(y)
+        if w is None
+        else check_array(
+            w, ensure_2d=False, force_all_finite=False, dtype=float, copy=True
+        )
+    )
     w = w if w.ndim == 2 else w.reshape((-1, 1))
     check_consistent_length(y, w)
     check_consistent_length(y.T, w.T)
@@ -54,16 +57,18 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     # count class labels per class and weight by confidence scores
     w[np.logical_or(np.isnan(w), is_unlabeled_y)] = 0
     y_off = y + np.arange(y.shape[0])[:, None] * n_classes
-    v = np.bincount(y_off.ravel(), minlength=y.shape[0] * n_classes,
-                    weights=w.ravel())
+    v = np.bincount(
+        y_off.ravel(), minlength=y.shape[0] * n_classes, weights=w.ravel()
+    )
     v = v.reshape(-1, n_classes)
 
     return v
 
 
-def majority_vote(y, w=None, classes=None, missing_label=np.nan,
-                  random_state=None):
-    """ Assigns a label to each sample based on weighted voting.
+def majority_vote(
+        y, w=None, classes=None, missing_label=np.nan, random_state=None
+):
+    """Assigns a label to each sample based on weighted voting.
     Samples with no labels are assigned with `missing_label`.
 
     Parameters
@@ -91,9 +96,13 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan,
     y = check_array(y, ensure_2d=False, dtype=None, force_all_finite=False)
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     n_samples = y.shape[0]
-    w = np.ones_like(y) if w is None else check_array(w, ensure_2d=False,
-                                                      force_all_finite=False,
-                                                      dtype=None, copy=True)
+    w = (
+        np.ones_like(y)
+        if w is None
+        else check_array(
+            w, ensure_2d=False, force_all_finite=False, dtype=None, copy=True
+        )
+    )
 
     # extract labeled samples
     is_labeled_y = np.any(is_labeled(y, missing_label), axis=1)
@@ -109,10 +118,12 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan,
         y_labeled_transformed = le.transform(y_labeled)
 
         # perform voting
-        vote_matrix = compute_vote_vectors(y_labeled_transformed,
-                                           w=w[is_labeled_y],
-                                           missing_label=-1,
-                                           classes=np.arange(len(le.classes_)))
+        vote_matrix = compute_vote_vectors(
+            y_labeled_transformed,
+            w=w[is_labeled_y],
+            missing_label=-1,
+            classes=np.arange(len(le.classes_)),
+        )
 
         vote_vector = rand_argmax(vote_matrix, random_state, axis=1)
 
@@ -122,5 +133,3 @@ def majority_vote(y, w=None, classes=None, missing_label=np.nan,
         y_aggregated[is_labeled_y] = y_labeled_inverse_transformed
 
     return y_aggregated
-
-

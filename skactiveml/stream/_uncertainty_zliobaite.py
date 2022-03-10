@@ -37,12 +37,12 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budgetmanager will
-        be initialized based on the following conditions:
-            If only a budget is given the default budgetmanager is initialized
+        FixedUncertaintyBudgetManager will be used by default. The
+        budget manager will be initialized based on the following conditions:
+            If only a budget is given the default budget manager is initialized
             with the given budget.
-            If only a budgetmanager is given use the budgetmanager.
-            If both are not given the default budgetmanager with the
+            If only a budget manager is given use the budget manager.
+            If both are not given the default budget manager with the
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
@@ -59,7 +59,10 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
     """
 
     def __init__(
-        self, budget_manager=None, budget=None, random_state=None,
+            self,
+            budget_manager=None,
+            budget=None,
+            random_state=None,
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
@@ -83,7 +86,8 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : SkactivemlClassifier
@@ -103,8 +107,8 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances in candidates which should be queried, with
-            0 <= n_queried_instances <= n_samples.
+            The indices of instances in candidates which should be queried,
+            with 0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -138,13 +142,16 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices, budget_manager_param_dict=None):
+    def update(
+            self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the budget manager and the count for seen and queried
         instances
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
@@ -152,7 +159,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Indicates which instances from candidates have been queried.
 
         budget_manager_param_dict : kwargs
-            Optional kwargs for budgetmanager.
+            Optional kwargs for budget manager.
 
         Returns
         -------
@@ -170,7 +177,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             self.budget_manager_ = check_budget_manager(
                 self.budget,
                 self.budget_manager,
-                self._get_default_budget_manager()
+                self._get_default_budget_manager(),
             )
 
         budget_manager_param_dict = (
@@ -245,7 +252,10 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
         candidates, return_utilities = super()._validate_data(
-            candidates, return_utilities, reset=reset, **check_candidates_params
+            candidates,
+            return_utilities,
+            reset=reset,
+            **check_candidates_params
         )
         self._validate_random_state()
         X, y, sample_weight = self._validate_X_y_sample_weight(
@@ -264,7 +274,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             self.budget_manager_ = check_budget_manager(
                 self.budget,
                 self.budget_manager,
-                self._get_default_budget_manager()
+                self._get_default_budget_manager(),
             )
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
@@ -345,14 +355,14 @@ class FixedUncertainty(UncertaintyZliobaite):
     budgetmanager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budgetmanager will
-        be initialized based on the following conditions:
-            If only a budget is given the default budgetmanager is initialized
+        FixedUncertaintyBudgetManager will be used by default. The budget
+        manager will be initialized based on the following conditions:
+            If only a budget is given the default budget manager is initialized
             with the given budget.
-            If only a budgetmanager is given use the budgetmanager.
-            If both are not given the default budgetmanager with the
+            If only a budget manager is given use the budget manager.
+            If both are not given the default budget manager with the
             default budget.
-            If both are given and the budget differs from budgetmanager.budget
+            If both are given and the budget differs from budget manager.budget
             a warning is thrown.
 
     random_state : int, RandomState instance, default=None
@@ -394,8 +404,8 @@ class VariableUncertainty(UncertaintyZliobaite):
     budgetmanager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budgetmanager will
-        be initialized based on the following conditions:
+        FixedUncertaintyBudgetManager will be used by default. The budget
+        manager will be initialized based on the following conditions:
             If only a budget is given the default budgetmanager is initialized
             with the given budget.
             If only a budgetmanager is given use the budgetmanager.
@@ -427,13 +437,13 @@ class VariableUncertainty(UncertaintyZliobaite):
 
 
 class RandomVariableUncertainty(UncertaintyZliobaite):
-    """The RandomVariableUncertainty (Ran-Var-Uncertainty in [1]) query strategy
-    samples instances based on the classifier's uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a time-dependent threshold calculated based
-    on the budget, the number of classes and the number of observed and
-    acquired samples. To better adapt at change detection the threshold is
-    multiplied by a random number generatot with N(1,delta).
+    """The RandomVariableUncertainty (Ran-Var-Uncertainty in [1]) query
+    strategy samples instances based on the classifier's uncertainty assessed
+    based on the classifier's predictions. The instance is queried when the
+    probability of the most likely class exceeds a time-dependent threshold
+    calculated based on the budget, the number of classes and the number of
+    observed and acquired samples. To better adapt at change detection the
+    threshold is multiplied by a random number generator with N(1,delta).
 
     Parameters
     ----------
@@ -444,8 +454,8 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
     budgetmanager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budgetmanager will
-        be initialized based on the following conditions:
+        FixedUncertaintyBudgetManager will be used by default. The budget
+        manager will be initialized based on the following conditions:
             If only a budget is given the default budgetmanager is initialized
             with the given budget.
             If only a budgetmanager is given use the budgetmanager.
@@ -489,9 +499,10 @@ class Split(UncertaintyZliobaite):
     budgetmanager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budgetmanager will
+        FixedUncertaintyBudgetManager will be used by default. The budget
+        manager will
         be initialized based on the following conditions:
-            If only a budget is given the default budgetmanager is initialized
+            If only a budget is given the default budget manager is initialized
             with the given budget.
             If only a budgetmanager is given use the budgetmanager.
             If both are not given the default budgetmanager with the

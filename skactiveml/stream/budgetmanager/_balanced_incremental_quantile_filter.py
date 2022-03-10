@@ -11,9 +11,10 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
     """
     The Balanced Incremental Quantile Filter has been proposed together with
     Probabilistic Active Learning for Datastreams [1]. It assesses whether a
-    given spatial utility (i.e., obtained via ProbabilisticAL) warrants to query the
-    label in question. The spatial ultilities are compared against a threshold
-    that is derived from a quantile (budget) of the last w observed utilities.
+    given spatial utility (i.e., obtained via ProbabilisticAL) warrants to
+    query the label in question. The spatial ultilities are compared against
+    a threshold that is derived from a quantile (budget) of the last w observed
+    utilities.
     To balance the number of queries, w_tol is used to increase or decrease the
     threshold based on the number of available acquisitions.
 

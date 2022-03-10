@@ -30,11 +30,10 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget=None, allow_exceeding_budget=True,
-                 random_state=None):
-        super().__init__(
-            budget=budget, random_state=random_state
-        )
+    def __init__(
+            self, budget=None, allow_exceeding_budget=True, random_state=None
+    ):
+        super().__init__(budget=budget, random_state=random_state)
         self.allow_exceeding_budget = allow_exceeding_budget
 
     def query(self, candidates, return_utilities=False):
@@ -47,7 +46,8 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates : array-like or sparse matrix of shape (n_samples, n_features)
+        candidates : array-like or sparse matrix of shape
+        (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
@@ -58,8 +58,8 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances in candidates which should be queried, with
-            0 <= n_queried_instances <= n_samples.
+            The indices of instances in candidates which should be queried,
+            with 0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -88,14 +88,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         for i, utility in enumerate(utilities):
             tmp_observed_instances += 1
             available_budget = (
-                tmp_observed_instances
-                * self.budget_
-                - tmp_queried_instances
+                    tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
             queried[i] = (
-                (self.allow_exceeding_budget or available_budget > 1)
-                and (utility >= 1 - self.budget_)
-            )
+                                 self.allow_exceeding_budget or available_budget > 1
+                         ) and (utility >= 1 - self.budget_)
             tmp_queried_instances += queried[i]
 
         # get the indices instances that should be queried
@@ -143,7 +140,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _validate_data(
-        self, candidates, return_utilities, reset=True, **check_candidates_params
+            self,
+            candidates,
+            return_utilities,
+            reset=True,
+            **check_candidates_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -179,7 +180,10 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         )
 
         candidates, return_utilities = super()._validate_data(
-            candidates, return_utilities, reset=reset, **check_candidates_params
+            candidates,
+            return_utilities,
+            reset=reset,
+            **check_candidates_params
         )
 
         self._validate_random_state()
@@ -208,9 +212,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     """
 
     def __init__(self, budget=None, random_state=None):
-        super().__init__(
-            budget=budget, random_state=random_state
-        )
+        super().__init__(budget=budget, random_state=random_state)
 
     def query(self, candidates, return_utilities=False):
         """Ask the query strategy which instances in candidates to acquire.
@@ -237,17 +239,16 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances in candidates which should be queried, with
-            0 <= n_queried_instances <= n_samples.
+            The indices of instances in candidates which should be queried,
+            with 0 <= n_queried_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
         candidates, return_utilities = self._validate_data(
-            candidates,
-            return_utilities
-            )
+            candidates, return_utilities
+        )
 
         utilities = np.zeros(candidates.shape[0])
 
@@ -260,9 +261,9 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         for i, x in enumerate(candidates):
             tmp_observed_instances += 1
             remaining_budget = (
-                tmp_observed_instances * self.budget_ - tmp_queried_instances
+                    tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
-            queried[i] = (remaining_budget >= 1)
+            queried[i] = remaining_budget >= 1
             if queried[i]:
                 utilities[i] = 1
             tmp_queried_instances += queried[i]
@@ -308,7 +309,11 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _validate_data(
-        self, candidates, return_utilities, reset=True, **check_candidates_params
+            self,
+            candidates,
+            return_utilities,
+            reset=True,
+            **check_candidates_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -336,7 +341,10 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
         candidates, return_utilities = super()._validate_data(
-            candidates, return_utilities, reset=reset, **check_candidates_params
+            candidates,
+            return_utilities,
+            reset=reset,
+            **check_candidates_params
         )
 
         self._validate_random_state()

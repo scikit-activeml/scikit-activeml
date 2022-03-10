@@ -17,9 +17,16 @@ from sklearn.svm import SVR
 from sklearn.utils import check_array, check_symmetric
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import simple_batch, check_classifier_params, \
-    MISSING_LABEL, check_scalar, check_random_state, check_X_y, is_labeled, \
-    ExtLabelEncoder
+from ..utils import (
+    simple_batch,
+    check_classifier_params,
+    MISSING_LABEL,
+    check_scalar,
+    check_random_state,
+    check_X_y,
+    is_labeled,
+    ExtLabelEncoder,
+)
 
 
 class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
@@ -59,15 +66,17 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         IEEE International Conference on Data Mining (ICDM), 2016
     """
 
-    def __init__(self,
-                 classes,
-                 base_regressor=None,
-                 cost_matrix=None,
-                 embed_dim=None,
-                 mds_params=None,
-                 nn_params=None,
-                 missing_label=MISSING_LABEL,
-                 random_state=None):
+    def __init__(
+            self,
+            classes,
+            base_regressor=None,
+            cost_matrix=None,
+            embed_dim=None,
+            mds_params=None,
+            nn_params=None,
+            missing_label=MISSING_LABEL,
+            random_state=None,
+    ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
@@ -80,8 +89,15 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         self.mds_params = mds_params
         self.nn_params = nn_params
 
-    def query(self, X, y, sample_weight=None, candidates=None, batch_size=1,
-              return_utilities=False):
+    def query(
+            self,
+            X,
+            y,
+            sample_weight=None,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
+    ):
         """Query the next instance to be labeled.
 
         Parameters
@@ -132,19 +148,38 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
             refers to samples in candidates.
         """
         # Check standard parameters.
-        X, y, candidates, batch_size, return_utilities = \
-            super()._validate_data(
-                X=X, y=y, candidates=candidates, batch_size=batch_size,
-                return_utilities=return_utilities, reset=True,
-            )
+        (
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+        ) = super()._validate_data(
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+        )
 
         # Obtain candidates plus mapping.
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        util_cand = _alce(X_cand, X, y, self.base_regressor, self.cost_matrix,
-                          self.classes, self.embed_dim, sample_weight,
-                          self.missing_label, self.random_state_,
-                          self.mds_params, self.nn_params)
+        util_cand = _alce(
+            X_cand,
+            X,
+            y,
+            self.base_regressor,
+            self.cost_matrix,
+            self.classes,
+            self.embed_dim,
+            sample_weight,
+            self.missing_label,
+            self.random_state_,
+            self.mds_params,
+            self.nn_params,
+        )
 
         if mapping is None:
             utilities = util_cand
@@ -152,13 +187,28 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = util_cand
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
 
 
-def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
-          sample_weight, missing_label, random_state, mds_params, nn_params):
+def _alce(
+        X_cand,
+        X,
+        y,
+        base_regressor,
+        cost_matrix,
+        classes,
+        embed_dim,
+        sample_weight,
+        missing_label,
+        random_state,
+        mds_params,
+        nn_params,
+):
     """Compute the alce score for the candidate instances.
 
     Parameters
@@ -206,13 +256,18 @@ def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
         cost_matrix = 1 - np.eye(len(classes))
 
     if np.count_nonzero(cost_matrix) == 0:
-        raise ValueError("The cost matrix must contain at least one positive "
-                         "number.")
+        raise ValueError(
+            "The cost matrix must contain at least one positive " "number."
+        )
 
     # Check the given data
     X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
-        X, y, X_cand, sample_weight, force_all_finite=False,
-        missing_label=missing_label
+        X,
+        y,
+        X_cand,
+        sample_weight,
+        force_all_finite=False,
+        missing_label=missing_label,
     )
 
     labeled = is_labeled(y, missing_label=missing_label)
@@ -223,25 +278,27 @@ def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
 
     # If all samples are unlabeled, the strategy randomly selects an instance
     if len(X) == 0:
-        warnings.warn("There are no labeled instances. The strategy selects "
-                      "one random instance.")
+        warnings.warn(
+            "There are no labeled instances. The strategy selects "
+            "one random instance."
+        )
         return np.ones(len(X_cand))
 
     # Check embedding dimension
     embed_dim = len(classes) if embed_dim is None else embed_dim
-    check_scalar(embed_dim, 'embed_dim', int, min_val=1)
+    check_scalar(embed_dim, "embed_dim", int, min_val=1)
 
     # Update mds parameters
     mds_params_default = {
-        'metric': False,
-        'n_components': embed_dim,
-        'n_uq': len(classes),
-        'max_iter': 300,
-        'eps': 1e-6,
-        'dissimilarity': "precomputed",
-        'n_init': 8,
-        'n_jobs': 1,
-        'random_state': random_state
+        "metric": False,
+        "n_components": embed_dim,
+        "n_uq": len(classes),
+        "max_iter": 300,
+        "eps": 1e-6,
+        "dissimilarity": "precomputed",
+        "n_init": 8,
+        "n_jobs": 1,
+        "random_state": random_state,
     }
     if mds_params is not None:
         if type(mds_params) is not dict:
@@ -254,9 +311,7 @@ def _alce(X_cand, X, y, base_regressor, cost_matrix, classes, embed_dim,
     if type(nn_params) is not dict:
         raise TypeError("'nn_params' must be a dictionary or None")
 
-    regressors = [
-        clone(base_regressor) for _ in range(embed_dim)
-    ]
+    regressors = [clone(base_regressor) for _ in range(embed_dim)]
     n_classes = len(classes)
 
     dissimilarities = np.zeros((2 * n_classes, 2 * n_classes))
@@ -296,9 +351,17 @@ by Kuan-Hao Huang.
 # Licence: BSD
 
 
-def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
-                     init=None, max_iter=300, verbose=0, eps=1e-3,
-                     random_state=None):
+def _smacof_single_p(
+        similarities,
+        n_uq,
+        metric=True,
+        n_components=2,
+        init=None,
+        max_iter=300,
+        verbose=0,
+        eps=1e-3,
+        random_state=None,
+):
     """
     Computes multidimensional scaling using SMACOF algorithm.
 
@@ -349,8 +412,10 @@ def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
     V[np.arange(len(V)), np.arange(len(V))] = W.sum(axis=1)
     e = np.ones((n_samples, 1))
 
-    Vp = np.linalg.inv(V + np.dot(e, e.T) / n_samples) - \
-         np.dot(e, e.T) / n_samples
+    Vp = (
+            np.linalg.inv(V + np.dot(e, e.T) / n_samples)
+            - np.dot(e, e.T) / n_samples
+    )
 
     sim_flat = similarities.ravel()
     sim_flat_w = sim_flat[sim_flat != 0]
@@ -362,8 +427,10 @@ def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
         # overrides the parameter p
         n_components = init.shape[1]
         if n_samples != init.shape[0]:
-            raise ValueError("init matrix should be of shape (%d, %d)" %
-                             (n_samples, n_components))
+            raise ValueError(
+                "init matrix should be of shape (%d, %d)"
+                % (n_samples, n_components)
+            )
         X = init
 
     old_stress = None
@@ -384,19 +451,21 @@ def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
             disparities = dis_flat.copy()
             disparities[sim_flat != 0] = disparities_flat
             disparities = disparities.reshape((n_samples, n_samples))
-            disparities *= np.sqrt((n_samples * (n_samples - 1) / 2)
-                                   / (disparities ** 2).sum())
+            disparities *= np.sqrt(
+                (n_samples * (n_samples - 1) / 2) / (disparities ** 2).sum()
+            )
             disparities[similarities == 0] = 0
 
         # Compute stress
-        _stress = (W.ravel() * (
-                    (dis.ravel() - disparities.ravel()) ** 2)).sum()
+        _stress = (
+                W.ravel() * ((dis.ravel() - disparities.ravel()) ** 2)
+        ).sum()
         _stress /= 2
 
         # Update X using the Guttman transform
         dis[dis == 0] = 1e-5
         ratio = disparities / dis
-        _B = - W * ratio
+        _B = -W * ratio
         _B[np.arange(len(_B)), np.arange(len(_B))] += (W * ratio).sum(axis=1)
 
         X = np.dot(Vp, np.dot(_B, X))
@@ -404,20 +473,31 @@ def _smacof_single_p(similarities, n_uq, metric=True, n_components=2,
         dis = np.sqrt((X ** 2).sum(axis=1)).sum()
 
         if verbose >= 2:
-            print('it: %d, stress %s' % (it, _stress))
+            print("it: %d, stress %s" % (it, _stress))
         if old_stress is not None:
             if (old_stress - _stress / dis) < eps:
                 if verbose:
-                    print(f'breaking at iteration {it} with stress {_stress}')
+                    print(f"breaking at iteration {it} with stress {_stress}")
                 break
         old_stress = _stress / dis
 
     return X, _stress, it + 1
 
 
-def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
-             n_init=8, n_jobs=1, max_iter=300, verbose=0, eps=1e-3,
-             random_state=None, return_n_iter=False):
+def smacof_p(
+        similarities,
+        n_uq,
+        metric=True,
+        n_components=2,
+        init=None,
+        n_init=8,
+        n_jobs=1,
+        max_iter=300,
+        verbose=0,
+        eps=1e-3,
+        random_state=None,
+        return_n_iter=False,
+):
     """
     Computes multidimensional scaling using SMACOF (Scaling by Majorizing a
     Complicated Function) algorithm
@@ -495,13 +575,13 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
     similarities = check_array(similarities)
     random_state = check_random_state(random_state)
 
-    if hasattr(init, '__array__'):
+    if hasattr(init, "__array__"):
         init = np.asarray(init).copy()
         if not n_init == 1:
             warnings.warn(
-                'Explicit initial positions passed: '
-                'performing only one init of the MDS instead of %d'
-                % n_init)
+                "Explicit initial positions passed: "
+                "performing only one init of the MDS instead of %d" % n_init
+            )
             n_init = 1
 
     best_pos, best_stress = None, None
@@ -509,10 +589,16 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
     if n_jobs == 1:
         for it in range(n_init):
             pos, stress, n_iter_ = _smacof_single_p(
-                similarities, n_uq, metric=metric,
-                n_components=n_components, init=init,
-                max_iter=max_iter, verbose=verbose,
-                eps=eps, random_state=random_state)
+                similarities,
+                n_uq,
+                metric=metric,
+                n_components=n_components,
+                init=init,
+                max_iter=max_iter,
+                verbose=verbose,
+                eps=eps,
+                random_state=random_state,
+            )
             if best_stress is None or stress < best_stress:
                 best_stress = stress
                 best_pos = pos.copy()
@@ -521,10 +607,18 @@ def smacof_p(similarities, n_uq, metric=True, n_components=2, init=None,
         seeds = random_state.randint(np.iinfo(np.int32).max, size=n_init)
         results = Parallel(n_jobs=n_jobs, verbose=max(verbose - 1, 0))(
             delayed(_smacof_single_p)(
-                similarities, n_uq, metric=metric, n_components=n_components,
-                init=init, max_iter=max_iter, verbose=verbose, eps=eps,
-                random_state=seed)
-            for seed in seeds)
+                similarities,
+                n_uq,
+                metric=metric,
+                n_components=n_components,
+                init=init,
+                max_iter=max_iter,
+                verbose=verbose,
+                eps=eps,
+                random_state=seed,
+            )
+            for seed in seeds
+        )
         positions, stress, n_iters = zip(*results)
         best = np.argmin(stress)
         best_stress = stress[best]
@@ -592,9 +686,19 @@ class MDSP(BaseEstimator):
     hypothesis" Kruskal, J. Psychometrika, 29, (1964)
     """
 
-    def __init__(self, n_components=2, n_uq=1, metric=True, n_init=4,
-                 max_iter=300, verbose=0, eps=1e-3, n_jobs=1,
-                 random_state=None, dissimilarity="euclidean"):
+    def __init__(
+            self,
+            n_components=2,
+            n_uq=1,
+            metric=True,
+            n_init=4,
+            max_iter=300,
+            verbose=0,
+            eps=1e-3,
+            n_jobs=1,
+            random_state=None,
+            dissimilarity="euclidean",
+    ):
         self.n_components = n_components
         self.n_uq = n_uq
         self.dissimilarity = dissimilarity
@@ -635,24 +739,36 @@ class MDSP(BaseEstimator):
         """
         X = check_array(X)
         if X.shape[0] == X.shape[1] and self.dissimilarity != "precomputed":
-            warnings.warn("The MDS API has changed. ``fit`` now constructs an"
-                          " dissimilarity matrix from data. To use a custom "
-                          "dissimilarity matrix, set "
-                          "``dissimilarity=precomputed``.")
+            warnings.warn(
+                "The MDS API has changed. ``fit`` now constructs an"
+                " dissimilarity matrix from data. To use a custom "
+                "dissimilarity matrix, set "
+                "``dissimilarity=precomputed``."
+            )
 
         if self.dissimilarity == "precomputed":
             self.dissimilarity_matrix_ = X
         elif self.dissimilarity == "euclidean":
             self.dissimilarity_matrix_ = euclidean_distances(X)
         else:
-            raise ValueError("Proximity must be 'precomputed' or 'euclidean'."
-                             " Got %s instead" % str(self.dissimilarity))
+            raise ValueError(
+                "Proximity must be 'precomputed' or 'euclidean'."
+                " Got %s instead" % str(self.dissimilarity)
+            )
 
         self.embedding_, self.stress_, self.n_iter_ = smacof_p(
-            self.dissimilarity_matrix_, self.n_uq, metric=self.metric,
-            n_components=self.n_components, init=init, n_init=self.n_init,
-            n_jobs=self.n_jobs, max_iter=self.max_iter, verbose=self.verbose,
-            eps=self.eps, random_state=self.random_state,
-            return_n_iter=True)
+            self.dissimilarity_matrix_,
+            self.n_uq,
+            metric=self.metric,
+            n_components=self.n_components,
+            init=init,
+            n_init=self.n_init,
+            n_jobs=self.n_jobs,
+            max_iter=self.max_iter,
+            verbose=self.verbose,
+            eps=self.eps,
+            random_state=self.random_state,
+            return_n_iter=True,
+        )
 
         return self.embedding_

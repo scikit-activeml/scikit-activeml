@@ -7,8 +7,13 @@ from sklearn.utils.validation import check_array
 
 from ..base import ClassFrequencyEstimator
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, check_scalar, simple_batch, check_type, \
-    check_equal_missing_label
+from ..utils import (
+    MISSING_LABEL,
+    check_scalar,
+    simple_batch,
+    check_type,
+    check_equal_missing_label,
+)
 
 
 class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
@@ -36,17 +41,28 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         pages 586-594. IOS Press, 2016
     """
 
-    def __init__(self, prior=1, m_max=1, missing_label=MISSING_LABEL,
-                 random_state=None):
+    def __init__(
+            self, prior=1, m_max=1, missing_label=MISSING_LABEL,
+            random_state=None
+    ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
         self.prior = prior
         self.m_max = m_max
 
-    def query(self, X, y, clf, fit_clf=True, sample_weight=None,
-              utility_weight=None, candidates=None, batch_size=1,
-              return_utilities=False):
+    def query(
+            self,
+            X,
+            y,
+            clf,
+            fit_clf=True,
+            sample_weight=None,
+            utility_weight=None,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
+    ):
         """Query the next instance to be labeled.
 
         Parameters
@@ -66,10 +82,10 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
             Weights of training samples in `X`.
         utility_weight: array-like, optional (default=None)
             Weight for each candidate (multiplied with utilities). Usually,
-            this is to be the density of a candidate in ProbabilisticAL. The length of
-            `utility_weight` is usually n_samples, except for the case when
-            candidates contains samples (ndim >= 2). Then the length is
-            `n_candidates`.
+            this is to be the density of a candidate in ProbabilisticAL. The
+            length of `utility_weight` is usually n_samples, except for the
+            case when candidates contains samples (ndim >= 2). Then the length
+            is `n_candidates`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
@@ -99,15 +115,15 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-                X, y, candidates, batch_size, return_utilities, reset=True
-            )
+            X, y, candidates, batch_size, return_utilities, reset=True
+        )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Check the classifier's type.
-        check_type(clf, 'clf', ClassFrequencyEstimator)
+        check_type(clf, "clf", ClassFrequencyEstimator)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_type(fit_clf, 'fit_clf', bool)
+        check_type(fit_clf, "fit_clf", bool)
 
         # Check `utility_weight`.
         if utility_weight is None:
@@ -134,8 +150,9 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         k_vec = clf.predict_freq(X_cand)
 
         # Calculate utilities and return the output.
-        utilities_cand = \
-            cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
+        utilities_cand = cost_reduction(
+            k_vec, prior=self.prior, m_max=self.m_max
+        )
 
         if mapping is None:
             utilities = utilities_cand
@@ -144,12 +161,15 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
             utilities[mapping] = utilities_cand
         utilities *= utility_weight
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
 
 
-def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
+def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
     """Calculate the expected cost reduction.
 
     Calculate the expected cost reduction for given maximum number of
@@ -172,11 +192,10 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
         Expected cost reduction for given parameters.
     """
     # Check if 'prior' is valid
-    check_scalar(prior, 'prior', (float, int),
-                 min_inclusive=False, min_val=0)
+    check_scalar(prior, "prior", (float, int), min_inclusive=False, min_val=0)
 
     # Check if 'm_max' is valid
-    check_scalar(m_max, 'm_max', int, min_val=1)
+    check_scalar(m_max, "m_max", int, min_val=1)
 
     n_classes = len(k_vec_list[0])
     n_samples = len(k_vec_list)
@@ -185,8 +204,9 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
     C = 1 - np.eye(n_classes) if C is None else np.asarray(C)
 
     # generate labelling vectors for all possible m values
-    l_vec_list = np.vstack([_gen_l_vec_list(m, n_classes)
-                            for m in range(m_max + 1)])
+    l_vec_list = np.vstack(
+        [_gen_l_vec_list(m, n_classes) for m in range(m_max + 1)]
+    )
     m_list = np.sum(l_vec_list, axis=1)
     n_l_vecs = len(l_vec_list)
 
@@ -202,22 +222,31 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.e-3):
 
     # all combination of k-, l-, and prediction indicator vectors
     combs = [k_vec_list, l_vec_list, np.eye(n_classes)]
-    combs = np.asarray([list(elem)
-                        for elem in list(itertools.product(*combs))])
+    combs = np.asarray(
+        [list(elem) for elem in list(itertools.product(*combs))]
+    )
 
     # three factors of the closed form solution
     factor_1 = 1 / _euler_beta(k_vec_list)
     factor_2 = _multinomial(l_vec_list)
-    factor_3 = _euler_beta(np.sum(combs, axis=1)).reshape(n_samples, n_l_vecs,
-                                                          n_classes)
+    factor_3 = _euler_beta(np.sum(combs, axis=1)).reshape(
+        n_samples, n_l_vecs, n_classes
+    )
 
     # expected classification cost for each m
     m_sums = np.asarray(
-        [factor_1[k_idx]
-         * np.bincount(m_list, factor_2 * [C[:, y_hats[k_idx, l_idx]]
-                                           @ factor_3[k_idx, l_idx]
-                                           for l_idx in range(n_l_vecs)])
-         for k_idx in range(n_samples)]
+        [
+            factor_1[k_idx]
+            * np.bincount(
+                m_list,
+                factor_2
+                * [
+                    C[:, y_hats[k_idx, l_idx]] @ factor_3[k_idx, l_idx]
+                    for l_idx in range(n_l_vecs)
+                ],
+            )
+            for k_idx in range(n_samples)
+        ]
     )
 
     # compute classification cost reduction as difference
@@ -253,9 +282,9 @@ def _gen_l_vec_list(m_approx, n_classes):
     for i in range(n_classes - 1):
         new_label_vec_list = []
         for labelVec in label_vec_list:
-            for newLabel in label_vec_res[label_vec_res
-                                          - (m_approx - sum(labelVec))
-                                          <= 1.e-10]:
+            for newLabel in label_vec_res[
+                label_vec_res - (m_approx - sum(labelVec)) <= 1.0e-10
+            ]:
                 new_label_vec_list.append(labelVec + [newLabel])
         label_vec_list = new_label_vec_list
 

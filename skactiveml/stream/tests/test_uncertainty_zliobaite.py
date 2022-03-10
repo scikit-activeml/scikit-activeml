@@ -48,7 +48,9 @@ class TemplateTestUncertaintyZliobaite:
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_random_state(self):
-        query_strategy = self.get_query_strategy()(random_state="string",)
+        query_strategy = self.get_query_strategy()(
+            random_state="string",
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_query_param_candidates(self):
@@ -111,7 +113,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=1,
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -120,7 +122,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=None,
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -129,7 +131,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=np.ones(5),
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -138,7 +140,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=self.X[1:],
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
 
     def test_query_param_y(self):
@@ -152,7 +154,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=self.X,
             y=1,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             TypeError,
@@ -161,7 +163,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=self.X,
             y=None,
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -170,7 +172,7 @@ class TemplateTestUncertaintyZliobaite:
             clf=self.clf,
             X=self.X,
             y=self.y[1:],
-            fit_clf=True
+            fit_clf=True,
         )
 
     def test_query_param_sample_weight(self):
@@ -185,7 +187,7 @@ class TemplateTestUncertaintyZliobaite:
             X=self.X,
             y=self.y[1:],
             sample_weight="string",
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -195,7 +197,7 @@ class TemplateTestUncertaintyZliobaite:
             X=self.X,
             y=self.y[1:],
             sample_weight=["string", "numbers", "test"],
-            fit_clf=True
+            fit_clf=True,
         )
         self.assertRaises(
             ValueError,
@@ -205,7 +207,7 @@ class TemplateTestUncertaintyZliobaite:
             X=self.X,
             y=self.y[1:],
             sample_weight=[1],
-            fit_clf=True
+            fit_clf=True,
         )
 
     def test_query_param_fit_clf(self):
@@ -258,12 +260,16 @@ class TestSplit(TemplateTestUncertaintyZliobaite, unittest.TestCase):
         return Split
 
 
-class TestFixedUncertainty(TemplateTestUncertaintyZliobaite, unittest.TestCase):
+class TestFixedUncertainty(
+    TemplateTestUncertaintyZliobaite, unittest.TestCase
+):
     def get_query_strategy(self):
         return FixedUncertainty
 
 
-class TestVariableUncertainty(TemplateTestUncertaintyZliobaite, unittest.TestCase):
+class TestVariableUncertainty(
+    TemplateTestUncertaintyZliobaite, unittest.TestCase
+):
     def get_query_strategy(self):
         return VariableUncertainty
 

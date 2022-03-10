@@ -6,7 +6,6 @@ from skactiveml.visualization import mesh
 
 
 class TestMisc(unittest.TestCase):
-
     def test_check_mesh(self):
         bound = np.array([[0, 0], [1, 1]])
         res = 10

@@ -5,15 +5,21 @@ import numpy as np
 from sklearn import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.metrics import pairwise_kernels
-from sklearn.utils.validation import check_array, \
-    check_consistent_length
+from sklearn.utils.validation import check_array, check_consistent_length
 
 from ..base import SkactivemlClassifier
 from ..classifier import ParzenWindowClassifier
-from ..utils import MISSING_LABEL, is_labeled, is_unlabeled, \
-    check_missing_label, check_equal_missing_label, check_type, check_indices
+from ..utils import (
+    MISSING_LABEL,
+    is_labeled,
+    is_unlabeled,
+    check_missing_label,
+    check_equal_missing_label,
+    check_type,
+    check_indices,
+)
 
-__all__ = ['IndexClassifierWrapper']
+__all__ = ["IndexClassifierWrapper"]
 
 
 class IndexClassifierWrapper:
@@ -76,7 +82,7 @@ class IndexClassifierWrapper:
         self.missing_label = missing_label
 
         # Validate classifier type.
-        check_type(self.clf, 'clf', SkactivemlClassifier)
+        check_type(self.clf, "clf", SkactivemlClassifier)
 
         # Check X, y, sample_weight: will be done by base clf
         check_consistent_length(self.X, self.y)
@@ -84,7 +90,7 @@ class IndexClassifierWrapper:
         if self.sample_weight is not None:
             check_consistent_length(self.X, self.sample_weight)
 
-        check_type(set_base_clf, 'set_base_clf', bool)
+        check_type(set_base_clf, "set_base_clf", bool)
 
         # deep copy classifier as it might be fitted already
         if hasattr(self.clf, "classes_"):
@@ -95,28 +101,32 @@ class IndexClassifierWrapper:
         else:
             if set_base_clf:
                 raise NotFittedError(
-                    'Classifier is not yet fitted but `set_base_clf=True` '
-                    'in `__init__` is set to True.'
+                    "Classifier is not yet fitted but `set_base_clf=True` "
+                    "in `__init__` is set to True."
                 )
 
         # Check and use partial fit if applicable
-        check_type(self.ignore_partial_fit, 'ignore_partial_fit', bool)
+        check_type(self.ignore_partial_fit, "ignore_partial_fit", bool)
         self.use_partial_fit = (
-            hasattr(self.clf, 'partial_fit') and not self.ignore_partial_fit
+                hasattr(self.clf,
+                        "partial_fit") and not self.ignore_partial_fit
         )
 
-        check_type(self.enforce_unique_samples, 'enforce_unique_samples', bool)
-        self.enforce_unique_samples = \
-            'check_unique' if enforce_unique_samples else False
+        check_type(self.enforce_unique_samples, "enforce_unique_samples", bool)
+        self.enforce_unique_samples = (
+            "check_unique" if enforce_unique_samples else False
+        )
         # TODO better change check_indices function
 
         if self.use_partial_fit and self.enforce_unique_samples:
-            warnings.warn('The `partial_fit` function by sklearn might not '
-                          'ensure that every sample is used only once in the '
-                          'fitting process.')
+            warnings.warn(
+                "The `partial_fit` function by sklearn might not "
+                "ensure that every sample is used only once in the "
+                "fitting process."
+            )
 
         # Check use_speed_up
-        check_type(self.use_speed_up, 'use_speed_up', bool)
+        check_type(self.use_speed_up, "use_speed_up", bool)
 
         # Check missing label
         check_missing_label(self.missing_label)
@@ -132,12 +142,11 @@ class IndexClassifierWrapper:
             self.pwc_K_ = np.full([len(self.X), len(self.X)], np.nan)
 
             self.clf_ = clone(self.clf)
-            self.clf_.metric = 'precomputed'
+            self.clf_.metric = "precomputed"
             self.clf_.metric_dict = {}
 
-
     def precompute(
-        self, idx_fit, idx_pred, fit_params='all', pred_params='all'
+            self, idx_fit, idx_pred, fit_params="all", pred_params="all"
     ):
         """
         Function to describe for which samples we should precompute something.
@@ -168,39 +177,39 @@ class IndexClassifierWrapper:
 
         # precompute ParzenWindowClassifier
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            if fit_params == 'all':
+            if fit_params == "all":
                 idx_fit_ = idx_fit
-            elif fit_params == 'labeled':
+            elif fit_params == "labeled":
                 idx_fit_ = idx_fit[
                     is_labeled(
                         self.y[idx_fit], missing_label=self.missing_label_
                     )
                 ]
-            elif fit_params == 'unlabeled':
+            elif fit_params == "unlabeled":
                 idx_fit_ = idx_fit[
                     is_unlabeled(
                         self.y[idx_fit], missing_label=self.missing_label_
                     )
                 ]
             else:
-                raise ValueError(f'`fit_params`== {fit_params} not defined')
+                raise ValueError(f"`fit_params`== {fit_params} not defined")
 
-            if pred_params == 'all':
+            if pred_params == "all":
                 idx_pred_ = idx_pred
-            elif pred_params == 'labeled':
+            elif pred_params == "labeled":
                 idx_pred_ = idx_pred[
                     is_labeled(
                         self.y[idx_pred], missing_label=self.missing_label_
                     )
                 ]
-            elif pred_params == 'unlabeled':
+            elif pred_params == "unlabeled":
                 idx_pred_ = idx_pred[
                     is_unlabeled(
                         self.y[idx_pred], missing_label=self.missing_label_
                     )
                 ]
             else:
-                raise ValueError(f'`pred_params`== {pred_params} not defined')
+                raise ValueError(f"`pred_params`== {pred_params} not defined")
 
             if len(idx_fit_) > 0 and len(idx_pred_) > 0:
                 self.pwc_K_[np.ix_(idx_fit_, idx_pred_)] = pairwise_kernels(
@@ -238,33 +247,34 @@ class IndexClassifierWrapper:
         """
         # check idx
         idx = check_array(idx, ensure_2d=False, dtype=int)
-        idx = check_indices(idx, self.X, dim=0,
-                            unique=self.enforce_unique_samples)
+        idx = check_indices(
+            idx, self.X, dim=0, unique=self.enforce_unique_samples
+        )
 
         # check set_base_clf
-        check_type(set_base_clf, 'set_base_clf', bool)
+        check_type(set_base_clf, "set_base_clf", bool)
 
         # check y
         if y is None:
             y = self.y[idx]
             if is_unlabeled(y, missing_label=self.missing_label_).all():
-                warnings.warn('All labels are of `missing_label` in `fit`.')
+                warnings.warn("All labels are of `missing_label` in `fit`.")
         else:
-            y = check_array(y, ensure_2d=False,
-                                  force_all_finite='allow-nan')
+            y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
             check_consistent_length(idx, y)
 
         # check sample_weight
         if sample_weight is None:
-            sample_weight = \
-                self._copy_sw(self._get_sw(self.sample_weight, idx=idx))
+            sample_weight = self._copy_sw(
+                self._get_sw(self.sample_weight, idx=idx)
+            )
             # TODO deepcopy
         else:
             sample_weight = check_array(sample_weight, ensure_2d=False)
             check_consistent_length(sample_weight, y)
 
         # check if a clf_ exists
-        if 'clf_' not in self.__dict__:
+        if "clf_" not in self.__dict__:
             self.clf_ = clone(self.clf)
 
         # fit classifier
@@ -286,8 +296,14 @@ class IndexClassifierWrapper:
 
         return self
 
-    def partial_fit(self, idx, y=None, sample_weight=None,
-                    use_base_clf=False, set_base_clf=False):
+    def partial_fit(
+            self,
+            idx,
+            y=None,
+            sample_weight=None,
+            use_base_clf=False,
+            set_base_clf=False,
+    ):
         """Update the fitted model using additional samples in `self.X[idx]`
         and y as class labels.
 
@@ -318,43 +334,48 @@ class IndexClassifierWrapper:
 
         # check idx
         add_idx = check_array(idx, ensure_2d=False, dtype=int)
-        add_idx = check_indices(add_idx, self.X, dim=0,
-                                unique=self.enforce_unique_samples)
+        add_idx = check_indices(
+            add_idx, self.X, dim=0, unique=self.enforce_unique_samples
+        )
 
         # check use_base_clf
-        check_type(use_base_clf, 'use_base_clf', bool)
+        check_type(use_base_clf, "use_base_clf", bool)
 
         if use_base_clf:
             if not self.is_fitted(base_clf=True):
                 raise NotFittedError(
-                    'Base classifier is not set. Please use '
-                    '`set_base_clf=True` in `__init__`, `fit`, or '
-                    '`partial_fit`.')
+                    "Base classifier is not set. Please use "
+                    "`set_base_clf=True` in `__init__`, `fit`, or "
+                    "`partial_fit`."
+                )
         else:
             if not self.is_fitted(base_clf=False):
                 raise NotFittedError(
-                    'Classifier is not fitted. Please `fit` before using '
-                    '`partial_fit`.'
+                    "Classifier is not fitted. Please `fit` before using "
+                    "`partial_fit`."
                 )
 
         # check set_base_clf
-        check_type(set_base_clf, 'set_base_clf', bool)
+        check_type(set_base_clf, "set_base_clf", bool)
 
         # check y
         if y is None:
             add_y = self.y[add_idx]
             if is_unlabeled(add_y, missing_label=self.missing_label_).all():
-                warnings.warn('All labels are of `missing_label` in '
-                              '`partial_fit`.')
+                warnings.warn(
+                    "All labels are of `missing_label` in " "`partial_fit`."
+                )
         else:
-            add_y = check_array(y, ensure_2d=False,
-                                force_all_finite='allow-nan')
+            add_y = check_array(
+                y, ensure_2d=False, force_all_finite="allow-nan"
+            )
             check_consistent_length(add_idx, add_y)
 
         # check sample_weight
         if sample_weight is None:
-            add_sample_weight = \
-                self._copy_sw(self._get_sw(self.sample_weight, idx=add_idx))
+            add_sample_weight = self._copy_sw(
+                self._get_sw(self.sample_weight, idx=add_idx)
+            )
         else:
             add_sample_weight = check_array(sample_weight, ensure_2d=False)
             check_consistent_length(add_idx, add_sample_weight)
@@ -365,19 +386,19 @@ class IndexClassifierWrapper:
                 self.clf_ = deepcopy(self.base_clf_)
 
             # partial fit clf
-            self.clf_.partial_fit(
-                self.X[add_idx], add_y, add_sample_weight
-            )
+            self.clf_.partial_fit(self.X[add_idx], add_y, add_sample_weight)
 
             if set_base_clf:
                 self.base_clf_ = deepcopy(self.clf_)
 
         # handle case using regular fit from clf
         else:
-            if not hasattr(self, 'idx_'):
-                raise NotFittedError('Fitted classifier from `init` cannot be '
-                                     'used for `partial_fit` as it is unknown '
-                                     'where it has been fitted on.')
+            if not hasattr(self, "idx_"):
+                raise NotFittedError(
+                    "Fitted classifier from `init` cannot be "
+                    "used for `partial_fit` as it is unknown "
+                    "where it has been fitted on."
+                )
             if use_base_clf:
                 self.clf_ = clone(self.base_clf_)
                 self.idx_ = self.base_idx_.copy()
@@ -390,17 +411,15 @@ class IndexClassifierWrapper:
                 cur_idx = np.arange(len(self.idx_))
             self.idx_ = np.concatenate([self.idx_[cur_idx], add_idx], axis=0)
             self.y_ = np.concatenate([self.y_[cur_idx], add_y], axis=0)
-            self.sample_weight_ = \
-                self._concat_sw(
-                    self._get_sw(self.sample_weight_, cur_idx),
-                    add_sample_weight
-                )
+            self.sample_weight_ = self._concat_sw(
+                self._get_sw(self.sample_weight_, cur_idx), add_sample_weight
+            )
 
             self.fit(
                 self.idx_,
                 y=self.y_,
                 sample_weight=self.sample_weight_,
-                set_base_clf=set_base_clf
+                set_base_clf=set_base_clf,
             )
 
         return self
@@ -424,10 +443,11 @@ class IndexClassifierWrapper:
             # check if results contain NAN
             if np.isnan(P).any():
                 raise ValueError(
-                    'Error in defining what should be '
-                    'pre-computed in ParzenWindowClassifier. Not all necessary '
-                    'information is available which results in '
-                    'NaNs in `predict_proba`.'
+                    "Error in defining what should be "
+                    "pre-computed in ParzenWindowClassifier. "
+                    "Not all necessary "
+                    "information is available which results in "
+                    "NaNs in `predict_proba`."
                 )
             return self.clf_.predict(P)
         else:
@@ -453,10 +473,11 @@ class IndexClassifierWrapper:
             # check if results contain NAN
             if np.isnan(P).any():
                 raise ValueError(
-                    'Error in defining what should be '
-                    'pre-computed in ParzenWindowClassifier. Not all necessary '
-                    'information is available which results in '
-                    'NaNs in `predict_proba`.'
+                    "Error in defining what should be "
+                    "pre-computed in ParzenWindowClassifier. "
+                    "Not all necessary "
+                    "information is available which results in "
+                    "NaNs in `predict_proba`."
                 )
             return self.clf_.predict_proba(P)
         else:
@@ -482,10 +503,11 @@ class IndexClassifierWrapper:
             # check if results contain NAN
             if np.isnan(P).any():
                 raise ValueError(
-                    'Error in defining what should be '
-                    'pre-computed in ParzenWindowClassifier. Not all necessary '
-                    'information is available which results in '
-                    'NaNs in `predict_proba`.'
+                    "Error in defining what should be "
+                    "pre-computed in ParzenWindowClassifier. "
+                    "Not all necessary "
+                    "information is available which results in "
+                    "NaNs in `predict_proba`."
                 )
             return self.clf_.predict_freq(P)
         else:
@@ -505,14 +527,14 @@ class IndexClassifierWrapper:
         is_fitted : boolean
             Boolean describing if the classifier is fitted.
         """
-        clf = 'base_clf_' if base_clf else 'clf_'
+        clf = "base_clf_" if base_clf else "clf_"
         if clf in self.__dict__:
             return hasattr(getattr(self, clf), "classes_")
         else:
             return False
 
     def __getattr__(self, item):
-        if 'clf_' in self.__dict__:
+        if "clf_" in self.__dict__:
             return getattr(self.clf_, item)
         else:
             return getattr(self.clf, item)
@@ -535,5 +557,6 @@ class IndexClassifierWrapper:
         if sample_weight is not None and sample_weight_add is not None:
             return np.concatenate([sample_weight, sample_weight_add], axis=0)
         else:
-            raise ValueError('All `sample_weight` must be either None or '
-                             'given.')
+            raise ValueError(
+                "All `sample_weight` must be either None or " "given."
+            )

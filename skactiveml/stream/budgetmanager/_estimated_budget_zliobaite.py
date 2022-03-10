@@ -337,8 +337,7 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         return utilities
 
     def _validate_theta(self):
-        """Validate if theta is set as a float.
-        """
+        """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
         # check if theta exists
         if not hasattr(self, "theta_"):
@@ -511,8 +510,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         return utilities
 
     def _validate_theta(self):
-        """Validate if theta is set as a float.
-        """
+        """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
         # check if theta exists
         if not hasattr(self, "theta_"):
@@ -692,8 +690,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         return utilities
 
     def _validate_theta(self):
-        """Validate if theta is set as a float.
-        """
+        """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
         # check if theta exists
         if not hasattr(self, "theta_"):
