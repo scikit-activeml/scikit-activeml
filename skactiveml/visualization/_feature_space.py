@@ -442,15 +442,18 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
                 _, utilities = qs.query(X=X, y=y, candidates=mesh_instances,
                                         **kwargs)
 
-            for a_idx, ax in zip(plot_annotators, axes):
+            for a_idx, ax_ in zip(plot_annotators, axes):
                 if n_annotators is not None:
                     utilities_a_idx = utilities[0, :, a_idx]
                 else:
                     utilities_a_idx = utilities[0, :]
                 utilities_a_idx = utilities_a_idx.reshape(X_mesh.shape)
-                ax.contourf(X_mesh, Y_mesh, utilities_a_idx, **contour_args)
+                ax_.contourf(X_mesh, Y_mesh, utilities_a_idx, **contour_args)
 
-            return ax
+            if n_annotators is None:
+                return axes[0]
+            else:
+                return axes
 
         except MappingError:
             candidates = unlabeled_indices(y, missing_label=qs.missing_label)
@@ -476,7 +479,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         _, utilities = qs.query(X=X, y=y, candidates=candidates,
                                 **kwargs)
 
-    for a_idx, ax in zip(plot_annotators, axes):
+    for a_idx, ax_ in zip(plot_annotators, axes):
         if n_annotators is not None:
             utilities_a_idx = utilities[0, :, a_idx]
         else:
@@ -486,7 +489,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
             utilities_a_idx,
             replace_nan=replace_nan,
             feature_bound=feature_bound,
-            ax=ax,
+            ax=ax_,
             res=res,
             contour_dict=contour_dict
         )

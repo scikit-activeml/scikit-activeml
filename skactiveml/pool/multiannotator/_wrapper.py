@@ -10,8 +10,8 @@ from ...utils import rand_argmax, check_type, MISSING_LABEL, majority_vote, \
     check_random_state, check_scalar
 
 
-class SingleAnnotWrapper(MultiAnnotatorPoolQueryStrategy):
-    """SingleAnnotWrapper
+class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
+    """SingleAnnotatorWrapper
 
     Implementation of a wrapper class for pool-based active
     learning query strategies with a single annotator such that it transforms

@@ -90,7 +90,7 @@ Classes
 
    IntervalEstimationThreshold
    IntervalEstimationAnnotModel
-   SingleAnnotWrapper
+   SingleAnnotatorWrapper
 
 :mod:`skactiveml.classifier`: Classifier
 ========================================

@@ -594,7 +594,7 @@ estimate:
 
 -  Define an aggregation function
 -  Evaluate the performance for each annotator sample pair
--  Use the ``SingleAnnotWrapper``
+-  Use the ``SingleAnnotatorWrapper``
 
 If the strategy is a ``greedy`` method regarding the utilities:
 

@@ -1,5 +1,4 @@
 import os
-from random import random
 import unittest
 
 import numpy as np
@@ -14,7 +13,7 @@ from skactiveml import visualization
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, RandomSampling, \
     ValueOfInformationEER
-from skactiveml.pool.multiannotator import SingleAnnotWrapper
+from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.visualization import plot_decision_boundary, plot_utilities, \
     plot_contour_for_samples
 from .._feature_space import _general_plot_utilities, plot_annotator_utilities
@@ -315,7 +314,7 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_multi_with_axes(self):
         fig, axes = plt.subplots(1, 5, figsize=(10, 2))
-        qs = SingleAnnotWrapper(clone(self.qs), random_state=0)
+        qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
         query_params_dict = {'clf': self.clf}
         plot_annotator_utilities(qs=qs, X=self.X, y=self.y_active_multi,
                                  feature_bound=self.bound, axes=axes,
@@ -329,7 +328,7 @@ class TestFeatureSpace(unittest.TestCase):
         self.assertIsNone(comparison)
 
     def test_multi_without_axes(self):
-        qs = SingleAnnotWrapper(clone(self.qs), random_state=0)
+        qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
         query_params_dict = {'clf': self.clf}
         plot_annotator_utilities(qs=qs, X=self.X, y=self.y_active_multi,
                                  feature_bound=self.bound,
