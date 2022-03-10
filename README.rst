@@ -19,7 +19,7 @@
 
 |
 
-.. image:: docs/logos/scikit-activeml-logo.png
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
    :width: 200
 
 |
@@ -50,7 +50,7 @@ unlabeled data. An overview of our repository's structure is given in the image 
 Each node represents a class or interface. The arrows illustrate the inheritance
 hierarchy among them. The functionality of a dashed node is not yet available in our library.
 
-.. image:: docs/logos/scikit-activeml-structure.png
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
    :width: 1000
 
 In our package ``skactiveml``, there three major components, i.e., ``SkactivemlClassifier``,
@@ -115,7 +115,7 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
     from skactiveml.pool import UncertaintySampling
     from skactiveml.utils import unlabeled_indices, MISSING_LABEL
     from skactiveml.classifier import SklearnClassifier
-    from skactiveml.visualization import plot_decision_boundary, plot_utility
+    from skactiveml.visualization import plot_decision_boundary, plot_utilities
 
     # Generate data set.
     X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
@@ -144,7 +144,7 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
     unlbld_idx = unlabeled_indices(y)
     fig, ax = plt.subplots(1, 1, figsize=(8, 8))
     ax.set_title(f'Accuracy score: {clf.score(X,y_true)}', fontsize=15)
-    plot_utility(qs, X=X, y=y, qs_dict={'clf': clf}, feature_bound=bound, ax=ax)
+    plot_utilities(qs, X=X, y=y, clf=clf, feature_bound=bound, ax=ax)
     plot_decision_boundary(clf, feature_bound=bound, confidence=0.6)
     plt.scatter(X[unlbld_idx,0], X[unlbld_idx,1], c='gray')
     plt.scatter(X[:,0], X[:,1], c=y, cmap='jet')
@@ -171,7 +171,7 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
     import matplotlib.pyplot as plt
     from scipy.ndimage import gaussian_filter1d
     from sklearn.datasets import make_blobs
-    from skactiveml.classifier import PWC
+    from skactiveml.classifier import ParzenWindowClassifier
     from skactiveml.stream import Split
     from skactiveml.utils import MISSING_LABEL
 
@@ -179,7 +179,7 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
     X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
 
     # Create classifier and query strategy.
-    clf = PWC(random_state=0, classes=np.unique(y_true))
+    clf = ParzenWindowClassifier(random_state=0, classes=np.unique(y_true))
     qs = Split(random_state=0)
 
     # Initializing the training data as an empty array.
@@ -195,8 +195,8 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
         y_cand = y_t
         clf.fit(X_train, y_train)
         correct_classifications.append(clf.predict(X_cand)[0] == y_cand)
-        sampled_indices = qs.query(X_cand=X_cand, clf=clf)
-        qs.update(X_cand=X_cand, queried_indices=sampled_indices)
+        sampled_indices = qs.query(candidates=X_cand, clf=clf)
+        qs.update(candidates=X_cand, queried_indices=sampled_indices)
         X_train.append(x_t)
         y_train.append(y_cand if len(sampled_indices) > 0 else MISSING_LABEL)
 
