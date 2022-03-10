@@ -3,9 +3,9 @@ The :mod:`skactiveml.stream` module implements query strategies for
 stream-based active learning.
 """
 
-from ._random import RandomSampler, PeriodicSampler
-from ._pals import PALS
-from ._uncertainty import (
+from ._stream_baselines import StreamRandomSampling, PeriodicSampling
+from ._stream_probabilistic_al import StreamProbabilisticAL
+from ._uncertainty_zliobaite import (
     FixedUncertainty,
     VariableUncertainty,
     Split,
@@ -13,11 +13,11 @@ from ._uncertainty import (
 )
 
 __all__ = [
-    "RandomSampler",
-    "PeriodicSampler",
+    "StreamRandomSampling",
+    "PeriodicSampling",
     "FixedUncertainty",
     "VariableUncertainty",
     "Split",
-    "PALS",
+    "StreamProbabilisticAL",
     "RandomVariableUncertainty",
 ]
