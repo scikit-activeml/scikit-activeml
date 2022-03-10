@@ -2,11 +2,11 @@ import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
 
-from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
-from skactiveml.visualization import plot_utility, plot_decision_boundary
+from skactiveml.utils import MISSING_LABEL, labeled_indices
+from skactiveml.visualization import plot_utilities, plot_decision_boundary
 
-#_ import
-#_bp_add_imports
+# _ import
+# _bp_add_imports
 
 random_state = np.random.RandomState(0)
 
@@ -48,7 +48,8 @@ for c in range(n_cycles):
         size=plt.rcParams["axes.titlesize"], ha="center",
         transform=ax.transAxes
     )
-    ax = plot_utility(qs, X=X, y=y, **query_params, res="#_res", feature_bound=feature_bound, ax=ax)
+    ax = plot_utilities(qs, X=X, y=y, **query_params, res="#_res",
+                        feature_bound=feature_bound, ax=ax)
     ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2)
     ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8, marker=".", s=300)
     ax = plot_decision_boundary(clf, feature_bound, ax=ax)

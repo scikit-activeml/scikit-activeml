@@ -5,7 +5,7 @@ import numpy as np
 from skactiveml.visualization import mesh
 
 
-class TestAuxiliaryFunctions(unittest.TestCase):
+class TestMisc(unittest.TestCase):
 
     def test_check_mesh(self):
         bound = np.array([[0, 0], [1, 1]])

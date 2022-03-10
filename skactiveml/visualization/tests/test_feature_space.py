@@ -13,8 +13,9 @@ from skactiveml import visualization
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, RandomSampling, \
     ValueOfInformationEER
-from skactiveml.visualization._feature_space import plot_decision_boundary, \
-    plot_utility, plot_contour_for_samples
+from skactiveml.visualization import plot_decision_boundary, plot_utilities, \
+    plot_contour_for_samples
+from .._feature_space import _general_plot_utilities
 
 
 class TestFeatureSpace(unittest.TestCase):
@@ -22,10 +23,10 @@ class TestFeatureSpace(unittest.TestCase):
     def setUp(self):
         self.path_prefix = os.path.dirname(visualization.__file__) + \
                            '/tests/images/'
-        np.random.seed(0)
         self.X, self.y = make_classification(n_features=2, n_redundant=0,
                                              random_state=0)
-        train_indices = np.random.randint(0, len(self.X), size=20)
+        train_indices = np.random.RandomState(0).randint(0, len(self.X),
+                                                         size=20)
         cand_indices = np.setdiff1d(np.arange(len(self.X)), train_indices)
         self.y_active = np.full_like(self.y, np.nan, dtype=float)
         self.y_active[cand_indices] = self.y[cand_indices]
@@ -99,68 +100,79 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(clf=self.clf, feature_bound=self.bound,
                                confidence_dict={'linestyles': ':'})
 
-    # Tests for plot_utility function
-    def test_plot_utility_param_qs(self):
-        self.assertRaises(TypeError, plot_utility, qs=self.clf, X=self.X,
+    # Tests for plot_utilities function
+    def test__general_plot_utilities_param_qs(self):
+        self.assertRaises(TypeError, _general_plot_utilities, qs=self.clf,
+                          X=self.X,
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_plot_utility_param_X(self):
-        self.assertRaises(ValueError, plot_utility, qs=self.qs,
+    def test__general_plot_utilities_param_X(self):
+        self.assertRaises(ValueError, _general_plot_utilities, qs=self.qs,
                           X=np.ones([len(self.X), 3]),
                           y=self.y, **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_plot_utility_param_y(self):
-        self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
+    def test__general_plot_utilities_param_y(self):
+        self.assertRaises(ValueError, _general_plot_utilities, qs=self.qs,
+                          X=self.X,
                           y=np.zeros(len(self.y) + 1), **self.qs_dict,
                           feature_bound=self.bound)
 
-    def test_plot_utility_param_candidates(self):
-        self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
+    def test__general_plot_utilities_param_candidates(self):
+        self.assertRaises(ValueError, _general_plot_utilities, qs=self.qs,
+                          X=self.X,
                           y=self.y, **self.qs_dict, candidates=[100])
-        plot_utility(qs=self.qs, X=self.X, y=self.y, **self.qs_dict,
-                     candidates=[99])
+        _general_plot_utilities(qs=self.qs, X=self.X, y=self.y, **self.qs_dict,
+                                candidates=[99])
 
-    def test_plot_utility_param_replace_nan(self):
-        plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=[1],
-                     **self.qs_dict,
-                     replace_nan=None, feature_bound=self.bound)
+    def test__general_plot_utilities_param_replace_nan(self):
+        _general_plot_utilities(qs=self.qs, X=self.X, y=self.y, candidates=[1],
+                                **self.qs_dict,
+                                replace_nan=None, feature_bound=self.bound)
 
-    def test_plot_utility_param_ignore_undefined_query_params(self):
-        plot_utility(qs=ValueOfInformationEER(),
-                     X=self.X, y=self.y_active,
-                     **self.qs_dict, ignore_undefined_query_params=True,
-                     feature_bound=self.bound)
-        plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=None,
-                     **self.qs_dict, ignore_undefined_query_params=True,
-                     feature_bound=self.bound)
-        plot_utility(qs=self.qs, X=self.X, y=self.y, candidates=[1],
-                     **self.qs_dict, ignore_undefined_query_params=True,
-                     feature_bound=self.bound)
+    def test__general_plot_utilities_param_ignore_undefined_query_params(self):
+        _general_plot_utilities(qs=ValueOfInformationEER(),
+                                X=self.X, y=self.y_active,
+                                **self.qs_dict,
+                                ignore_undefined_query_params=True,
+                                feature_bound=self.bound)
+        _general_plot_utilities(qs=self.qs, X=self.X, y=self.y,
+                                candidates=None,
+                                **self.qs_dict,
+                                ignore_undefined_query_params=True,
+                                feature_bound=self.bound)
+        _general_plot_utilities(qs=self.qs, X=self.X, y=self.y, candidates=[1],
+                                **self.qs_dict,
+                                ignore_undefined_query_params=True,
+                                feature_bound=self.bound)
 
-    def test_plot_utility_param_res(self):
-        self.assertRaises(ValueError, plot_utility, qs=self.qs, X=self.X,
+    def test__general_plot_utilities_param_res(self):
+        self.assertRaises(ValueError, _general_plot_utilities, qs=self.qs,
+                          X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, res=-3)
 
-    def test_plot_utility_param_ax(self):
-        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
+    def test__general_plot_utilities_param_ax(self):
+        self.assertRaises(TypeError, _general_plot_utilities, qs=self.qs,
+                          X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, ax=2)
 
-    def test_plot_utility_param_axes(self):
-        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
+    def test__general_plot_utilities_param_axes(self):
+        self.assertRaises(TypeError, _general_plot_utilities, qs=self.qs,
+                          X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, axes=2)
 
-    def test_plot_utility_param_contour_dict(self):
-        self.assertRaises(TypeError, plot_utility, qs=self.qs, X=self.X,
+    def test__general_plot_utilities_param_contour_dict(self):
+        self.assertRaises(TypeError, _general_plot_utilities, qs=self.qs,
+                          X=self.X,
                           y=self.y_active, **self.qs_dict,
                           feature_bound=self.bound, contour_dict='string')
-        plot_utility(qs=self.qs, **self.qs_dict, X=self.X,
-                     y=self.y, feature_bound=self.bound,
-                     contour_dict={'linestyles': '.'})
+        _general_plot_utilities(qs=self.qs, **self.qs_dict, X=self.X,
+                                y=self.y, feature_bound=self.bound,
+                                contour_dict={'linestyles': '.'})
 
     def test_plot_contour_for_samples_param_X(self):
         for X in [None, 1, np.arange(10)]:
@@ -215,8 +227,8 @@ class TestFeatureSpace(unittest.TestCase):
     def test_without_candidates(self):
         fig, ax = plt.subplots()
         qs = RandomSampling(random_state=0)
-        plot_utility(qs=qs, X=np.zeros((1, 2)), y=[np.nan],
-                     feature_bound=self.bound, ax=ax)
+        plot_utilities(qs=qs, X=np.zeros((1, 2)), y=[np.nan],
+                       feature_bound=self.bound, ax=ax)
 
         ax.scatter(self.X_cand[:, 0], self.X_cand[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
@@ -232,8 +244,8 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_with_candidates(self):
         fig, ax = plt.subplots()
-        plot_utility(qs=self.qs, X=self.X_train, y=self.y_train,
-                     **self.qs_dict, candidates=self.X_cand, ax=ax)
+        plot_utilities(qs=self.qs, X=self.X_train, y=self.y_train,
+                       **self.qs_dict, candidates=self.X_cand, ax=ax)
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
@@ -261,8 +273,8 @@ class TestFeatureSpace(unittest.TestCase):
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
         fig, ax = plt.subplots()
-        plot_utility(qs=qs, X=X_train, y=y_train, clf=clf,
-                     feature_bound=bound, ax=ax)
+        plot_utilities(qs=qs, X=X_train, y=y_train, clf=clf,
+                       feature_bound=bound, ax=ax)
         ax.scatter(X_cand[:, 0], X_cand[:, 1], c='k', marker='.')
         ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train,
                    cmap=self.cmap, alpha=.9, marker='.')
@@ -280,8 +292,8 @@ class TestFeatureSpace(unittest.TestCase):
         svc.fit(self.X_train, self.y_train)
 
         fig, ax = plt.subplots()
-        plot_utility(qs=self.qs, **self.qs_dict, X=self.X_train,
-                     y=self.y_train, candidates=self.X_cand, ax=ax)
+        plot_utilities(qs=self.qs, **self.qs_dict, X=self.X_train,
+                       y=self.y_train, candidates=self.X_cand, ax=ax)
         ax.scatter(self.X[:, 0], self.X[:, 1], c='k', marker='.')
         ax.scatter(self.X_train[:, 0], self.X_train[:, 1], c=self.y_train,
                    cmap=self.cmap, alpha=.9, marker='.')

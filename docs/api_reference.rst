@@ -147,7 +147,7 @@ Classes
    :toctree: generated/api
    :template: function.rst
 
-   plot_utility
+   plot_utilities
    plot_decision_boundary
 
 :mod:`skactiveml.utils`: Utility classes, functions and constants

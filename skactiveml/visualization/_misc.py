@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import Colormap
-from matplotlib.figure import Figure
 
 from ..utils import check_scalar, check_type, check_bound
 
@@ -70,43 +69,3 @@ def _get_contour_args(contour_dict):
         check_type(contour_dict, 'contour_dict', dict)
         contour_args.update(contour_dict)
     return contour_args
-
-
-def _get_legend_args(legend_dict, fontsize):
-    legend_args = {'fontsize': fontsize, 'loc': 'lower left',
-                   'bbox_to_anchor': (0.0, -0.5)}
-    if legend_dict is not None:
-        check_type(legend_dict, 'legend_dict', dict)
-        legend_args.update(legend_dict)
-    return legend_args
-
-
-def _get_tick_args(tick_dict):
-    tick_args = {'axis': 'both', 'which': 'both', 'direction': 'in',
-                 'labelbottom': False, 'labelleft': False}
-    if tick_dict is not None:
-        check_type(tick_dict, 'tick_dict', dict)
-        tick_args.update(tick_dict)
-    return tick_args
-
-
-def _get_figure_for_ma(fig, fig_size, title, fontsize, n_annotators,
-                       tick_args):
-    if fig is None:
-        if fig_size is None:
-            fig_size = (8, 1.5)
-        fig, _ = plt.subplots(nrows=1, ncols=n_annotators, figsize=fig_size,
-                              sharex='all', sharey='all')
-        axes = fig.get_axes()
-        if title is not None:
-            fig.suptitle(title, fontsize=fontsize)
-        axes[0].set_ylabel(r'feature $x_2$', fontsize=fontsize, color='k')
-        for a, ax in enumerate(axes):
-            ax.set_title(fr'annotator $a_{a + 1}$', fontsize=fontsize)
-            ax.set_xlabel(r'feature $x_1$', fontsize=fontsize, color='k')
-            ax.tick_params(**tick_args)
-        return fig
-    elif not isinstance(fig, Figure):
-        check_type(fig, 'fig', Figure)
-    else:
-        return fig

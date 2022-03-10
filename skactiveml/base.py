@@ -221,12 +221,12 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
+        candidates : None or array-like of shape (n_candidates,), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
             If candidates is None, the unlabeled samples from (X,y) are
             considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
+            If candidates is of shape (n_candidates,) and of type int,
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
@@ -366,7 +366,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             array-like of shape (n_candidates, n_features),
             optional (default=None)
             If `candidates` is None, the samples from (X,y), for which an
-            annotator exists such that the annotator sample pairs is
+            annotator exists such that the annotator sample pair is
             unlabeled are considered as sample candidates.
             If `candidates` is of shape (n_candidates,) and of type int,
             `candidates` is considered as the indices of the sample candidates
