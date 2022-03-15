@@ -819,7 +819,10 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             )
 
         if self.normalize:
-            return err / norm
+            if norm == 0:
+                return 0
+            else:
+                return err / norm
         else:
             return err
 
