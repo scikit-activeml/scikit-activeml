@@ -36,6 +36,16 @@ class TestUtilityWrapper(unittest.TestCase):
             idx = qs.query(**self.kwargs, utility_weights=uw)
             self.assertEqual(idx[0], i)
 
+        # test utilities
+        utility_weights = np.random.rand(len(self.candidates))
+        qs = UtilityWrapper(UncertaintySampling())
+        _, utils_w = qs.query(**self.kwargs, utility_weights=utility_weights,
+                           return_utilities=True)
+        qs = UncertaintySampling()
+        _, utils = qs.query(**self.kwargs, return_utilities=True)
+        np.testing.assert_array_equal(utils*utility_weights, utils_w)
+
+
         # random_state
         cand = np.ones(shape=(100, 2))
         kwargs = self.kwargs
@@ -47,3 +57,10 @@ class TestUtilityWrapper(unittest.TestCase):
         idx = qs.query(**self.kwargs, batch_size=len(cand))
 
         np.testing.assert_array_equal(idx_w, idx)
+
+    def test_attr(self):
+        qs = UncertaintySampling()
+        attributes = qs.__dict__
+        qs = UtilityWrapper(qs)
+        for attr in attributes:
+            getattr(qs, attr)
