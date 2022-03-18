@@ -485,7 +485,7 @@ class TestExamples(unittest.TestCase):
     def setUp(self):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.json_path = path.join(self.skaml_path, "docs", "examples", "pool")
-        self.exceptions = []
+        self.exceptions = ['UtilityWrapper']
         self.working_dir = os.curdir
 
     def test_pool_example_files(self):
