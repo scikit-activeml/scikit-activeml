@@ -21,6 +21,7 @@ from ._uncertainty_sampling import (
     uncertainty_scores,
     expected_average_precision,
 )
+from._wrapper import UtilityWrapper
 
 __all__ = [
     "multiannotator",
@@ -39,4 +40,5 @@ __all__ = [
     "vote_entropy",
     "FourDs",
     "CostEmbeddingAL",
+    "UtilityWrapper",
 ]
