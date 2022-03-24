@@ -226,7 +226,7 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             clf.fit(self.X, self.y2)
-            self.assertEqual(len(w), 2)
+            self.assertEqual(len(w), 1)
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertFalse(hasattr(clf, "partial_fit"))
@@ -269,7 +269,10 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
 
     def test_predict_proba(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(GaussianProcessClassifier(), missing_label="nan"),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                missing_label="nan",
+                classes=["ny", "paris", "tokyo"]),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict_proba, X=self.X)
@@ -306,7 +309,9 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
 
     def test_predict(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(GaussianProcessClassifier()),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(), 
+                missing_label='nan'),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
@@ -413,7 +418,8 @@ class TestSubSampleEstimator(unittest.TestCase):
             warnings.simplefilter("always")
             clf.fit(self.X, self.y2)
             self.assertEqual(len(w), 1)
-        self.assertFalse(clf.is_fitted_)
+        self.assertTrue(clf.is_fitted_)
+        self.assertFalse(clf.estimator_.is_fitted_)
         # Soll der einen Haben. Wenn ja erbe von sklearn ...
         self.assertFalse(hasattr(clf, "kernel_"))
 

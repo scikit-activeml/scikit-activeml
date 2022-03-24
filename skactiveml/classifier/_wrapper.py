@@ -12,7 +12,7 @@ from collections import deque
 from xmlrpc.client import boolean
 
 import numpy as np
-from sklearn.base import MetaEstimatorMixin, is_classifier
+from sklearn.base import BaseEstimator, MetaEstimatorMixin, is_classifier
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import (
     check_is_fitted,
@@ -576,7 +576,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
 
         if not hasattr(self, "frequency_estimator_"):
             if self.frequency_estimator is None:
-                self.frequency_estimator_ = SubSampleEstimator(SklearnClassifier(KernelDensity() ,missing_label=self.missing_label),missing_label=self.missing_label, max_fit_len=self.frequency_max_fit_len)
+                self.frequency_estimator_ = SubSampleEstimator(KernelDensity(),missing_label=self.missing_label, max_fit_len=self.frequency_max_fit_len)
             else:
                 self.frequency_estimator_ = deepcopy(self.frequency_estimator)
         if not isinstance(self.frequency_estimator_, SkactivemlClassifier):
@@ -738,7 +738,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         return X, y, sample_weight
 
 # skactivml classifier
-class SubSampleEstimator(SkactivemlClassifier):
+class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
     # max_fit_len if None speicher alles wenn int dann nim das als max
     # handle_window (last oder random, (priority classified)) entscheidet welche elemente genommen werden sollen
     def __init__(
@@ -845,7 +845,7 @@ class SubSampleEstimator(SkactivemlClassifier):
         )
 
         # Check whether estimator is a valid classifier.
-        if not isinstance(self.estimator, SkactivemlClassifier):
+        if not isinstance(self.estimator, BaseEstimator):
             raise TypeError(
                 "'{}' must be a SkactivemlClassifier "
                 "classifier.".format(self.estimator)
