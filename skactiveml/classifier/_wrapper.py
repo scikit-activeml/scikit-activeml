@@ -9,6 +9,7 @@ from multiple annotators.
 import warnings
 from copy import deepcopy
 from collections import deque
+from xmlrpc.client import boolean
 
 import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
@@ -17,11 +18,14 @@ from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
+    check_consistent_length,
+    column_or_1d
 )
+from sklearn.utils.multiclass import check_classification_targets
 from sklearn.neighbors import KernelDensity
 
 from ..base import SkactivemlClassifier, ClassFrequencyEstimator
-from ..utils import rand_argmin, MISSING_LABEL, check_scalar
+from ..utils import rand_argmin, MISSING_LABEL, check_scalar, call_func, check_type, is_labeled, check_cost_matrix, check_classifier_params, check_random_state, ExtLabelEncoder, check_class_prior
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -276,8 +280,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         try:
             X_lbld = X[is_lbld]
             y_lbld = y[is_lbld].astype(np.int64)
+            
             if np.sum(is_lbld) == 0:
-                raise ValueError("There is no labeled data.")
+                if hasattr(self, "is_fitted_") and self.is_fitted_ is True and fit_function == "partial_fit":
+                    return self
+                else:
+                    raise ValueError("There is no labeled data.")
             elif (
                 not has_fit_parameter(self.estimator, "sample_weight")
                 or sample_weight is None
@@ -325,8 +333,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             return getattr(self.estimator, item)
 
-
-class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
+#sklearnclassifier rausnehmen und davon ausgehen das es eine skactiveml instance ist
+class KernelFrequencyClassifier(ClassFrequencyEstimator):
     """KernelFrequencyClassifier
 
     Implementation of a wrapper class for scikit-learn classifiers such that
@@ -387,21 +395,13 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
         class_prior=0.0,
         random_state=None,
     ):
-        SklearnClassifier.__init__(
-            self,
-            estimator=estimator,
+        super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
         )
-        ClassFrequencyEstimator.__init__(
-            self,
-            classes=classes,
-            missing_label=missing_label,
-            cost_matrix=cost_matrix,
-            random_state=random_state,
-        )
+        self.estimator = estimator
         self.frequency_max_fit_len = frequency_max_fit_len
         self.class_prior = class_prior
         self.frequency_estimator = frequency_estimator
@@ -436,9 +436,16 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
             sample_weight=sample_weight,
             **fit_kwargs,
         )
-        return super().fit(X, y, sample_weight, **fit_kwargs)
+        return self._fit(
+            fit_function="fit",
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            **fit_kwargs,
+        )
 
-    def partiat_fit(self, X, y, sample_weight=None, **fit_kwargs):
+    @if_delegate_has_method(delegate="estimator")
+    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
 
@@ -469,7 +476,79 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
             sample_weight=sample_weight,
             **fit_kwargs,
         )
-        return super().partial_fit(X, y, sample_weight, **fit_kwargs)
+        return self._fit(
+            fit_function="partial_fit",
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            **fit_kwargs,
+        )
+
+    def predict(self, X):
+        check_is_fitted(self)
+        return self.estimator_.predict(X)
+    
+    def predict_proba(self, X):
+        check_is_fitted(self)
+        proba = self.estimator_.predict_proba(X)
+        return proba
+
+    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+        check_scalar(
+            self.frequency_max_fit_len,
+            "m_max",
+            int,
+            min_val=0,
+            min_inclusive=False,
+        )
+
+        X, y, sample_weight = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+        )
+        # TODO: check hier machen oder nicht ?
+        # Check whether estimator can deal with cost matrix.
+        if self.cost_matrix is not None and not hasattr(
+            self.estimator, "predict_proba"
+        ):
+            raise ValueError(
+                "'cost_matrix' can be only set, if 'estimator'"
+                "implements 'predict_proba'."
+            )
+
+        if hasattr(self, "estimator_"):
+            if fit_function != "partial_fit":
+                self.estimator_ = deepcopy(self.estimator)
+        else:
+            self.estimator_ = deepcopy(self.estimator)
+        if not isinstance(self.estimator_, SkactivemlClassifier):
+            is_lbld = ~np.isnan(y)
+            X_train = X[is_lbld]
+            y_train = y[is_lbld].astype(np.int64)
+            if sample_weight is not None:
+                sample_weight_train = sample_weight[is_lbld]
+            else:
+                sample_weight_train = sample_weight
+            if np.sum(is_lbld) == 0:
+                raise ValueError("There is no labeled data.")
+        else:
+            X_train = X
+            y_train = y
+            sample_weight_train = sample_weight
+
+        if fit_function == "fit":
+            self.estimator_.fit(X=X_train, y=y_train, sample_weight=sample_weight_train, **fit_kwargs)
+        elif fit_function == "partial_fit":
+            self.estimator_.partial_fit(X=X_train, y=y_train, sample_weight=sample_weight_train, **fit_kwargs)
+        return self
 
     def _fit_frequency_estimator(
         self, fit_function, X, y, sample_weight=None, **fit_kwargs
@@ -488,8 +567,7 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
             min_inclusive=False,
         )
 
-        X, y, sample_weight = ClassFrequencyEstimator._validate_data(
-            self,
+        X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
@@ -498,94 +576,37 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
 
         if not hasattr(self, "frequency_estimator_"):
             if self.frequency_estimator is None:
-                self.frequency_estimator_ = KernelDensity()
+                self.frequency_estimator_ = SubSampleEstimator(SklearnClassifier(KernelDensity() ,missing_label=self.missing_label),missing_label=self.missing_label, max_fit_len=self.frequency_max_fit_len)
             else:
                 self.frequency_estimator_ = deepcopy(self.frequency_estimator)
-
-        is_lbld = ~np.isnan(y)
-        self._label_counts = [
-            np.sum(y[is_lbld] == c) for c in range(len(self._le.classes_))
-        ]
-        try:
-            X_lbld = X[is_lbld]
-            y_lbld = y[is_lbld].astype(np.int64)
+        if not isinstance(self.frequency_estimator_, SkactivemlClassifier):
+            is_lbld = ~np.isnan(y)
+            X_train = X[is_lbld]
+            y_train = y[is_lbld].astype(np.int64)
+            if sample_weight is not None:
+                sample_weight_train = sample_weight[is_lbld]
+            else:
+                sample_weight_train = sample_weight
             if np.sum(is_lbld) == 0:
                 raise ValueError("There is no labeled data.")
-            elif (
-                not has_fit_parameter(
-                    self.frequency_estimator_, "sample_weight"
-                )
-                or sample_weight is None
-            ):
-                if fit_function == "partial_fit":
-                    if not hasattr(self, "X_train_"):
-                        self.X_train_ = deque(
-                            maxlen=self.frequency_max_fit_len
-                        )
-                    if not hasattr(self, "y_train_"):
-                        self.y_train_ = deque(
-                            maxlen=self.frequency_max_fit_len
-                        )
-                    self.X_train_.extend(X_lbld)
-                    self.y_train_.extend(y_lbld)
-                    self.frequency_estimator_.fit(
-                        X=self.X_train_, y=self.y_train
+        else:
+            X_train = X
+            y_train = y
+            sample_weight_train = sample_weight
+        
+        # skaktivml oder nicht wenn nicht dann unlabled wegmachen
+        if fit_function == "partial_fit":
+            call_func(self.frequency_estimator_.partial_fit,
+                        X=X_train,
+                        y=y_train,
+                        sample_weight=sample_weight_train,
                     )
-                elif fit_function == "fit":
-                    self.X_train_ = deque(maxlen=self.frequency_max_fit_len)
-                    self.y_train_ = deque(maxlen=self.frequency_max_fit_len)
-                    self.X_train_.extend(X_lbld)
-                    self.y_train_.extend(y_lbld)
-                    self.frequency_estimator_.fit(
-                        X=self.X_train_, y=self.y_train_
+        elif fit_function == "fit":
+            call_func(self.frequency_estimator_.fit,
+                        X=X_train,
+                        y=y_train,
+                        sample_weight=sample_weight_train,
                     )
-            else:
-                if fit_function == "partial_fit":
-                    if not hasattr(self, "X_train_"):
-                        self.X_train_ = deque(
-                            maxlen=self.frequency_max_fit_len
-                        )
-                    if not hasattr(self, "y_train_"):
-                        self.y_train_ = deque(
-                            maxlen=self.frequency_max_fit_len
-                        )
-                    if not hasattr(self, "sample_weight_"):
-                        self.sample_weight_ = deque(
-                            maxlen=self.frequency_max_fit_len
-                        )
-                    self.X_train_.extend(X_lbld)
-                    self.y_train_.extend(y_lbld)
-                    self.sample_weight_.extend(sample_weight[is_lbld])
-                    self.frequency_estimator_.fit(
-                        X=self.X_train_,
-                        y=self.y_train_,
-                        sample_weight=self.sample_weight_,
-                    )
-                elif fit_function == "fit":
-                    self.X_train_ = deque(maxlen=self.frequency_max_fit_len)
-                    self.y_train_ = deque(maxlen=self.frequency_max_fit_len)
-                    self.sample_weight_ = deque(
-                        maxlen=self.frequency_max_fit_len
-                    )
-                    self.X_train_.extend(X_lbld)
-                    self.y_train_.extend(y_lbld)
-                    self.sample_weight_.extend(sample_weight[is_lbld])
-                    self.frequency_estimator_.fit(
-                        X=self.X_train_,
-                        y=self.y_train_,
-                        sample_weight=self.sample_weight_,
-                    )
-            self.is_fitted_ = True
-        except Exception as e:
-            self.is_fitted_ = False
-            warnings.warn(
-                "The 'base_estimator' could not be fitted because of"
-                " '{}'. Therefore, the class labels of the samples "
-                "are counted and will be used to make predictions. "
-                "The class label distribution is `_label_counts={}`.".format(
-                    e, self._label_counts
-                )
-            )
 
     def predict_freq(self, X):
         """Return class frequency estimates for the input samples 'X'.
@@ -606,16 +627,20 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
         X = check_array(X)
 
         # Predict zeros because of missing training data.
-        if self.n_features_in_ is None or not hasattr(self, "X_train_"):
+        if self.n_features_in_ is None:
             return np.zeros((len(X), len(self.classes_)))
-
-        frequencys = []
+            
+        if hasattr(self.frequency_estimator_, "predict_freq"):
+            return self.frequency_estimator_.predict_freq(X)
+        frequencies = []
         for x in X:
-            frequencys.extend(self._predict_freq(x))
-        return np.array(frequencys)
+            frequencies.extend(self._predict_freq(x))
+        return np.array(frequencies)
 
     def _predict_freq(self, X):
         X = np.array(X).reshape([1, -1])
+        # schauen ob freqeuency_estimator predict_freq besitzt
+        # übernehme diese sonst rechnung wie unten gegeben
         frequency = np.exp(self.frequency_estimator_.score_samples(X))
         pred_proba = self.estimator_.predict_proba(X)
         return np.array(frequency) * pred_proba + self.class_prior_
@@ -627,3 +652,416 @@ class KernelFrequencyClassifier(SklearnClassifier, ClassFrequencyEstimator):
             return getattr(self.estimator_, item)
         else:
             raise AttributeError(f"{item} does not exist")
+
+    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None, check_y_dict=None, y_ensure_1d=True):
+
+        if check_X_dict is None:
+            check_X_dict = {'ensure_min_samples': 0, 'ensure_min_features': 0}
+        if check_y_dict is None:
+            check_y_dict = {
+                'ensure_min_samples': 0, 'ensure_min_features': 0,
+                'ensure_2d': False,
+                'force_all_finite': False, 'dtype': None
+            }
+            
+        
+
+        # Check common classifier parameters.
+        check_classifier_params(self.classes, self.missing_label,
+                                self.cost_matrix)
+
+        # Store and check random state.
+        self.random_state_ = check_random_state(self.random_state)
+
+        # Create label encoder.
+        self._le = ExtLabelEncoder(
+            classes=self.classes, missing_label=self.missing_label
+        )
+
+        # Check input parameters.
+        y = check_array(y, **check_y_dict)
+        if len(y) > 0:
+            y_le = column_or_1d(y) if y_ensure_1d else y
+            y_le = self._le.fit_transform(y_le)
+            is_lbdl = is_labeled(y_le)
+            
+            if len(y_le[is_lbdl]) > 0:
+                check_classification_targets(y_le[is_lbdl])
+            if len(self._le.classes_) == 0:
+                raise ValueError(
+                    "No class label is known because 'y' contains no actual "
+                    "class labels and 'classes' is not defined. Change at "
+                    "least on of both to overcome this error."
+                )
+        else:
+            self._le.fit_transform(self.classes)
+            check_X_dict['ensure_2d'] = False
+        X = check_array(X, **check_X_dict)
+        check_consistent_length(X, y)
+
+        # Update detected classes.
+        self.classes_ = self._le.classes_
+
+        # Check classes.
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, **check_y_dict)
+            if not np.array_equal(y.shape, sample_weight.shape):
+                raise ValueError(
+                    f'`y` has the shape {y.shape} and `sample_weight` has the '
+                    f'shape {sample_weight.shape}. Both need to have '
+                    f'identical shapes.'
+                )
+
+        # Update cost matrix.
+        self.cost_matrix_ = (
+            1 - np.eye(len(self.classes_))
+            if self.cost_matrix is None
+            else self.cost_matrix
+        )
+        self.cost_matrix_ = check_cost_matrix(
+            self.cost_matrix_, len(self.classes_)
+        )
+        if self.classes is not None:
+            class_indices = np.argsort(self.classes)
+            self.cost_matrix_ = self.cost_matrix_[class_indices]
+            self.cost_matrix_ = self.cost_matrix_[:, class_indices]
+
+        self._label_counts = [
+                np.sum(y_le[is_lbdl] == c) for c in range(len(self._le.classes_))
+            ]
+
+        # Check class prior.
+        self.class_prior_ = check_class_prior(
+            self.class_prior, len(self.classes_)
+        )
+
+        return X, y, sample_weight
+
+# skactivml classifier
+class SubSampleEstimator(SkactivemlClassifier):
+    # max_fit_len if None speicher alles wenn int dann nim das als max
+    # handle_window (last oder random, (priority classified)) entscheidet welche elemente genommen werden sollen
+    def __init__(
+        self,
+        estimator,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
+        max_fit_len=None,
+        handle_window='last',
+        only_labled=False,
+
+    ):
+        super().__init__(
+            classes=classes,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
+        )
+        self.estimator = estimator
+        self.only_labled = only_labled
+        self.max_fit_len = max_fit_len
+        self.handle_window = handle_window
+
+    def fit(self, X, y, sample_weight=None, **fit_kwargs):
+        self._handle_window("fit", X, y, sample_weight)
+        return self._fit("fit", X=self.X_train_, y=self.y_train_, sample_weight=self.sample_weight_, **fit_kwargs)
+
+    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+        self._handle_window("partial_fit", X, y, sample_weight)
+
+        if hasattr(self.estimator, "partial_fit"):
+            return self._fit("partial_fit", X=X, y=y, sample_weight=sample_weight, **fit_kwargs)
+        else:
+            return self._fit("fit", X=self.X_train_, y=self.y_train_, sample_weight=self.sample_weight_, **fit_kwargs)
+
+    def _handle_window(self, fit_func, X, y, sample_weight=None):
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+        X, y, sample_weight = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+        )
+
+        
+        X_train = X
+        y_train = y
+        sample_weight_train = sample_weight
+
+        if not hasattr(self, "X_train_"):
+            self.X_train_ = deque(maxlen=self.max_fit_len)
+        if not hasattr(self, "y_train_"):
+            self.y_train_ = deque(maxlen=self.max_fit_len)
+        if not hasattr(self, "sample_weight_"):
+            self.sample_weight_ = deque(maxlen=self.max_fit_len)
+
+        if fit_func == "fit":
+            self.X_train_ = deque(maxlen=self.max_fit_len)
+            self.y_train_ = deque(maxlen=self.max_fit_len)
+            self.sample_weight_ = deque(maxlen=self.max_fit_len)
+        elif fit_func == "partial_fit":
+            # noch das rausschmeißen einbauen
+            if self.max_fit_len is not None and len(self.X_train_) >= self.max_fit_len:
+                if self.handle_window == "random":
+                    index = np.random.choice(self.X_train_.shape[0], self.max_fit_len-len(X_train), replace=False)
+                    # erstellen von dem array und deque könnte ersetzt werden, da die queue sowieso nur max_fit_len lang sein kann.
+                    # also: self.X_train_.extend(np.array(self.X_train_)[index]) , sollte auch reichen
+
+                    # kommentar schreiben und das obere anwenden
+                    # since old data will get removed when max_fit_len is 
+                    # reached extend the randomized data to the window.
+                    self.X_train_.extend(np.array(self.X_train_)[index])
+                    self.y_train_.extend(np.array(self.y_train_)[index])
+                    self.sample_weight_.extend(np.array(self.sample_weight_)[index])
+        self.X_train_.extend(X_train)
+        self.y_train_.extend(y_train)
+        if sample_weight is not None:
+            self.sample_weight_.extend(sample_weight_train)
+        else:
+            self.sample_weight_ = None
+        
+
+    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        # Check input parameters.
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+        X, y, sample_weight, is_lbld = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+            return_is_lbld=True
+        )
+
+        # Check whether estimator is a valid classifier.
+        if not isinstance(self.estimator, SkactivemlClassifier):
+            raise TypeError(
+                "'{}' must be a SkactivemlClassifier "
+                "classifier.".format(self.estimator)
+            )
+
+        # Check whether estimator can deal with cost matrix.
+        if self.cost_matrix is not None and not hasattr(
+            self.estimator, "predict_proba"
+        ):
+            raise ValueError(
+                "'cost_matrix' can be only set, if 'estimator'"
+                "implements 'predict_proba'."
+            )
+        if fit_function == "fit" or not hasattr(self, "n_features_in_"):
+            self._check_n_features(X, reset=True)
+        elif fit_function == "partial_fit":
+            self._check_n_features(X, reset=False)
+        if (
+            not has_fit_parameter(self.estimator, "sample_weight")
+            and sample_weight is not None
+        ):
+            warnings.warn(
+                f"{self.estimator} does not support `sample_weight`. "
+                f"Therefore, this parameter will be ignored."
+            )
+        if hasattr(self, "estimator_"):
+            if fit_function != "partial_fit":
+                self.estimator_ = deepcopy(self.estimator)
+        else:
+            self.estimator_ = deepcopy(self.estimator)
+        
+        # nur labeled oder alle speichern vllt eine option machen
+        if self.only_labled:
+            # count labels per class
+            
+            X = X[is_lbld]
+            y = y[is_lbld]
+            if sample_weight is not None:
+                sample_weight = sample_weight[is_lbld]
+            else:
+                sample_weight = None
+            if np.sum(is_lbld) == 0:
+                raise ValueError("There is no labeled data.")
+
+        try:
+            if (
+                not has_fit_parameter(self.estimator, "sample_weight")
+                or sample_weight is None
+            ):
+                if fit_function == "partial_fit":
+                    classes = self._le.transform(self.classes_)
+                    # classes is called 2 times
+                    if isinstance(self.estimator_, SklearnClassifier):
+                        self.estimator_.classes_ = classes
+                        self.estimator_.partial_fit(
+                            X=X, y=y, **fit_kwargs
+                        )
+                    else:
+                        self.estimator_.partial_fit(
+                            X=X, y=y, classes=classes, **fit_kwargs
+                        )
+                elif fit_function == "fit":
+                    self.estimator_.fit(X=X, y=y, **fit_kwargs)
+            else:
+                if fit_function == "partial_fit":
+                    classes = self._le.transform(self.classes_)
+                    self.estimator_.partial_fit(
+                        X=X,
+                        y=y,
+                        classes=classes,
+                        sample_weight=sample_weight,
+                        **fit_kwargs,
+                    )
+                elif fit_function == "fit":
+                    self.estimator_.fit(
+                        X=X,
+                        y=y,
+                        sample_weight=sample_weight,
+                        **fit_kwargs,
+                    )
+            self.is_fitted_ = True
+        except Exception as e:
+            self.is_fitted_ = False
+            if hasattr(self, "_label_counts"):
+                warnings.warn(
+                    "The 'base_estimator' could not be fitted because of"
+                    " '{}'. Therefore, the class labels of the samples "
+                    "are counted and will be used to make predictions. "
+                    "The class label distribution is `_label_counts={}`.".format(
+                        e, self._label_counts
+                    )
+                )
+            else:
+                warnings.warn(
+                    "The 'base_estimator' could not be fitted because of"
+                    " '{}'.".format(e)
+                )
+        return self
+
+    def __getattr__(self, item):
+        if item in self.__dict__:
+            return self.__dict__[item]
+        elif "estimator_" in self.__dict__ and hasattr(self.estimator_, item):
+            return getattr(self.estimator_, item)
+        else:
+            raise AttributeError(f"{item} does not exist")
+
+    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None, check_y_dict=None, y_ensure_1d=True, return_is_lbld=False):
+
+        if hasattr(self, "X_train_"):
+            X_tmp = np.concatenate([self.X_train_, X])
+            reduce_tmp_var = True
+        else:
+            X_tmp = X
+        if hasattr(self, "y_train_"):
+            y_new = np.concatenate([self.y_train_, y])
+        else:
+            y_new = y
+        if hasattr(self, "sample_weight_") and self.sample_weight_ is not None:
+            sample_weight_tmp = np.concatenate([self.sample_weight_, sample_weight])
+        else:
+            sample_weight_tmp = sample_weight
+
+        if self.max_fit_len is not None:
+            check_scalar(self.max_fit_len, "max_fit_len", int, min_val=0)
+        check_type(self.only_labled, "only_labled", bool)
+        check_type(self.handle_window, "handle_window", str)
+
+        if check_X_dict is None:
+            check_X_dict = {'ensure_min_samples': 0, 'ensure_min_features': 0}
+        if check_y_dict is None:
+            check_y_dict = {
+                'ensure_min_samples': 0, 'ensure_min_features': 0,
+                'ensure_2d': False,
+                'force_all_finite': False, 'dtype': None
+            }
+            
+        # Check common classifier parameters.
+        check_classifier_params(self.classes, self.missing_label,
+                                self.cost_matrix)
+
+        # Store and check random state.
+        self.random_state_ = check_random_state(self.random_state)
+
+        # Create label encoder.
+        self._le = ExtLabelEncoder(
+            classes=self.classes, missing_label=self.missing_label
+        )
+        # TODO: y lieber kopieren
+        # Check input parameters.
+        y = check_array(y, **check_y_dict)
+        if len(y) > 0:
+            y_le = column_or_1d(y_new) if y_ensure_1d else y_new
+            y_le = self._le.fit_transform(y_new)
+            is_lbdl = is_labeled(y_le)
+            
+            if len(y_le[is_lbdl]) > 0:
+                check_classification_targets(y_le[is_lbdl])
+            if len(self._le.classes_) == 0:
+                raise ValueError(
+                    "No class label is known because 'y' contains no actual "
+                    "class labels and 'classes' is not defined. Change at "
+                    "least on of both to overcome this error."
+                )
+        else:
+            self._le.fit_transform(self.classes)
+            check_X_dict['ensure_2d'] = False
+        X = check_array(X, **check_X_dict)
+        check_consistent_length(X, y)
+
+        # Update detected classes.
+        self.classes_ = self._le.classes_
+
+        # Check classes.
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, **check_y_dict)
+            if not np.array_equal(y.shape, sample_weight.shape):
+                raise ValueError(
+                    f'`y` has the shape {y.shape} and `sample_weight` has the '
+                    f'shape {sample_weight.shape}. Both need to have '
+                    f'identical shapes.'
+                )
+
+        # Update cost matrix.
+        self.cost_matrix_ = (
+            1 - np.eye(len(self.classes_))
+            if self.cost_matrix is None
+            else self.cost_matrix
+        )
+        self.cost_matrix_ = check_cost_matrix(
+            self.cost_matrix_, len(self.classes_)
+        )
+        if self.classes is not None:
+            class_indices = np.argsort(self.classes)
+            self.cost_matrix_ = self.cost_matrix_[class_indices]
+            self.cost_matrix_ = self.cost_matrix_[:, class_indices]
+
+        self._label_counts = [
+                np.sum(y_le[is_lbdl] == c) for c in range(len(self._le.classes_))
+            ]
+
+        if return_is_lbld:
+            is_lbdl = is_lbdl[len(self.y_train_):]
+            return X, y, sample_weight, is_lbdl
+        else:
+            return X, y, sample_weight
+
+    def predict(self, X):
+        check_is_fitted(self)
+        X = check_array(X, **self.check_X_dict_)
+        self._check_n_features(X, reset=False)
+        return self.estimator_.predict(X)
+    
+    def predict_proba(self, X):
+        check_is_fitted(self)
+        X = check_array(X, **self.check_X_dict_)
+        self._check_n_features(X, reset=False)
+        proba = self.estimator_.predict_proba(X)
+        return proba
