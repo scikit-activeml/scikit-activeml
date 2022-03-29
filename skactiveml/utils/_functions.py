@@ -3,10 +3,10 @@ import warnings
 
 import numpy as np
 
-from sklearn.utils.validation import check_array
+from sklearn.utils.validation import check_array, check_consistent_length, column_or_1d
 
 from ._selection import rand_argmax
-from ._validation import check_scalar
+from ._validation import check_scalar, check_indices
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
@@ -58,7 +58,7 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
     Returns
     -------
     best_indices : np.ndarray, shape (batch_size) if ndim == 1
-    (batch_size, ndim) else
+        (batch_size, ndim) else
         The index of the batch instance.
     batch_utilities : np.ndarray,  shape (batch_size, len(utilities))
         The utilities of the batch (if return_utilities=True).
@@ -92,3 +92,69 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
         return best_indices, batch_utilities
     else:
         return best_indices
+
+
+def update_X_y(X, y, y_update, idx_update=None, X_update=None):
+    """Update the training data by the updating samples/labels.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        Training data set.
+    y : array-like of shape (n_samples)
+        Labels of the training data set.
+    idx_update : array-like of shape (n_updates)
+        Index of the samples to be updated.
+    X_update : array-like of shape (n_updates, n_features) or (n_features)
+        Samples to be updated.
+    y_update : array-like of shape (n_updates)
+        Updating labels.
+
+    Returns
+    -------
+    X_new : array-like of shape (n_new_samples, n_features)
+        The new training data set.
+    y_new : array-like of shape (n_new_samples)
+        The new labels.
+    """
+    X = check_array(X)
+    y = column_or_1d(check_array(y, force_all_finite=False, ensure_2d=False))
+    check_consistent_length(X, y)
+
+    y_update = check_array(y_update, force_all_finite=False, ensure_2d=False)
+    y_update = column_or_1d(y_update)
+
+    if idx_update is not None:
+        idx_update = check_indices(idx_update, A=X, unique='check_unique')
+        check_consistent_length(y_update, idx_update)
+        X_new = X.copy()
+        y_new = y.copy()
+        y_new[idx_update] = y_update
+        return X_new, y_new
+    elif X_update is not None:
+        X_update = check_array(X_update, ensure_2d=False)
+        check_consistent_length(X.T, X_update.T)
+        check_consistent_length(y_update, X_update)
+        X_new = np.append(X, X_update, axis=0)
+        y_new = np.append(y, y_update, axis=0)
+        return X_new, y_new
+    else:
+        raise ValueError("`idx_update` or `X_update` must not be `None`")
+
+
+def rank_utilities(*utilities, rank_method=None):
+    """Combine different utilities to one utility assignment.
+
+    Parameters
+    ----------
+    utilities : iterable of array-like of shape (n_samples)
+        Different utilities
+    rank_method : string
+
+    Returns
+    -------
+    X_new : array-like of shape (n_new_samples, n_features)
+        The new training data set.
+    y_new : array-like of shape (n_new_samples)
+        The new labels.
+    """

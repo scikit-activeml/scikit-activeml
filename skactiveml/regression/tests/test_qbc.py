@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from sklearn.ensemble import BaggingRegressor
 from sklearn.linear_model import LinearRegression
 
 from skactiveml.regression._qbc import QBC
@@ -13,13 +14,14 @@ class TestQBC(unittest.TestCase):
         pass
 
     def test_query(self):
-        gsy = QBC(n_committee_learners=5, random_state=0)
+        gsy = QBC(random_state=0)
 
-        reg = SklearnRegressor(estimator=LinearRegression())
+        reg = SklearnRegressor(estimator=BaggingRegressor(LinearRegression(),
+                                                          n_estimators=3))
 
         X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
-        X = np.array([[1, 2], [3, 4]])
-        y = np.array([0, 1])
+        X = np.array([[1, 2], [3, 6], [5, 4], [7, 8]])
+        y = np.array([0, 1, 2, 3])
 
-        query_indices = gsy.query(X_cand, reg, X, y, batch_size=2)
+        query_indices = gsy.query(X, y, candidates=X_cand, ensemble=reg, batch_size=2)
         print(query_indices)

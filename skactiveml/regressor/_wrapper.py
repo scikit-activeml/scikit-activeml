@@ -7,6 +7,7 @@ from sklearn.utils.metaestimators import _IffHasAttrDescriptor
 from sklearn.utils.validation import has_fit_parameter, check_array
 
 from skactiveml.base import SkactivemlRegressor, SkactivemlConditionalEstimator
+from skactiveml.utils import check_type
 from skactiveml.utils._label import is_all_labeled
 
 
@@ -48,7 +49,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     def __init__(self, estimator, random_state=None):
         super().__init__(random_state=random_state)
         self.estimator = estimator
-        self.estimator_ = None
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -91,6 +91,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         if len(labeled_indices) != 0:
             self.estimator_.fit(X_labeled, y_labeled, **estimator_parameters)
+
+        return self
 
     def predict(self, X, **predict_kwargs):
         """Return label predictions for the input data X.
@@ -138,6 +140,12 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         else:
             return self.estimator_.sample(X, n_samples)
 
+    def __getattr__(self, item):
+        if 'estimator_' in self.__dict__:
+            return getattr(self.estimator_, item)
+        else:
+            return getattr(self.estimator, item)
+
 
 class SklearnConditionalEstimator(SkactivemlConditionalEstimator,
                                   SklearnRegressor):
@@ -156,7 +164,7 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator,
     def __init__(self, estimator, random_state=None, var=None):
         super(SklearnConditionalEstimator, self).__init__(estimator, random_state)
         # if var is None: estimator.std else use as variance estimate function
-
+        self.var = var
         # prior mean 0, prior variance 1
 
     def estimate_conditional_distribution(self, X):
@@ -179,6 +187,11 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator,
                                 "regressor.")
 
             self.estimator_ = deepcopy(self.estimator)
+
+        check_type(self.var, f'{self.var}', float, int, None)
+
+        if self.var is not None:
+            return self.var
 
         if 'return_std' not in inspect.signature(
                 self.estimator.predict).parameters.keys():

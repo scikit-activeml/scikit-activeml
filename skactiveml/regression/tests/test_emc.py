@@ -22,5 +22,5 @@ class TestEMC(unittest.TestCase):
         X = np.array([[1, 2], [3, 4]])
         y = np.array([0, 1])
 
-        query_indices = qs.query(X_cand, reg, X, y, batch_size=2)
+        query_indices = qs.query(X, y, candidates=X_cand, reg=reg, batch_size=2)
         print(query_indices)

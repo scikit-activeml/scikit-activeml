@@ -23,5 +23,5 @@ class TestGSy(unittest.TestCase):
         y = np.array([0, 1])
         reg.fit(X, y)
 
-        query_indices = gsy.query(X_cand, reg, X, y, batch_size=2)
+        query_indices = gsy.query(X, y, candidates=X_cand, reg=reg, batch_size=2)
         print(query_indices)

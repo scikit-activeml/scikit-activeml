@@ -1,6 +1,7 @@
 import copy
 import warnings
 from collections.abc import Iterable
+from inspect import Parameter, signature
 
 import numpy as np
 from sklearn.utils.validation import check_array, column_or_1d, \
@@ -533,6 +534,44 @@ def check_type(obj, name, *target_types):
         if len(list(target_vals)) >= 1:
             error_str += f' or equal one of the following values: {set(target_vals)}'
         raise TypeError(error_str + '.')
+
+
+def check_callable(func, name, n_free_parameters=None):
+    """ Checks if function is a callable and if the number of free parameters is
+    correct.
+
+    Parameters
+    ----------
+    func: callable
+        The functions to be validated.
+    name: str
+        The name of the function
+    n_free_parameters: int, optional (default=None)
+        The number of free parameters. If `n_free_parameters` is `None`,
+        `n_free_parameters` is set to `1`.
+    """
+
+    if n_free_parameters is None:
+        n_free_parameters = 1
+
+    if not callable(func):
+        raise TypeError(
+            f"`{name}` must be callable. "
+            f"`{name}` is of type {type(func)}"
+        )
+
+    # count the number of arguments that have no default value
+    n_free_params = len(list(
+        filter(lambda x: x.default == Parameter.empty,
+               signature(func).parameters.values())
+    ))
+
+    if n_free_params != n_free_parameters:
+        raise TypeError(
+            f"The number of free parameters of the callable has to "
+            f"equal one. "
+            f"The number of free parameters is {n_free_params}."
+        )
 
 
 def check_bound(bound=None, X=None, ndim=2, epsilon=0,

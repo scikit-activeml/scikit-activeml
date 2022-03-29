@@ -381,8 +381,6 @@ class TestMultiAnnotWrapper(unittest.TestCase):
         self.assertEqual((4, 2, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
 
-
-
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]
         best_annotator_indices = best_cand_indices[:, 1]

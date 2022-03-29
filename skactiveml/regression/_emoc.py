@@ -1,33 +1,44 @@
-from copy import deepcopy
-
 import numpy as np
+from sklearn import clone
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlRegressor
-from skactiveml.utils import check_type, simple_batch
+from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlConditionalEstimator
+from skactiveml.utils import check_type, check_random_state
+from skactiveml.utils._approximation import conditional_expect
+from skactiveml.utils._functions import update_X_y, simple_batch
+from skactiveml.utils._validation import check_callable
 
 
-class EMC(SingleAnnotPoolBasedQueryStrategy):
-    """Expected Model Change
+class ExpectedModelOutputChange(SingleAnnotPoolBasedQueryStrategy):
+    """Regression based Expected Model Output Change
 
-    This class implements expected model output change.
+    This class implements an expected model output change based approach for
+    regression, where samples are queried that change the output of the model
+    the most.
 
     Parameters
     ----------
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
-    k_bootstraps: int, optional (default=1)
-        The minimum number of samples the estimator requires.
-    ord: int or string (default=2)
-        The Norm to measure the gradient.
+
+    References
+    ----------
+    [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
+        Oliver and Barz, Bjoern and Denzler, Joachim and AG, Carl Zeiss. Active
+        Learning for Regression Tasks with Expected Model Output Change,
+        page 103 and subsequently, 2018.
+
     """
 
-    def __init__(self, k_bootstraps=10, ord=2, random_state=None):
+    def __init__(self, random_state=None, integration_dict=None, loss=None):
         super().__init__(random_state=random_state)
-        self.ord = ord
-        self.k_bootstraps = k_bootstraps
+        self.loss = loss if loss is not None else lambda x, y: np.sum((x-y)**2)
+        if integration_dict is not None:
+            self.integration_dict = integration_dict
+        else:
+            self.integration_dict = {'integration_method': 'assume_linear'}
 
-    def query(self, X, y, reg, fit_clf=True, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(self, X, y, cond_est, sample_weight=None,
+              candidates=None, batch_size=1, return_utilities=False, fit_cond_est=None):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -38,11 +49,10 @@ class EMC(SingleAnnotPoolBasedQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        reg: SkactivemlRegressor
-            Regressor to predict the data.
-        fit_clf : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
+        cond_est: SkactivemlConditionalEstimator
+            Estimates the output and the conditional distribution.
+        fit_cond_est: bool
+            Whether the conditional estimator is fitted.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -81,39 +91,39 @@ class EMC(SingleAnnotPoolBasedQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
-
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, 'reg', SkactivemlRegressor)
+        check_type(cond_est, 'cond_est', SkactivemlConditionalEstimator)
+        check_type(self.integration_dict, 'self.integration_dict', dict)
+        random_state = check_random_state(random_state=self.random_state)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_eval = X_cand
 
-        rng = np.random.default_rng(self.random_state)
-        n_samples = len(X)
-        k = min(n_samples, self.k_bootstraps)
-        learners = [deepcopy(reg) for _ in range(k)]
-        sample_indices = np.arange(n_samples)
-        subsets_indices = [rng.choice(sample_indices, size=n_samples*(k-1)//k)
-                           for _ in range(k)]
+        loss = self.loss
 
-        for learner, subset_indices in zip(learners, subsets_indices):
-            X_for_learner = X[subset_indices]
-            y_for_learner = y[subset_indices]
-            learner.fit(X_for_learner, y_for_learner)
+        check_callable(loss, 'self.loss', n_free_parameters=2)
 
-        results = np.array([learner.predict(X_cand) for learner in learners])
-        scalars = np.average(np.abs(results), axis=0)
-        norms = np.linalg.norm(X_cand, ord=self.ord, axis=1)
-        utilities_cand = np.multiply(scalars, norms)
+        if fit_cond_est:
+            cond_est = clone(cond_est).fit(X, y, sample_weight)
 
-        if mapping is None:
-            utilities = utilities_cand
-        else:
-            utilities = np.full(len(X), np.nan)
-            utilities[mapping] = utilities_cand
+        y_pred = cond_est.predict(X_eval)
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
+        def model_output_change(x_idx, x_cand, y_pot):
+            X_new, y_new = update_X_y(X, y, y_pot, idx_update=x_idx,
+                                      X_update=x_cand)
+            cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
+            y_pred_new = cond_est_new.predict(X_eval)
+
+            return loss(y_pred, y_pred_new)
+
+        change = conditional_expect(X_cand, model_output_change, cond_est,
+                                    random_state=random_state,
+                                    include_x=True,
+                                    **self.integration_dict)
+
+        return simple_batch(change, batch_size=batch_size,
+                            random_state=self.random_state_,
                             return_utilities=return_utilities)

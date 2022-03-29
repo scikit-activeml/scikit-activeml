@@ -8,6 +8,7 @@ from ...base import MultiAnnotPoolBasedQueryStrategy, \
     SingleAnnotPoolBasedQueryStrategy
 from ...utils import rand_argmax, check_type, MISSING_LABEL, majority_vote, \
     check_random_state, check_scalar
+from ...utils._validation import check_callable
 
 
 class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
@@ -180,24 +181,7 @@ class MultiAnnotWrapper(MultiAnnotPoolBasedQueryStrategy):
         else:
             y_aggregate = self.y_aggregate
 
-        if not callable(y_aggregate):
-            raise TypeError(
-                f"`self.y_aggregate` must be callable. "
-                f"`self.y_aggregate` is of type {type(y_aggregate)}"
-            )
-
-        # count the number of arguments that have no default value
-        n_free_params = len(list(
-            filter(lambda x: x.default == Parameter.empty,
-                   signature(y_aggregate).parameters.values())
-        ))
-
-        if n_free_params != 1:
-            raise TypeError(
-                f"The number of free parameters of the callable has to "
-                f"equal one. "
-                f"The number of free parameters is {n_free_params}."
-            )
+        check_callable(y_aggregate, 'self.y_aggregate', n_free_parameters=1)
 
         y_sq = y_aggregate(y)
 
