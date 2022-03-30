@@ -2,15 +2,15 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    SingleAnnotPoolBasedQueryStrategy,
+    SingleAnnotatorPoolQueryStrategy,
     SkactivemlConditionalEstimator,
 )
-from skactiveml.utils import check_type, simple_batch, check_random_state
+from skactiveml.utils import check_type, simple_batch
 from skactiveml.utils._approximation import conditional_expect
 from skactiveml.utils._functions import update_X_y
 
 
-class MutualInformationGainMaximization(SingleAnnotPoolBasedQueryStrategy):
+class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Mutual Information Gain Maximization
 
     This class implements a mutual information based selection strategies, where

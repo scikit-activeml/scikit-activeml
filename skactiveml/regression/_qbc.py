@@ -4,11 +4,11 @@ import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import _is_arraylike, check_random_state
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlRegressor
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
 from skactiveml.utils import simple_batch, check_type
 
 
-class QBC(SingleAnnotPoolBasedQueryStrategy):
+class QBC(SingleAnnotatorPoolQueryStrategy):
     """Regression based on Query by Committee
 
     This class implements an Regression adaption of Query by Committee. It

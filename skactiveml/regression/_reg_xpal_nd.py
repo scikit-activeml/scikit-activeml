@@ -26,8 +26,7 @@ class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
         The estimator used to estimate the probability distribution.
     """
 
-    def __init__(self, random_state=None, post_est=None,
-                 n_monte_carlo_samples=10):
+    def __init__(self, random_state=None, post_est=None, n_monte_carlo_samples=10):
         super().__init__(random_state=random_state)
         if post_est is None:
             self.posterior_estimator = NormalInverseWishartKernelEstimator()
@@ -35,8 +34,17 @@ class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
             self.posterior_estimator = post_est
         self.n_monte_carlo_samples = n_monte_carlo_samples
 
-    def query(self, X_cand, reg, E, X, y, batch_size=1,
-              assume_linear=False, return_utilities=False):
+    def query(
+        self,
+        X_cand,
+        reg,
+        E,
+        X,
+        y,
+        batch_size=1,
+        assume_linear=False,
+        return_utilities=False,
+    ):
 
         """Query the next instance to be labeled.
 
@@ -80,23 +88,24 @@ class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
         posterior_estimator = self.posterior_estimator.fit(X, y)
 
         if assume_linear:
-            return self._query_assume_lin(X_cand, reg, E, X, y,
-                                          posterior_estimator,
-                                          utilities, return_utilities)
+            return self._query_assume_lin(
+                X_cand, reg, E, X, y, posterior_estimator, utilities, return_utilities
+            )
 
         else:
-            return self._query_not_assume_lin(X_cand, reg, E, X, y,
-                                              posterior_estimator,
-                                              utilities, return_utilities)
+            return self._query_not_assume_lin(
+                X_cand, reg, E, X, y, posterior_estimator, utilities, return_utilities
+            )
 
-    def _query_assume_lin(self, X_cand, reg, E, X, y, posterior_estimator,
-                          utilities, return_utilities):
+    def _query_assume_lin(
+        self, X_cand, reg, E, X, y, posterior_estimator, utilities, return_utilities
+    ):
 
         My_cand, Var_cand = posterior_estimator.estimate_mu_cov(X_cand)
 
         for idx, (x_c, my_c, var_c) in enumerate(zip(X_cand, My_cand, Var_cand)):
             E = np.array([x_c])
-            sigma_v = (var_c.diagonal())**(1/2)
+            sigma_v = (var_c.diagonal()) ** (1 / 2)
             perf = self.x_perf_assume_linear(reg, E, x_c, my_c, sigma_v, X, y)
             utilities[idx] = perf
 
@@ -105,8 +114,9 @@ class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
         else:
             return rand_argmax(utilities)
 
-    def _query_not_assume_lin(self, X_cand, reg, E, X, y, posterior_estimator,
-                              utilities, return_utilities):
+    def _query_not_assume_lin(
+        self, X_cand, reg, E, X, y, posterior_estimator, utilities, return_utilities
+    ):
 
         n_rvs = self.n_monte_carlo_samples
         Y_cand = posterior_estimator.estimate_random_variates(X_cand, n_rvs)
@@ -154,8 +164,9 @@ class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
         for reg_new, y_new in zip(reg_new_s, y_new_s):
             reg_new.fit(X_new, y_new)
 
-        my_s = [self.posterior_estimator.fit(X_new, y_new).predict(E)
-                for y_new in y_new_s]
+        my_s = [
+            self.posterior_estimator.fit(X_new, y_new).predict(E) for y_new in y_new_s
+        ]
 
         y_pred_old = reg_old.predict(E)
         y_pred_new_s = [reg_new.predict(E) for reg_new in reg_new_s]
@@ -163,12 +174,21 @@ class RegxPalNd(SingleAnnotPoolBasedQueryStrategy):
         error_old = np.sum((y_pred_old - my_s[1]) ** 2)
         error_new = np.sum((y_pred_new_s[1] - my_s[1]) ** 2)
 
-        var_new = 1/2*(np.sum(((my_s[2] - my_s[1])
-                               - (y_pred_new_s[2] - y_pred_new_s[1]))**2)
-                       + np.sum(((my_s[0] - my_s[1])
-                                 - (y_pred_new_s[0] - y_pred_new_s[1]))**2))
+        var_new = (
+            1
+            / 2
+            * (
+                np.sum(((my_s[2] - my_s[1]) - (y_pred_new_s[2] - y_pred_new_s[1])) ** 2)
+                + np.sum(
+                    ((my_s[0] - my_s[1]) - (y_pred_new_s[0] - y_pred_new_s[1])) ** 2
+                )
+            )
+        )
 
-        var_old = 1/2*(np.sum((my_s[2] - my_s[1])**2)
-                       + np.sum((my_s[0] - my_s[1])**2))
+        var_old = (
+            1
+            / 2
+            * (np.sum((my_s[2] - my_s[1]) ** 2) + np.sum((my_s[0] - my_s[1]) ** 2))
+        )
 
         return np.average((error_old - error_new) + (var_old - var_new))

@@ -11,19 +11,42 @@ import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils.multiclass import check_classification_targets
-from sklearn.utils.validation import check_array, check_consistent_length, \
-    column_or_1d
+from sklearn.utils.validation import (
+    check_array,
+    check_consistent_length,
+    column_or_1d,
+)
 
-from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled, \
-    unlabeled_indices, ExtLabelEncoder, rand_argmin, check_classifier_params, \
-    check_random_state, check_cost_matrix, check_scalar, check_class_prior, \
-    check_missing_label, check_indices
+from .exceptions import MappingError
+from .utils import (
+    MISSING_LABEL,
+    is_labeled,
+    is_unlabeled,
+    unlabeled_indices,
+    ExtLabelEncoder,
+    rand_argmin,
+    check_classifier_params,
+    check_random_state,
+    check_cost_matrix,
+    check_scalar,
+    check_class_prior,
+    check_missing_label,
+    check_indices,
+)
 
-__all__ = ['QueryStrategy', 'SingleAnnotPoolBasedQueryStrategy',
-           'MultiAnnotPoolBasedQueryStrategy', 'BudgetManager',
-           'SingleAnnotStreamBasedQueryStrategy', 'SkactivemlClassifier',
-           'SkactivemlRegressor', 'SkactivemlConditionalEstimator',
-           'ClassFrequencyEstimator', 'AnnotModelMixin']
+# '__all__' is necessary to create the sphinx docs.
+__all__ = [
+    "QueryStrategy",
+    "SingleAnnotatorPoolQueryStrategy",
+    "MultiAnnotatorPoolQueryStrategy",
+    "BudgetManager",
+    "SingleAnnotatorStreamQueryStrategy",
+    "SkactivemlClassifier",
+    "ClassFrequencyEstimator",
+    "AnnotatorModelMixin",
+    "SkactivemlRegressor",
+    "SkactivemlConditionalEstimator",
+]
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -40,12 +63,13 @@ class QueryStrategy(ABC, BaseEstimator):
 
     @abstractmethod
     def query(self, *args, **kwargs):
-        """Determines the query for active learning based on input arguments.
+        """
+        Determines the query for active learning based on input arguments.
         """
         raise NotImplementedError
 
 
-class PoolBasedQueryStrategy(QueryStrategy):
+class PoolQueryStrategy(QueryStrategy):
     """Base class for all pool-based active learning query strategies in
     scikit-activeml.
 
@@ -62,8 +86,16 @@ class PoolBasedQueryStrategy(QueryStrategy):
         super().__init__(random_state=random_state)
         self.missing_label = missing_label
 
-    def _validate_data(self, X, y, candidates, batch_size, return_utilities,
-                       reset=True, check_X_dict=None):
+    def _validate_data(
+        self,
+        X,
+        y,
+        candidates,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
+    ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
 
@@ -112,37 +144,37 @@ class PoolBasedQueryStrategy(QueryStrategy):
         """
         # Check samples.
         if check_X_dict is None:
-            check_X_dict = {'allow_nd': True}
+            check_X_dict = {"allow_nd": True}
         X = check_array(X, **check_X_dict)
 
         # Check number of features.
         self._check_n_features(X, reset=reset)
 
         # Check labels
-        y = check_array(y, ensure_2d=False, force_all_finite='allow-nan')
+        y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
         check_consistent_length(X, y)
 
         # Check missing_label
         check_missing_label(self.missing_label)
         self.missing_label_ = self.missing_label
 
-        # Check candidates
+        # Check candidates (+1 to avoid zero multiplier).
+        seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_))) + 1
         if candidates is not None:
-            check_candidates_dict = deepcopy(check_X_dict)
-            check_candidates_dict['ensure_2d'] = False
-            candidates = check_array(candidates, **check_candidates_dict)
-            seed_mult = len(candidates)
-            if candidates.ndim == 2:
+            candidates = np.array(candidates)
+            if candidates.ndim == 1:
+                candidates = check_indices(candidates, y, dim=0)
+            else:
+                check_candidates_dict = deepcopy(check_X_dict)
+                check_candidates_dict["ensure_2d"] = False
+                candidates = check_array(candidates, **check_candidates_dict)
                 self._check_n_features(candidates, reset=False)
-        else:
-            seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_)))
 
         # Check return_utilities.
-        check_scalar(return_utilities, 'return_utilities', bool)
+        check_scalar(return_utilities, "return_utilities", bool)
 
         # Check batch size.
-        check_scalar(batch_size, target_type=int, name='batch_size',
-                     min_val=1)
+        check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
 
         # Check random state.
         self.random_state_ = check_random_state(self.random_state, seed_mult)
@@ -150,14 +182,22 @@ class PoolBasedQueryStrategy(QueryStrategy):
         return X, y, candidates, batch_size, return_utilities
 
 
-class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
+class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with a
     single annotator in scikit-activeml.
     """
 
     @abstractmethod
-    def query(self, X, y, *args, candidates=None, batch_size=1,
-              return_utilities=False, **kwargs):
+    def query(
+        self,
+        X,
+        y,
+        *args,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+        **kwargs,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -206,8 +246,16 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         """
         raise NotImplementedError
 
-    def _validate_data(self, X, y, candidates, batch_size, return_utilities,
-                       reset=True, check_X_dict=None):
+    def _validate_data(
+        self,
+        X,
+        y,
+        candidates,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
+    ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
 
@@ -219,12 +267,12 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
+        candidates : None or array-like of shape (n_candidates,), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
             If candidates is None, the unlabeled samples from (X,y) are
             considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
+            If candidates is of shape (n_candidates,) and of type int,
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
@@ -255,31 +303,39 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
-        X, y, candidates, batch_size, return_utilities = \
-            super()._validate_data(
-                X, y, candidates, batch_size, return_utilities, reset,
-                check_X_dict
-            )
+        (X, y, candidates, batch_size, return_utilities,) = super()._validate_data(
+            X, y, candidates, batch_size, return_utilities, reset, check_X_dict
+        )
         y = column_or_1d(y, warn=True)
 
         if candidates is None:
-            n_candidates = \
-                int(np.sum(is_unlabeled(y, missing_label=self.missing_label_)))
+            n_candidates = int(
+                np.sum(is_unlabeled(y, missing_label=self.missing_label_))
+            )
         else:
             n_candidates = len(candidates)
 
         if n_candidates < batch_size:
             warnings.warn(
                 f"'batch_size={batch_size}' is larger than number of "
-                f"candidates. Instead, 'batch_size={n_candidates}' was set.")
+                f"candidates. Instead, 'batch_size={n_candidates}' was set."
+            )
             batch_size = n_candidates
 
         return X, y, candidates, batch_size, return_utilities
 
-    def _transform_candidates(self, candidates, X, y, enforce_mapping=False):
+    def _transform_candidates(
+        self,
+        candidates,
+        X,
+        y,
+        enforce_mapping=False,
+        allow_only_unlabeled=False,
+    ):
         """
         Transforms the `candidates` parameter into a sample array and the
-        corresponding index array `mapping` such that `X_cand = X[mapping]`.
+        corresponding index array `mapping` such that
+        `candidates = X[mapping]`.
 
         Parameters
         ----------
@@ -300,32 +356,39 @@ class SingleAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         enforce_mapping : bool, default=False
             If True, an exception is raised when no exact mapping can be
             determined (i.e., `mapping` is None).
+        allow_only_unlabeled : bool, default=False
+            If True, an exception is raised when indices of candidates contain
+            labeled samples.
 
         Returns
         -------
-        X_cand : np.ndarray of shape (n_candidates, n_features)
+        candidates : np.ndarray of shape (n_candidates, n_features)
             Candidate samples from which the strategy can query the label.
         mapping : np.ndarray of shape (n_candidates) or None
-            Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
+            Index array that maps `candidates` to `X`.
+            (`candidates = X[mapping]`)
         """
-        # TODO check if candidates are only unlabeled ones if given as another
-        #  option
 
         if candidates is None:
             ulbd_idx = unlabeled_indices(y, self.missing_label_)
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
+            if allow_only_unlabeled:
+                if is_labeled(y[candidates], self.missing_label_).any():
+                    raise ValueError("Candidates must not contain labeled " "samples.")
             return X[candidates], candidates
         else:
             if enforce_mapping:
-                raise ValueError('Mapping `X_cand` to `X` is not posssible '
-                                 'but `enforce_mapping` is True. Use index '
-                                 'array for `candidates` instead.')
+                raise MappingError(
+                    "Mapping `candidates` to `X` is not "
+                    "possible but `enforce_mapping` is True. "
+                    "Use index array for `candidates` instead."
+                )
             else:
                 return candidates, None
 
 
-class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
+class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with
     multiple annotators in scikit-activeml.
 
@@ -339,8 +402,17 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
     """
 
     @abstractmethod
-    def query(self, X, y, *args, candidates=None, annotators=None,
-              batch_size=1, return_utilities=False, **kwargs):
+    def query(
+        self,
+        X,
+        y,
+        *args,
+        candidates=None,
+        annotators=None,
+        batch_size=1,
+        return_utilities=False,
+        **kwargs,
+    ):
         """Determines which candidate sample is to be annotated by which
         annotator.
 
@@ -358,7 +430,7 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             array-like of shape (n_candidates, n_features),
             optional (default=None)
             If `candidates` is None, the samples from (X,y), for which an
-            annotator exists such that the annotator sample pairs is
+            annotator exists such that the annotator sample pair is
             unlabeled are considered as sample candidates.
             If `candidates` is of shape (n_candidates,) and of type int,
             `candidates` is considered as the indices of the sample candidates
@@ -409,8 +481,17 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
         """
         raise NotImplementedError
 
-    def _validate_data(self, X, y, candidates, annotators, batch_size,
-                       return_utilities, reset=True, check_X_dict=None):
+    def _validate_data(
+        self,
+        X,
+        y,
+        candidates,
+        annotators,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
+    ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
 
@@ -482,63 +563,68 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
-        X, y, candidates, batch_size, return_utilities = \
-            super()._validate_data(
-                X, y, candidates, batch_size, return_utilities, reset,
-                check_X_dict
-            )
+        (X, y, candidates, batch_size, return_utilities,) = super()._validate_data(
+            X, y, candidates, batch_size, return_utilities, reset, check_X_dict
+        )
 
-        check_array(y, ensure_2d=True, force_all_finite='allow-nan')
+        check_array(y, ensure_2d=True, force_all_finite="allow-nan")
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
-            annotators = check_array(annotators, ensure_2d=False)
+            annotators = check_array(annotators, ensure_2d=False, allow_nd=True)
 
-        if annotators is not None and annotators.ndim == 1:
-            annotators = check_indices(annotators, y, dim=1)
-        elif annotators is not None and annotators.ndim == 2:
-            if candidates is None or candidates.ndim == 1:
-                check_consistent_length(X, annotators)
+            if annotators.ndim == 1:
+                annotators = check_indices(annotators, y, dim=1)
+            elif annotators.ndim == 2:
+                annotators = check_array(annotators, dtype=bool)
+                if candidates is None or candidates.ndim == 1:
+                    check_consistent_length(X, annotators)
+                else:
+                    check_consistent_length(candidates, annotators)
+                check_consistent_length(y.T, annotators.T)
             else:
-                check_consistent_length(candidates, annotators)
-            check_consistent_length(y.T, annotators.T)
+                raise ValueError(
+                    "`annotators` must be either None, 1d or 2d " "array-like."
+                )
 
-        if candidates is None and annotators is None:
-            n_candidate_pairs = int(np.sum(unlabeled_pairs))
-        elif candidates is None and annotators.ndim == 1:
-            n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
-        elif candidates.ndim == 1 and annotators is None:
-            candidates = check_indices(candidates, y, dim=0)
-            n_candidate_pairs = len(candidates)*len(y.T)
-        elif candidates.ndim == 1 and annotators.ndim == 1:
-            candidates = check_indices(candidates, y, dim=0)
-            n_candidate_pairs = int(np.sum(unlabeled_pairs[candidates,
-                                                           annotators]))
-        elif candidates.ndim == 2 and annotators is None:
-            n_candidate_pairs = len(candidates)*len(y.T)
-        elif candidates.ndim == 2 and annotators.ndim == 1:
-            n_candidate_pairs = len(candidates)*len(annotators)
+        if annotators is None:
+            if candidates is None:
+                n_candidate_pairs = int(np.sum(unlabeled_pairs))
+            elif candidates.ndim == 1:
+                n_candidate_pairs = len(candidates) * len(y.T)
+            else:
+                n_candidate_pairs = len(candidates) * len(y.T)
+        elif annotators.ndim == 1:
+            if candidates is None:
+                n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
+            elif candidates.ndim == 1:
+                n_candidate_pairs = int(
+                    np.sum(unlabeled_pairs[candidates][:, annotators])
+                )
+            else:
+                n_candidate_pairs = len(candidates) * len(annotators)
         else:
-            annotators = check_array(annotators, dtype=bool)
             n_candidate_pairs = int(np.sum(annotators))
 
         if n_candidate_pairs < batch_size:
             warnings.warn(
                 f"'batch_size={batch_size}' is larger than number of "
                 f"candidates pairs. Instead, 'batch_size={n_candidate_pairs}'"
-                f" was set.")
+                f" was set."
+            )
             batch_size = n_candidate_pairs
 
         return X, y, candidates, annotators, batch_size, return_utilities
 
-    def _transform_cand_annot(self, candidates, annotators, X, y,
-                              enforce_mapping=False):
+    def _transform_cand_annot(
+        self, candidates, annotators, X, y, enforce_mapping=False
+    ):
         """
         Transforms the `candidates` parameter into a sample array and the
-        corresponding index array `mapping` such that `X_cand = X[mapping]`,
-        and transforms `annotators` into a boolean array such that `A_cand`
-        represents the available annotator sample pairs for the samples of
-        X_cand.
+        corresponding index array `mapping` such that
+        `candidates = X[mapping]`, and transforms `annotators` into a boolean
+        array such that `A_cand` represents the available annotator sample
+        pairs for the samples of candidates.
 
         Parameters
         ----------
@@ -580,16 +666,16 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
 
         Returns
         -------
-        X_cand : np.ndarray of shape (n_candidates, n_features)
+        candidates : np.ndarray of shape (n_candidates, n_features)
             Candidate samples from which the strategy can query the label.
         mapping : np.ndarray of shape (n_candidates) or None
-            Index array that maps `X_cand` to `X`. (`X_cand = X[mapping]`)
+            Index array that maps `candidates` to `X`
+            (`candidates = X[mapping]`).
         A_cand : np.ndarray of shape(n_candidates, n_annotators)
-            Available annotator sample pair with respect to `X_cand`.
+            Available annotator sample pair with respect to `candidates`.
         """
         unlbd_pairs = is_unlabeled(y, self.missing_label_)
-        unlbd_sample_indices = np.argwhere(np.any(unlbd_pairs, axis=1))\
-            .flatten()
+        unlbd_sample_indices = np.argwhere(np.any(unlbd_pairs, axis=1)).flatten()
         n_annotators = y.shape[1]
 
         if candidates is not None and candidates.ndim == 2:
@@ -603,9 +689,11 @@ class MultiAnnotPoolBasedQueryStrategy(PoolBasedQueryStrategy):
                 A_cand = annotators
 
             if enforce_mapping:
-                raise ValueError('Mapping `X_cand` to `X` is not posssible'
-                                 'but `enforce_mapping` is True. Use index'
-                                 'array for `candidates` instead.')
+                raise ValueError(
+                    "Mapping `candidates` to `X` is not posssible"
+                    "but `enforce_mapping` is True. Use index"
+                    "array for `candidates` instead."
+                )
             else:
                 return candidates, None, A_cand
 
@@ -668,16 +756,17 @@ class BudgetManager(ABC, BaseEstimator):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, X_cand, queried_indices, *args, **kwargs):
+    def update(self, candidates, queried_indices, *args, **kwargs):
         """Updates the BudgetManager.
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : array-like
-            Indicates which instances from X_cand have been queried.
+            Indicates which instances from candidates have been queried.
 
         Returns
         -------
@@ -727,7 +816,7 @@ class BudgetManager(ABC, BaseEstimator):
         return utilities
 
 
-class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
+class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
        scikit-activeml.
 
@@ -745,12 +834,12 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         self.budget = budget
 
     @abstractmethod
-    def query(self, X_cand, *args, return_utilities=False, **kwargs):
-        """Ask the query strategy which instances in X_cand to acquire.
+    def query(self, candidates, *args, return_utilities=False, **kwargs):
+        """Ask the query strategy which instances in candidates to acquire.
 
-        The query startegy determines the most useful instances in X_cand,
+        The query startegy determines the most useful instances in candidates,
         which can be acquired within the budgeting constraint specified by the
-        budget_manager.
+        budgetmanager.
         Please note that, when the decisions from this function
         may differ from the final sampling, simulate=True can set, so that the
         query strategy can be updated later with update(...) with the final
@@ -759,7 +848,8 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
@@ -770,8 +860,8 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         Returns
         -------
         queried_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in X_cand which should be sampled, with
-            0 <= n_sampled_instances <= n_samples.
+            The indices of instances in candidates which should be sampled,
+            with 0 <= n_sampled_instances <= n_samples.
 
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
@@ -782,7 +872,7 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
     @abstractmethod
     def update(
         self,
-        X_cand,
+        candidates,
         queried_indices,
         *args,
         budget_manager_param_dict=None,
@@ -798,15 +888,16 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
 
         Parameters
         ----------
-        X_cand : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         queried_indices : array-like
-            Indicates which instances from X_cand have been queried.
+            Indicates which instances from candidates have been queried.
 
         budget_manager_param_dict : kwargs, optional
-            Optional kwargs for budget_manager.
+            Optional kwargs for budgetmanager.
         Returns
         -------
         self : StreamBasedQueryStrategy
@@ -828,22 +919,28 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             self.budget_ = self.budget
         else:
             self.budget_ = 0.1
-        check_scalar(self.budget_, "budget", float, min_val=0.0, max_val=1.0,
-                     min_inclusive=False, )
+        check_scalar(
+            self.budget_,
+            "budget",
+            float,
+            min_val=0.0,
+            max_val=1.0,
+            min_inclusive=False,
+        )
 
     def _validate_data(
         self,
-        X_cand,
+        candidates,
         return_utilities,
         *args,
         reset=True,
-        **check_X_cand_params,
+        **check_candidates_params,
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
         Parameters
         ----------
-        X_cand: array-like of shape (n_candidates, n_features)
+        candidates: array-like of shape (n_candidates, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
@@ -852,21 +949,21 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
-        **check_X_cand_params : kwargs
+        **check_candidates_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
         Returns
         -------
-        X_cand: np.ndarray, shape (n_candidates, n_features)
+        candidates: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
         # Check candidate instances.
-        X_cand = check_array(X_cand, **check_X_cand_params)
+        candidates = check_array(candidates, **check_candidates_params)
 
         # Check number of features.
-        self._check_n_features(X_cand, reset=reset)
+        self._check_n_features(candidates, reset=reset)
 
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
@@ -874,10 +971,10 @@ class SingleAnnotStreamBasedQueryStrategy(QueryStrategy):
         # Check random state.
         self._validate_random_state()
 
-        # Check budget_manager.
+        # Check budgetmanager.
         self._validate_budget()
 
-        return X_cand, return_utilities
+        return candidates, return_utilities
 
 
 class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
@@ -911,8 +1008,13 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         predicting class `classes_[j]`  for a sample of class `classes_[i]`.
     """
 
-    def __init__(self, classes=None, missing_label=MISSING_LABEL,
-                 cost_matrix=None, random_state=None):
+    def __init__(
+        self,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
+    ):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
@@ -1002,27 +1104,36 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         y_pred = self._le.transform(self.predict(X))
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
-    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None,
-                       check_y_dict=None, y_ensure_1d=True):
+    def _validate_data(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        check_y_dict=None,
+        y_ensure_1d=True,
+    ):
         if check_X_dict is None:
-            check_X_dict = {'ensure_min_samples': 0, 'ensure_min_features': 0}
+            check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
         if check_y_dict is None:
             check_y_dict = {
-                'ensure_min_samples': 0, 'ensure_min_features': 0,
-                'ensure_2d': False,
-                'force_all_finite': False, 'dtype': None
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "ensure_2d": False,
+                "force_all_finite": False,
+                "dtype": None,
             }
 
         # Check common classifier parameters.
-        check_classifier_params(self.classes, self.missing_label,
-                                self.cost_matrix)
+        check_classifier_params(self.classes, self.missing_label, self.cost_matrix)
 
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
         # Create label encoder.
-        self._le = ExtLabelEncoder(classes=self.classes,
-                                   missing_label=self.missing_label)
+        self._le = ExtLabelEncoder(
+            classes=self.classes, missing_label=self.missing_label
+        )
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
@@ -1040,7 +1151,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
                 )
         else:
             self._le.fit_transform(self.classes)
-            check_X_dict['ensure_2d'] = False
+            check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
 
@@ -1052,16 +1163,18 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             sample_weight = check_array(sample_weight, **check_y_dict)
             if not np.array_equal(y.shape, sample_weight.shape):
                 raise ValueError(
-                    f'`y` has the shape {y.shape} and `sample_weight` has the '
-                    f'shape {sample_weight.shape}. Both need to have '
-                    f'identical shapes.'
+                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"shape {sample_weight.shape}. Both need to have "
+                    f"identical shapes."
                 )
 
         # Update cost matrix.
-        self.cost_matrix_ = 1 - np.eye(len(self.classes_)) \
-            if self.cost_matrix is None else self.cost_matrix
-        self.cost_matrix_ = check_cost_matrix(self.cost_matrix_,
-                                              len(self.classes_))
+        self.cost_matrix_ = (
+            1 - np.eye(len(self.classes_))
+            if self.cost_matrix is None
+            else self.cost_matrix
+        )
+        self.cost_matrix_ = check_cost_matrix(self.cost_matrix_, len(self.classes_))
         if self.classes is not None:
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
@@ -1117,12 +1230,19 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         class `classes_[j]` for a sample of class `classes_[i]`.
     """
 
-    def __init__(self, class_prior=0, classes=None,
-                 missing_label=MISSING_LABEL,
-                 cost_matrix=None, random_state=None):
+    def __init__(
+        self,
+        class_prior=0,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
+    ):
         super().__init__(
-            classes=classes, missing_label=missing_label,
-            cost_matrix=cost_matrix, random_state=random_state
+            classes=classes,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
         )
         self.class_prior = class_prior
 
@@ -1165,17 +1285,26 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
-    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None,
-                       check_y_dict=None, y_ensure_1d=True):
+    def _validate_data(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        check_y_dict=None,
+        y_ensure_1d=True,
+    ):
         X, y, sample_weight = super()._validate_data(
-            X=X, y=y, sample_weight=sample_weight, check_X_dict=check_X_dict,
-            check_y_dict=check_y_dict, y_ensure_1d=y_ensure_1d
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=check_X_dict,
+            check_y_dict=check_y_dict,
+            y_ensure_1d=y_ensure_1d,
         )
 
         # Check class prior.
-        self.class_prior_ = check_class_prior(
-            self.class_prior, len(self.classes_)
-        )
+        self.class_prior_ = check_class_prior(self.class_prior, len(self.classes_))
 
         return X, y, sample_weight
 
@@ -1300,20 +1429,19 @@ class SkactivemlConditionalEstimator(SkactivemlRegressor):
             Drawn random variate samples.
         """
         rv = self.estimate_conditional_distribution(X)
-        rv_samples = rv.rvs(size=(n_rv_samples, len(X)),
-                            random_state=random_state)
+        rv_samples = rv.rvs(size=(n_rv_samples, len(X)), random_state=random_state)
         return rv_samples.T
 
 
-class AnnotModelMixin(ABC):
-    """AnnotModelMixin
+class AnnotatorModelMixin(ABC):
+    """AnnotatorModelMixin
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.
     """
 
     @abstractmethod
-    def predict_annot_perf(self, X):
+    def predict_annotator_perf(self, X):
         """Calculates the performance of an annotator to provide the true label
         for a given sample.
 

@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    SingleAnnotPoolBasedQueryStrategy,
+    SingleAnnotatorPoolQueryStrategy,
     SkactivemlConditionalEstimator,
 )
 from skactiveml.utils import check_type, simple_batch, check_random_state
@@ -10,7 +10,7 @@ from skactiveml.utils._approximation import conditional_expect
 from skactiveml.utils._functions import update_X_y
 
 
-class KullbackLeiblerDivergenceMaximization(SingleAnnotPoolBasedQueryStrategy):
+class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Kullback Leibler Divergence Maximization
 
     This class implements a Kullback Leibler divergence based selection

@@ -2,16 +2,16 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    SingleAnnotPoolBasedQueryStrategy,
     SkactivemlConditionalEstimator,
+    SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, check_random_state
+from skactiveml.utils import check_type, check_random_state, simple_batch
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y, simple_batch
+from skactiveml.utils._functions import update_X_y
 from skactiveml.utils._validation import check_callable
 
 
-class ExpectedModelOutputChange(SingleAnnotPoolBasedQueryStrategy):
+class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
     """Regression based Expected Model Output Change
 
     This class implements an expected model output change based approach for

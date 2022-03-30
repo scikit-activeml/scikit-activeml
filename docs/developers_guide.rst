@@ -153,7 +153,7 @@ General
 
 All query strategies are stored in a file
 ``skactiveml/pool/_query_strategy.py``. Every class inherits from
-``SingleAnnotatorPoolBasedQueryStrategy``. The class must implement the
+``SingleAnnotatorPoolQueryStrategy``. The class must implement the
 ``__init__`` function for initialization and a ``query`` function.
 
 ``__init__`` function
@@ -242,7 +242,7 @@ All query strategies are tested by a general unittest
 (``test_pool.py``). Querying of every method is tested with standard
 configurations with 0, 1, and 5 initial labels. For every class
 ``ExampleQueryStrategy`` that inherits from
-``SingleAnnotPoolBasedQueryStrategy`` (stored in ``_example.py``), it is
+``SingleAnnotatorPoolQueryStrategy`` (stored in ``_example.py``), it is
 automatically tested if there exists a file ``test/test_example.py``. It
 is necessary that both filenames are the same. Moreover, the test class
 must be called ``TestExampleQueryStrategy(unittest.TestCase)``. Every
@@ -266,7 +266,7 @@ General
 
 All query strategies are stored in a file ``skactivml/stream/*.py``.
 Every query strategy inherits from
-``SingleAnnotatorStreamBasedQueryStrategy``. Every query strategy has
+``SingleAnnotatorStreamQueryStrategy``. Every query strategy has
 either an internal budget handling or an outsourced ``budget_manager``.
 
 For typical class parameters we use standard names:
@@ -396,7 +396,7 @@ Testing
 All stream query strategies are tested by a general unittest
 (``stream/tests/test_stream.py``) -For every class
 ``ExampleQueryStrategy`` that inherits from
-``SingleAnnotStreamBasedQueryStrategy`` (stored in ``_example.py``), it
+``SingleAnnotatorStreamQueryStrategy`` (stored in ``_example.py``), it
 is automatically tested if there exists a file ``test/test_example.py``.
 It is necessary that both filenames are the same. Moreover, the test
 class must be called ``TestExampleQueryStrategy`` and inherit from
@@ -497,7 +497,7 @@ Multi-Annotator Pool-based Query Strategies
 
 All query strategies are stored in a file
 ``skactiveml/pool/multi/_query_strategy.py``. Every class inherits from
-``MultiAnnotatorPoolBasedQueryStrategy``. The class must implement the
+``MultiAnnotatorPoolQueryStrategy``. The class must implement the
 following functions:
 
 +--------------+--------------------------------------------------------------+
@@ -594,7 +594,7 @@ estimate:
 
 -  Define an aggregation function
 -  Evaluate the performance for each annotator sample pair
--  Use the ``MultiAnnotWrapper``
+-  Use the ``SingleAnnotatorWrapper``
 
 If the strategy is a ``greedy`` method regarding the utilities:
 
@@ -874,11 +874,11 @@ Annotator models are marked by implementing the interface
 ``skactiveml.base.AnnotMixing``. These models can estimate the
 performances of annotators for given samples. Every class of a
 classifier inherits from ``skactiveml.base.SkactivemlClassifier``. The
-class of an annotator model must implement the ``predict_annot_perf``
+class of an annotator model must implement the ``predict_annotator_perf``
 method estimating the performances per sample of each annotator as
 proxies of the provided annotation’s qualities.
 
-``predict_annot_perf`` function
+``predict_annotator_perf`` function
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Required Parameters:

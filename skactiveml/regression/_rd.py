@@ -1,12 +1,12 @@
 import numpy as np
 from sklearn.cluster import KMeans
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.utils import is_labeled, check_type, simple_batch
 from skactiveml.utils._functions import rank_utilities
 
 
-class RD(SingleAnnotPoolBasedQueryStrategy):
+class RD(SingleAnnotatorPoolQueryStrategy):
     """RD
 
     This class implements the active learning for regression based query

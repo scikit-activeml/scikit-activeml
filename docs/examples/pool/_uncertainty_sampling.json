@@ -1,0 +1,86 @@
+[
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Uncertainty Sampling with Margin",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Uncertainty Sampling with Margin",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "" : [],
+    "init_params" : {
+      "method" : "'margin_sampling'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    }
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Uncertainty Sampling with Least-Confidence",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Uncertainty Sampling with Least-Confidence",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "" : [],
+    "init_params" : {
+      "method" : "'least_confident'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    }
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Uncertainty Sampling with Entropy",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title" : "Uncertainty Sampling with Entropy",
+    "refs" : ["settles2009active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "" : [],
+    "init_params" : {
+      "method" : "'entropy'"
+    },
+    "query_params" : {
+      "clf" : "clf"
+    }
+  },
+  {
+    "class" : "UncertaintySampling",
+    "method" : "Expected Average Precision",
+    "categories" : {
+      "Settles2012" : "Uncertainty Sampling"
+    },
+    "tags" : ["pool"],
+    "title": "Expected Average Precision",
+    "refs": [
+      "wang2018uncertainty"
+    ],
+    "sequence": [
+      "title",
+      "text_0",
+      "plot",
+      "refs"
+    ],
+    "text_0": "",
+    "bp_add_imports": [],
+    "init_params": {
+      "method": "'expected_average_precision'"
+    },
+    "query_params": {
+      "clf": "clf"
+    },
+    "use_candidate_plotting": true
+  }
+]

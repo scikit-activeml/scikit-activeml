@@ -1,12 +1,12 @@
 import numpy as np
 from sklearn import clone
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlRegressor
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
 from skactiveml.regression._gsx import GSx
 from skactiveml.utils import check_type
 
 
-class GSy(SingleAnnotPoolBasedQueryStrategy):
+class GSy(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling on the feature space
 
     This class implements greedy sampling on the target space.

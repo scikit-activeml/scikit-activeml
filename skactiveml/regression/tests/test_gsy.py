@@ -1,4 +1,3 @@
-
 import unittest
 
 import numpy as np
@@ -9,7 +8,6 @@ from skactiveml.regressor._wrapper import SklearnRegressor
 
 
 class TestGSy(unittest.TestCase):
-
     def setUp(self):
         pass
 

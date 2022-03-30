@@ -1,11 +1,13 @@
 import numpy as np
 from sklearn.metrics import pairwise_distances
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
+from skactiveml.base import (
+    SingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import rand_argmax
 
 
-class GSx(SingleAnnotPoolBasedQueryStrategy):
+class GSx(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling on the feature space
 
     This class implements greedy sampling

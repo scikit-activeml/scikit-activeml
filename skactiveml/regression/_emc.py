@@ -2,11 +2,14 @@ from copy import deepcopy
 
 import numpy as np
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlRegressor
+from skactiveml.base import (
+    SkactivemlRegressor,
+    SingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import check_type, simple_batch
 
 
-class EMC(SingleAnnotPoolBasedQueryStrategy):
+class EMC(SingleAnnotatorPoolQueryStrategy):
     """Expected Model Change
 
     This class implements expected model output change.
@@ -26,8 +29,17 @@ class EMC(SingleAnnotPoolBasedQueryStrategy):
         self.ord = ord
         self.k_bootstraps = k_bootstraps
 
-    def query(self, X, y, reg, fit_clf=True, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(
+        self,
+        X,
+        y,
+        reg,
+        fit_clf=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -86,7 +98,7 @@ class EMC(SingleAnnotPoolBasedQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, 'reg', SkactivemlRegressor)
+        check_type(reg, "reg", SkactivemlRegressor)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -95,8 +107,9 @@ class EMC(SingleAnnotPoolBasedQueryStrategy):
         k = min(n_samples, self.k_bootstraps)
         learners = [deepcopy(reg) for _ in range(k)]
         sample_indices = np.arange(n_samples)
-        subsets_indices = [rng.choice(sample_indices, size=n_samples*(k-1)//k)
-                           for _ in range(k)]
+        subsets_indices = [
+            rng.choice(sample_indices, size=n_samples * (k - 1) // k) for _ in range(k)
+        ]
 
         for learner, subset_indices in zip(learners, subsets_indices):
             X_for_learner = X[subset_indices]
@@ -114,6 +127,9 @@ class EMC(SingleAnnotPoolBasedQueryStrategy):
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )

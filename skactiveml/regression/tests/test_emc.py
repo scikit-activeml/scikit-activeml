@@ -9,7 +9,6 @@ from skactiveml.regressor._wrapper import SklearnRegressor
 
 
 class TestEMC(unittest.TestCase):
-
     def setUp(self):
         pass
 

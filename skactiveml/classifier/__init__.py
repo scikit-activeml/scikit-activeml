@@ -1,8 +1,13 @@
 """
-The :mod:`skactiveml.classifier` module # TODO.
+The :mod:`skactiveml.classifier` module.
 """
-from ._cmm import CMM
-from ._pwc import PWC
+from ._mixture_model_classifier import MixtureModelClassifier
+from ._parzen_window_classifier import ParzenWindowClassifier
 from ._wrapper import SklearnClassifier
 
-__all__ = ['multi', 'PWC', 'CMM', 'SklearnClassifier']
+__all__ = [
+    "multiannotator",
+    "ParzenWindowClassifier",
+    "MixtureModelClassifier",
+    "SklearnClassifier",
+]

@@ -12,7 +12,7 @@ from sklearn.utils.validation import (
     check_random_state as check_random_state_sklearn,
 )
 
-from ._label import MISSING_LABEL, check_missing_label
+from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
 
 
 def check_scalar(
@@ -89,6 +89,11 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
         check_classes(classes)
         dtype = np.array(classes).dtype
         check_missing_label(missing_label, target_type=dtype, name="classes")
+        n_labeled = is_unlabeled(y=classes, missing_label=missing_label).sum()
+        if n_labeled > 0:
+            raise ValueError(
+                f"`classes={classes}` contains " f"`missing_label={missing_label}.`"
+            )
         if cost_matrix is not None:
             check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
     else:
@@ -139,7 +144,10 @@ def check_class_prior(class_prior, n_classes):
     check_scalar(n_classes, name="n_classes", target_type=int, min_val=1)
     if np.isscalar(class_prior):
         check_scalar(
-            class_prior, name="class_prior", target_type=(int, float), min_val=0
+            class_prior,
+            name="class_prior",
+            target_type=(int, float),
+            min_val=0,
         )
         class_prior = np.array([class_prior] * n_classes)
     else:
@@ -354,16 +362,16 @@ def check_X_y(
     y_converted : object
         The converted and validated y.
 
-    X_cand : object
-        The converted and validated X_cand
-        Only returned if X_cand is not None.
+    candidates : object
+        The converted and validated candidates
+        Only returned if candidates is not None.
 
     sample_weight : np.ndarray
         The converted and validated sample_weight.
 
     sample_weight_cand : np.ndarray
         The converted and validated sample_weight_cand.
-        Only returned if X_cand is not None.
+        Only returned if candidates is not None.
     """
     if allow_nan is None:
         allow_nan = True if missing_label is np.nan else False
@@ -427,7 +435,7 @@ def check_X_y(
         )
         if X is not None and X_cand.shape[1] != X.shape[1]:
             raise ValueError(
-                "The number of features of X_cand does not match"
+                "The number of features of candidates does not match"
                 "the number of features of X"
             )
 
@@ -486,9 +494,9 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         The array that is indexed.
     dim : int or tuple of ints
         The dimensions of the array that are indexed.
-        If `dim` equals `'adaptive'`, `dim` is set to first indices corresponding
-        to the shape of `indices`. E.g., if `indices` is of shape (n_indices,),
-        `dim` is set `0`.
+        If `dim` equals `'adaptive'`, `dim` is set to first indices
+        corresponding to the shape of `indices`. E.g., if `indices` is of
+        shape (n_indices,), `dim` is set `0`.
     unique: bool or `check_unique`
         If `unique` is `True` unique indices are returned. If `unique` is
         `'check_unique'` an exception is raised if the indices are not unique.
@@ -568,7 +576,7 @@ def check_type(obj, name, *target_types):
         The variable name of the object.
     target_types : iterable
         The possible types. If a target_val in `target_types` is not of type
-        `type` `obj` is allowed to equal the target_val.
+        `type` `obj` is allowed to be equal to the target_val.
 
     """
     target_vals = [
@@ -704,7 +712,7 @@ def check_budget_manager(
     default_budget_manager_class,
     default_budget_manager_dict=None,
 ):
-    """Validate if budget manager is a budget_manager class and create a
+    """Validate if budget manager is a budgetmanager class and create a
     copy 'budget_manager_'.
     """
     if default_budget_manager_dict is None:
@@ -716,7 +724,7 @@ def check_budget_manager(
     else:
         if budget is not None and budget != budget_manager.budget:
             warnings.warn(
-                "budget_manager is already given such that the budget "
+                "budgetmanager is already given such that the budget "
                 "is not used. The given budget differs from the "
                 "budget_managers budget."
             )

@@ -31,9 +31,10 @@ def if_delegate_has_alternative_methods(delegate, *alternative_methods):
     if not isinstance(delegate, tuple):
         delegate = (delegate,)
 
-    return lambda fn: \
-        all(_IffHasAttrDescriptor(fn, delegate, attribute_name=method_name)
-            for method_name in alternative_methods)
+    return lambda fn: all(
+        _IffHasAttrDescriptor(fn, delegate, attribute_name=method_name)
+        for method_name in alternative_methods
+    )
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -73,21 +74,23 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         """
 
         if not is_regressor(estimator=self.estimator):
-            raise TypeError("'{}' must be a scikit-learn "
-                            "regressor.".format(self.estimator))
+            raise TypeError(
+                "'{}' must be a scikit-learn " "regressor.".format(self.estimator)
+            )
 
         self.estimator_ = deepcopy(self.estimator)
 
         labeled_indices = is_all_labeled(y)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]
-        estimator_parameters = dict(fit_kwargs) if fit_kwargs is not None \
-            else {}
+        estimator_parameters = dict(fit_kwargs) if fit_kwargs is not None else {}
 
-        if has_fit_parameter(self.estimator_, 'sample_weight') \
-                and sample_weight is not None:
+        if (
+            has_fit_parameter(self.estimator_, "sample_weight")
+            and sample_weight is not None
+        ):
             sample_weight_labeled = sample_weight[labeled_indices]
-            estimator_parameters['sample_weight'] = sample_weight_labeled
+            estimator_parameters["sample_weight"] = sample_weight_labeled
 
         if len(labeled_indices) != 0:
             self.estimator_.fit(X_labeled, y_labeled, **estimator_parameters)
@@ -112,7 +115,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         """
         return self.estimator_.predict(X, **predict_kwargs)
 
-    @if_delegate_has_alternative_methods('est', 'sample_y', 'sample')
+    @if_delegate_has_alternative_methods("est", "sample_y", "sample")
     def sample_y(self, X, n_samples, random_state=None):
         """Assumes a conditional probability estimator. Samples are drawn from
         the posterior or prior conditional probability estimator.
@@ -135,20 +138,19 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             Values of n_samples samples drawn from Gaussian process and
             evaluated at query points.
         """
-        if hasattr(self.estimator_, 'sample_y'):
+        if hasattr(self.estimator_, "sample_y"):
             return self.estimator_.sample_y(X, n_samples, random_state)
         else:
             return self.estimator_.sample(X, n_samples)
 
     def __getattr__(self, item):
-        if 'estimator_' in self.__dict__:
+        if "estimator_" in self.__dict__:
             return getattr(self.estimator_, item)
         else:
             return getattr(self.estimator, item)
 
 
-class SklearnConditionalEstimator(SkactivemlConditionalEstimator,
-                                  SklearnRegressor):
+class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegressor):
     """SklearnConditionalEstimator
 
     Implementation of a wrapper class for scikit-learn conditional estimators
@@ -183,23 +185,26 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator,
         """
         if self.estimator_ is None:
             if not is_regressor(estimator=self.estimator):
-                raise TypeError(f"`{self.estimator}` must be a scikit-learn "
-                                "regressor.")
+                raise TypeError(
+                    f"`{self.estimator}` must be a scikit-learn " "regressor."
+                )
 
             self.estimator_ = deepcopy(self.estimator)
 
-        check_type(self.var, f'{self.var}', float, int, None)
+        check_type(self.var, f"{self.var}", float, int, None)
 
         if self.var is not None:
             return self.var
 
-        if 'return_std' not in inspect.signature(
-                self.estimator.predict).parameters.keys():
-            raise ValueError(f"`{self.estimator}` must have key_word argument"
-                             f"`return_std` for predict.")
+        if (
+            "return_std"
+            not in inspect.signature(self.estimator.predict).parameters.keys()
+        ):
+            raise ValueError(
+                f"`{self.estimator}` must have key_word argument"
+                f"`return_std` for predict."
+            )
         X = check_array(X)
         loc, scale = self.estimator_.predict(X, return_std=True)
 
         return norm(loc=loc, scale=scale)
-
-

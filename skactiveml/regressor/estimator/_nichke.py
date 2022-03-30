@@ -6,10 +6,18 @@ from ...base import SkactivemlConditionalEstimator
 
 
 class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
-    METRICS = list(KERNEL_PARAMS.keys()) + ['precomputed']
+    METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
 
-    def __init__(self, metric='rbf', metric_dict=None, mu_0=0,
-                 kappa_0=0.1, nu_0=2.0, sigma_sq_0=1.0, random_state=None):
+    def __init__(
+        self,
+        metric="rbf",
+        metric_dict=None,
+        mu_0=0,
+        kappa_0=0.1,
+        nu_0=2.0,
+        sigma_sq_0=1.0,
+        random_state=None,
+    ):
         super().__init__(random_state=random_state)
         self.mu_0 = mu_0
         self.kappa_0 = kappa_0
@@ -30,7 +38,7 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
         # maximum likelihood
         N = np.sum(K, axis=1)
         mu_ml = K @ self.y_ / N
-        var_ml = np.sqrt(np.abs((K @ (self.y_ ** 2) / N) - mu_ml ** 2))
+        var_ml = np.sqrt(np.abs((K @ (self.y_**2) / N) - mu_ml**2))
 
         return mu_ml, var_ml, N
 
@@ -45,9 +53,11 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
         mu_N = (kappa_0 * mu_0 + N * mu_ml) / (kappa_0 + N)
         kappa_N = kappa_0 + N
         nu_N = nu_0 + N
-        sigma_sq_N = (nu_0*sigma_sq_0 + var_ml
-                      + (kappa_0 * N * (mu_ml - mu_0) ** 2) / (kappa_0 + N)
-                      )/nu_N
+        sigma_sq_N = (
+            nu_0 * sigma_sq_0
+            + var_ml
+            + (kappa_0 * N * (mu_ml - mu_0) ** 2) / (kappa_0 + N)
+        ) / nu_N
         # posterior to marginal
         df = nu_N
         loc = mu_N

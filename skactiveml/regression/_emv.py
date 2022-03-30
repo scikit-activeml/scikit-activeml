@@ -1,17 +1,15 @@
-import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    SingleAnnotPoolBasedQueryStrategy,
     SkactivemlConditionalEstimator,
+    SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, check_random_state
+from skactiveml.utils import check_type, simple_batch
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y, simple_batch
-from skactiveml.utils._validation import check_callable
+from skactiveml.utils._functions import update_X_y
 
 
-class ExpectedModelVarianceMinimization(SingleAnnotPoolBasedQueryStrategy):
+class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
     """Expected model variance minimization
 
     This class implements the active learning strategy expected model variance
