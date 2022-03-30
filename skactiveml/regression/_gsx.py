@@ -16,11 +16,15 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
     ----------
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
+    metric: str, optional (default=None)
+        Metric used for calculating the distances of points in the feature
+        space must be a valid argument for `sklearn.metrics.pairwise_distances`
+        argument `metric`.
     """
 
-    def __init__(self, x_metric="euclidean", random_state=None):
+    def __init__(self, random_state=None, metric=None):
         super().__init__(random_state=random_state)
-        self.x_metric = x_metric
+        self.x_metric = metric if metric is not None else "euclidean"
 
     def query(self, X, y, candidates=None, batch_size=1, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.

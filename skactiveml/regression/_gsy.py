@@ -122,7 +122,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
         utilities = np.zeros((batch_size, n_samples))
 
         if batch_size_x > 0:
-            gs = GSx(x_metric=self.x_metric, random_state=self.random_state)
+            gs = GSx(metric=self.x_metric, random_state=self.random_state)
 
             query_indices_x, utilities_x = gs.query(
                 X=X[is_labeled],
@@ -135,7 +135,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
             query_indices[0:batch_size_x] = query_indices_x
             utilities[0:batch_size_x, :] = utilities_x
         if batch_size_y > 0:
-            gs = GSx(x_metric=self.y_metric, random_state=self.random_state)
+            gs = GSx(metric=self.y_metric, random_state=self.random_state)
 
             query_indices_y, utilities_y = gs.query(
                 X=y[is_labeled],

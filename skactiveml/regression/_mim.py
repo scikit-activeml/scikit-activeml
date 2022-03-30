@@ -22,7 +22,8 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
     integration_dict: dict,
-        Dictionary for integration arguments, i.e. `integration method` etc..
+        Dictionary for integration arguments, i.e. `integration method` etc.,
+        used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
 
     References

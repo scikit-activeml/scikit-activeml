@@ -20,8 +20,12 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
+    integration_dict: dict, optional (default=None)
+        Dictionary for integration arguments, i.e. `integration method` etc.,
+        used for calculating the expected `y` value for the candidate samples.
+        For details see method `conditional_expect`.
 
     References
     ----------

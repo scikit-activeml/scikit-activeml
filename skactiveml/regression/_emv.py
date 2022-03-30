@@ -1,3 +1,4 @@
+import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
@@ -18,8 +19,12 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
+    integration_dict: dict, optional (default=None)
+        Dictionary for integration arguments, i.e. `integration method` etc.,
+        used for calculating the expected `y` value for the candidate samples.
+        For details see method `conditional_expect`.
 
     References
     ----------
@@ -120,7 +125,7 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
             cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
             _, new_model_var = cond_est_new.predict(X_eval, return_std=True)
 
-            return new_model_var
+            return np.average(new_model_var)
 
         ex_model_variance = conditional_expect(
             X_cand,

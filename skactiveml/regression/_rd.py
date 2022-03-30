@@ -103,7 +103,7 @@ class RD(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(self.qs, "self.qs", SingleAnnotPoolBasedQueryStrategy)
+        check_type(self.qs, "self.qs", SingleAnnotatorPoolQueryStrategy)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_labeled = X[is_labeled(X)]
