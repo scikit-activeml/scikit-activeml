@@ -1,7 +1,10 @@
 import numpy as np
 from sklearn import clone
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlConditionalEstimator
+from skactiveml.base import (
+    SingleAnnotPoolBasedQueryStrategy,
+    SkactivemlConditionalEstimator,
+)
 from skactiveml.utils import check_type, simple_batch, check_random_state
 from skactiveml.utils._approximation import conditional_expect
 from skactiveml.utils._functions import update_X_y
@@ -36,25 +39,37 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotPoolBasedQueryStrategy):
 
     """
 
-    def __init__(self, random_state=None, integration_dict_potential_y_val=None,
-                 integration_dict_cross_entropy=None):
+    def __init__(
+        self,
+        random_state=None,
+        integration_dict_potential_y_val=None,
+        integration_dict_cross_entropy=None,
+    ):
         super().__init__(random_state=random_state)
 
         if integration_dict_potential_y_val is not None:
-            self.integration_dict_potential_y_val = \
-                integration_dict_potential_y_val
+            self.integration_dict_potential_y_val = integration_dict_potential_y_val
         else:
-            self.integration_dict_potential_y_val = \
-                {'integration_method': 'assume_linear'}
+            self.integration_dict_potential_y_val = {"method": "assume_linear"}
 
         if integration_dict_cross_entropy is not None:
             self.integration_dict_cross_entropy = integration_dict_cross_entropy
         else:
-            self.integration_dict_cross_entropy = \
-                {'integration_method': 'monte_carlo', 'n_monte_carlo': 10}
+            self.integration_dict_cross_entropy = {
+                "method": "monte_carlo",
+                "n_monte_carlo": 10,
+            }
 
-    def query(self, X, y, cond_est, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(
+        self,
+        X,
+        y,
+        cond_est,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -109,14 +124,16 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotPoolBasedQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(cond_est, 'cond_est', SkactivemlConditionalEstimator)
+        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if sample_weight is not None and mapping is not None:
-            raise ValueError("If `sample_weight` is not `None`a mapping "
-                             "between candidates and the training dataset must "
-                             "exist.")
+            raise ValueError(
+                "If `sample_weight` is not `None`a mapping "
+                "between candidates and the training dataset must "
+                "exist."
+            )
 
         utilities_cand = self._kullback_leibler_divergence(
             X_cand, X_cand, cond_est, X, y, sample_weight
@@ -128,12 +145,16 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotPoolBasedQueryStrategy):
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
 
-    def _kullback_leibler_divergence(self, X_eval, X_cand, mapping, cond_est,
-                                     X, y, sample_weight=None):
+    def _kullback_leibler_divergence(
+        self, X_eval, X_cand, mapping, cond_est, X, y, sample_weight=None
+    ):
         """Calculates the mutual information gain over the evaluation set if each
         candidate sample where to be labeled.
 
@@ -163,34 +184,35 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotPoolBasedQueryStrategy):
         random_state = check_random_state(random_state=self.random_state)
         prior_entropy = np.sum(cond_est.predict(X_cand, return_entropy=True)[1])
 
-        def cross_entropy_new_old(value, y_pot):
-            if mapping is None:
-                X_new, y_new = update_X_y(X, y, y_pot, idx_update=value)
+        def cross_entropy_new_old(idx, x_cand, y_pot):
+            if mapping is not None:
+                X_new, y_new = update_X_y(X, y, y_pot, idx_update=mapping[idx])
             else:
-                X_new, y_new = update_X_y(X, y, y_pot, X_update=[value])
+                X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
 
             new_cond_est = clone(cond_est).fit(X_new, y_new, sample_weight)
             return cross_entropy(
-                X_eval, new_cond_est, cond_est,
+                X_eval,
+                new_cond_est,
+                cond_est,
                 integration_dict=self.integration_dict_cross_entropy,
-                random_state=random_state
+                random_state=random_state,
             )
 
-        if mapping is None:
-            values = mapping
-        else:
-            values = X_cand
-
-        cross_ent = conditional_expect(values, cross_entropy_new_old,
-                                       cond_est,
-                                       random_state=random_state,
-                                       include_idx=True)
+        cross_ent = conditional_expect(
+            X_cand,
+            cross_entropy_new_old,
+            cond_est,
+            random_state=random_state,
+            include_idx=True,
+        )
 
         return cross_ent - prior_entropy
 
 
-def cross_entropy(X_eval, true_cond_est, other_cond_est,
-                  integration_dict=None, random_state=None):
+def cross_entropy(
+    X_eval, true_cond_est, other_cond_est, integration_dict=None, random_state=None
+):
     """Calculates the cross entropy.
 
     Parameters
@@ -213,16 +235,19 @@ def cross_entropy(X_eval, true_cond_est, other_cond_est,
         The conditional entropy for each candidate sample.
     """
 
-    check_type(integration_dict, 'integration_dict', dict)
-    check_type(true_cond_est, 'true_cond_est', SkactivemlConditionalEstimator)
-    check_type(other_cond_est, 'other_cond_est', SkactivemlConditionalEstimator)
+    check_type(integration_dict, "integration_dict", dict)
+    check_type(true_cond_est, "true_cond_est", SkactivemlConditionalEstimator)
+    check_type(other_cond_est, "other_cond_est", SkactivemlConditionalEstimator)
     random_state = check_random_state(random_state)
 
     dist = other_cond_est.estimate_conditional_distribution(X_eval)
-    cross_ent = - conditional_expect(X_eval, dist.logpdf,
-                                     cond_est=true_cond_est,
-                                     random_state=random_state,
-                                     **integration_dict,
-                                     vector_func=True)
+    cross_ent = -conditional_expect(
+        X_eval,
+        dist.logpdf,
+        cond_est=true_cond_est,
+        random_state=random_state,
+        **integration_dict,
+        vector_func=True
+    )
 
     return cross_ent

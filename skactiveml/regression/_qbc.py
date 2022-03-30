@@ -28,11 +28,23 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
 
     """
 
-    def __init__(self, random_state=None,):
+    def __init__(
+        self,
+        random_state=None,
+    ):
         super().__init__(random_state=random_state)
 
-    def query(self, X, y, ensemble, fit_ensemble=True, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(
+        self,
+        X,
+        y,
+        ensemble,
+        fit_ensemble=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -91,27 +103,28 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        if isinstance(ensemble, SkactivemlRegressor) and \
-                hasattr(ensemble, 'n_estimators'):
+        if isinstance(ensemble, SkactivemlRegressor) and hasattr(
+            ensemble, "n_estimators"
+        ):
 
             if fit_ensemble:
                 ensemble = clone(ensemble).fit(X, y, sample_weight)
 
-            if hasattr(ensemble, 'estimators_'):
+            if hasattr(ensemble, "estimators_"):
                 est_arr = ensemble.estimators_
             else:
                 est_arr = [ensemble] * ensemble.n_estimators
         elif _is_arraylike(ensemble):
             est_arr = deepcopy(ensemble)
             for idx, est in enumerate(est_arr):
-                check_type(est, f'ensemble[{idx}]', SkactivemlRegressor)
+                check_type(est, f"ensemble[{idx}]", SkactivemlRegressor)
                 if fit_ensemble:
                     est_arr[idx] = est.fit(X, y, sample_weight)
         else:
             raise TypeError(
-                f'`ensemble` must either be a `{SkactivemlRegressor} '
-                f'with the attribute `n_esembles` and `estimators_` after '
-                f'fitting or a list of {SkactivemlRegressor} objects.'
+                f"`ensemble` must either be a `{SkactivemlRegressor} "
+                f"with the attribute `n_esembles` and `estimators_` after "
+                f"fitting or a list of {SkactivemlRegressor} objects."
             )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
@@ -125,12 +138,11 @@ class QBC(SingleAnnotPoolBasedQueryStrategy):
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
-        return simple_batch(utilities, self.random_state_,
-                            batch_size=batch_size,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
 
     # TODO: https://aclanthology.org/D08-1112.pdf
-
-
-
-

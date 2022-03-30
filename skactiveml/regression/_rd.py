@@ -3,6 +3,7 @@ from sklearn.cluster import KMeans
 
 from skactiveml.base import SingleAnnotPoolBasedQueryStrategy
 from skactiveml.utils import is_labeled, check_type, simple_batch
+from skactiveml.utils._functions import rank_utilities
 
 
 class RD(SingleAnnotPoolBasedQueryStrategy):
@@ -32,8 +33,17 @@ class RD(SingleAnnotPoolBasedQueryStrategy):
         self.X_ = None
         self.k_means_ = None
 
-    def query(self, X, y, qs_dict=None, fit_ensemble=True, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(
+        self,
+        X,
+        y,
+        qs_dict=None,
+        fit_ensemble=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -93,36 +103,32 @@ class RD(SingleAnnotPoolBasedQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(self.qs, 'self.qs', SingleAnnotPoolBasedQueryStrategy)
+        check_type(self.qs, "self.qs", SingleAnnotPoolBasedQueryStrategy)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_labeled = X[is_labeled(X)]
         n_labeled = len(X_labeled)
 
-        if mapping is None:
-            total_utilities = np.zeros((batch_size, len(X_cand)))
-        else:
-            total_utilities = np.zeros((batch_size, len(X)))
+        total_query_indices = np.zeros(batch_size)
+        total_utilities = np.zeros((batch_size, len(X_cand)))
 
         first_batch_size = np.max(0, np.min(X.shape[1] - n_labeled, batch_size))
         if n_labeled < X.shape[1]:
             X_copy = self.X_
             if X_copy is None or X_copy.shape != X.shape or np.any(X_copy != X):
                 self.X_ = X.copy()
-                self.k_means_ = KMeans(n_clusters=n_labeled + first_batch_size,
-                                       random_state=self.random_state)
+                self.k_means_ = KMeans(
+                    n_clusters=n_labeled + first_batch_size,
+                    random_state=self.random_state,
+                )
                 self.k_means_.fit(X=X, sample_weight=sample_weight)
-            utilities_cand = self._k_means_utility(self.k_means_, X_cand,
-                                                   X_labeled)
-            if mapping is None:
-                utilities = utilities_cand
-            else:
-                utilities = np.full(len(X), np.nan)
-                utilities[mapping] = utilities_cand
+            utilities_cand = self._k_means_utility(self.k_means_, X_cand, X_labeled)
 
             first_idx, first_utilities = simple_batch(
-                utilities, batch_size=first_batch_size, return_utilities=True)
+                utilities_cand, batch_size=first_batch_size, return_utilities=True
+            )
 
+            total_query_indices[:first_batch_size] = first_utilities
             total_utilities[:first_batch_size] = first_utilities
 
             if mapping is None:
@@ -133,24 +139,80 @@ class RD(SingleAnnotPoolBasedQueryStrategy):
                 X_cand = np.delete(X_cand, mapping[first_idx], axis=0)
 
         second_batch_size = batch_size - first_batch_size
+        if second_batch_size == 0:
+            if return_utilities:
+                if mapping is not None:
+                    utilities = np.zeros((batch_size, len(X)))
+                    utilities[mapping] = total_utilities
+                    total_utilities = utilities
+                return total_query_indices, total_utilities
+            else:
+                return total_query_indices
+
         if self.qs is None:
             k_means = KMeans(n_clusters=second_batch_size + n_labeled)
             k_means.fit(X=X, sample_weight=sample_weight)
             utilities_cand = self._k_means_utility(k_means, X_cand, X_labeled)
         else:
-            k_means = KMeans(n_clusters=batch_size + n_labeled)
+            # cluster the candidates
+            n_cluster = batch_size + n_labeled
+            k_means = KMeans(n_clusters=n_cluster)
             k_means.fit(X=X, sample_weight=sample_weight)
+            counter = np.zeros((len(X), n_cluster))
+            counter[k_means.predict(X)] = 1
+            counter = np.sum(counter, axis=0)
+            X_cand_prediction = k_means.predict(X_cand)
+            covered = k_means.predict(X_labeled)
+            uncovered_clusters = ~np.isin(np.arange(n_cluster), covered)
 
+            count_utilities_cand = counter[X_cand_prediction]
+            uncovered_utilities_cand = uncovered_clusters[X_cand_prediction]
+            cluster_utilities = rank_utilities(uncovered_clusters, counter)
+            sorted_clusters = np.argsort(cluster_utilities)
+            n_covered = 0
+            qs_utilities_cand = np.zeros(len(X_cand))
 
+            # decide for each cluster where to query
+            for cluster in sorted_clusters:
+                is_cluster_cand = X_cand_prediction == cluster
+                if n_covered >= second_batch_size:
+                    break
+                if mapping is None:
+                    _, utilities = self.qs.query(
+                        X,
+                        y,
+                        candidates=X_cand[is_cluster_cand],
+                        batch_size=1,
+                        **qs_dict,
+                    )
+                    qs_utilities_cand[is_cluster_cand] = utilities
+                else:
+                    idx_cluster = mapping[is_cluster_cand]
+                    _, utilities = self.qs.query(
+                        X,
+                        y,
+                        candidates=idx_cluster,
+                        batch_size=1,
+                        **qs_dict,
+                    )
+                    qs_utilities_cand[is_cluster_cand] = utilities[idx_cluster]
+                n_covered += np.sum(is_cluster_cand)
 
+            utilities_cand = rank_utilities(
+                uncovered_utilities_cand, count_utilities_cand, qs_utilities_cand
+            )
 
-        if mapping is None:
-            utilities = utilities_cand
+        second_idx, second_utilities = simple_batch(
+            utilities_cand, batch_size=first_batch_size, return_utilities=True
+        )
+
+        total_query_indices[:first_batch_size] = second_idx
+        total_utilities[:first_batch_size] = second_utilities
+
+        if return_utilities:
+            return total_query_indices, total_utilities
         else:
-            utilities = np.full(len(X), np.nan)
-            utilities[mapping] = utilities_cand
-
-        return simple_batch(utilities, return_utilities=return_utilities)
+            return total_query_indices
 
     def _k_means_utility(self, k_means, X_cand, X_labeled):
         clusters = k_means.predict(X_cand)

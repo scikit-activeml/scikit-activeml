@@ -19,15 +19,25 @@ class GSy(SingleAnnotPoolBasedQueryStrategy):
         The minimum number of samples the estimator requires.
     """
 
-    def __init__(self, x_metric='euclidean', y_metric='euclidean', k_0=1,
-                 random_state=None):
+    def __init__(
+        self, x_metric="euclidean", y_metric="euclidean", k_0=1, random_state=None
+    ):
         super().__init__(random_state=random_state)
         self.x_metric = x_metric
         self.y_metric = y_metric
         self.k_0 = k_0
 
-    def query(self, X, y, reg, fit_clf=True, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False):
+    def query(
+        self,
+        X,
+        y,
+        reg,
+        fit_clf=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -86,7 +96,7 @@ class GSy(SingleAnnotPoolBasedQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, 'reg', SkactivemlRegressor)
+        check_type(reg, "reg", SkactivemlRegressor)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -114,21 +124,26 @@ class GSy(SingleAnnotPoolBasedQueryStrategy):
         if batch_size_x > 0:
             gs = GSx(x_metric=self.x_metric, random_state=self.random_state)
 
-            query_indices_x, utilities_x = gs.query(X=X[is_labeled],
-                                                    y=y[is_labeled],
-                                                    candidates=X_cand,
-                                                    batch_size=batch_size_x,
-                                                    return_utilities=True)
+            query_indices_x, utilities_x = gs.query(
+                X=X[is_labeled],
+                y=y[is_labeled],
+                candidates=X_cand,
+                batch_size=batch_size_x,
+                return_utilities=True,
+            )
+
             query_indices[0:batch_size_x] = query_indices_x
             utilities[0:batch_size_x, :] = utilities_x
         if batch_size_y > 0:
             gs = GSx(x_metric=self.y_metric, random_state=self.random_state)
 
-            query_indices_y, utilities_y = gs.query(X=y[is_labeled],
-                                                    y=y[is_labeled],
-                                                    candidates=y_pred,
-                                                    batch_size=batch_size_y,
-                                                    return_utilities=True)
+            query_indices_y, utilities_y = gs.query(
+                X=y[is_labeled],
+                y=y[is_labeled],
+                candidates=y_pred,
+                batch_size=batch_size_y,
+                return_utilities=True,
+            )
             query_indices[batch_size_x:batch_size] = query_indices_y
             utilities[batch_size_x:batch_size, :] = utilities_y
 

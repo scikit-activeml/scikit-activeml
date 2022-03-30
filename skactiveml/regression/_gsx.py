@@ -16,7 +16,7 @@ class GSx(SingleAnnotPoolBasedQueryStrategy):
         Random state for candidate selection.
     """
 
-    def __init__(self, x_metric='euclidean', random_state=None):
+    def __init__(self, x_metric="euclidean", random_state=None):
         super().__init__(random_state=random_state)
         self.x_metric = x_metric
 
@@ -96,17 +96,18 @@ class GSx(SingleAnnotPoolBasedQueryStrategy):
 
         for i in range(batch_size):
             if selected_indices.shape[0] == 0:
-                dist = d[np.ix_(candidate_indices, candidate_indices)]
+                dist = d[candidate_indices][candidate_indices]
                 util = -np.sum(dist, axis=1)
             else:
-                dist = d[np.ix_(candidate_indices, selected_indices)]
+                dist = d[candidate_indices][selected_indices]
                 util = np.min(dist, axis=1)
             utilities[i, candidate_indices] = util
 
             idx = rand_argmax(util, random_state=self.random_state)
             query_indices[i] = candidate_indices[idx]
-            selected_indices = np.append(selected_indices,
-                                         candidate_indices[idx], axis=0)
+            selected_indices = np.append(
+                selected_indices, candidate_indices[idx], axis=0
+            )
             candidate_indices = np.delete(candidate_indices, idx, axis=0)
 
         if return_utilities:

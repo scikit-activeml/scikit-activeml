@@ -5,31 +5,28 @@ from skactiveml.base import (
     SingleAnnotPoolBasedQueryStrategy,
     SkactivemlConditionalEstimator,
 )
-from skactiveml.utils import check_type, simple_batch, check_random_state
+from skactiveml.utils import check_type, check_random_state
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y
+from skactiveml.utils._functions import update_X_y, simple_batch
+from skactiveml.utils._validation import check_callable
 
 
-class MutualInformationGainMaximization(SingleAnnotPoolBasedQueryStrategy):
-    """Regression based Mutual Information Gain Maximization
+class ExpectedModelVarianceMinimization(SingleAnnotPoolBasedQueryStrategy):
+    """Expected model variance minimization
 
-    This class implements a mutual information based selection strategies, where
-    it is assumed that the prediction probability for different samples
-    are independent.
+    This class implements the active learning strategy expected model variance
+    minimization, which tries to select the sample that minimizes the expected
+    model variance.
 
     Parameters
     ----------
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
-    integration_dict: dict,
-        Dictionary for integration arguments, i.e. `integration method` etc..
-        For details see method `conditional_expect`.
 
     References
     ----------
-    [1] Elreedy, Dina and F Atiya, Amir and I Shaheen, Samir. A novel active
-        learning regression framework for balancing the exploration-exploitation
-        trade-off, page 651 and subsequently, 2019.
+    [1] Cohn, David A and Ghahramani, Zoubin and Jordan, Michael I. Active
+        learning with statistical models, pages 129--145, 1996.
 
     """
 
@@ -38,7 +35,7 @@ class MutualInformationGainMaximization(SingleAnnotPoolBasedQueryStrategy):
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
-            self.integration_dict = {"method": "assume_linear"}
+            self.integration_dict = {"integration_method": "assume_linear"}
 
     def query(
         self,
@@ -49,7 +46,7 @@ class MutualInformationGainMaximization(SingleAnnotPoolBasedQueryStrategy):
         candidates=None,
         batch_size=1,
         return_utilities=False,
-        fit_cond_est=True,
+        fit_cond_est=None,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -62,10 +59,9 @@ class MutualInformationGainMaximization(SingleAnnotPoolBasedQueryStrategy):
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
         cond_est: SkactivemlConditionalEstimator
-            Estimates the entropy.
-        fit_cond_est : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
+            Estimates the output and the conditional distribution.
+        fit_cond_est: bool
+            Whether the conditional estimator is fitted.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -112,84 +108,37 @@ class MutualInformationGainMaximization(SingleAnnotPoolBasedQueryStrategy):
         check_type(self.integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_eval = X
 
         if fit_cond_est:
             cond_est = clone(cond_est).fit(X, y, sample_weight)
 
-        if sample_weight is not None and mapping is not None:
-            raise ValueError(
-                "If `sample_weight` is not `None`, a mapping "
-                "between candidates and the training dataset must "
-                "exist."
-            )
-
-        utilities_cand = self._mutual_information(
-            X_cand, X_cand, mapping, cond_est, X, y, sample_weight
-        )
-
-        if mapping is None:
-            utilities = utilities_cand
-        else:
-            utilities = np.full(len(X), np.nan)
-            utilities[mapping] = utilities_cand
-
-        return simple_batch(
-            utilities,
-            self.random_state_,
-            batch_size=batch_size,
-            return_utilities=return_utilities,
-        )
-
-    def _mutual_information(
-        self, X_eval, X_cand, mapping, cond_est, X, y, sample_weight=None
-    ):
-        """Calculates the mutual information gain over the evaluation set if each
-        candidate where to be labeled.
-
-        Parameters
-        ----------
-        X_eval : array-like of shape (n_samples, n_features)
-            The samples where the information gain should be evaluated.
-        cond_est: SkactivemlConditionalEstimator
-            Estimates the entropy, predicts values.
-        X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
-            Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
-            Weights of training samples in `X`.
-
-        Returns
-        -------
-        query_indices : numpy.ndarray of shape (n_candidate_samples)
-            The expected information gain for each candidate sample.
-        """
-
-        prior_entropy = np.sum(cond_est.predict(X_cand, return_entropy=True)[1])
-
-        def new_entropy(idx, x_cand, y_pot):
+        def new_model_variance(x_idx, x_cand, y_pot):
             if mapping is not None:
-                X_new, y_new = update_X_y(X, y, y_pot, idx_update=mapping[idx])
+                X_new, y_new = update_X_y(X, y, y_pot, idx_update=x_idx)
             else:
                 X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
 
-            new_cond_est = clone(cond_est).fit(X_new, y_new, sample_weight)
-            _, entropy_cand = new_cond_est.predict(X_eval, return_entropy=True)
-            potentials_post_entropy = np.sum(entropy_cand)
-            return potentials_post_entropy
+            cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
+            _, new_model_var = cond_est_new.predict(X_eval, return_std=True)
 
-        cond_entropy = conditional_expect(
+            return new_model_var
+
+        ex_model_variance = conditional_expect(
             X_cand,
-            new_entropy,
+            new_model_variance,
             cond_est,
             random_state=self.random_state_,
-            include_idx=True,
             include_x=True,
             **self.integration_dict
         )
 
-        mi_gain = cond_entropy - prior_entropy
+        # minimize the expected model variance by maximizing the negative
+        # expected model variance
 
-        return mi_gain
+        return simple_batch(
+            -ex_model_variance,
+            batch_size=batch_size,
+            random_state=self.random_state_,
+            return_utilities=return_utilities,
+        )

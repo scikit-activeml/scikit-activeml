@@ -1,7 +1,10 @@
 import numpy as np
 from sklearn import clone
 
-from skactiveml.base import SingleAnnotPoolBasedQueryStrategy, SkactivemlConditionalEstimator
+from skactiveml.base import (
+    SingleAnnotPoolBasedQueryStrategy,
+    SkactivemlConditionalEstimator,
+)
 from skactiveml.utils import check_type, check_random_state
 from skactiveml.utils._approximation import conditional_expect
 from skactiveml.utils._functions import update_X_y, simple_batch
@@ -31,14 +34,23 @@ class ExpectedModelOutputChange(SingleAnnotPoolBasedQueryStrategy):
 
     def __init__(self, random_state=None, integration_dict=None, loss=None):
         super().__init__(random_state=random_state)
-        self.loss = loss if loss is not None else lambda x, y: np.sum((x-y)**2)
+        self.loss = loss if loss is not None else lambda x, y: np.sum((x - y) ** 2)
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
-            self.integration_dict = {'integration_method': 'assume_linear'}
+            self.integration_dict = {"integration_method": "assume_linear"}
 
-    def query(self, X, y, cond_est, sample_weight=None,
-              candidates=None, batch_size=1, return_utilities=False, fit_cond_est=None):
+    def query(
+        self,
+        X,
+        y,
+        cond_est,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+        fit_cond_est=None,
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -95,16 +107,14 @@ class ExpectedModelOutputChange(SingleAnnotPoolBasedQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(cond_est, 'cond_est', SkactivemlConditionalEstimator)
-        check_type(self.integration_dict, 'self.integration_dict', dict)
-        random_state = check_random_state(random_state=self.random_state)
+        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
+        check_type(self.integration_dict, "self.integration_dict", dict)
+
+        loss = self.loss
+        check_callable(loss, "self.loss", n_free_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_eval = X_cand
-
-        loss = self.loss
-
-        check_callable(loss, 'self.loss', n_free_parameters=2)
 
         if fit_cond_est:
             cond_est = clone(cond_est).fit(X, y, sample_weight)
@@ -112,18 +122,28 @@ class ExpectedModelOutputChange(SingleAnnotPoolBasedQueryStrategy):
         y_pred = cond_est.predict(X_eval)
 
         def model_output_change(x_idx, x_cand, y_pot):
-            X_new, y_new = update_X_y(X, y, y_pot, idx_update=x_idx,
-                                      X_update=x_cand)
+            if mapping is not None:
+                X_new, y_new = update_X_y(X, y, y_pot, idx_update=x_idx)
+            else:
+                X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
+
             cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
             y_pred_new = cond_est_new.predict(X_eval)
 
             return loss(y_pred, y_pred_new)
 
-        change = conditional_expect(X_cand, model_output_change, cond_est,
-                                    random_state=random_state,
-                                    include_x=True,
-                                    **self.integration_dict)
+        change = conditional_expect(
+            X_cand,
+            model_output_change,
+            cond_est,
+            random_state=self.random_state_,
+            include_x=True,
+            **self.integration_dict
+        )
 
-        return simple_batch(change, batch_size=batch_size,
-                            random_state=self.random_state_,
-                            return_utilities=return_utilities)
+        return simple_batch(
+            change,
+            batch_size=batch_size,
+            random_state=self.random_state_,
+            return_utilities=return_utilities,
+        )
