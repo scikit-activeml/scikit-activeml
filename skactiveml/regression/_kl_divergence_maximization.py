@@ -164,6 +164,8 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             The samples where the information gain should be evaluated.
         X_cand : array-like of shape (n_candidate_samples, n_features)
             The candidate samples that determine the information gain.
+        mapping : array-like of shape (n_candidate_samples,) or None
+            A mapping between `X_cand` and `X` if it exists.
         cond_est: SkactivemlConditionalEstimator
             Estimates the entropy, predicts values.
         X : array-like of shape (n_samples, n_features)
@@ -205,6 +207,7 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             cond_est,
             random_state=random_state,
             include_idx=True,
+            include_x=True,
         )
 
         return cross_ent - prior_entropy

@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.regression._emc import EMC
+from skactiveml.regression._expected_model_change import EMC
 from skactiveml.regression._qbc import QBC
 from skactiveml.regressor._wrapper import SklearnRegressor
 

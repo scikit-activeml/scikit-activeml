@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
-from skactiveml.regression._gsx import GSx
+from skactiveml.regression._greedy_sampling_x import GSx
 from skactiveml.utils import check_type
 
 
