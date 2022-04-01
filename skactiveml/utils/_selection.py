@@ -1,10 +1,13 @@
 """Utilities for selection."""
+import operator
 import warnings
+from functools import reduce
 
 import numpy as np
+from scipy.stats import rankdata
 from sklearn.utils import check_array
 
-from ._validation import check_random_state, check_scalar
+from ._validation import check_random_state, check_scalar, check_type
 
 
 def rand_argmin(a, random_state=None, **argmin_kwargs):
@@ -34,7 +37,7 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
     index_array = np.argmax(
         random_state.random(a.shape)
         * (a == np.nanmin(a, **argmin_kwargs, keepdims=True)),
-        **argmin_kwargs
+        **argmin_kwargs,
     )
     if np.isscalar(index_array) and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
@@ -68,7 +71,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
     index_array = np.argmax(
         random_state.random(a.shape)
         * (a == np.nanmax(a, **argmax_kwargs, keepdims=True)),
-        **argmax_kwargs
+        **argmax_kwargs,
     )
     if np.isscalar(index_array) and a.ndim > 1:
         index_array = np.unravel_index(index_array, a.shape)
@@ -97,7 +100,7 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
     Returns
     -------
     best_indices : np.ndarray, shape (batch_size) if ndim == 1
-    (batch_size, ndim) else
+        (batch_size, ndim) else
         The index of the batch instance.
     batch_utilities : np.ndarray,  shape (batch_size, len(utilities))
         The utilities of the batch (if return_utilities=True).
@@ -138,3 +141,77 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
         return best_indices, batch_utilities
     else:
         return best_indices
+
+
+def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
+    """Combine different utilities hierarchically to one utility assignment.
+
+    Parameters
+    ----------
+    iter_ranking : iterable of array-like
+        The different utilities. They must share a common shape in the sense
+        that the have the same number of dimensions and are broadcastable by
+        numpy. If the common shape has more than two dimensions.
+    rank_method : string, optional (default = None)
+        The method by which the utilities are ranked. See `scipy.rankdata`s
+        argument `method` for details.
+    rank_per_batch: bool, optional (default = False)
+        Whether the last index is the batch size and is not used for ranking
+
+    Returns
+    -------
+    combined_utilities : np.ndarray
+        The combined utilities.
+    """
+
+    if rank_method is None:
+        rank_method = "min"
+    check_type(rank_method, "rank_method", str)
+    check_type(rank_per_batch, "rank_per_batch", bool)
+
+    iter_ranking = list(iter_ranking)
+    for idx, ranking in enumerate(iter_ranking):
+        iter_ranking[idx] = check_array(
+            ranking, allow_nd=True, ensure_2d=False, force_all_finite=False
+        ).astype(float)
+        if idx != 0 and iter_ranking[idx - 1].ndim != ranking.ndim:
+            raise ValueError(
+                f"The number of dimensions of the `ranking` in "
+                f"`iter_ranking` must be the same, but "
+                f"`iter_ranking[{idx}].ndim == {ranking.ndim}"
+                f" and `iter_ranking[{idx-1}].ndim == "
+                f"{iter_ranking[idx - 1].ndim}`."
+            )
+    np.broadcast_shapes(*(u.shape for u in iter_ranking))
+
+    iter_ranking = [i for i in reversed(iter_ranking)]
+    combined_ranking = iter_ranking[0]
+
+    for idx in range(1, len(iter_ranking)):
+        next_utilities = iter_ranking[idx]
+        nu_shape = next_utilities.shape
+        if rank_per_batch:
+            rank_shape = (nu_shape[0], max(reduce(operator.mul, nu_shape[1:], 1), 1))
+            rank_dict = {"method": rank_method, "axis": 1}
+        else:
+            rank_shape = reduce(operator.mul, nu_shape, 1)
+            rank_dict = {"method": rank_method}
+
+        rank_next_utilities = next_utilities.reshape(rank_shape)
+        # exchange nan values to make `rankdata` work.
+        nan_values = np.isnan(rank_next_utilities)
+        rank_next_utilities[nan_values] = -np.inf
+        rank_next_utilities = rankdata(rank_next_utilities, **rank_dict).astype(float)
+        rank_next_utilities[nan_values] = np.nan
+        next_utilities = rank_next_utilities.reshape(nu_shape)
+
+        if combined_ranking.min() != combined_ranking.max():
+            combined_ranking = (
+                1
+                / (combined_ranking.max() - combined_ranking.min() + 1)
+                * (combined_ranking - combined_ranking.min())
+            )
+
+        combined_ranking = combined_ranking + next_utilities
+
+    return combined_ranking

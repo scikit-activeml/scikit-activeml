@@ -754,9 +754,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         # as there are no instances left for estimating
 
         le = id_clf._le
-        y_eval = id_clf.y[idx_eval]
+        y_eval = id_clf.y_true[idx_eval]
         idx_labeled = idx_train[is_labeled(y_eval)]
-        y_labeled = id_clf.y[idx_labeled]
+        y_labeled = id_clf.y_true[idx_labeled]
         idx_unlabeled = idx_train[is_unlabeled(y_eval)]
 
         if self.candidate_to_labeled:
@@ -792,9 +792,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         # TODO: maybe use function for code below to reduce redundancies
         if self.subtract_current:
             le = id_clf._le
-            y_eval = id_clf.y[idx_eval]
+            y_eval = id_clf.y_true[idx_eval]
             idx_labeled = idx_train[is_labeled(y_eval)]
-            y_labeled = id_clf.y[idx_labeled]
+            y_labeled = id_clf.y_true[idx_labeled]
             idx_unlabeled = idx_train[is_unlabeled(y_eval)]
 
             y_labeled_c_id = le.transform(y_labeled)

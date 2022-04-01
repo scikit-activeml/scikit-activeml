@@ -123,9 +123,9 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
                 X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
 
             cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
-            _, new_model_var = cond_est_new.predict(X_eval, return_std=True)
+            _, new_model_std = cond_est_new.predict(X_eval, return_std=True)
 
-            return np.average(new_model_var)
+            return np.average(new_model_std**2)
 
         ex_model_variance = conditional_expect(
             X_cand,

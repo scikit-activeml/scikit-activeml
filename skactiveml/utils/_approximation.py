@@ -96,13 +96,13 @@ def conditional_expect(
         elif method == "assume_linear":
             y_val = cond_est.predict(X).reshape(-1, 1)
             expectation = func(*arg_filter(np.arange(len(X)), X, y_val))
-        elif method == "scipy":
+        elif method == "scipy":  # can be optimized
             for idx, x in enumerate(X):
                 cond_dist = cond_est.estimate_conditional_distribution([x])
                 expectation[idx] = cond_dist.expect(
                     lambda y: func(
-                        *arg_filter(np.array([idx]), np.array([x]), np.array([[y]]))
-                    ),
+                        *arg_filter(np.arange(len(X)), X, np.full((len(X), 1), y))
+                    )[idx],
                     **scipy_dict,
                 )
 

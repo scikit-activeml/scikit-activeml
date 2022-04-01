@@ -186,7 +186,7 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         random_state = check_random_state(random_state=self.random_state)
         prior_entropy = np.sum(cond_est.predict(X_cand, return_entropy=True)[1])
 
-        def cross_entropy_new_old(idx, x_cand, y_pot):
+        def new_cross_entropy(idx, x_cand, y_pot):
             if mapping is not None:
                 X_new, y_new = update_X_y(X, y, y_pot, idx_update=mapping[idx])
             else:
@@ -203,7 +203,7 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
         cross_ent = conditional_expect(
             X_cand,
-            cross_entropy_new_old,
+            new_cross_entropy,
             cond_est,
             random_state=random_state,
             include_idx=True,
@@ -223,10 +223,10 @@ def cross_entropy(
     X_eval : array-like of shape (n_samples, n_features)
         The samples where the cross entropy should be evaluated.
     true_cond_est: SkactivemlConditionalEstimator
-        True distribution for the cross entropy.
+        True distribution of the cross entropy.
     other_cond_est: SkactivemlConditionalEstimator
-        Distribution to evaluate by the cross entropy
-    integration_dict: dict,
+        Evaluated distribution of the cross entropy.
+    integration_dict: dict, optional default = None
         Dictionary for integration arguments, i.e. `integration method` etc..
         For details see method `conditional_expect`.
     random_state: numeric | np.random.RandomState, optional
@@ -234,9 +234,12 @@ def cross_entropy(
 
     Returns
     -------
-    query_indices : numpy.ndarray of shape (n_candidate_samples)
-        The conditional entropy for each candidate sample.
+    cross_ent : numpy.ndarray of shape (n_samples)
+        The cross entropy.
     """
+
+    if integration_dict is None:
+        integration_dict = {}
 
     check_type(integration_dict, "integration_dict", dict)
     check_type(true_cond_est, "true_cond_est", SkactivemlConditionalEstimator)

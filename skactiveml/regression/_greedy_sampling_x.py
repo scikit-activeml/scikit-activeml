@@ -4,7 +4,7 @@ from sklearn.metrics import pairwise_distances
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import rand_argmax
+from skactiveml.utils import rand_argmax, is_labeled, labeled_indices
 
 
 class GSx(SingleAnnotatorPoolQueryStrategy):
@@ -78,34 +78,30 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, allow_only_unlabeled=True
+        )
 
-        query_indices = np.zeros(batch_size)
-        utilities = np.full((batch_size, X_cand.shape[0]), np.nan)
+        query_indices = np.zeros(batch_size, dtype=int)
 
-        n_features = X_cand.shape[1]
-        n_candidates = X_cand.shape[0]
-        if X is not None and y is not None:
-            if y.ndim == 1:
-                y = y.reshape(-1, 1)
-            is_labeled = np.all(~np.isnan(y), axis=1)
-            X = X[is_labeled]
-        elif X is None:
-            X = np.zeros((0, n_features), dtype=float)
-        n_selected = X.shape[0]
+        if mapping is None:
+            X_all = np.append(X, X_cand, axis=0)
+            selected_indices = labeled_indices(y)
+            candidate_indices = len(X) + np.arange(0, len(X_cand), dtype=int)
+        else:
+            X_all = X
+            selected_indices = labeled_indices(y)
+            candidate_indices = mapping
 
-        candidate_indices = np.arange(n_candidates)
-        selected_indices = np.arange(n_candidates, n_candidates + n_selected)
-
-        X_all = np.append(X_cand, X, axis=0)
-        d = pairwise_distances(X_all, metric=self.x_metric)
+        utilities = np.full((batch_size, len(X_all)), np.nan)
+        distances = pairwise_distances(X_all, metric=self.x_metric)
 
         for i in range(batch_size):
             if selected_indices.shape[0] == 0:
-                dist = d[candidate_indices][candidate_indices]
+                dist = distances[candidate_indices][:, candidate_indices]
                 util = -np.sum(dist, axis=1)
             else:
-                dist = d[candidate_indices][selected_indices]
+                dist = distances[candidate_indices][:, selected_indices]
                 util = np.min(dist, axis=1)
             utilities[i, candidate_indices] = util
 
@@ -115,6 +111,10 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
                 selected_indices, candidate_indices[idx], axis=0
             )
             candidate_indices = np.delete(candidate_indices, idx, axis=0)
+
+        if mapping is None:
+            query_indices = query_indices - len(X)
+            utilities = utilities[:, len(X) :]
 
         if return_utilities:
             return query_indices, utilities

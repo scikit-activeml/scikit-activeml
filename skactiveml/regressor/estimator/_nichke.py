@@ -1,13 +1,13 @@
 import numpy as np
 from scipy.stats import t
-from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
+from sklearn.metrics.pairwise import pairwise_kernels
+from sklearn.utils import check_array
 
 from ...base import SkactivemlConditionalEstimator
+from ...utils import is_labeled
 
 
 class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
-    METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
-
     def __init__(
         self,
         metric="rbf",
@@ -27,10 +27,34 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
         self.metric_dict = {} if metric_dict is None else metric_dict
 
     def fit(self, X, y, sample_weight=None):
-        self.X_ = X.copy()[~np.isnan(y)]
-        self.y_ = y.copy()[~np.isnan(y)]
-
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+        is_lbld = is_labeled(y)
+        X_prior = np.zeros((1, len(X.T)))
+        self.X_ = np.append(X_prior, X[is_lbld], axis=0)
+        self.y_ = np.append([self.mu_0], y[is_lbld], axis=0)
         return self
+
+    def estimate_conditional_distribution(self, X):
+        check_array(X)
+
+        K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict)
+        K[:, 0] = self.kappa_0
+        N = np.sum(K[:, 1:], axis=1)
+        kappa_L = self.kappa_0 + N
+        nu_L = self.nu_0 + N
+        mu_L = 1 / kappa_L * (K @ self.y_)
+        sigma_sq_L = (
+            1
+            / nu_L
+            * (
+                np.sum((self.y_[np.newaxis, :] - mu_L[:, np.newaxis]) ** 2 * K, axis=1)
+                + self.nu_0 * self.sigma_sq_0
+            )
+        )
+        df = nu_L
+        loc = mu_L
+        scale = np.sqrt((1 + kappa_L) / kappa_L * sigma_sq_L)
+        return t(df=df, loc=loc, scale=scale)
 
     def _estimate_likelihood_mu_var_N(self, X):
         K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict)
@@ -42,7 +66,7 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
 
         return mu_ml, var_ml, N
 
-    def estimate_conditional_distribution(self, X):
+    def _estimate_conditional_distribution(self, X):
         mu_ml, var_ml, N = self._estimate_likelihood_mu_var_N(X)
 
         # normal inv chi squared
@@ -62,5 +86,4 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
         df = nu_N
         loc = mu_N
         scale = np.sqrt(((kappa_N + 1) / kappa_N) * sigma_sq_N)
-        print(scale)
         return t(df=df, loc=loc, scale=scale)

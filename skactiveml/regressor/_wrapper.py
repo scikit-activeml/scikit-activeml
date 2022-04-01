@@ -1,4 +1,5 @@
 import inspect
+import numpy as np
 from copy import deepcopy
 
 from scipy.stats import norm
@@ -8,7 +9,8 @@ from sklearn.utils.validation import has_fit_parameter, check_array
 
 from skactiveml.base import SkactivemlRegressor, SkactivemlConditionalEstimator
 from skactiveml.utils import check_type
-from skactiveml.utils._label import is_all_labeled
+from skactiveml.utils._label import is_labeled
+from skactiveml.utils._validation import check_callable
 
 
 def if_delegate_has_alternative_methods(delegate, *alternative_methods):
@@ -80,7 +82,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         self.estimator_ = deepcopy(self.estimator)
 
-        labeled_indices = is_all_labeled(y)
+        labeled_indices = is_labeled(y)
         X_labeled = X[labeled_indices]
         y_labeled = y[labeled_indices]
         estimator_parameters = dict(fit_kwargs) if fit_kwargs is not None else {}
@@ -92,7 +94,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             sample_weight_labeled = sample_weight[labeled_indices]
             estimator_parameters["sample_weight"] = sample_weight_labeled
 
-        if len(labeled_indices) != 0:
+        if np.sum(labeled_indices) != 0:
             self.estimator_.fit(X_labeled, y_labeled, **estimator_parameters)
 
         return self
@@ -163,11 +165,9 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
 
     """
 
-    def __init__(self, estimator, random_state=None, var=None):
+    def __init__(self, estimator, random_state=None, std=1):
         super(SklearnConditionalEstimator, self).__init__(estimator, random_state)
-        # if var is None: estimator.std else use as variance estimate function
-        self.var = var
-        # prior mean 0, prior variance 1
+        self.std = std
 
     def estimate_conditional_distribution(self, X):
         """Returns the estimated target distribution conditioned on the test
@@ -183,7 +183,7 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
         dist : scipy.stats.rv_continuous
 
         """
-        if self.estimator_ is None:
+        if not hasattr(self, "estimator_"):
             if not is_regressor(estimator=self.estimator):
                 raise TypeError(
                     f"`{self.estimator}` must be a scikit-learn " "regressor."
@@ -191,10 +191,11 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
 
             self.estimator_ = deepcopy(self.estimator)
 
-        check_type(self.var, f"{self.var}", float, int, None)
+        check_type(self.std, f"{self.std}", float, int, None)
 
-        if self.var is not None:
-            return self.var
+        if callable(self.std):
+            check_callable(self.std, "self.var")
+            return self.estimator_.predict(X), self.std(X)
 
         if (
             "return_std"
@@ -206,5 +207,6 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
             )
         X = check_array(X)
         loc, scale = self.estimator_.predict(X, return_std=True)
-
+        if self.std is not None:
+            scale = np.sqrt(self.std**2 + scale)
         return norm(loc=loc, scale=scale)

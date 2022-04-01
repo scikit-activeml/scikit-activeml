@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.utils import is_labeled, check_type, simple_batch
-from skactiveml.utils._functions import rank_utilities
+from skactiveml.utils._functions import combine_ranking
 
 
 class RD(SingleAnnotatorPoolQueryStrategy):
@@ -158,19 +158,15 @@ class RD(SingleAnnotatorPoolQueryStrategy):
             n_cluster = batch_size + n_labeled
             k_means = KMeans(n_clusters=n_cluster)
             k_means.fit(X=X, sample_weight=sample_weight)
-            counter = np.zeros((len(X), n_cluster))
-            counter[k_means.predict(X)] = 1
-            counter = np.sum(counter, axis=0)
+            counts = np.bincount(k_means.predict(X))
             X_cand_prediction = k_means.predict(X_cand)
             covered = k_means.predict(X_labeled)
             uncovered_clusters = ~np.isin(np.arange(n_cluster), covered)
 
-            count_utilities_cand = counter[X_cand_prediction]
-            uncovered_utilities_cand = uncovered_clusters[X_cand_prediction]
-            cluster_utilities = rank_utilities(uncovered_clusters, counter)
-            sorted_clusters = np.argsort(cluster_utilities)
+            cluster_ranking = combine_ranking(uncovered_clusters, counts)
+            sorted_clusters = np.argsort(cluster_ranking)
             n_covered = 0
-            qs_utilities_cand = np.zeros(len(X_cand))
+            qs_utilities = np.zeros(len(X_cand))
 
             # decide for each cluster where to query
             for cluster in sorted_clusters:
@@ -178,28 +174,28 @@ class RD(SingleAnnotatorPoolQueryStrategy):
                 if n_covered >= second_batch_size:
                     break
                 if mapping is None:
-                    _, utilities = self.qs.query(
-                        X,
-                        y,
-                        candidates=X_cand[is_cluster_cand],
-                        batch_size=1,
-                        **qs_dict,
-                    )
-                    qs_utilities_cand[is_cluster_cand] = utilities
+                    cluster_candidates = X_cand[is_cluster_cand]
+                else:
+                    cluster_candidates = mapping[is_cluster_cand]
+                _, utilities = self.qs.query(
+                    X,
+                    y,
+                    candidates=cluster_candidates,
+                    batch_size=1,
+                    **qs_dict,
+                )
+                if mapping is None:
+                    qs_utilities[is_cluster_cand] = utilities
                 else:
                     idx_cluster = mapping[is_cluster_cand]
-                    _, utilities = self.qs.query(
-                        X,
-                        y,
-                        candidates=idx_cluster,
-                        batch_size=1,
-                        **qs_dict,
-                    )
-                    qs_utilities_cand[is_cluster_cand] = utilities[idx_cluster]
+                    qs_utilities[is_cluster_cand] = utilities[idx_cluster]
                 n_covered += np.sum(is_cluster_cand)
 
-            utilities_cand = rank_utilities(
-                uncovered_utilities_cand, count_utilities_cand, qs_utilities_cand
+            count_utilities = counts[X_cand_prediction]
+            uncovered_utilities = uncovered_clusters[X_cand_prediction]
+
+            utilities_cand = combine_ranking(
+                uncovered_utilities, count_utilities, qs_utilities
             )
 
         second_idx, second_utilities = simple_batch(

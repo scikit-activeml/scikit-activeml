@@ -594,7 +594,7 @@ def check_type(obj, name, *target_types):
         error_str = f"`{name}` has type `{type(obj)}` but must have "
         if len(target_types) == 1:
             error_str += f"type `{target_types[0]}`"
-        elif len(target_types) <= 3:
+        elif 1 <= len(target_types) <= 3:
             error_str += "type "
             for i in range(len(target_types) - 1):
                 error_str += f"`{target_types[i]}`,"

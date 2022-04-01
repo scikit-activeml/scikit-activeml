@@ -125,7 +125,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             )
 
         utilities_cand = self._mutual_information(
-            X_cand, X_cand, mapping, cond_est, X, y, sample_weight
+            X, X_cand, mapping, cond_est, X, y, sample_weight
         )
 
         if mapping is None:
@@ -168,7 +168,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             The expected information gain for each candidate sample.
         """
 
-        prior_entropy = np.sum(cond_est.predict(X_cand, return_entropy=True)[1])
+        prior_entropy = np.sum(cond_est.predict(X_eval, return_entropy=True)[1])
 
         def new_entropy(idx, x_cand, y_pot):
             if mapping is not None:
@@ -191,6 +191,6 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             **self.integration_dict
         )
 
-        mi_gain = cond_entropy - prior_entropy
+        mi_gain = prior_entropy - cond_entropy
 
         return mi_gain

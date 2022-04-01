@@ -52,27 +52,6 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
         return y == missing_label
 
 
-def is_all_labeled(y, missing_label=MISSING_LABEL):
-    """Creates a boolean mask indicating present labels.
-
-    Parameters
-    ----------
-    y : array-like, shape (n_samples, n_targets) or (n_samples,)
-        Target values to be checked w.r.t. to present targets.
-    missing_label : number | str | None | np.nan, optional (default=np.nan)
-        Symbol to represent a missing label.
-
-    Returns
-    -------
-    is_unlabeled : numpy.ndarray, shape (n_samples)
-        Boolean mask indicating, where present labels in y exist.
-    """
-    if y.ndim == 2:
-        return np.all(is_labeled(y, missing_label=missing_label), axis=1)
-    else:
-        return is_labeled(y, missing_label=missing_label)
-
-
 def is_labeled(y, missing_label=MISSING_LABEL):
     """Creates a boolean mask indicating present labels.
 

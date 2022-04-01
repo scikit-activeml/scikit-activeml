@@ -3,7 +3,7 @@ from sklearn import clone
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
 from skactiveml.regression._greedy_sampling_x import GSx
-from skactiveml.utils import check_type
+from skactiveml.utils import check_type, is_labeled
 
 
 class GSy(SingleAnnotatorPoolQueryStrategy):
@@ -103,49 +103,67 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
         if fit_clf:
             reg = clone(reg).fit(X, y, sample_weight)
 
-        n_train_samples = X.shape[0]
-        y_pred = reg.predict(X_cand)
-
-        if y.ndim == 1:
-            y = y.reshape(-1, 1)
-        if y_pred.ndim == 1:
-            y_pred = y_pred.reshape(-1, 1)
-
-        is_labeled = np.all(~np.isnan(y), axis=1)
-
-        n_samples = X_cand.shape[0]
-
-        batch_size_x = max(0, min(self.k_0 - n_train_samples, batch_size))
+        n_labeled = np.sum(is_labeled(y))
+        batch_size_x = max(0, min(self.k_0 - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
         query_indices = np.zeros((batch_size,))
-        utilities = np.zeros((batch_size, n_samples))
+
+        if mapping is None:
+            utilities = np.full((batch_size, len(X_cand)), np.nan)
+        else:
+            utilities = np.full((batch_size, len(X)), np.nan)
 
         if batch_size_x > 0:
             gs = GSx(metric=self.x_metric, random_state=self.random_state)
-
             query_indices_x, utilities_x = gs.query(
-                X=X[is_labeled],
-                y=y[is_labeled],
-                candidates=X_cand,
+                X=X,
+                y=y,
+                candidates=candidates,
                 batch_size=batch_size_x,
                 return_utilities=True,
             )
 
             query_indices[0:batch_size_x] = query_indices_x
             utilities[0:batch_size_x, :] = utilities_x
-        if batch_size_y > 0:
-            gs = GSx(metric=self.y_metric, random_state=self.random_state)
+            if mapping is not None:
+                query_indices_x = mapping[query_indices_x]
 
+        else:
+            query_indices_x = np.zeros(0, dtype=int)
+
+        if batch_size_y > 0:
+            is_queried = np.full(len(X_cand), False)
+            is_queried[query_indices_x] = True
+            # not all ready queried indices
+            indices_nq = np.where(~is_queried)
+
+            y_to_X = y.copy()
+            y_pred = reg.predict(X_cand)
+
+            if mapping is None:
+                y_to_X = np.append(y, y_pred[is_queried])
+                y_candidate = y_pred[~is_queried].reshape(-1, 1)
+            else:
+                y_to_X[mapping] = y_pred
+                y_candidate = mapping[~is_queried]
+
+            gs = GSx(metric=self.y_metric, random_state=self.random_state)
             query_indices_y, utilities_y = gs.query(
-                X=y[is_labeled],
-                y=y[is_labeled],
-                candidates=y_pred,
+                # use 0 as a default value
+                X=np.where(is_labeled(y_to_X), y_to_X, 0).reshape(-1, 1),
+                y=y_to_X,
+                candidates=y_candidate,
                 batch_size=batch_size_y,
                 return_utilities=True,
             )
-            query_indices[batch_size_x:batch_size] = query_indices_y
-            utilities[batch_size_x:batch_size, :] = utilities_y
+
+            if mapping is None:
+                query_indices[batch_size_x:batch_size] = indices_nq[query_indices_y]
+                utilities[batch_size_x:batch_size][:, indices_nq] = utilities_y
+            else:
+                query_indices[batch_size_x:batch_size] = query_indices_y
+                utilities[batch_size_x:batch_size] = utilities_y
 
         if return_utilities:
             return query_indices, utilities

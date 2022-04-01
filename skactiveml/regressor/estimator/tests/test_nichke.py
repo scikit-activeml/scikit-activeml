@@ -13,8 +13,8 @@ class TestNICHE(unittest.TestCase):
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_estimate_posterior(self):
-        nchke = NormalInverseChiKernelEstimator()
-        nchke.fit(self.X, self.y)
+        nichke = NormalInverseChiKernelEstimator()
+        nichke.fit(self.X, self.y)
 
-        mu, std = nchke.predict(self.X_cand, return_std=True)
+        mu, std = nichke.predict(self.X_cand, return_std=True)
         print(mu, std)

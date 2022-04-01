@@ -1360,6 +1360,46 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         """
         raise NotImplementedError
 
+    def _validate_data(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        check_y_dict=None,
+        y_ensure_1d=True,
+    ):
+
+        if check_X_dict is None:
+            check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
+        if check_y_dict is None:
+            check_y_dict = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "ensure_2d": False,
+                "force_all_finite": False,
+                "dtype": None,
+            }
+
+        # Store and check random state.
+        self.random_state_ = check_random_state(self.random_state)
+
+        X = check_array(X, **check_X_dict)
+        y = check_array(y, **check_y_dict)
+        if len(y) > 0:
+            y = column_or_1d(y) if y_ensure_1d else y
+
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, **check_y_dict)
+            if not np.array_equal(y.shape, sample_weight.shape):
+                raise ValueError(
+                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"shape {sample_weight.shape}. Both need to have "
+                    f"identical shapes."
+                )
+
+        return X, y, sample_weight
+
 
 class SkactivemlConditionalEstimator(SkactivemlRegressor):
     """SkactivemlConditionalEstimator
