@@ -58,7 +58,9 @@ class TestClassifier(unittest.TestCase):
         # Set up estimators for Sklearn wrapper and multi-annot classifier.
         self.sklearn_estimator = GaussianNB()
         self.skactiveml_estimator = classifier.SklearnClassifier(
-            GaussianNB(), missing_label=self.missing_label, classes=self.classes
+            GaussianNB(),
+            missing_label=self.missing_label,
+            classes=self.classes,
         )
         self.estimator = self.sklearn_estimator
         cmm = classifier.MixtureModelClassifier(

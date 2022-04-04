@@ -403,13 +403,13 @@ class TestSubSampleEstimator(unittest.TestCase):
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
 
-    def test_init_param_handle_window(self):
+    def test_init_param_replacing_strategy(self):
         clf = SubSampleEstimator(
-            estimator=ParzenWindowClassifier(), handle_window=None
+            estimator=ParzenWindowClassifier(), replacing_strategy=None
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = SubSampleEstimator(
-            estimator=ParzenWindowClassifier(), handle_window=0
+            estimator=ParzenWindowClassifier(), replacing_strategy=0
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
@@ -516,7 +516,7 @@ class TestSubSampleEstimator(unittest.TestCase):
             missing_label="nan",
             only_labled=True,
             max_fit_len=5,
-            handle_window="random",
+            replacing_strategy="random",
         )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(

@@ -352,15 +352,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 class KernelFrequencyClassifier(ClassFrequencyEstimator):
     """KernelFrequencyClassifier
 
-    Implementation of a wrapper class for scikit-learn classifiers such that
-    missing labels can be handled. Therefor, samples with missing labels are
-    filtered. Furthermore, use a seperate frequency estimator to estimate
-    class frequencies, such that the scikit-learn classifier can be used as a
-    ClassFrequencyEstimator.
+    Implementation of a wrapper class for skactiveml classifiers such that
+    `predict_freq` can be used by calculating the frequencies using other 
+    models (e.g., KernelDensity from scikit-learn or ParzenWindowClassifier).
 
     Parameters
     ----------
-    estimator : sklearn.base.ClassifierMixin with predict_proba method
+    estimator : sklearn.base.SkactivemlClassifier with predict_proba method
         scikit-learn classifier that is able to deal with missing labels.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
@@ -371,13 +369,13 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
         `classes` is not none.
-    frequency_estimator: sklearn.base.BaseEstimator, default=None
-        Model which implements the score_samples method which calculates the
-        frequency of observed labels in the neighborhood. if set to None use
-        sklear.neighbors.KernelDensity.
-    frequency_max_fit_len: int, default=1000,
-        Value to represend the frequency estimator sliding window size for
-        X, y and sample weight. If 'None' the windows is unrestricted in size.
+    frequency_estimator: sklearn.base.BaseEstimator or
+    sklearn.base.SkactivemlClassifier, default=None
+        If `frequency_estimator`, the predicted frequencies are used as is.
+        Otherwise the model needs to implement the score_samples method which 
+        calculates the density of observed labels in the neighborhood. if set 
+        to None use sklear.neighbors.KernelDensity with a sliding window of
+        1000 realized by SubSampleEstimator.
     class_prior : float or array-like, shape (n_classes), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -387,16 +385,6 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
     random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
-
-    Attributes
-    ----------
-    classes_ : array-like of shape (n_classes,)
-        Holds the label for each class after fitting.
-    cost_matrix_ : array-like of shape (classes, classes)
-        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
-        class `classes_[j]` for a sample of class `classes_[i]`.
-    estimator_ : sklearn.base.ClassifierMixin with predict_proba method
-        The scikit-learn classifier after calling the fit method.
     """
 
     def __init__(
@@ -661,7 +649,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                     KernelDensity(),
                     missing_label=self.missing_label,
                     classes=self.classes,
-                    max_fit_len=self.frequency_max_fit_len,
+                    max_fit_len=1000,
                 )
             else:
                 self.frequency_estimator_ = deepcopy(self.frequency_estimator)
@@ -683,8 +671,6 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                 y=y_train,
                 sample_weight=sample_weight_train,
             )
-
-    
 
     def _validate_data(
         self,
@@ -786,16 +772,16 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
 class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
     """SubSampleEstimator
 
-    Implementation of a wrapper class for scikit-learn classifiers such that
-    missing labels can be handled. Therefor, samples with missing labels are
-    filtered. Furthermore, saves X, y and sample_weight in a
-    sliding window, enabeling the simulation of a partial fit function for any
-    classifier.
+    Implementation of a wrapper class for SkactivemlClassifier such that the 
+    number of training samples can be limited. Furthermore, saves X, y and
+    sample_weight, enabling the use of a partial fit for any classifier. The
+    class offers two updating strategies, i.e., replacing the oldes samples
+    (sliding window) or replacing samples randomly.
 
     Parameters
     ----------
-    estimator : sklearn.base.ClassifierMixin with predict_proba method
-        scikit-learn classifier that is able to deal with missing labels.
+    estimator : sklearn.base.SkactivemlClassifier
+        The wrapped classifier.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -806,28 +792,17 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
         `classes` is not none.
     max_fit_len: int, default=None,
-        Value to represend the estimator sliding window size for X, y and
+        Value to represent the estimator sliding window size for X, y and
         sample weight. If 'None' the windows is unrestricted in size.
-    handle_window: str, default='last'
-        The decision on how to handel the sliding window when the max_fit_len
-        is reached. 
+    replacing_strategy: str, default='last'
+        Defines how old instances are replaced.
         'last': First in First out
-        'random' : randomly sort previous data and add the new indices
+        'random' : replacing old samples randomly
     only_labled: bool, default=False
-        decides if only labled data should be saved of all data.
+        If True, unlabled samples are discarded.
     random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
-
-    Attributes
-    ----------
-    classes_ : array-like of shape (n_classes,)
-        Holds the label for each class after fitting.
-    cost_matrix_ : array-like of shape (classes, classes)
-        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
-        class `classes_[j]` for a sample of class `classes_[i]`.
-    estimator_ : sklearn.base.ClassifierMixin with predict_proba method
-        The scikit-learn classifier after calling the fit method.
     """
 
     def __init__(
@@ -838,7 +813,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         cost_matrix=None,
         random_state=None,
         max_fit_len=None,
-        handle_window="last",
+        replacing_strategy="last",
         only_labled=False,
     ):
         super().__init__(
@@ -850,7 +825,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator = estimator
         self.only_labled = only_labled
         self.max_fit_len = max_fit_len
-        self.handle_window = handle_window
+        self.replacing_strategy = replacing_strategy
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -875,7 +850,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         self: SubSampleEstimator,
             The SubSampleEstimator is fitted on the training data.
         """
-        self._handle_window("fit", X, y, sample_weight)
+        self._replacing_strategy("fit", X, y, sample_weight)
         return self._fit(
             "fit",
             X=self.X_train_,
@@ -886,7 +861,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
-        labels. If 'base_estimator' has no partial_fit function uses fit with
+        labels. If 'base_estimator' has no partial_fit function use fit with
         the sliding window for X, y and sample_weight.
 
         Parameters
@@ -909,7 +884,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         self : SubSampleEstimator,
             The SubSampleEstimator is fitted on the training data.
         """
-        self._handle_window("partial_fit", X, y, sample_weight)
+        self._replacing_strategy("partial_fit", X, y, sample_weight)
 
         if hasattr(self.estimator, "partial_fit"):
             return self._fit(
@@ -928,7 +903,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 **fit_kwargs,
             )
 
-    def _handle_window(self, fit_func, X, y, sample_weight=None):
+    def _replacing_strategy(self, fit_func, X, y, sample_weight=None):
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
@@ -959,7 +934,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 self.max_fit_len is not None
                 and len(self.X_train_) + len(X) >= self.max_fit_len
             ):
-                if self.handle_window == "random":
+                if self.replacing_strategy == "random":
                     index = np.random.choice(
                         len(self.X_train_),
                         len(self.X_train_) - len(X),
@@ -1088,7 +1063,6 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 )
         return self
 
-
     def _validate_data(
         self,
         X,
@@ -1108,7 +1082,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         if self.max_fit_len is not None:
             check_scalar(self.max_fit_len, "max_fit_len", int, min_val=0)
         check_type(self.only_labled, "only_labled", bool)
-        check_type(self.handle_window, "handle_window", str)
+        check_type(self.replacing_strategy, "replacing_strategy", str)
         if check_y_dict is None:
             check_y_dict = {
                 "ensure_min_samples": 0,
@@ -1183,7 +1157,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
             self.cost_matrix_ = self.cost_matrix_[:, class_indices]
-        
+
         return X, y, sample_weight
 
     def predict(self, X):
