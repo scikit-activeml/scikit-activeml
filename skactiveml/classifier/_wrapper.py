@@ -284,7 +284,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             self.estimator_ = deepcopy(self.estimator)
         # count labels per class
-        is_lbld = ~np.isnan(y)
+        is_lbld = is_labeled(y, missing_label=-1)
         self._label_counts = [
             np.sum(y[is_lbld] == c) for c in range(len(self._le.classes_))
         ]
@@ -853,8 +853,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         self.handle_window = handle_window
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
-        """Fit the model using X as training data and y as class labels. Resets
-        the sliding window for X, y and sample_weight.
+        """Fit the model using X as training data and y as class labels.
 
         Parameters
         ----------
@@ -887,7 +886,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
-        labels. If 'base_estimator' has no partial_fit function uses fit with 
+        labels. If 'base_estimator' has no partial_fit function uses fit with
         the sliding window for X, y and sample_weight.
 
         Parameters
@@ -996,12 +995,11 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 "classifier.".format(self.estimator)
             )
 
-        X, y, sample_weight, is_lbld = self._validate_data(
+        X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
-            return_is_lbld=True,
         )
 
         # Check whether estimator can deal with cost matrix.
@@ -1024,6 +1022,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
         try:
             if self.only_labled:
+                is_lbld = is_labeled(y, self.missing_label)
                 X = X[is_lbld]
                 y = y[is_lbld]
                 if sample_weight is not None:
@@ -1039,20 +1038,6 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                         return self
                     else:
                         raise ValueError("There is no labeled data.")
-            if (
-                not isinstance(self.estimator_, SkactivemlClassifier)
-                and np.sum(is_lbld) == 0
-            ):
-                self.estimator_ = SklearnClassifier(
-                    self.estimator_,
-                    classes=self.classes,
-                    missing_label=self.missing_label,
-                    cost_matrix=self.cost_matrix,
-                    random_state=self.random_state,
-                )
-                warnings.warn(
-                    "The 'base_estimator' is not an SkactivemlClassifier and fitted with no Labeled data, Therfore it will be wrapped into an SklearnClassifier"
-                )
             if (
                 not has_fit_parameter(self.estimator, "sample_weight")
                 or sample_weight is None
@@ -1112,7 +1097,6 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         check_X_dict=None,
         check_y_dict=None,
         y_ensure_1d=True,
-        return_is_lbld=False,
     ):
 
         # create new y array to check classes
@@ -1199,12 +1183,8 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
             self.cost_matrix_ = self.cost_matrix_[:, class_indices]
-
-        if return_is_lbld:
-            is_lbdl = is_lbdl[len(self.y_train_) :]
-            return X, y, sample_weight, is_lbdl
-        else:
-            return X, y, sample_weight
+        
+        return X, y, sample_weight
 
     def predict(self, X):
         """Return class label predictions for the input data X.

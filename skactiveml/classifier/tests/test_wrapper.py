@@ -16,7 +16,7 @@ from sklearn.utils.validation import NotFittedError, check_is_fitted
 from skactiveml.classifier import (
     SklearnClassifier,
     KernelFrequencyClassifier,
-    PWC,
+    ParzenWindowClassifier,
     SubSampleEstimator,
 )
 
@@ -62,6 +62,8 @@ class TestSklearnClassifier(unittest.TestCase):
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
+        clf.fit(self.X, self.y1, sample_weight=np.ones_like(self.y1))
+        self.assertTrue(clf.is_fitted_)
         clf.fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "kernel_"))
@@ -358,7 +360,9 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         self.assertRaises(NotFittedError, clf.predict_freq, X=self.X)
         clf.fit(X=self.X, y=self.y1)
         freq = clf.predict_freq(X=self.X)
-        est = PWC(missing_label="nan").fit(X=self.X, y=self.y1)
+        est = ParzenWindowClassifier(missing_label="nan").fit(
+            X=self.X, y=self.y1
+        )
         self.assertEqual(len(np.unique(freq)), 2)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
         clf = KernelFrequencyClassifier(
@@ -366,11 +370,13 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
                 GaussianProcessClassifier(), missing_label="nan"
             ),
             missing_label="nan",
-            frequency_estimator=PWC(missing_label="nan"),
+            frequency_estimator=ParzenWindowClassifier(missing_label="nan"),
         )
         clf.fit(X=self.X, y=self.y1)
         freq = clf.predict_freq(X=self.X)
-        est = PWC(missing_label="nan").fit(X=self.X, y=self.y1)
+        est = ParzenWindowClassifier(missing_label="nan").fit(
+            X=self.X, y=self.y1
+        )
         self.assertEqual(len(np.unique(freq)), 2)
 
 
@@ -388,21 +394,33 @@ class TestSubSampleEstimator(unittest.TestCase):
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_max_fit_len(self):
-        clf = SubSampleEstimator(estimator=PWC(), max_fit_len="Test")
+        clf = SubSampleEstimator(
+            estimator=ParzenWindowClassifier(), max_fit_len="Test"
+        )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(estimator=PWC(), max_fit_len=-1)
+        clf = SubSampleEstimator(
+            estimator=ParzenWindowClassifier(), max_fit_len=-1
+        )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_handle_window(self):
-        clf = SubSampleEstimator(estimator=PWC(), handle_window=None)
+        clf = SubSampleEstimator(
+            estimator=ParzenWindowClassifier(), handle_window=None
+        )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(estimator=PWC(), handle_window=0)
+        clf = SubSampleEstimator(
+            estimator=ParzenWindowClassifier(), handle_window=0
+        )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_only_labled(self):
-        clf = SubSampleEstimator(estimator=PWC(), only_labled="Test")
+        clf = SubSampleEstimator(
+            estimator=ParzenWindowClassifier(), only_labled="Test"
+        )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(estimator=PWC(), only_labled=0)
+        clf = SubSampleEstimator(
+            estimator=ParzenWindowClassifier(), only_labled=0
+        )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_fit(self):
@@ -463,13 +481,10 @@ class TestSubSampleEstimator(unittest.TestCase):
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
         clf = SubSampleEstimator(
-            SklearnClassifier(
-                DecisionTreeClassifier(), missing_label="nan"
-            ),
+            SklearnClassifier(DecisionTreeClassifier(), missing_label="nan"),
             missing_label="nan",
         )
         clf.fit(self.X, self.y1, sample_weight=np.ones(len(self.y1)))
-        
 
         X = [[1], [0]]
         y_true = [1, 0]

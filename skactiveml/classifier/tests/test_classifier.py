@@ -13,7 +13,7 @@ from sklearn.utils.validation import NotFittedError
 
 from skactiveml import classifier
 from skactiveml.base import SkactivemlClassifier
-from skactiveml.classifier import multi
+from skactiveml.classifier import multiannotator
 from skactiveml.utils import call_func
 
 
@@ -29,8 +29,8 @@ class TestClassifier(unittest.TestCase):
                 self.classifiers[clf_name] = clf
                 self.is_multi[clf_name] = False
                 self.is_sklearn_wrapper[clf_name] = "Sklearn" in clf_name
-        for clf_name in multi.__all__:
-            clf = getattr(multi, clf_name)
+        for clf_name in multiannotator.__all__:
+            clf = getattr(multiannotator, clf_name)
             if inspect.isclass(clf) and issubclass(clf, SkactivemlClassifier):
                 self.classifiers[clf_name] = clf
                 self.is_multi[clf_name] = True
@@ -61,23 +61,31 @@ class TestClassifier(unittest.TestCase):
             GaussianNB(), missing_label=self.missing_label, classes=self.classes
         )
         self.estimator = self.sklearn_estimator
-        cmm = classifier.CMM(missing_label=self.missing_label, random_state=0)
+        cmm = classifier.MixtureModelClassifier(
+            missing_label=self.missing_label, random_state=0
+        )
         gnb = classifier.SklearnClassifier(
             GaussianNB(), missing_label=self.missing_label
         )
         mlp = classifier.SklearnClassifier(
             MLPClassifier(), missing_label=self.missing_label
         )
-        self.estimators = [("CMM", cmm), ("GaussianNB", gnb), ("MLP", mlp)]
+        self.estimators = [
+            ("MixtureModelClassifier", cmm),
+            ("GaussianNB", gnb),
+            ("MLP", mlp),
+        ]
 
     def test_classifiers(self):
         # Test predictions of classifiers.
         for clf in self.classifiers:
             self.y = self.y_single
             self.y_missing_label = self.y_single_missing_label
+            self.y_shape = self.y_multi
             if self.is_multi[clf]:
                 self.y = self.y_multi
                 self.y_missing_label = self.y_multi_missing_label
+                self.y_shape = self.y_single
             self.estimator = self.sklearn_estimator
             if not self.is_sklearn_wrapper[clf]:
                 self.estimator = self.skactiveml_estimator
@@ -111,9 +119,14 @@ class TestClassifier(unittest.TestCase):
             clf_mdl.fit(X=[], y=[])
             P = clf_mdl.predict_proba(X=self.X)
             np.testing.assert_array_equal(P, np.ones((len(self.X), 3)) / 3)
-            if hasattr(clf_mdl, "predict_annot_perf"):
-                P = clf_mdl.predict_annot_perf(X=self.X)
+            if hasattr(clf_mdl, "predict_annotator_perf"):
+                P = clf_mdl.predict_annotator_perf(X=self.X)
                 np.testing.assert_array_equal(P, np.ones((len(self.X), 1)) / 3)
+
+        with self.subTest(msg="Labels Shape Test", clf_name=clf):
+            self.assertRaises(
+                ValueError, clf_mdl.fit, X=self.X, y=self.y_shape
+            )
 
         # Test classifier on data with only missing labels.
         with self.subTest(msg="Missing Label Test", clf_name=clf):
@@ -160,11 +173,13 @@ class TestClassifier(unittest.TestCase):
         for clf in self.classifiers:
             self.y = self.y_single
             self.y_missing_label = self.y_single_missing_label
+            self.y_shape = self.y_multi
             mod = "skactiveml.classifier.tests.test"
             if self.is_multi[clf]:
                 self.y = self.y_multi
-                mod = "skactiveml.classifier.multi.tests.test"
+                mod = "skactiveml.classifier.multiannotator.tests.test"
                 self.y_missing_label = self.y_multi_missing_label
+                self.y_shape = self.y_single
             self.estimator = self.sklearn_estimator
             if not self.is_sklearn_wrapper[clf]:
                 self.estimator = self.skactiveml_estimator
@@ -212,7 +227,7 @@ class TestClassifier(unittest.TestCase):
                     "predict",
                     "predict_proba",
                     "predict_freq",
-                    "predict_annot_perf",
+                    "predict_annotator_perf",
                 ]
                 for m in methods:
                     if not hasattr(clf_mdl, m):
@@ -241,7 +256,7 @@ class TestClassifier(unittest.TestCase):
                     self._test_predict_proba_param_X(clf_class)
                 if hasattr(clf_mdl, "predict_freq"):
                     self._test_predict_freq_param_X(clf_class)
-                if hasattr(clf_mdl, "predict_annot_perf"):
+                if hasattr(clf_mdl, "predict_annotator_perf"):
                     self._test_predict_annot_perf_param_X(clf_class)
 
     def _test_init_param_class_prior(self, clf_class):
@@ -462,10 +477,12 @@ class TestClassifier(unittest.TestCase):
             missing_label=self.missing_label,
         )
         clf_mdl.fit(X=self.X, y=self.y)
-        self.assertRaises(ValueError, clf_mdl.predict_annot_perf, X=[0, 0])
-        self.assertRaises(ValueError, clf_mdl.predict_annot_perf, X=[[0], [0]])
+        self.assertRaises(ValueError, clf_mdl.predict_annotator_perf, X=[0, 0])
         self.assertRaises(
-            ValueError, clf_mdl.predict_annot_perf, X=[["x", "y"]]
+            ValueError, clf_mdl.predict_annotator_perf, X=[[0], [0]]
+        )
+        self.assertRaises(
+            ValueError, clf_mdl.predict_annotator_perf, X=[["x", "y"]]
         )
 
 

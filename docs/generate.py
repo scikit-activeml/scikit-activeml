@@ -1,13 +1,17 @@
+import distutils.dir_util
+import importlib
 import inspect
 import json
 import os
-from pybtex.database import parse_file
+import warnings
 
 import numpy as np
+from pybtex.database import parse_file
 
 import skactiveml
-import warnings
-import distutils.dir_util
+
+for module in skactiveml.__all__:
+    importlib.import_module('skactiveml.' + module)
 
 warnings.filterwarnings("ignore")
 
@@ -48,6 +52,10 @@ def automodule(module, level=0):
     constants = []
 
     for item in module.__all__:
+        try:
+            importlib.import_module(module.__name__ + "." + item)
+        except ModuleNotFoundError:
+            pass
         if inspect.ismodule(getattr(module, item)):
             modules.append(item)
         if inspect.isclass(getattr(module, item)):
@@ -356,7 +364,7 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     dir_path : string
         The directory path in which to save the python example file.
     data : dict
-        The data from the jason example file for the example.
+        The data from the json example file for the example.
     package : module
         The '__init__' module of the package for which the examples should be
         created.
@@ -502,28 +510,20 @@ def format_plot(data, template_path):
     -------
     string : The formatted string for the example script.
     """
-    # Collect the expected parameters for the query method.
-    if 'X' not in data['query_params'].keys() and \
-            'X' in inspect.signature(data["qs"].query).parameters:
-        data['query_params']['"X"'] = 'X'
-    if 'y' not in data['query_params'].keys() and \
-            'y' in inspect.signature(data["qs"].query).parameters:
-        data['query_params']['"y"'] = 'y'
-
     block_str = ''
     with open(template_path, "r") as template:
         for line in template:
             if '#_' in line:
-                if '#_ import' in line:
+                if '#_import' in line:
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
                     if 'clf' not in data.keys() and \
                             'clf' not in data['init_params'].keys():
-                        line += 'from skactiveml.classifier import PWC\n'
+                        line += 'from skactiveml.classifier import ParzenWindowClassifier\n'
                 elif 'init_clf' in line:
                     # Decide which classifier to use, if clf is None.
                     if 'clf' not in data.keys():
                         if 'clf' not in data['init_params'].keys():
-                            clf = 'PWC(classes=[0, 1], random_state=random_state)'
+                            clf = 'ParzenWindowClassifier(classes=[0, 1], random_state=random_state)'
                         else:
                             clf = data['init_params']['clf']
                     else:
@@ -547,9 +547,20 @@ def format_plot(data, template_path):
                            dict_to_str(data['query_params'], allocator=': ',
                                        key_as_string=True) + '}\n'
                 elif '"#_n_cycles"' in line:
-                    start = line.find('"#_n_cycles"')
                     n_cycles = os.getenv('N_CYCLES', default='2')
-                    line = line[:start] + n_cycles + '\n'
+                    line = line.replace('"#_n_cycles"', n_cycles)
+                elif '"#_n_samples"' in line:
+                    n_samples = os.getenv('N_SAMPLES', default='10')
+                    line = line.replace('"#_n_samples"', n_samples)
+                elif '"#_res"' in line:
+                    res = os.getenv('RES', default='3')
+                    line = line.replace('"#_res"', res)
+                elif '"#_candidates"' in line:
+                    if 'use_candidate_plotting' not in data.keys():
+                        cand = 'None'
+                    else:
+                        cand = "np.arange(len(X))"
+                    line = line.replace('"#_candidates"', cand)
                 elif '#_bp' in line:
                     try:
                         s = line.find('#_')
