@@ -14,76 +14,79 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
         metric_dict=None,
         mu_0=0,
         kappa_0=0.1,
-        nu_0=2.0,
+        nu_0=2.5,
         sigma_sq_0=1.0,
         random_state=None,
     ):
         super().__init__(random_state=random_state)
-        self.mu_0 = mu_0
         self.kappa_0 = kappa_0
         self.nu_0 = nu_0
+        self.mu_0 = mu_0
         self.sigma_sq_0 = sigma_sq_0
         self.metric = metric
         self.metric_dict = {} if metric_dict is None else metric_dict
 
+        self.X_ = None
+        self.y_ = None
+
     def fit(self, X, y, sample_weight=None):
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
         is_lbld = is_labeled(y)
-        X_prior = np.zeros((1, len(X.T)))
-        self.X_ = np.append(X_prior, X[is_lbld], axis=0)
-        self.y_ = np.append([self.mu_0], y[is_lbld], axis=0)
+        self.X_ = X[is_lbld]
+        self.y_ = y[is_lbld]
+        if sample_weight is not None:
+            weights_ = sample_weight[is_lbld]
+            self.y_ = (weights_ * self.y_) / np.average(weights_)
         return self
 
-    def estimate_conditional_distribution(self, X):
-        check_array(X)
-
-        K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict)
-        K[:, 0] = self.kappa_0
-        N = np.sum(K[:, 1:], axis=1)
-        kappa_L = self.kappa_0 + N
-        nu_L = self.nu_0 + N
-        mu_L = 1 / kappa_L * (K @ self.y_)
-        sigma_sq_L = (
-            1
-            / nu_L
-            * (
-                np.sum((self.y_[np.newaxis, :] - mu_L[:, np.newaxis]) ** 2 * K, axis=1)
-                + self.nu_0 * self.sigma_sq_0
-            )
-        )
-        df = nu_L
-        loc = mu_L
-        scale = np.sqrt((1 + kappa_L) / kappa_L * sigma_sq_L)
-        return t(df=df, loc=loc, scale=scale)
-
-    def _estimate_likelihood_mu_var_N(self, X):
+    def _estimate_ml_params(self, X):
         K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict)
 
-        # maximum likelihood
         N = np.sum(K, axis=1)
         mu_ml = K @ self.y_ / N
-        var_ml = np.sqrt(np.abs((K @ (self.y_**2) / N) - mu_ml**2))
+        scatter = np.sum(
+            K * (self.y_[np.newaxis, :] - mu_ml[:, np.newaxis]) ** 2, axis=1
+        )
+        var_ml = 1 / N * scatter
 
-        return mu_ml, var_ml, N
+        return N, mu_ml, var_ml
 
-    def _estimate_conditional_distribution(self, X):
-        mu_ml, var_ml, N = self._estimate_likelihood_mu_var_N(X)
+    def _estimate_update_params(self, X):
 
-        # normal inv chi squared
-        mu_0 = self.mu_0
-        kappa_0 = self.kappa_0
-        nu_0 = self.nu_0
-        sigma_sq_0 = self.sigma_sq_0
-        mu_N = (kappa_0 * mu_0 + N * mu_ml) / (kappa_0 + N)
-        kappa_N = kappa_0 + N
-        nu_N = nu_0 + N
-        sigma_sq_N = (
-            nu_0 * sigma_sq_0
-            + var_ml
-            + (kappa_0 * N * (mu_ml - mu_0) ** 2) / (kappa_0 + N)
-        ) / nu_N
-        # posterior to marginal
-        df = nu_N
-        loc = mu_N
-        scale = np.sqrt(((kappa_N + 1) / kappa_N) * sigma_sq_N)
+        if self.X_ is not None and len(self.X_) != 0:
+            N, mu_ml, var_ml = self._estimate_ml_params(X)
+            update_params = (N, N, mu_ml, var_ml)
+            return update_params
+        else:
+            neutral_params = (np.zeros(len(X)),) * 4
+            return neutral_params
+
+    def estimate_conditional_distribution(self, X):
+
+        X = check_array(X)
+        prior_params = (self.kappa_0, self.nu_0, self.mu_0, self.sigma_sq_0)
+        update_params = self._estimate_update_params(X)
+        post_params = _combine_params(prior_params, update_params)
+
+        kappa_post, nu_post, mu_post, sigma_sq_post = post_params
+
+        df = nu_post
+        loc = mu_post
+        scale = np.sqrt((1 + kappa_post) / kappa_post * sigma_sq_post)
         return t(df=df, loc=loc, scale=scale)
+
+
+def _combine_params(prior_params, update_params):
+    kappa_1, nu_1, mu_1, sigma_sq_1 = prior_params
+    kappa_2, nu_2, mu_2, sigma_sq_2 = update_params
+
+    kappa_com = kappa_1 + kappa_2
+    nu_com = nu_1 + nu_2
+    mu_com = (kappa_1 * mu_1 + kappa_2 * mu_2) / kappa_com
+    scatter_com = (
+        nu_1 * sigma_sq_1
+        + nu_2 * sigma_sq_2
+        + kappa_1 * kappa_com * (mu_1 - mu_2) ** 2 / (kappa_1 + kappa_2)
+    )
+    sigma_sq_com = scatter_com / nu_com
+    return kappa_com, nu_com, mu_com, sigma_sq_com

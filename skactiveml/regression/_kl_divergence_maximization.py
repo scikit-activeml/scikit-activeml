@@ -7,7 +7,7 @@ from skactiveml.base import (
 )
 from skactiveml.utils import check_type, simple_batch, check_random_state
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y
+from skactiveml.utils._functions import update_X_y, reshape_dist, update_X_y_map
 
 
 class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
@@ -136,7 +136,7 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             )
 
         utilities_cand = self._kullback_leibler_divergence(
-            X_cand, X_cand, cond_est, X, y, sample_weight
+            X_cand, X_cand, mapping, cond_est, X, y, sample_weight=sample_weight
         )
 
         if mapping is None:
@@ -183,34 +183,30 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             The expected information gain for each candidate sample.
         """
 
-        random_state = check_random_state(random_state=self.random_state)
-        prior_entropy = np.sum(cond_est.predict(X_cand, return_entropy=True)[1])
-
         def new_cross_entropy(idx, x_cand, y_pot):
-            if mapping is not None:
-                X_new, y_new = update_X_y(X, y, y_pot, idx_update=mapping[idx])
-            else:
-                X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
-
+            X_new, y_new = update_X_y_map(X, y, y_pot, idx, x_cand, mapping)
             new_cond_est = clone(cond_est).fit(X_new, y_new, sample_weight)
-            return cross_entropy(
+            entropy_post = np.sum(new_cond_est.predict(X_eval, return_entropy=True)[1])
+            cross_ent = cross_entropy(
                 X_eval,
                 new_cond_est,
                 cond_est,
                 integration_dict=self.integration_dict_cross_entropy,
-                random_state=random_state,
+                random_state=self.random_state_,
             )
+            return cross_ent - entropy_post
 
-        cross_ent = conditional_expect(
+        kl_div = conditional_expect(
             X_cand,
             new_cross_entropy,
             cond_est,
-            random_state=random_state,
+            random_state=self.random_state_,
             include_idx=True,
             include_x=True,
+            **self.integration_dict_potential_y_val
         )
 
-        return cross_ent - prior_entropy
+        return kl_div
 
 
 def cross_entropy(
@@ -246,7 +242,10 @@ def cross_entropy(
     check_type(other_cond_est, "other_cond_est", SkactivemlConditionalEstimator)
     random_state = check_random_state(random_state)
 
-    dist = other_cond_est.estimate_conditional_distribution(X_eval)
+    dist = reshape_dist(
+        other_cond_est.estimate_conditional_distribution(X_eval), shape=(len(X_eval), 1)
+    )
+
     cross_ent = -conditional_expect(
         X_eval,
         dist.logpdf,
@@ -256,4 +255,4 @@ def cross_entropy(
         vector_func=True
     )
 
-    return cross_ent
+    return np.sum(cross_ent)

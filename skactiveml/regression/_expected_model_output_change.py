@@ -5,9 +5,9 @@ from skactiveml.base import (
     SkactivemlConditionalEstimator,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, check_random_state, simple_batch
+from skactiveml.utils import check_type, simple_batch
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y
+from skactiveml.utils._functions import update_X_y_map
 from skactiveml.utils._validation import check_callable
 
 
@@ -42,7 +42,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
-            self.integration_dict = {"integration_method": "assume_linear"}
+            self.integration_dict = {"method": "assume_linear"}
 
     def query(
         self,
@@ -118,19 +118,15 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         check_callable(loss, "self.loss", n_free_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-        X_eval = X_cand
+        X_eval = X
 
         if fit_cond_est:
             cond_est = clone(cond_est).fit(X, y, sample_weight)
 
         y_pred = cond_est.predict(X_eval)
 
-        def model_output_change(x_idx, x_cand, y_pot):
-            if mapping is not None:
-                X_new, y_new = update_X_y(X, y, y_pot, idx_update=x_idx)
-            else:
-                X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
-
+        def model_output_change(idx, x_cand, y_pot):
+            X_new, y_new = update_X_y_map(X, y, y_pot, idx, x_cand, mapping)
             cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
             y_pred_new = cond_est_new.predict(X_eval)
 
@@ -141,12 +137,19 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             model_output_change,
             cond_est,
             random_state=self.random_state_,
+            include_idx=True,
             include_x=True,
             **self.integration_dict
         )
 
+        if mapping is None:
+            utilities = change
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = change
+
         return simple_batch(
-            change,
+            utilities,
             batch_size=batch_size,
             random_state=self.random_state_,
             return_utilities=return_utilities,

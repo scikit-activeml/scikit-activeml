@@ -5,11 +5,12 @@ from sklearn import clone
 from sklearn.utils.validation import _is_arraylike, check_random_state
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
-from skactiveml.utils import simple_batch, check_type
+from skactiveml.utils import simple_batch, check_type, check_scalar
+from skactiveml.utils._functions import bootstrap_estimators
 
 
-class QBC(SingleAnnotatorPoolQueryStrategy):
-    """Regression based on Query by Committee
+class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
+    """Regression based Query-by-Committee
 
     This class implements an Regression adaption of Query by Committee. It
     tries to estimate the model variance by a Committee of estimators.
@@ -18,6 +19,10 @@ class QBC(SingleAnnotatorPoolQueryStrategy):
     ----------
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
+    k_bootstraps: int, optional (default=3)
+        The number of bootstraps used to estimate the true model.
+    n_train: int or float, optional (default=0.5)
+        The size of a bootstrap compared to the training data.
 
     References
     ----------
@@ -28,11 +33,10 @@ class QBC(SingleAnnotatorPoolQueryStrategy):
 
     """
 
-    def __init__(
-        self,
-        random_state=None,
-    ):
+    def __init__(self, random_state=None, k_bootstraps=3, n_train=0.5):
         super().__init__(random_state=random_state)
+        self.k_bootstraps = k_bootstraps
+        self.n_train = n_train
 
     def query(
         self,
@@ -120,11 +124,30 @@ class QBC(SingleAnnotatorPoolQueryStrategy):
                 check_type(est, f"ensemble[{idx}]", SkactivemlRegressor)
                 if fit_ensemble:
                     est_arr[idx] = est.fit(X, y, sample_weight)
+        elif isinstance(ensemble, SkactivemlRegressor):
+            check_scalar(
+                self.n_train,
+                "self.n_train",
+                (int, float),
+                min_val=0,
+                max_val=1,
+                min_inclusive=False,
+            )
+            check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
+            est_arr = bootstrap_estimators(
+                ensemble,
+                X,
+                y,
+                k_bootstrap=self.k_bootstraps,
+                n_train=self.n_train,
+                sample_weight=sample_weight,
+                random_state=self.random_state_,
+            )
+
         else:
             raise TypeError(
                 f"`ensemble` must either be a `{SkactivemlRegressor} "
-                f"with the attribute `n_esembles` and `estimators_` after "
-                f"fitting or a list of {SkactivemlRegressor} objects."
+                f"or a list of {SkactivemlRegressor} objects."
             )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)

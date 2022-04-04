@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.regression._expected_model_change import EMC
-from skactiveml.regression._qbc import QBC
+from skactiveml.regression._expected_model_change import ExpectedModelChange
+from skactiveml.regression._query_by_committee import QueryByCommittee
 from skactiveml.regressor._wrapper import SklearnRegressor
 
 
@@ -13,7 +13,7 @@ class TestEMC(unittest.TestCase):
         pass
 
     def test_query(self):
-        qs = EMC(k_bootstraps=5, random_state=0)
+        qs = ExpectedModelChange(k_bootstraps=5, random_state=0)
 
         reg = SklearnRegressor(estimator=LinearRegression())
 

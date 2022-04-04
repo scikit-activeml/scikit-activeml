@@ -78,9 +78,7 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        X_cand, mapping = self._transform_candidates(
-            candidates, X, y, allow_only_unlabeled=True
-        )
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         query_indices = np.zeros(batch_size, dtype=int)
 

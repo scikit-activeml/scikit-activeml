@@ -3,14 +3,15 @@ from sklearn.cluster import KMeans
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.utils import is_labeled, check_type, simple_batch
-from skactiveml.utils._functions import combine_ranking
+from skactiveml.utils._selection import combine_ranking
 
 
-class RD(SingleAnnotatorPoolQueryStrategy):
-    """RD
+class RepresentativenessAndDiversity(SingleAnnotatorPoolQueryStrategy):
+    """RD ALR, Representativeness and Diversity in active learning for
+    regression
 
     This class implements the active learning for regression based query
-    strategy RD.
+    strategy RD ALR.
 
     Parameters
     ----------

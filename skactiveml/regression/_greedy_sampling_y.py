@@ -107,7 +107,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
         batch_size_x = max(0, min(self.k_0 - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
-        query_indices = np.zeros((batch_size,))
+        query_indices = np.zeros((batch_size,), dtype=int)
 
         if mapping is None:
             utilities = np.full((batch_size, len(X_cand)), np.nan)
@@ -120,7 +120,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
                 X=X,
                 y=y,
                 candidates=candidates,
-                batch_size=batch_size_x,
+                batch_size=int(batch_size_x),
                 return_utilities=True,
             )
 
@@ -136,15 +136,18 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
             is_queried = np.full(len(X_cand), False)
             is_queried[query_indices_x] = True
             # not all ready queried indices
-            indices_nq = np.where(~is_queried)
+            indices_nq = np.argwhere(~is_queried).flatten()
 
             y_to_X = y.copy()
             y_pred = reg.predict(X_cand)
 
             if mapping is None:
                 y_to_X = np.append(y, y_pred[is_queried])
+                y_new = y_to_X
                 y_candidate = y_pred[~is_queried].reshape(-1, 1)
             else:
+                y_new = y_to_X.copy()
+                y_new[mapping[is_queried]] = y_pred[is_queried]
                 y_to_X[mapping] = y_pred
                 y_candidate = mapping[~is_queried]
 
@@ -152,9 +155,9 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
             query_indices_y, utilities_y = gs.query(
                 # use 0 as a default value
                 X=np.where(is_labeled(y_to_X), y_to_X, 0).reshape(-1, 1),
-                y=y_to_X,
+                y=y_new,
                 candidates=y_candidate,
-                batch_size=batch_size_y,
+                batch_size=int(batch_size_y),
                 return_utilities=True,
             )
 

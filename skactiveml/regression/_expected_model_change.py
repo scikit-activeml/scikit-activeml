@@ -1,15 +1,17 @@
 from copy import deepcopy
 
 import numpy as np
+from sklearn import clone
 
 from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, simple_batch
+from skactiveml.utils import check_type, simple_batch, check_scalar
+from skactiveml.utils._functions import bootstrap_estimators
 
 
-class EMC(SingleAnnotatorPoolQueryStrategy):
+class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
     """Expected Model Change
 
     This class implements expected model output change.
@@ -18,23 +20,27 @@ class EMC(SingleAnnotatorPoolQueryStrategy):
     ----------
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
-    k_bootstraps: int, optional (default=1)
-        The minimum number of samples the estimator requires.
+    k_bootstraps: int, optional (default=3)
+        The number of bootstraps used to estimate the true model.
+    n_train: int or float, optional (default=0.5)
+        The size of a bootstrap compared to the training data.
     ord: int or string (default=2)
-        The Norm to measure the gradient.
+        The Norm to measure the gradient. Argument will be passed to
+        `np.linalg.norm`.
     """
 
-    def __init__(self, k_bootstraps=10, ord=2, random_state=None):
+    def __init__(self, k_bootstraps=3, n_train=0.5, ord=2, random_state=None):
         super().__init__(random_state=random_state)
-        self.ord = ord
         self.k_bootstraps = k_bootstraps
+        self.n_train = n_train
+        self.ord = ord
 
     def query(
         self,
         X,
         y,
         reg,
-        fit_clf=True,
+        fit_reg=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -52,8 +58,8 @@ class EMC(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL.
         reg: SkactivemlRegressor
             Regressor to predict the data.
-        fit_clf : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
+        fit_reg : bool, optional (default=True)
+            Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
@@ -99,25 +105,34 @@ class EMC(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", SkactivemlRegressor)
+        check_scalar(
+            self.n_train,
+            "self.n_train",
+            (int, float),
+            min_val=0,
+            max_val=1,
+            min_inclusive=False,
+        )
+        check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
+
+        if fit_reg:
+            reg = clone(reg).fit(X, y, sample_weight)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        rng = np.random.default_rng(self.random_state)
-        n_samples = len(X)
-        k = min(n_samples, self.k_bootstraps)
-        learners = [deepcopy(reg) for _ in range(k)]
-        sample_indices = np.arange(n_samples)
-        subsets_indices = [
-            rng.choice(sample_indices, size=n_samples * (k - 1) // k) for _ in range(k)
-        ]
+        learners = bootstrap_estimators(
+            reg,
+            X,
+            y,
+            k_bootstrap=self.k_bootstraps,
+            n_train=self.n_train,
+            sample_weight=sample_weight,
+            random_state=self.random_state_,
+        )
 
-        for learner, subset_indices in zip(learners, subsets_indices):
-            X_for_learner = X[subset_indices]
-            y_for_learner = y[subset_indices]
-            learner.fit(X_for_learner, y_for_learner)
-
-        results = np.array([learner.predict(X_cand) for learner in learners])
-        scalars = np.average(np.abs(results), axis=0)
+        results_learner = np.array([learner.predict(X_cand) for learner in learners])
+        pred = reg.predict(X_cand).reshape(1, -1)
+        scalars = np.average(np.abs(results_learner - pred), axis=0)
         norms = np.linalg.norm(X_cand, ord=self.ord, axis=1)
         utilities_cand = np.multiply(scalars, norms)
 

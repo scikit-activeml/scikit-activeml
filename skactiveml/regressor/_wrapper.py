@@ -165,7 +165,7 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
 
     """
 
-    def __init__(self, estimator, random_state=None, std=1):
+    def __init__(self, estimator, random_state=None, std=None):
         super(SklearnConditionalEstimator, self).__init__(estimator, random_state)
         self.std = std
 

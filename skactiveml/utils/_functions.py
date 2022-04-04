@@ -1,20 +1,16 @@
 import inspect
-import operator
-import warnings
-from functools import reduce
 
 import numpy as np
+import scipy
 from scipy.stats import rankdata
-
+from sklearn import clone
 from sklearn.utils.validation import (
     check_array,
     column_or_1d,
     check_consistent_length,
-    _is_arraylike,
 )
 
-from ._selection import rand_argmax
-from ._validation import check_scalar, check_indices, check_type
+from ._validation import check_indices, check_type
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
@@ -101,3 +97,94 @@ def update_X_y(X, y, y_update, idx_update=None, X_update=None):
         return X_new, y_new
     else:
         raise ValueError("`idx_update` or `X_update` must not be `None`")
+
+
+def bootstrap_estimators(
+    est,
+    X,
+    y,
+    k_bootstrap,
+    n_train,
+    sample_weight=None,
+    random_state=None,
+):
+    learners = [clone(est) for _ in range(k_bootstrap)]
+    sample_indices = np.arange(len(X))
+    subsets_indices = [
+        random_state.choice(sample_indices, size=int(len(X) * n_train))
+        for _ in range(k_bootstrap)
+    ]
+
+    for learner, subset_indices in zip(learners, subsets_indices):
+        X_for_learner = X[subset_indices]
+        y_for_learner = y[subset_indices]
+        if sample_weight is None:
+            learner.fit(X_for_learner, y_for_learner)
+        else:
+            weight_for_learner = sample_weight[subset_indices]
+            learner.fit(X_for_learner, y_for_learner, weight_for_learner)
+
+    return learners
+
+
+def update_X_y_map(X, y, y_update, idx_update=None, x_update=None, mapping=None):
+    """Update the training data by the updating sample/label, depending on
+    the mapping. Chooses `X_update` if `mapping is None` and updates
+    `X[mapping[idx_update]]` otherwise.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        Training data set.
+    y : array-like of shape (n_samples)
+        Labels of the training data set.
+    idx_update : int
+        Index of the sample to be updated.
+    x_update : (n_features)
+        Sample to be updated.
+    y_update : array-like of shape (n_updates) or numeric
+        Updating labels or updating label.
+    mapping : array-like of shape (n_candidates)
+        The deciding mapping.
+
+    Returns
+    -------
+    X_new : np.ndarray of shape (n_new_samples, n_features)
+        The new training data set.
+    y_new : np.ndarray of shape (n_new_samples)
+        The new labels.
+    """
+    if mapping is not None:
+        check_indices([idx_update], A=mapping, unique="check_unique")
+        X_new, y_new = update_X_y(X, y, y_update, idx_update=mapping[idx_update])
+    else:
+        X_new, y_new = update_X_y(X, y, y_update, X_update=x_update)
+
+    return X_new, y_new
+
+
+def reshape_dist(dist, shape=None):
+    """Reshapes the parameters of a distribution.
+
+    Parameters
+    ----------
+    dist : scipy.stats._distn_infrastructure.rv_frozen
+        The distribution.
+    shape : tuple, optional (default = None)
+        The new shape.
+
+    Returns
+    -------
+    dist : scipy.stats._distn_infrastructure.rv_frozen
+        The reshape distribution.
+    """
+    check_type(dist, "dist", scipy.stats._distn_infrastructure.rv_frozen)
+    check_type(shape, "shape", tuple, None)
+    for idx, item in enumerate(shape):
+        check_type(item, f"shape[{idx}]", int)
+
+    for argument in ["loc", "scale", "df"]:
+        if argument in dist.kwds:
+            dist.kwds[argument].shape = shape
+
+    return dist

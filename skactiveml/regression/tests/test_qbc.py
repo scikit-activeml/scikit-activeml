@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.ensemble import BaggingRegressor
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.regression._qbc import QBC
+from skactiveml.regression._query_by_committee import QueryByCommittee
 from skactiveml.regressor._wrapper import SklearnRegressor
 
 
@@ -13,7 +13,7 @@ class TestQBC(unittest.TestCase):
         pass
 
     def test_query(self):
-        gsy = QBC(random_state=0)
+        gsy = QueryByCommittee(random_state=0)
 
         reg = SklearnRegressor(
             estimator=BaggingRegressor(LinearRegression(), n_estimators=3)

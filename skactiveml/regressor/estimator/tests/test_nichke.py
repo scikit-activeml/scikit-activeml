@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from skactiveml.regressor.estimator._nichke import NormalInverseChiKernelEstimator
 
@@ -8,7 +9,7 @@ from skactiveml.regressor.estimator._nichke import NormalInverseChiKernelEstimat
 class TestNICHE(unittest.TestCase):
     def setUp(self):
         self.X = np.array([[0, 1], [1, 0], [2, 3]])
-        self.y = np.array([1, 1, 1])
+        self.y = np.array([1, 2, 3])
 
         self.X_cand = np.array([[2, 1], [3, 5]])
 

@@ -7,7 +7,7 @@ from skactiveml.base import (
 )
 from skactiveml.utils import check_type, simple_batch
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y
+from skactiveml.utils._functions import update_X_y, update_X_y_map
 
 
 class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
@@ -38,7 +38,7 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
-            self.integration_dict = {"integration_method": "assume_linear"}
+            self.integration_dict = {"method": "assume_linear"}
 
     def query(
         self,
@@ -49,7 +49,6 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         candidates=None,
         batch_size=1,
         return_utilities=False,
-        fit_cond_est=None,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -63,8 +62,6 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL.
         cond_est: SkactivemlConditionalEstimator
             Estimates the output and the conditional distribution.
-        fit_cond_est: bool
-            Whether the conditional estimator is fitted.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -113,15 +110,8 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_eval = X
 
-        if fit_cond_est:
-            cond_est = clone(cond_est).fit(X, y, sample_weight)
-
-        def new_model_variance(x_idx, x_cand, y_pot):
-            if mapping is not None:
-                X_new, y_new = update_X_y(X, y, y_pot, idx_update=x_idx)
-            else:
-                X_new, y_new = update_X_y(X, y, y_pot, X_update=x_cand)
-
+        def new_model_variance(idx, x_cand, y_pot):
+            X_new, y_new = update_X_y_map(X, y, y_pot, idx, x_cand, mapping)
             cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
             _, new_model_std = cond_est_new.predict(X_eval, return_std=True)
 
@@ -133,14 +123,21 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
             cond_est,
             random_state=self.random_state_,
             include_x=True,
+            include_idx=True,
             **self.integration_dict
         )
+
+        if mapping is None:
+            utilities = -ex_model_variance
+        else:
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = -ex_model_variance
 
         # minimize the expected model variance by maximizing the negative
         # expected model variance
 
         return simple_batch(
-            -ex_model_variance,
+            utilities,
             batch_size=batch_size,
             random_state=self.random_state_,
             return_utilities=return_utilities,
