@@ -10,6 +10,7 @@ from sklearn.gaussian_process import (
 from sklearn.linear_model import Perceptron
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KernelDensity
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 
 from skactiveml.classifier import (
@@ -101,6 +102,9 @@ class TestSklearnClassifier(unittest.TestCase):
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertTrue(hasattr(clf, "partial_fit"))
+        clf.partial_fit(
+            self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
+        )
 
     def test_predict_proba(self):
         clf = SklearnClassifier(
@@ -170,13 +174,14 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         clf = KernelFrequencyClassifier(estimator="Test")
         self.assertEqual(clf.estimator, "Test")
         clf = KernelFrequencyClassifier(
-            missing_label="nan", estimator=SklearnClassifier(GaussianProcessRegressor())
+            estimator=KernelDensity(), missing_label="nan"
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_frequency_estimator(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(Perceptron()), frequency_estimator="Test"
+            estimator=SklearnClassifier(Perceptron()),
+            frequency_estimator="Test",
         )
         self.assertEqual(clf.frequency_estimator, "Test")
         clf = KernelFrequencyClassifier(
@@ -188,7 +193,8 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
 
     def test_init_param_frequency_max_fit_len(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(Perceptron()), frequency_max_fit_len="Test"
+            estimator=SklearnClassifier(Perceptron()),
+            frequency_max_fit_len="Test",
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = KernelFrequencyClassifier(
@@ -197,8 +203,6 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
 
     def test_fit(self):
-        # self.assertEqual(clf.kernel, clf.estimator.kernel)
-        # self.assertFalse(hasattr(clf, "kernel_"))
         clf = KernelFrequencyClassifier(
             estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
             missing_label="nan",
@@ -211,7 +215,11 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         clf = KernelFrequencyClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(GaussianProcessClassifier(), classes=["tokyo", "paris", "new york"], missing_label="nan"),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                classes=["tokyo", "paris", "new york"],
+                missing_label="nan",
+            ),
             classes=["tokyo", "paris", "new york"],
             missing_label="nan",
         )
@@ -230,6 +238,14 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertFalse(hasattr(clf, "partial_fit"))
+
+        clf = KernelFrequencyClassifier(
+            SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+            missing_label="nan",
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
 
         X = [[1], [0]]
         y_true = [1, 0]
@@ -264,15 +280,13 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
-        # is allways true since it simmulates partial_fit
         self.assertTrue(hasattr(clf, "partial_fit"))
 
     def test_predict_proba(self):
         clf = KernelFrequencyClassifier(
             estimator=SklearnClassifier(
-                GaussianProcessClassifier(),
-                missing_label="nan",
-                classes=["ny", "paris", "tokyo"]),
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict_proba, X=self.X)
@@ -292,11 +306,14 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         P_exp = np.ones((len(self.X), 1))
         np.testing.assert_array_equal(P_exp, P)
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(GaussianProcessClassifier(), classes=["ny", "paris", "tokyo"],  missing_label="nan"),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                classes=["ny", "paris", "tokyo"],
+                missing_label="nan",
+            ),
             classes=["ny", "paris", "tokyo"],
             missing_label="nan",
         )
-        # Fehlermeldung kommt wie eigentlich erwartet
         clf.fit(X=self.X, y=self.y_nan)
         P = clf.predict_proba(X=self.X)
         P_exp = np.ones((len(self.X), 3)) / 3
@@ -310,8 +327,8 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
     def test_predict(self):
         clf = KernelFrequencyClassifier(
             estimator=SklearnClassifier(
-                GaussianProcessClassifier(), 
-                missing_label='nan'),
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
@@ -329,21 +346,32 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
             y = clf.predict(X=self.X)
             self.assertEqual(len(w), 1)
         y_exp = ["tokyo"] * len(self.X)
-        # selbe problem wie bei subsam.. ist int liste und nicht string
         np.testing.assert_array_equal(y_exp, y)
 
     def test_predict_freq(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(GaussianProcessClassifier(), missing_label="nan"),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict_freq, X=self.X)
         clf.fit(X=self.X, y=self.y1)
         freq = clf.predict_freq(X=self.X)
         est = PWC(missing_label="nan").fit(X=self.X, y=self.y1)
-        # Weiß ich nicht genau ob test geändert werden muss oder freq falsch ist
         self.assertEqual(len(np.unique(freq)), 2)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
+        clf = KernelFrequencyClassifier(
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+            missing_label="nan",
+            frequency_estimator=PWC(missing_label="nan"),
+        )
+        clf.fit(X=self.X, y=self.y1)
+        freq = clf.predict_freq(X=self.X)
+        est = PWC(missing_label="nan").fit(X=self.X, y=self.y1)
+        self.assertEqual(len(np.unique(freq)), 2)
 
 
 class TestSubSampleEstimator(unittest.TestCase):
@@ -351,14 +379,12 @@ class TestSubSampleEstimator(unittest.TestCase):
         self.X = np.zeros((4, 1))
         self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
+        self.y3 = [0, 1, 0, 0]
         self.y_nan = ["nan", "nan", "nan", "nan"]
 
     def test_init_param_estimator(self):
-        clf = SubSampleEstimator(estimator="Test")
+        clf = SubSampleEstimator(estimator="Test", missing_label="nan")
         self.assertEqual(clf.estimator, "Test")
-        clf = SubSampleEstimator(
-            missing_label="nan", estimator=GaussianProcessRegressor()
-        )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_max_fit_len(self):
@@ -381,8 +407,11 @@ class TestSubSampleEstimator(unittest.TestCase):
 
     def test_fit(self):
         clf = SubSampleEstimator(
-            estimator=SklearnClassifier(GaussianProcessClassifier(), missing_label="nan",
-            classes=["tokyo", "paris"]),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                missing_label="nan",
+                classes=["tokyo", "paris"],
+            ),
             missing_label="nan",
             classes=["tokyo", "paris"],
             random_state=0,
@@ -401,7 +430,11 @@ class TestSubSampleEstimator(unittest.TestCase):
         clf = SubSampleEstimator(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf = SubSampleEstimator(
-            estimator=SklearnClassifier(GaussianProcessClassifier(), classes=["ny", "paris", "tokyo"], missing_label="nan"),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                classes=["ny", "paris", "tokyo"],
+                missing_label="nan",
+            ),
             classes=["tokyo", "paris", "new york"],
             missing_label="nan",
             only_labled=True,
@@ -420,8 +453,23 @@ class TestSubSampleEstimator(unittest.TestCase):
             self.assertEqual(len(w), 1)
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(clf.estimator_.is_fitted_)
-        # Soll der einen Haben. Wenn ja erbe von sklearn ...
         self.assertFalse(hasattr(clf, "kernel_"))
+
+        clf = SubSampleEstimator(
+            SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+            missing_label="nan",
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
+        clf = SubSampleEstimator(
+            SklearnClassifier(
+                DecisionTreeClassifier(), missing_label="nan"
+            ),
+            missing_label="nan",
+        )
+        clf.fit(self.X, self.y1, sample_weight=np.ones(len(self.y1)))
+        
 
         X = [[1], [0]]
         y_true = [1, 0]
@@ -452,17 +500,34 @@ class TestSubSampleEstimator(unittest.TestCase):
             classes=["tokyo", "paris", "new york"],
             missing_label="nan",
             only_labled=True,
+            max_fit_len=5,
+            handle_window="random",
         )
         self.assertEqual(clf.missing_label, "nan")
+        clf.partial_fit(
+            self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
+        )
         clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
-        # is allways true since it simmulates partial_fit
-        self.assertTrue(hasattr(clf, "partial_fit"))
+        clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
+        self.assertEqual(len(clf.X_train_), 5)
+        clf.partial_fit(
+            self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
+        )
+
+        clf = SubSampleEstimator(estimator=Perceptron(), classes=[0, 1])
+        clf.partial_fit(X=self.X, y=self.y3)
+        clf = SubSampleEstimator(estimator=Perceptron(), classes=[0, 1])
+        clf.partial_fit(
+            X=self.X, y=self.y3, sample_weight=np.ones_like(self.y3)
+        )
 
     def test_predict_proba(self):
         clf = SubSampleEstimator(
-            SklearnClassifier(estimator=GaussianProcessClassifier(), missing_label="nan"),
+            SklearnClassifier(
+                estimator=GaussianProcessClassifier(), missing_label="nan"
+            ),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict_proba, X=self.X)
@@ -483,15 +548,13 @@ class TestSubSampleEstimator(unittest.TestCase):
         np.testing.assert_array_equal(P_exp, P)
         clf = SubSampleEstimator(
             estimator=SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan", classes=["ny", "paris", "tokyo"]
+                GaussianProcessClassifier(),
+                missing_label="nan",
+                classes=["ny", "paris", "tokyo"],
             ),
             classes=["ny", "paris", "tokyo"],
             missing_label="nan",
         )
-        # Fehler da im try catch block eine fehlermelung ausgeworfen wird, wodurch
-        # das programm abgebrochen wird was im normal test nicht passiert. Dadurch wird
-        # n_classes nicht erstellt, was für predict proba verwendet wird
-        # TODO Label encoder rausnehmen
         clf.fit(X=self.X, y=self.y_nan)
         P = clf.predict_proba(X=self.X)
         P_exp = np.ones((len(self.X), 3)) / 3
@@ -504,7 +567,9 @@ class TestSubSampleEstimator(unittest.TestCase):
 
     def test_predict(self):
         clf = SubSampleEstimator(
-            estimator=SklearnClassifier(GaussianProcessClassifier(),missing_label="nan"),
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
