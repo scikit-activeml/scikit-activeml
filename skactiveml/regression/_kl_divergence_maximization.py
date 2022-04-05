@@ -69,6 +69,7 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         candidates=None,
         batch_size=1,
         return_utilities=False,
+        fit_cond_est=True,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -135,8 +136,11 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 "exist."
             )
 
+        if fit_cond_est:
+            cond_est = clone(cond_est).fit(X, y, sample_weight)
+
         utilities_cand = self._kullback_leibler_divergence(
-            X_cand, X_cand, mapping, cond_est, X, y, sample_weight=sample_weight
+            X, X_cand, mapping, cond_est, X, y, sample_weight=sample_weight
         )
 
         if mapping is None:

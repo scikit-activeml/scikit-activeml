@@ -5,6 +5,7 @@ from sklearn.utils import check_array
 
 from skactiveml.base import SkactivemlConditionalEstimator
 from skactiveml.utils import check_type, check_random_state, check_scalar
+from skactiveml.utils._functions import reshape_dist
 from skactiveml.utils._validation import check_callable
 
 
@@ -62,7 +63,7 @@ def conditional_expect(
     X = check_array(X, allow_nd=True)
 
     check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
-    check_type(method, "method", "monte_carlo", "assume_linear", "scipy")
+    check_type(method, "method", "monte_carlo", "assume_linear", "scipy", "quantile")
     check_type(n_monte_carlo, "n_monte_carlo", int)
     check_type(scipy_dict, "scipy_args", dict, None)
     check_type(include_idx, "include_idx", bool)
@@ -96,7 +97,7 @@ def conditional_expect(
         elif method == "assume_linear":
             y_val = cond_est.predict(X).reshape(-1, 1)
             expectation = func(*arg_filter(np.arange(len(X)), X, y_val))
-        elif method == "scipy":  # can be optimized
+        elif method == "scipy":
             for idx, x in enumerate(X):
                 cond_dist = cond_est.estimate_conditional_distribution([x])
                 expectation[idx] = cond_dist.expect(
@@ -105,7 +106,14 @@ def conditional_expect(
                     )[idx],
                     **scipy_dict,
                 )
-
+        elif method == "quantile":
+            cond_dist = reshape_dist(
+                cond_est.estimate_conditional_distribution(X), shape=(-1, 1)
+            )
+            split_val = np.arange(1, n_monte_carlo + 1) / (n_monte_carlo + 1)
+            y_val = cond_dist.ppf(split_val.reshape(1, -1))
+            output = func(*arg_filter(np.arange(len(X)), X, y_val))
+            expectation = np.average(output, axis=1)
     else:
         if method == "monte_carlo":
             for idx, x in enumerate(X):
