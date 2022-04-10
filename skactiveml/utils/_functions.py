@@ -10,7 +10,13 @@ from sklearn.utils.validation import (
     check_consistent_length,
 )
 
-from ._validation import check_indices, check_type
+from ._validation import (
+    check_indices,
+    check_type,
+    check_X_y,
+    check_scalar,
+    check_random_state,
+)
 
 
 def call_func(f_callable, only_mandatory=False, **kwargs):
@@ -65,6 +71,7 @@ def update_X_y(X, y, y_update, idx_update=None, X_update=None):
     y_new : np.ndarray of shape (n_new_samples)
         The new labels.
     """
+
     X = check_array(X)
     y = column_or_1d(check_array(y, force_all_finite=False, ensure_2d=False))
     check_consistent_length(X, y)
@@ -167,10 +174,42 @@ def bootstrap_estimators(
     sample_weight=None,
     random_state=None,
 ):
+    """Train the estimator on bootstraps of `X` and `y`.
+
+    Parameters
+    ----------
+    est : SkactivemlClassifier or SkactivemlRegressor
+        The estimator to be be trained.
+    X : array-like of shape (n_samples, n_features)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples)
+        Labels of the training data set.
+    k_bootstrap : int
+        The number of trained bootstraps.
+    n_train : int or float
+        The size of each bootstrap training data set.
+    sample_weight: array-like of shape (n_samples), optional (default=None)
+        Weights of training samples in `X`.
+    random_state : numeric | np.random.RandomState (default=None)
+        The random state to use. If `random_state is None` random
+        `random_state` is used.
+
+    Returns
+    -------
+    bootstrap_est : list of SkactivemlClassifier or SkactivemlRegressor
+        The estimators trained on different bootstraps.
+    """
+
+    check_X_y(X=X, y=y, sample_weight=sample_weight)
+    check_scalar(k_bootstrap, "k_bootstrap", int, min_val=1)
+    check_scalar(n_train, "n_train", (int, float), min_val=0, min_inclusive=False)
+    random_state = check_random_state(random_state)
+
     learners = [clone(est) for _ in range(k_bootstrap)]
     sample_indices = np.arange(len(X))
     subsets_indices = [
-        random_state.choice(sample_indices, size=int(len(X) * n_train))
+        random_state.choice(sample_indices, size=int(len(X) * n_train + 1))
         for _ in range(k_bootstrap)
     ]
 
@@ -187,7 +226,8 @@ def bootstrap_estimators(
 
 
 def reshape_dist(dist, shape=None):
-    """Reshapes the parameters of a distribution.
+    """Reshapes the parameters "loc", "scale", "df" of a distribution, if they
+    exist.
 
     Parameters
     ----------
@@ -199,7 +239,7 @@ def reshape_dist(dist, shape=None):
     Returns
     -------
     dist : scipy.stats._distn_infrastructure.rv_frozen
-        The reshape distribution.
+        The reshaped distribution.
     """
     check_type(dist, "dist", scipy.stats._distn_infrastructure.rv_frozen)
     check_type(shape, "shape", tuple, None)
