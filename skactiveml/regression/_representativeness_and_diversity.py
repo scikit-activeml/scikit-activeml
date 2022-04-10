@@ -39,7 +39,6 @@ class RepresentativenessAndDiversity(SingleAnnotatorPoolQueryStrategy):
         X,
         y,
         qs_dict=None,
-        fit_ensemble=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -58,9 +57,6 @@ class RepresentativenessAndDiversity(SingleAnnotatorPoolQueryStrategy):
         qs_dict : dict
             Dictionary for the further arguments of the query strategy besides
             `X`, `y` and `candidates`.
-        fit_ensemble : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -104,117 +100,136 @@ class RepresentativenessAndDiversity(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(self.qs, "self.qs", SingleAnnotatorPoolQueryStrategy)
+        check_type(self.qs, "self.qs", SingleAnnotatorPoolQueryStrategy, None)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-        X_labeled = X[is_labeled(X)]
-        n_labeled = len(X_labeled)
 
-        total_query_indices = np.zeros(batch_size)
+        X_labeled = X[is_labeled(y)]
+        X_cand_origin = X_cand.copy()
+        if mapping is not None:
+            mapping_origin = mapping.copy()
+
+        total_query_indices = np.zeros(batch_size, dtype=int)
         total_utilities = np.zeros((batch_size, len(X_cand)))
+        first_batch_size = max(0, min(X.shape[1] - len(X_labeled), batch_size))
+        second_batch_size = batch_size - first_batch_size
 
-        first_batch_size = np.max(0, np.min(X.shape[1] - n_labeled, batch_size))
-        if n_labeled < X.shape[1]:
-            X_copy = self.X_
-            if X_copy is None or X_copy.shape != X.shape or np.any(X_copy != X):
+        if first_batch_size > 0:
+            if self.X_ is None or not np.array_equal(X, self.X_):
                 self.X_ = X.copy()
                 self.k_means_ = KMeans(
-                    n_clusters=n_labeled + first_batch_size,
-                    random_state=self.random_state,
+                    n_clusters=min(len(X), len(X_labeled) + first_batch_size),
+                    random_state=self.random_state_,
                 )
                 self.k_means_.fit(X=X, sample_weight=sample_weight)
-            utilities_cand = self._k_means_utility(self.k_means_, X_cand, X_labeled)
 
-            first_idx, first_utilities = simple_batch(
+            l_sample_count, _ = _cluster_sample_count(self.k_means_, X_labeled, X)
+            cand_l_sample_count = l_sample_count[self.k_means_.predict(X_cand)]
+            cand_closeness = _closeness_to_cluster(self.k_means_, X_cand)
+            utilities_cand = combine_ranking(-cand_l_sample_count, cand_closeness)
+
+            first_indices, first_utilities = simple_batch(
                 utilities_cand, batch_size=first_batch_size, return_utilities=True
             )
 
-            total_query_indices[:first_batch_size] = first_utilities
+            total_query_indices[:first_batch_size] = first_indices
             total_utilities[:first_batch_size] = first_utilities
 
-            if mapping is None:
-                X_labeled = np.append(X_labeled, X_cand[first_idx], axis=0)
-                X_cand = np.delete(X_cand, first_idx, axis=0)
-            else:
-                X_labeled = np.append(X_labeled, X[first_idx], axis=0)
-                X_cand = np.delete(X_cand, mapping[first_idx], axis=0)
+            X_labeled = np.append(X_labeled, X_cand[first_indices], axis=0)
+            X_cand = np.delete(X_cand, first_indices, axis=0)
 
-        second_batch_size = batch_size - first_batch_size
-        if second_batch_size == 0:
-            if return_utilities:
-                if mapping is not None:
-                    utilities = np.zeros((batch_size, len(X)))
-                    utilities[mapping] = total_utilities
-                    total_utilities = utilities
-                return total_query_indices, total_utilities
-            else:
-                return total_query_indices
-
-        if self.qs is None:
-            k_means = KMeans(n_clusters=second_batch_size + n_labeled)
-            k_means.fit(X=X, sample_weight=sample_weight)
-            utilities_cand = self._k_means_utility(k_means, X_cand, X_labeled)
+            if mapping is not None:
+                mapping = np.delete(mapping, first_indices)
         else:
-            # cluster the candidates
-            n_cluster = batch_size + n_labeled
-            k_means = KMeans(n_clusters=n_cluster)
-            k_means.fit(X=X, sample_weight=sample_weight)
-            counts = np.bincount(k_means.predict(X))
-            X_cand_prediction = k_means.predict(X_cand)
-            covered = k_means.predict(X_labeled)
-            uncovered_clusters = ~np.isin(np.arange(n_cluster), covered)
+            first_indices = np.zeros(0, dtype=int)
 
-            cluster_ranking = combine_ranking(uncovered_clusters, counts)
+        if second_batch_size > 0:
+            self.k_means_ = KMeans(
+                n_clusters=min(len(X), len(X_labeled) + second_batch_size),
+                random_state=self.random_state_,
+            )
+            self.k_means_.fit(X=X, sample_weight=sample_weight)
+
+            l_sample_count, t_sample_count = _cluster_sample_count(
+                self.k_means_, X_labeled, X
+            )
+            cand_clusters = self.k_means_.predict(X_cand)
+            cluster_ranking = combine_ranking(-l_sample_count, t_sample_count)
             sorted_clusters = np.argsort(cluster_ranking)
-            n_covered = 0
+
             qs_utilities = np.zeros(len(X_cand))
 
             # decide for each cluster where to query
             for cluster in sorted_clusters:
-                is_cluster_cand = X_cand_prediction == cluster
-                if n_covered >= second_batch_size:
-                    break
+                is_cluster_cand = cand_clusters == cluster
+
                 if mapping is None:
                     cluster_candidates = X_cand[is_cluster_cand]
                 else:
                     cluster_candidates = mapping[is_cluster_cand]
-                _, utilities = self.qs.query(
-                    X,
-                    y,
-                    candidates=cluster_candidates,
-                    batch_size=1,
-                    **qs_dict,
-                )
-                if mapping is None:
-                    qs_utilities[is_cluster_cand] = utilities
+
+                if np.sum(is_cluster_cand) == 0:
+                    utilities = np.zeros(0)
+                elif self.qs is not None:
+                    _, utilities = self.qs.query(
+                        X,
+                        y,
+                        candidates=cluster_candidates,
+                        batch_size=1,
+                        **qs_dict,
+                    )
                 else:
-                    idx_cluster = mapping[is_cluster_cand]
-                    qs_utilities[is_cluster_cand] = utilities[idx_cluster]
-                n_covered += np.sum(is_cluster_cand)
+                    utilities = _closeness_to_cluster(
+                        self.k_means_, X_cand[is_cluster_cand]
+                    )
 
-            count_utilities = counts[X_cand_prediction]
-            uncovered_utilities = uncovered_clusters[X_cand_prediction]
+                qs_utilities[is_cluster_cand] = utilities
 
-            utilities_cand = combine_ranking(
-                uncovered_utilities, count_utilities, qs_utilities
+            cand_cluster_ranking = cluster_ranking[cand_clusters]
+            if self.qs is None:
+                utilities_cand = cand_cluster_ranking + qs_utilities
+            else:
+                utilities_cand = combine_ranking(cand_cluster_ranking, qs_utilities)
+
+            # batch regarding the remaining candidates after the first batch
+            second_indices_off, second_utilities_off = simple_batch(
+                utilities_cand, batch_size=second_batch_size, return_utilities=True
             )
+            # indices for X_cand of the remaining candidates after the first batch
+            other_indices = np.delete(np.arange(len(X_cand_origin)), first_indices)
+            second_indices = other_indices[second_indices_off]
+            second_utilities = np.full((second_batch_size, len(X_cand_origin)), np.nan)
+            second_utilities[:, other_indices] = second_utilities_off
 
-        second_idx, second_utilities = simple_batch(
-            utilities_cand, batch_size=first_batch_size, return_utilities=True
-        )
+            total_query_indices[first_batch_size:] = second_indices
+            total_utilities[first_batch_size:] = second_utilities
 
-        total_query_indices[:first_batch_size] = second_idx
-        total_utilities[:first_batch_size] = second_utilities
+        if mapping is None:
+            utilities = total_utilities
+            query_indices = total_query_indices
+        else:
+            utilities = np.full((batch_size, len(X)), np.nan)
+            utilities[:, mapping_origin] = total_utilities
+            query_indices = mapping_origin[total_query_indices]
 
         if return_utilities:
-            return total_query_indices, total_utilities
+            return query_indices, utilities
         else:
-            return total_query_indices
+            return query_indices
 
-    def _k_means_utility(self, k_means, X_cand, X_labeled):
-        clusters = k_means.predict(X_cand)
-        distances = np.min(self.k_means_.transform(X_cand), axis=1)
-        covered = k_means.predict(X_labeled)
-        uncovered = ~np.isin(clusters, covered)
-        closeness = np.exp(-distances)
-        return uncovered + closeness
+
+def _cluster_sample_count(k_means, X_labeled, X):
+    labeled_samples_per_cluster = np.bincount(
+        k_means.predict(X_labeled) if len(X_labeled) != 0 else np.zeros(0, dtype=int),
+        minlength=k_means.n_clusters,
+    )
+    total_samples_per_cluster = np.bincount(
+        k_means.predict(X), minlength=k_means.n_clusters
+    )
+    return labeled_samples_per_cluster, total_samples_per_cluster
+
+
+def _closeness_to_cluster(k_means, X_cand):
+    cand_distances = np.min(k_means.transform(X_cand), axis=1)
+    cand_closeness = 1 / 2 * np.exp(-cand_distances)
+    return cand_closeness

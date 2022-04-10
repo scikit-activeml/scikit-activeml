@@ -3,7 +3,7 @@ from sklearn import clone
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
 from skactiveml.regression._greedy_sampling_x import GSx
-from skactiveml.utils import check_type, is_labeled
+from skactiveml.utils import check_type, is_labeled, check_scalar
 
 
 class GSy(SingleAnnotatorPoolQueryStrategy):
@@ -97,6 +97,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", SkactivemlRegressor)
+        check_scalar(self.k_0, "self.k_0", int, min_val=1)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -153,7 +154,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
 
             gs = GSx(metric=self.y_metric, random_state=self.random_state)
             query_indices_y, utilities_y = gs.query(
-                # use 0 as a default value
+                # replace missing_value by 0, since it does not implement
                 X=np.where(is_labeled(y_to_X), y_to_X, 0).reshape(-1, 1),
                 y=y_new,
                 candidates=y_candidate,

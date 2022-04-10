@@ -590,20 +590,30 @@ def check_type(obj, name, *target_types):
         all(not isinstance(obj, target_type) for target_type in target_types)
         and obj not in target_vals
     ):
+        error_str = f"`{name}` "
+        if len(target_vals) == 0 and len(target_types) > 0:
+            error_str += f"has type `{type(obj)}` "
+        elif len(target_vals) > 0 and len(target_types) == 0:
+            error_str += f"has value `{obj}` "
+        else:
+            error_str += f"has type `{type(obj)}` and value `{obj}` "
 
-        error_str = f"`{name}` has type `{type(obj)}` but must have "
+        error_str += "but must "
+
         if len(target_types) == 1:
-            error_str += f"type `{target_types[0]}`"
+            error_str += f"have type `{target_types[0]}` "
         elif 1 <= len(target_types) <= 3:
-            error_str += "type "
+            error_str += "have type "
             for i in range(len(target_types) - 1):
                 error_str += f"`{target_types[i]}`,"
-            error_str += f" or `{target_types[len(target_types) - 1]}`"
-        else:
-            error_str += f"one of the following types: {set(target_types)}"
+            error_str += f" or `{target_types[len(target_types) - 1]}` "
+        elif len(target_types) > 3:
+            error_str += f"have one of the following types: {set(target_types)} "
 
-        if len(list(target_vals)) >= 1:
-            error_str += f" or equal one of the following values: {set(target_vals)}"
+        if len(target_vals) >= 1:
+            if len(target_types) > 0:
+                error_str = "or "
+            error_str += f"equal one of the following values: {set(target_vals)}"
         raise TypeError(error_str + ".")
 
 

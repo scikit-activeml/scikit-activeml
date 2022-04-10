@@ -7,7 +7,10 @@ from skactiveml.base import (
 )
 from skactiveml.utils import check_type, simple_batch, check_random_state
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y, reshape_dist, update_X_y_map
+from skactiveml.utils._functions import (
+    reshape_dist,
+    update_reg,
+)
 
 
 class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
@@ -57,7 +60,7 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         else:
             self.integration_dict_cross_entropy = {
                 "method": "monte_carlo",
-                "n_monte_carlo": 10,
+                "n_integration_samples": 10,
             }
 
     def query(
@@ -129,13 +132,6 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        if sample_weight is not None and mapping is not None:
-            raise ValueError(
-                "If `sample_weight` is not `None`a mapping "
-                "between candidates and the training dataset must "
-                "exist."
-            )
-
         if fit_cond_est:
             cond_est = clone(cond_est).fit(X, y, sample_weight)
 
@@ -188,12 +184,20 @@ class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         """
 
         def new_cross_entropy(idx, x_cand, y_pot):
-            X_new, y_new = update_X_y_map(X, y, y_pot, idx, x_cand, mapping)
-            new_cond_est = clone(cond_est).fit(X_new, y_new, sample_weight)
-            entropy_post = np.sum(new_cond_est.predict(X_eval, return_entropy=True)[1])
+            cond_est_new = update_reg(
+                cond_est,
+                X,
+                y,
+                sample_weight=sample_weight,
+                y_update=y_pot,
+                idx_update=idx,
+                X_update=x_cand,
+                mapping=mapping,
+            )
+            entropy_post = np.sum(cond_est_new.predict(X_eval, return_entropy=True)[1])
             cross_ent = cross_entropy(
                 X_eval,
-                new_cond_est,
+                cond_est_new,
                 cond_est,
                 integration_dict=self.integration_dict_cross_entropy,
                 random_state=self.random_state_,

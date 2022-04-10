@@ -7,7 +7,7 @@ from skactiveml.base import (
 )
 from skactiveml.utils import check_type, simple_batch
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y_map
+from skactiveml.utils._functions import update_reg
 from skactiveml.utils._validation import check_callable
 
 
@@ -38,7 +38,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(self, random_state=None, integration_dict=None, loss=None):
         super().__init__(random_state=random_state)
-        self.loss = loss if loss is not None else lambda x, y: np.sum((x - y) ** 2)
+        self.loss = loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
@@ -126,8 +126,16 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         y_pred = cond_est.predict(X_eval)
 
         def model_output_change(idx, x_cand, y_pot):
-            X_new, y_new = update_X_y_map(X, y, y_pot, idx, x_cand, mapping)
-            cond_est_new = clone(cond_est).fit(X_new, y_new, sample_weight)
+            cond_est_new = update_reg(
+                cond_est,
+                X,
+                y,
+                sample_weight=sample_weight,
+                y_update=y_pot,
+                idx_update=idx,
+                X_update=x_cand,
+                mapping=mapping,
+            )
             y_pred_new = cond_est_new.predict(X_eval)
 
             return loss(y_pred, y_pred_new)

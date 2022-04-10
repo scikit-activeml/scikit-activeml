@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.utils import rand_argmin, rand_argmax, simple_batch
+from skactiveml.utils._selection import combine_ranking
 
 
 class TestSelection(unittest.TestCase):
@@ -99,3 +100,13 @@ class TestSelection(unittest.TestCase):
             return_utilities=False,
         )
         np.testing.assert_equal((0, 2), indices.shape)
+
+    def test_combine_ranking(self):
+
+        ranking_1 = np.array([0.1, 0.2, 0.4])
+        new_ranking = combine_ranking(ranking_1)
+        np.testing.assert_array_equal(ranking_1, new_ranking)
+
+        ranking_2 = np.array([0, 1, 1])
+        com_ranking = combine_ranking(ranking_2, ranking_1)
+        print(com_ranking)

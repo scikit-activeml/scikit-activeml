@@ -81,11 +81,12 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         query_indices = np.zeros(batch_size, dtype=int)
+        is_sample = np.arange(len(X), dtype=int)
 
         if mapping is None:
             X_all = np.append(X, X_cand, axis=0)
             selected_indices = labeled_indices(y)
-            candidate_indices = len(X) + np.arange(0, len(X_cand), dtype=int)
+            candidate_indices = len(X) + np.arange(len(X_cand), dtype=int)
         else:
             X_all = X
             selected_indices = labeled_indices(y)
@@ -96,7 +97,7 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
 
         for i in range(batch_size):
             if selected_indices.shape[0] == 0:
-                dist = distances[candidate_indices][:, candidate_indices]
+                dist = distances[candidate_indices][:, is_sample]
                 util = -np.sum(dist, axis=1)
             else:
                 dist = distances[candidate_indices][:, selected_indices]

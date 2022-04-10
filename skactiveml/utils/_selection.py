@@ -144,28 +144,34 @@ def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=Fa
 
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
-    """Combine different utilities hierarchically to one utility assignment.
+    """Combine different rankings hierarchically to one ranking assignment.
+    For a ranking index i is ranked higher than index j iff
+    ranking[i] > ranking[j].
+    For the combined ranking it will hold that the first ranking of iter_ranking
+    always determines the ranking position at an index, and only when
+    two ranking assignments are equal the second ranking will determine
+    the ranking position and so forth.
 
     Parameters
     ----------
     iter_ranking : iterable of array-like
-        The different utilities. They must share a common shape in the sense
+        The different rankings. They must share a common shape in the sense
         that the have the same number of dimensions and are broadcastable by
         numpy. If the common shape has more than two dimensions.
     rank_method : string, optional (default = None)
         The method by which the utilities are ranked. See `scipy.rankdata`s
         argument `method` for details.
-    rank_per_batch: bool, optional (default = False)
-        Whether the last index is the batch size and is not used for ranking
+    rank_per_batch : bool, optional (default = False)
+        Whether the first index determines the batch and is not used for ranking
 
     Returns
     -------
-    combined_utilities : np.ndarray
-        The combined utilities.
+    combined_ranking : np.ndarray
+        The combined ranking.
     """
 
     if rank_method is None:
-        rank_method = "min"
+        rank_method = "dense"
     check_type(rank_method, "rank_method", str)
     check_type(rank_per_batch, "rank_per_batch", bool)
 
@@ -184,34 +190,36 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
             )
     np.broadcast_shapes(*(u.shape for u in iter_ranking))
 
-    iter_ranking = [i for i in reversed(iter_ranking)]
     combined_ranking = iter_ranking[0]
 
     for idx in range(1, len(iter_ranking)):
-        next_utilities = iter_ranking[idx]
-        nu_shape = next_utilities.shape
+        next_ranking = iter_ranking[idx]
+        cr_shape = combined_ranking.shape
         if rank_per_batch:
-            rank_shape = (nu_shape[0], max(reduce(operator.mul, nu_shape[1:], 1), 1))
+            rank_shape = (cr_shape[0], max(reduce(operator.mul, cr_shape[1:], 1), 1))
             rank_dict = {"method": rank_method, "axis": 1}
         else:
-            rank_shape = reduce(operator.mul, nu_shape, 1)
+            rank_shape = reduce(operator.mul, cr_shape, 1)
             rank_dict = {"method": rank_method}
 
-        rank_next_utilities = next_utilities.reshape(rank_shape)
-        # exchange nan values to make `rankdata` work.
-        nan_values = np.isnan(rank_next_utilities)
-        rank_next_utilities[nan_values] = -np.inf
-        rank_next_utilities = rankdata(rank_next_utilities, **rank_dict).astype(float)
-        rank_next_utilities[nan_values] = np.nan
-        next_utilities = rank_next_utilities.reshape(nu_shape)
+        combined_ranking = combined_ranking.reshape(rank_shape)
 
-        if combined_ranking.min() != combined_ranking.max():
-            combined_ranking = (
+        # exchange nan values to make rankdata work.
+        nan_values = np.isnan(combined_ranking)
+        combined_ranking[nan_values] = -np.inf
+        combined_ranking = rankdata(combined_ranking, **rank_dict).astype(float)
+        combined_ranking[nan_values] = np.nan
+        combined_ranking = combined_ranking.reshape(cr_shape)
+
+        if next_ranking.min() != next_ranking.max() and (
+            next_ranking.min() < 0 or next_ranking.max() >= 1
+        ):
+            next_ranking = (
                 1
-                / (combined_ranking.max() - combined_ranking.min() + 1)
-                * (combined_ranking - combined_ranking.min())
+                / (next_ranking.max() - next_ranking.min() + 1)
+                * (next_ranking - next_ranking.min())
             )
 
-        combined_ranking = combined_ranking + next_utilities
+        combined_ranking = combined_ranking + next_ranking
 
     return combined_ranking

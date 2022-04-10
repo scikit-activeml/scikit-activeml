@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import numpy as np
 from sklearn import clone
 
@@ -7,10 +5,9 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlConditionalEstimator,
 )
-from skactiveml.regressor.estimator._nichke import NormalInverseChiKernelEstimator
 from skactiveml.utils import check_type, simple_batch
 from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_X_y, update_X_y_map
+from skactiveml.utils._functions import update_reg
 
 
 class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
@@ -120,13 +117,6 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         if fit_cond_est:
             cond_est = clone(cond_est).fit(X, y, sample_weight)
 
-        if sample_weight is not None and mapping is not None:
-            raise ValueError(
-                "If `sample_weight` is not `None`, a mapping "
-                "between candidates and the training dataset must "
-                "exist."
-            )
-
         utilities_cand = self._mutual_information(
             X, X_cand, mapping, cond_est, X, y, sample_weight
         )
@@ -174,9 +164,17 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         prior_entropy = np.sum(cond_est.predict(X_eval, return_entropy=True)[1])
 
         def new_entropy(idx, x_cand, y_pot):
-            X_new, y_new = update_X_y_map(X, y, y_pot, idx, x_cand, mapping)
-            new_cond_est = clone(cond_est).fit(X_new, y_new, sample_weight)
-            _, entropy_cand = new_cond_est.predict(X_eval, return_entropy=True)
+            cond_est_new = update_reg(
+                cond_est,
+                X,
+                y,
+                sample_weight=sample_weight,
+                y_update=y_pot,
+                idx_update=idx,
+                X_update=x_cand,
+                mapping=mapping,
+            )
+            _, entropy_cand = cond_est_new.predict(X_eval, return_entropy=True)
             potentials_post_entropy = np.sum(entropy_cand)
             return potentials_post_entropy
 

@@ -1,6 +1,7 @@
 import itertools
 
 import numpy as np
+from scipy import integrate
 from sklearn.utils import check_array
 
 from skactiveml.base import SkactivemlConditionalEstimator
@@ -14,8 +15,9 @@ def conditional_expect(
     func,
     cond_est,
     method=None,
-    n_monte_carlo=10,
-    scipy_dict=None,
+    quantile_method=None,
+    n_integration_samples=10,
+    quad_dict=None,
     random_state=None,
     include_x=False,
     include_idx=False,
@@ -32,16 +34,39 @@ def conditional_expect(
         The function that transforms the random variable.
     cond_est: SkactivemlConditionalEstimator
         Distribution over which the expectation is calculated.
-    method: string, default='monte_carlo'
-        The method by which the expectation is computed:
-        -'monte_carlo' basic monte carlo integration using random sampling.
+    method: string, optional, optional (default=None)
+        The method by which the expectation is computed.
         -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
-          thereby computes only the function applied to the expected value.
-        -'scipy' uses `scipy` function `expect` on the `rv_continuous` random
-          variable of `cond_est`.
-    n_monte_carlo: int, optional (default=10)
-        The number of monte carlo samples used.
-    scipy_dict: dict, optional (default=None)
+          thereby only takes the function value at the expected y value.
+        -'monte_carlo' Basic monte carlo integration. Taking the average
+          of randomly drawn samples. `n_integration_samples` specifies the
+          number of monte carlo samples.
+        -'quantile' Uses the quantile function to transform the integration
+          space into the interval from 0 to 1 and than uses the method from
+          'quantile_method' to calculate the integral. The number of integration
+          points is specified by `n_integration_samples`.
+        -'quad' uses `scipy's` function `expect` on the `rv_continuous` random
+          variable of `cond_est`, which in turn uses a dynamic gaussian
+          quadrature routine for calculating the integral. Performance is worse
+          using a vector function.
+        If `method is None` quantile is used.
+    quantile_method: string, optional (default=None)
+        Specifies the integration methods used after the quantile
+        transformation.
+        -'trapezoid' Trapezoidal method for integration using evenly spaced
+          samples.
+        -'simpson' Simpson method for integration using evenly spaced samples.
+        -'average' Taking the average value for integration using evenly spaced
+          samples.
+        -'romberg' Romberg method for integration. If `n_integration_samples` is
+          not equal to `2**k + 1` for a natural number k, the number of
+          samples used for integration is put to the smallest such number greater
+          than `n_integration_samples`.
+        -'quadrature' Gaussian quadrature method for integration.
+        If `quantile_method is None` quadrature is used.
+    n_integration_samples: int, optional (default=10)
+        The number of integration samples used in 'quantile' and 'monte_carlo'.
+    quad_dict: dict, optional (default=None)
         Further arguments for using `scipy's` `expect`
     random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
@@ -49,30 +74,55 @@ def conditional_expect(
         If `include_x` is `True`, `func` also takes the x value.
     include_idx: bool, optional (default=False)
         If `include_idx` is `True`, `func` also takes the index of the x value.
-    vector_func: bool, optional (default=False)
+    vector_func: bool or str, optional (default=False)
         If `vector_func` is `True`, the integration values are passed as a whole
-        to the function `func`.
+        to the function `func`. If `vector_func` is 'optional', the integration
+        values might or might not be passed as a whole. The integration values
+        if passed as a whole are of the form (n_samples, n_integration), where
+        n_integration denotes the number of integration values.
 
 
     Returns
     -------
-    expectation : numpy.ndarray of shape (n_1, ..., n_i-1, n_i+1, ..., n_m)
-        The conditional expectation for each value applied
+    expectation : numpy.ndarray of shape (n_samples)
+        The conditional expectation for each value applied.
     """
 
     X = check_array(X, allow_nd=True)
 
     check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
-    check_type(method, "method", "monte_carlo", "assume_linear", "scipy", "quantile")
-    check_type(n_monte_carlo, "n_monte_carlo", int)
-    check_type(scipy_dict, "scipy_args", dict, None)
+    check_type(
+        method, "method", "monte_carlo", "assume_linear", "quad", "quantile", None
+    )
+    check_type(
+        quantile_method,
+        "quantile_method",
+        "trapezoid",
+        "simpson",
+        "average",
+        "romberg",
+        "quadrature",
+        None,
+    )
+    check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
+    check_type(quad_dict, "scipy_args", dict, None)
     check_type(include_idx, "include_idx", bool)
     check_type(include_x, "include_x", bool)
-    check_type(vector_func, "vector_func", bool)
+    check_type(vector_func, "vector_func", bool, "optional")
     check_callable(func, "func", n_free_parameters=1 + include_idx + include_x)
 
-    if scipy_dict is None:
-        scipy_dict = {}
+    if method is None:
+        method = "quantile"
+    if quantile_method is None:
+        quantile_method = "quadrature"
+    if quad_dict is None:
+        quad_dict = {}
+    if method == "quantile" and quantile_method == "romberg":
+        # n_integration_samples need to be of the form 2**k + 1
+        n_integration_samples = int(np.log2(n_integration_samples) + 1) + 1
+    is_optional = vector_func == "optional"
+    if is_optional:
+        vector_func = True
 
     random_state = check_random_state(random_state)
 
@@ -85,55 +135,83 @@ def conditional_expect(
         ret += (y,)
         return ret
 
+    def evaluate_func(inner_potential_y):
+        if vector_func:
+            inner_output = func(*arg_filter(np.arange(len(X)), X, inner_potential_y))
+        else:
+            inner_output = np.zeros_like(inner_potential_y)
+            for idx_x, inner_x in enumerate(X):
+                for idx_y, y_val in enumerate(inner_potential_y[idx_x]):
+                    inner_output[idx_x, idx_y] = func(
+                        *arg_filter(idx_x, inner_x, y_val)
+                    )
+        return inner_output
+
     expectation = np.zeros(len(X))
 
-    if vector_func:
-        if method == "monte_carlo":
-            potential_y_vals = cond_est.sample_y(
-                X=X, n_rv_samples=n_monte_carlo, random_state=random_state
+    if method in ["assume_linear", "monte_carlo"]:
+        if method == "assume_linear":
+            potential_y = cond_est.predict(X).reshape(-1, 1)
+        else:  # method equals "monte_carlo"
+            potential_y = cond_est.sample_y(
+                X=X, n_rv_samples=n_integration_samples, random_state=random_state
             )
-            output = func(*arg_filter(np.arange(len(X)), X, potential_y_vals))
-            expectation = np.average(output, axis=1)
-        elif method == "assume_linear":
-            y_val = cond_est.predict(X).reshape(-1, 1)
-            expectation = func(*arg_filter(np.arange(len(X)), X, y_val))
-        elif method == "scipy":
-            for idx, x in enumerate(X):
-                cond_dist = cond_est.estimate_conditional_distribution([x])
-                expectation[idx] = cond_dist.expect(
-                    lambda y: func(
-                        *arg_filter(np.arange(len(X)), X, np.full((len(X), 1), y))
-                    )[idx],
-                    **scipy_dict,
-                )
-        elif method == "quantile":
+        expectation = np.average(evaluate_func(potential_y), axis=1)
+    elif method == "quantile":
+        if quantile_method in ["trapezoid, simpson, average, romberg"]:
+            eval_points = np.arange(1, n_integration_samples + 1) / (
+                n_integration_samples + 1
+            )
             cond_dist = reshape_dist(
                 cond_est.estimate_conditional_distribution(X), shape=(-1, 1)
             )
-            split_val = np.arange(1, n_monte_carlo + 1) / (n_monte_carlo + 1)
-            y_val = cond_dist.ppf(split_val.reshape(1, -1))
-            output = func(*arg_filter(np.arange(len(X)), X, y_val))
-            expectation = np.average(output, axis=1)
-    else:
-        if method == "monte_carlo":
-            for idx, x in enumerate(X):
-                potential_y_vals = cond_est.sample_y(
-                    X=[x], n_rv_samples=n_monte_carlo, random_state=random_state
-                )[0]
-                output = np.zeros_like(potential_y_vals)
-                for i, y_val in enumerate(potential_y_vals):
-                    output[i] = func(*arg_filter(idx, x, y_val))
+            potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
+            output = evaluate_func(potential_y)
 
-                expectation[idx] = np.average(output)
-        elif method == "assume_linear":
-            for idx, x in enumerate(X):
-                y_val = cond_est.predict([x])[0]
-                expectation[idx] = func(*arg_filter(idx, x, y_val))
-        elif method == "scipy":
-            for idx, x in enumerate(X):
-                cond_dist = cond_est.estimate_conditional_distribution([x])
-                expectation[idx] = cond_dist.expect(
-                    lambda y: func(*arg_filter(idx, x, y)), **scipy_dict
+            if quantile_method == "trapezoid":
+                expectation = integrate.trapezoid(
+                    output, dx=1 / n_integration_samples, axis=1
                 )
+            elif quantile_method == "simpson":
+                expectation = integrate.simpson(
+                    output, dx=1 / n_integration_samples, axis=1
+                )
+            elif quantile_method == "average":
+                expectation = np.average(output, axis=-1)
+            else:  # quantile_method equals "romberg"
+                expectation = integrate.romb(
+                    output, dx=1 / n_integration_samples, axis=1
+                )
+        else:  # quantile_method equals "quadrature"
+
+            def fixed_quad_function_wrapper(inner_eval_points):
+                inner_cond_dist = reshape_dist(
+                    cond_est.estimate_conditional_distribution(X), shape=(-1, 1)
+                )
+                inner_potential_y = inner_cond_dist.ppf(
+                    inner_eval_points.reshape(1, -1)
+                )
+
+                return evaluate_func(inner_potential_y)
+
+            expectation, _ = integrate.fixed_quad(
+                fixed_quad_function_wrapper, 0, 1, n=n_integration_samples
+            )
+    else:  # method equals "quad"
+        for idx, x in enumerate(X):
+            cond_dist = cond_est.estimate_conditional_distribution([x])
+
+            def quad_function_wrapper(y):
+                if is_optional or not vector_func:
+                    return func(*arg_filter(idx, x, y))
+                else:
+                    return func(
+                        *arg_filter(np.arange(len(X)), X, np.full((len(X), 1), y))
+                    )[idx]
+
+            expectation[idx] = cond_dist.expect(
+                quad_function_wrapper,
+                **quad_dict,
+            )
 
     return expectation
