@@ -1,19 +1,13 @@
 import unittest
 
 import numpy as np
-import sklearn
-from sklearn.gaussian_process import GaussianProcessRegressor
 
-from skactiveml.regression._expected_model_variance import (
+from skactiveml.pool.regression._expected_model_variance import (
     ExpectedModelVarianceMinimization,
 )
-from skactiveml.regression._mutual_information_maximization import (
-    MutualInformationGainMaximization,
+from skactiveml.pool.regression._representativeness_and_diversity import (
+    RD,
 )
-from skactiveml.regression._representativeness_and_diversity import (
-    RepresentativenessAndDiversity,
-)
-from skactiveml.regressor._wrapper import SklearnConditionalEstimator
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -22,22 +16,17 @@ class TestMIM(unittest.TestCase):
         pass
 
     def test_query(self):
-        qs = RepresentativenessAndDiversity()
+        qs = RD()
 
         X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
-        X = np.array(
-            [
-                [1, 2],
-                [3, 4],
-            ]
-        )
+        X = np.array([[1, 2], [3, 4]])
         y = np.array([0, 1])
 
         query_indices = qs.query(X, y, candidates=X_cand, batch_size=2)
         print(query_indices)
 
     def test_query_2(self):
-        qs = RepresentativenessAndDiversity()
+        qs = RD()
 
         X = np.array([[1, 2], [3, 4], [0, 0], [0, 1], [-10, 1]])
         y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
@@ -46,7 +35,7 @@ class TestMIM(unittest.TestCase):
         print(query_indices)
 
     def test_query_3(self):
-        qs = RepresentativenessAndDiversity()
+        qs = RD()
 
         X = np.array([[1, 2], [3, 4], [0, 0], [0, 1], [-10, 1]])
         y = np.array([1.0] + [MISSING_LABEL] * 4)
@@ -55,4 +44,4 @@ class TestMIM(unittest.TestCase):
         print(query_indices)
 
     def test_query_4(self):
-        qs = RepresentativenessAndDiversity(qs=ExpectedModelVarianceMinimization())
+        qs = RD(qs=ExpectedModelVarianceMinimization())

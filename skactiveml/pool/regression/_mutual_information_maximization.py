@@ -6,8 +6,8 @@ from skactiveml.base import (
     SkactivemlConditionalEstimator,
 )
 from skactiveml.utils import check_type, simple_batch
-from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_reg
+from skactiveml.pool.regression.utils._integration import conditional_expect
+from skactiveml.pool.regression.utils._model_fitting import update_reg
 
 
 class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
@@ -48,9 +48,9 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         cond_est,
         sample_weight=None,
         candidates=None,
+        fit_cond_est=True,
         batch_size=1,
         return_utilities=False,
-        fit_cond_est=True,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -64,9 +64,6 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL.
         cond_est: SkactivemlConditionalEstimator
             Estimates the entropy.
-        fit_cond_est : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -79,6 +76,9 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
+        fit_cond_est : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)

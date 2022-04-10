@@ -4,8 +4,9 @@ import numpy as np
 from sklearn.ensemble import BaggingRegressor
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.regression._query_by_committee import QueryByCommittee
+from skactiveml.pool.regression import QueryByCommittee
 from skactiveml.regressor._wrapper import SklearnRegressor
+from skactiveml.regressor.estimator import NormalInverseChiKernelEstimator
 
 
 class TestQBC(unittest.TestCase):
@@ -15,9 +16,7 @@ class TestQBC(unittest.TestCase):
     def test_query(self):
         gsy = QueryByCommittee(random_state=0)
 
-        reg = SklearnRegressor(
-            estimator=BaggingRegressor(LinearRegression(), n_estimators=3)
-        )
+        reg = NormalInverseChiKernelEstimator()
 
         X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
         X = np.array([[1, 2], [3, 6], [5, 4], [7, 8]])

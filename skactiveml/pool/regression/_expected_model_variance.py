@@ -1,48 +1,53 @@
-from copy import deepcopy
-
 import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    SkactivemlRegressor,
+    SkactivemlConditionalEstimator,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, simple_batch, check_scalar
-from skactiveml.utils._functions import bootstrap_estimators
+from skactiveml.utils import check_type, simple_batch
+from .utils._integration import conditional_expect
+from .utils._model_fitting import update_reg
 
 
-class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
-    """Expected Model Change
+class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
+    """Expected model variance minimization
 
-    This class implements expected model output change.
+    This class implements the active learning strategy expected model variance
+    minimization, which tries to select the sample that minimizes the expected
+    model variance.
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
-    k_bootstraps: int, optional (default=3)
-        The number of bootstraps used to estimate the true model.
-    n_train: int or float, optional (default=0.5)
-        The size of a bootstrap compared to the training data.
-    ord: int or string (default=2)
-        The Norm to measure the gradient. Argument will be passed to
-        `np.linalg.norm`.
+    integration_dict: dict, optional (default=None)
+        Dictionary for integration arguments, i.e. `integration method` etc.,
+        used for calculating the expected `y` value for the candidate samples.
+        For details see method `conditional_expect`.
+
+    References
+    ----------
+    [1] Cohn, David A and Ghahramani, Zoubin and Jordan, Michael I. Active
+        learning with statistical models, pages 129--145, 1996.
+
     """
 
-    def __init__(self, k_bootstraps=3, n_train=0.5, ord=2, random_state=None):
+    def __init__(self, random_state=None, integration_dict=None):
         super().__init__(random_state=random_state)
-        self.k_bootstraps = k_bootstraps
-        self.n_train = n_train
-        self.ord = ord
+        if integration_dict is not None:
+            self.integration_dict = integration_dict
+        else:
+            self.integration_dict = {"method": "assume_linear"}
 
     def query(
         self,
         X,
         y,
-        reg,
-        fit_reg=True,
+        cond_est,
         sample_weight=None,
         candidates=None,
+        fit_cond_est=True,
         batch_size=1,
         return_utilities=False,
     ):
@@ -56,11 +61,8 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        reg: SkactivemlRegressor
-            Regressor to predict the data.
-        fit_reg : bool, optional (default=True)
-            Defines whether the regressor should be fitted on `X`, `y`, and
-            `sample_weight`.
+        cond_est: SkactivemlConditionalEstimator
+            Estimates the output and the conditional distribution.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -73,6 +75,9 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
+        fit_cond_est : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -99,42 +104,47 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
-
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, "reg", SkactivemlRegressor)
-        check_scalar(
-            self.n_train,
-            "self.n_train",
-            (int, float),
-            min_val=0,
-            max_val=1,
-            min_inclusive=False,
-        )
-        check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
-
-        if fit_reg:
-            reg = clone(reg).fit(X, y, sample_weight)
+        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
+        check_type(self.integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_eval = X
 
-        learners = bootstrap_estimators(
-            reg,
-            X,
-            y,
-            k_bootstrap=self.k_bootstraps,
-            n_train=self.n_train,
-            sample_weight=sample_weight,
+        if fit_cond_est:
+            cond_est = clone(cond_est).fit(X, y, sample_weight)
+
+        old_model_variance = cond_est.predict(X_eval, return_std=True)[1] ** 2
+
+        def new_model_variance(idx, x_cand, y_pot):
+            cond_est_new = update_reg(
+                cond_est,
+                X,
+                y,
+                sample_weight=sample_weight,
+                y_update=y_pot,
+                idx_update=idx,
+                X_update=x_cand,
+                mapping=mapping,
+            )
+            _, new_model_std = cond_est_new.predict(X_eval, return_std=True)
+
+            return np.average(new_model_std**2)
+
+        ex_model_variance = conditional_expect(
+            X_cand,
+            new_model_variance,
+            cond_est,
             random_state=self.random_state_,
+            include_x=True,
+            include_idx=True,
+            **self.integration_dict
         )
 
-        results_learner = np.array([learner.predict(X_cand) for learner in learners])
-        pred = reg.predict(X_cand).reshape(1, -1)
-        scalars = np.average(np.abs(results_learner - pred), axis=0)
-        norms = np.linalg.norm(X_cand, ord=self.ord, axis=1)
-        utilities_cand = np.multiply(scalars, norms)
+        utilities_cand = old_model_variance - ex_model_variance
 
         if mapping is None:
             utilities = utilities_cand
@@ -142,9 +152,12 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
+        # minimize the expected model variance by maximizing the negative
+        # expected model variance
+
         return simple_batch(
             utilities,
-            self.random_state_,
             batch_size=batch_size,
+            random_state=self.random_state_,
             return_utilities=return_utilities,
         )

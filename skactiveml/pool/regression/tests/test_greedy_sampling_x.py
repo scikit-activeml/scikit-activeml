@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from skactiveml.regression._greedy_sampling_x import GSx
+from skactiveml.pool.regression._greedy_sampling_x import GSx
 
 
 class TestGSx(unittest.TestCase):

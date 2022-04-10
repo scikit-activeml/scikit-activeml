@@ -1,13 +1,15 @@
-import itertools
-
 import numpy as np
+import scipy
 from scipy import integrate
 from sklearn.utils import check_array
 
 from skactiveml.base import SkactivemlConditionalEstimator
-from skactiveml.utils import check_type, check_random_state, check_scalar
-from skactiveml.utils._functions import reshape_dist
-from skactiveml.utils._validation import check_callable
+from skactiveml.utils._validation import (
+    check_type,
+    check_random_state,
+    check_scalar,
+    check_callable,
+)
 
 
 def conditional_expect(
@@ -215,3 +217,31 @@ def conditional_expect(
             )
 
     return expectation
+
+
+def reshape_dist(dist, shape=None):
+    """Reshapes the parameters "loc", "scale", "df" of a distribution, if they
+    exist.
+
+    Parameters
+    ----------
+    dist : scipy.stats._distn_infrastructure.rv_frozen
+        The distribution.
+    shape : tuple, optional (default = None)
+        The new shape.
+
+    Returns
+    -------
+    dist : scipy.stats._distn_infrastructure.rv_frozen
+        The reshaped distribution.
+    """
+    check_type(dist, "dist", scipy.stats._distn_infrastructure.rv_frozen)
+    check_type(shape, "shape", tuple, None)
+    for idx, item in enumerate(shape):
+        check_type(item, f"shape[{idx}]", int)
+
+    for argument in ["loc", "scale", "df"]:
+        if argument in dist.kwds:
+            dist.kwds[argument].shape = shape
+
+    return dist

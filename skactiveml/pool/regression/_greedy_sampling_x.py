@@ -4,7 +4,7 @@ from sklearn.metrics import pairwise_distances
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import rand_argmax, is_labeled, labeled_indices
+from skactiveml.utils import rand_argmax, labeled_indices
 
 
 class GSx(SingleAnnotatorPoolQueryStrategy):

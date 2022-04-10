@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from skactiveml.regression._expected_model_output_change import (
+from skactiveml.pool.regression._expected_model_output_change import (
     ExpectedModelOutputChange,
 )
 from skactiveml.regressor._wrapper import SklearnConditionalEstimator

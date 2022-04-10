@@ -1,20 +1,22 @@
 import numpy as np
+from sklearn import clone
 
 from skactiveml.base import (
     SkactivemlConditionalEstimator,
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import check_type, simple_batch
-from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_reg
+from skactiveml.pool.regression.utils._integration import conditional_expect
+from skactiveml.pool.regression.utils._model_fitting import update_reg
+from skactiveml.utils._validation import check_callable
 
 
-class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
-    """Expected model variance minimization
+class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
+    """Regression based Expected Model Output Change
 
-    This class implements the active learning strategy expected model variance
-    minimization, which tries to select the sample that minimizes the expected
-    model variance.
+    This class implements an expected model output change based approach for
+    regression, where samples are queried that change the output of the model
+    the most
 
     Parameters
     ----------
@@ -27,13 +29,16 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Cohn, David A and Ghahramani, Zoubin and Jordan, Michael I. Active
-        learning with statistical models, pages 129--145, 1996.
+    [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
+        Oliver and Barz, Bjoern and Denzler, Joachim and AG, Carl Zeiss. Active
+        Learning for Regression Tasks with Expected Model Output Change,
+        page 103 and subsequently, 2018.
 
     """
 
-    def __init__(self, random_state=None, integration_dict=None):
+    def __init__(self, random_state=None, integration_dict=None, loss=None):
         super().__init__(random_state=random_state)
+        self.loss = loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
@@ -48,6 +53,7 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         candidates=None,
         batch_size=1,
         return_utilities=False,
+        fit_cond_est=None,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -61,6 +67,8 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL.
         cond_est: SkactivemlConditionalEstimator
             Estimates the output and the conditional distribution.
+        fit_cond_est: bool
+            Whether the conditional estimator is fitted.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -106,10 +114,18 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
         check_type(self.integration_dict, "self.integration_dict", dict)
 
+        loss = self.loss
+        check_callable(loss, "self.loss", n_free_parameters=2)
+
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_eval = X
 
-        def new_model_variance(idx, x_cand, y_pot):
+        if fit_cond_est:
+            cond_est = clone(cond_est).fit(X, y, sample_weight)
+
+        y_pred = cond_est.predict(X_eval)
+
+        def model_output_change(idx, x_cand, y_pot):
             cond_est_new = update_reg(
                 cond_est,
                 X,
@@ -120,28 +136,25 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
                 X_update=x_cand,
                 mapping=mapping,
             )
-            _, new_model_std = cond_est_new.predict(X_eval, return_std=True)
+            y_pred_new = cond_est_new.predict(X_eval)
 
-            return np.average(new_model_std**2)
+            return loss(y_pred, y_pred_new)
 
-        ex_model_variance = conditional_expect(
+        change = conditional_expect(
             X_cand,
-            new_model_variance,
+            model_output_change,
             cond_est,
             random_state=self.random_state_,
-            include_x=True,
             include_idx=True,
+            include_x=True,
             **self.integration_dict
         )
 
         if mapping is None:
-            utilities = -ex_model_variance
+            utilities = change
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping] = -ex_model_variance
-
-        # minimize the expected model variance by maximizing the negative
-        # expected model variance
+            utilities[mapping] = change
 
         return simple_batch(
             utilities,

@@ -4,11 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.linear_model import LinearRegression
 
 from skactiveml.base import SkactivemlConditionalEstimator
 from skactiveml.regressor._wrapper import SklearnConditionalEstimator
-from skactiveml.utils._approximation import conditional_expect
+from skactiveml.pool.regression.utils._integration import conditional_expect
 
 
 class TestApproximation(unittest.TestCase):

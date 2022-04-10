@@ -1,19 +1,19 @@
-from copy import deepcopy
-
 import numpy as np
 from sklearn import clone
-from sklearn.utils.validation import _is_arraylike, check_random_state
 
-from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
-from skactiveml.utils import simple_batch, check_type, check_scalar
-from skactiveml.utils._functions import bootstrap_estimators
+from skactiveml.base import (
+    SkactivemlRegressor,
+    SingleAnnotatorPoolQueryStrategy,
+)
+from skactiveml.utils import check_type, simple_batch, check_scalar
+from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 
 
-class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Query-by-Committee
+class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
+    """Expected Model Change
 
-    This class implements an Regression adaption of Query by Committee. It
-    tries to estimate the model variance by a Committee of estimators.
+    This class implements expected model output change, an active learning
+    query strategy for linear regression.
 
     Parameters
     ----------
@@ -23,27 +23,23 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         The number of bootstraps used to estimate the true model.
     n_train: int or float, optional (default=0.5)
         The size of a bootstrap compared to the training data.
-
-    References
-    ----------
-    [1] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active learning
-        for regression based on query by committee. International conference on
-        intelligent data engineering and automated learning, pages 209--218,
-        2007.
-
+    ord: int or string (default=2)
+        The Norm to measure the gradient. Argument will be passed to
+        `np.linalg.norm`.
     """
 
-    def __init__(self, random_state=None, k_bootstraps=3, n_train=0.5):
+    def __init__(self, k_bootstraps=3, n_train=0.5, ord=2, random_state=None):
         super().__init__(random_state=random_state)
         self.k_bootstraps = k_bootstraps
         self.n_train = n_train
+        self.ord = ord
 
     def query(
         self,
         X,
         y,
-        ensemble,
-        fit_ensemble=True,
+        reg,
+        fit_reg=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -59,10 +55,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        ensemble: {SkactivemlRegressor, array-like}
-            Regressor to predict the data.
-        fit_ensemble : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
+        reg: SkactivemlRegressor
+            Regressor to predict the data. Assumes linear regressor.
+        fit_reg : bool, optional (default=True)
+            Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
@@ -107,53 +103,37 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        if isinstance(ensemble, SkactivemlRegressor) and hasattr(
-            ensemble, "n_estimators"
-        ):
+        check_type(reg, "reg", SkactivemlRegressor)
+        check_scalar(
+            self.n_train,
+            "self.n_train",
+            (int, float),
+            min_val=0,
+            max_val=1,
+            min_inclusive=False,
+        )
+        check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
 
-            if fit_ensemble:
-                ensemble = clone(ensemble).fit(X, y, sample_weight)
-
-            if hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
-            else:
-                est_arr = [ensemble] * ensemble.n_estimators
-        elif _is_arraylike(ensemble):
-            est_arr = deepcopy(ensemble)
-            for idx, est in enumerate(est_arr):
-                check_type(est, f"ensemble[{idx}]", SkactivemlRegressor)
-                if fit_ensemble:
-                    est_arr[idx] = est.fit(X, y, sample_weight)
-        elif isinstance(ensemble, SkactivemlRegressor):
-            check_scalar(
-                self.n_train,
-                "self.n_train",
-                (int, float),
-                min_val=0,
-                max_val=1,
-                min_inclusive=False,
-            )
-            check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
-            est_arr = bootstrap_estimators(
-                ensemble,
-                X,
-                y,
-                k_bootstrap=self.k_bootstraps,
-                n_train=self.n_train,
-                sample_weight=sample_weight,
-                random_state=self.random_state_,
-            )
-
-        else:
-            raise TypeError(
-                f"`ensemble` must either be a `{SkactivemlRegressor} "
-                f"or a list of {SkactivemlRegressor} objects."
-            )
+        if fit_reg:
+            reg = clone(reg).fit(X, y, sample_weight)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        results = np.array([learner.predict(X_cand) for learner in est_arr])
-        utilities_cand = np.std(results, axis=0)
+        learners = bootstrap_estimators(
+            reg,
+            X,
+            y,
+            k_bootstrap=self.k_bootstraps,
+            n_train=self.n_train,
+            sample_weight=sample_weight,
+            random_state=self.random_state_,
+        )
+
+        results_learner = np.array([learner.predict(X_cand) for learner in learners])
+        pred = reg.predict(X_cand).reshape(1, -1)
+        scalars = np.average(np.abs(results_learner - pred), axis=0)
+        norms = np.linalg.norm(X_cand, ord=self.ord, axis=1)
+        utilities_cand = np.multiply(scalars, norms)
 
         if mapping is None:
             utilities = utilities_cand
@@ -167,5 +147,3 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
-
-    # TODO: https://aclanthology.org/D08-1112.pdf

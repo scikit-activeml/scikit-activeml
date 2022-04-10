@@ -24,6 +24,7 @@ from ._uncertainty_sampling import (
 
 __all__ = [
     "multiannotator",
+    "regression",
     "utils",
     "RandomSampling",
     "ProbabilisticAL",

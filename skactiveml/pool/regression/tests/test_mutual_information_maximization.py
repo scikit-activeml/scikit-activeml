@@ -1,10 +1,9 @@
 import unittest
 
 import numpy as np
-import sklearn
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from skactiveml.regression._mutual_information_maximization import (
+from skactiveml.pool.regression._mutual_information_maximization import (
     MutualInformationGainMaximization,
 )
 from skactiveml.regressor._wrapper import SklearnConditionalEstimator

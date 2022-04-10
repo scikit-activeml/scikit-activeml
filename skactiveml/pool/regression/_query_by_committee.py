@@ -1,59 +1,53 @@
+from copy import deepcopy
+
 import numpy as np
 from sklearn import clone
+from sklearn.utils.validation import _is_arraylike
 
-from skactiveml.base import (
-    SkactivemlConditionalEstimator,
-    SingleAnnotatorPoolQueryStrategy,
-)
-from skactiveml.utils import check_type, simple_batch
-from skactiveml.utils._approximation import conditional_expect
-from skactiveml.utils._functions import update_reg
-from skactiveml.utils._validation import check_callable
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
+from skactiveml.utils import simple_batch, check_type, check_scalar
+from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 
 
-class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Expected Model Output Change
+class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
+    """Regression based Query-by-Committee
 
-    This class implements an expected model output change based approach for
-    regression, where samples are queried that change the output of the model
-    the most.
+    This class implements an Regression adaption of Query by Committee. It
+    tries to estimate the model variance by a Committee of estimators.
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
-    integration_dict: dict, optional (default=None)
-        Dictionary for integration arguments, i.e. `integration method` etc.,
-        used for calculating the expected `y` value for the candidate samples.
-        For details see method `conditional_expect`.
+    k_bootstraps: int, optional (default=3)
+        The number of bootstraps used to estimate the true model.
+    n_train: int or float, optional (default=0.5)
+        The size of a bootstrap compared to the training data.
 
     References
     ----------
-    [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
-        Oliver and Barz, Bjoern and Denzler, Joachim and AG, Carl Zeiss. Active
-        Learning for Regression Tasks with Expected Model Output Change,
-        page 103 and subsequently, 2018.
+    [1] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active learning
+        for regression based on query by committee. International conference on
+        intelligent data engineering and automated learning, pages 209--218,
+        2007.
 
     """
 
-    def __init__(self, random_state=None, integration_dict=None, loss=None):
+    def __init__(self, random_state=None, k_bootstraps=3, n_train=0.5):
         super().__init__(random_state=random_state)
-        self.loss = loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
-        if integration_dict is not None:
-            self.integration_dict = integration_dict
-        else:
-            self.integration_dict = {"method": "assume_linear"}
+        self.k_bootstraps = k_bootstraps
+        self.n_train = n_train
 
     def query(
         self,
         X,
         y,
-        cond_est,
+        ensemble,
+        fit_ensemble=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
         return_utilities=False,
-        fit_cond_est=None,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -65,10 +59,11 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        cond_est: SkactivemlConditionalEstimator
-            Estimates the output and the conditional distribution.
-        fit_cond_est: bool
-            Whether the conditional estimator is fitted.
+        ensemble: {SkactivemlRegressor, array-like}
+            Regressor to predict the data.
+        fit_ensemble : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -107,58 +102,68 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
-        check_type(self.integration_dict, "self.integration_dict", dict)
+        if isinstance(ensemble, SkactivemlRegressor) and hasattr(
+            ensemble, "n_estimators"
+        ):
 
-        loss = self.loss
-        check_callable(loss, "self.loss", n_free_parameters=2)
+            if fit_ensemble:
+                ensemble = clone(ensemble).fit(X, y, sample_weight)
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
-        X_eval = X
-
-        if fit_cond_est:
-            cond_est = clone(cond_est).fit(X, y, sample_weight)
-
-        y_pred = cond_est.predict(X_eval)
-
-        def model_output_change(idx, x_cand, y_pot):
-            cond_est_new = update_reg(
-                cond_est,
+            if hasattr(ensemble, "estimators_"):
+                est_arr = ensemble.estimators_
+            else:
+                est_arr = [ensemble] * ensemble.n_estimators
+        elif _is_arraylike(ensemble):
+            est_arr = deepcopy(ensemble)
+            for idx, est in enumerate(est_arr):
+                check_type(est, f"ensemble[{idx}]", SkactivemlRegressor)
+                if fit_ensemble:
+                    est_arr[idx] = est.fit(X, y, sample_weight)
+        elif isinstance(ensemble, SkactivemlRegressor):
+            check_scalar(
+                self.n_train,
+                "self.n_train",
+                (int, float),
+                min_val=0,
+                max_val=1,
+                min_inclusive=False,
+            )
+            check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
+            est_arr = bootstrap_estimators(
+                ensemble,
                 X,
                 y,
+                k_bootstrap=self.k_bootstraps,
+                n_train=self.n_train,
                 sample_weight=sample_weight,
-                y_update=y_pot,
-                idx_update=idx,
-                X_update=x_cand,
-                mapping=mapping,
+                random_state=self.random_state_,
             )
-            y_pred_new = cond_est_new.predict(X_eval)
 
-            return loss(y_pred, y_pred_new)
+        else:
+            raise TypeError(
+                f"`ensemble` must either be a `{SkactivemlRegressor} "
+                f"or a list of {SkactivemlRegressor} objects."
+            )
 
-        change = conditional_expect(
-            X_cand,
-            model_output_change,
-            cond_est,
-            random_state=self.random_state_,
-            include_idx=True,
-            include_x=True,
-            **self.integration_dict
-        )
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+
+        results = np.array([learner.predict(X_cand) for learner in est_arr])
+        utilities_cand = np.std(results, axis=0)
 
         if mapping is None:
-            utilities = change
+            utilities = utilities_cand
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping] = change
+            utilities[mapping] = utilities_cand
 
         return simple_batch(
             utilities,
+            self.random_state_,
             batch_size=batch_size,
-            random_state=self.random_state_,
             return_utilities=return_utilities,
         )

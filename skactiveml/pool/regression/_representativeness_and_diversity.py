@@ -6,7 +6,7 @@ from skactiveml.utils import is_labeled, check_type, simple_batch
 from skactiveml.utils._selection import combine_ranking
 
 
-class RepresentativenessAndDiversity(SingleAnnotatorPoolQueryStrategy):
+class RD(SingleAnnotatorPoolQueryStrategy):
     """RD ALR, Representativeness and Diversity in active learning for
     regression
 
@@ -186,10 +186,7 @@ class RepresentativenessAndDiversity(SingleAnnotatorPoolQueryStrategy):
                 qs_utilities[is_cluster_cand] = utilities
 
             cand_cluster_ranking = cluster_ranking[cand_clusters]
-            if self.qs is None:
-                utilities_cand = cand_cluster_ranking + qs_utilities
-            else:
-                utilities_cand = combine_ranking(cand_cluster_ranking, qs_utilities)
+            utilities_cand = combine_ranking(cand_cluster_ranking, qs_utilities)
 
             # batch regarding the remaining candidates after the first batch
             second_indices_off, second_utilities_off = simple_batch(
