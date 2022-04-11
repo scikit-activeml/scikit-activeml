@@ -96,10 +96,10 @@ def update_reg(
         Updating labels or updating label.
     sample_weight : array-like of shape (n_samples), optional (default = None)
         Sample weight of the training data set. If
-    idx_update : int, optional (default = None)
-        Index of the sample to be updated.
-    X_update : (n_features), optional (default = None)
-        Sample to be updated.
+    idx_update : array-like of shape (n_updates) or int
+        Index of the samples or sample to be updated.
+    X_update : array-like of shape (n_updates, n_features) or (n_features)
+        Samples to be updated or sample to be updated.
     mapping : array-like of shape (n_candidates), optional (default = None)
         The deciding mapping.
 
@@ -133,8 +133,8 @@ def bootstrap_estimators(
     est,
     X,
     y,
-    k_bootstrap,
-    n_train,
+    k_bootstrap=5,
+    n_train=0.5,
     sample_weight=None,
     random_state=None,
 ):
@@ -149,9 +149,9 @@ def bootstrap_estimators(
         unlabeled samples.
     y : array-like of shape (n_samples)
         Labels of the training data set.
-    k_bootstrap : int
+    k_bootstrap : int, optional (default=5)
         The number of trained bootstraps.
-    n_train : int or float
+    n_train : int or float, optional (default=0.5)
         The size of each bootstrap training data set.
     sample_weight: array-like of shape (n_samples), optional (default=None)
         Weights of training samples in `X`.
@@ -161,7 +161,7 @@ def bootstrap_estimators(
 
     Returns
     -------
-    bootstrap_est : list of SkactivemlClassifier or SkactivemlRegressor
+    bootstrap_est : list of SkactivemlClassifier or list of SkactivemlRegressor
         The estimators trained on different bootstraps.
     """
 

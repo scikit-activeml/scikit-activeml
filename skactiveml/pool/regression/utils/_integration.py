@@ -121,7 +121,7 @@ def conditional_expect(
         quad_dict = {}
     if method == "quantile" and quantile_method == "romberg":
         # n_integration_samples need to be of the form 2**k + 1
-        n_integration_samples = int(np.log2(n_integration_samples) + 1) + 1
+        n_integration_samples = 2 ** int(np.log2(n_integration_samples) + 1) + 1
     is_optional = vector_func == "optional"
     if is_optional:
         vector_func = True
@@ -160,7 +160,7 @@ def conditional_expect(
             )
         expectation = np.average(evaluate_func(potential_y), axis=1)
     elif method == "quantile":
-        if quantile_method in ["trapezoid, simpson, average, romberg"]:
+        if quantile_method in ["trapezoid", "simpson", "average", "romberg"]:
             eval_points = np.arange(1, n_integration_samples + 1) / (
                 n_integration_samples + 1
             )

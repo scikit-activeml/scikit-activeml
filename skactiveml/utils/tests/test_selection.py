@@ -103,10 +103,31 @@ class TestSelection(unittest.TestCase):
 
     def test_combine_ranking(self):
 
-        ranking_1 = np.array([0.1, 0.2, 0.4])
-        new_ranking = combine_ranking(ranking_1)
-        np.testing.assert_array_equal(ranking_1, new_ranking)
+        self.assertRaises(
+            ValueError, combine_ranking, np.array([0, 1]), np.array([[0, 1], [1, 2]])
+        )
 
-        ranking_2 = np.array([0, 1, 1])
-        com_ranking = combine_ranking(ranking_2, ranking_1)
-        print(com_ranking)
+        ranking_1 = np.array([0, 1, 1])
+        ranking_2 = np.array([0.1, 0.2, 0.4])
+        new_ranking = combine_ranking(ranking_2)
+        np.testing.assert_array_equal(ranking_2, new_ranking)
+
+        com_ranking = combine_ranking(ranking_1, ranking_2)
+        np.testing.assert_array_equal(com_ranking, np.array([1.1, 2.2, 2.4]))
+
+        ranking_1 = np.array([0.1, 0.1, 0.2])
+        ranking_2 = np.array([14, 13, 12])
+        com_ranking = combine_ranking(ranking_1, ranking_2)
+        self.assertTrue(com_ranking[2] > com_ranking[0])
+        self.assertTrue(com_ranking[0] > com_ranking[1])
+
+        ranking_1 = np.array([[2, 3, 4], [1, 0, 0]])
+        ranking_2 = np.array([[4, 3, 3], [4.5, 4, 10]])
+
+        com_ranking = combine_ranking(ranking_1, ranking_2, rank_per_batch=True)
+
+        self.assertTrue(com_ranking[0, 2] > com_ranking[0, 1])
+        self.assertTrue(com_ranking[0, 1] > com_ranking[0, 0])
+
+        self.assertTrue(com_ranking[1, 0] > com_ranking[1, 2])
+        self.assertTrue(com_ranking[1, 2] > com_ranking[1, 1])

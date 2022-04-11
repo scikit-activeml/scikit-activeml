@@ -31,20 +31,22 @@ def gaussian_noise_generator_1d(
 
     Returns
     -------
-    noise: np.ndarray of shape (n_samples)
+    noise : np.ndarray of shape (n_samples)
         The noise for each sample.
     """
 
     X = check_array(X, allow_nd=False, ensure_2d=True)
     check_type(X.shape[1], "X.shape[1]", 1)
-    for (value, name) in [(interval_std, "interval_std"), (default_std, "default_std")]:
-        check_scalar(value, name, (int, float), min_val=0, min_inclusive=False)
+    check_scalar(
+        interval_std, "interval_std", (int, float), min_val=0, min_inclusive=False
+    )
+    check_scalar(default_std, "default_std", (int, float), min_val=0)
     random_state = check_random_state(random_state)
 
     intervals = _check_interval_and_assign(list(intervals), interval_std)
 
     x = X.flatten()
-    noise = np.zeros_like(x)
+    noise = np.zeros_like(x, dtype=float)
     for a, b, std_itv in intervals:
         noise_itv = norm.rvs(scale=std_itv, size=x.shape, random_state=random_state)
         noise = noise + np.where((a <= x) & (x < b), noise_itv, 0)
@@ -72,7 +74,7 @@ def sample_generator_1d(n_samples, *intervals, interval_density=1, random_state=
 
     Returns
     -------
-    X: np.ndarray of shape (n_samples, 1)
+    X : np.ndarray of shape (n_samples, 1)
         The generated samples.
     """
 
