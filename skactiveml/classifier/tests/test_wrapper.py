@@ -180,29 +180,80 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
-    def test_init_param_frequency_estimator(self):
+    def test_init_param_frequency_replacing_strategy(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(Perceptron()),
-            frequency_estimator="Test",
+            estimator=ParzenWindowClassifier(),
+            frequency_replacing_strategy=None,
         )
-        self.assertEqual(clf.frequency_estimator, "Test")
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = KernelFrequencyClassifier(
+            estimator=ParzenWindowClassifier(missing_label="nan"),
             missing_label="nan",
-            estimator=SklearnClassifier(GaussianProcessRegressor()),
-            frequency_estimator=KernelDensity(),
+            frequency_replacing_strategy=0,
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_frequency_max_fit_len(self):
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(Perceptron()),
+            estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
             frequency_max_fit_len="Test",
+            missing_label="nan",
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(Perceptron()), frequency_max_fit_len=0
+            estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
+            frequency_max_fit_len=0,
+            missing_label="nan",
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+
+    def test_init_param_metric_dict(self):
+        clf = KernelFrequencyClassifier(Perceptron(), missing_label=-1)
+        self.assertEqual(clf.metric_dict, None)
+        clf = KernelFrequencyClassifier(
+            Perceptron(), missing_label="nan", metric_dict="Test"
+        )
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+        clf = KernelFrequencyClassifier(
+            Perceptron(), missing_label="nan", metric_dict=["gamma"]
+        )
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+
+    def test_init_param_metric(self):
+        clf = KernelFrequencyClassifier(Perceptron())
+        self.assertEqual(clf.metric, "rbf")
+        clf = KernelFrequencyClassifier(Perceptron(), metric="Test")
+        self.assertEqual(clf.metric, "Test")
+        clf = KernelFrequencyClassifier(
+            SklearnClassifier(Perceptron(), missing_label="nan"),
+            missing_label="nan",
+            metric="Test",
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+
+    def test_init_param_n_neighbors(self):
+        clf = KernelFrequencyClassifier(Perceptron())
+        self.assertTrue(clf.n_neighbors is None)
+        clf = KernelFrequencyClassifier(Perceptron(), n_neighbors=1)
+        self.assertEqual(clf.n_neighbors, 1)
+        clf = KernelFrequencyClassifier(
+            SklearnClassifier(Perceptron(), missing_label="nan"),
+            missing_label="nan",
+            n_neighbors=0,
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        clf = KernelFrequencyClassifier(
+            SklearnClassifier(Perceptron(), missing_label="nan"),
+            missing_label="nan",
+            n_neighbors=-1,
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        clf = KernelFrequencyClassifier(
+            SklearnClassifier(Perceptron(), missing_label="nan"),
+            missing_label="nan",
+            n_neighbors=1.5,
+        )
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_fit(self):
         clf = KernelFrequencyClassifier(
@@ -365,19 +416,6 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         )
         self.assertEqual(len(np.unique(freq)), 2)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
-        clf = KernelFrequencyClassifier(
-            estimator=SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan"
-            ),
-            missing_label="nan",
-            frequency_estimator=ParzenWindowClassifier(missing_label="nan"),
-        )
-        clf.fit(X=self.X, y=self.y1)
-        freq = clf.predict_freq(X=self.X)
-        est = ParzenWindowClassifier(missing_label="nan").fit(
-            X=self.X, y=self.y1
-        )
-        self.assertEqual(len(np.unique(freq)), 2)
 
 
 class TestSubSampleEstimator(unittest.TestCase):

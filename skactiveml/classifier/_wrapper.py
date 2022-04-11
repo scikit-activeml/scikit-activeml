@@ -10,8 +10,10 @@ import warnings
 from copy import copy, deepcopy
 from collections import deque
 from xmlrpc.client import boolean
+from matplotlib.pyplot import ylabel
 
 import numpy as np
+from sklearn.metrics.pairwise import KERNEL_PARAMS
 from sklearn.base import BaseEstimator, MetaEstimatorMixin, is_classifier
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import (
@@ -21,6 +23,7 @@ from sklearn.utils.validation import (
     check_consistent_length,
     column_or_1d,
 )
+from . import ParzenWindowClassifier
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.neighbors import KernelDensity
 from ..base import SkactivemlClassifier, ClassFrequencyEstimator
@@ -369,13 +372,21 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
         `classes` is not none.
-    frequency_estimator: sklearn.base.BaseEstimator or
-    sklearn.base.SkactivemlClassifier, default=None
-        If `frequency_estimator`, the predicted frequencies are used as is.
-        Otherwise the model needs to implement the score_samples method which 
-        calculates the density of observed labels in the neighborhood. if set 
-        to None use sklear.neighbors.KernelDensity with a sliding window of
-        1000 realized by SubSampleEstimator.
+    metric : str or callable, default='rbf'
+        The metric must a be a valid kernel defined by the function
+        `sklearn.metrics.pairwise.pairwise_kernels`.
+    n_neighbors : int or None, default=None
+        Number of nearest neighbours. Default is None, which means all
+        available samples are considered.
+    metric_dict : dict,
+        Any further parameters are passed directly to the kernel function.
+    frequency_max_fit_len: int, default=None,
+        Value to represent the frequency estimator sliding window size for X,
+        y and sample weight. If 'None' the windows is unrestricted in size.
+    frequency_replacing_strategy: str, default='last'
+        Defines how old instances of the frequency estimator are replaced.
+        'last': First in First out
+        'random' : replacing old samples randomly
     class_prior : float or array-like, shape (n_classes), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -393,9 +404,12 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
-        frequency_estimator=None,
-        frequency_max_fit_len=1000,
         class_prior=0.0,
+        n_neighbors=None,
+        metric="rbf",
+        metric_dict=None,
+        frequency_max_fit_len=None,
+        frequency_replacing_strategy="last",
         random_state=None,
     ):
         super().__init__(
@@ -404,10 +418,13 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             cost_matrix=cost_matrix,
             random_state=random_state,
         )
+        self.n_neighbors = n_neighbors
+        self.metric = metric
+        self.metric_dict = metric_dict
         self.estimator = estimator
-        self.frequency_max_fit_len = frequency_max_fit_len
         self.class_prior = class_prior
-        self.frequency_estimator = frequency_estimator
+        self.frequency_max_fit_len = frequency_max_fit_len
+        self.frequency_replacing_strategy = frequency_replacing_strategy
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -545,21 +562,13 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         check_is_fitted(self)
         X = check_array(X)
 
-        if hasattr(self.frequency_estimator_, "predict_freq"):
-            return self.frequency_estimator_.predict_freq(X=X)
         # Predict zeros because of missing training data.
         if not self.is_fitted_:
             return np.zeros((len(X), len(self.classes_)))
-        F = []
-        for x in X:
-            F.extend(self._predict_freq(x))
-        return np.array(F)
-
-    def _predict_freq(self, X):
-        X = np.array(X).reshape([1, -1])
-        frequency = np.exp(self.frequency_estimator_.score_samples(X))
+        frequencies = self.frequency_estimator_.predict_freq(X)
+        # tiled_frequencies = np.tile(frequencies, [1, len(self.classes_)])
         pred_proba = self.estimator_.predict_proba(X)
-        return np.array(frequency) * pred_proba + self.class_prior_
+        return frequencies * pred_proba + self.class_prior_
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         self.check_X_dict_ = {
@@ -568,13 +577,6 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             "allow_nd": True,
             "dtype": None,
         }
-        check_scalar(
-            self.frequency_max_fit_len,
-            "m_max",
-            int,
-            min_val=0,
-            min_inclusive=False,
-        )
 
         # Check whether estimator is a valid classifier.
         if not isinstance(
@@ -622,55 +624,20 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
     def _fit_frequency_estimator(
         self, fit_function, X, y, sample_weight=None, **fit_kwargs
     ):
-        self.check_X_dict_ = {
-            "ensure_min_samples": 0,
-            "ensure_min_features": 0,
-            "allow_nd": True,
-            "dtype": None,
-        }
-        check_scalar(
-            self.frequency_max_fit_len,
-            "m_max",
-            int,
-            min_val=0,
-            min_inclusive=False,
-        )
 
         X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
-            check_X_dict=self.check_X_dict_,
         )
-
-        if not hasattr(self, "frequency_estimator_"):
-            if self.frequency_estimator is None:
-                self.frequency_estimator_ = SubSampleEstimator(
-                    KernelDensity(),
-                    missing_label=self.missing_label,
-                    classes=self.classes,
-                    max_fit_len=1000,
-                )
-            else:
-                self.frequency_estimator_ = deepcopy(self.frequency_estimator)
-        X_train = X
-        y_train = y
-        sample_weight_train = sample_weight
+        y_lbld = np.full(y.shape, np.nan)
+        y_lbld[is_labeled(y, missing_label=self.missing_label)] = 0
 
         if fit_function == "partial_fit":
-            call_func(
-                self.frequency_estimator_.partial_fit,
-                X=X_train,
-                y=y_train,
-                sample_weight=sample_weight_train,
-            )
+            fit_callback = self.frequency_estimator_.partial_fit
         elif fit_function == "fit":
-            call_func(
-                self.frequency_estimator_.fit,
-                X=X_train,
-                y=y_train,
-                sample_weight=sample_weight_train,
-            )
+            fit_callback = self.frequency_estimator_.fit
+        return fit_callback(X, y_lbld, sample_weight)
 
     def _validate_data(
         self,
@@ -681,6 +648,9 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         check_y_dict=None,
         y_ensure_1d=True,
     ):
+        if check_X_dict is None:
+            check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
+
         if check_y_dict is None:
             check_y_dict = {
                 "ensure_min_samples": 0,
@@ -759,6 +729,48 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         self.class_prior_ = check_class_prior(
             self.class_prior, len(self.classes_)
         )
+
+        # Check whether metric is available.
+        if self.metric not in KERNEL_PARAMS and not callable(
+                self.metric
+        ):
+            raise ValueError(
+                "The parameter 'metric' must be callable or "
+                "in {}".format(KERNEL_PARAMS.keys())
+            )
+
+        # Check number of neighbors which must be a positive integer.
+        if self.n_neighbors is not None:
+            check_scalar(
+                self.n_neighbors,
+                name="n_neighbors",
+                min_val=1,
+                target_type=int,
+            )
+
+        # Ensure that metric_dict is a Python dictionary.
+        self.metric_dict_ = (
+            self.metric_dict if self.metric_dict is not None else {}
+        )
+        if not isinstance(self.metric_dict_, dict):
+            raise TypeError("'metric_dict' must be a Python dictionary.")
+
+        if not hasattr(self, "frequency_estimator_"):
+            self.frequency_estimator_ = SubSampleEstimator(
+                ParzenWindowClassifier(
+                    n_neighbors=self.n_neighbors,
+                    metric=self.metric,
+                    metric_dict=self.metric_dict,
+                    missing_label=np.nan,
+                    classes=[0],
+                    random_state=self.random_state_.randint(2 ** 31 - 1),
+                ),
+                max_fit_len=self.frequency_max_fit_len,
+                replacing_strategy=self.frequency_replacing_strategy,
+                only_labled=True,
+                classes=[0],
+                missing_label=np.nan,
+            )
 
         return X, y, sample_weight
 
@@ -1080,7 +1092,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             y_new = y
 
         if self.max_fit_len is not None:
-            check_scalar(self.max_fit_len, "max_fit_len", int, min_val=0)
+            check_scalar(self.max_fit_len, "max_fit_len", int, min_val=0, min_inclusive=False)
         check_type(self.only_labled, "only_labled", bool)
         check_type(self.replacing_strategy, "replacing_strategy", str)
         if check_y_dict is None:
@@ -1108,7 +1120,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         y = check_array(y, **check_y_dict)
         if len(y) > 0:
             y_le = column_or_1d(y_new) if y_ensure_1d else y_new
-            y_le = self._le.fit_transform(y_new)
+            y_le = self._le.fit_transform(y_le)
             is_lbdl = is_labeled(y_le)
 
             if len(y_le[is_lbdl]) > 0:
