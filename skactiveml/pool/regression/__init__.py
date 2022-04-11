@@ -14,7 +14,7 @@ from skactiveml.pool.regression._expected_model_variance import (
 from skactiveml.pool.regression._greedy_sampling_x import GSx
 from skactiveml.pool.regression._greedy_sampling_y import GSy
 from skactiveml.pool.regression._kl_divergence_maximization import (
-    KullbackLeiblerDivergenceMaximization,
+    KLDivergenceMaximization,
     cross_entropy,
 )
 from skactiveml.pool.regression._mutual_information_maximization import (
@@ -32,7 +32,7 @@ __all__ = [
     "ExpectedModelVarianceMinimization",
     "GSx",
     "GSy",
-    "KullbackLeiblerDivergenceMaximization",
+    "KLDivergenceMaximization",
     "cross_entropy",
     "MutualInformationGainMaximization",
     "QueryByCommittee",

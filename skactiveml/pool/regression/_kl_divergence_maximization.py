@@ -13,7 +13,7 @@ from skactiveml.pool.regression.utils._integration import (
 from skactiveml.pool.regression.utils._model_fitting import update_reg
 
 
-class KullbackLeiblerDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
+class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Kullback Leibler Divergence Maximization
 
     This class implements a Kullback Leibler divergence based selection
