@@ -3,9 +3,9 @@ from sklearn import clone
 
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
-    SkactivemlConditionalEstimator,
+    TargetDistributionEstimator,
 )
-from skactiveml.utils import check_type, simple_batch
+from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.regression.utils._integration import conditional_expect
 from skactiveml.pool.regression.utils._model_fitting import update_reg
 
@@ -19,12 +19,14 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
     integration_dict: dict,
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState, optional
+        Random state for candidate selection.
 
     References
     ----------
@@ -34,8 +36,13 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 
     """
 
-    def __init__(self, random_state=None, integration_dict=None):
-        super().__init__(random_state=random_state)
+    def __init__(
+        self,
+        integration_dict=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
@@ -45,10 +52,10 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         self,
         X,
         y,
-        cond_est,
+        reg,
+        fit_reg=True,
         sample_weight=None,
         candidates=None,
-        fit_cond_est=True,
         batch_size=1,
         return_utilities=False,
     ):
@@ -62,8 +69,12 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        cond_est: SkactivemlConditionalEstimator
-            Estimates the entropy.
+        reg: TargetDistributionEstimator
+            Predicts the entropy and the y-values the candidate samples
+            could have.
+        fit_reg : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -76,9 +87,6 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
-        fit_cond_est : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -109,16 +117,16 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
+        check_type(reg, "reg", TargetDistributionEstimator)
         check_type(self.integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        if fit_cond_est:
-            cond_est = clone(cond_est).fit(X, y, sample_weight)
+        if fit_reg:
+            reg = clone(reg).fit(X, y, sample_weight)
 
         utilities_cand = self._mutual_information(
-            X, X_cand, mapping, cond_est, X, y, sample_weight
+            X, X_cand, mapping, reg, X, y, sample_weight
         )
 
         if mapping is None:
@@ -135,7 +143,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _mutual_information(
-        self, X_eval, X_cand, mapping, cond_est, X, y, sample_weight=None
+        self, X_eval, X_cand, mapping, reg, X, y, sample_weight=None
     ):
         """Calculates the mutual information gain over the evaluation set if each
         candidate where to be labeled.
@@ -144,7 +152,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         ----------
         X_eval : array-like of shape (n_samples, n_features)
             The samples where the information gain should be evaluated.
-        cond_est: SkactivemlConditionalEstimator
+        reg: TargetDistributionEstimator
             Estimates the entropy, predicts values.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
@@ -161,11 +169,11 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             The expected information gain for each candidate sample.
         """
 
-        prior_entropy = np.sum(cond_est.predict(X_eval, return_entropy=True)[1])
+        prior_entropy = np.sum(reg.predict(X_eval, return_entropy=True)[1])
 
         def new_entropy(idx, x_cand, y_pot):
-            cond_est_new = update_reg(
-                cond_est,
+            reg_new = update_reg(
+                reg,
                 X,
                 y,
                 sample_weight=sample_weight,
@@ -174,14 +182,14 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
                 X_update=x_cand,
                 mapping=mapping,
             )
-            _, entropy_cand = cond_est_new.predict(X_eval, return_entropy=True)
+            _, entropy_cand = reg_new.predict(X_eval, return_entropy=True)
             potentials_post_entropy = np.sum(entropy_cand)
             return potentials_post_entropy
 
         cond_entropy = conditional_expect(
             X_cand,
             new_entropy,
-            cond_est,
+            reg,
             random_state=self.random_state_,
             include_idx=True,
             include_x=True,

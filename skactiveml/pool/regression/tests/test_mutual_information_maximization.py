@@ -6,7 +6,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from skactiveml.pool.regression._mutual_information_maximization import (
     MutualInformationGainMaximization,
 )
-from skactiveml.regressor._wrapper import SklearnConditionalEstimator
+from skactiveml.regressor._wrapper import SklearnTargetDistributionRegressor
 
 
 class TestMIM(unittest.TestCase):
@@ -16,7 +16,9 @@ class TestMIM(unittest.TestCase):
     def test_query(self):
         mim = MutualInformationGainMaximization(random_state=0)
 
-        cond_est = SklearnConditionalEstimator(estimator=GaussianProcessRegressor())
+        cond_est = SklearnTargetDistributionRegressor(
+            estimator=GaussianProcessRegressor()
+        )
 
         X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
         X = np.array([[1, 2], [3, 4]])

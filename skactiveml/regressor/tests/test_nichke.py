@@ -1,9 +1,8 @@
 import unittest
 
 import numpy as np
-import matplotlib.pyplot as plt
 
-from skactiveml.regressor.estimator._nichke import NormalInverseChiKernelEstimator
+from skactiveml.regressor._nichke import NICKernelRegressor
 
 
 class TestNICHE(unittest.TestCase):
@@ -14,7 +13,7 @@ class TestNICHE(unittest.TestCase):
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_estimate_posterior(self):
-        nichke = NormalInverseChiKernelEstimator()
+        nichke = NICKernelRegressor()
         nichke.fit(self.X, self.y)
 
         mu, std = nichke.predict(self.X_cand, return_std=True)

@@ -3,9 +3,9 @@ from sklearn import clone
 
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
-    SkactivemlConditionalEstimator,
+    TargetDistributionEstimator,
 )
-from skactiveml.utils import check_type, simple_batch, check_random_state
+from skactiveml.utils import check_type, simple_batch, check_random_state, MISSING_LABEL
 from skactiveml.pool.regression.utils._integration import (
     conditional_expect,
     reshape_dist,
@@ -22,8 +22,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
     integration_dict_potential_y_val: dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
@@ -33,6 +31,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         used for calculating the cross entropy between the updated conditional
         estimator by the `X_cand` value and the old conditional estimator.
         For details see method `conditional_expect`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState, optional
+        Random state for candidate selection.
 
     References
     ----------
@@ -44,11 +46,12 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
         self,
-        random_state=None,
         integration_dict_potential_y_val=None,
         integration_dict_cross_entropy=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
-        super().__init__(random_state=random_state)
+        super().__init__(random_state=random_state, missing_label=missing_label)
 
         if integration_dict_potential_y_val is not None:
             self.integration_dict_potential_y_val = integration_dict_potential_y_val
@@ -67,10 +70,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         self,
         X,
         y,
-        cond_est,
+        reg,
+        fit_reg=True,
         sample_weight=None,
         candidates=None,
-        fit_cond_est=True,
         batch_size=1,
         return_utilities=False,
     ):
@@ -84,8 +87,12 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        cond_est: SkactivemlConditionalEstimator
-            Estimates the entropy.
+        reg: TargetDistributionEstimator
+            Estimates the entropy and the cross entropy and the potential
+            y-values for the candidate samples.
+        fit_reg : bool, optional (default=True)
+            Defines whether the regressor should be fitted on `X`, `y`, and
+            `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -98,9 +105,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
-        fit_cond_est : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -131,15 +135,15 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
+        check_type(reg, "reg", TargetDistributionEstimator)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        if fit_cond_est:
-            cond_est = clone(cond_est).fit(X, y, sample_weight)
+        if fit_reg:
+            reg = clone(reg).fit(X, y, sample_weight)
 
         utilities_cand = self._kullback_leibler_divergence(
-            X, X_cand, mapping, cond_est, X, y, sample_weight=sample_weight
+            X, X_cand, mapping, reg, X, y, sample_weight=sample_weight
         )
 
         if mapping is None:
@@ -156,7 +160,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _kullback_leibler_divergence(
-        self, X_eval, X_cand, mapping, cond_est, X, y, sample_weight=None
+        self, X_eval, X_cand, mapping, reg, X, y, sample_weight=None
     ):
         """Calculates the mutual information gain over the evaluation set if each
         candidate sample where to be labeled.
@@ -169,7 +173,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             The candidate samples that determine the information gain.
         mapping : array-like of shape (n_candidate_samples,) or None
             A mapping between `X_cand` and `X` if it exists.
-        cond_est: SkactivemlConditionalEstimator
+        reg: TargetDistributionEstimator
             Estimates the entropy, predicts values.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
@@ -186,9 +190,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             The expected information gain for each candidate sample.
         """
 
-        def new_cross_entropy(idx, x_cand, y_pot):
-            cond_est_new = update_reg(
-                cond_est,
+        def new_kl_divergence(idx, x_cand, y_pot):
+            reg_new = update_reg(
+                reg,
                 X,
                 y,
                 sample_weight=sample_weight,
@@ -197,11 +201,11 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 X_update=x_cand,
                 mapping=mapping,
             )
-            entropy_post = np.sum(cond_est_new.predict(X_eval, return_entropy=True)[1])
+            entropy_post = np.sum(reg_new.predict(X_eval, return_entropy=True)[1])
             cross_ent = cross_entropy(
                 X_eval,
-                cond_est_new,
-                cond_est,
+                reg_new,
+                reg,
                 integration_dict=self.integration_dict_cross_entropy,
                 random_state=self.random_state_,
             )
@@ -209,8 +213,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
         kl_div = conditional_expect(
             X_cand,
-            new_cross_entropy,
-            cond_est,
+            new_kl_divergence,
+            reg,
             random_state=self.random_state_,
             include_idx=True,
             include_x=True,
@@ -221,7 +225,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
 
 def cross_entropy(
-    X_eval, true_cond_est, other_cond_est, integration_dict=None, random_state=None
+    X_eval, true_reg, other_reg, integration_dict=None, random_state=None
 ):
     """Calculates the cross entropy.
 
@@ -229,9 +233,9 @@ def cross_entropy(
     ----------
     X_eval : array-like of shape (n_samples, n_features)
         The samples where the cross entropy should be evaluated.
-    true_cond_est: SkactivemlConditionalEstimator
+    true_reg: TargetDistributionEstimator
         True distribution of the cross entropy.
-    other_cond_est: SkactivemlConditionalEstimator
+    other_reg: TargetDistributionEstimator
         Evaluated distribution of the cross entropy.
     integration_dict: dict, optional default = None
         Dictionary for integration arguments, i.e. `integration method` etc..
@@ -249,18 +253,18 @@ def cross_entropy(
         integration_dict = {}
 
     check_type(integration_dict, "integration_dict", dict)
-    check_type(true_cond_est, "true_cond_est", SkactivemlConditionalEstimator)
-    check_type(other_cond_est, "other_cond_est", SkactivemlConditionalEstimator)
+    check_type(true_reg, "true_reg", TargetDistributionEstimator)
+    check_type(other_reg, "other_reg", TargetDistributionEstimator)
     random_state = check_random_state(random_state)
 
     dist = reshape_dist(
-        other_cond_est.estimate_conditional_distribution(X_eval), shape=(len(X_eval), 1)
+        other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
     )
 
     cross_ent = -conditional_expect(
         X_eval,
         dist.logpdf,
-        cond_est=true_cond_est,
+        reg=true_reg,
         random_state=random_state,
         **integration_dict,
         vector_func=True

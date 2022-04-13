@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 
 from skactiveml.pool.regression._reg_xpal import RegxPal
-from skactiveml.regressor._nwr import NWR
+from skactiveml.regressor._nwr import NadarayaWatsonRegressor
 from skactiveml.regressor._wrapper import SklearnRegressor
 
 
@@ -32,7 +32,7 @@ class TestRegXPal(unittest.TestCase):
         qs = RegxPal(random_state=0, n_monte_carlo_samples=100)
 
         # reg = SklearnRegressor(estimator=LinearRegression())
-        reg = NWR(metric_dict={"gamma": 10.0})
+        reg = NadarayaWatsonRegressor(metric_dict={"gamma": 10.0})
 
         X_cand = np.linspace(-3, 6, 1000)
         X_cand_r = X_cand.reshape(-1, 1)
@@ -67,7 +67,7 @@ class TestRegXPal(unittest.TestCase):
         )
 
         # reg = SklearnRegressor(estimator=LinearRegression())
-        reg = NWR(metric_dict={"gamma": 10.0})
+        reg = NadarayaWatsonRegressor(metric_dict={"gamma": 10.0})
 
         X_cand = np.linspace(-1, 1, 100)
         y_cand = X_cand.copy()

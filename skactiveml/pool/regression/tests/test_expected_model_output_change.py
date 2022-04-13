@@ -6,7 +6,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from skactiveml.pool.regression._expected_model_output_change import (
     ExpectedModelOutputChange,
 )
-from skactiveml.regressor._wrapper import SklearnConditionalEstimator
+from skactiveml.regressor._wrapper import SklearnTargetDistributionRegressor
 
 
 class TestMIM(unittest.TestCase):
@@ -16,14 +16,14 @@ class TestMIM(unittest.TestCase):
     def test_query(self):
         mim = ExpectedModelOutputChange(random_state=0)
 
-        cond_est = SklearnConditionalEstimator(estimator=GaussianProcessRegressor())
+        cond_est = SklearnTargetDistributionRegressor(
+            estimator=GaussianProcessRegressor()
+        )
 
         X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
         X = np.array([[1, 2], [3, 4]])
         y = np.array([0, 1])
         cond_est.fit(X, y)
 
-        query_indices = mim.query(
-            X, y, candidates=X_cand, cond_est=cond_est, batch_size=2
-        )
+        query_indices = mim.query(X, y, candidates=X_cand, reg=cond_est, batch_size=2)
         print(query_indices)

@@ -2,11 +2,11 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
-from skactiveml.utils import is_labeled, check_type, simple_batch
+from skactiveml.utils import is_labeled, check_type, simple_batch, MISSING_LABEL
 from skactiveml.utils._selection import combine_ranking
 
 
-class RD(SingleAnnotatorPoolQueryStrategy):
+class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
     """RD ALR, Representativeness and Diversity in active learning for
     regression
 
@@ -15,10 +15,12 @@ class RD(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
+    qs: SingleAnnotPoolBasedQueryStrategy
+        Query strategy used for further selection of the samples.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
-    qs: SingleAnnotPoolBasedQueryStrategy
-        Query strategy used for further selection of the samples
 
     References
     ----------
@@ -28,8 +30,13 @@ class RD(SingleAnnotatorPoolQueryStrategy):
 
     """
 
-    def __init__(self, random_state=None, qs=None):
-        super().__init__(random_state=random_state)
+    def __init__(
+        self,
+        qs=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.qs = qs
         self.X_ = None
         self.k_means_ = None

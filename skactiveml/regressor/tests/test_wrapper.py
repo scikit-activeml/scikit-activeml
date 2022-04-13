@@ -4,7 +4,10 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.regressor._wrapper import SklearnRegressor, SklearnConditionalEstimator
+from skactiveml.regressor._wrapper import (
+    SklearnRegressor,
+    SklearnTargetDistributionRegressor,
+)
 
 
 class TestWrapper(unittest.TestCase):
@@ -31,7 +34,7 @@ class TestCondEstWrapper(unittest.TestCase):
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_estimate_cond(self):
-        reg = SklearnConditionalEstimator(estimator=GaussianProcessRegressor())
+        reg = SklearnTargetDistributionRegressor(estimator=GaussianProcessRegressor())
         reg.fit(self.X, self.y)
 
         y_pred = reg.predict(self.X_cand, return_std=True)

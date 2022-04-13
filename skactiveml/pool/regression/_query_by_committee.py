@@ -5,7 +5,7 @@ from sklearn import clone
 from sklearn.utils.validation import _is_arraylike
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
-from skactiveml.utils import simple_batch, check_type, check_scalar
+from skactiveml.utils import simple_batch, check_type, check_scalar, MISSING_LABEL
 from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 
 
@@ -17,12 +17,14 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
     k_bootstraps: int, optional (default=3)
         The number of bootstraps used to estimate the true model.
     n_train: int or float, optional (default=0.5)
         The size of a bootstrap compared to the training data.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState, optional
+        Random state for candidate selection.
 
     References
     ----------
@@ -33,8 +35,14 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
     """
 
-    def __init__(self, random_state=None, k_bootstraps=3, n_train=0.5):
-        super().__init__(random_state=random_state)
+    def __init__(
+        self,
+        k_bootstraps=3,
+        n_train=0.5,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.k_bootstraps = k_bootstraps
         self.n_train = n_train
 
@@ -102,6 +110,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
+
+        # combine
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True

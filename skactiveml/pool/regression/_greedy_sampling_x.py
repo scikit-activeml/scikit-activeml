@@ -4,7 +4,7 @@ from sklearn.metrics import pairwise_distances
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import rand_argmax, labeled_indices
+from skactiveml.utils import rand_argmax, labeled_indices, MISSING_LABEL
 
 
 class GSx(SingleAnnotatorPoolQueryStrategy):
@@ -14,16 +14,23 @@ class GSx(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
     metric: str, optional (default=None)
         Metric used for calculating the distances of points in the feature
         space must be a valid argument for `sklearn.metrics.pairwise_distances`
         argument `metric`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState, optional
+        Random state for candidate selection.
     """
 
-    def __init__(self, random_state=None, metric=None):
-        super().__init__(random_state=random_state)
+    def __init__(
+        self,
+        metric=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.x_metric = metric if metric is not None else "euclidean"
 
     def query(self, X, y, candidates=None, batch_size=1, return_utilities=False):

@@ -3,19 +3,48 @@ from scipy.stats import t
 from sklearn.metrics.pairwise import pairwise_kernels
 from sklearn.utils import check_array
 
-from ...base import SkactivemlConditionalEstimator
-from ...utils import is_labeled
+from skactiveml.base import TargetDistributionEstimator
+from skactiveml.utils import is_labeled, MISSING_LABEL
 
 
-class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
+class NICKernelRegressor(TargetDistributionEstimator):
+    """NICKernelRegressor
+
+    The NICKernelRegressor (Normal inverse chi kernel regressor) locally
+    fits a t distribution using the training data weighting the samples
+    by a kernel.
+
+    Parameters
+    __________
+    metric : str or callable, default='rbf'
+        The metric must a be a valid kernel defined by the function
+        `sklearn.metrics.pairwise.pairwise_kernels`.
+    metric_dict : dict, optional (default=None)
+        Any further parameters are passed directly to the kernel function.
+    mu_0 : int or float, optional (default=0)
+        The prior mean.
+    kappa_0 : int or float, optional (default=0.1)
+        The weight of the prior mean.
+    sigma_sq_0: int or float, optional (default=1.0)
+        The prior variance.
+    nu_0 : int or float, optional (default=2.5)
+        The weight of the prior variance.
+    missing_label : scalar, string, np.nan, or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int, RandomState instance or None, optional (default=None)
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+    """
+
     def __init__(
         self,
         metric="rbf",
         metric_dict=None,
         mu_0=0,
         kappa_0=0.1,
-        nu_0=2.5,
         sigma_sq_0=1.0,
+        nu_0=2.5,
+        missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(random_state=random_state)
@@ -25,13 +54,32 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
         self.sigma_sq_0 = sigma_sq_0
         self.metric = metric
         self.metric_dict = {} if metric_dict is None else metric_dict
+        self.missing_label = missing_label
 
         self.X_ = None
         self.y_ = None
 
     def fit(self, X, y, sample_weight=None):
+        """Fit the model using X as training data and y as class labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_targets)
+            Contains the values of the samples, where
+            missing values are represented the attribute 'np.nan'.
+        sample_weight : array-like, shape (n_samples)
+            It contains the weights of the training samples' values.
+
+        Returns
+        -------
+        self: SkactivemlRegressor,
+            The SkactivemlRegressor is fitted on the training data.
+        """
+
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
-        is_lbld = is_labeled(y)
+        is_lbld = is_labeled(y, missing_label=self.missing_label_)
         self.X_ = X[is_lbld]
         self.y_ = y[is_lbld]
         if sample_weight is not None:
@@ -61,7 +109,20 @@ class NormalInverseChiKernelEstimator(SkactivemlConditionalEstimator):
             neutral_params = (np.zeros(len(X)),) * 4
             return neutral_params
 
-    def estimate_conditional_distribution(self, X):
+    def predict_target_distribution(self, X):
+        """Returns the estimated target distribution conditioned on the test
+        samples `X`.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+
+        Returns
+        -------
+        dist : scipy.stats.rv_continuous
+
+        """
 
         X = check_array(X)
         prior_params = (self.kappa_0, self.nu_0, self.mu_0, self.sigma_sq_0)

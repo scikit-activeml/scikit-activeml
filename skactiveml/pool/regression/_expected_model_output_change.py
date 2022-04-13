@@ -2,10 +2,10 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    SkactivemlConditionalEstimator,
+    TargetDistributionEstimator,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, simple_batch
+from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.regression.utils._integration import conditional_expect
 from skactiveml.pool.regression.utils._model_fitting import update_reg
 from skactiveml.utils._validation import check_callable
@@ -20,12 +20,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional (default=None)
-        Random state for candidate selection.
     integration_dict: dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
 
     References
     ----------
@@ -36,8 +38,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     """
 
-    def __init__(self, random_state=None, integration_dict=None, loss=None):
-        super().__init__(random_state=random_state)
+    def __init__(
+        self,
+        integration_dict=None,
+        loss=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.loss = loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
         if integration_dict is not None:
             self.integration_dict = integration_dict
@@ -48,12 +56,12 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         self,
         X,
         y,
-        cond_est,
+        reg,
+        fit_reg=None,
         sample_weight=None,
         candidates=None,
         batch_size=1,
         return_utilities=False,
-        fit_cond_est=None,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -65,10 +73,11 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        cond_est: SkactivemlConditionalEstimator
+        reg: TargetDistributionEstimator
             Estimates the output and the conditional distribution.
-        fit_cond_est: bool
-            Whether the conditional estimator is fitted.
+        fit_reg: bool, optional (default=True)
+            Defines whether the regressor should be fitted on `X`, `y`, and
+            `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -111,7 +120,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
+        check_type(reg, "reg", TargetDistributionEstimator)
         check_type(self.integration_dict, "self.integration_dict", dict)
 
         loss = self.loss
@@ -120,14 +129,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_eval = X
 
-        if fit_cond_est:
-            cond_est = clone(cond_est).fit(X, y, sample_weight)
+        if fit_reg:
+            reg = clone(reg).fit(X, y, sample_weight)
 
-        y_pred = cond_est.predict(X_eval)
+        y_pred = reg.predict(X_eval)
 
         def model_output_change(idx, x_cand, y_pot):
-            cond_est_new = update_reg(
-                cond_est,
+            reg_new = update_reg(
+                reg,
                 X,
                 y,
                 sample_weight=sample_weight,
@@ -136,14 +145,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
                 X_update=x_cand,
                 mapping=mapping,
             )
-            y_pred_new = cond_est_new.predict(X_eval)
+            y_pred_new = reg_new.predict(X_eval)
 
             return loss(y_pred, y_pred_new)
 
         change = conditional_expect(
             X_cand,
             model_output_change,
-            cond_est,
+            reg,
             random_state=self.random_state_,
             include_idx=True,
             include_x=True,

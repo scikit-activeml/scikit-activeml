@@ -3,8 +3,8 @@ import scipy
 from scipy import integrate
 from sklearn.utils import check_array
 
-from skactiveml.base import SkactivemlConditionalEstimator
-from skactiveml.utils._validation import (
+from ....base import TargetDistributionEstimator
+from ....utils._validation import (
     check_type,
     check_random_state,
     check_scalar,
@@ -15,7 +15,7 @@ from skactiveml.utils._validation import (
 def conditional_expect(
     X,
     func,
-    cond_est,
+    reg,
     method=None,
     quantile_method=None,
     n_integration_samples=10,
@@ -26,7 +26,7 @@ def conditional_expect(
     vector_func=False,
 ):
     f"""Calculates the conditional expectation, i.e. E[func(Y)|X=x_eval], where
-    Y | X ~ cond_est, for x_eval in `X_eval`.
+    Y | X ~ reg.predict_target_distribution, for x_eval in `X_eval`.
 
     Parameters
     ----------
@@ -34,8 +34,8 @@ def conditional_expect(
         The samples where the expectation should be evaluated.
     func : callable
         The function that transforms the random variable.
-    cond_est: SkactivemlConditionalEstimator
-        Distribution over which the expectation is calculated.
+    reg: TargetDistributionEstimator
+        Predicts the target distribution over which the expectation is calculated.
     method: string, optional, optional (default=None)
         The method by which the expectation is computed.
         -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
@@ -48,7 +48,7 @@ def conditional_expect(
           'quantile_method' to calculate the integral. The number of integration
           points is specified by `n_integration_samples`.
         -'quad' uses `scipy's` function `expect` on the `rv_continuous` random
-          variable of `cond_est`, which in turn uses a dynamic gaussian
+          variable of `reg`, which in turn uses a dynamic gaussian
           quadrature routine for calculating the integral. Performance is worse
           using a vector function.
         If `method is None` quantile is used.
@@ -92,7 +92,7 @@ def conditional_expect(
 
     X = check_array(X, allow_nd=True)
 
-    check_type(cond_est, "cond_est", SkactivemlConditionalEstimator)
+    check_type(reg, "reg", TargetDistributionEstimator)
     check_type(
         method, "method", "monte_carlo", "assume_linear", "quad", "quantile", None
     )
@@ -153,9 +153,9 @@ def conditional_expect(
 
     if method in ["assume_linear", "monte_carlo"]:
         if method == "assume_linear":
-            potential_y = cond_est.predict(X).reshape(-1, 1)
+            potential_y = reg.predict(X).reshape(-1, 1)
         else:  # method equals "monte_carlo"
-            potential_y = cond_est.sample_y(
+            potential_y = reg.sample_y(
                 X=X, n_rv_samples=n_integration_samples, random_state=random_state
             )
         expectation = np.average(evaluate_func(potential_y), axis=1)
@@ -164,9 +164,7 @@ def conditional_expect(
             eval_points = np.arange(1, n_integration_samples + 1) / (
                 n_integration_samples + 1
             )
-            cond_dist = reshape_dist(
-                cond_est.estimate_conditional_distribution(X), shape=(-1, 1)
-            )
+            cond_dist = reshape_dist(reg.predict_target_distribution(X), shape=(-1, 1))
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
 
@@ -188,7 +186,7 @@ def conditional_expect(
 
             def fixed_quad_function_wrapper(inner_eval_points):
                 inner_cond_dist = reshape_dist(
-                    cond_est.estimate_conditional_distribution(X), shape=(-1, 1)
+                    reg.predict_target_distribution(X), shape=(-1, 1)
                 )
                 inner_potential_y = inner_cond_dist.ppf(
                     inner_eval_points.reshape(1, -1)
@@ -201,7 +199,7 @@ def conditional_expect(
             )
     else:  # method equals "quad"
         for idx, x in enumerate(X):
-            cond_dist = cond_est.estimate_conditional_distribution([x])
+            cond_dist = reg.predict_target_distribution([x])
 
             def quad_function_wrapper(y):
                 if is_optional or not vector_func:

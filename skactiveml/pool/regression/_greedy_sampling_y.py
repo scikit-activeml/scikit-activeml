@@ -3,7 +3,7 @@ from sklearn import clone
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
 from skactiveml.pool.regression._greedy_sampling_x import GSx
-from skactiveml.utils import check_type, is_labeled, check_scalar
+from skactiveml.utils import check_type, is_labeled, check_scalar, MISSING_LABEL
 
 
 class GSy(SingleAnnotatorPoolQueryStrategy):
@@ -13,16 +13,23 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
     k_0: int, optional (default=1)
         The minimum number of samples the estimator requires.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state: numeric | np.random.RandomState, optional
+        Random state for candidate selection.
     """
 
     def __init__(
-        self, x_metric="euclidean", y_metric="euclidean", k_0=1, random_state=None
+        self,
+        x_metric="euclidean",
+        y_metric="euclidean",
+        k_0=1,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
-        super().__init__(random_state=random_state)
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.x_metric = x_metric
         self.y_metric = y_metric
         self.k_0 = k_0
@@ -32,7 +39,7 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
         X,
         y,
         reg,
-        fit_clf=True,
+        fit_reg=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -50,8 +57,8 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL.
         reg: SkactivemlRegressor
             Regressor to predict the data.
-        fit_clf : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
+        fit_reg : bool, optional (default=True)
+            Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
@@ -101,10 +108,10 @@ class GSy(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        if fit_clf:
+        if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)
 
-        n_labeled = np.sum(is_labeled(y))
+        n_labeled = np.sum(is_labeled(y, missing_label=self.missing_label_))
         batch_size_x = max(0, min(self.k_0 - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 

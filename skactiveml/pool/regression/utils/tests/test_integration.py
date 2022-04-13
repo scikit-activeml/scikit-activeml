@@ -6,9 +6,9 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from .....base import SkactivemlConditionalEstimator
+from .....base import TargetDistributionEstimator
 from ...utils._integration import conditional_expect
-from .....regressor._wrapper import SklearnConditionalEstimator
+from .....regressor._wrapper import SklearnTargetDistributionRegressor
 
 
 class TestApproximation(unittest.TestCase):
@@ -17,7 +17,9 @@ class TestApproximation(unittest.TestCase):
 
     def test_conditional_expectation(self):
 
-        cond_est = SklearnConditionalEstimator(estimator=GaussianProcessRegressor())
+        cond_est = SklearnTargetDistributionRegressor(
+            estimator=GaussianProcessRegressor()
+        )
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         y_train = np.array([-1, 2, 1, 4])
         cond_est.fit(X_train, y_train)
@@ -75,7 +77,7 @@ class TestApproximation(unittest.TestCase):
             res = conditional_expect(
                 X=X,
                 func=dummy_func,
-                cond_est=cond_est,
+                reg=cond_est,
                 include_x=True,
                 include_idx=True,
                 **parameter
@@ -84,11 +86,11 @@ class TestApproximation(unittest.TestCase):
             np.testing.assert_array_equal(res, np.zeros(2))
 
     def test_conditional_expectation_2(self):
-        class DummyCondEst(SkactivemlConditionalEstimator):
+        class DummyCondEst(TargetDistributionEstimator):
             def fit(self, X, y, sample_weight=None):
                 return self
 
-            def estimate_conditional_distribution(self, X):
+            def predict_target_distribution(self, X):
                 return norm(loc=np.zeros(len(X)))
 
         cond_est = DummyCondEst()
@@ -112,7 +114,7 @@ class TestApproximation(unittest.TestCase):
                 conditional_expect(
                     X,
                     lambda x: x**2,
-                    cond_est=cond_est,
+                    reg=cond_est,
                     random_state=self.random_state,
                     **arg_dict
                 )

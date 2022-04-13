@@ -22,7 +22,7 @@ from skactiveml.pool.regression._mutual_information_maximization import (
 )
 from skactiveml.pool.regression._query_by_committee import QueryByCommittee
 from skactiveml.pool.regression._representativeness_and_diversity import (
-    RD,
+    RepresentativenessDiversity,
 )
 
 __all__ = [
@@ -37,5 +37,5 @@ __all__ = [
     "MutualInformationGainMaximization",
     "QueryByCommittee",
     "EpistemicUncertaintySampling",
-    "RD",
+    "RepresentativenessDiversity",
 ]

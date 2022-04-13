@@ -45,7 +45,7 @@ __all__ = [
     "ClassFrequencyEstimator",
     "AnnotatorModelMixin",
     "SkactivemlRegressor",
-    "SkactivemlConditionalEstimator",
+    "TargetDistributionEstimator",
 ]
 
 
@@ -1316,13 +1316,15 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 
     Parameters
     __________
+    missing_label : scalar, string, np.nan, or None, default=np.nan
+        Value to represent a missing label.
     random_state : int, RandomState instance or None, optional (default=None)
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
-
     """
 
-    def __init__(self, random_state=None):
+    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
+        self.missing_label = missing_label
         self.random_state = random_state
 
     @abstractmethod
@@ -1341,8 +1343,8 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 
         Returns
         -------
-        self: SkactivemlEstimator,
-            The SkactivemlEstimator is fitted on the training data.
+        self: SkactivemlRegressor,
+            The SkactivemlRegressor is fitted on the training data.
         """
         raise NotImplementedError
 
@@ -1355,7 +1357,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
             Input samples.
         Returns
         -------
-        y : numpy.ndarray, shape (n_samples) or (n_samples, n_targets)
+        y : numpy.ndarray, shape (n_samples)
             Predicted values of the test samples 'X'.
         """
         raise NotImplementedError
@@ -1381,6 +1383,9 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
                 "dtype": None,
             }
 
+        check_missing_label(self.missing_label)
+        self.missing_label_ = self.missing_label
+
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
@@ -1401,15 +1406,15 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         return X, y, sample_weight
 
 
-class SkactivemlConditionalEstimator(SkactivemlRegressor):
-    """SkactivemlConditionalEstimator
+class TargetDistributionEstimator(SkactivemlRegressor):
+    """ContinuousTargetDistributionEstimator
 
     Bass class for scikit-activeml continuous conditional posterior estimators.
 
     """
 
     @abstractmethod
-    def estimate_conditional_distribution(self, X):
+    def predict_target_distribution(self, X):
         """Returns the estimated target distribution conditioned on the test
         samples `X`.
 
@@ -1434,6 +1439,11 @@ class SkactivemlConditionalEstimator(SkactivemlRegressor):
         ----------
         X :  array-like, shape (n_samples, n_features)
             Input samples.
+        return_std : bool, optional (default=False)
+            Whether to return the standard deviation.
+        return_entropy : bool, optional (default=False)
+            Whether to return the differential entropy.
+
         Returns
         -------
         mu : numpy.ndarray, shape (n_samples)
@@ -1443,7 +1453,7 @@ class SkactivemlConditionalEstimator(SkactivemlRegressor):
         entropy : numpy..ndarray, optional
             Predicted differential entropy conditioned on `X`.
         """
-        rv = self.estimate_conditional_distribution(X)
+        rv = self.predict_target_distribution(X)
         result = (rv.mean(),)
         if return_std:
             result += (rv.std(),)
@@ -1468,7 +1478,7 @@ class SkactivemlConditionalEstimator(SkactivemlRegressor):
         y_samples : numpy.ndarray, shape (n_samples, n_rv_samples)
             Drawn random variate samples.
         """
-        rv = self.estimate_conditional_distribution(X)
+        rv = self.predict_target_distribution(X)
         rv_samples = rv.rvs(size=(n_rv_samples, len(X)), random_state=random_state)
         return rv_samples.T
 

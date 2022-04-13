@@ -6,7 +6,7 @@ from skactiveml.pool.regression._expected_model_variance import (
     ExpectedModelVarianceMinimization,
 )
 from skactiveml.pool.regression._representativeness_and_diversity import (
-    RD,
+    RepresentativenessDiversity,
 )
 from skactiveml.utils import MISSING_LABEL
 
@@ -16,7 +16,7 @@ class TestMIM(unittest.TestCase):
         pass
 
     def test_query(self):
-        qs = RD()
+        qs = RepresentativenessDiversity()
 
         X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
         X = np.array([[1, 2], [3, 4]])
@@ -26,7 +26,7 @@ class TestMIM(unittest.TestCase):
         print(query_indices)
 
     def test_query_2(self):
-        qs = RD()
+        qs = RepresentativenessDiversity()
 
         X = np.array([[1, 2], [3, 4], [0, 0], [0, 1], [-10, 1]])
         y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
@@ -35,7 +35,7 @@ class TestMIM(unittest.TestCase):
         print(query_indices)
 
     def test_query_3(self):
-        qs = RD()
+        qs = RepresentativenessDiversity()
 
         X = np.array([[1, 2], [3, 4], [0, 0], [0, 1], [-10, 1]])
         y = np.array([1.0] + [MISSING_LABEL] * 4)
@@ -44,4 +44,4 @@ class TestMIM(unittest.TestCase):
         print(query_indices)
 
     def test_query_4(self):
-        qs = RD(qs=ExpectedModelVarianceMinimization())
+        qs = RepresentativenessDiversity(qs=ExpectedModelVarianceMinimization())

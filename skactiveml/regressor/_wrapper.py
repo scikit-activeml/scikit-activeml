@@ -7,9 +7,9 @@ from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.utils.metaestimators import _IffHasAttrDescriptor
 from sklearn.utils.validation import has_fit_parameter, check_array
 
-from skactiveml.base import SkactivemlRegressor, SkactivemlConditionalEstimator
+from skactiveml.base import SkactivemlRegressor, TargetDistributionEstimator
 from skactiveml.utils import check_type
-from skactiveml.utils._label import is_labeled
+from skactiveml.utils._label import is_labeled, MISSING_LABEL
 from skactiveml.utils._validation import check_callable
 
 
@@ -47,10 +47,19 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     samples with missing values are filtered and one output regressor are
     wrapped by a multi output regressor.
 
+    Parameters
+    ----------
+    estimator : sklearn.base.RegressorMixin with predict method
+        scikit-learn regressor.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or RandomState instance or None, default=None
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
     """
 
-    def __init__(self, estimator, random_state=None):
-        super().__init__(random_state=random_state)
+    def __init__(self, estimator, missing_label=MISSING_LABEL, random_state=None):
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.estimator = estimator
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -82,19 +91,21 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         self.estimator_ = deepcopy(self.estimator)
 
-        labeled_indices = is_labeled(y)
-        X_labeled = X[labeled_indices]
-        y_labeled = y[labeled_indices]
+        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+
+        is_lbld = is_labeled(y, missing_label=self.missing_label_)
+        X_labeled = X[is_lbld]
+        y_labeled = y[is_lbld]
         estimator_parameters = dict(fit_kwargs) if fit_kwargs is not None else {}
 
         if (
             has_fit_parameter(self.estimator_, "sample_weight")
             and sample_weight is not None
         ):
-            sample_weight_labeled = sample_weight[labeled_indices]
+            sample_weight_labeled = sample_weight[is_lbld]
             estimator_parameters["sample_weight"] = sample_weight_labeled
 
-        if np.sum(labeled_indices) != 0:
+        if np.sum(is_lbld) != 0:
             self.estimator_.fit(X_labeled, y_labeled, **estimator_parameters)
 
         return self
@@ -152,8 +163,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             return getattr(self.estimator, item)
 
 
-class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegressor):
-    """SklearnConditionalEstimator
+class SklearnTargetDistributionRegressor(TargetDistributionEstimator, SklearnRegressor):
+    """SklearnTargetDistributionRegressor
 
     Implementation of a wrapper class for scikit-learn conditional estimators
     such that missing labels can be handled and the conditional distribution
@@ -163,21 +174,31 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
     The wrapped regressor of sklearn needs `return_std` as a key_word argument
     for `predict`.
 
+    Parameters
+    ----------
+    estimator : sklearn.base.RegressorMixin with predict method
+        scikit-learn regressor.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or RandomState instance or None, default=None
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
     """
 
-    def __init__(self, estimator, random_state=None, std=None):
-        super(SklearnConditionalEstimator, self).__init__(estimator, random_state)
-        self.std = std
+    def __init__(self, estimator, missing_label=MISSING_LABEL, random_state=None):
+        super(SklearnTargetDistributionRegressor, self).__init__(
+            estimator, missing_label=missing_label, random_state=random_state
+        )
 
-    def estimate_conditional_distribution(self, X):
+    def predict_target_distribution(self, X):
         """Returns the estimated target distribution conditioned on the test
         samples `X`.
-
 
         Parameters
         ----------
         X :  array-like, shape (n_samples, n_features)
             Input samples.
+
         Returns
         -------
         dist : scipy.stats.rv_continuous
@@ -191,12 +212,6 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
 
             self.estimator_ = deepcopy(self.estimator)
 
-        check_type(self.std, f"{self.std}", float, int, None)
-
-        if callable(self.std):
-            check_callable(self.std, "self.var")
-            return self.estimator_.predict(X), self.std(X)
-
         if (
             "return_std"
             not in inspect.signature(self.estimator.predict).parameters.keys()
@@ -205,8 +220,7 @@ class SklearnConditionalEstimator(SkactivemlConditionalEstimator, SklearnRegress
                 f"`{self.estimator}` must have key_word argument"
                 f"`return_std` for predict."
             )
+
         X = check_array(X)
         loc, scale = self.estimator_.predict(X, return_std=True)
-        if self.std is not None:
-            scale = np.sqrt(self.std**2 + scale)
         return norm(loc=loc, scale=scale)
