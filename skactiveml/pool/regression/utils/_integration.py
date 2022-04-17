@@ -240,6 +240,7 @@ def reshape_dist(dist, shape=None):
 
     for argument in ["loc", "scale", "df"]:
         if argument in dist.kwds:
+            # check if shapes are compatible
             dist.kwds[argument].shape = shape
 
     return dist

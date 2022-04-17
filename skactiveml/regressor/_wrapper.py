@@ -5,7 +5,7 @@ from copy import deepcopy
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.utils.metaestimators import _IffHasAttrDescriptor
-from sklearn.utils.validation import has_fit_parameter, check_array
+from sklearn.utils.validation import has_fit_parameter, check_array, check_is_fitted
 
 from skactiveml.base import SkactivemlRegressor, TargetDistributionEstimator
 from skactiveml.utils import check_type
@@ -204,13 +204,7 @@ class SklearnTargetDistributionRegressor(TargetDistributionEstimator, SklearnReg
         dist : scipy.stats.rv_continuous
 
         """
-        if not hasattr(self, "estimator_"):
-            if not is_regressor(estimator=self.estimator):
-                raise TypeError(
-                    f"`{self.estimator}` must be a scikit-learn " "regressor."
-                )
-
-            self.estimator_ = deepcopy(self.estimator)
+        check_is_fitted(self)
 
         if (
             "return_std"

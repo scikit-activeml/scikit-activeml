@@ -2,9 +2,10 @@ import numpy as np
 from scipy.stats import t
 from sklearn.metrics.pairwise import pairwise_kernels
 from sklearn.utils import check_array
+from sklearn.utils.validation import check_is_fitted
 
 from skactiveml.base import TargetDistributionEstimator
-from skactiveml.utils import is_labeled, MISSING_LABEL
+from skactiveml.utils import is_labeled, MISSING_LABEL, check_scalar
 
 
 class NICKernelRegressor(TargetDistributionEstimator):
@@ -56,9 +57,6 @@ class NICKernelRegressor(TargetDistributionEstimator):
         self.metric_dict = {} if metric_dict is None else metric_dict
         self.missing_label = missing_label
 
-        self.X_ = None
-        self.y_ = None
-
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
 
@@ -80,8 +78,18 @@ class NICKernelRegressor(TargetDistributionEstimator):
 
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
+        for (value, name) in [
+            (self.kappa_0, "self.kappa_0"),
+            (self.nu_0, "self.nu_0"),
+            (self.sigma_sq_0, "self.sigma_sq_0"),
+        ]:
+            check_scalar(value, name, (int, float), min_val=0)
+        check_scalar(self.mu_0, "self.mu_0", (int, float))
+
         self.X_ = X[is_lbld]
         self.y_ = y[is_lbld]
+
+        self.prior_params_ = (self.kappa_0, self.nu_0, self.mu_0, self.sigma_sq_0)
         if sample_weight is not None:
             weights_ = sample_weight[is_lbld]
             self.y_ = (weights_ * self.y_) / np.average(weights_)
@@ -101,7 +109,7 @@ class NICKernelRegressor(TargetDistributionEstimator):
 
     def _estimate_update_params(self, X):
 
-        if self.X_ is not None and len(self.X_) != 0:
+        if len(self.X_) != 0:
             N, mu_ml, var_ml = self._estimate_ml_params(X)
             update_params = (N, N, mu_ml, var_ml)
             return update_params
@@ -123,9 +131,10 @@ class NICKernelRegressor(TargetDistributionEstimator):
         dist : scipy.stats.rv_continuous
 
         """
+        check_is_fitted(self)
 
         X = check_array(X)
-        prior_params = (self.kappa_0, self.nu_0, self.mu_0, self.sigma_sq_0)
+        prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
         post_params = _combine_params(prior_params, update_params)
 
@@ -147,7 +156,7 @@ def _combine_params(prior_params, update_params):
     scatter_com = (
         nu_1 * sigma_sq_1
         + nu_2 * sigma_sq_2
-        + kappa_1 * kappa_com * (mu_1 - mu_2) ** 2 / (kappa_1 + kappa_2)
+        + kappa_1 * kappa_2 * (mu_1 - mu_2) ** 2 / kappa_com
     )
     sigma_sq_com = scatter_com / nu_com
     return kappa_com, nu_com, mu_com, sigma_sq_com

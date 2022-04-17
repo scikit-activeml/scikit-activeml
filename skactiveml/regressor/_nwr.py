@@ -26,8 +26,8 @@ class NadarayaWatsonRegressor(SkactivemlRegressor):
     def __init__(
         self,
         metric="rbf",
-        missing_label=MISSING_LABEL,
         metric_dict=None,
+        missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(random_state=random_state)
@@ -35,6 +35,8 @@ class NadarayaWatsonRegressor(SkactivemlRegressor):
             metric=metric,
             metric_dict=metric_dict,
             kappa_0=0,
+            nu_0=3,
+            sigma_sq_0=1,
             missing_label=missing_label,
             random_state=None,
         )
