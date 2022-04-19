@@ -64,11 +64,11 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            enforce_mapping,
-            cost_matrix=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        enforce_mapping,
+        cost_matrix=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -77,19 +77,19 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         self.enforce_mapping = enforce_mapping
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            ignore_partial_fit=True,
-            sample_weight=None,
-            candidates=None,
-            sample_weight_candidates=None,
-            X_eval=None,
-            sample_weight_eval=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        ignore_partial_fit=True,
+        sample_weight=None,
+        candidates=None,
+        sample_weight_candidates=None,
+        X_eval=None,
+        sample_weight_eval=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -282,19 +282,19 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _validate_data(
-            self,
-            X,
-            y,
-            sample_weight,
-            clf,
-            candidates,
-            sample_weight_candidates,
-            X_eval,
-            sample_weight_eval,
-            batch_size,
-            return_utilities,
-            reset=True,
-            check_X_dict=None,
+        self,
+        X,
+        y,
+        sample_weight,
+        clf,
+        candidates,
+        sample_weight_candidates,
+        X_eval,
+        sample_weight_eval,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
     ):
 
         # Validate input parameters.
@@ -340,21 +340,21 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         pass
 
     def _precompute_and_fit_clf(
-            self,
-            id_clf,
-            X_full,
-            y_full,
-            idx_train,
-            idx_cand,
-            idx_eval,
-            fit_clf=True,
+        self,
+        id_clf,
+        X_full,
+        y_full,
+        idx_train,
+        idx_cand,
+        idx_eval,
+        fit_clf=True,
     ):
         if fit_clf:
             id_clf.fit(idx_train, set_base_clf=True)
         return id_clf
 
     def _estimate_current_error(
-            self, id_clf, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
     ):
         """
         Result must be of float or of shape (len(idx_eval))
@@ -362,7 +362,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         return 0.0
 
     def _estimate_error_for_candidate(
-            self, uclf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
+        self, uclf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
     ):
         raise NotImplementedError(
             "Error estimation method must be implemented"
@@ -379,19 +379,19 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         self.cost_matrix_ = check_cost_matrix(cost_matrix, n_classes)
 
     def _concatenate_samples(
-            self,
-            X,
-            y,
-            sample_weight,
-            candidates,
-            sample_weight_candidates,
-            X_eval,
-            sample_weight_eval,
+        self,
+        X,
+        y,
+        sample_weight,
+        candidates,
+        sample_weight_candidates,
+        X_eval,
+        sample_weight_eval,
     ):
 
         # Check if candidates are samples if sample_weight_candidates is set
         if (
-                candidates is None or candidates.ndim == 1
+            candidates is None or candidates.ndim == 1
         ) and sample_weight_candidates is not None:
             raise ValueError(
                 "Attribute `sample_weight_candidates` can only "
@@ -407,7 +407,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             )
 
         if sample_weight_candidates is not None and len(candidates) != len(
-                sample_weight_candidates
+            sample_weight_candidates
         ):
             raise ValueError(
                 "If `sample_weight` is set, it must have same "
@@ -474,7 +474,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         return X_full, y_full, w_full, w_eval, idx_train, idx_cand, idx_eval
 
     def _risk_estimation(
-            self, prob_true, prob_pred, cost_matrix, sample_weight
+        self, prob_true, prob_pred, cost_matrix, sample_weight
     ):
         if prob_true.ndim == 1 and prob_pred.ndim == 1:
             cost_est = cost_matrix[prob_true, :][
@@ -497,7 +497,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             )
         else:
             prob_mat = (
-                    prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis, :]
+                prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis, :]
             )
             return np.sum(
                 sample_weight[:, np.newaxis, np.newaxis]
@@ -528,6 +528,9 @@ class MonteCarloEER(ExpectedErrorReduction):
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`.
         Used for misclassification loss and ignored for log loss.
+    subtract_current : bool, optional (default=False)
+        If True, the current error estimate is subtracted from the simulated
+        score. This might be helpful to define a stopping criterion.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : numeric or np.random.RandomState
@@ -539,11 +542,12 @@ class MonteCarloEER(ExpectedErrorReduction):
         monte carlo estimation of error reduction. ICML, (pp. 441-448)."""
 
     def __init__(
-            self,
-            method="misclassification_loss",
-            cost_matrix=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        method="misclassification_loss",
+        cost_matrix=None,
+        subtract_current=False,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             enforce_mapping=False,
@@ -552,11 +556,10 @@ class MonteCarloEER(ExpectedErrorReduction):
             random_state=random_state,
         )
         self.method = method
+        self.subtract_current = subtract_current
 
     def _validate_init_params(self):
         super()._validate_init_params()
-        # TODO check if cost_matrix is None for log_loss
-
         # Validate method.
         if not isinstance(self.method, str):
             raise TypeError(
@@ -569,16 +572,33 @@ class MonteCarloEER(ExpectedErrorReduction):
                 f"`log_loss` the given one is: {self.method}"
             )
 
+        check_type(self.subtract_current, "subtract_current", bool)
+
+        if self.method == "log_loss" and self.cost_matrix is not None:
+            raise ValueError(
+                "`cost_matrix` must be None if `method` is set to `log_loss`"
+            )
+
     def _estimate_current_error(
-            self, id_clf, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
     ):
-        # TODO: implement
-        return super()._estimate_current_error(
-            id_clf, idx_train, idx_cand, idx_eval, w_eval
-        )
+        if self.subtract_current:
+            probs = id_clf.predict_proba(idx_eval)
+            if self.method == "misclassification_loss":
+                preds = np.argmin(np.dot(probs, self.cost_matrix_), axis=1)
+                err = self._risk_estimation(
+                    probs, preds, self.cost_matrix_, w_eval[idx_eval]
+                )
+            elif self.method == "log_loss":
+                err = self._logloss_estimation(probs, probs)
+            return err
+        else:
+            return super()._estimate_current_error(
+                id_clf, idx_train, idx_cand, idx_eval, w_eval
+            )
 
     def _estimate_error_for_candidate(
-            self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
     ):
         id_clf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
         probs = id_clf.predict_proba(idx_eval)
@@ -590,12 +610,10 @@ class MonteCarloEER(ExpectedErrorReduction):
             )
         elif self.method == "log_loss":
             err = self._logloss_estimation(probs, probs)
-
         return err
 
     def _precompute_and_fit_clf(
-            self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval,
-            fit_clf
+        self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf
     ):
         id_clf.precompute(idx_train, idx_cand)
         id_clf.precompute(idx_train, idx_eval)
@@ -663,15 +681,15 @@ class ValueOfInformationEER(ExpectedErrorReduction):
     """
 
     def __init__(
-            self,
-            cost_matrix=None,
-            consider_unlabeled=True,
-            consider_labeled=True,
-            candidate_to_labeled=True,
-            subtract_current=False,
-            normalize=False,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        cost_matrix=None,
+        consider_unlabeled=True,
+        consider_labeled=True,
+        candidate_to_labeled=True,
+        subtract_current=False,
+        normalize=False,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             enforce_mapping=True,
@@ -694,16 +712,16 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         check_type(self.normalize, "normalize", bool)
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            sample_weight=None,
-            fit_clf=True,
-            ignore_partial_fit=True,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        sample_weight=None,
+        fit_clf=True,
+        ignore_partial_fit=True,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -779,7 +797,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         )
 
     def _estimate_error_for_candidate(
-            self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
     ):
         id_clf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
 
@@ -820,14 +838,14 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
         if self.normalize:
             if norm == 0:
-                return 0
+                return 0.0
             else:
                 return err / norm
         else:
             return err
 
     def _estimate_current_error(
-            self, id_clf, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
     ):
         # estimate current utility score if required
         # TODO: maybe use function for code below to reduce redundancies
@@ -864,11 +882,12 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             else:
                 return err
         else:
-            return 0.0
+            return super()._estimate_current_error(
+                id_clf, idx_train, idx_cand, idx_eval, w_eval
+            )
 
     def _precompute_and_fit_clf(
-            self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval,
-            fit_clf
+        self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf
     ):
 
         # TODO: replace the following line by more efficient code
