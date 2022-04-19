@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.pool.regression._greedy_sampling_y import GSy
+from skactiveml.pool.regression._greedy_sampling_y import GreedySamplingY
 from skactiveml.regressor._wrapper import SklearnRegressor
 
 
@@ -12,7 +12,7 @@ class TestGSy(unittest.TestCase):
         pass
 
     def test_query(self):
-        gsy = GSy(k_0=2, random_state=0)
+        gsy = GreedySamplingY(k_0=2, random_state=0)
 
         reg = SklearnRegressor(estimator=LinearRegression())
 
