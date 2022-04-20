@@ -11,6 +11,7 @@ from ._uncertainty_zliobaite import (
     Split,
     RandomVariableUncertainty,
 )
+from ._density_uncertainty import DBStream, CogDQS
 
 __all__ = [
     "StreamRandomSampling",
@@ -20,4 +21,6 @@ __all__ = [
     "Split",
     "StreamProbabilisticAL",
     "RandomVariableUncertainty",
+    "DBStream",
+    "CogDQS",
 ]
