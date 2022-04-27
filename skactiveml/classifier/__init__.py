@@ -6,7 +6,7 @@ from ._parzen_window_classifier import ParzenWindowClassifier
 from ._wrapper import (
     SklearnClassifier,
     KernelFrequencyClassifier,
-    SubSampleEstimator,
+    SubsampleEstimator,
 )
 
 __all__ = [
@@ -15,5 +15,5 @@ __all__ = [
     "MixtureModelClassifier",
     "SklearnClassifier",
     "KernelFrequencyClassifier",
-    "SubSampleEstimator",
+    "SubsampleEstimator",
 ]

@@ -7,13 +7,10 @@ from multiple annotators.
 
 
 import warnings
-from copy import copy, deepcopy
+from copy import deepcopy
 from collections import deque
-from xmlrpc.client import boolean
-from matplotlib.pyplot import ylabel
 
 import numpy as np
-from sklearn.metrics.pairwise import KERNEL_PARAMS
 from sklearn.base import BaseEstimator, MetaEstimatorMixin, is_classifier
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import (
@@ -25,13 +22,11 @@ from sklearn.utils.validation import (
 )
 from . import ParzenWindowClassifier
 from sklearn.utils.multiclass import check_classification_targets
-from sklearn.neighbors import KernelDensity
 from ..base import SkactivemlClassifier, ClassFrequencyEstimator
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
     check_scalar,
-    call_func,
     check_type,
     is_labeled,
     check_cost_matrix,
@@ -39,6 +34,7 @@ from ..utils import (
     check_random_state,
     ExtLabelEncoder,
     check_class_prior,
+    check_equal_missing_label,
 )
 
 
@@ -356,43 +352,41 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
     """KernelFrequencyClassifier
 
     Implementation of a wrapper class for skactiveml classifiers such that
-    `predict_freq` can be used by calculating the frequencies using other 
+    `predict_freq` can be used by calculating the frequencies using other
     models (e.g., KernelDensity from scikit-learn or ParzenWindowClassifier).
 
     Parameters
     ----------
-    estimator : sklearn.base.SkactivemlClassifier with predict_proba method
-        scikit-learn classifier that is able to deal with missing labels.
+    estimator : sklearn.base.SkactivemlClassifier
+        The `SkactivemlClassifier` where the `predict_freq` method should be
+        added.
+    class_frequency_estimator : sklearn.base.ClassFrequencyEstimator,
+        default=None
+        The `ClassFrequencyEstimator` from which the `predict_freq` method
+        should utilized.
+    use_only_marginal_frequencies : boolean, default=True
+        If True, the estimated class frequencies from the
+        `class_frequency_estimator` are marginalized over all classes and
+        multiplied with the predicted class probabilities from the `estimator`.
+        If False, the frequencies provided by the `class_frequency_estimator`
+        are returned as is.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
-        during the fit.
+        during the fit. Is ignored if class_frequency_estimator is not None.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
-    metric : str or callable, default='rbf'
-        The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
-    n_neighbors : int or None, default=None
-        Number of nearest neighbours. Default is None, which means all
-        available samples are considered.
-    metric_dict : dict,
-        Any further parameters are passed directly to the kernel function.
-    frequency_max_fit_len: int, default=None,
-        Value to represent the frequency estimator sliding window size for X,
-        y and sample weight. If 'None' the windows is unrestricted in size.
-    frequency_replacing_strategy: str, default='last'
-        Defines how old instances of the frequency estimator are replaced.
-        'last': First in First out
-        'random' : replacing old samples randomly
+        `classes` is not none. Is ignored if class_frequency_estimator is not
+        None.
     class_prior : float or array-like, shape (n_classes), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
         prior number of samples belonging to class `classes_[i]`. If
         `class_prior` is a float, `class_prior` indicates the non-negative
-        prior number of samples per class.
+        prior number of samples per class. Is ignored if
+        class_frequency_estimator is not None.
     random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
@@ -401,30 +395,24 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
     def __init__(
         self,
         estimator,
+        class_frequency_estimator=None,
+        use_only_marginal_frequencies=True,
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         class_prior=0.0,
-        n_neighbors=None,
-        metric="rbf",
-        metric_dict=None,
-        frequency_max_fit_len=None,
-        frequency_replacing_strategy="last",
         random_state=None,
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
+            class_prior=class_prior,
             random_state=random_state,
         )
-        self.n_neighbors = n_neighbors
-        self.metric = metric
-        self.metric_dict = metric_dict
+        self.class_frequency_estimator = class_frequency_estimator
+        self.use_only_marginal_frequencies = use_only_marginal_frequencies
         self.estimator = estimator
-        self.class_prior = class_prior
-        self.frequency_max_fit_len = frequency_max_fit_len
-        self.frequency_replacing_strategy = frequency_replacing_strategy
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -449,6 +437,13 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         self: KernelFrequencyClassifier,
             The KernelFrequencyClassifier is fitted on the training data.
         """
+        self._fit(
+            fit_function="fit",
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            **fit_kwargs,
+        )
         self._fit_frequency_estimator(
             fit_function="fit",
             X=X,
@@ -456,13 +451,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             sample_weight=sample_weight,
             **fit_kwargs,
         )
-        return self._fit(
-            fit_function="fit",
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
-            **fit_kwargs,
-        )
+        return self.estimator_
 
     @if_delegate_has_method(delegate="estimator")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -489,6 +478,13 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         self : KernelFrequencyClassifier,
             The KernelFrequencyClassifier is fitted on the training data.
         """
+        self._fit(
+            fit_function="partial_fit",
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            **fit_kwargs,
+        )
         self._fit_frequency_estimator(
             fit_function="partial_fit",
             X=X,
@@ -496,13 +492,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             sample_weight=sample_weight,
             **fit_kwargs,
         )
-        return self._fit(
-            fit_function="partial_fit",
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
-            **fit_kwargs,
-        )
+        return self.estimator_
 
     def predict(self, X):
         """Return class label predictions for the input data X.
@@ -561,14 +551,16 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         """
         check_is_fitted(self)
         X = check_array(X)
-
         # Predict zeros because of missing training data.
+        # Only required because of the use of SubsampleEstimator
         if not self.is_fitted_:
             return np.zeros((len(X), len(self.classes_)))
-        frequencies = self.frequency_estimator_.predict_freq(X)
-        # tiled_frequencies = np.tile(frequencies, [1, len(self.classes_)])
+        frequencies = self.class_frequency_estimator_.predict_freq(X)
+        if not self.use_only_marginal_frequencies:
+            return frequencies
+        marginal_frequencies = np.sum(frequencies, axis=1, keepdims=True)
         pred_proba = self.estimator_.predict_proba(X)
-        return frequencies * pred_proba + self.class_prior_
+        return marginal_frequencies * pred_proba
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         self.check_X_dict_ = {
@@ -579,12 +571,18 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         }
 
         # Check whether estimator is a valid classifier.
-        if not isinstance(
-            self.estimator, SklearnClassifier
-        ) and not is_classifier(estimator=self.estimator):
+        if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
-                "'{}' must be a SkactivemlClassifier or scikit-learn "
+                "'{}' must be a SkactivemlClassifier"
                 "classifier.".format(self.estimator)
+            )
+
+        if self.class_frequency_estimator is not None and not isinstance(
+            self.class_frequency_estimator, SkactivemlClassifier
+        ):
+            raise TypeError(
+                "'{}' must be a SkactivemlClassifier"
+                "classifier.".format(self.class_frequency_estimator)
             )
 
         X, y, sample_weight = self._validate_data(
@@ -594,13 +592,26 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             check_X_dict=self.check_X_dict_,
         )
 
-        if self.cost_matrix is not None and not hasattr(
-            self.estimator, "predict_proba"
-        ):
-            raise ValueError(
-                "'cost_matrix' can be only set, if 'estimator'"
-                "implements 'predict_proba'."
-            )
+        if not hasattr(self, "class_frequency_estimator_"):
+            if self.class_frequency_estimator is None:
+                is_labeled(y, missing_label=self.missing_label)
+                self.class_frequency_estimator_ = SubsampleEstimator(
+                    ParzenWindowClassifier(
+                        missing_label=self.missing_label,
+                        classes=self.classes,
+                        random_state=self.random_state_.randint(2 ** 31 - 1),
+                        class_prior=self.class_prior,
+                        cost_matrix=self.cost_matrix,
+                    ),
+                    only_labled=True,
+                    classes=self.classes,
+                    missing_label=self.missing_label,
+                    random_state=self.random_state_.randint(2 ** 31 - 1),
+                )
+            else:
+                self.class_frequency_estimator_ = deepcopy(
+                    self.class_frequency_estimator
+                )
 
         if hasattr(self, "estimator_"):
             if fit_function != "partial_fit":
@@ -618,38 +629,35 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             )
         if hasattr(self.estimator_, "is_fitted_"):
             self.is_fitted_ = self.estimator_.is_fitted_
+        if hasattr(self.estimator_, "classes_"):
+            self.classes_ = self.estimator_.classes_
+
+        if hasattr(self.estimator_, "_le"):
+            self._le = self.estimator_._le
 
         return self
 
     def _fit_frequency_estimator(
         self, fit_function, X, y, sample_weight=None, **fit_kwargs
     ):
-
-        X, y, sample_weight = self._validate_data(
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
+        check_equal_missing_label(
+            self.class_frequency_estimator_.missing_label,
+            self.estimator.missing_label,
         )
-        y_lbld = np.full(y.shape, np.nan)
-        y_lbld[is_labeled(y, missing_label=self.missing_label)] = 0
 
+        # Check class prior.
+        self.class_prior_ = check_class_prior(
+            self.class_prior, len(self.classes_)
+        )
         if fit_function == "partial_fit":
-            fit_callback = self.frequency_estimator_.partial_fit
+            fit_callback = self.class_frequency_estimator_.partial_fit
         elif fit_function == "fit":
-            fit_callback = self.frequency_estimator_.fit
-        return fit_callback(X, y_lbld, sample_weight)
+            fit_callback = self.class_frequency_estimator_.fit
+        return fit_callback(X, y, sample_weight)
 
     def _validate_data(
-        self,
-        X,
-        y,
-        sample_weight=None,
-        check_X_dict=None,
-        check_y_dict=None,
-        y_ensure_1d=True,
+        self, X, y, sample_weight=None, check_X_dict=None, check_y_dict=None,
     ):
-        if check_X_dict is None:
-            check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
 
         if check_y_dict is None:
             check_y_dict = {
@@ -668,38 +676,19 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        # Create label encoder.
-        self._le = ExtLabelEncoder(
-            classes=self.classes, missing_label=self.missing_label
-        )
-
         # Check input parameters.
         y = check_array(y, **check_y_dict)
-        if len(y) > 0:
-            y_le = column_or_1d(y) if y_ensure_1d else y
-            y_le = self._le.fit_transform(y_le)
-            is_lbdl = is_labeled(y_le)
-
-            if len(y_le[is_lbdl]) > 0:
-                check_classification_targets(y_le[is_lbdl])
-            if len(self._le.classes_) == 0:
-                raise ValueError(
-                    "No class label is known because 'y' contains no actual "
-                    "class labels and 'classes' is not defined. Change at "
-                    "least on of both to overcome this error."
-                )
-            self._label_counts = [
-                np.sum(y_le[is_lbdl] == c)
-                for c in range(len(self._le.classes_))
-            ]
-        else:
-            self._le.fit_transform(self.classes)
+        check_type(
+            self.use_only_marginal_frequencies,
+            "use_only_marginal_frequencies",
+            bool,
+        )
+        if len(y) == 0:
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
 
-        # Update detected classes.
-        self.classes_ = self._le.classes_
+        # # Update detected classes.
 
         # Check classes.
         if sample_weight is not None:
@@ -711,67 +700,6 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                     f"identical shapes."
                 )
 
-        # Update cost matrix.
-        self.cost_matrix_ = (
-            1 - np.eye(len(self.classes_))
-            if self.cost_matrix is None
-            else self.cost_matrix
-        )
-        self.cost_matrix_ = check_cost_matrix(
-            self.cost_matrix_, len(self.classes_)
-        )
-        if self.classes is not None:
-            class_indices = np.argsort(self.classes)
-            self.cost_matrix_ = self.cost_matrix_[class_indices]
-            self.cost_matrix_ = self.cost_matrix_[:, class_indices]
-
-        # Check class prior.
-        self.class_prior_ = check_class_prior(
-            self.class_prior, len(self.classes_)
-        )
-
-        # Check whether metric is available.
-        if self.metric not in KERNEL_PARAMS and not callable(
-                self.metric
-        ):
-            raise ValueError(
-                "The parameter 'metric' must be callable or "
-                "in {}".format(KERNEL_PARAMS.keys())
-            )
-
-        # Check number of neighbors which must be a positive integer.
-        if self.n_neighbors is not None:
-            check_scalar(
-                self.n_neighbors,
-                name="n_neighbors",
-                min_val=1,
-                target_type=int,
-            )
-
-        # Ensure that metric_dict is a Python dictionary.
-        self.metric_dict_ = (
-            self.metric_dict if self.metric_dict is not None else {}
-        )
-        if not isinstance(self.metric_dict_, dict):
-            raise TypeError("'metric_dict' must be a Python dictionary.")
-
-        if not hasattr(self, "frequency_estimator_"):
-            self.frequency_estimator_ = SubSampleEstimator(
-                ParzenWindowClassifier(
-                    n_neighbors=self.n_neighbors,
-                    metric=self.metric,
-                    metric_dict=self.metric_dict,
-                    missing_label=np.nan,
-                    classes=[0],
-                    random_state=self.random_state_.randint(2 ** 31 - 1),
-                ),
-                max_fit_len=self.frequency_max_fit_len,
-                replacing_strategy=self.frequency_replacing_strategy,
-                only_labled=True,
-                classes=[0],
-                missing_label=np.nan,
-            )
-
         return X, y, sample_weight
 
     def __getattr__(self, item):
@@ -781,10 +709,10 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             raise AttributeError(f"{item} does not exist")
 
 
-class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
-    """SubSampleEstimator
+class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
+    """SubsampleEstimator
 
-    Implementation of a wrapper class for SkactivemlClassifier such that the 
+    Implementation of a wrapper class for SkactivemlClassifier such that the
     number of training samples can be limited. Furthermore, saves X, y and
     sample_weight, enabling the use of a partial fit for any classifier. The
     class offers two updating strategies, i.e., replacing the oldes samples
@@ -803,10 +731,10 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
         `classes` is not none.
-    max_fit_len: int, default=None,
+    subsample_size: int, default=None,
         Value to represent the estimator sliding window size for X, y and
         sample weight. If 'None' the windows is unrestricted in size.
-    replacing_strategy: str, default='last'
+    replacement_method: str, default='last'
         Defines how old instances are replaced.
         'last': First in First out
         'random' : replacing old samples randomly
@@ -824,8 +752,8 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
-        max_fit_len=None,
-        replacing_strategy="last",
+        subsample_size=None,
+        replacement_method="last",
         only_labled=False,
     ):
         super().__init__(
@@ -836,8 +764,8 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         )
         self.estimator = estimator
         self.only_labled = only_labled
-        self.max_fit_len = max_fit_len
-        self.replacing_strategy = replacing_strategy
+        self.subsample_size = subsample_size
+        self.replacement_method = replacement_method
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -859,10 +787,10 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        self: SubSampleEstimator,
-            The SubSampleEstimator is fitted on the training data.
+        self: SubsampleEstimator,
+            The SubsampleEstimator is fitted on the training data.
         """
-        self._replacing_strategy("fit", X, y, sample_weight)
+        self._replacement_method("fit", X, y, sample_weight)
         return self._fit(
             "fit",
             X=self.X_train_,
@@ -893,10 +821,10 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        self : SubSampleEstimator,
-            The SubSampleEstimator is fitted on the training data.
+        self : SubsampleEstimator,
+            The SubsampleEstimator is fitted on the training data.
         """
-        self._replacing_strategy("partial_fit", X, y, sample_weight)
+        self._replacement_method("partial_fit", X, y, sample_weight)
 
         if hasattr(self.estimator, "partial_fit"):
             return self._fit(
@@ -915,7 +843,7 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 **fit_kwargs,
             )
 
-    def _replacing_strategy(self, fit_func, X, y, sample_weight=None):
+    def _replacement_method(self, fit_func, X, y, sample_weight=None):
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
@@ -930,29 +858,29 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
         if not hasattr(self, "X_train_"):
-            self.X_train_ = deque(maxlen=self.max_fit_len)
+            self.X_train_ = deque(maxlen=self.subsample_size)
         if not hasattr(self, "y_train_"):
-            self.y_train_ = deque(maxlen=self.max_fit_len)
+            self.y_train_ = deque(maxlen=self.subsample_size)
         if not hasattr(self, "sample_weight_"):
-            self.sample_weight_ = deque(maxlen=self.max_fit_len)
+            self.sample_weight_ = deque(maxlen=self.subsample_size)
         # reset the window if fit is called otherwise extend the window with
         # the given data
         if fit_func == "fit":
-            self.X_train_ = deque(maxlen=self.max_fit_len)
-            self.y_train_ = deque(maxlen=self.max_fit_len)
-            self.sample_weight_ = deque(maxlen=self.max_fit_len)
+            self.X_train_ = deque(maxlen=self.subsample_size)
+            self.y_train_ = deque(maxlen=self.subsample_size)
+            self.sample_weight_ = deque(maxlen=self.subsample_size)
         elif fit_func == "partial_fit":
             if (
-                self.max_fit_len is not None
-                and len(self.X_train_) + len(X) >= self.max_fit_len
+                self.subsample_size is not None
+                and len(self.X_train_) + len(X) >= self.subsample_size
             ):
-                if self.replacing_strategy == "random":
+                if self.replacement_method == "random":
                     index = np.random.choice(
                         len(self.X_train_),
                         len(self.X_train_) - len(X),
                         replace=False,
                     )
-                    # since old data will get removed when max_fit_len is
+                    # since old data will get removed when subsample_size is
                     # reached extend the randomized data to the window.
                     self.X_train_.extend(np.array(self.X_train_)[index])
                     self.y_train_.extend(np.array(self.y_train_)[index])
@@ -1091,10 +1019,16 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             y_new = y
 
-        if self.max_fit_len is not None:
-            check_scalar(self.max_fit_len, "max_fit_len", int, min_val=0, min_inclusive=False)
+        if self.subsample_size is not None:
+            check_scalar(
+                self.subsample_size,
+                "subsample_size",
+                int,
+                min_val=0,
+                min_inclusive=False,
+            )
         check_type(self.only_labled, "only_labled", bool)
-        check_type(self.replacing_strategy, "replacing_strategy", str)
+        check_type(self.replacement_method, "replacement_method", str)
         if check_y_dict is None:
             check_y_dict = {
                 "ensure_min_samples": 0,
@@ -1108,6 +1042,36 @@ class SubSampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         check_classifier_params(
             self.classes, self.missing_label, self.cost_matrix
         )
+
+        if isinstance(self.estimator, SkactivemlClassifier):
+            if (
+                self.cost_matrix is not None
+                and self.estimator.cost_matrix is not None
+                and not np.array_equiv(
+                    self.cost_matrix, self.estimator.cost_matrix
+                )
+            ):
+                raise ValueError(
+                    "'cost_matrix' and estimator.cost_matrix must be equal. "
+                    "Got {} is not equal to {}.".format(
+                        self.cost_matrix, self.estimator.cost_matrix
+                    )
+                )
+            if self.only_labled:
+                check_equal_missing_label(
+                    self.missing_label, self.estimator.missing_label,
+                )
+            if (
+                self.classes is not None
+                and self.estimator.classes is not None
+                and not np.array_equiv(self.classes, self.estimator.classes)
+            ):
+                raise ValueError(
+                    "'classes' and estimator.classes must be equal. "
+                    "Got {} is not equal to {}.".format(
+                        self.classes, self.estimator.classes
+                    )
+                )
 
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)

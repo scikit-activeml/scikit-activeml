@@ -17,7 +17,7 @@ from skactiveml.classifier import (
     SklearnClassifier,
     KernelFrequencyClassifier,
     ParzenWindowClassifier,
-    SubSampleEstimator,
+    SubsampleEstimator,
 )
 
 
@@ -180,78 +180,29 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
-    def test_init_param_frequency_replacing_strategy(self):
+    def test_init_param_class_frequency_estimator(self):
         clf = KernelFrequencyClassifier(
-            estimator=ParzenWindowClassifier(),
-            frequency_replacing_strategy=None,
+            estimator=ParzenWindowClassifier(), class_frequency_estimator=None,
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = KernelFrequencyClassifier(
             estimator=ParzenWindowClassifier(missing_label="nan"),
             missing_label="nan",
-            frequency_replacing_strategy=0,
+            class_frequency_estimator=0,
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
-    def test_init_param_frequency_max_fit_len(self):
+    def test_init_param_use_only_marginal_frequencies(self):
         clf = KernelFrequencyClassifier(
             estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
-            frequency_max_fit_len="Test",
+            use_only_marginal_frequencies="Test",
             missing_label="nan",
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
         clf = KernelFrequencyClassifier(
             estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
-            frequency_max_fit_len=0,
+            use_only_marginal_frequencies=0,
             missing_label="nan",
-        )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
-
-    def test_init_param_metric_dict(self):
-        clf = KernelFrequencyClassifier(Perceptron(), missing_label=-1)
-        self.assertEqual(clf.metric_dict, None)
-        clf = KernelFrequencyClassifier(
-            Perceptron(), missing_label="nan", metric_dict="Test"
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = KernelFrequencyClassifier(
-            Perceptron(), missing_label="nan", metric_dict=["gamma"]
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-
-    def test_init_param_metric(self):
-        clf = KernelFrequencyClassifier(Perceptron())
-        self.assertEqual(clf.metric, "rbf")
-        clf = KernelFrequencyClassifier(Perceptron(), metric="Test")
-        self.assertEqual(clf.metric, "Test")
-        clf = KernelFrequencyClassifier(
-            SklearnClassifier(Perceptron(), missing_label="nan"),
-            missing_label="nan",
-            metric="Test",
-        )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
-
-    def test_init_param_n_neighbors(self):
-        clf = KernelFrequencyClassifier(Perceptron())
-        self.assertTrue(clf.n_neighbors is None)
-        clf = KernelFrequencyClassifier(Perceptron(), n_neighbors=1)
-        self.assertEqual(clf.n_neighbors, 1)
-        clf = KernelFrequencyClassifier(
-            SklearnClassifier(Perceptron(), missing_label="nan"),
-            missing_label="nan",
-            n_neighbors=0,
-        )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
-        clf = KernelFrequencyClassifier(
-            SklearnClassifier(Perceptron(), missing_label="nan"),
-            missing_label="nan",
-            n_neighbors=-1,
-        )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
-        clf = KernelFrequencyClassifier(
-            SklearnClassifier(Perceptron(), missing_label="nan"),
-            missing_label="nan",
-            n_neighbors=1.5,
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
@@ -259,12 +210,11 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         clf = KernelFrequencyClassifier(
             estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
             missing_label="nan",
-            cost_matrix=1 - np.eye(2),
             classes=["tokyo", "paris"],
             random_state=0,
         )
         np.testing.assert_array_equal(["tokyo", "paris"], clf.classes)
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        # self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
         clf = KernelFrequencyClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf = KernelFrequencyClassifier(
@@ -300,6 +250,14 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
 
+        clf = KernelFrequencyClassifier(
+            SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+            missing_label="None",
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
+
         X = [[1], [0]]
         y_true = [1, 0]
         clf = KernelFrequencyClassifier(
@@ -313,7 +271,11 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
 
     def test_partial_fit(self):
         clf = KernelFrequencyClassifier(
-            SklearnClassifier(estimator=GaussianNB(), missing_label="nan"),
+            SklearnClassifier(
+                estimator=GaussianNB(),
+                missing_label="nan",
+                classes=["tokyo", "paris", "new york"],
+            ),
             classes=["tokyo", "paris", "new york"],
             missing_label="nan",
         )
@@ -411,14 +373,29 @@ class TestKernelFrequencyClassifier(unittest.TestCase):
         self.assertRaises(NotFittedError, clf.predict_freq, X=self.X)
         clf.fit(X=self.X, y=self.y1)
         freq = clf.predict_freq(X=self.X)
+
+        self.assertEqual(len(np.unique(freq)), 2)
         est = ParzenWindowClassifier(missing_label="nan").fit(
             X=self.X, y=self.y1
         )
-        self.assertEqual(len(np.unique(freq)), 2)
+        clf = KernelFrequencyClassifier(
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+            class_frequency_estimator=est,
+            missing_label="nan",
+            use_only_marginal_frequencies=False,
+        )
+
+        clf.fit(X=self.X, y=self.y1)
+        freq = clf.predict_freq(X=self.X)
+        est.fit(X=self.X, y=self.y1)
+        freq_est = est.predict_freq(X=self.X)
+        np.testing.assert_array_equal(freq, freq_est)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
 
 
-class TestSubSampleEstimator(unittest.TestCase):
+class TestSubsampleEstimator(unittest.TestCase):
     def setUp(self):
         self.X = np.zeros((4, 1))
         self.y1 = ["tokyo", "paris", "nan", "tokyo"]
@@ -427,42 +404,42 @@ class TestSubSampleEstimator(unittest.TestCase):
         self.y_nan = ["nan", "nan", "nan", "nan"]
 
     def test_init_param_estimator(self):
-        clf = SubSampleEstimator(estimator="Test", missing_label="nan")
+        clf = SubsampleEstimator(estimator="Test", missing_label="nan")
         self.assertEqual(clf.estimator, "Test")
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
-    def test_init_param_max_fit_len(self):
-        clf = SubSampleEstimator(
-            estimator=ParzenWindowClassifier(), max_fit_len="Test"
+    def test_init_param_subsample_size(self):
+        clf = SubsampleEstimator(
+            estimator=ParzenWindowClassifier(), subsample_size="Test"
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(
-            estimator=ParzenWindowClassifier(), max_fit_len=-1
+        clf = SubsampleEstimator(
+            estimator=ParzenWindowClassifier(), subsample_size=-1
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
 
-    def test_init_param_replacing_strategy(self):
-        clf = SubSampleEstimator(
-            estimator=ParzenWindowClassifier(), replacing_strategy=None
+    def test_init_param_replacement_method(self):
+        clf = SubsampleEstimator(
+            estimator=ParzenWindowClassifier(), replacement_method=None
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(
-            estimator=ParzenWindowClassifier(), replacing_strategy=0
+        clf = SubsampleEstimator(
+            estimator=ParzenWindowClassifier(), replacement_method=0
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_init_param_only_labled(self):
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=ParzenWindowClassifier(), only_labled="Test"
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=ParzenWindowClassifier(), only_labled=0
         )
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_fit(self):
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=SklearnClassifier(
                 GaussianProcessClassifier(),
                 missing_label="nan",
@@ -475,7 +452,7 @@ class TestSubSampleEstimator(unittest.TestCase):
         np.testing.assert_array_equal(["tokyo", "paris"], clf.classes)
         self.assertEqual(clf.estimator.kernel, clf.estimator.estimator.kernel)
         self.assertFalse(hasattr(clf, "kernel_"))
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=SklearnClassifier(Perceptron()),
             missing_label="nan",
             cost_matrix=1 - np.eye(2),
@@ -483,15 +460,15 @@ class TestSubSampleEstimator(unittest.TestCase):
             random_state=0,
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
-        clf = SubSampleEstimator(estimator=GaussianProcessClassifier())
+        clf = SubsampleEstimator(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=SklearnClassifier(
                 GaussianProcessClassifier(),
-                classes=["ny", "paris", "tokyo"],
+                classes=["new york", "paris", "tokyo"],
                 missing_label="nan",
             ),
-            classes=["tokyo", "paris", "new york"],
+            classes=["new york", "paris", "tokyo"],
             missing_label="nan",
             only_labled=True,
         )
@@ -500,7 +477,7 @@ class TestSubSampleEstimator(unittest.TestCase):
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "kernel_"))
         np.testing.assert_array_equal(
-            clf.classes_, ["new york", "paris", "tokyo"]
+            clf.estimator_.classes_, ["new york", "paris", "tokyo"]
         )
         self.assertEqual(clf.missing_label, "nan")
         with warnings.catch_warnings(record=True) as w:
@@ -511,14 +488,14 @@ class TestSubSampleEstimator(unittest.TestCase):
         self.assertFalse(clf.estimator_.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
 
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             SklearnClassifier(
                 GaussianProcessClassifier(), missing_label="nan"
             ),
             missing_label="nan",
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             SklearnClassifier(DecisionTreeClassifier(), missing_label="nan"),
             missing_label="nan",
         )
@@ -526,17 +503,17 @@ class TestSubSampleEstimator(unittest.TestCase):
 
         X = [[1], [0]]
         y_true = [1, 0]
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             SklearnClassifier(GaussianProcessClassifier()), classes=[0, 1]
         )
-        ensemble = SubSampleEstimator(
+        ensemble = SubsampleEstimator(
             SklearnClassifier(BaggingClassifier(clf)), classes=[0, 1]
         )
         ensemble.fit(X, y_true)
         self.assertTrue(ensemble.is_fitted_, True)
 
     def test_partial_fit(self):
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             SklearnClassifier(estimator=GaussianNB(), missing_label="nan"),
             classes=["tokyo", "paris", "new york"],
             missing_label="nan",
@@ -548,13 +525,27 @@ class TestSubSampleEstimator(unittest.TestCase):
         np.testing.assert_array_equal(
             clf.classes_, ["new york", "paris", "tokyo"]
         )
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
+            estimator=SklearnClassifier(
+                GaussianNB(),
+                missing_label="nan",
+                cost_matrix=[[1, 2, 1], [2, 1, 1], [2, 1, 3]],
+            ),
+            classes=["tokyo", "paris", "new york"],
+            missing_label="nan",
+            only_labled=True,
+            subsample_size=5,
+            replacement_method="random",
+            cost_matrix=[[1, 1, 1], [2, 1, 1], [2, 1, 3]],
+        )
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        clf = SubsampleEstimator(
             estimator=SklearnClassifier(GaussianNB(), missing_label="nan"),
             classes=["tokyo", "paris", "new york"],
             missing_label="nan",
             only_labled=True,
-            max_fit_len=5,
-            replacing_strategy="random",
+            subsample_size=5,
+            replacement_method="random",
         )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(
@@ -569,15 +560,15 @@ class TestSubSampleEstimator(unittest.TestCase):
             self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
         )
 
-        clf = SubSampleEstimator(estimator=Perceptron(), classes=[0, 1])
+        clf = SubsampleEstimator(estimator=Perceptron(), classes=[0, 1])
         clf.partial_fit(X=self.X, y=self.y3)
-        clf = SubSampleEstimator(estimator=Perceptron(), classes=[0, 1])
+        clf = SubsampleEstimator(estimator=Perceptron(), classes=[0, 1])
         clf.partial_fit(
             X=self.X, y=self.y3, sample_weight=np.ones_like(self.y3)
         )
 
     def test_predict_proba(self):
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             SklearnClassifier(
                 estimator=GaussianProcessClassifier(), missing_label="nan"
             ),
@@ -599,7 +590,7 @@ class TestSubSampleEstimator(unittest.TestCase):
             self.assertEqual(len(w), 1)
         P_exp = np.ones((len(self.X), 1))
         np.testing.assert_array_equal(P_exp, P)
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=SklearnClassifier(
                 GaussianProcessClassifier(),
                 missing_label="nan",
@@ -619,7 +610,7 @@ class TestSubSampleEstimator(unittest.TestCase):
         np.testing.assert_array_equal(P_exp, P)
 
     def test_predict(self):
-        clf = SubSampleEstimator(
+        clf = SubsampleEstimator(
             estimator=SklearnClassifier(
                 GaussianProcessClassifier(), missing_label="nan"
             ),
