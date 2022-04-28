@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from skactiveml.pool.regression._mutual_information_maximization import (
+from skactiveml.pool.regression._information_maximization import (
     MutualInformationGainMaximization,
 )
 from skactiveml.regressor._wrapper import SklearnTargetDistributionRegressor

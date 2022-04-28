@@ -4,6 +4,8 @@ pool-based active learning.
 """
 
 from . import multiannotator
+from skactiveml.pool.regression._greedy_sampling import GreedySamplingX, GreedySamplingY
+from . import regression
 from . import utils
 from ._cost_embedding_al import CostEmbeddingAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
@@ -40,4 +42,6 @@ __all__ = [
     "vote_entropy",
     "FourDs",
     "CostEmbeddingAL",
+    "GreedySamplingX",
+    "GreedySamplingY",
 ]

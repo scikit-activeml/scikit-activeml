@@ -42,6 +42,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         self.k_bootstraps = k_bootstraps
         self.n_train = n_train
         self.ord = ord
+        # maybe add feature map
 
     def query(
         self,
@@ -65,7 +66,8 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
         reg: SkactivemlRegressor
-            Regressor to predict the data. Assumes linear regressor.
+            Regressor to predict the data. Assumes a linear regressor with respect
+            to the parameters.
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -121,7 +123,9 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             max_val=1,
             min_inclusive=False,
         )
-        check_scalar(self.k_bootstraps, "self.k_bootstraps", int)
+        check_scalar(self.k_bootstraps, "self.k_bootstraps", int, min_val=1)
+        check_type(fit_reg, "fit_reg", bool)
+        check_type(return_utilities, "return_utilities", bool)
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)

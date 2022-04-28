@@ -148,3 +148,40 @@ class TestApproximation(unittest.TestCase):
 
         plt.plot(alpha, g)
         plt.show()
+
+    def test_something(self):
+        class DummyCondEst(TargetDistributionEstimator):
+            def fit(self, X, y, sample_weight=None):
+                return self
+
+            def predict_target_distribution(self, X):
+                return norm(loc=np.zeros(len(X)))
+
+        X = (np.arange(11) - 6).reshape(-1, 1)
+        dist = norm(loc=1)
+        cond_est = DummyCondEst()
+        expect_1 = conditional_expect(
+            X,
+            lambda x: -dist.logpdf(x),
+            cond_est,
+            n_integration_samples=7,
+            method="gauss_hermite",
+        )
+        expect_2 = conditional_expect(
+            X,
+            lambda x: -dist.logpdf(x),
+            cond_est,
+            method="dynamic_quad",
+            vector_func="both",
+        )
+        expect_3 = conditional_expect(
+            X,
+            lambda x: -dist.logpdf(x),
+            cond_est,
+            method="quantile",
+            n_integration_samples=7,
+            vector_func="both",
+        )
+        print(expect_1)
+        print(expect_2)
+        print(expect_3)

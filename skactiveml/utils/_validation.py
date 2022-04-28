@@ -653,14 +653,14 @@ def check_callable(func, name, n_free_parameters=None):
     if n_free_params != n_free_parameters:
         raise TypeError(
             f"The number of free parameters of the callable has to "
-            f"equal one. "
+            f"equal {n_free_parameters}. "
             f"The number of free parameters is {n_free_params}."
         )
 
 
 def check_bound(bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False):
     """Validates bound and returns the bound of X if bound is None.
-    `bound` and `X` must not be None.
+    `bound` or `X` must not be None.
 
     Parameters
     ----------

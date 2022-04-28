@@ -211,15 +211,6 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         combined_ranking[nan_values] = np.nan
         combined_ranking = combined_ranking.reshape(cr_shape)
 
-        if next_ranking.min() != next_ranking.max() and (
-            next_ranking.min() < 0 or next_ranking.max() >= 1
-        ):
-            next_ranking = (
-                1
-                / (next_ranking.max() - next_ranking.min() + 1)
-                * (next_ranking - next_ranking.min())
-            )
-
-        combined_ranking = combined_ranking + next_ranking
+        combined_ranking = combined_ranking + 1 / (1 + np.exp(-next_ranking))  # sigmoid
 
     return combined_ranking

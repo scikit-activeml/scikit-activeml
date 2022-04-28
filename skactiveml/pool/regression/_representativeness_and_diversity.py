@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import rankdata
 from sklearn.cluster import KMeans
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
@@ -161,7 +162,9 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
                 self.k_means_, X_labeled, X
             )
             cand_clusters = self.k_means_.predict(X_cand)
-            cluster_ranking = combine_ranking(-l_sample_count, t_sample_count)
+            cluster_ranking = rankdata(
+                combine_ranking(-l_sample_count, t_sample_count), method="dense"
+            )
             sorted_clusters = np.argsort(cluster_ranking)
 
             qs_utilities = np.zeros(len(X_cand))
@@ -193,7 +196,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
                 qs_utilities[is_cluster_cand] = utilities
 
             cand_cluster_ranking = cluster_ranking[cand_clusters]
-            utilities_cand = combine_ranking(cand_cluster_ranking, qs_utilities)
+            utilities_cand = cand_cluster_ranking + 1 / (1 + np.exp(-qs_utilities))
 
             # batch regarding the remaining candidates after the first batch
             second_indices_off, second_utilities_off = simple_batch(
@@ -235,5 +238,5 @@ def _cluster_sample_count(k_means, X_labeled, X):
 
 def _closeness_to_cluster(k_means, X_cand):
     cand_distances = np.min(k_means.transform(X_cand), axis=1)
-    cand_closeness = 1 / 2 * np.exp(-cand_distances)
+    cand_closeness = -cand_distances
     return cand_closeness

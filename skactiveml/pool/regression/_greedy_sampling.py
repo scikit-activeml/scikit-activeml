@@ -40,7 +40,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         random_state=None,
     ):
         super().__init__(random_state=random_state, missing_label=missing_label)
-        self.x_metric = metric if metric is not None else "euclidean"
+        self.metric = metric if metric is not None else "euclidean"
 
     def query(self, X, y, candidates=None, batch_size=1, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
@@ -109,7 +109,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             candidate_indices = mapping
 
         utilities = np.full((batch_size, len(X_all)), np.nan)
-        distances = pairwise_distances(X_all, metric=self.x_metric)
+        distances = pairwise_distances(X_all, metric=self.metric)
 
         for i in range(batch_size):
             if selected_indices.shape[0] == 0:
@@ -235,6 +235,7 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", SkactivemlRegressor)
+        check_type(fit_reg, "fit_reg", bool)
         check_scalar(self.k_0, "self.k_0", int, min_val=1)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)

@@ -57,7 +57,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         X,
         y,
         reg,
-        fit_reg=None,
+        fit_reg=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -122,6 +122,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
         check_type(reg, "reg", TargetDistributionEstimator)
         check_type(self.integration_dict, "self.integration_dict", dict)
+        check_type(fit_reg, "fit_reg", bool)
 
         loss = self.loss
         check_callable(loss, "self.loss", n_free_parameters=2)

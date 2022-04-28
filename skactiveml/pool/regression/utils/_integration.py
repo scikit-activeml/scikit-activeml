@@ -1,6 +1,7 @@
 import numpy as np
 import scipy
 from scipy import integrate
+from scipy.special import roots_hermitenorm
 from sklearn.utils import check_array
 
 from ....base import TargetDistributionEstimator
@@ -47,11 +48,14 @@ def conditional_expect(
           space into the interval from 0 to 1 and than uses the method from
           'quantile_method' to calculate the integral. The number of integration
           points is specified by `n_integration_samples`.
-        -'quad' uses `scipy's` function `expect` on the `rv_continuous` random
-          variable of `reg`, which in turn uses a dynamic gaussian
+        -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
+          to be gaussian distributed. The number of evaluation  points is given
+          by `n_integration_samples`.
+        -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
+          random variable of `reg`, which in turn uses a dynamic gaussian
           quadrature routine for calculating the integral. Performance is worse
           using a vector function.
-        If `method is None` quantile is used.
+        If `method is None` 'gauss_hermite' is used.
     quantile_method: string, optional (default=None)
         Specifies the integration methods used after the quantile
         transformation.
@@ -78,7 +82,7 @@ def conditional_expect(
         If `include_idx` is `True`, `func` also takes the index of the x value.
     vector_func: bool or str, optional (default=False)
         If `vector_func` is `True`, the integration values are passed as a whole
-        to the function `func`. If `vector_func` is 'optional', the integration
+        to the function `func`. If `vector_func` is 'both', the integration
         values might or might not be passed as a whole. The integration values
         if passed as a whole are of the form (n_samples, n_integration), where
         n_integration denotes the number of integration values.
@@ -94,7 +98,14 @@ def conditional_expect(
 
     check_type(reg, "reg", TargetDistributionEstimator)
     check_type(
-        method, "method", "monte_carlo", "assume_linear", "quad", "quantile", None
+        method,
+        "method",
+        "monte_carlo",
+        "assume_linear",
+        "dynamic_quad",
+        "gauss_hermite",
+        "quantile",
+        None,
     )
     check_type(
         quantile_method,
@@ -110,11 +121,11 @@ def conditional_expect(
     check_type(quad_dict, "scipy_args", dict, None)
     check_type(include_idx, "include_idx", bool)
     check_type(include_x, "include_x", bool)
-    check_type(vector_func, "vector_func", bool, "optional")
+    check_type(vector_func, "vector_func", bool, "both")
     check_callable(func, "func", n_free_parameters=1 + include_idx + include_x)
 
     if method is None:
-        method = "quantile"
+        method = "gauss_hermite"
     if quantile_method is None:
         quantile_method = "quadrature"
     if quad_dict is None:
@@ -122,7 +133,7 @@ def conditional_expect(
     if method == "quantile" and quantile_method == "romberg":
         # n_integration_samples need to be of the form 2**k + 1
         n_integration_samples = 2 ** int(np.log2(n_integration_samples) + 1) + 1
-    is_optional = vector_func == "optional"
+    is_optional = vector_func == "both"
     if is_optional:
         vector_func = True
 
@@ -197,6 +208,17 @@ def conditional_expect(
             expectation, _ = integrate.fixed_quad(
                 fixed_quad_function_wrapper, 0, 1, n=n_integration_samples
             )
+    elif method == "gauss_hermite":
+        unscaled_potential_y, weights = roots_hermitenorm(n_integration_samples)
+        cond_mean, cond_std = reg.predict(X, return_std=True)
+        potential_y = (
+            cond_std[:, np.newaxis] * unscaled_potential_y[np.newaxis, :]
+            + cond_mean[:, np.newaxis]
+        )
+        output = evaluate_func(potential_y)
+        expectation = (
+            1 / (2 * np.pi) ** (1 / 2) * np.sum(weights[np.newaxis, :] * output, axis=1)
+        )
     else:  # method equals "quad"
         for idx, x in enumerate(X):
             cond_dist = reg.predict_target_distribution([x])

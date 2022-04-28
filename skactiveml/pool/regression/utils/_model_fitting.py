@@ -109,9 +109,9 @@ def update_reg(
         The updated regressor.
     """
 
-    if sample_weight is not None and mapping is not None:
+    if sample_weight is not None and mapping is None:
         raise ValueError(
-            "If `sample_weight` is not `None`a mapping "
+            "If `sample_weight` is not `None` a mapping "
             "between candidates and the training dataset must "
             "exist."
         )

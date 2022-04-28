@@ -117,14 +117,14 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
 
         check_type(reg, "reg", TargetDistributionEstimator)
         check_type(self.integration_dict, "self.integration_dict", dict)
-
+        check_type(fit_reg, "fit_reg", bool)
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_eval = X
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)
 
-        old_model_variance = reg.predict(X_eval, return_std=True)[1] ** 2
+        old_model_variance = np.average(reg.predict(X_eval, return_std=True)[1] ** 2)
 
         def new_model_variance(idx, x_cand, y_pot):
             reg_new = update_reg(
@@ -158,9 +158,6 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         else:
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
-
-        # minimize the expected model variance by maximizing the negative
-        # expected model variance
 
         return simple_batch(
             utilities,
