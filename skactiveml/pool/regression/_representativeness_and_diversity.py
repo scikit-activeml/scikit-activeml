@@ -16,7 +16,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    qs: SingleAnnotPoolBasedQueryStrategy
+    inner_qs: SingleAnnotPoolBasedQueryStrategy
         Query strategy used for further selection of the samples.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -33,12 +33,12 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
         self,
-        qs=None,
+        inner_qs=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(random_state=random_state, missing_label=missing_label)
-        self.qs = qs
+        self.inner_qs = inner_qs
         self.X_ = None
         self.k_means_ = None
 
@@ -46,7 +46,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
         self,
         X,
         y,
-        qs_dict=None,
+        inner_qs_dict=None,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -62,7 +62,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        qs_dict : dict
+        inner_qs_dict : dict
             Dictionary for the further arguments of the query strategy besides
             `X`, `y` and `candidates`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
@@ -108,7 +108,10 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(self.qs, "self.qs", SingleAnnotatorPoolQueryStrategy, None)
+        check_type(self.inner_qs, "self.qs", SingleAnnotatorPoolQueryStrategy, None)
+        check_type(inner_qs_dict, "qs_dict", dict, None)
+        if inner_qs_dict is None:
+            inner_qs_dict = {}
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -180,14 +183,19 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
 
                 if np.sum(is_cluster_cand) == 0:
                     utilities = np.zeros(0)
-                elif self.qs is not None:
-                    _, utilities = self.qs.query(
+                elif self.inner_qs is not None:
+                    utilities = self.inner_qs.query(
                         X,
                         y,
                         candidates=cluster_candidates,
                         batch_size=1,
-                        **qs_dict,
+                        return_utilities=True,
+                        **inner_qs_dict,
+                    )[1].flatten()
+                    utilities = (
+                        utilities if mapping is None else utilities[cluster_candidates]
                     )
+
                 else:
                     utilities = _closeness_to_cluster(
                         self.k_means_, X_cand[is_cluster_cand]

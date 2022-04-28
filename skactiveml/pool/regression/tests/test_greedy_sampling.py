@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from skactiveml.pool import GreedySamplingX, GreedySamplingY
+from skactiveml.pool.regression import GreedySamplingX, GreedySamplingY
 from skactiveml.pool.regression.tests.test_pool_regression import (
     test_regression_query_strategy_init_random_state,
     test_regression_query_strategy_init_missing_label,
@@ -14,7 +14,6 @@ from skactiveml.pool.regression.tests.test_pool_regression import (
     test_regression_query_strategy_query_candidates,
     test_regression_query_strategy_query_batch_size,
     test_regression_query_strategy_query_return_utilities,
-    test_regression_query_strategy_init_integration_dict,
 )
 from skactiveml.regressor import NICKernelRegressor
 from skactiveml.utils import MISSING_LABEL

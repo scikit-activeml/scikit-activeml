@@ -117,17 +117,14 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
+        check_type(fit_ensemble, "fit_ensemble", bool)
+
         if isinstance(ensemble, SkactivemlRegressor) and hasattr(
             ensemble, "n_estimators"
         ):
-
             if fit_ensemble:
                 ensemble = clone(ensemble).fit(X, y, sample_weight)
-
-            if hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
-            else:
-                est_arr = [ensemble] * ensemble.n_estimators
+            est_arr = ensemble.estimators_
         elif _is_arraylike(ensemble):
             est_arr = deepcopy(ensemble)
             for idx, est in enumerate(est_arr):

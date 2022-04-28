@@ -10,7 +10,8 @@ from skactiveml.pool.regression._expected_model_output_change import (
 from skactiveml.pool.regression._expected_model_variance import (
     ExpectedModelVarianceMinimization,
 )
-from skactiveml.pool.regression._information_maximization import (
+from skactiveml.pool.regression._greedy_sampling import GreedySamplingX, GreedySamplingY
+from skactiveml.pool.regression._information_gain_maximization import (
     MutualInformationGainMaximization,
     KLDivergenceMaximization,
     cross_entropy,
@@ -32,4 +33,6 @@ __all__ = [
     "MutualInformationGainMaximization",
     "QueryByCommittee",
     "RepresentativenessDiversity",
+    "GreedySamplingX",
+    "GreedySamplingY",
 ]

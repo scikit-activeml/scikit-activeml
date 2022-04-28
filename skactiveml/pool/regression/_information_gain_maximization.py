@@ -121,6 +121,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", TargetDistributionEstimator)
+        check_type(fit_reg, "fit_reg", bool)
         check_type(self.integration_dict, "self.integration_dict", dict)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
@@ -327,6 +328,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", TargetDistributionEstimator)
+        check_type(fit_reg, "fit_reg", bool)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -393,12 +395,14 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 mapping=mapping,
             )
             entropy_post = np.sum(reg_new.predict(X_eval, return_entropy=True)[1])
-            cross_ent = cross_entropy(
-                X_eval,
-                reg_new,
-                reg,
-                integration_dict=self.integration_dict_cross_entropy,
-                random_state=self.random_state_,
+            cross_ent = np.sum(
+                cross_entropy(
+                    X_eval,
+                    reg_new,
+                    reg,
+                    integration_dict=self.integration_dict_cross_entropy,
+                    random_state=self.random_state_,
+                )
             )
             return cross_ent - entropy_post
 
@@ -461,4 +465,4 @@ def cross_entropy(
         vector_func="both"
     )
 
-    return np.sum(cross_ent)
+    return cross_ent

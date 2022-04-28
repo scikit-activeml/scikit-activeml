@@ -4,7 +4,6 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 
 from skactiveml.classifier import ParzenWindowClassifier
-from skactiveml.exceptions import MappingError
 from skactiveml.regressor import (
     NICKernelRegressor,
     SklearnRegressor,
@@ -12,10 +11,8 @@ from skactiveml.regressor import (
 )
 from skactiveml.utils import (
     MISSING_LABEL,
-    is_labeled,
     unlabeled_indices,
     call_func,
-    labeled_indices,
     is_unlabeled,
 )
 

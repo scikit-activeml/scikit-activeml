@@ -2,46 +2,79 @@ import unittest
 
 import numpy as np
 
-from skactiveml.pool.regression._expected_model_variance import (
-    ExpectedModelVarianceMinimization,
+from skactiveml.pool.regression import RepresentativenessDiversity, QueryByCommittee
+from skactiveml.pool.regression.tests.test_pool_regression import (
+    test_regression_query_strategy_init_random_state,
+    test_regression_query_strategy_init_missing_label,
+    test_regression_query_strategy_query_X,
+    test_regression_query_strategy_query_y,
+    test_regression_query_strategy_query_candidates,
+    test_regression_query_strategy_query_batch_size,
+    test_regression_query_strategy_query_return_utilities,
 )
-from skactiveml.pool.regression._representativeness_and_diversity import (
-    RepresentativenessDiversity,
-)
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.regressor import NICKernelRegressor
 
 
-class TestMIM(unittest.TestCase):
+class TestRepresentativenessDiversity(unittest.TestCase):
     def setUp(self):
-        pass
+        self.random_state = 1
+        self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
+        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
+        self.y = np.array([0, 1, 2, -2])
+        self.reg = NICKernelRegressor()
+        self.query_dict = dict(X=self.X, y=self.y, candidates=self.candidates)
 
-    def test_query(self):
-        qs = RepresentativenessDiversity()
+    def test_init_param_random_state(self):
+        test_regression_query_strategy_init_random_state(
+            self, RepresentativenessDiversity
+        )
 
-        X_cand = np.array([[1, 0], [0, 0], [0, 1], [-10, 1], [10, -10]])
-        X = np.array([[1, 2], [3, 4]])
-        y = np.array([0, 1])
+    def test_init_param_missing_label(self):
+        test_regression_query_strategy_init_missing_label(
+            self, RepresentativenessDiversity
+        )
 
-        query_indices = qs.query(X, y, candidates=X_cand, batch_size=2)
-        print(query_indices)
+    def test_init_param_inner_qs(self):
+        for illegal_qs in ["illegal", dict]:
+            qs = RepresentativenessDiversity(inner_qs=illegal_qs)
+            self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
 
-    def test_query_2(self):
-        qs = RepresentativenessDiversity()
+        inner_qs = QueryByCommittee()
+        qs = RepresentativenessDiversity(inner_qs=inner_qs)
+        self.query_dict["inner_qs_dict"] = dict(ensemble=NICKernelRegressor())
+        indices, utilities = qs.query(**self.query_dict, return_utilities=True)
+        self.assertEqual(indices.shape, (1,))
+        self.assertEqual(utilities.shape, (1, len(self.candidates)))
 
-        X = np.array([[1, 2], [3, 4], [0, 0], [0, 1], [-10, 1]])
-        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
+    def test_query_param_X(self):
+        test_regression_query_strategy_query_X(self, RepresentativenessDiversity)
 
-        query_indices = qs.query(X, y, batch_size=2)
-        print(query_indices)
+    def test_query_param_y(self):
+        test_regression_query_strategy_query_y(self, RepresentativenessDiversity)
 
-    def test_query_3(self):
-        qs = RepresentativenessDiversity()
+    def test_query_param_sample_weight(self):
+        for illegal_sample_weight in ["illegal", dict]:
+            self.query_dict["sample_weight"] = illegal_sample_weight
+            qs = RepresentativenessDiversity()
+            self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
 
-        X = np.array([[1, 2], [3, 4], [0, 0], [0, 1], [-10, 1]])
-        y = np.array([1.0] + [MISSING_LABEL] * 4)
+    def test_query_param_inner_qs_dict(self):
+        for qs_dict in ["illegal", dict]:
+            self.query_dict["inner_qs_dict"] = qs_dict
+            qs = RepresentativenessDiversity()
+            self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
 
-        query_indices = qs.query(X, y, batch_size=2)
-        print(query_indices)
+    def test_query_param_candidates(self):
+        test_regression_query_strategy_query_candidates(
+            self, RepresentativenessDiversity
+        )
 
-    def test_query_4(self):
-        qs = RepresentativenessDiversity(qs=ExpectedModelVarianceMinimization())
+    def test_query_param_batch_size(self):
+        test_regression_query_strategy_query_batch_size(
+            self, RepresentativenessDiversity
+        )
+
+    def test_query_param_return_utilities(self):
+        test_regression_query_strategy_query_return_utilities(
+            self, RepresentativenessDiversity
+        )
