@@ -141,18 +141,19 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         check_equal_missing_label(clf.missing_label, self.missing_label)
 
         # Obtain candidates plus mapping.
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True)
         map_candidates = mapping is not None
 
         mask_l = is_labeled(y=y, missing_label=self.missing_label)
         mask_a = is_unlabeled(y=y, missing_label=self.missing_label)
-        if mapping is None:
-            mapping = np.arange(stop=len(X_cand), dtype=int) + np.sum(mask_l)
-            y = np.concatenate(
-                (y[mask_l], np.full(len(X_cand), fill_value=np.nan)),
-                axis=0
-            )
-            X = np.concatenate((X[mask_l], X_cand), axis=0)
+       # y = y*2 - 1  # TODO
+        # if mapping is None:
+        #     mapping = np.arange(stop=len(X_cand), dtype=int) + np.sum(mask_l)
+        #     y = np.concatenate(
+        #         (y[mask_l], np.full(len(X_cand), fill_value=np.nan)),
+        #         axis=0
+        #     )
+        #     X = np.concatenate((X[mask_l], X_cand), axis=0)
 
 
         # Check whether metric is available.
@@ -201,12 +202,17 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         L_aa_inv = _L_aa_inv(K, lmbda, mask_a, mask_l)
 
         utilities_cand = np.full((len(X)), fill_value=np.nan)
+        utilities_cand_2 = np.full((len(X)), fill_value=np.nan)
         y_labeled_ovr = _one_versus_rest_transform(y[mask_l], classes, l_rest=0)  # TODO l_rest?
+        y = (y == classes[0])*2 - 1  # TODO
         for i, s in enumerate(mapping):
             mask_u = mask_a.copy()
             mask_u[s] = False
             #L_uu_inv = _del_i_inv(L_aa_inv, i)
             L_uu_inv = np.linalg.inv(L[mask_u][:, mask_u])
+
+            utilities_cand_2[s] = \
+                utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u, 1)
 
             if method == 0:
                 temp_1 = np.empty(len(classes))
@@ -217,24 +223,20 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                     temp_1[j] -= temp_2.T.dot(L_uu_inv).dot(temp_2)
                 utilities_cand[s] = L[s, s] + np.max(temp_1)
             elif method == 1:
-                temp = L[:, mask_l][s] - L[:, mask_u][s].dot(L_uu_inv).dot(L[:, mask_l][mask_u])
+                temp = L[[s]][:, mask_l] - L[[s]][:, mask_u].dot(L_uu_inv).dot(L[mask_u][:, mask_l])
 
-                utilities_cand[s] = L[s, s] - det_L_aa / L[s, s]
-                + 2 * abs(temp.dot((y[mask_l]*2-1).T))
+                utilities_cand[s] = L[s, s] - (det_L_aa / L[s, s])
+                + 2 * np.linalg.det(temp.dot((y[mask_l].reshape(-1, 1))))
             elif method == 2:
-                yl = y[mask_l].reshape(-1, 1)
                 utilities_cand[s] = \
-                    L[s, s] + yl.T.dot(L[mask_l][:, mask_l]).dot(yl) \
-                    + np.max([
-                        2*ys*L[s][mask_l].dot(yl)
-                        - (L[mask_u][:, mask_l].dot(yl)
-                           + ys*L[mask_u][:, s].reshape(-1, 1)
-                           ).T.dot(L_uu_inv).dot(
-                            L[mask_u][:, mask_l].dot(yl).reshape(-1, 1)
-                            + ys*L[mask_u][:, s].reshape(-1, 1)
-                        )
-                        for ys in [-1, 1]
+                    utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u, classes[0])
+            elif method == 3:
+                utilities_cand[s] = \
+                    np.max([
+                        utilities_two_class(L, L_uu_inv, y, s, mask_l,
+                                            mask_u, y_c) for y_c in classes
                     ])
+
 
         if not map_candidates:
             utilities = -utilities_cand[mapping]
@@ -262,10 +264,10 @@ def _one_versus_rest_transform(y, classes, l_one=1, l_rest=0,
     return y_ovr.T
 
 
-def _del_i_inv(A_inv, i):
-    a = A_inv[i, i]
-    b = -np.delete(A_inv[:, i], i, axis=0)
-    D = np.delete(np.delete(A_inv, i, axis=0), i, axis=1)
+def _del_i_inv(A_inv, s):
+    a = A_inv[s, s]
+    b = -np.delete(A_inv[:, s], s, axis=0)
+    D = np.delete(np.delete(A_inv, s, axis=0), s, axis=1)
     B_inv = D - (1 / a) * np.dot(b, b.T)
     return B_inv
 
@@ -279,3 +281,22 @@ def _L_aa_inv(K, lmbda, is_unlabeled, is_labeled):
         )
     ).dot(K[is_labeled][:, is_unlabeled])
     return L_aa_inv
+
+
+def utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u, y_c):
+    y = (y == y_c)*2.0-1
+    yl = y[mask_l].reshape(-1, 1)
+    utility_cand = \
+        L[s, s] + yl.T.dot(L[mask_l][:, mask_l]).dot(yl) \
+        + np.max([
+            2 * ys * L[s][mask_l].dot(yl)
+            - (L[mask_u][:, mask_l].dot(yl)
+               + L[mask_u][:, [s]] * ys
+               ).T.dot(L_uu_inv).dot(
+                L[mask_u][:, mask_l].dot(yl)
+                + L[mask_u][:, [s]] * ys
+            )
+            for ys in [-1, 1]
+        ])
+
+    return utility_cand
