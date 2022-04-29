@@ -45,7 +45,7 @@ class TestApproximation(unittest.TestCase):
         X = np.arange(2 * 3).reshape((2, 3))
 
         for parameter_1, parameter_2 in itertools.product(parameters_1, parameters_2):
-            parameter = parameter_1 | parameter_2
+            parameter = {**parameter_1, **parameter_2}
 
             def dummy_func(idx, x, y):
                 if parameter["vector_func"] == "both":
