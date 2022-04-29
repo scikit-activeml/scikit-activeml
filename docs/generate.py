@@ -525,8 +525,8 @@ def format_plot(data, template_path):
     block_str = ""
     with open(template_path, "r") as template:
         for line in template:
-            if "#_" in line:
-                if "#_import" in line:
+            if "#_" or "# _" in line:
+                if "# _import" in line:
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
                     if (
                         "clf" not in data.keys()
@@ -588,10 +588,10 @@ def format_plot(data, template_path):
                     else:
                         cand = "np.arange(len(X))"
                     line = line.replace('"#_candidates"', cand)
-                elif "#_bp" in line:
+                elif "# _bp" in line:
                     try:
-                        s = line.find("#_")
-                        bp = line[s + 2 :].split()[0]
+                        s = line.find("# _")
+                        bp = line[s + 3 :].split()[0]
                         prefix = line[:s]
                         line = ""
                         if type(data[bp]) != list:
