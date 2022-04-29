@@ -63,18 +63,38 @@ class TestWrapper(unittest.TestCase):
         reg_2.fit(X, y)
         self.assertTrue(np.any(reg_1.predict(X) != reg_2.predict(X)))
 
+    def test_getattr(self):
+        reg = SklearnRegressor(
+            estimator=LinearRegression(),
+            random_state=self.random_state,
+        )
+        self.assertTrue(hasattr(reg, "positive"))
+        reg.fit(self.X, self.y)
+        self.assertTrue(hasattr(reg, "coef_"))
+
+    def test_sample_y(self):
+        reg = SklearnRegressor(estimator=GaussianProcessRegressor())
+        X = np.arange(4 * 2).reshape(4, 2)
+        y = np.arange(4) - 1
+        X_sample = 1 / 2 * np.arange(3 * 2).reshape(3, 2) + 1
+        reg.fit(X, y)
+        result = reg.sample_y(X_sample, 5)
+        self.assertEqual(result.shape, (3, 5))
+
 
 class TestCondEstWrapper(unittest.TestCase):
     def setUp(self):
         self.X = np.array([[0, 1], [1, 0], [2, 3]])
         self.y = np.array([1, 2, 3])
-
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_estimate_cond(self):
         reg = SklearnTargetDistributionRegressor(estimator=GaussianProcessRegressor())
         reg.fit(self.X, self.y)
 
-        y_pred = reg.predict(self.X_cand, return_std=True)
+        y_pred = reg.predict_target_distribution(self.X_cand).logpdf(0)
+        self.assertEqual(y_pred.shape, (len(self.X_cand),))
 
-        print(y_pred)
+        reg = SklearnTargetDistributionRegressor(estimator=LinearRegression())
+        reg.fit(self.X, self.y)
+        self.assertRaises(ValueError, reg.predict_target_distribution, self.X_cand)

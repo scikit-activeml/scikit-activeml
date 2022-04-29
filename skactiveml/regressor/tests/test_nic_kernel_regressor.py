@@ -2,11 +2,11 @@ import unittest
 
 import numpy as np
 
-from skactiveml.regressor._nichke import NICKernelRegressor
+from skactiveml.regressor._nic_kernel_regressor import NICKernelRegressor
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestNICHE(unittest.TestCase):
+class TestNICKernelEstimator(unittest.TestCase):
     def setUp(self):
         self.X = np.array([[0, 1], [1, 0], [2, 3]])
         self.y = np.array([1, 2, 3])

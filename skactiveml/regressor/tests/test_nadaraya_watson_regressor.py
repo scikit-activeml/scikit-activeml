@@ -7,7 +7,7 @@ from skactiveml.regressor import NadarayaWatsonRegressor
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestNICHE(unittest.TestCase):
+class TestNadarayaWatsonRegressor(unittest.TestCase):
     def setUp(self):
         self.X = np.array([[0, 1], [1, 0], [2, 3]])
         self.random_state = 0

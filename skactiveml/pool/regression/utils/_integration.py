@@ -239,7 +239,7 @@ def conditional_expect(
     return expectation
 
 
-def reshape_dist(dist, shape=None):
+def reshape_dist(dist, shape):
     """Reshapes the parameters "loc", "scale", "df" of a distribution, if they
     exist.
 
@@ -247,7 +247,7 @@ def reshape_dist(dist, shape=None):
     ----------
     dist : scipy.stats._distn_infrastructure.rv_frozen
         The distribution.
-    shape : tuple, optional (default = None)
+    shape : tuple
         The new shape.
 
     Returns
@@ -256,7 +256,7 @@ def reshape_dist(dist, shape=None):
         The reshaped distribution.
     """
     check_type(dist, "dist", scipy.stats._distn_infrastructure.rv_frozen)
-    check_type(shape, "shape", tuple, None)
+    check_type(shape, "shape", tuple)
     for idx, item in enumerate(shape):
         check_type(item, f"shape[{idx}]", int)
 

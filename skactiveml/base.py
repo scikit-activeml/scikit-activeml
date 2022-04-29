@@ -1425,7 +1425,8 @@ class TargetDistributionEstimator(SkactivemlRegressor):
 
         Returns
         -------
-        dist : scipy.stats.rv_continuous
+        dist : scipy.stats._distn_infrastructure.rv_frozen
+            The distribution of the targets at the test samples.
 
         """
         return NotImplementedError

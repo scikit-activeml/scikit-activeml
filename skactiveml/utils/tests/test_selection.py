@@ -113,7 +113,9 @@ class TestSelection(unittest.TestCase):
         np.testing.assert_array_equal(ranking_2, new_ranking)
 
         com_ranking = combine_ranking(ranking_1, ranking_2)
-        np.testing.assert_array_equal(com_ranking, np.array([1.1, 2.2, 2.4]))
+
+        self.assertTrue(com_ranking[1] > com_ranking[0])
+        self.assertTrue(com_ranking[2] > com_ranking[1])
 
         ranking_1 = np.array([0.1, 0.1, 0.2])
         ranking_2 = np.array([14, 13, 12])

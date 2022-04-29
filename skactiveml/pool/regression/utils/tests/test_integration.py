@@ -1,14 +1,12 @@
 import itertools
 import unittest
 
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from .....base import TargetDistributionEstimator
-from ...utils._integration import conditional_expect
-from .....regressor._wrapper import SklearnTargetDistributionRegressor
+from skactiveml.pool.regression.utils import conditional_expect, reshape_dist
+from skactiveml.regressor import SklearnTargetDistributionRegressor
 
 
 class TestApproximation(unittest.TestCase):
@@ -31,15 +29,17 @@ class TestApproximation(unittest.TestCase):
             {"method": None, "quantile_method": "trapezoid"},
             {"method": "quantile", "quantile_method": "simpson"},
             {"method": "quantile", "quantile_method": "romberg"},
+            {"method": "quantile", "quantile_method": "trapezoid"},
             {"method": "quantile", "quantile_method": "average"},
             {"method": "quantile", "quantile_method": "quadrature"},
-            {"method": "quad"},
+            {"method": "dynamic_quad"},
+            {"method": "gauss_hermite"},
         ]
 
         parameters_2 = [
             {"vector_func": True},
             {"vector_func": False},
-            {"vector_func": "optional"},
+            {"vector_func": "both"},
         ]
 
         X = np.arange(2 * 3).reshape((2, 3))
@@ -48,8 +48,8 @@ class TestApproximation(unittest.TestCase):
             parameter = parameter_1 | parameter_2
 
             def dummy_func(idx, x, y):
-                if parameter["vector_func"] == "optional":
-                    if parameter["method"] == "quad":
+                if parameter["vector_func"] == "both":
+                    if parameter["method"] == "dynamic_quad":
                         self.assertTrue(isinstance(idx, int))
                         self.assertTrue(isinstance(y, float))
                         self.assertEqual(x.shape, (3,))
@@ -85,103 +85,9 @@ class TestApproximation(unittest.TestCase):
 
             np.testing.assert_array_equal(res, np.zeros(2))
 
-    def test_conditional_expectation_2(self):
-        class DummyCondEst(TargetDistributionEstimator):
-            def fit(self, X, y, sample_weight=None):
-                return self
-
-            def predict_target_distribution(self, X):
-                return norm(loc=np.zeros(len(X)))
-
-        cond_est = DummyCondEst()
-
-        X = np.array([[0]])
-
-        arg_dicts = [
-            {"method": "quad", "quad_dict": {"epsabs": 0.1}},
-            {
-                "method": "quantile",
-                "n_integration_samples": 300,
-                "quantile_method": "simpson",
-            },
-            {"method": "monte_carlo", "n_integration_samples": 300},
-        ]
-
-        results = list()
-
-        for arg_dict in arg_dicts:
-            results.append(
-                conditional_expect(
-                    X,
-                    lambda x: x**2,
-                    reg=cond_est,
-                    random_state=self.random_state,
-                    **arg_dict
-                )
-            )
-
-        print(results)
-
-    def test_conditional_expectation_3(self):
-        def diff(f):
-            h = 2 ** (-5)
-            return lambda x: (f(x + h) - f(x - h)) / (2 * h)
-
-        dist = norm()
-
-        y = np.linspace(0, 1, 1000)
-        g = dist.pdf(dist.ppf(y))
-        h = diff(dist.ppf)(y)
-        f = g * h
-
-        plt.plot(y, f)
-        plt.show()
-
-    def test_conditional_expectation_4(self):
-        dist = norm()
-
-        def f(x):
-            return -dist.logpdf(x)
-
-        alpha = np.linspace(0, 1, 1000)
-        g = f(dist.ppf(alpha))
-
-        plt.plot(alpha, g)
-        plt.show()
-
-    def test_something(self):
-        class DummyCondEst(TargetDistributionEstimator):
-            def fit(self, X, y, sample_weight=None):
-                return self
-
-            def predict_target_distribution(self, X):
-                return norm(loc=np.zeros(len(X)))
-
-        X = (np.arange(11) - 6).reshape(-1, 1)
-        dist = norm(loc=1)
-        cond_est = DummyCondEst()
-        expect_1 = conditional_expect(
-            X,
-            lambda x: -dist.logpdf(x),
-            cond_est,
-            n_integration_samples=7,
-            method="gauss_hermite",
-        )
-        expect_2 = conditional_expect(
-            X,
-            lambda x: -dist.logpdf(x),
-            cond_est,
-            method="dynamic_quad",
-            vector_func="both",
-        )
-        expect_3 = conditional_expect(
-            X,
-            lambda x: -dist.logpdf(x),
-            cond_est,
-            method="quantile",
-            n_integration_samples=7,
-            vector_func="both",
-        )
-        print(expect_1)
-        print(expect_2)
-        print(expect_3)
+    def test_reshape_distribution(self):
+        dist = norm(loc=np.array([0, 0]))
+        reshape_dist(dist, shape=(2, 1))
+        self.assertEqual(dist.kwds["loc"].shape, (2, 1))
+        self.assertRaises(TypeError, reshape_dist, dist, "illegal")
+        self.assertRaises(TypeError, reshape_dist, "illegal", (2, 1))

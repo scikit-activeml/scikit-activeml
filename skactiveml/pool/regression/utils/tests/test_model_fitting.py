@@ -52,13 +52,13 @@ class TestFunctions(unittest.TestCase):
 
     def test_update_reg(self):
         self.assertRaises(
-            ValueError,
+            (TypeError, ValueError),
             update_reg,
             self.reg,
             self.X,
             self.y,
             self.y_pot,
-            sample_weight=self.samples_weight,
+            sample_weight=self.sample_weight,
             mapping=self.mapping,
         )
         self.reg.fit(self.X, self.y)
@@ -84,6 +84,17 @@ class TestFunctions(unittest.TestCase):
             X_update=np.array([8, 4]),
         )
         self.assertTrue(np.any(reg_new.predict(self.X) != self.reg.predict(self.X)))
+        self.assertRaises(
+            ValueError,
+            update_reg,
+            self.reg,
+            self.X,
+            self.y,
+            self.y_pot,
+            sample_weight=np.arange(7) + 1,
+            mapping=None,
+            X_update=np.array([8, 4]),
+        )
 
     def test_boostrap_aggregation(self):
         reg_s = bootstrap_estimators(self.reg, self.X, self.y, k_bootstrap=5)

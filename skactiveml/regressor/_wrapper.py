@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
-from sklearn.utils.metaestimators import _IffHasAttrDescriptor
+from sklearn.utils.metaestimators import _IffHasAttrDescriptor, if_delegate_has_method
 from sklearn.utils.validation import has_fit_parameter, check_array, check_is_fitted
 
 from skactiveml.base import SkactivemlRegressor, TargetDistributionEstimator
@@ -13,30 +13,30 @@ from skactiveml.utils._label import is_labeled, MISSING_LABEL
 from skactiveml.utils._validation import check_callable
 
 
-def if_delegate_has_alternative_methods(delegate, *alternative_methods):
-    """Create a decorator for methods that are delegated to alternative methods
-     of a sub-estimator
-
-    This enables ducktyping by hasattr returning True according to the
-    sub-estimator. By
-    Parameters
-    ----------
-    delegate : str, list of str or tuple of str
-        Name of the sub-estimator that can be accessed as an attribute of the
-        base object. If a list or a tuple of names are provided, the first
-        sub-estimator that is an attribute of the base object will be used.
-    alternative_methods : iterable of str
-        Names of the alternative methods.
-    """
-    if isinstance(delegate, list):
-        delegate = tuple(delegate)
-    if not isinstance(delegate, tuple):
-        delegate = (delegate,)
-
-    return lambda fn: all(
-        _IffHasAttrDescriptor(fn, delegate, attribute_name=method_name)
-        for method_name in alternative_methods
-    )
+# def if_delegate_has_alternative_methods(delegate, *alternative_methods):
+#    """Create a decorator for methods that are delegated to alternative methods
+#     of a sub-estimator
+#
+#    This enables ducktyping by hasattr returning True according to the
+#    sub-estimator. By
+#    Parameters
+#    ----------
+#    delegate : str, list of str or tuple of str
+#        Name of the sub-estimator that can be accessed as an attribute of the
+#        base object. If a list or a tuple of names are provided, the first
+#        sub-estimator that is an attribute of the base object will be used.
+#    alternative_methods : iterable of str
+#        Names of the alternative methods.
+#    """
+#    if isinstance(delegate, list):
+#        delegate = tuple(delegate)
+#    if not isinstance(delegate, tuple):
+#        delegate = (delegate,)
+#
+#    return lambda fn: all(
+#        _IffHasAttrDescriptor(fn, delegate, attribute_name=method_name)
+#        for method_name in alternative_methods
+#    )
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -128,7 +128,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         """
         return self.estimator_.predict(X, **predict_kwargs)
 
-    @if_delegate_has_alternative_methods("est", "sample_y", "sample")
+    # @if_delegate_has_alternative_methods("est", "sample_y", "sample")
+    @if_delegate_has_method(delegate="estimator")
     def sample_y(self, X, n_samples, random_state=None):
         """Assumes a conditional probability estimator. Samples are drawn from
         the posterior or prior conditional probability estimator.
@@ -151,10 +152,11 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             Values of n_samples samples drawn from Gaussian process and
             evaluated at query points.
         """
-        if hasattr(self.estimator_, "sample_y"):
-            return self.estimator_.sample_y(X, n_samples, random_state)
-        else:
-            return self.estimator_.sample(X, n_samples)
+        return self.estimator_.sample_y(X, n_samples, random_state)
+        # if hasattr(self.estimator_, "sample_y"):
+        #    return self.estimator_.sample_y(X, n_samples, random_state)
+        # else:
+        #    return self.estimator_.sample(X, n_samples)
 
     def __getattr__(self, item):
         if "estimator_" in self.__dict__:
@@ -201,7 +203,8 @@ class SklearnTargetDistributionRegressor(TargetDistributionEstimator, SklearnReg
 
         Returns
         -------
-        dist : scipy.stats.rv_continuous
+        dist : scipy.stats._distn_infrastructure.rv_frozen
+            The distribution of the targets at the test samples.
 
         """
         check_is_fitted(self)

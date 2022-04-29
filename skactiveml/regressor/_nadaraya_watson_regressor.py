@@ -1,5 +1,5 @@
 from skactiveml.base import SkactivemlRegressor
-from skactiveml.regressor._nichke import NICKernelRegressor
+from skactiveml.regressor._nic_kernel_regressor import NICKernelRegressor
 from skactiveml.utils import MISSING_LABEL
 
 

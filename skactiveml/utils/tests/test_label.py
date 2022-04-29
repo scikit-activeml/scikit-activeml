@@ -105,11 +105,6 @@ class TestLabel(unittest.TestCase):
             is_labeled(self.y6, missing_label="nan"),
         )
 
-    def test_is_any_labeled(self):
-        y = np.array([[0, np.nan], [1, 0], [np.nan, np.nan]])
-        mask = is_all_labeled(y)
-        np.testing.assert_array_equal(mask, [False, True, False])
-
     def test_unlabeled_indices(self):
         unlbld_indices = unlabeled_indices(self.y3, missing_label=None)
         true_unlbld_indices = [0, 4]
