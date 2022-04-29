@@ -4,16 +4,16 @@ import numpy as np
 
 from skactiveml.pool.regression import ExpectedModelChange
 from skactiveml.pool.regression.tests.test_pool_regression import (
-    test_regression_query_strategy_init_random_state,
-    test_regression_query_strategy_init_missing_label,
-    test_regression_query_strategy_query_X,
-    test_regression_query_strategy_query_y,
-    test_regression_query_strategy_query_reg,
-    test_regression_query_strategy_query_fit_reg,
-    test_regression_query_strategy_query_sample_weight,
-    test_regression_query_strategy_query_candidates,
-    test_regression_query_strategy_query_batch_size,
-    test_regression_query_strategy_query_return_utilities,
+    provide_test_regression_query_strategy_init_random_state,
+    provide_test_regression_query_strategy_init_missing_label,
+    provide_test_regression_query_strategy_query_X,
+    provide_test_regression_query_strategy_query_y,
+    provide_test_regression_query_strategy_query_reg,
+    provide_test_regression_query_strategy_query_fit_reg,
+    provide_test_regression_query_strategy_query_sample_weight,
+    provide_test_regression_query_strategy_query_candidates,
+    provide_test_regression_query_strategy_query_batch_size,
+    provide_test_regression_query_strategy_query_return_utilities,
 )
 from skactiveml.regressor import NICKernelRegressor
 
@@ -31,10 +31,14 @@ class TestExpectedModelChange(unittest.TestCase):
         )
 
     def test_init_param_random_state(self):
-        test_regression_query_strategy_init_random_state(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_init_random_state(
+            self, ExpectedModelChange
+        )
 
     def test_init_param_missing_label(self):
-        test_regression_query_strategy_init_missing_label(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_init_missing_label(
+            self, ExpectedModelChange
+        )
 
     def test_init_param_k_bootstrap(self):
         for wrong_val, error in zip(["five", 0], [TypeError, ValueError]):
@@ -51,25 +55,33 @@ class TestExpectedModelChange(unittest.TestCase):
         self.assertRaises(ValueError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):
-        test_regression_query_strategy_query_X(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_X(self, ExpectedModelChange)
 
     def test_query_param_y(self):
-        test_regression_query_strategy_query_y(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_y(self, ExpectedModelChange)
 
     def test_query_param_reg(self):
-        test_regression_query_strategy_query_reg(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_reg(self, ExpectedModelChange)
 
     def test_query_param_fit_reg(self):
-        test_regression_query_strategy_query_fit_reg(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_fit_reg(self, ExpectedModelChange)
 
     def test_query_param_sample_weight(self):
-        test_regression_query_strategy_query_sample_weight(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_sample_weight(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_candidates(self):
-        test_regression_query_strategy_query_candidates(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_candidates(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_batch_size(self):
-        test_regression_query_strategy_query_batch_size(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_batch_size(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_return_utilities(self):
-        test_regression_query_strategy_query_return_utilities(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_return_utilities(
+            self, ExpectedModelChange
+        )

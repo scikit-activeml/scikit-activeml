@@ -17,7 +17,7 @@ from skactiveml.utils import (
 )
 
 
-def test_regression_query_strategy_init_random_state(
+def provide_test_regression_query_strategy_init_random_state(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
 
@@ -59,7 +59,7 @@ def test_regression_query_strategy_init_random_state(
         )
 
 
-def test_regression_query_strategy_init_missing_label(
+def provide_test_regression_query_strategy_init_missing_label(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -97,7 +97,7 @@ def test_regression_query_strategy_init_missing_label(
         test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
 
 
-def test_regression_query_strategy_init_integration_dict(
+def provide_test_regression_query_strategy_init_integration_dict(
     test_instance, qs_class, init_dict=None, query_dict=None, integration_dict_name=None
 ):
     # initialisation
@@ -129,7 +129,7 @@ def test_regression_query_strategy_init_integration_dict(
         )
 
 
-def test_regression_query_strategy_query_X(
+def provide_test_regression_query_strategy_query_X(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -157,7 +157,7 @@ def test_regression_query_strategy_query_X(
         )
 
 
-def test_regression_query_strategy_query_y(
+def provide_test_regression_query_strategy_query_y(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -187,7 +187,7 @@ def test_regression_query_strategy_query_y(
         )
 
 
-def test_regression_query_strategy_query_reg(
+def provide_test_regression_query_strategy_query_reg(
     test_instance, qs_class, init_dict=None, query_dict=None, is_probabilistic=False
 ):
     # initialisation
@@ -227,7 +227,7 @@ def test_regression_query_strategy_query_reg(
         test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
 
 
-def test_regression_query_strategy_query_fit_reg(
+def provide_test_regression_query_strategy_query_fit_reg(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -263,7 +263,7 @@ def test_regression_query_strategy_query_fit_reg(
         test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
 
 
-def test_regression_query_strategy_query_sample_weight(
+def provide_test_regression_query_strategy_query_sample_weight(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -301,7 +301,7 @@ def test_regression_query_strategy_query_sample_weight(
         test_instance.assertRaises((TypeError, ValueError), call_func, **query_dict)
 
 
-def test_regression_query_strategy_query_candidates(
+def provide_test_regression_query_strategy_query_candidates(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -345,7 +345,7 @@ def test_regression_query_strategy_query_candidates(
         )
 
 
-def test_regression_query_strategy_query_batch_size(
+def provide_test_regression_query_strategy_query_batch_size(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation
@@ -380,7 +380,7 @@ def test_regression_query_strategy_query_batch_size(
         )
 
 
-def test_regression_query_strategy_query_return_utilities(
+def provide_test_regression_query_strategy_query_return_utilities(
     test_instance, qs_class, init_dict=None, query_dict=None
 ):
     # initialisation

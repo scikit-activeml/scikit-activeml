@@ -9,70 +9,74 @@ from skactiveml.pool.regression import (
     cross_entropy,
 )
 from skactiveml.pool.regression.tests.test_pool_regression import (
-    test_regression_query_strategy_init_random_state,
-    test_regression_query_strategy_init_missing_label,
-    test_regression_query_strategy_query_X,
-    test_regression_query_strategy_query_y,
-    test_regression_query_strategy_query_reg,
-    test_regression_query_strategy_query_fit_reg,
-    test_regression_query_strategy_query_sample_weight,
-    test_regression_query_strategy_query_candidates,
-    test_regression_query_strategy_query_batch_size,
-    test_regression_query_strategy_query_return_utilities,
-    test_regression_query_strategy_init_integration_dict,
+    provide_test_regression_query_strategy_init_random_state,
+    provide_test_regression_query_strategy_init_missing_label,
+    provide_test_regression_query_strategy_query_X,
+    provide_test_regression_query_strategy_query_y,
+    provide_test_regression_query_strategy_query_reg,
+    provide_test_regression_query_strategy_query_fit_reg,
+    provide_test_regression_query_strategy_query_sample_weight,
+    provide_test_regression_query_strategy_query_candidates,
+    provide_test_regression_query_strategy_query_batch_size,
+    provide_test_regression_query_strategy_query_return_utilities,
+    provide_test_regression_query_strategy_init_integration_dict,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 
 
 class TestMutualInformationGainMaximization(unittest.TestCase):
     def test_init_param_random_state(self):
-        test_regression_query_strategy_init_random_state(
+        provide_test_regression_query_strategy_init_random_state(
             self, MutualInformationGainMaximization
         )
 
     def test_init_param_missing_label(self):
-        test_regression_query_strategy_init_missing_label(
+        provide_test_regression_query_strategy_init_missing_label(
             self, MutualInformationGainMaximization
         )
 
     def test_init_param_integration_dict(self):
-        test_regression_query_strategy_init_integration_dict(
+        provide_test_regression_query_strategy_init_integration_dict(
             self, MutualInformationGainMaximization
         )
 
     def test_query_param_X(self):
-        test_regression_query_strategy_query_X(self, MutualInformationGainMaximization)
+        provide_test_regression_query_strategy_query_X(
+            self, MutualInformationGainMaximization
+        )
 
     def test_query_param_y(self):
-        test_regression_query_strategy_query_y(self, MutualInformationGainMaximization)
+        provide_test_regression_query_strategy_query_y(
+            self, MutualInformationGainMaximization
+        )
 
     def test_query_param_reg(self):
-        test_regression_query_strategy_query_reg(
+        provide_test_regression_query_strategy_query_reg(
             self, MutualInformationGainMaximization, is_probabilistic=True
         )
 
     def test_query_param_fit_reg(self):
-        test_regression_query_strategy_query_fit_reg(
+        provide_test_regression_query_strategy_query_fit_reg(
             self, MutualInformationGainMaximization
         )
 
     def test_query_param_sample_weight(self):
-        test_regression_query_strategy_query_sample_weight(
+        provide_test_regression_query_strategy_query_sample_weight(
             self, MutualInformationGainMaximization
         )
 
     def test_query_param_candidates(self):
-        test_regression_query_strategy_query_candidates(
+        provide_test_regression_query_strategy_query_candidates(
             self, MutualInformationGainMaximization
         )
 
     def test_query_param_batch_size(self):
-        test_regression_query_strategy_query_batch_size(
+        provide_test_regression_query_strategy_query_batch_size(
             self, MutualInformationGainMaximization
         )
 
     def test_query_param_return_utilities(self):
-        test_regression_query_strategy_query_return_utilities(
+        provide_test_regression_query_strategy_query_return_utilities(
             self, MutualInformationGainMaximization
         )
 
@@ -82,54 +86,62 @@ class TestKLDivergenceMaximization(unittest.TestCase):
         self.random_state = 0
 
     def test_init_param_random_state(self):
-        test_regression_query_strategy_init_random_state(self, KLDivergenceMaximization)
+        provide_test_regression_query_strategy_init_random_state(
+            self, KLDivergenceMaximization
+        )
 
     def test_init_param_missing_label(self):
-        test_regression_query_strategy_init_missing_label(
+        provide_test_regression_query_strategy_init_missing_label(
             self, KLDivergenceMaximization
         )
 
     def test_init_param_integration_dict_potential_y_val(self):
-        test_regression_query_strategy_init_integration_dict(
+        provide_test_regression_query_strategy_init_integration_dict(
             self,
             KLDivergenceMaximization,
             integration_dict_name="integration_dict_potential_y_val",
         )
 
     def test_init_param_integration_dict_cross_entropy(self):
-        test_regression_query_strategy_init_integration_dict(
+        provide_test_regression_query_strategy_init_integration_dict(
             self,
             KLDivergenceMaximization,
             integration_dict_name="integration_dict_cross_entropy",
         )
 
     def test_query_param_X(self):
-        test_regression_query_strategy_query_X(self, KLDivergenceMaximization)
+        provide_test_regression_query_strategy_query_X(self, KLDivergenceMaximization)
 
     def test_query_param_y(self):
-        test_regression_query_strategy_query_y(self, KLDivergenceMaximization)
+        provide_test_regression_query_strategy_query_y(self, KLDivergenceMaximization)
 
     def test_query_param_reg(self):
-        test_regression_query_strategy_query_reg(
+        provide_test_regression_query_strategy_query_reg(
             self, KLDivergenceMaximization, is_probabilistic=True
         )
 
     def test_query_param_fit_reg(self):
-        test_regression_query_strategy_query_fit_reg(self, KLDivergenceMaximization)
+        provide_test_regression_query_strategy_query_fit_reg(
+            self, KLDivergenceMaximization
+        )
 
     def test_query_param_sample_weight(self):
-        test_regression_query_strategy_query_sample_weight(
+        provide_test_regression_query_strategy_query_sample_weight(
             self, KLDivergenceMaximization
         )
 
     def test_query_param_candidates(self):
-        test_regression_query_strategy_query_candidates(self, KLDivergenceMaximization)
+        provide_test_regression_query_strategy_query_candidates(
+            self, KLDivergenceMaximization
+        )
 
     def test_query_param_batch_size(self):
-        test_regression_query_strategy_query_batch_size(self, KLDivergenceMaximization)
+        provide_test_regression_query_strategy_query_batch_size(
+            self, KLDivergenceMaximization
+        )
 
     def test_query_param_return_utilities(self):
-        test_regression_query_strategy_query_return_utilities(
+        provide_test_regression_query_strategy_query_return_utilities(
             self, KLDivergenceMaximization
         )
 

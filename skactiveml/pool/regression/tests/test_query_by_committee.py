@@ -8,13 +8,13 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool.regression import QueryByCommittee
 from skactiveml.pool.regression.tests.test_pool_regression import (
-    test_regression_query_strategy_init_random_state,
-    test_regression_query_strategy_init_missing_label,
-    test_regression_query_strategy_query_X,
-    test_regression_query_strategy_query_y,
-    test_regression_query_strategy_query_candidates,
-    test_regression_query_strategy_query_batch_size,
-    test_regression_query_strategy_query_return_utilities,
+    provide_test_regression_query_strategy_init_random_state,
+    provide_test_regression_query_strategy_init_missing_label,
+    provide_test_regression_query_strategy_query_X,
+    provide_test_regression_query_strategy_query_y,
+    provide_test_regression_query_strategy_query_candidates,
+    provide_test_regression_query_strategy_query_batch_size,
+    provide_test_regression_query_strategy_query_return_utilities,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 
@@ -32,12 +32,12 @@ class TestQueryByCommittee(unittest.TestCase):
         )
 
     def test_init_param_random_state(self):
-        test_regression_query_strategy_init_random_state(
+        provide_test_regression_query_strategy_init_random_state(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
     def test_init_param_missing_label(self):
-        test_regression_query_strategy_init_missing_label(
+        provide_test_regression_query_strategy_init_missing_label(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
@@ -54,12 +54,12 @@ class TestQueryByCommittee(unittest.TestCase):
             self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
 
     def test_query_param_X(self):
-        test_regression_query_strategy_query_X(
+        provide_test_regression_query_strategy_query_X(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
     def test_query_param_y(self):
-        test_regression_query_strategy_query_y(
+        provide_test_regression_query_strategy_query_y(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
@@ -82,17 +82,17 @@ class TestQueryByCommittee(unittest.TestCase):
             self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
 
     def test_query_param_candidates(self):
-        test_regression_query_strategy_query_candidates(
+        provide_test_regression_query_strategy_query_candidates(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
     def test_query_param_batch_size(self):
-        test_regression_query_strategy_query_batch_size(
+        provide_test_regression_query_strategy_query_batch_size(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
     def test_query_param_return_utilities(self):
-        test_regression_query_strategy_query_return_utilities(
+        provide_test_regression_query_strategy_query_return_utilities(
             self, QueryByCommittee, query_dict=self.query_dict_regression_test
         )
 
