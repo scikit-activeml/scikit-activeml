@@ -207,7 +207,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
@@ -1429,7 +1429,7 @@ class TargetDistributionEstimator(SkactivemlRegressor):
             The distribution of the targets at the test samples.
 
         """
-        return NotImplementedError
+        raise NotImplementedError
 
     def predict(self, X, return_std=False, return_entropy=False):
         """Returns the mean, std (optional) and differential entropy (optional)

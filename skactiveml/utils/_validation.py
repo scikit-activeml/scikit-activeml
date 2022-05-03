@@ -651,7 +651,7 @@ def check_callable(func, name, n_free_parameters=None):
     )
 
     if n_free_params != n_free_parameters:
-        raise TypeError(
+        raise ValueError(
             f"The number of free parameters of the callable has to "
             f"equal {n_free_parameters}. "
             f"The number of free parameters is {n_free_params}."

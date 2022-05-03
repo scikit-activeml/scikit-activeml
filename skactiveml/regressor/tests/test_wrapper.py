@@ -42,6 +42,9 @@ class TestWrapper(unittest.TestCase):
         y = np.full(3, MISSING_LABEL)
         reg.fit(self.X, y)
         self.assertFalse(was_fitted_dict["is_fitted"])
+        y = np.zeros(3)
+        reg.fit(self.X, y)
+        self.assertTrue(was_fitted_dict["is_fitted"])
 
         reg_1 = SklearnRegressor(
             estimator=MLPRegressor(random_state=self.random_state),

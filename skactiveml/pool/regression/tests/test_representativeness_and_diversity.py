@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.pool.regression import RepresentativenessDiversity, QueryByCommittee
-from skactiveml.pool.regression.tests.test_pool_regression import (
+from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
     provide_test_regression_query_strategy_query_X,

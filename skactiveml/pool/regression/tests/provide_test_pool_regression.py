@@ -150,8 +150,7 @@ def provide_test_regression_query_strategy_query_X(
 
     # wrong shape dimension, wrong shape form, None and str not allowed
     for X_illegal in [np.arange(5), np.arange(3).reshape(3, 1), None, "illegal"]:
-        for name, value in [("X", X_illegal), ("y", y), ("batch_size", 1)]:
-            query_dict[name] = value
+        query_dict["X"] = X_illegal
         test_instance.assertRaises(
             (TypeError, ValueError), call_func, qs.query, **query_dict
         )
@@ -296,7 +295,7 @@ def provide_test_regression_query_strategy_query_sample_weight(
             test_instance.assertTrue(call_status_dict["used_sample_weight"])
 
     # illegal arguments
-    for illegal_sample_weight in ["illegal", dict]:
+    for illegal_sample_weight in ["illegal", dict, np.arange(len(y) - 1)]:
         query_dict["sample_weight"] = illegal_sample_weight
         test_instance.assertRaises((TypeError, ValueError), call_func, **query_dict)
 

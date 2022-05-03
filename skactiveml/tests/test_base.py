@@ -12,6 +12,8 @@ from skactiveml.base import (
     AnnotatorModelMixin,
     BudgetManager,
     SingleAnnotatorStreamQueryStrategy,
+    SkactivemlRegressor,
+    TargetDistributionEstimator,
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL
@@ -250,4 +252,34 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
             self.qs.update,
             candidates=None,
             queried_indices=None,
+        )
+
+
+class ScaktivemlRegressorTest(unittest.TestCase):
+    @patch.multiple(SkactivemlRegressor, __abstractmethods__=set())
+    def setUp(self):
+        self.reg = SkactivemlRegressor(missing_label=-1)
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.reg.fit, X=None, y=None)
+
+    def test_predict(self):
+        self.assertRaises(NotImplementedError, self.reg.predict, X=None)
+
+    def test_validate_data(self):
+        X = np.arange(5 * 2).reshape(5, 2)
+        y = 1 / 2 * np.arange(5)
+        self.assertRaises(
+            ValueError, self.reg._validate_data, X=X, y=y, sample_weight=np.arange(1, 5)
+        )
+
+
+class TargetDistributionEstimatorTest(unittest.TestCase):
+    @patch.multiple(TargetDistributionEstimator, __abstractmethods__=set())
+    def setUp(self):
+        self.reg = TargetDistributionEstimator(missing_label=-1)
+
+    def test_predict_target_distribution(self):
+        self.assertRaises(
+            NotImplementedError, self.reg.predict_target_distribution, X=None
         )
