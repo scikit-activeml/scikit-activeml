@@ -1,7 +1,8 @@
 import numpy as np
 from sklearn import clone
 
-from skactiveml.base import SingleAnnotatorPoolQueryStrategy
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy, \
+    SkactivemlClassifier
 
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 
@@ -131,14 +132,16 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             reset=True,
         )
 
+        # Validate classifier type.
+        check_type(clf, "clf", SkactivemlClassifier)
+        # Check missing_label.
+        check_equal_missing_label(clf.missing_label, self.missing_label)
+
         # Obtain the classes.
         check_type(fit_clf, "fit_clf", bool)
         if fit_clf:
             clf = clone(clf).fit(X, y)
         classes = clf.classes_
-
-        # Check missing_label.
-        check_equal_missing_label(clf.missing_label, self.missing_label)
 
         # Obtain candidates plus mapping.
         X_cand, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True)
@@ -176,7 +179,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         lmbda = self.lmbda
         if lmbda is None:
             lmbda = np.min(((batch_size - 1) * 0.05, 0.5))  # TODO default?
-        check_scalar(lmbda, target_type=(float, int), name="lmbda")
+        check_scalar(lmbda, target_type=(float, int), name="lmbda")  # TODO min max
 
         # --- Computation ----------------------------------------------------
         # Compute kernel (metric) matrix.
@@ -202,41 +205,46 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         L_aa_inv = _L_aa_inv(K, lmbda, mask_a, mask_l)
 
         utilities_cand = np.full((len(X)), fill_value=np.nan)
-        utilities_cand_2 = np.full((len(X)), fill_value=np.nan)
-        y_labeled_ovr = _one_versus_rest_transform(y[mask_l], classes, l_rest=0)  # TODO l_rest?
-        y = (y == classes[0])*2 - 1  # TODO
+        y_labeled_ovr = _one_versus_rest_transform(y[mask_l], classes, l_rest=-1)  # TODO l_rest?
+        y_ = (y_labeled_ovr[0] == 1)*2.0 - 1  # TODO
         for i, s in enumerate(mapping):
             mask_u = mask_a.copy()
             mask_u[s] = False
-            #L_uu_inv = _del_i_inv(L_aa_inv, i)
-            L_uu_inv = np.linalg.inv(L[mask_u][:, mask_u])
+            L_uu_inv = _del_i_inv(L_aa_inv, i)
+            np.testing.assert_allclose(L_uu_inv, np.linalg.inv(L[mask_u][:, mask_u]), rtol=1e-5)
 
-            utilities_cand_2[s] = \
-                utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u, 1)
+
 
             if method == 0:
-                temp_1 = np.empty(len(classes))
-                for j in range(len(classes)):
-                    y_j = y_labeled_ovr[:, j].reshape(-1, 1)
-                    temp_1[j] = y_j.T.dot(L[mask_l][:, mask_l]).dot(y_j)
-                    temp_2 = (L[mask_u][:, mask_l].dot(y_j) + L[mask_u][:, s].reshape(-1, 1))
-                    temp_1[j] -= temp_2.T.dot(L_uu_inv).dot(temp_2)
-                utilities_cand[s] = L[s, s] + np.max(temp_1)
+                utilities_cand[s] = \
+                    L[s, s] \
+                    + np.max([yl.T.dot(L[mask_l][:, mask_l]).dot(yl) +
+                        2 * L[s][mask_l].dot(yl)
+                        - (L[mask_u][:, mask_l].dot(yl)
+                           + L[mask_u][:, [s]]
+                           ).T.dot(L_uu_inv).dot(
+                            L[mask_u][:, mask_l].dot(yl)
+                            + L[mask_u][:, [s]]
+                        )
+                        for yl in y_labeled_ovr.T[:, :, np.newaxis]
+                    ])
             elif method == 1:
                 temp = L[[s]][:, mask_l] - L[[s]][:, mask_u].dot(L_uu_inv).dot(L[mask_u][:, mask_l])
 
                 utilities_cand[s] = L[s, s] - (det_L_aa / L[s, s])
-                + 2 * np.linalg.det(temp.dot((y[mask_l].reshape(-1, 1))))
+                + 2 * np.linalg.det(temp.dot((y_[mask_l].reshape(-1, 1))))
             elif method == 2:
+                if len(classes) != 2:
+                    raise ValueError('len(classes)!=2')
                 utilities_cand[s] = \
-                    utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u, classes[0])
+                    utilities_two_class(L, L_uu_inv, y_, s, mask_l, mask_u)
             elif method == 3:
-                utilities_cand[s] = \
-                    np.max([
-                        utilities_two_class(L, L_uu_inv, y, s, mask_l,
-                                            mask_u, y_c) for y_c in classes
-                    ])
-
+                temp = np.empty(len(classes))
+                for i in range(len(classes)):
+                    y_c = (y_labeled_ovr[i] == 1)*2.0 - 1
+                    temp[i] = utilities_two_class(L, L_uu_inv, y_c, s, mask_l,
+                                               mask_u)
+                utilities_cand[s] = np.max(temp)
 
         if not map_candidates:
             utilities = -utilities_cand[mapping]
@@ -265,9 +273,11 @@ def _one_versus_rest_transform(y, classes, l_one=1, l_rest=0,
 
 
 def _del_i_inv(A_inv, s):
+    np.testing.assert_allclose(A_inv, A_inv.T,
+                               err_msg='A_inv is not symmetric.')
     a = A_inv[s, s]
-    b = -np.delete(A_inv[:, s], s, axis=0)
-    D = np.delete(np.delete(A_inv, s, axis=0), s, axis=1)
+    b = np.delete(A_inv[:, [s]], s, axis=0)
+    D = np.delete(np.delete(A_inv, [s], axis=0), [s], axis=1)
     B_inv = D - (1 / a) * np.dot(b, b.T)
     return B_inv
 
@@ -283,9 +293,8 @@ def _L_aa_inv(K, lmbda, is_unlabeled, is_labeled):
     return L_aa_inv
 
 
-def utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u, y_c):
-    y = (y == y_c)*2.0-1
-    yl = y[mask_l].reshape(-1, 1)
+def utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u):
+    yl = y.reshape(-1, 1)
     utility_cand = \
         L[s, s] + yl.T.dot(L[mask_l][:, mask_l]).dot(yl) \
         + np.max([
