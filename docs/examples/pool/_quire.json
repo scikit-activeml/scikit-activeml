@@ -18,6 +18,7 @@
     },
     "query_params" : {
       "clf" : "clf"
-    }
+    },
+    "bp_preproc" : []
   }
 ]

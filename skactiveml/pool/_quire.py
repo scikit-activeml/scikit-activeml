@@ -21,11 +21,10 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
     lmbda :
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
-        `sklearn.metrics.pairwise.pairwise_kernels`.
-    metric_dict : dict,
+        `sklearn.metrics.pairwise.pairwise_kernels` or 'precomputed'.
+    metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-    missing_label : scalar or string or np.nan or None, optional
-    (default=MISSING_LABEL)
+    missing_label : scalar or string or np.nan or None, default=MISSING_LABEL
         Value to represent a missing label.
     random_state : numeric or np.random.RandomState, optional (default=None)
         The random state to use.
@@ -40,8 +39,8 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
             self,
-            lmbda=None,
-            metric="rbf",  # TODO default?
+            lmbda=1.0,
+            metric="rbf",
             metric_dict=None,
             missing_label=MISSING_LABEL,
             random_state=None,
@@ -57,31 +56,29 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             self,
             X,
             y,
-            clf,
+            clf,  # TODO do we need clf
             fit_clf=True,
             candidates=None,
             batch_size=1,
             return_utilities=False,
-            method=0
     ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+        X : array-like of shape (n_samples, n_features) or shape
+                (n_samples, n_samples) if metric == 'precomputed'
+            Training data set, including the labeled and unlabeled samples.
         y : array-like of shape (n_samples)
-            Labels of the training data set (possibly including unlabeled ones
+            Labels of the training data set, including unlabeled ones
             indicated by self.MISSING_LABEL.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the method `fit`.
-        fit_clf : bool, optional (default=True)
+        fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
+        candidates : None or array-like of shape (n_candidates), dtype=int,
+                default=None
             If candidates is None, the unlabeled samples from (X,y) are
             considered as candidates.
             If candidates is of shape (n_candidates) and of type int,
@@ -89,9 +86,9 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X).
-        batch_size : int, optional (default=1)
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
@@ -144,12 +141,12 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         classes = clf.classes_
 
         # Obtain candidates plus mapping.
-        X_cand, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True)
-        map_candidates = mapping is not None
-
+        X_cand, mapping = self._transform_candidates(candidates, X, y,
+                                                     enforce_mapping=True)
         mask_l = is_labeled(y=y, missing_label=self.missing_label)
         mask_a = is_unlabeled(y=y, missing_label=self.missing_label)
-       # y = y*2 - 1  # TODO
+
+        map_candidates = mapping is not None
         # if mapping is None:
         #     mapping = np.arange(stop=len(X_cand), dtype=int) + np.sum(mask_l)
         #     y = np.concatenate(
@@ -157,7 +154,6 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         #         axis=0
         #     )
         #     X = np.concatenate((X[mask_l], X_cand), axis=0)
-
 
         # Check whether metric is available.
         if self.metric not in Quire.METRICS and not callable(
@@ -177,74 +173,48 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
         # Check lmbda.
         lmbda = self.lmbda
-        if lmbda is None:
-            lmbda = np.min(((batch_size - 1) * 0.05, 0.5))  # TODO default?
-        check_scalar(lmbda, target_type=(float, int), name="lmbda")  # TODO min max
+        check_scalar(lmbda, target_type=(float, int), name="lmbda", min_val=0,
+                     min_inclusive=True)
 
         # --- Computation ----------------------------------------------------
         # Compute kernel (metric) matrix.
-        # TODO can we precompute the kernel
         if self.metric == "precomputed":
-            K = np.array(self.K)
-            if K.shape != (len(X), len(X)):
+            K = np.array(X)
+            if K.shape != (len(y), len(y)):
                 raise ValueError(
                     "The kernel matrix 'K' must have the shape "
                     "(n_samples, n_samples)."
                 )
         else:
-            self._check_n_features(X, reset=False)
             K = pairwise_kernels(
                 X, X, metric=self.metric, **self.metric_dict_
             )
         # compute L and L_aa
         L = np.linalg.inv(K + lmbda * np.eye(len(X)))
-        L_aa = L[mask_a][:, mask_a]
-        # compute det(L_aa)
-        det_L_aa = np.linalg.det(L_aa)
         # Compute the inverse of L_aa
         L_aa_inv = _L_aa_inv(K, lmbda, mask_a, mask_l)
 
         utilities_cand = np.full((len(X)), fill_value=np.nan)
-        y_labeled_ovr = _one_versus_rest_transform(y[mask_l], classes, l_rest=-1)  # TODO l_rest?
-        y_ = (y_labeled_ovr[0] == 1)*2.0 - 1  # TODO
+        y_labeled_ovr = _one_versus_rest_transform(
+            y[mask_l], classes, l_rest=-1
+        )
         for i, s in enumerate(mapping):
             mask_u = mask_a.copy()
             mask_u[s] = False
             L_uu_inv = _del_i_inv(L_aa_inv, i)
-            np.testing.assert_allclose(L_uu_inv, np.linalg.inv(L[mask_u][:, mask_u]), rtol=1e-5)
 
-
-
-            if method == 0:
-                utilities_cand[s] = \
-                    L[s, s] \
-                    + np.max([yl.T.dot(L[mask_l][:, mask_l]).dot(yl) +
-                        2 * L[s][mask_l].dot(yl)
-                        - (L[mask_u][:, mask_l].dot(yl)
-                           + L[mask_u][:, [s]]
-                           ).T.dot(L_uu_inv).dot(
-                            L[mask_u][:, mask_l].dot(yl)
-                            + L[mask_u][:, [s]]
-                        )
-                        for yl in y_labeled_ovr.T[:, :, np.newaxis]
-                    ])
-            elif method == 1:
-                temp = L[[s]][:, mask_l] - L[[s]][:, mask_u].dot(L_uu_inv).dot(L[mask_u][:, mask_l])
-
-                utilities_cand[s] = L[s, s] - (det_L_aa / L[s, s])
-                + 2 * np.linalg.det(temp.dot((y_[mask_l].reshape(-1, 1))))
-            elif method == 2:
-                if len(classes) != 2:
-                    raise ValueError('len(classes)!=2')
-                utilities_cand[s] = \
-                    utilities_two_class(L, L_uu_inv, y_, s, mask_l, mask_u)
-            elif method == 3:
-                temp = np.empty(len(classes))
-                for i in range(len(classes)):
-                    y_c = (y_labeled_ovr[i] == 1)*2.0 - 1
-                    temp[i] = utilities_two_class(L, L_uu_inv, y_c, s, mask_l,
-                                               mask_u)
-                utilities_cand[s] = np.max(temp)
+            utilities_cand[s] = \
+                L[s, s] \
+                + np.max([yl.T.dot(L[mask_l][:, mask_l]).dot(yl) +
+                          2 * L[s][mask_l].dot(yl)
+                          - (L[mask_u][:, mask_l].dot(yl)
+                             + L[mask_u][:, [s]]
+                             ).T.dot(L_uu_inv).dot(
+                    L[mask_u][:, mask_l].dot(yl)
+                    + L[mask_u][:, [s]]
+                )
+                          for yl in y_labeled_ovr.T[:, :, np.newaxis]
+                          ])
 
         if not map_candidates:
             utilities = -utilities_cand[mapping]
@@ -291,21 +261,3 @@ def _L_aa_inv(K, lmbda, is_unlabeled, is_labeled):
         )
     ).dot(K[is_labeled][:, is_unlabeled])
     return L_aa_inv
-
-
-def utilities_two_class(L, L_uu_inv, y, s, mask_l, mask_u):
-    yl = y.reshape(-1, 1)
-    utility_cand = \
-        L[s, s] + yl.T.dot(L[mask_l][:, mask_l]).dot(yl) \
-        + np.max([
-            2 * ys * L[s][mask_l].dot(yl)
-            - (L[mask_u][:, mask_l].dot(yl)
-               + L[mask_u][:, [s]] * ys
-               ).T.dot(L_uu_inv).dot(
-                L[mask_u][:, mask_l].dot(yl)
-                + L[mask_u][:, [s]] * ys
-            )
-            for ys in [-1, 1]
-        ])
-
-    return utility_cand

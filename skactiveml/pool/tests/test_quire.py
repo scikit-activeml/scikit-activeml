@@ -16,8 +16,8 @@ class TestQuire(unittest.TestCase):
         self.candidates = np.array([1, 3])
         self.X_cand = np.array([[8, 1], [9, 1], [5, 1]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.y = np.array([0, 0, 1, 1])
-        self.y_MISSING_LABEL = np.array(
+        self.y_true = np.array([0, 0, 1, 1])
+        self.y = np.array(
             [0, MISSING_LABEL, 1, MISSING_LABEL]
         )
         self.classes = np.array([0, 1])
@@ -25,29 +25,26 @@ class TestQuire(unittest.TestCase):
             classes=self.classes, random_state=self.random_state
         )
         self.kwargs = dict(
-            candidates=self.candidates, X=self.X, y=self.y, clf=self.clf
-        )
-        self.kwargs_MISSING_LABEL = dict(
-            candidates=self.candidates, X=self.X, y=self.y_MISSING_LABEL,
+            candidates=self.candidates, X=self.X, y=self.y,
             clf=self.clf
         )
 
     def test_init_param_metric_dict(self):
         for metric_dict in ['String', 42, {'string': None}]:
             qs = Quire(metric_dict=metric_dict)
-            self.assertRaises(TypeError, qs.query, **self.kwargs_MISSING_LABEL)
+            self.assertRaises(TypeError, qs.query, **self.kwargs)
 
     def test_init_param_metric(self):
         qs = Quire(metric="Test")
-        self.assertRaises(ValueError, qs.query, **self.kwargs_MISSING_LABEL)
+        self.assertRaises(ValueError, qs.query, **self.kwargs)
         qs = Quire(metric=42)
-        self.assertRaises(ValueError, qs.query, **self.kwargs_MISSING_LABEL)
+        self.assertRaises(ValueError, qs.query, **self.kwargs)
 
     def test_init_param_lmbda(self):
         for lmbda in [-1, 'string']:
             qs = Quire(lmbda=lmbda)
             self.assertRaises((ValueError, TypeError), qs.query,
-                              **self.kwargs_MISSING_LABEL)
+                              **self.kwargs)
 
     def test_query_param_clf(self):
         qs = Quire()
@@ -59,19 +56,42 @@ class TestQuire(unittest.TestCase):
                 candidates=self.candidates,
                 clf=clf,
                 X=self.X,
-                y=self.y,
+                y=self.y_true,
             )
 
     def test_query_param_fit_clf(self):
         qs = Quire()
         for fit_clf in ["string", self.candidates, None]:
             self.assertRaises(
-                TypeError, qs.query, **self.kwargs_MISSING_LABEL,
+                TypeError, qs.query, **self.kwargs,
                 fit_clf=fit_clf
             )
 
     def test_query(self):
-        pass
+        # Test metric="precomputed"
+        qs = Quire(metric="precomputed")
+        K = pairwise_kernels(self.X, self.X, metric='rbf')
+        _, utils = qs.query(K, self.y, self.clf, return_utilities=True)
+        qs = Quire(metric="rbf")
+        _, expected_utils = qs.query(**self.kwargs, return_utilities=True)
+        np.testing.assert_array_equal(expected_utils, utils)
+
+        # Test with zero labels.
+        qs.query(clf=self.clf, X=self.X,
+                 y=np.full(shape=len(self.X), fill_value=np.nan))
+
+        # Test Scenario.
+        qs = Quire(metric='precomputed')
+        K = np.zeros_like(K)
+        _, utils = qs.query(K, self.y, self.clf, return_utilities=True)
+        is_lbld = is_labeled(self.y)
+        y_labeled = self.y[is_lbld].reshape(-1, 1)*2-1
+        expected_utils = np.full_like(utils, -1 - y_labeled.T.dot(y_labeled))
+        np.testing.assert_array_equal(expected_utils[:, ~is_lbld],
+                                      utils[:, ~is_lbld])
+
+        qs = Quire()
+        _, utils = qs.query(**self.kwargs, return_utilities=True)
 
     def test__del_i_inv(self):
         A = np.random.random((3, 3))
@@ -85,7 +105,7 @@ class TestQuire(unittest.TestCase):
     def test__L_aa_inv(self):
         lmbda = 1
         X = np.append(self.X, self.X_cand, axis=0)
-        y = np.append(self.y, np.full(len(self.X_cand), MISSING_LABEL))
+        y = np.append(self.y_true, np.full(len(self.X_cand), MISSING_LABEL))
         is_lbld = is_labeled(y=y, missing_label=MISSING_LABEL)
         is_unlbld = is_unlabeled(y=y, missing_label=MISSING_LABEL)
         K = pairwise_kernels(X, X, metric='rbf')
