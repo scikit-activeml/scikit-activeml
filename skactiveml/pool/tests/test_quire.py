@@ -39,6 +39,9 @@ class TestQuire(unittest.TestCase):
         self.assertRaises(ValueError, qs.query, **self.kwargs)
         qs = Quire(metric=42)
         self.assertRaises(ValueError, qs.query, **self.kwargs)
+        qs = Quire(metric='precomputed')
+        K = np.zeros((len(self.y), len(self.y)-1))
+        self.assertRaises(ValueError, qs.query, y=self.y, X=K, clf=self.clf)
 
     def test_init_param_lmbda(self):
         for lmbda in [-1, 'string']:
@@ -125,4 +128,8 @@ class TestQuire(unittest.TestCase):
         classes = np.unique(y)
         np.testing.assert_array_equal(
             y_ovr, _one_versus_rest_transform(y, classes, l_rest=0)
+        )
+        np.testing.assert_array_equal(
+            y_ovr, _one_versus_rest_transform(y, classes, missing_label=-1,
+                                              l_rest=0)
         )

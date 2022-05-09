@@ -216,10 +216,11 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                           for yl in y_labeled_ovr.T[:, :, np.newaxis]
                           ])
 
-        if not map_candidates:
-            utilities = -utilities_cand[mapping]
-        else:
-            utilities = -utilities_cand
+        # if not map_candidates:
+        #     utilities = -utilities_cand[mapping]
+        # else:
+        #     utilities = -utilities_cand
+        utilities = -utilities_cand
 
         return simple_batch(
             utilities,
