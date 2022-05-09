@@ -11,17 +11,15 @@ from copy import deepcopy
 from collections import deque
 
 import numpy as np
-from sklearn.base import BaseEstimator, MetaEstimatorMixin, is_classifier
+from sklearn.base import MetaEstimatorMixin, is_classifier
 from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
     check_consistent_length,
-    column_or_1d,
 )
 from . import ParzenWindowClassifier
-from sklearn.utils.multiclass import check_classification_targets
 from ..base import SkactivemlClassifier, ClassFrequencyEstimator
 from ..utils import (
     rand_argmin,
@@ -29,10 +27,8 @@ from ..utils import (
     check_scalar,
     check_type,
     is_labeled,
-    check_cost_matrix,
     check_classifier_params,
     check_random_state,
-    ExtLabelEncoder,
     check_class_prior,
     check_equal_missing_label,
 )
@@ -278,7 +274,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 f"Therefore, this parameter will be ignored."
             )
         if hasattr(self, "estimator_"):
-            if fit_function != "partial_fit":
+            if fit_function == "fit":
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
@@ -364,7 +360,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         default=None
         The `ClassFrequencyEstimator` from which the `predict_freq` method
         should utilized.
-    use_only_marginal_frequencies : boolean, default=True
+    frequency_with_estimator_proba : boolean, default=True
         If True, the estimated class frequencies from the
         `class_frequency_estimator` are marginalized over all classes and
         multiplied with the predicted class probabilities from the `estimator`.
@@ -396,7 +392,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         self,
         estimator,
         class_frequency_estimator=None,
-        use_only_marginal_frequencies=True,
+        frequency_with_estimator_proba=True,
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
@@ -411,7 +407,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             random_state=random_state,
         )
         self.class_frequency_estimator = class_frequency_estimator
-        self.use_only_marginal_frequencies = use_only_marginal_frequencies
+        self.frequency_with_estimator_proba = frequency_with_estimator_proba
         self.estimator = estimator
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -552,11 +548,11 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         check_is_fitted(self)
         X = check_array(X)
         # Predict zeros because of missing training data.
-        # Only required because of the use of SubsampleEstimator
+        # Only required because of the use of SubsampleClassifier
         if not self.is_fitted_:
             return np.zeros((len(X), len(self.classes_)))
         frequencies = self.class_frequency_estimator_.predict_freq(X)
-        if not self.use_only_marginal_frequencies:
+        if not self.frequency_with_estimator_proba:
             return frequencies
         marginal_frequencies = np.sum(frequencies, axis=1, keepdims=True)
         pred_proba = self.estimator_.predict_proba(X)
@@ -595,7 +591,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         if not hasattr(self, "class_frequency_estimator_"):
             if self.class_frequency_estimator is None:
                 is_labeled(y, missing_label=self.missing_label)
-                self.class_frequency_estimator_ = SubsampleEstimator(
+                self.class_frequency_estimator_ = SubsampleClassifier(
                     ParzenWindowClassifier(
                         missing_label=self.missing_label,
                         classes=self.classes,
@@ -603,7 +599,8 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                         class_prior=self.class_prior,
                         cost_matrix=self.cost_matrix,
                     ),
-                    only_labled=True,
+                    cost_matrix=self.cost_matrix,
+                    only_labeled=True,
                     classes=self.classes,
                     missing_label=self.missing_label,
                     random_state=self.random_state_.randint(2 ** 31 - 1),
@@ -614,7 +611,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                 )
 
         if hasattr(self, "estimator_"):
-            if fit_function != "partial_fit":
+            if fit_function == "fit":
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
@@ -640,10 +637,44 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
     def _fit_frequency_estimator(
         self, fit_function, X, y, sample_weight=None, **fit_kwargs
     ):
+        # check if missing labels are equal
+        check_equal_missing_label(
+            self.missing_label, self.estimator_.missing_label,
+        )
         check_equal_missing_label(
             self.class_frequency_estimator_.missing_label,
-            self.estimator.missing_label,
+            self.estimator_.missing_label,
         )
+        # check if classes are equal
+        if self.classes is None:
+            self.classes_ = self.estimator_.classes_
+        else:
+            if self.estimator.classes is not None and not np.array_equiv(
+                self.classes, self.estimator.classes
+            ):
+                raise ValueError(
+                    "'classes' and estimator.classes must be equal. "
+                    "Got {} is not equal to {}.".format(
+                        self.classes, self.estimator.classes,
+                    )
+                )
+            else:
+                self.classes_ = self.estimator_.classes_
+
+        if self.cost_matrix is None:
+            self.cost_matrix_ = self.estimator_.cost_matrix_
+        else:
+            if self.estimator.cost_matrix is not None and not np.array_equiv(
+                self.cost_matrix, self.estimator.cost_matrix
+            ):
+                raise ValueError(
+                    "'cost_matrix' and estimator.cost_matrix must be equal. "
+                    "Got {} is not equal to {}.".format(
+                        self.cost_matrix, self.estimator.cost_matrix,
+                    )
+                )
+            else:
+                self.cost_matrix_ = self.estimator_.cost_matrix_
 
         # Check class prior.
         self.class_prior_ = check_class_prior(
@@ -679,16 +710,14 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
         # Check input parameters.
         y = check_array(y, **check_y_dict)
         check_type(
-            self.use_only_marginal_frequencies,
-            "use_only_marginal_frequencies",
+            self.frequency_with_estimator_proba,
+            "frequency_with_estimator_proba",
             bool,
         )
         if len(y) == 0:
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
-
-        # # Update detected classes.
 
         # Check classes.
         if sample_weight is not None:
@@ -709,8 +738,8 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             raise AttributeError(f"{item} does not exist")
 
 
-class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
-    """SubsampleEstimator
+class SubsampleClassifier(SkactivemlClassifier, MetaEstimatorMixin):
+    """SubsampleClassifier
 
     Implementation of a wrapper class for SkactivemlClassifier such that the
     number of training samples can be limited. Furthermore, saves X, y and
@@ -738,8 +767,13 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         Defines how old instances are replaced.
         'last': First in First out
         'random' : replacing old samples randomly
-    only_labled: bool, default=False
-        If True, unlabled samples are discarded.
+    only_labeled: bool, default=False
+        If True, unlabeled samples are discarded.
+    ignore_estimator_partial_fit: bool, default=False
+        If True, the existing partial_fit method in `estimator` is ignored and
+        the sliding window is used instead. If False, the partial_fit method
+        in estimator is used but a warning is thrown as the sliding window has
+        no effect.
     random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
@@ -751,10 +785,11 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
-        random_state=None,
         subsample_size=None,
         replacement_method="last",
-        only_labled=False,
+        only_labeled=False,
+        ignore_estimator_partial_fit=False,
+        random_state=None,
     ):
         super().__init__(
             classes=classes,
@@ -763,9 +798,10 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             random_state=random_state,
         )
         self.estimator = estimator
-        self.only_labled = only_labled
+        self.only_labeled = only_labeled
         self.subsample_size = subsample_size
         self.replacement_method = replacement_method
+        self.ignore_estimator_partial_fit = ignore_estimator_partial_fit
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
@@ -787,8 +823,8 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        self: SubsampleEstimator,
-            The SubsampleEstimator is fitted on the training data.
+        self: SubsampleClassifier,
+            The SubsampleClassifier is fitted on the training data.
         """
         self._replacement_method("fit", X, y, sample_weight)
         return self._fit(
@@ -821,19 +857,33 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        self : SubsampleEstimator,
-            The SubsampleEstimator is fitted on the training data.
+        self : SubsampleClassifier,
+            The SubsampleClassifier is fitted on the training data.
         """
         self._replacement_method("partial_fit", X, y, sample_weight)
 
         if hasattr(self.estimator, "partial_fit"):
-            return self._fit(
-                "partial_fit",
-                X=X,
-                y=y,
-                sample_weight=sample_weight,
-                **fit_kwargs,
-            )
+            if self.ignore_estimator_partial_fit:
+                return self._fit(
+                    "fit",
+                    X=self.X_train_,
+                    y=self.y_train_,
+                    sample_weight=self.sample_weight_,
+                    **fit_kwargs,
+                )
+            else:
+                warnings.warn(
+                    "The partial_fit method in estimator is used but the "
+                    "sliding window has no effect. To avoid this set "
+                    "`ignore_estimator_partial_fit`=True"
+                )
+                return self._fit(
+                    "partial_fit",
+                    X=X,
+                    y=y,
+                    sample_weight=sample_weight,
+                    **fit_kwargs,
+                )
         else:
             return self._fit(
                 "fit",
@@ -850,12 +900,18 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             "allow_nd": True,
             "dtype": None,
         }
-        X, y, sample_weight = self._validate_data(
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
-            check_X_dict=self.check_X_dict_,
-        )
+        check_y_dict = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "ensure_2d": False,
+            "force_all_finite": False,
+            "dtype": None,
+        }
+        y = check_array(y, **check_y_dict)
+        if len(y) == 0:
+            self.check_X_dict_["ensure_2d"] = False
+        X = check_array(X, **self.check_X_dict_)
+        check_consistent_length(X, y)
 
         if not hasattr(self, "X_train_"):
             self.X_train_ = deque(maxlen=self.subsample_size)
@@ -863,6 +919,14 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             self.y_train_ = deque(maxlen=self.subsample_size)
         if not hasattr(self, "sample_weight_"):
             self.sample_weight_ = deque(maxlen=self.subsample_size)
+        if self.only_labeled:
+            is_lbld = is_labeled(y, self.missing_label)
+            X = X[is_lbld]
+            y = y[is_lbld]
+            if sample_weight is not None:
+                sample_weight = sample_weight[is_lbld]
+            else:
+                sample_weight = None
         # reset the window if fit is called otherwise extend the window with
         # the given data
         if fit_func == "fit":
@@ -904,9 +968,9 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
         }
 
         # Check whether estimator is a valid classifier.
-        if not isinstance(self.estimator, BaseEstimator):
+        if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
-                "'{}' must be a BaseEstimator "
+                "'{}' must be a SkactivemlClassifier"
                 "classifier.".format(self.estimator)
             )
 
@@ -925,99 +989,36 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 "'cost_matrix' can be only set, if 'estimator'"
                 "implements 'predict_proba'."
             )
+
         if fit_function == "fit" or not hasattr(self, "n_features_in_"):
             self._check_n_features(X, reset=True)
         elif fit_function == "partial_fit":
             self._check_n_features(X, reset=False)
+
         if hasattr(self, "estimator_"):
-            if fit_function != "partial_fit":
+            if fit_function == "fit":
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
 
-        try:
-            if self.only_labled:
-                is_lbld = is_labeled(y, self.missing_label)
-                X = X[is_lbld]
-                y = y[is_lbld]
-                if sample_weight is not None:
-                    sample_weight = sample_weight[is_lbld]
-                else:
-                    sample_weight = None
-                if np.sum(is_lbld) == 0:
-                    if (
-                        hasattr(self, "is_fitted_")
-                        and self.is_fitted_ is True
-                        and fit_function == "partial_fit"
-                    ):
-                        return self
-                    else:
-                        raise ValueError("There is no labeled data.")
-            if (
-                not has_fit_parameter(self.estimator, "sample_weight")
-                or sample_weight is None
-            ):
-                if fit_function == "partial_fit":
-                    classes = self._le.transform(self.classes_)
-                    # classes is called 2 times if estimator is a
-                    # SklearnClassifier
-                    if isinstance(self.estimator_, SklearnClassifier):
-                        self.estimator_.classes_ = classes
-                        self.estimator_.partial_fit(X=X, y=y, **fit_kwargs)
-                    else:
-                        self.estimator_.partial_fit(
-                            X=X, y=y, classes=classes, **fit_kwargs
-                        )
-                elif fit_function == "fit":
-                    self.estimator_.fit(X=X, y=y, **fit_kwargs)
-            else:
-                if fit_function == "partial_fit":
-                    classes = self._le.transform(self.classes_)
-                    self.estimator_.partial_fit(
-                        X=X,
-                        y=y,
-                        classes=classes,
-                        sample_weight=sample_weight,
-                        **fit_kwargs,
-                    )
-                elif fit_function == "fit":
-                    self.estimator_.fit(
-                        X=X, y=y, sample_weight=sample_weight, **fit_kwargs,
-                    )
-            self.is_fitted_ = True
-        except Exception as e:
-            self.is_fitted_ = False
-            if hasattr(self, "_label_counts"):
-                warnings.warn(
-                    "The 'base_estimator' could not be fitted because of"
-                    " '{}'. Therefore, the class labels of the samples "
-                    "are counted and will be used to make predictions. "
-                    "The class label distribution is `_label_counts={}`.".format(
-                        e, self._label_counts
-                    )
-                )
-            else:
-                warnings.warn(
-                    "The 'base_estimator' could not be fitted because of"
-                    " '{}'.".format(e)
-                )
+        sample_weight_train = sample_weight
+        if fit_function == "fit":
+            self.estimator_.fit(
+                X=X, y=y, sample_weight=sample_weight_train, **fit_kwargs
+            )
+        elif fit_function == "partial_fit":
+            self.estimator_.partial_fit(
+                X=X, y=y, sample_weight=sample_weight_train, **fit_kwargs
+            )
+
+        if hasattr(self.estimator_, "classes_"):
+            self.classes_ = self.estimator_.classes_
+
         return self
 
     def _validate_data(
-        self,
-        X,
-        y,
-        sample_weight=None,
-        check_X_dict=None,
-        check_y_dict=None,
-        y_ensure_1d=True,
+        self, X, y, sample_weight=None, check_X_dict=None, check_y_dict=None,
     ):
-
-        # create new y array to check classes
-        if hasattr(self, "y_train_"):
-            y_new = np.concatenate([self.y_train_, y])
-        else:
-            y_new = y
 
         if self.subsample_size is not None:
             check_scalar(
@@ -1027,7 +1028,13 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                 min_val=0,
                 min_inclusive=False,
             )
-        check_type(self.only_labled, "only_labled", bool)
+        check_type(self.only_labeled, "only_labeled", bool)
+
+        check_type(
+            self.ignore_estimator_partial_fit,
+            "ignore_estimator_partial_fit",
+            bool,
+        )
         check_type(self.replacement_method, "replacement_method", str)
         if check_y_dict is None:
             check_y_dict = {
@@ -1043,72 +1050,50 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
             self.classes, self.missing_label, self.cost_matrix
         )
 
-        if isinstance(self.estimator, SkactivemlClassifier):
-            if (
-                self.cost_matrix is not None
-                and self.estimator.cost_matrix is not None
-                and not np.array_equiv(
+        if (
+            self.cost_matrix is not None
+            and self.estimator.cost_matrix is not None
+            and not np.array_equiv(
+                self.cost_matrix, self.estimator.cost_matrix
+            )
+        ):
+            raise ValueError(
+                "'cost_matrix' and estimator.cost_matrix must be equal. "
+                "Got {} is not equal to {}.".format(
                     self.cost_matrix, self.estimator.cost_matrix
                 )
-            ):
-                raise ValueError(
-                    "'cost_matrix' and estimator.cost_matrix must be equal. "
-                    "Got {} is not equal to {}.".format(
-                        self.cost_matrix, self.estimator.cost_matrix
-                    )
+            )
+        # self.missing_label is not testet completly and
+        # needs to be checked for the general test.
+        # if general test is removed, remove this check.
+        _ = is_labeled(y, missing_label=self.missing_label)
+
+        check_equal_missing_label(
+            self.missing_label, self.estimator.missing_label,
+        )
+        # if self.classes=None or self.estimator.classes=None then no checks are done
+        # if general test is removed it should be checked again
+        if (
+            self.classes is not None
+            and self.estimator.classes is not None
+            and not np.array_equiv(self.classes, self.estimator.classes)
+        ):
+            raise ValueError(
+                "'classes' and estimator.classes must be equal. "
+                "Got {} is not equal to {}.".format(
+                    self.classes, self.estimator.classes
                 )
-            if self.only_labled:
-                check_equal_missing_label(
-                    self.missing_label, self.estimator.missing_label,
-                )
-            if (
-                self.classes is not None
-                and self.estimator.classes is not None
-                and not np.array_equiv(self.classes, self.estimator.classes)
-            ):
-                raise ValueError(
-                    "'classes' and estimator.classes must be equal. "
-                    "Got {} is not equal to {}.".format(
-                        self.classes, self.estimator.classes
-                    )
-                )
+            )
 
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        # Create label encoder.
-        self._le = ExtLabelEncoder(
-            classes=self.classes, missing_label=self.missing_label
-        )
         # Check input parameters.
         y = check_array(y, **check_y_dict)
-        if len(y) > 0:
-            y_le = column_or_1d(y_new) if y_ensure_1d else y_new
-            y_le = self._le.fit_transform(y_le)
-            is_lbdl = is_labeled(y_le)
-
-            if len(y_le[is_lbdl]) > 0:
-                check_classification_targets(y_le[is_lbdl])
-            if len(self._le.classes_) == 0:
-                raise ValueError(
-                    "No class label is known because 'y' contains no actual "
-                    "class labels and 'classes' is not defined. Change at "
-                    "least one of both to overcome this error."
-                )
-            self._label_counts = [
-                np.sum(y_le[is_lbdl] == c)
-                for c in range(len(self._le.classes_))
-            ]
-        else:
-            y_new = check_array(y_new, **check_y_dict)
-            is_lbdl = np.ones(y_new.shape, dtype=bool)
-            self._le.fit_transform(self.classes)
+        if len(y) == 0:
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
-
-        # Update detected classes.
-        self.classes_ = self._le.classes_
 
         # Check classes.
         if sample_weight is not None:
@@ -1119,20 +1104,6 @@ class SubsampleEstimator(SkactivemlClassifier, MetaEstimatorMixin):
                     f"shape {sample_weight.shape}. Both need to have "
                     f"identical shapes."
                 )
-
-        # Update cost matrix.
-        self.cost_matrix_ = (
-            1 - np.eye(len(self.classes_))
-            if self.cost_matrix is None
-            else self.cost_matrix
-        )
-        self.cost_matrix_ = check_cost_matrix(
-            self.cost_matrix_, len(self.classes_)
-        )
-        if self.classes is not None:
-            class_indices = np.argsort(self.classes)
-            self.cost_matrix_ = self.cost_matrix_[class_indices]
-            self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 
         return X, y, sample_weight
 
