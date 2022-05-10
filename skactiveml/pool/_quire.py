@@ -1,13 +1,9 @@
 import numpy as np
-from sklearn import clone
-
-from skactiveml.base import SingleAnnotatorPoolQueryStrategy, \
-    SkactivemlClassifier
-
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 
+from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.utils import check_scalar, simple_batch, MISSING_LABEL, \
-    is_labeled, is_unlabeled, check_type, check_equal_missing_label
+    is_labeled, is_unlabeled, ExtLabelEncoder
 
 
 class Quire(SingleAnnotatorPoolQueryStrategy):
@@ -18,7 +14,10 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    lmbda :
+    classes: array-like, shape (n_classes)
+        Array of class labels.
+    lmbda : float, default=1.0
+        Controls the weighting of informativeness and representativeness.
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels` or 'precomputed'.
@@ -39,6 +38,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
             self,
+            classes,
             lmbda=1.0,
             metric="rbf",
             metric_dict=None,
@@ -48,6 +48,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
+        self.classes = classes
         self.lmbda = lmbda
         self.metric = metric
         self.metric_dict = metric_dict
@@ -56,8 +57,6 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             self,
             X,
             y,
-            clf,  # TODO do we need clf
-            fit_clf=True,
             candidates=None,
             batch_size=1,
             return_utilities=False,
@@ -72,11 +71,6 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set, including unlabeled ones
             indicated by self.MISSING_LABEL.
-        clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the method `fit`.
-        fit_clf : bool, default=True
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
         candidates : None or array-like of shape (n_candidates), dtype=int,
                 default=None
             If candidates is None, the unlabeled samples from (X,y) are
@@ -129,24 +123,16 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             reset=True,
         )
 
-        # Validate classifier type.
-        check_type(clf, "clf", SkactivemlClassifier)
-        # Check missing_label.
-        check_equal_missing_label(clf.missing_label, self.missing_label)
-
-        # Obtain the classes.
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            clf = clone(clf).fit(X, y)
-        classes = clf.classes_
-
         # Obtain candidates plus mapping.
         X_cand, mapping = self._transform_candidates(candidates, X, y,
                                                      enforce_mapping=True)
         mask_l = is_labeled(y=y, missing_label=self.missing_label)
         mask_a = is_unlabeled(y=y, missing_label=self.missing_label)
+        le = ExtLabelEncoder(self.classes, self.missing_label)
+        y = le.fit_transform(y)
+        classes_ = le.transform(self.classes)
 
-        map_candidates = mapping is not None
+        # map_candidates = mapping is not None
         # if mapping is None:
         #     mapping = np.arange(stop=len(X_cand), dtype=int) + np.sum(mask_l)
         #     y = np.concatenate(
@@ -196,7 +182,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
         utilities_cand = np.full((len(X)), fill_value=np.nan)
         y_labeled_ovr = _one_versus_rest_transform(
-            y[mask_l], classes, l_rest=-1
+            y[mask_l], classes_, l_rest=-1
         )
         for i, s in enumerate(mapping):
             mask_u = mask_a.copy()

@@ -1,10 +1,8 @@
 import unittest
 
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.metrics import pairwise_kernels
 
-from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool._quire import _del_i_inv, _L_aa_inv, \
     _one_versus_rest_transform, Quire
 from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled
@@ -21,79 +19,57 @@ class TestQuire(unittest.TestCase):
             [0, MISSING_LABEL, 1, MISSING_LABEL]
         )
         self.classes = np.array([0, 1])
-        self.clf = ParzenWindowClassifier(
-            classes=self.classes, random_state=self.random_state
-        )
         self.kwargs = dict(
             candidates=self.candidates, X=self.X, y=self.y,
-            clf=self.clf
         )
 
-    def test_init_param_metric_dict(self):
-        for metric_dict in ['String', 42, {'string': None}]:
-            qs = Quire(metric_dict=metric_dict)
-            self.assertRaises(TypeError, qs.query, **self.kwargs)
-
-    def test_init_param_metric(self):
-        qs = Quire(metric="Test")
-        self.assertRaises(ValueError, qs.query, **self.kwargs)
-        qs = Quire(metric=42)
-        self.assertRaises(ValueError, qs.query, **self.kwargs)
-        qs = Quire(metric='precomputed')
-        K = np.zeros((len(self.y), len(self.y)-1))
-        self.assertRaises(ValueError, qs.query, y=self.y, X=K, clf=self.clf)
+    def test_init_param_classes(self):
+        qs = Quire(self.classes)
+        self.assertTrue(hasattr(qs, "classes"))
 
     def test_init_param_lmbda(self):
         for lmbda in [-1, 'string']:
-            qs = Quire(lmbda=lmbda)
+            qs = Quire(self.classes, lmbda=lmbda)
             self.assertRaises((ValueError, TypeError), qs.query,
                               **self.kwargs)
 
-    def test_query_param_clf(self):
-        qs = Quire()
-        for clf in [GaussianProcessClassifier(),
-                    ParzenWindowClassifier(missing_label="missing")]:
-            self.assertRaises(
-                TypeError,
-                qs.query,
-                candidates=self.candidates,
-                clf=clf,
-                X=self.X,
-                y=self.y_true,
-            )
+    def test_init_param_metric_dict(self):
+        for metric_dict in ['String', 42, {'string': None}]:
+            qs = Quire(self.classes, metric_dict=metric_dict)
+            self.assertRaises(TypeError, qs.query, **self.kwargs)
 
-    def test_query_param_fit_clf(self):
-        qs = Quire()
-        for fit_clf in ["string", self.candidates, None]:
-            self.assertRaises(
-                TypeError, qs.query, **self.kwargs,
-                fit_clf=fit_clf
-            )
+    def test_init_param_metric(self):
+        qs = Quire(self.classes, metric="Test")
+        self.assertRaises(ValueError, qs.query, **self.kwargs)
+        qs = Quire(self.classes, metric=42)
+        self.assertRaises(ValueError, qs.query, **self.kwargs)
+        qs = Quire(self.classes, metric='precomputed')
+        K = np.zeros((len(self.y), len(self.y)-1))
+        self.assertRaises(ValueError, qs.query, y=self.y, X=K)
 
     def test_query(self):
         # Test metric="precomputed"
-        qs = Quire(metric="precomputed")
+        qs = Quire(self.classes, metric="precomputed")
         K = pairwise_kernels(self.X, self.X, metric='rbf')
-        _, utils = qs.query(K, self.y, self.clf, return_utilities=True)
-        qs = Quire(metric="rbf")
+        _, utils = qs.query(K, self.y, return_utilities=True)
+        qs = Quire(self.classes, metric="rbf")
         _, expected_utils = qs.query(**self.kwargs, return_utilities=True)
         np.testing.assert_array_equal(expected_utils, utils)
 
         # Test with zero labels.
-        qs.query(clf=self.clf, X=self.X,
-                 y=np.full(shape=len(self.X), fill_value=np.nan))
+        qs.query(X=self.X, y=np.full(shape=len(self.X), fill_value=np.nan))
 
         # Test Scenario.
-        qs = Quire(metric='precomputed')
+        qs = Quire(self.classes, metric='precomputed')
         K = np.zeros_like(K)
-        _, utils = qs.query(K, self.y, self.clf, return_utilities=True)
+        _, utils = qs.query(K, self.y, return_utilities=True)
         is_lbld = is_labeled(self.y)
         y_labeled = self.y[is_lbld].reshape(-1, 1)*2-1
         expected_utils = np.full_like(utils, -1 - y_labeled.T.dot(y_labeled))
         np.testing.assert_array_equal(expected_utils[:, ~is_lbld],
                                       utils[:, ~is_lbld])
 
-        qs = Quire()
+        qs = Quire(self.classes)
         _, utils = qs.query(**self.kwargs, return_utilities=True)
 
     def test__del_i_inv(self):
