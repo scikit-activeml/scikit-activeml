@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    TargetDistributionEstimator,
+    ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
@@ -10,8 +10,8 @@ from .utils._integration import conditional_expect
 from .utils._model_fitting import update_reg
 
 
-class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
-    """Expected model variance minimization
+class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
+    """Expected model variance reduction
 
     This class implements the active learning strategy expected model variance
     minimization, which tries to select the sample that minimizes the expected
@@ -68,8 +68,8 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        reg: TargetDistributionEstimator
-            Estimates the output and the conditional distribution.
+        reg: ProbabilisticRegressor
+            Predicts the output and the conditional distribution.
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -115,7 +115,7 @@ class ExpectedModelVarianceMinimization(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, "reg", TargetDistributionEstimator)
+        check_type(reg, "reg", ProbabilisticRegressor)
         check_type(self.integration_dict, "self.integration_dict", dict)
         check_type(fit_reg, "fit_reg", bool)
         X_cand, mapping = self._transform_candidates(candidates, X, y)

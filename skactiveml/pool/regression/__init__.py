@@ -8,7 +8,7 @@ from skactiveml.pool.regression._expected_model_output_change import (
     ExpectedModelOutputChange,
 )
 from skactiveml.pool.regression._expected_model_variance import (
-    ExpectedModelVarianceMinimization,
+    ExpectedModelVarianceReduction,
 )
 from skactiveml.pool.regression._greedy_sampling import GreedySamplingX, GreedySamplingY
 from skactiveml.pool.regression._information_gain_maximization import (
@@ -27,7 +27,7 @@ __all__ = [
     "utils",
     "ExpectedModelChange",
     "ExpectedModelOutputChange",
-    "ExpectedModelVarianceMinimization",
+    "ExpectedModelVarianceReduction",
     "KLDivergenceMaximization",
     "cross_entropy",
     "MutualInformationGainMaximization",

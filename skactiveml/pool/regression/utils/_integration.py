@@ -4,7 +4,7 @@ from scipy import integrate
 from scipy.special import roots_hermitenorm
 from sklearn.utils import check_array
 
-from ....base import TargetDistributionEstimator
+from ....base import ProbabilisticRegressor
 from ....utils._validation import (
     check_type,
     check_random_state,
@@ -26,7 +26,7 @@ def conditional_expect(
     include_idx=False,
     vector_func=False,
 ):
-    f"""Calculates the conditional expectation, i.e. E[func(Y)|X=x_eval], where
+    """Calculates the conditional expectation, i.e. E[func(Y)|X=x_eval], where
     Y | X ~ reg.predict_target_distribution, for x_eval in `X_eval`.
 
     Parameters
@@ -35,7 +35,7 @@ def conditional_expect(
         The samples where the expectation should be evaluated.
     func : callable
         The function that transforms the random variable.
-    reg: TargetDistributionEstimator
+    reg: ProbabilisticRegressor
         Predicts the target distribution over which the expectation is calculated.
     method: string, optional, optional (default=None)
         The method by which the expectation is computed.
@@ -96,7 +96,7 @@ def conditional_expect(
 
     X = check_array(X, allow_nd=True)
 
-    check_type(reg, "reg", TargetDistributionEstimator)
+    check_type(reg, "reg", ProbabilisticRegressor)
     check_type(
         method,
         "method",
@@ -219,7 +219,7 @@ def conditional_expect(
         expectation = (
             1 / (2 * np.pi) ** (1 / 2) * np.sum(weights[np.newaxis, :] * output, axis=1)
         )
-    else:  # method equals "quad"
+    else:  # method equals "dynamic_quad"
         for idx, x in enumerate(X):
             cond_dist = reg.predict_target_distribution([x])
 

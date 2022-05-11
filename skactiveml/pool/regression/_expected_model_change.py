@@ -7,12 +7,13 @@ from skactiveml.base import (
 )
 from skactiveml.utils import check_type, simple_batch, check_scalar, MISSING_LABEL
 from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
+from skactiveml.utils._validation import check_callable
 
 
 class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
     """Expected Model Change
 
-    This class implements expected model output change, an active learning
+    This class implements expected model change, an active learning
     query strategy for linear regression.
 
     Parameters
@@ -24,10 +25,19 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
     ord: int or string (default=2)
         The Norm to measure the gradient. Argument will be passed to
         `np.linalg.norm`.
+    feature_map: callable
+        The feature map of the linear regressor. Takes in the feature data. Must
+        output a np.array of dimension 2.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
+
+    References
+    ----------
+    [1] Cai, Wenbin, Ya Zhang, and Jun Zhou. Maximizing expected model change
+    for active learning in regression, pages 51--60, 2013.
+
     """
 
     def __init__(
@@ -35,6 +45,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         k_bootstraps=3,
         n_train=0.5,
         ord=2,
+        feature_map=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -42,7 +53,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         self.k_bootstraps = k_bootstraps
         self.n_train = n_train
         self.ord = ord
-        # maybe add feature map
+        self.feature_map = feature_map if feature_map is not None else lambda x: x
 
     def query(
         self,
@@ -115,6 +126,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", SkactivemlRegressor)
+        check_type(fit_reg, "fit_reg", bool)
         check_scalar(
             self.n_train,
             "self.n_train",
@@ -124,8 +136,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             min_inclusive=False,
         )
         check_scalar(self.k_bootstraps, "self.k_bootstraps", int, min_val=1)
-        check_type(fit_reg, "fit_reg", bool)
-        check_type(return_utilities, "return_utilities", bool)
+        check_callable(self.feature_map, "self.feature_map")
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)
@@ -145,7 +156,8 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         results_learner = np.array([learner.predict(X_cand) for learner in learners])
         pred = reg.predict(X_cand).reshape(1, -1)
         scalars = np.average(np.abs(results_learner - pred), axis=0)
-        norms = np.linalg.norm(X_cand, ord=self.ord, axis=1)
+        X_cand_mapped_features = self.feature_map(X_cand)
+        norms = np.linalg.norm(X_cand_mapped_features, ord=self.ord, axis=1)
         utilities_cand = np.multiply(scalars, norms)
 
         if mapping is None:

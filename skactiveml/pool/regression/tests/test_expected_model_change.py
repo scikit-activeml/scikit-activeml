@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from sklearn.linear_model import LinearRegression
 
 from skactiveml.pool.regression import ExpectedModelChange
 from skactiveml.pool.regression.tests.provide_test_pool_regression import (
@@ -15,16 +16,16 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
 )
-from skactiveml.regressor import NICKernelRegressor
+from skactiveml.regressor import SklearnRegressor
 
 
 class TestExpectedModelChange(unittest.TestCase):
     def setUp(self):
         self.random_state = 1
         self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
-        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.y = np.array([0, 1, 2, -2])
-        self.reg = NICKernelRegressor()
+        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3.5, 2], [4.2, 4]])
+        self.y = np.array([np.nan, np.nan, 2, -2, 3.4, 2.7])
+        self.reg = SklearnRegressor(LinearRegression())
         self.qs = ExpectedModelChange()
         self.query_kwargs = dict(
             X=self.X, y=self.y, candidates=self.candidates, reg=self.reg
@@ -49,6 +50,15 @@ class TestExpectedModelChange(unittest.TestCase):
         for wrong_val, error in zip(["five", 1.5], [TypeError, ValueError]):
             qs = ExpectedModelChange(n_train=wrong_val)
             self.assertRaises(error, qs.query, **self.query_kwargs)
+
+    def test_init_param_feature_map(self):
+        for wrong_val in ["wrong_val", 1]:
+            qs = ExpectedModelChange(feature_map=wrong_val)
+            self.assertRaises(TypeError, qs.query, **self.query_kwargs)
+
+        qs = ExpectedModelChange(feature_map=lambda x: np.zeros((len(x), 1)))
+        utilities = qs.query(self.X, self.y, reg=self.reg, return_utilities=True)[1]
+        np.testing.assert_array_equal(np.zeros(2), utilities[0, :2])
 
     def test_init_param_ord(self):
         qs = ExpectedModelChange(ord="wrong_norm")

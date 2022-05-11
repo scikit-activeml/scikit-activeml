@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
-    TargetDistributionEstimator,
+    ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
@@ -16,7 +16,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     This class implements an expected model output change based approach for
     regression, where samples are queried that change the output of the model
-    the most
+    the most.
 
     Parameters
     ----------
@@ -73,7 +73,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        reg: TargetDistributionEstimator
+        reg: ProbabilisticRegressor
             Estimates the output and the conditional distribution.
         fit_reg: bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
@@ -120,7 +120,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, "reg", TargetDistributionEstimator)
+        check_type(reg, "reg", ProbabilisticRegressor)
         check_type(self.integration_dict, "self.integration_dict", dict)
         check_type(fit_reg, "fit_reg", bool)
 

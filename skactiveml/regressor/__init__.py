@@ -5,12 +5,12 @@ from skactiveml.regressor._nic_kernel_regressor import NICKernelRegressor
 from skactiveml.regressor._nadaraya_watson_regressor import NadarayaWatsonRegressor
 from skactiveml.regressor._wrapper import (
     SklearnRegressor,
-    SklearnTargetDistributionRegressor,
+    SklearnProbabilisticRegressor,
 )
 
 __all__ = [
     "NICKernelRegressor",
     "NadarayaWatsonRegressor",
     "SklearnRegressor",
-    "SklearnTargetDistributionRegressor",
+    "SklearnProbabilisticRegressor",
 ]

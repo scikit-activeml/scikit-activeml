@@ -9,9 +9,38 @@ from sklearn.svm import SVC
 
 from skactiveml.regressor._wrapper import (
     SklearnRegressor,
-    SklearnTargetDistributionRegressor,
+    SklearnProbabilisticRegressor,
+    if_delegate_has_alternative_methods,
 )
 from skactiveml.utils import MISSING_LABEL
+
+
+class TestIfDelegateHasAlternativeMethods(unittest.TestCase):
+    def test_ifDelegateHasAlternativeMethods(self):
+        class DelegateDummy1:
+            def __init__(self, name):
+                self.name = name
+
+            def say_name(self):
+                return self.name
+
+        class DelegateDummy2:
+            def __init__(self, name):
+                self.name = name
+
+        class Dummy:
+            def __init__(self, d):
+                self.d = d
+
+            @if_delegate_has_alternative_methods("d", "say_name")
+            def do_something(self):
+                return self.d.say_name()
+
+        dummy = Dummy(DelegateDummy1("test_name"))
+        self.assertTrue(hasattr(dummy, "do_something"))
+        self.assertEqual(dummy.do_something(), "test_name")
+        dummy = Dummy(DelegateDummy2("test_name"))
+        self.assertFalse(hasattr(dummy, "do_something"))
 
 
 class TestWrapper(unittest.TestCase):
@@ -84,6 +113,18 @@ class TestWrapper(unittest.TestCase):
         result = reg.sample_y(X_sample, 5)
         self.assertEqual(result.shape, (3, 5))
 
+    def test_sample(self):
+        lin_reg = LinearRegression()
+        lin_reg.sample = lambda a, b: a
+        reg = SklearnRegressor(lin_reg)
+
+        X = np.array([[0], [1], [2], [3], [4]])
+        y = np.array([3, 4, 1, 2, 1])
+
+        reg.fit(X, y)
+
+        self.assertEqual(reg.sample_y("a", 10), "a")
+
 
 class TestCondEstWrapper(unittest.TestCase):
     def setUp(self):
@@ -92,12 +133,12 @@ class TestCondEstWrapper(unittest.TestCase):
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_estimate_cond(self):
-        reg = SklearnTargetDistributionRegressor(estimator=GaussianProcessRegressor())
+        reg = SklearnProbabilisticRegressor(estimator=GaussianProcessRegressor())
         reg.fit(self.X, self.y)
 
         y_pred = reg.predict_target_distribution(self.X_cand).logpdf(0)
         self.assertEqual(y_pred.shape, (len(self.X_cand),))
 
-        reg = SklearnTargetDistributionRegressor(estimator=LinearRegression())
+        reg = SklearnProbabilisticRegressor(estimator=LinearRegression())
         reg.fit(self.X, self.y)
         self.assertRaises(ValueError, reg.predict_target_distribution, self.X_cand)

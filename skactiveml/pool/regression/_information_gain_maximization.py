@@ -3,7 +3,7 @@ from sklearn import clone
 
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
-    TargetDistributionEstimator,
+    ProbabilisticRegressor,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL, check_random_state
 from skactiveml.pool.regression.utils._integration import (
@@ -72,7 +72,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        reg: TargetDistributionEstimator
+        reg: ProbabilisticRegressor
             Predicts the entropy and the y-values the candidate samples
             could have.
         fit_reg : bool, optional (default=True)
@@ -120,7 +120,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, "reg", TargetDistributionEstimator)
+        check_type(reg, "reg", ProbabilisticRegressor)
         check_type(fit_reg, "fit_reg", bool)
         check_type(self.integration_dict, "self.integration_dict", dict)
 
@@ -156,7 +156,12 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         ----------
         X_eval : array-like of shape (n_samples, n_features)
             The samples where the information gain should be evaluated.
-        reg: TargetDistributionEstimator
+        X_cand : array-like of shape (n_candidate_samples, n_features)
+            The candidate samples that are potentially labeled.
+        mapping : array-like of shape (n_samples,) or None
+            The potential mapping between the candidate samples and the
+            training data set.
+        reg: ProbabilisticRegressor
             Estimates the entropy, predicts values.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
@@ -279,7 +284,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        reg: TargetDistributionEstimator
+        reg: ProbabilisticRegressor
             Estimates the entropy and the cross entropy and the potential
             y-values for the candidate samples.
         fit_reg : bool, optional (default=True)
@@ -327,7 +332,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, "reg", TargetDistributionEstimator)
+        check_type(reg, "reg", ProbabilisticRegressor)
         check_type(fit_reg, "fit_reg", bool)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
@@ -366,7 +371,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             The candidate samples that determine the information gain.
         mapping : array-like of shape (n_candidate_samples,) or None
             A mapping between `X_cand` and `X` if it exists.
-        reg: TargetDistributionEstimator
+        reg: ProbabilisticRegressor
             Estimates the entropy, predicts values.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
@@ -428,9 +433,9 @@ def cross_entropy(
     ----------
     X_eval : array-like of shape (n_samples, n_features)
         The samples where the cross entropy should be evaluated.
-    true_reg: TargetDistributionEstimator
+    true_reg: ProbabilisticRegressor
         True distribution of the cross entropy.
-    other_reg: TargetDistributionEstimator
+    other_reg: ProbabilisticRegressor
         Evaluated distribution of the cross entropy.
     integration_dict: dict, optional default = None
         Dictionary for integration arguments, i.e. `integration method` etc..
@@ -448,8 +453,8 @@ def cross_entropy(
         integration_dict = {}
 
     check_type(integration_dict, "integration_dict", dict)
-    check_type(true_reg, "true_reg", TargetDistributionEstimator)
-    check_type(other_reg, "other_reg", TargetDistributionEstimator)
+    check_type(true_reg, "true_reg", ProbabilisticRegressor)
+    check_type(other_reg, "other_reg", ProbabilisticRegressor)
     random_state = check_random_state(random_state)
 
     dist = reshape_dist(

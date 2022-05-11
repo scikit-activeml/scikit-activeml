@@ -45,7 +45,7 @@ __all__ = [
     "ClassFrequencyEstimator",
     "AnnotatorModelMixin",
     "SkactivemlRegressor",
-    "TargetDistributionEstimator",
+    "ProbabilisticRegressor",
 ]
 
 
@@ -1312,7 +1312,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
     """SkactivemlRegressor
 
-    Bass class for scikit-activeml regressor.
+    Bass class for scikit-activeml regressors.
 
     Parameters
     __________
@@ -1406,16 +1406,16 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         return X, y, sample_weight
 
 
-class TargetDistributionEstimator(SkactivemlRegressor):
-    """ContinuousTargetDistributionEstimator
+class ProbabilisticRegressor(SkactivemlRegressor):
+    """ProbabilisticRegressor
 
-    Bass class for scikit-activeml continuous conditional posterior estimators.
+    Bass class for scikit-activeml probabilistic regressors.
 
     """
 
     @abstractmethod
     def predict_target_distribution(self, X):
-        """Returns the estimated target distribution conditioned on the test
+        """Returns the predicted target distribution conditioned on the test
         samples `X`.
 
         Parameters
@@ -1433,8 +1433,8 @@ class TargetDistributionEstimator(SkactivemlRegressor):
 
     def predict(self, X, return_std=False, return_entropy=False):
         """Returns the mean, std (optional) and differential entropy (optional)
-        of the estimated target distribution conditioned on the test samples
-        'X'.
+        of the predicted target distribution conditioned on the test samples
+        `X`.
 
         Parameters
         ----------
@@ -1465,8 +1465,8 @@ class TargetDistributionEstimator(SkactivemlRegressor):
         return result
 
     def sample_y(self, X, n_rv_samples=1, random_state=None):
-        """Return random variate samples from the posterior distribution
-        conditioned on the test samples X.
+        """Returns random variate samples from the predicted target distribution
+        conditioned on the test samples `X`.
 
         Parameters
         ----------

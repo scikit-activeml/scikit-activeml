@@ -8,7 +8,7 @@ from sklearn.linear_model import LinearRegression
 
 from skactiveml.pool.regression.utils import conditional_expect, reshape_dist
 from skactiveml.regressor import (
-    SklearnTargetDistributionRegressor,
+    SklearnProbabilisticRegressor,
     NICKernelRegressor,
     SklearnRegressor,
 )
@@ -72,7 +72,7 @@ class TestApproximation(unittest.TestCase):
 
     def test_conditional_expectation(self):
 
-        reg = SklearnTargetDistributionRegressor(estimator=GaussianProcessRegressor())
+        reg = SklearnProbabilisticRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         y_train = np.array([-1, 2, 1, 4])
         reg.fit(X_train, y_train)

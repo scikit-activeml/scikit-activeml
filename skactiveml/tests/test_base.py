@@ -13,7 +13,7 @@ from skactiveml.base import (
     BudgetManager,
     SingleAnnotatorStreamQueryStrategy,
     SkactivemlRegressor,
-    TargetDistributionEstimator,
+    ProbabilisticRegressor,
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL
@@ -275,9 +275,9 @@ class ScaktivemlRegressorTest(unittest.TestCase):
 
 
 class TargetDistributionEstimatorTest(unittest.TestCase):
-    @patch.multiple(TargetDistributionEstimator, __abstractmethods__=set())
+    @patch.multiple(ProbabilisticRegressor, __abstractmethods__=set())
     def setUp(self):
-        self.reg = TargetDistributionEstimator(missing_label=-1)
+        self.reg = ProbabilisticRegressor(missing_label=-1)
 
     def test_predict_target_distribution(self):
         self.assertRaises(

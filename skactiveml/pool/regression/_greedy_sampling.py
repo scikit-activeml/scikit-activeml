@@ -19,7 +19,7 @@ from skactiveml.utils import (
 class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling on the feature space
 
-    This class implements greedy sampling
+    This class implements greedy sampling on the feature space.
 
     Parameters
     ----------
@@ -31,6 +31,12 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
+
+    References
+    ----------
+    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active learning for
+    regression using greedy sampling, pages 90--105, 2019.
+
     """
 
     def __init__(
@@ -138,18 +144,32 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
 
 
 class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
-    """Greedy Sampling on the feature space
+    """Greedy Sampling on the target space
 
     This class implements greedy sampling on the target space.
 
     Parameters
     ----------
+    x_metric: str, optional (default=None)
+        Metric used for calculating the distances of points in the feature
+        space must be a valid argument for `sklearn.metrics.pairwise_distances`
+        argument `metric`.
+    y_metric: str, optional (default=None)
+        Metric used for calculating the distances of points in the target
+        space must be a valid argument for `sklearn.metrics.pairwise_distances`
+        argument `metric`.
     k_0: int, optional (default=1)
         The minimum number of samples the estimator requires.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
+
+    References
+    ----------
+    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active learning for
+    regression using greedy sampling, pages 90--105, 2019.
+
     """
 
     def __init__(

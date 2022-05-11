@@ -4,11 +4,11 @@ from sklearn.metrics.pairwise import pairwise_kernels
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from skactiveml.base import TargetDistributionEstimator
+from skactiveml.base import ProbabilisticRegressor
 from skactiveml.utils import is_labeled, MISSING_LABEL, check_scalar
 
 
-class NICKernelRegressor(TargetDistributionEstimator):
+class NICKernelRegressor(ProbabilisticRegressor):
     """NICKernelRegressor
 
     The NICKernelRegressor (Normal inverse chi kernel regressor) locally

@@ -7,7 +7,7 @@ from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.regressor import (
     NICKernelRegressor,
     SklearnRegressor,
-    SklearnTargetDistributionRegressor,
+    SklearnProbabilisticRegressor,
 )
 from skactiveml.utils import (
     MISSING_LABEL,
@@ -202,7 +202,7 @@ def provide_test_regression_query_strategy_query_reg(
     if is_probabilistic:
         possible_regs = [
             NICKernelRegressor(),
-            SklearnTargetDistributionRegressor(GaussianProcessRegressor()),
+            SklearnProbabilisticRegressor(GaussianProcessRegressor()),
         ]
         illegal_regs = [
             "illegal",
