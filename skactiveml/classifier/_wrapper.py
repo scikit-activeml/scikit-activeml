@@ -588,6 +588,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             check_X_dict=self.check_X_dict_,
         )
 
+        # initialize class_frequency_estimator_ if not available already
         if not hasattr(self, "class_frequency_estimator_"):
             if self.class_frequency_estimator is None:
                 is_labeled(y, missing_label=self.missing_label)
@@ -624,13 +625,6 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             self.estimator_.partial_fit(
                 X=X, y=y, sample_weight=sample_weight_train, **fit_kwargs
             )
-        if hasattr(self.estimator_, "is_fitted_"):
-            self.is_fitted_ = self.estimator_.is_fitted_
-        if hasattr(self.estimator_, "classes_"):
-            self.classes_ = self.estimator_.classes_
-
-        if hasattr(self.estimator_, "_le"):
-            self._le = self.estimator_._le
 
         return self
 
@@ -646,9 +640,7 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
             self.estimator_.missing_label,
         )
         # check if classes are equal
-        if self.classes is None:
-            self.classes_ = self.estimator_.classes_
-        else:
+        if self.classes is not None:
             if self.estimator.classes is not None and not np.array_equiv(
                 self.classes, self.estimator.classes
             ):
@@ -658,12 +650,8 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                         self.classes, self.estimator.classes,
                     )
                 )
-            else:
-                self.classes_ = self.estimator_.classes_
 
-        if self.cost_matrix is None:
-            self.cost_matrix_ = self.estimator_.cost_matrix_
-        else:
+        if self.cost_matrix is not None:
             if self.estimator.cost_matrix is not None and not np.array_equiv(
                 self.cost_matrix, self.estimator.cost_matrix
             ):
@@ -673,8 +661,6 @@ class KernelFrequencyClassifier(ClassFrequencyEstimator):
                         self.cost_matrix, self.estimator.cost_matrix,
                     )
                 )
-            else:
-                self.cost_matrix_ = self.estimator_.cost_matrix_
 
         # Check class prior.
         self.class_prior_ = check_class_prior(
@@ -1010,9 +996,6 @@ class SubsampleClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.estimator_.partial_fit(
                 X=X, y=y, sample_weight=sample_weight_train, **fit_kwargs
             )
-
-        if hasattr(self.estimator_, "classes_"):
-            self.classes_ = self.estimator_.classes_
 
         return self
 
