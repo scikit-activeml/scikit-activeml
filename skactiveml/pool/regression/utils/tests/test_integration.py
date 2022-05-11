@@ -68,7 +68,9 @@ class TestApproximation(unittest.TestCase):
             for i in range(1, 3):
                 incorrect_func = dummy_funcs[(n_free_parameters + i) % 3]
                 param_dict["func"] = incorrect_func
-                self.assertRaises(TypeError, conditional_expect, **param_dict)
+                self.assertRaises(
+                    (TypeError, ValueError), conditional_expect, **param_dict
+                )
 
     def test_conditional_expectation(self):
 
