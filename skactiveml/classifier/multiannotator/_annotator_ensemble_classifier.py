@@ -59,13 +59,13 @@ class AnnotatorEnsembleClassifier(
     """
 
     def __init__(
-            self,
-            estimators,
-            voting="hard",
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            random_state=None,
+        self,
+        estimators,
+        voting="hard",
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
     ):
         _BaseHeterogeneousEnsemble.__init__(self, estimators=estimators)
         SkactivemlClassifier.__init__(
@@ -130,9 +130,9 @@ class AnnotatorEnsembleClassifier(
             f"{len(self.estimators)}) but has shape {y.shape}."
         )
         if (
-                self.named_estimators is not None
-                and y.ndim <= 1
-                or y.shape[1] != len(self.estimators)
+            self.named_estimators is not None
+            and y.ndim <= 1
+            or y.shape[1] != len(self.estimators)
         ):
             raise ValueError(error_msg)
 
@@ -217,8 +217,8 @@ class AnnotatorEnsembleClassifier(
             if classes_none and not est_classes_none:
                 raise ValueError(error_msg)
             if (
-                    not classes_none
-                    and not est_classes_none
-                    and not np.array_equal(self.classes, est.classes)
+                not classes_none
+                and not est_classes_none
+                and not np.array_equal(self.classes, est.classes)
             ):
                 raise ValueError(error_msg)

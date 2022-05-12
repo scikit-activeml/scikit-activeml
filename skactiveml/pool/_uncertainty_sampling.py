@@ -55,11 +55,11 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            method="least_confident",
-            cost_matrix=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        method="least_confident",
+        cost_matrix=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -68,15 +68,15 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         self.cost_matrix = cost_matrix
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            sample_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -375,7 +375,7 @@ def _f(n, t, p, f_arr, g_arr):
     if t == 0 and n == 0:
         return 1
     return (
-            p[n - 1] * f_arr[n - 1, t - 1]
-            + p[n - 1] * t * g_arr[n - 1, t - 1] / n
-            + (1 - p[n - 1]) * f_arr[n - 1, t]
+        p[n - 1] * f_arr[n - 1, t - 1]
+        + p[n - 1] * t * g_arr[n - 1, t - 1] / n
+        + (1 - p[n - 1]) * f_arr[n - 1, t]
     )

@@ -45,13 +45,13 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
 
     def __init__(
-            self,
-            classes,
-            lmbda=1.0,
-            metric="rbf",
-            metric_dict=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        classes,
+        lmbda=1.0,
+        metric="rbf",
+        metric_dict=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -62,12 +62,12 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         self.metric_dict = metric_dict
 
     def query(
-            self,
-            X,
-            y,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -200,8 +200,8 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                     yl.T.dot(L[mask_l][:, mask_l]).dot(yl)
                     + 2 * L[s][mask_l].dot(yl)
                     - (L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
-                        .T.dot(L_uu_inv)
-                        .dot(L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
+                    .T.dot(L_uu_inv)
+                    .dot(L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
                     for yl in y_labeled_ovr.T[:, :, np.newaxis]
                 ]
             )
@@ -244,16 +244,15 @@ def _del_i_inv(A_inv, s):
 
 def _L_aa_inv(K, lmbda, is_unlabeled, is_labeled):
     L_aa_inv = (
-            lmbda * np.eye(sum(is_unlabeled)) + K[is_unlabeled][:,
-                                                is_unlabeled]
+        lmbda * np.eye(sum(is_unlabeled)) + K[is_unlabeled][:, is_unlabeled]
     )
     L_aa_inv -= (
         K[is_unlabeled][:, is_labeled]
-            .dot(
+        .dot(
             np.linalg.inv(
                 lmbda * np.eye(sum(is_labeled)) + K[is_labeled][:, is_labeled]
             )
         )
-            .dot(K[is_labeled][:, is_unlabeled])
+        .dot(K[is_labeled][:, is_unlabeled])
     )
     return L_aa_inv

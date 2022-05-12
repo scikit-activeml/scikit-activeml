@@ -29,7 +29,7 @@ from skactiveml.visualization._feature_space import _general_plot_utilities
 class TestFeatureSpace(unittest.TestCase):
     def setUp(self):
         self.path_prefix = (
-                os.path.dirname(visualization.__file__) + "/tests/images/"
+            os.path.dirname(visualization.__file__) + "/tests/images/"
         )
         self.X, self.y = make_classification(
             n_features=2, n_redundant=0, random_state=0

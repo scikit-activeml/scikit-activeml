@@ -66,7 +66,7 @@ class TestGeneral(unittest.TestCase):
         for qs_name in pool.__all__:
             qs = getattr(pool, qs_name)
             if inspect.isclass(qs) and issubclass(
-                    qs, SingleAnnotatorPoolQueryStrategy
+                qs, SingleAnnotatorPoolQueryStrategy
             ):
                 self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())
@@ -250,9 +250,9 @@ class TestGeneral(unittest.TestCase):
                 y[0:init_budget] = self.y_true[0:init_budget]
 
                 with self.subTest(
-                        msg="Basic AL Cycle",
-                        init_budget=init_budget,
-                        qs_name=qs_name,
+                    msg="Basic AL Cycle",
+                    init_budget=init_budget,
+                    qs_name=qs_name,
                 ):
                     qs = call_func(
                         self.query_strategies[qs_name],
@@ -323,7 +323,7 @@ class TestGeneral(unittest.TestCase):
                     self.assertTrue(
                         hasattr(test_obj, test_func_name),
                         msg="'{}()' missing for parameter '{}' of "
-                            "__init__()".format(test_func_name, param),
+                        "__init__()".format(test_func_name, param),
                     )
 
                 # Check query parameters.
@@ -521,9 +521,9 @@ class TestExamples(unittest.TestCase):
         for item in pool.__all__:
             with self.subTest(msg="JSON Test", qs_name=item):
                 item_missing = (
-                        inspect.isclass(getattr(pool, item))
-                        and item not in self.exceptions
-                        and item not in strats_with_json
+                    inspect.isclass(getattr(pool, item))
+                    and item not in self.exceptions
+                    and item not in strats_with_json
                 )
                 self.assertFalse(
                     item_missing,

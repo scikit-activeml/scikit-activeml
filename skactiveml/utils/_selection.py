@@ -77,7 +77,7 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
 
 def simple_batch(
-        utilities, random_state=None, batch_size=1, return_utilities=False
+    utilities, random_state=None, batch_size=1, return_utilities=False
 ):
     """Generates a batch by selecting the highest values in the 'utilities'.
     If utilities is an ND-array, the returned utilities will be an

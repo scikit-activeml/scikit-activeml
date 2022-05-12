@@ -20,7 +20,7 @@ class TestStream(unittest.TestCase):
         for qs_name in stream.__all__:
             qs = getattr(stream, qs_name)
             if inspect.isclass(qs) and issubclass(
-                    qs, SingleAnnotatorStreamQueryStrategy
+                qs, SingleAnnotatorStreamQueryStrategy
             ):
                 self.query_strategies[qs_name] = qs
         self.clf = ParzenWindowClassifier()
@@ -33,12 +33,12 @@ class TestStream(unittest.TestCase):
         training_size = 50
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
-            random_state=rand.randint(2 ** 31 - 1),
+            random_state=rand.randint(2**31 - 1),
             shuffle=True,
         )
 
         clf = ParzenWindowClassifier(
-            classes=[0, 1], random_state=rand.randint(2 ** 31 - 1)
+            classes=[0, 1], random_state=rand.randint(2**31 - 1)
         )
 
         X_init = X[:train_init_size, :]
@@ -55,7 +55,7 @@ class TestStream(unittest.TestCase):
         # Test predictions of classifiers.
         for qs_name, qs_class in self.query_strategies.items():
             self._test_query_strategy(
-                rand.randint(2 ** 31 - 1),
+                rand.randint(2**31 - 1),
                 qs_class,
                 clf,
                 X_init,
@@ -66,7 +66,7 @@ class TestStream(unittest.TestCase):
                 qs_name,
             )
             self._test_update_before_query(
-                rand.randint(2 ** 31 - 1),
+                rand.randint(2**31 - 1),
                 qs_class,
                 clf,
                 X_init,
@@ -78,20 +78,20 @@ class TestStream(unittest.TestCase):
             )
 
     def _test_query_strategy(
-            self,
-            rand_seed,
-            query_strategy_class,
-            clf,
-            X_init,
-            y_init,
-            X_stream,
-            y_stream,
-            training_size,
-            qs_name,
+        self,
+        rand_seed,
+        query_strategy_class,
+        clf,
+        X_init,
+        y_init,
+        X_stream,
+        y_stream,
+        training_size,
+        qs_name,
     ):
 
         rand = check_random_state(rand_seed)
-        random_state = rand.randint(2 ** 31 - 1)
+        random_state = rand.randint(2**31 - 1)
         query_strategy = query_strategy_class(random_state=random_state)
 
         query_strategy2 = query_strategy_class(random_state=random_state)
@@ -150,19 +150,19 @@ class TestStream(unittest.TestCase):
             clf.fit(X_train, y_train)
 
     def _test_update_before_query(
-            self,
-            rand_seed,
-            query_strategy_class,
-            clf,
-            X_init,
-            y_init,
-            X_stream,
-            y_stream,
-            training_size,
-            qs_name,
+        self,
+        rand_seed,
+        query_strategy_class,
+        clf,
+        X_init,
+        y_init,
+        X_stream,
+        y_stream,
+        training_size,
+        qs_name,
     ):
         rand = check_random_state(rand_seed)
-        random_state = rand.randint(2 ** 31 - 1)
+        random_state = rand.randint(2**31 - 1)
         query_strategy = query_strategy_class(random_state=random_state)
 
         query_strategy2 = query_strategy_class(random_state=random_state)
@@ -245,7 +245,7 @@ class TestStream(unittest.TestCase):
                     self.assertTrue(
                         hasattr(test_obj, test_func_name),
                         msg="'{}()' missing for parameter '{}' of "
-                            "__init__()".format(test_func_name, param),
+                        "__init__()".format(test_func_name, param),
                     )
 
                 # Check query parameters.

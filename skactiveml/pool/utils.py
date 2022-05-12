@@ -108,8 +108,7 @@ class IndexClassifierWrapper:
         # Check and use partial fit if applicable
         check_type(self.ignore_partial_fit, "ignore_partial_fit", bool)
         self.use_partial_fit = (
-                hasattr(self.clf,
-                        "partial_fit") and not self.ignore_partial_fit
+            hasattr(self.clf, "partial_fit") and not self.ignore_partial_fit
         )
 
         check_type(self.enforce_unique_samples, "enforce_unique_samples", bool)
@@ -146,7 +145,7 @@ class IndexClassifierWrapper:
             self.clf_.metric_dict = {}
 
     def precompute(
-            self, idx_fit, idx_pred, fit_params="all", pred_params="all"
+        self, idx_fit, idx_pred, fit_params="all", pred_params="all"
     ):
         """
         Function to describe for which samples we should precompute something.
@@ -297,12 +296,12 @@ class IndexClassifierWrapper:
         return self
 
     def partial_fit(
-            self,
-            idx,
-            y=None,
-            sample_weight=None,
-            use_base_clf=False,
-            set_base_clf=False,
+        self,
+        idx,
+        y=None,
+        sample_weight=None,
+        use_base_clf=False,
+        set_base_clf=False,
     ):
         """Update the fitted model using additional samples in `self.X[idx]`
         and y as class labels.

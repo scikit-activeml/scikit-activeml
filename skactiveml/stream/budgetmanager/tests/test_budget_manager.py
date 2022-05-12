@@ -26,7 +26,7 @@ class TestBudgetManager(unittest.TestCase):
     def test_budget_managers(self):
         # Create data set for testing.
         rand = np.random.RandomState(0)
-        random_state = rand.randint(2 ** 31 - 1)
+        random_state = rand.randint(2**31 - 1)
         utilities = rand.rand(100)
 
         for bm_name, bm_class in self.budget_managers.items():
@@ -90,8 +90,8 @@ class TestBudgetManager(unittest.TestCase):
                 # Get class to check.
                 class_filename = path.basename(inspect.getfile(bm_class))[:-3]
                 mod = (
-                        "skactiveml.stream.budgetmanager.tests.test"
-                        + class_filename
+                    "skactiveml.stream.budgetmanager.tests.test"
+                    + class_filename
                 )
                 mod = import_module(mod)
                 test_class_name = "Test" + bm_class.__name__
@@ -105,7 +105,7 @@ class TestBudgetManager(unittest.TestCase):
                     self.assertTrue(
                         hasattr(test_obj, test_func_name),
                         msg=f"'{test_func_name}()' missing for parameter"
-                            f" '{param}' of {bm_name}.__init__()",
+                        f" '{param}' of {bm_name}.__init__()",
                     )
 
                 # Check query parameters.

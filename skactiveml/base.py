@@ -85,14 +85,14 @@ class PoolQueryStrategy(QueryStrategy):
         self.missing_label = missing_label
 
     def _validate_data(
-            self,
-            X,
-            y,
-            candidates,
-            batch_size,
-            return_utilities,
-            reset=True,
-            check_X_dict=None,
+        self,
+        X,
+        y,
+        candidates,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -187,14 +187,14 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
     @abstractmethod
     def query(
-            self,
-            X,
-            y,
-            *args,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
-            **kwargs,
+        self,
+        X,
+        y,
+        *args,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+        **kwargs,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -245,14 +245,14 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         raise NotImplementedError
 
     def _validate_data(
-            self,
-            X,
-            y,
-            candidates,
-            batch_size,
-            return_utilities,
-            reset=True,
-            check_X_dict=None,
+        self,
+        X,
+        y,
+        candidates,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -329,12 +329,12 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return X, y, candidates, batch_size, return_utilities
 
     def _transform_candidates(
-            self,
-            candidates,
-            X,
-            y,
-            enforce_mapping=False,
-            allow_only_unlabeled=False,
+        self,
+        candidates,
+        X,
+        y,
+        enforce_mapping=False,
+        allow_only_unlabeled=False,
     ):
         """
         Transforms the `candidates` parameter into a sample array and the
@@ -409,15 +409,15 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
     @abstractmethod
     def query(
-            self,
-            X,
-            y,
-            *args,
-            candidates=None,
-            annotators=None,
-            batch_size=1,
-            return_utilities=False,
-            **kwargs,
+        self,
+        X,
+        y,
+        *args,
+        candidates=None,
+        annotators=None,
+        batch_size=1,
+        return_utilities=False,
+        **kwargs,
     ):
         """Determines which candidate sample is to be annotated by which
         annotator.
@@ -488,15 +488,15 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         raise NotImplementedError
 
     def _validate_data(
-            self,
-            X,
-            y,
-            candidates,
-            annotators,
-            batch_size,
-            return_utilities,
-            reset=True,
-            check_X_dict=None,
+        self,
+        X,
+        y,
+        candidates,
+        annotators,
+        batch_size,
+        return_utilities,
+        reset=True,
+        check_X_dict=None,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -631,7 +631,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return X, y, candidates, annotators, batch_size, return_utilities
 
     def _transform_cand_annot(
-            self, candidates, annotators, X, y, enforce_mapping=False
+        self, candidates, annotators, X, y, enforce_mapping=False
     ):
         """
         Transforms the `candidates` parameter into a sample array and the
@@ -1025,11 +1025,11 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
     """
 
     def __init__(
-            self,
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            random_state=None,
+        self,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
     ):
         self.classes = classes
         self.missing_label = missing_label
@@ -1121,13 +1121,13 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
     def _validate_data(
-            self,
-            X,
-            y,
-            sample_weight=None,
-            check_X_dict=None,
-            check_y_dict=None,
-            y_ensure_1d=True,
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        check_y_dict=None,
+        y_ensure_1d=True,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1251,12 +1251,12 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     """
 
     def __init__(
-            self,
-            class_prior=0,
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            random_state=None,
+        self,
+        class_prior=0,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
     ):
         super().__init__(
             classes=classes,
@@ -1306,13 +1306,13 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return P
 
     def _validate_data(
-            self,
-            X,
-            y,
-            sample_weight=None,
-            check_X_dict=None,
-            check_y_dict=None,
-            y_ensure_1d=True,
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        check_y_dict=None,
+        y_ensure_1d=True,
     ):
         X, y, sample_weight = super()._validate_data(
             X=X,

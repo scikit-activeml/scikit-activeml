@@ -67,15 +67,15 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            classes,
-            base_regressor=None,
-            cost_matrix=None,
-            embed_dim=None,
-            mds_params=None,
-            nn_params=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        classes,
+        base_regressor=None,
+        cost_matrix=None,
+        embed_dim=None,
+        mds_params=None,
+        nn_params=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -90,13 +90,13 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         self.nn_params = nn_params
 
     def query(
-            self,
-            X,
-            y,
-            sample_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Query the next instance to be labeled.
 
@@ -196,18 +196,18 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
 
 
 def _alce(
-        X_cand,
-        X,
-        y,
-        base_regressor,
-        cost_matrix,
-        classes,
-        embed_dim,
-        sample_weight,
-        missing_label,
-        random_state,
-        mds_params,
-        nn_params,
+    X_cand,
+    X,
+    y,
+    base_regressor,
+    cost_matrix,
+    classes,
+    embed_dim,
+    sample_weight,
+    missing_label,
+    random_state,
+    mds_params,
+    nn_params,
 ):
     """Compute the alce score for the candidate instances.
 
@@ -352,15 +352,15 @@ by Kuan-Hao Huang.
 
 
 def _smacof_single_p(
-        similarities,
-        n_uq,
-        metric=True,
-        n_components=2,
-        init=None,
-        max_iter=300,
-        verbose=0,
-        eps=1e-3,
-        random_state=None,
+    similarities,
+    n_uq,
+    metric=True,
+    n_components=2,
+    init=None,
+    max_iter=300,
+    verbose=0,
+    eps=1e-3,
+    random_state=None,
 ):
     """
     Computes multidimensional scaling using SMACOF algorithm.
@@ -413,8 +413,8 @@ def _smacof_single_p(
     e = np.ones((n_samples, 1))
 
     Vp = (
-            np.linalg.inv(V + np.dot(e, e.T) / n_samples)
-            - np.dot(e, e.T) / n_samples
+        np.linalg.inv(V + np.dot(e, e.T) / n_samples)
+        - np.dot(e, e.T) / n_samples
     )
 
     sim_flat = similarities.ravel()
@@ -452,13 +452,13 @@ def _smacof_single_p(
             disparities[sim_flat != 0] = disparities_flat
             disparities = disparities.reshape((n_samples, n_samples))
             disparities *= np.sqrt(
-                (n_samples * (n_samples - 1) / 2) / (disparities ** 2).sum()
+                (n_samples * (n_samples - 1) / 2) / (disparities**2).sum()
             )
             disparities[similarities == 0] = 0
 
         # Compute stress
         _stress = (
-                W.ravel() * ((dis.ravel() - disparities.ravel()) ** 2)
+            W.ravel() * ((dis.ravel() - disparities.ravel()) ** 2)
         ).sum()
         _stress /= 2
 
@@ -470,7 +470,7 @@ def _smacof_single_p(
 
         X = np.dot(Vp, np.dot(_B, X))
 
-        dis = np.sqrt((X ** 2).sum(axis=1)).sum()
+        dis = np.sqrt((X**2).sum(axis=1)).sum()
 
         if verbose >= 2:
             print("it: %d, stress %s" % (it, _stress))
@@ -485,18 +485,18 @@ def _smacof_single_p(
 
 
 def smacof_p(
-        similarities,
-        n_uq,
-        metric=True,
-        n_components=2,
-        init=None,
-        n_init=8,
-        n_jobs=1,
-        max_iter=300,
-        verbose=0,
-        eps=1e-3,
-        random_state=None,
-        return_n_iter=False,
+    similarities,
+    n_uq,
+    metric=True,
+    n_components=2,
+    init=None,
+    n_init=8,
+    n_jobs=1,
+    max_iter=300,
+    verbose=0,
+    eps=1e-3,
+    random_state=None,
+    return_n_iter=False,
 ):
     """
     Computes multidimensional scaling using SMACOF (Scaling by Majorizing a
@@ -687,17 +687,17 @@ class MDSP(BaseEstimator):
     """
 
     def __init__(
-            self,
-            n_components=2,
-            n_uq=1,
-            metric=True,
-            n_init=4,
-            max_iter=300,
-            verbose=0,
-            eps=1e-3,
-            n_jobs=1,
-            random_state=None,
-            dissimilarity="euclidean",
+        self,
+        n_components=2,
+        n_uq=1,
+        metric=True,
+        n_init=4,
+        max_iter=300,
+        verbose=0,
+        eps=1e-3,
+        n_jobs=1,
+        random_state=None,
+        dissimilarity="euclidean",
     ):
         self.n_components = n_components
         self.n_uq = n_uq

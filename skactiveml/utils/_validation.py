@@ -15,13 +15,13 @@ from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
 
 
 def check_scalar(
-        x,
-        name,
-        target_type,
-        min_inclusive=True,
-        max_inclusive=True,
-        min_val=None,
-        max_val=None,
+    x,
+    name,
+    target_type,
+    min_inclusive=True,
+    max_inclusive=True,
+    min_val=None,
+    max_val=None,
 ):
     """Validate scalar parameters type and value.
 
@@ -178,11 +178,11 @@ def check_class_prior(class_prior, n_classes):
 
 
 def check_cost_matrix(
-        cost_matrix,
-        n_classes,
-        only_non_negative=False,
-        contains_non_zero=False,
-        diagonal_is_zero=False,
+    cost_matrix,
+    n_classes,
+    only_non_negative=False,
+    contains_non_zero=False,
+    diagonal_is_zero=False,
 ):
     """Check whether cost matrix has shape `(n_classes, n_classes)`.
 
@@ -247,27 +247,27 @@ def check_cost_matrix(
 
 
 def check_X_y(
-        X=None,
-        y=None,
-        X_cand=None,
-        sample_weight=None,
-        sample_weight_cand=None,
-        accept_sparse=False,
-        *,
-        accept_large_sparse=True,
-        dtype="numeric",
-        order=None,
-        copy=False,
-        force_all_finite=True,
-        ensure_2d=True,
-        allow_nd=False,
-        multi_output=False,
-        allow_nan=None,
-        ensure_min_samples=1,
-        ensure_min_features=1,
-        y_numeric=False,
-        estimator=None,
-        missing_label=MISSING_LABEL,
+    X=None,
+    y=None,
+    X_cand=None,
+    sample_weight=None,
+    sample_weight_cand=None,
+    accept_sparse=False,
+    *,
+    accept_large_sparse=True,
+    dtype="numeric",
+    order=None,
+    copy=False,
+    force_all_finite=True,
+    ensure_2d=True,
+    allow_nd=False,
+    multi_output=False,
+    allow_nan=None,
+    ensure_min_samples=1,
+    ensure_min_features=1,
+    y_numeric=False,
+    estimator=None,
+    missing_label=MISSING_LABEL,
 ):
     """Input validation for standard estimators.
 
@@ -431,10 +431,10 @@ def check_X_y(
         sample_weight = check_array(sample_weight, ensure_2d=False)
         check_consistent_length(y, sample_weight)
         if (
-                y.ndim > 1
-                and y.shape[1] > 1
-                or sample_weight.ndim > 1
-                and sample_weight.shape[1] > 1
+            y.ndim > 1
+            and y.shape[1] > 1
+            or sample_weight.ndim > 1
+            and sample_weight.shape[1] > 1
         ):
             check_consistent_length(y.T, sample_weight.T)
 
@@ -500,7 +500,7 @@ def check_random_state(random_state, seed_multiplier=None):
     random_state = copy.deepcopy(random_state)
     random_state = check_random_state_sklearn(random_state)
 
-    seed = (random_state.randint(1, 2 ** 31) * seed_multiplier) % (2 ** 31)
+    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
     return np.random.RandomState(seed)
 
 
@@ -615,9 +615,8 @@ def check_type(obj, name, *target_types):
     ]
 
     if (
-            all(not isinstance(obj, target_type) for target_type in
-                target_types)
-            and obj not in target_vals
+        all(not isinstance(obj, target_type) for target_type in target_types)
+        and obj not in target_vals
     ):
 
         error_str = f"`{name}` has type `{type(obj)}` but must have "
@@ -639,7 +638,7 @@ def check_type(obj, name, *target_types):
 
 
 def check_bound(
-        bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False
+    bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False
 ):
     """Validates bound and returns the bound of X if bound is None.
     `bound` and `X` must not be None.
@@ -699,10 +698,10 @@ def check_bound(
 
 
 def check_budget_manager(
-        budget,
-        budget_manager,
-        default_budget_manager_class,
-        default_budget_manager_dict=None,
+    budget,
+    budget_manager,
+    default_budget_manager_class,
+    default_budget_manager_dict=None,
 ):
     """Validate if budget manager is a budgetmanager class and create a
     copy 'budget_manager_'.

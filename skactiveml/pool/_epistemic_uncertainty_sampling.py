@@ -50,8 +50,7 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self, precompute=False, missing_label=MISSING_LABEL,
-            random_state=None
+        self, precompute=False, missing_label=MISSING_LABEL, random_state=None
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -59,15 +58,15 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         self.precompute = precompute
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            sample_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -162,7 +161,7 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 self._precompute_array,
             ) = _epistemic_uncertainty_pwc(freq, self._precompute_array)
         elif isinstance(clf, SklearnClassifier) and isinstance(
-                clf.estimator_, LogisticRegression
+            clf.estimator_, LogisticRegression
         ):
             mask_labeled = is_labeled(y, self.missing_label_)
             if sample_weight is None:
@@ -341,8 +340,8 @@ def _pwc_ml_1(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta ** p) * ((1 - theta) ** n)) / (
-            ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
+    piH = ((theta**p) * ((1 - theta) ** n)) / (
+        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
     )
     return -np.minimum(piH, 2 * theta - 1)
 
@@ -367,8 +366,8 @@ def _pwc_ml_0(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta ** p) * ((1 - theta) ** n)) / (
-            ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
+    piH = ((theta**p) * ((1 - theta) ** n)) / (
+        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
     )
     return -np.minimum(piH, 1 - 2 * theta)
 
@@ -405,7 +404,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
         Discovery Science. Springer, Cham, 2019.
     """
     if not isinstance(clf, SklearnClassifier) or not isinstance(
-            clf.estimator, LogisticRegression
+        clf.estimator, LogisticRegression
     ):
         raise TypeError(
             "clf has to be a wrapped LogisticRegression "

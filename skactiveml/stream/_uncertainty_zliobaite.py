@@ -59,10 +59,10 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
     """
 
     def __init__(
-            self,
-            budget_manager=None,
-            budget=None,
-            random_state=None,
+        self,
+        budget_manager=None,
+        budget=None,
+        random_state=None,
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
@@ -143,7 +143,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             return queried_indices
 
     def update(
-            self, candidates, queried_indices, budget_manager_param_dict=None
+        self, candidates, queried_indices, budget_manager_param_dict=None
     ):
         """Updates the budget manager and the count for seen and queried
         instances

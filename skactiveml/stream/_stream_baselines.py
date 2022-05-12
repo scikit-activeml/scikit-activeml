@@ -31,7 +31,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     """
 
     def __init__(
-            self, budget=None, allow_exceeding_budget=True, random_state=None
+        self, budget=None, allow_exceeding_budget=True, random_state=None
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.allow_exceeding_budget = allow_exceeding_budget
@@ -88,11 +88,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         for i, utility in enumerate(utilities):
             tmp_observed_instances += 1
             available_budget = (
-                    tmp_observed_instances * self.budget_ - tmp_queried_instances
+                tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
             queried[i] = (
-                                 self.allow_exceeding_budget or available_budget > 1
-                         ) and (utility >= 1 - self.budget_)
+                self.allow_exceeding_budget or available_budget > 1
+            ) and (utility >= 1 - self.budget_)
             tmp_queried_instances += queried[i]
 
         # get the indices instances that should be queried
@@ -140,11 +140,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _validate_data(
-            self,
-            candidates,
-            return_utilities,
-            reset=True,
-            **check_candidates_params
+        self,
+        candidates,
+        return_utilities,
+        reset=True,
+        **check_candidates_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -261,7 +261,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         for i, x in enumerate(candidates):
             tmp_observed_instances += 1
             remaining_budget = (
-                    tmp_observed_instances * self.budget_ - tmp_queried_instances
+                tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
             queried[i] = remaining_budget >= 1
             if queried[i]:
@@ -309,11 +309,11 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _validate_data(
-            self,
-            candidates,
-            return_utilities,
-            reset=True,
-            **check_candidates_params
+        self,
+        candidates,
+        return_utilities,
+        reset=True,
+        **check_candidates_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
