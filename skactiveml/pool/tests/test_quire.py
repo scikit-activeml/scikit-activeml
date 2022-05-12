@@ -28,7 +28,7 @@ class TestQuire(unittest.TestCase):
         self.assertTrue(hasattr(qs, "classes"))
 
     def test_init_param_lmbda(self):
-        for lmbda in [-1, 'string']:
+        for lmbda in [-1, 0, 'string']:
             qs = Quire(self.classes, lmbda=lmbda)
             self.assertRaises((ValueError, TypeError), qs.query,
                               **self.kwargs)
@@ -104,8 +104,4 @@ class TestQuire(unittest.TestCase):
         classes = np.unique(y)
         np.testing.assert_array_equal(
             y_ovr, _one_versus_rest_transform(y, classes, l_rest=0)
-        )
-        np.testing.assert_array_equal(
-            y_ovr, _one_versus_rest_transform(y, classes, missing_label=-1,
-                                              l_rest=0)
         )

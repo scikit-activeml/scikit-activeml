@@ -17,12 +17,13 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
     classes: array-like, shape (n_classes)
         Array of class labels.
     lmbda : float, default=1.0
-        Controls the weighting of informativeness and representativeness.
+        Controls informativeness (high) and representativeness (low). Values
+        must be greater than 0.
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels` or 'precomputed'.
     metric_dict : dict, default=None
-        Any further parameters are passed directly to the kernel function.
+        Any further parameters are passed directly to the metric function.
     missing_label : scalar or string or np.nan or None, default=MISSING_LABEL
         Value to represent a missing label.
     random_state : numeric or np.random.RandomState, optional (default=None)
@@ -66,20 +67,19 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features) or shape
-                (n_samples, n_samples) if metric == 'precomputed'
+        (n_samples, n_samples) if metric == 'precomputed'
             Training data set, including the labeled and unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set, including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by self.missing_label.
         candidates : None or array-like of shape (n_candidates), dtype=int,
-                default=None
-            If candidates is None, the unlabeled samples from (X,y) are
+        default=None
+            If `candidates` is None, the unlabeled samples from (X,y) are
             considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X).
+            If `candidates` is of shape (n_candidates) and of type int,
+            `candidates` is considered as the indices of the samples in (X,y).
+            The option `candidates` with shape (n_candidates, n_features) is
+            not supported.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -93,8 +93,6 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             sample.
             If candidates is None or of shape (n_candidates), the indexing
             refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or
             numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
@@ -103,8 +101,6 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan.
             If candidates is None or of shape (n_candidates), the indexing
             refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
         """
         # --- Validation -----------------------------------------------------
         # Check standard parameters.
@@ -132,6 +128,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         y = le.fit_transform(y)
         classes_ = le.transform(self.classes)
 
+        # If we want to use enforce_mapping = False later
         # map_candidates = mapping is not None
         # if mapping is None:
         #     mapping = np.arange(stop=len(X_cand), dtype=int) + np.sum(mask_l)
@@ -160,7 +157,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         # Check lmbda.
         lmbda = self.lmbda
         check_scalar(lmbda, target_type=(float, int), name="lmbda", min_val=0,
-                     min_inclusive=True)
+                     min_inclusive=False)
 
         # --- Computation ----------------------------------------------------
         # Compute kernel (metric) matrix.
@@ -202,6 +199,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                           for yl in y_labeled_ovr.T[:, :, np.newaxis]
                           ])
 
+        # If we want to use enforce_mapping = False later
         # if not map_candidates:
         #     utilities = -utilities_cand[mapping]
         # else:
@@ -216,16 +214,13 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def _one_versus_rest_transform(y, classes, l_one=1, l_rest=0,
-                               missing_label=MISSING_LABEL):
-    dtype = np.float64 if missing_label is np.nan else None
+def _one_versus_rest_transform(y, classes, l_one=1, l_rest=-1):
+    missing_label = np.nan
+    dtype = np.float64
     y_ovr = np.full((len(classes), len(y)), fill_value=l_rest, dtype=dtype)
     for i, c in enumerate(classes):
         y_ovr[i, (y == c)] = l_one
-        if missing_label is np.nan:
-            y_ovr[i, (np.isnan(y))] = np.nan
-        else:
-            y_ovr[i, (y == missing_label)] = missing_label
+        y_ovr[i, (np.isnan(y))] = missing_label
     return y_ovr.T
 
 
