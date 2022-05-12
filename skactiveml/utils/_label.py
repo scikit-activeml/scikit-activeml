@@ -142,9 +142,9 @@ def check_missing_label(missing_label, target_type=None, name=None):
         is_character_type = np.issubdtype(target_type, np.character)
         is_number_type = np.issubdtype(target_type, np.number)
         if (
-                (is_character_type and is_number)
-                or (is_number_type and is_character)
-                or (is_object_type and not is_None)
+            (is_character_type and is_number)
+            or (is_number_type and is_character)
+            or (is_object_type and not is_None)
         ):
             name = "target object" if name is None else str(name)
             raise TypeError(

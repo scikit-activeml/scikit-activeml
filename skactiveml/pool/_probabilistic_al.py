@@ -42,8 +42,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self, prior=1, m_max=1, missing_label=MISSING_LABEL,
-            random_state=None
+        self, prior=1, m_max=1, missing_label=MISSING_LABEL, random_state=None
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -52,16 +51,16 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         self.m_max = m_max
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            sample_weight=None,
-            utility_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        sample_weight=None,
+        utility_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Query the next instance to be labeled.
 

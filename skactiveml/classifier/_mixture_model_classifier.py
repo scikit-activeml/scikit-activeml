@@ -79,14 +79,14 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
     """
 
     def __init__(
-            self,
-            mixture_model=None,
-            weight_mode="responsibilities",
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            class_prior=0.0,
-            random_state=None,
+        self,
+        mixture_model=None,
+        weight_mode="responsibilities",
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        class_prior=0.0,
+        random_state=None,
     ):
         super().__init__(
             classes=classes,
@@ -131,8 +131,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
             self.mixture_model_ = bgm
         else:
             if not isinstance(
-                    self.mixture_model,
-                    (GaussianMixture, BayesianGaussianMixture)
+                self.mixture_model, (GaussianMixture, BayesianGaussianMixture)
             ):
                 raise TypeError(
                     f"`mixture_model` is of the type `{self.mixture_model}` "

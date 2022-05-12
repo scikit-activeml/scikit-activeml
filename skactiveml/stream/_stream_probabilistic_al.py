@@ -161,7 +161,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return queried_indices
 
     def update(
-            self, candidates, queried_indices, budget_manager_param_dict=None
+        self, candidates, queried_indices, budget_manager_param_dict=None
     ):
         """Updates the budget manager
 

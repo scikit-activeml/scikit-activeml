@@ -58,12 +58,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """
 
     def __init__(
-            self,
-            estimator,
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            random_state=None,
+        self,
+        estimator,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
     ):
         super().__init__(
             classes=classes,
@@ -243,7 +243,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(
-                self.estimator, "predict_proba"
+            self.estimator, "predict_proba"
         ):
             raise ValueError(
                 "'cost_matrix' can be only set, if 'estimator'"
@@ -254,8 +254,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         elif fit_function == "partial_fit":
             self._check_n_features(X, reset=False)
         if (
-                not has_fit_parameter(self.estimator, "sample_weight")
-                and sample_weight is not None
+            not has_fit_parameter(self.estimator, "sample_weight")
+            and sample_weight is not None
         ):
             warnings.warn(
                 f"{self.estimator} does not support `sample_weight`. "
@@ -277,8 +277,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if np.sum(is_lbld) == 0:
                 raise ValueError("There is no labeled data.")
             elif (
-                    not has_fit_parameter(self.estimator, "sample_weight")
-                    or sample_weight is None
+                not has_fit_parameter(self.estimator, "sample_weight")
+                or sample_weight is None
             ):
                 if fit_function == "partial_fit":
                     classes = self._le.transform(self.classes_)

@@ -48,10 +48,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            method="KL_divergence",
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        method="KL_divergence",
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -59,15 +59,15 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         self.method = method
 
     def query(
-            self,
-            X,
-            y,
-            ensemble,
-            fit_ensemble=True,
-            sample_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        ensemble,
+        fit_ensemble=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -146,8 +146,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
         # Check if the parameter `ensemble` is valid.
         if isinstance(ensemble, SkactivemlClassifier) and (
-                hasattr(ensemble, "n_estimators")
-                or hasattr(ensemble, "estimators")
+            hasattr(ensemble, "n_estimators")
+            or hasattr(ensemble, "estimators")
         ):
             check_equal_missing_label(
                 ensemble.missing_label, self.missing_label_
@@ -180,9 +180,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                         est_arr[i - 1].classes_,
                         est_arr[i].classes_,
                         err_msg=f"The inferred classes of the {i - 1}-th and "
-                                f"{i}-th are not equal. Set the `classes` "
-                                f"parameter of each ensemble member to avoid "
-                                f"this error.",
+                        f"{i}-th are not equal. Set the `classes` "
+                        f"parameter of each ensemble member to avoid "
+                        f"this error.",
                     )
             classes = est_arr[0].classes_
         else:

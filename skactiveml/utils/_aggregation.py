@@ -66,7 +66,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
 
 
 def majority_vote(
-        y, w=None, classes=None, missing_label=np.nan, random_state=None
+    y, w=None, classes=None, missing_label=np.nan, random_state=None
 ):
     """Assigns a label to each sample based on weighted voting.
     Samples with no labels are assigned with `missing_label`.

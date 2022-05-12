@@ -46,7 +46,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self, lmbda=None, missing_label=MISSING_LABEL, random_state=None
+        self, lmbda=None, missing_label=MISSING_LABEL, random_state=None
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -54,15 +54,15 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         self.lmbda = lmbda
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            sample_weight=None,
-            candidates=None,
-            return_utilities=False,
-            batch_size=1,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        sample_weight=None,
+        candidates=None,
+        return_utilities=False,
+        batch_size=1,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -169,13 +169,13 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
             (P_cand_sorted[:, -1] + 1.0e-5) / (P_cand_sorted[:, -2] + 1.0e-5)
         )
         distance_cand = (distance_cand - np.min(distance_cand) + 1.0e-5) / (
-                np.max(distance_cand) - np.min(distance_cand) + 1.0e-5
+            np.max(distance_cand) - np.min(distance_cand) + 1.0e-5
         )
 
         # Compute densities according to Eq. 10 in [1].
         density_cand = clf.mixture_model_.score_samples(X_cand)
         density_cand = (density_cand - np.min(density_cand) + 1.0e-5) / (
-                np.max(density_cand) - np.min(density_cand) + 1.0e-5
+            np.max(density_cand) - np.min(density_cand) + 1.0e-5
         )
 
         # Compute distributions according to Eq. 11 in [1].
@@ -204,9 +204,9 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         # Compute utilities to select sample.
         utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
         utilities_cand[0] = (
-                alpha * (1 - distance_cand)
-                + beta * density_cand
-                + rho * distribution_cand
+            alpha * (1 - distance_cand)
+            + beta * density_cand
+            + rho * distribution_cand
         )
         query_indices_cand[0] = rand_argmax(
             utilities_cand[0], self.random_state_
@@ -228,9 +228,9 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
             for i in range(1, batch_size):
                 # Update distributions according to Eq. 11 in [1].
                 R_sum = (
-                        R_cand
-                        + np.sum(R_cand[is_selected], axis=0, keepdims=True)
-                        + R_lbld_sum
+                    R_cand
+                    + np.sum(R_cand[is_selected], axis=0, keepdims=True)
+                    + R_lbld_sum
                 )
                 R_mean = R_sum / (len(R_lbld) + len(query_indices_cand) + 1)
                 distribution_cand = clf.mixture_model_.weights_ - R_mean
@@ -244,15 +244,15 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
                     density_cand + np.sum(density_cand[is_selected])
                 ) / (len(query_indices_cand) + 1)
                 diversity_cand = (diversity_cand - np.min(diversity_cand)) / (
-                        np.max(diversity_cand) - np.min(diversity_cand)
+                    np.max(diversity_cand) - np.min(diversity_cand)
                 )
 
                 # Compute utilities to select sample.
                 utilities_cand[i] = (
-                        alpha * (1 - distance_cand)
-                        + beta * density_cand
-                        + lmbda * diversity_cand
-                        + rho * distribution_cand
+                    alpha * (1 - distance_cand)
+                    + beta * density_cand
+                    + lmbda * diversity_cand
+                    + rho * distribution_cand
                 )
                 utilities_cand[i, is_selected] = np.nan
                 query_indices_cand[i] = rand_argmax(
