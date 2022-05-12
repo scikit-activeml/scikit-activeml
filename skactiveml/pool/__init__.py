@@ -15,6 +15,7 @@ from ._query_by_committee import (
     average_kl_divergence,
     vote_entropy,
 )
+from ._quire import Quire
 from ._random_sampling import RandomSampling
 from ._uncertainty_sampling import (
     UncertaintySampling,
@@ -35,6 +36,7 @@ __all__ = [
     "MonteCarloEER",
     "ValueOfInformationEER",
     "QueryByCommittee",
+    "Quire",
     "average_kl_divergence",
     "vote_entropy",
     "FourDs",
