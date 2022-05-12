@@ -173,7 +173,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
             ("unlabeled", unlabeled_indices(self.y)),
         ]
         for (fit_str, fit_idx), (pred_str, pred_idx) in list(
-                product(params, params)
+            product(params, params)
         ):
             with self.subTest(msg="Sub", fit_str=fit_str, pred_str=pred_str):
                 iclf = self.iclf(use_speed_up=True)

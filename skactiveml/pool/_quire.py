@@ -2,8 +2,14 @@ import numpy as np
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
-from skactiveml.utils import check_scalar, simple_batch, MISSING_LABEL, \
-    is_labeled, is_unlabeled, ExtLabelEncoder
+from skactiveml.utils import (
+    check_scalar,
+    simple_batch,
+    MISSING_LABEL,
+    is_labeled,
+    is_unlabeled,
+    ExtLabelEncoder,
+)
 
 
 class Quire(SingleAnnotatorPoolQueryStrategy):
@@ -35,6 +41,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         querying informative and representative examples. Advances in neural
         information processing systems, 23.
     """
+
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
 
     def __init__(
@@ -120,8 +127,9 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         )
 
         # Obtain candidates plus mapping.
-        X_cand, mapping = self._transform_candidates(candidates, X, y,
-                                                     enforce_mapping=True)
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, enforce_mapping=True
+        )
         mask_l = is_labeled(y=y, missing_label=self.missing_label)
         mask_a = is_unlabeled(y=y, missing_label=self.missing_label)
         le = ExtLabelEncoder(self.classes, self.missing_label)
@@ -139,9 +147,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         #     X = np.concatenate((X[mask_l], X_cand), axis=0)
 
         # Check whether metric is available.
-        if self.metric not in Quire.METRICS and not callable(
-                self.metric
-        ):
+        if self.metric not in Quire.METRICS and not callable(self.metric):
             raise ValueError(
                 "The parameter 'metric' must be callable or "
                 "in {}".format(KERNEL_PARAMS.keys())
@@ -156,8 +162,13 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
         # Check lmbda.
         lmbda = self.lmbda
-        check_scalar(lmbda, target_type=(float, int), name="lmbda", min_val=0,
-                     min_inclusive=False)
+        check_scalar(
+            lmbda,
+            target_type=(float, int),
+            name="lmbda",
+            min_val=0,
+            min_inclusive=False,
+        )
 
         # --- Computation ----------------------------------------------------
         # Compute kernel (metric) matrix.
@@ -169,9 +180,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
                     "(n_samples, n_samples)."
                 )
         else:
-            K = pairwise_kernels(
-                X, X, metric=self.metric, **self.metric_dict_
-            )
+            K = pairwise_kernels(X, X, metric=self.metric, **self.metric_dict_)
         # compute L and L_aa
         L = np.linalg.inv(K + lmbda * np.eye(len(X)))
         # Compute the inverse of L_aa
@@ -186,18 +195,16 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
             mask_u[s] = False
             L_uu_inv = _del_i_inv(L_aa_inv, i)
 
-            utilities_cand[s] = \
-                L[s, s] \
-                + np.max([yl.T.dot(L[mask_l][:, mask_l]).dot(yl) +
-                          2 * L[s][mask_l].dot(yl)
-                          - (L[mask_u][:, mask_l].dot(yl)
-                             + L[mask_u][:, [s]]
-                             ).T.dot(L_uu_inv).dot(
-                    L[mask_u][:, mask_l].dot(yl)
-                    + L[mask_u][:, [s]]
-                )
-                          for yl in y_labeled_ovr.T[:, :, np.newaxis]
-                          ])
+            utilities_cand[s] = L[s, s] + np.max(
+                [
+                    yl.T.dot(L[mask_l][:, mask_l]).dot(yl)
+                    + 2 * L[s][mask_l].dot(yl)
+                    - (L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
+                        .T.dot(L_uu_inv)
+                        .dot(L[mask_u][:, mask_l].dot(yl) + L[mask_u][:, [s]])
+                    for yl in y_labeled_ovr.T[:, :, np.newaxis]
+                ]
+            )
 
         # If we want to use enforce_mapping = False later
         # if not map_candidates:
@@ -225,8 +232,9 @@ def _one_versus_rest_transform(y, classes, l_one=1, l_rest=-1):
 
 
 def _del_i_inv(A_inv, s):
-    np.testing.assert_allclose(A_inv, A_inv.T,
-                               err_msg='A_inv is not symmetric.')
+    np.testing.assert_allclose(
+        A_inv, A_inv.T, err_msg="A_inv is not symmetric."
+    )
     a = A_inv[s, s]
     b = np.delete(A_inv[:, [s]], s, axis=0)
     D = np.delete(np.delete(A_inv, [s], axis=0), [s], axis=1)
@@ -235,11 +243,17 @@ def _del_i_inv(A_inv, s):
 
 
 def _L_aa_inv(K, lmbda, is_unlabeled, is_labeled):
-    L_aa_inv = \
-        (lmbda * np.eye(sum(is_unlabeled)) + K[is_unlabeled][:, is_unlabeled])
-    L_aa_inv -= K[is_unlabeled][:, is_labeled].dot(
-        np.linalg.inv(
-            lmbda * np.eye(sum(is_labeled)) + K[is_labeled][:, is_labeled]
+    L_aa_inv = (
+            lmbda * np.eye(sum(is_unlabeled)) + K[is_unlabeled][:,
+                                                is_unlabeled]
+    )
+    L_aa_inv -= (
+        K[is_unlabeled][:, is_labeled]
+            .dot(
+            np.linalg.inv(
+                lmbda * np.eye(sum(is_labeled)) + K[is_labeled][:, is_labeled]
+            )
         )
-    ).dot(K[is_labeled][:, is_unlabeled])
+            .dot(K[is_labeled][:, is_unlabeled])
+    )
     return L_aa_inv
