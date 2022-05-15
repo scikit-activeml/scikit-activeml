@@ -660,7 +660,8 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
         sample_weight = np.ones(y.shape[0])
 
     # Logistic loss is the negative of the log of the logistic function.
-    out = -np.sum(sample_weight * log_logistic(yz)) + 0.5 * alpha * np.dot(w, w)
+    out = -np.sum(sample_weight * log_logistic(yz))
+    out += 0.5 * alpha * np.dot(w, w)
     return out
 
 
