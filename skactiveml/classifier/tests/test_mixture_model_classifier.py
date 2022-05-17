@@ -66,7 +66,9 @@ class TestMixtureModelClassifier(unittest.TestCase):
         self.assertFalse(hasattr(cmm, "classes_"))
         cmm.fit(X=self.X, y=self.y)
         self.assertTrue(hasattr(cmm, "mixture_model_"))
-        np.testing.assert_array_equal(cmm.classes_, ["new york", "paris", "tokyo"])
+        np.testing.assert_array_equal(
+            cmm.classes_, ["new york", "paris", "tokyo"]
+        )
         np.testing.assert_array_equal(1 - np.eye(3), cmm.cost_matrix_)
         np.testing.assert_array_equal([[0, 1, 1]], cmm.F_components_)
         cmm.fit(X=self.X, y=self.y, sample_weight=self.w)

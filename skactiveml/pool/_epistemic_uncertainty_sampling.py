@@ -309,7 +309,9 @@ def _interpolate(precompute_array, freq):
     -------
         Array of interpolated values.
     """
-    points = np.zeros((precompute_array.shape[0] * precompute_array.shape[1], 2))
+    points = np.zeros(
+        (precompute_array.shape[0] * precompute_array.shape[1], 2)
+    )
     for n in range(precompute_array.shape[0]):
         for p in range(precompute_array.shape[1]):
             points[n * precompute_array.shape[1] + p] = n, p
@@ -432,7 +434,9 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
 
     # Calculate the maximum likelihood of the logistic function.
     L_ml = np.exp(
-        -_loglike_logreg(w=w_ml, X=X, y=y, gamma=gamma, sample_weight=sample_weight)
+        -_loglike_logreg(
+            w=w_ml, X=X, y=y, gamma=gamma, sample_weight=sample_weight
+        )
     )
 
     # Set the initial guess for minimize function.
@@ -540,7 +544,9 @@ def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
     check_scalar(L_ml, name="L_ml", target_type=(float, int))
 
     L_theta = np.exp(
-        -_loglike_logreg(w=theta, X=X, y=y, sample_weight=sample_weight, gamma=gamma)
+        -_loglike_logreg(
+            w=theta, X=X, y=y, sample_weight=sample_weight, gamma=gamma
+        )
     )
     return L_theta / L_ml
 
@@ -573,7 +579,9 @@ def _loglike_logreg(w, X, y, sample_weight=None, gamma=1):
     """
     if len(y) == 0:
         return np.log(2) * len(X)
-    return _logistic_loss(w=w, X=X, y=y, alpha=gamma, sample_weight=sample_weight)
+    return _logistic_loss(
+        w=w, X=X, y=y, alpha=gamma, sample_weight=sample_weight
+    )
 
 
 def _theta(func, alpha, x0, A, args=()):
@@ -607,5 +615,7 @@ def _theta(func, alpha, x0, A, args=()):
     """
     bounds = np.log(alpha / (1 - alpha))
     constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
-    res = minimize(func, x0=x0, method="SLSQP", constraints=constraints, args=args)
+    res = minimize(
+        func, x0=x0, method="SLSQP", constraints=constraints, args=args
+    )
     return res.x

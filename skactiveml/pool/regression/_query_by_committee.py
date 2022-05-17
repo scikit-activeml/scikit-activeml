@@ -4,8 +4,16 @@ import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import _is_arraylike
 
-from skactiveml.base import SingleAnnotatorPoolQueryStrategy, SkactivemlRegressor
-from skactiveml.utils import simple_batch, check_type, check_scalar, MISSING_LABEL
+from skactiveml.base import (
+    SingleAnnotatorPoolQueryStrategy,
+    SkactivemlRegressor,
+)
+from skactiveml.utils import (
+    simple_batch,
+    check_type,
+    check_scalar,
+    MISSING_LABEL,
+)
 from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 
 

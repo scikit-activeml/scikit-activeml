@@ -62,12 +62,16 @@ def ext_confusion_matrix(
     """
     # Check input.
     y_true = column_or_1d(y_true)
-    y_pred = check_array(y_pred, force_all_finite=False, ensure_2d=False, dtype=None)
+    y_pred = check_array(
+        y_pred, force_all_finite=False, ensure_2d=False, dtype=None
+    )
     if y_pred.ndim == 1:
         y_pred = y_pred.reshape(-1, 1)
     check_consistent_length(y_true, y_pred)
     if normalize not in ["true", "pred", "all", None]:
-        raise ValueError("'normalize' must be one of {'true', 'pred', 'all', " "None}.")
+        raise ValueError(
+            "'normalize' must be one of {'true', 'pred', 'all', " "None}."
+        )
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
     y = np.column_stack((y_true, y_pred))
     y = le.fit_transform(y)

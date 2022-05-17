@@ -136,7 +136,9 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             )
 
         # Ensure that metric_dict is a Python dictionary.
-        self.metric_dict_ = self.metric_dict if self.metric_dict is not None else {}
+        self.metric_dict_ = (
+            self.metric_dict if self.metric_dict is not None else {}
+        )
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
@@ -183,14 +185,18 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         # Compute kernel (metric) matrix.
         if self.metric == "precomputed":
             K = X
-            if np.size(K, 0) != np.size(X, 0) or np.size(K, 1) != np.size(self.X_, 0):
+            if np.size(K, 0) != np.size(X, 0) or np.size(K, 1) != np.size(
+                self.X_, 0
+            ):
                 raise ValueError(
                     "The kernel matrix 'X' must have the shape "
                     "(n_test_samples, n_train_samples)."
                 )
         else:
             self._check_n_features(X, reset=False)
-            K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict_)
+            K = pairwise_kernels(
+                X, self.X_, metric=self.metric, **self.metric_dict_
+            )
 
         # computing class frequency estimates
         if self.n_neighbors is None or np.size(self.X_, 0) <= self.n_neighbors:

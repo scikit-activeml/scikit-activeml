@@ -22,10 +22,12 @@ class TemplateTestExpectedErrorReduction:
         self.classes = [0, 1, 2]
         self.cost_matrix = np.eye(3)
         self.clf = ParzenWindowClassifier(classes=self.classes)
-        self.clf_partial = SklearnClassifier(GaussianNB(), classes=self.classes).fit(
-            self.X, self.y
+        self.clf_partial = SklearnClassifier(
+            GaussianNB(), classes=self.classes
+        ).fit(self.X, self.y)
+        self.kwargs = dict(
+            X=self.X, y=self.y, candidates=self.candidates, clf=self.clf
         )
-        self.kwargs = dict(X=self.X, y=self.y, candidates=self.candidates, clf=self.clf)
 
         class DummyClf(SkactivemlClassifier):
             def __init__(self, classes=None):
@@ -38,7 +40,9 @@ class TemplateTestExpectedErrorReduction:
                 return self
 
             def predict_proba(self, X):
-                return np.full(shape=(len(X), len(self.classes_)), fill_value=0.5)
+                return np.full(
+                    shape=(len(X), len(self.classes_)), fill_value=0.5
+                )
 
         self.DummyClf = DummyClf
 
@@ -253,7 +257,9 @@ class TestExpectedErrorReduction(unittest.TestCase):
         np.testing.assert_array_equal(sample_weight_eval, w_eval[idx_eval])
 
         np.testing.assert_array_equal(cand, X_full[idx_cand])
-        np.testing.assert_array_equal(np.full((len(cand)), np.nan), y_full[idx_cand])
+        np.testing.assert_array_equal(
+            np.full((len(cand)), np.nan), y_full[idx_cand]
+        )
         np.testing.assert_array_equal(sample_weight_cand, w_full[idx_cand])
 
         (
@@ -267,7 +273,9 @@ class TestExpectedErrorReduction(unittest.TestCase):
         ) = qs._concatenate_samples(
             X, y, None, cand, sample_weight_cand, X_eval, sample_weight_eval
         )
-        np.testing.assert_array_equal(np.ones(len(idx_train)), w_full[idx_train])
+        np.testing.assert_array_equal(
+            np.ones(len(idx_train)), w_full[idx_train]
+        )
 
         (
             X_full,
@@ -341,13 +349,18 @@ class TestExpectedErrorReduction(unittest.TestCase):
         )
 
     def test__risk_estimation(self):
-        def risk_estimation_slow(prob_true, prob_pred, cost_matrix, sample_weight):
+        def risk_estimation_slow(
+            prob_true, prob_pred, cost_matrix, sample_weight
+        ):
             n_samples = len(prob_true)
             n_classes = len(cost_matrix)
             result = 0
             if prob_true.ndim == 1 and prob_pred.ndim == 1:
                 for i in range(n_samples):
-                    result += sample_weight[i] * cost_matrix[prob_true[i], prob_pred[i]]
+                    result += (
+                        sample_weight[i]
+                        * cost_matrix[prob_true[i], prob_pred[i]]
+                    )
             elif prob_true.ndim == 1 and prob_pred.ndim == 2:
                 for i in range(n_samples):
                     for j in range(n_classes):
@@ -551,7 +564,9 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
         # TODO: ParzenWindowClassifier Test
 
 
-class TestValueOfInformationEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
+class TestValueOfInformationEER(
+    TemplateTestExpectedErrorReduction, unittest.TestCase
+):
     def get_query_strategy(self):
         return ValueOfInformationEER
 

@@ -110,7 +110,9 @@ class TestParzenWindowClassifier(unittest.TestCase):
         np.testing.assert_array_equal(F_call, F_rbf)
 
     def test_predict_proba(self):
-        pwc = ParzenWindowClassifier(classes=["tokyo", "paris"], missing_label="nan")
+        pwc = ParzenWindowClassifier(
+            classes=["tokyo", "paris"], missing_label="nan"
+        )
         self.assertRaises(NotFittedError, pwc.predict_proba, X=self.X)
         pwc.fit(X=self.X, y=self.y_nan)
         P = pwc.predict_proba(X=self.X)

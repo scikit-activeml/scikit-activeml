@@ -144,7 +144,9 @@ class IndexClassifierWrapper:
             self.clf_.metric = "precomputed"
             self.clf_.metric_dict = {}
 
-    def precompute(self, idx_fit, idx_pred, fit_params="all", pred_params="all"):
+    def precompute(
+        self, idx_fit, idx_pred, fit_params="all", pred_params="all"
+    ):
         """
         Function to describe for which samples we should precompute something.
         Will be internally handled differently for different classifiers. The
@@ -178,11 +180,15 @@ class IndexClassifierWrapper:
                 idx_fit_ = idx_fit
             elif fit_params == "labeled":
                 idx_fit_ = idx_fit[
-                    is_labeled(self.y[idx_fit], missing_label=self.missing_label_)
+                    is_labeled(
+                        self.y[idx_fit], missing_label=self.missing_label_
+                    )
                 ]
             elif fit_params == "unlabeled":
                 idx_fit_ = idx_fit[
-                    is_unlabeled(self.y[idx_fit], missing_label=self.missing_label_)
+                    is_unlabeled(
+                        self.y[idx_fit], missing_label=self.missing_label_
+                    )
                 ]
             else:
                 raise ValueError(f"`fit_params`== {fit_params} not defined")
@@ -191,11 +197,15 @@ class IndexClassifierWrapper:
                 idx_pred_ = idx_pred
             elif pred_params == "labeled":
                 idx_pred_ = idx_pred[
-                    is_labeled(self.y[idx_pred], missing_label=self.missing_label_)
+                    is_labeled(
+                        self.y[idx_pred], missing_label=self.missing_label_
+                    )
                 ]
             elif pred_params == "unlabeled":
                 idx_pred_ = idx_pred[
-                    is_unlabeled(self.y[idx_pred], missing_label=self.missing_label_)
+                    is_unlabeled(
+                        self.y[idx_pred], missing_label=self.missing_label_
+                    )
                 ]
             else:
                 raise ValueError(f"`pred_params`== {pred_params} not defined")
@@ -236,7 +246,9 @@ class IndexClassifierWrapper:
         """
         # check idx
         idx = check_array(idx, ensure_2d=False, dtype=int)
-        idx = check_indices(idx, self.X, dim=0, unique=self.enforce_unique_samples)
+        idx = check_indices(
+            idx, self.X, dim=0, unique=self.enforce_unique_samples
+        )
 
         # check set_base_clf
         check_type(set_base_clf, "set_base_clf", bool)
@@ -252,7 +264,9 @@ class IndexClassifierWrapper:
 
         # check sample_weight
         if sample_weight is None:
-            sample_weight = self._copy_sw(self._get_sw(self.sample_weight, idx=idx))
+            sample_weight = self._copy_sw(
+                self._get_sw(self.sample_weight, idx=idx)
+            )
             # TODO deepcopy
         else:
             sample_weight = check_array(sample_weight, ensure_2d=False)
@@ -347,9 +361,13 @@ class IndexClassifierWrapper:
         if y is None:
             add_y = self.y[add_idx]
             if is_unlabeled(add_y, missing_label=self.missing_label_).all():
-                warnings.warn("All labels are of `missing_label` in " "`partial_fit`.")
+                warnings.warn(
+                    "All labels are of `missing_label` in " "`partial_fit`."
+                )
         else:
-            add_y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+            add_y = check_array(
+                y, ensure_2d=False, force_all_finite="allow-nan"
+            )
             check_consistent_length(add_idx, add_y)
 
         # check sample_weight
@@ -538,4 +556,6 @@ class IndexClassifierWrapper:
         if sample_weight is not None and sample_weight_add is not None:
             return np.concatenate([sample_weight, sample_weight_add], axis=0)
         else:
-            raise ValueError("All `sample_weight` must be either None or " "given.")
+            raise ValueError(
+                "All `sample_weight` must be either None or " "given."
+            )

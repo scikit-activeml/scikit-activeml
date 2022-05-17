@@ -303,7 +303,13 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
-        (X, y, candidates, batch_size, return_utilities,) = super()._validate_data(
+        (
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+        ) = super()._validate_data(
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
         y = column_or_1d(y, warn=True)
@@ -375,7 +381,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         elif candidates.ndim == 1:
             if allow_only_unlabeled:
                 if is_labeled(y[candidates], self.missing_label_).any():
-                    raise ValueError("Candidates must not contain labeled " "samples.")
+                    raise ValueError(
+                        "Candidates must not contain labeled " "samples."
+                    )
             return X[candidates], candidates
         else:
             if enforce_mapping:
@@ -563,7 +571,13 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
-        (X, y, candidates, batch_size, return_utilities,) = super()._validate_data(
+        (
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+        ) = super()._validate_data(
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
@@ -675,7 +689,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Available annotator sample pair with respect to `candidates`.
         """
         unlbd_pairs = is_unlabeled(y, self.missing_label_)
-        unlbd_sample_indices = np.argwhere(np.any(unlbd_pairs, axis=1)).flatten()
+        unlbd_sample_indices = np.argwhere(
+            np.any(unlbd_pairs, axis=1)
+        ).flatten()
         n_annotators = y.shape[1]
 
         if candidates is not None and candidates.ndim == 2:
@@ -1125,7 +1141,9 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             }
 
         # Check common classifier parameters.
-        check_classifier_params(self.classes, self.missing_label, self.cost_matrix)
+        check_classifier_params(
+            self.classes, self.missing_label, self.cost_matrix
+        )
 
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
@@ -1174,7 +1192,9 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             if self.cost_matrix is None
             else self.cost_matrix
         )
-        self.cost_matrix_ = check_cost_matrix(self.cost_matrix_, len(self.classes_))
+        self.cost_matrix_ = check_cost_matrix(
+            self.cost_matrix_, len(self.classes_)
+        )
         if self.classes is not None:
             class_indices = np.argsort(self.classes)
             self.cost_matrix_ = self.cost_matrix_[class_indices]
@@ -1304,7 +1324,9 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
 
         # Check class prior.
-        self.class_prior_ = check_class_prior(self.class_prior, len(self.classes_))
+        self.class_prior_ = check_class_prior(
+            self.class_prior, len(self.classes_)
+        )
 
         return X, y, sample_weight
 
@@ -1480,7 +1502,9 @@ class ProbabilisticRegressor(SkactivemlRegressor):
             Drawn random variate samples.
         """
         rv = self.predict_target_distribution(X)
-        rv_samples = rv.rvs(size=(n_rv_samples, len(X)), random_state=random_state)
+        rv_samples = rv.rvs(
+            size=(n_rv_samples, len(X)), random_state=random_state
+        )
         return rv_samples.T
 
 

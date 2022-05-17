@@ -57,13 +57,17 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     # count class labels per class and weight by confidence scores
     w[np.logical_or(np.isnan(w), is_unlabeled_y)] = 0
     y_off = y + np.arange(y.shape[0])[:, None] * n_classes
-    v = np.bincount(y_off.ravel(), minlength=y.shape[0] * n_classes, weights=w.ravel())
+    v = np.bincount(
+        y_off.ravel(), minlength=y.shape[0] * n_classes, weights=w.ravel()
+    )
     v = v.reshape(-1, n_classes)
 
     return v
 
 
-def majority_vote(y, w=None, classes=None, missing_label=np.nan, random_state=None):
+def majority_vote(
+    y, w=None, classes=None, missing_label=np.nan, random_state=None
+):
     """Assigns a label to each sample based on weighted voting.
     Samples with no labels are assigned with `missing_label`.
 

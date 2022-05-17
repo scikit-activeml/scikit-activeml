@@ -28,11 +28,15 @@ from skactiveml.visualization._feature_space import _general_plot_utilities
 
 class TestFeatureSpace(unittest.TestCase):
     def setUp(self):
-        self.path_prefix = os.path.dirname(visualization.__file__) + "/tests/images/"
+        self.path_prefix = (
+            os.path.dirname(visualization.__file__) + "/tests/images/"
+        )
         self.X, self.y = make_classification(
             n_features=2, n_redundant=0, random_state=0
         )
-        train_indices = np.random.RandomState(0).randint(0, len(self.X), size=20)
+        train_indices = np.random.RandomState(0).randint(
+            0, len(self.X), size=20
+        )
         cand_indices = np.setdiff1d(np.arange(len(self.X)), train_indices)
         self.y_active = np.full_like(self.y, np.nan, dtype=float)
         self.y_active[cand_indices] = self.y[cand_indices]
@@ -362,7 +366,9 @@ class TestFeatureSpace(unittest.TestCase):
             (np.arange(10), ValueError),
         ]
         for values, err in test_cases:
-            self.assertRaises(err, plot_contour_for_samples, X=self.X, values=values)
+            self.assertRaises(
+                err, plot_contour_for_samples, X=self.X, values=values
+            )
 
     def test_plot_contour_for_samples_param_replace_nan(self):
         values = np.full_like(self.utilities, np.nan)
@@ -521,7 +527,9 @@ class TestFeatureSpace(unittest.TestCase):
         bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 
         fig, ax = plt.subplots()
-        plot_utilities(qs=qs, X=X_train, y=y_train, clf=clf, feature_bound=bound, ax=ax)
+        plot_utilities(
+            qs=qs, X=X_train, y=y_train, clf=clf, feature_bound=bound, ax=ax
+        )
         ax.scatter(X_cand[:, 0], X_cand[:, 1], c="k", marker=".")
         ax.scatter(
             X_train[:, 0],

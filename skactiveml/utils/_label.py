@@ -25,13 +25,17 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     if len(y) == 0:
         return np.array(y, dtype=bool)
     if not isinstance(y, np.ndarray):
-        types = set(t.__qualname__ for t in set(type(v) for v in deepflatten(y)))
+        types = set(
+            t.__qualname__ for t in set(type(v) for v in deepflatten(y))
+        )
         types.add(type(missing_label).__qualname__)
         is_number = False
         is_character = False
         for t in types:
             t = object if t == "NoneType" else t
-            is_character = True if np.issubdtype(t, np.character) else is_character
+            is_character = (
+                True if np.issubdtype(t, np.character) else is_character
+            )
             is_number = True if np.issubdtype(t, np.number) else is_number
             if is_character and is_number:
                 raise TypeError(
@@ -146,7 +150,9 @@ def check_missing_label(missing_label, target_type=None, name=None):
             name = "target object" if name is None else str(name)
             raise TypeError(
                 "'missing_label' has type '{}' and is not compatible to the "
-                "type '{}' of '{}'.".format(type(missing_label), target_type, name)
+                "type '{}' of '{}'.".format(
+                    type(missing_label), target_type, name
+                )
             )
 
 

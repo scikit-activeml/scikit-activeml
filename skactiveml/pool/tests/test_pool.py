@@ -65,7 +65,9 @@ class TestGeneral(unittest.TestCase):
         self.query_strategies = {}
         for qs_name in pool.__all__:
             qs = getattr(pool, qs_name)
-            if inspect.isclass(qs) and issubclass(qs, SingleAnnotatorPoolQueryStrategy):
+            if inspect.isclass(qs) and issubclass(
+                qs, SingleAnnotatorPoolQueryStrategy
+            ):
                 self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())
 

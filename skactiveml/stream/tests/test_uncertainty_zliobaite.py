@@ -28,7 +28,9 @@ class TemplateTestUncertaintyZliobaite:
         self.candidates = X[train_init_size:, :]
         self.y = y[:train_init_size]
         self.clf = ParzenWindowClassifier()
-        self.kwargs = dict(candidates=self.candidates, clf=self.clf, X=self.X, y=self.y)
+        self.kwargs = dict(
+            candidates=self.candidates, clf=self.clf, X=self.X, y=self.y
+        )
 
     def test_init_param_budget(self):
         # budget must be defined as a float greater than 0
@@ -263,7 +265,9 @@ class TestFixedUncertainty(TemplateTestUncertaintyZliobaite, unittest.TestCase):
         return FixedUncertainty
 
 
-class TestVariableUncertainty(TemplateTestUncertaintyZliobaite, unittest.TestCase):
+class TestVariableUncertainty(
+    TemplateTestUncertaintyZliobaite, unittest.TestCase
+):
     def get_query_strategy(self):
         return VariableUncertainty
 

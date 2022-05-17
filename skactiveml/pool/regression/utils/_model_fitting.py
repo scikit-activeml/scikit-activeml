@@ -44,7 +44,10 @@ def update_X_y(X, y, y_update, idx_update=None, X_update=None):
         y_update = np.array([y_update])
     else:
         y_update = check_array(
-            y_update, force_all_finite=False, ensure_2d=False, ensure_min_samples=0
+            y_update,
+            force_all_finite=False,
+            ensure_2d=False,
+            ensure_min_samples=0,
         )
         y_update = column_or_1d(y_update)
 
@@ -121,7 +124,9 @@ def update_reg(
             check_indices([idx_update], A=mapping, unique="check_unique")
         else:
             check_indices(idx_update, A=mapping, unique="check_unique")
-        X_new, y_new = update_X_y(X, y, y_update, idx_update=mapping[idx_update])
+        X_new, y_new = update_X_y(
+            X, y, y_update, idx_update=mapping[idx_update]
+        )
     else:
         X_new, y_new = update_X_y(X, y, y_update, X_update=X_update)
 
@@ -168,7 +173,12 @@ def bootstrap_estimators(
     check_X_y(X=X, y=y, sample_weight=sample_weight)
     check_scalar(k_bootstrap, "k_bootstrap", int, min_val=1)
     check_scalar(
-        n_train, "n_train", (int, float), min_val=0, max_val=1, min_inclusive=False
+        n_train,
+        "n_train",
+        (int, float),
+        min_val=0,
+        max_val=1,
+        min_inclusive=False,
     )
     check_type(est, "est", SkactivemlClassifier, SkactivemlRegressor)
     random_state = check_random_state(random_state)

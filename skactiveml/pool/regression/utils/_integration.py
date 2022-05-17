@@ -150,7 +150,9 @@ def conditional_expect(
 
     def evaluate_func(inner_potential_y):
         if vector_func:
-            inner_output = func(*arg_filter(np.arange(len(X)), X, inner_potential_y))
+            inner_output = func(
+                *arg_filter(np.arange(len(X)), X, inner_potential_y)
+            )
         else:
             inner_output = np.zeros_like(inner_potential_y)
             for idx_x, inner_x in enumerate(X):
@@ -167,7 +169,9 @@ def conditional_expect(
             potential_y = reg.predict(X).reshape(-1, 1)
         else:  # method equals "monte_carlo"
             potential_y = reg.sample_y(
-                X=X, n_rv_samples=n_integration_samples, random_state=random_state
+                X=X,
+                n_rv_samples=n_integration_samples,
+                random_state=random_state,
             )
         expectation = np.average(evaluate_func(potential_y), axis=1)
     elif method == "quantile":
@@ -175,7 +179,9 @@ def conditional_expect(
             eval_points = np.arange(1, n_integration_samples + 1) / (
                 n_integration_samples + 1
             )
-            cond_dist = reshape_dist(reg.predict_target_distribution(X), shape=(-1, 1))
+            cond_dist = reshape_dist(
+                reg.predict_target_distribution(X), shape=(-1, 1)
+            )
             potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
             output = evaluate_func(potential_y)
 
@@ -217,7 +223,9 @@ def conditional_expect(
         )
         output = evaluate_func(potential_y)
         expectation = (
-            1 / (2 * np.pi) ** (1 / 2) * np.sum(weights[np.newaxis, :] * output, axis=1)
+            1
+            / (2 * np.pi) ** (1 / 2)
+            * np.sum(weights[np.newaxis, :] * output, axis=1)
         )
     else:  # method equals "dynamic_quad"
         for idx, x in enumerate(X):
@@ -228,7 +236,9 @@ def conditional_expect(
                     return func(*arg_filter(idx, x, y))
                 else:
                     return func(
-                        *arg_filter(np.arange(len(X)), X, np.full((len(X), 1), y))
+                        *arg_filter(
+                            np.arange(len(X)), X, np.full((len(X), 1), y)
+                        )
                     )[idx]
 
             expectation[idx] = cond_dist.expect(

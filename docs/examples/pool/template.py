@@ -65,8 +65,12 @@ for c in range(n_cycles):
         feature_bound=feature_bound,
         ax=ax,
     )
-    ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2)
-    ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=0.8, marker=".", s=300)
+    ax.scatter(
+        X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".", zorder=2
+    )
+    ax.scatter(
+        X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=0.8, marker=".", s=300
+    )
     ax = plot_decision_boundary(clf, feature_bound, ax=ax)
 
     coll_new = list(ax.collections)

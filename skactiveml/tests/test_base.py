@@ -132,7 +132,9 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             y=np.array([[1, MISSING_LABEL], [2, 3]]),
         )
         X_cand, mapping, A_cand = re_val
-        np.testing.assert_array_equal(A_cand, np.array([[False, True], [True, True]]))
+        np.testing.assert_array_equal(
+            A_cand, np.array([[False, True], [True, True]])
+        )
 
         re_val = self.qs._validate_data(
             candidates=None,
@@ -218,7 +220,9 @@ class AnnotatorModelMixinTest(unittest.TestCase):
         self.clf = AnnotatorModelMixin()
 
     def test_predict_annotator_perf(self):
-        self.assertRaises(NotImplementedError, self.clf.predict_annotator_perf, X=None)
+        self.assertRaises(
+            NotImplementedError, self.clf.predict_annotator_perf, X=None
+        )
 
 
 class TestBudgetManager(unittest.TestCase):
@@ -227,7 +231,9 @@ class TestBudgetManager(unittest.TestCase):
         self.bm = BudgetManager()
 
     def test_fit(self):
-        self.assertRaises(NotImplementedError, self.bm.query_by_utility, utilities=None)
+        self.assertRaises(
+            NotImplementedError, self.bm.query_by_utility, utilities=None
+        )
 
     def test_update(self):
         self.assertRaises(
@@ -239,7 +245,9 @@ class TestBudgetManager(unittest.TestCase):
 
 
 class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
-    @patch.multiple(SingleAnnotatorStreamQueryStrategy, __abstractmethods__=set())
+    @patch.multiple(
+        SingleAnnotatorStreamQueryStrategy, __abstractmethods__=set()
+    )
     def setUp(self):
         self.qs = SingleAnnotatorStreamQueryStrategy(budget=None)
 
@@ -270,7 +278,11 @@ class ScaktivemlRegressorTest(unittest.TestCase):
         X = np.arange(5 * 2).reshape(5, 2)
         y = 1 / 2 * np.arange(5)
         self.assertRaises(
-            ValueError, self.reg._validate_data, X=X, y=y, sample_weight=np.arange(1, 5)
+            ValueError,
+            self.reg._validate_data,
+            X=X,
+            y=y,
+            sample_weight=np.arange(1, 5),
         )
 
 

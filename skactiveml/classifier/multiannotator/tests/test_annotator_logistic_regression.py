@@ -36,7 +36,9 @@ class TestAnnotatorLogisticRegression(unittest.TestCase):
         self.assertEqual(lr.solver_dict, None)
         lr = AnnotatorLogisticRegression(solver_dict={"verbose": 0})
         self.assertTrue(isinstance(lr.solver_dict, dict))
-        lr = AnnotatorLogisticRegression(missing_label="nan", solver_dict="Test")
+        lr = AnnotatorLogisticRegression(
+            missing_label="nan", solver_dict="Test"
+        )
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
 
     def test_init_param_fit_intercept(self):
@@ -44,7 +46,9 @@ class TestAnnotatorLogisticRegression(unittest.TestCase):
         self.assertTrue(lr.fit_intercept)
         lr = AnnotatorLogisticRegression(fit_intercept=False)
         self.assertFalse(lr.fit_intercept)
-        lr = AnnotatorLogisticRegression(missing_label="nan", fit_intercept="Test")
+        lr = AnnotatorLogisticRegression(
+            missing_label="nan", fit_intercept="Test"
+        )
         self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
 
     def test_init_param_max_iter(self):
@@ -62,9 +66,13 @@ class TestAnnotatorLogisticRegression(unittest.TestCase):
         self.assertEqual(lr.annot_prior_full, 1)
         lr = AnnotatorLogisticRegression(annot_prior_full=2)
         self.assertEqual(lr.annot_prior_full, 2)
-        lr = AnnotatorLogisticRegression(annot_prior_full=0, missing_label="nan")
+        lr = AnnotatorLogisticRegression(
+            annot_prior_full=0, missing_label="nan"
+        )
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
-        lr = AnnotatorLogisticRegression(annot_prior_full=[1, 1], missing_label="nan")
+        lr = AnnotatorLogisticRegression(
+            annot_prior_full=[1, 1], missing_label="nan"
+        )
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
 
     def test_init_param_annot_prior_diag(self):
@@ -72,7 +80,9 @@ class TestAnnotatorLogisticRegression(unittest.TestCase):
         self.assertEqual(lr.annot_prior_diag, 0)
         lr = AnnotatorLogisticRegression(annot_prior_diag=2)
         self.assertEqual(lr.annot_prior_diag, 2)
-        lr = AnnotatorLogisticRegression(annot_prior_diag=-0.1, missing_label="nan")
+        lr = AnnotatorLogisticRegression(
+            annot_prior_diag=-0.1, missing_label="nan"
+        )
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
         lr = AnnotatorLogisticRegression(
             annot_prior_diag=[0, 0, -0.1], missing_label="nan"
@@ -84,9 +94,13 @@ class TestAnnotatorLogisticRegression(unittest.TestCase):
         self.assertEqual(lr.weights_prior, 1)
         lr = AnnotatorLogisticRegression(weights_prior=0)
         self.assertEqual(lr.annot_prior_diag, 0)
-        lr = AnnotatorLogisticRegression(weights_prior=[0, 1], missing_label="nan")
+        lr = AnnotatorLogisticRegression(
+            weights_prior=[0, 1], missing_label="nan"
+        )
         self.assertRaises(TypeError, lr.fit, X=self.X, y=self.y)
-        lr = AnnotatorLogisticRegression(weights_prior=-0.1, missing_label="nan")
+        lr = AnnotatorLogisticRegression(
+            weights_prior=-0.1, missing_label="nan"
+        )
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
 
     def test_fit(self):

@@ -30,7 +30,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         Controls the randomness of the estimator.
     """
 
-    def __init__(self, budget=None, allow_exceeding_budget=True, random_state=None):
+    def __init__(
+        self, budget=None, allow_exceeding_budget=True, random_state=None
+    ):
         super().__init__(budget=budget, random_state=random_state)
         self.allow_exceeding_budget = allow_exceeding_budget
 
@@ -63,7 +65,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        candidates, return_utilities = self._validate_data(candidates, return_utilities)
+        candidates, return_utilities = self._validate_data(
+            candidates, return_utilities
+        )
 
         # copy random state in case of simulating the query
         prior_random_state = self.random_state_.get_state()
@@ -86,9 +90,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             available_budget = (
                 tmp_observed_instances * self.budget_ - tmp_queried_instances
             )
-            queried[i] = (self.allow_exceeding_budget or available_budget > 1) and (
-                utility >= 1 - self.budget_
-            )
+            queried[i] = (
+                self.allow_exceeding_budget or available_budget > 1
+            ) and (utility >= 1 - self.budget_)
             tmp_queried_instances += queried[i]
 
         # get the indices instances that should be queried
@@ -136,7 +140,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _validate_data(
-        self, candidates, return_utilities, reset=True, **check_candidates_params
+        self,
+        candidates,
+        return_utilities,
+        reset=True,
+        **check_candidates_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 
@@ -167,7 +175,9 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         if not hasattr(self, "queried_instances_"):
             self.queried_instances_ = 0
 
-        check_scalar(self.allow_exceeding_budget, "allow_exceeding_budget", bool)
+        check_scalar(
+            self.allow_exceeding_budget, "allow_exceeding_budget", bool
+        )
 
         candidates, return_utilities = super()._validate_data(
             candidates, return_utilities, reset=reset, **check_candidates_params
@@ -233,7 +243,9 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
         """
-        candidates, return_utilities = self._validate_data(candidates, return_utilities)
+        candidates, return_utilities = self._validate_data(
+            candidates, return_utilities
+        )
 
         utilities = np.zeros(candidates.shape[0])
 
@@ -294,7 +306,11 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _validate_data(
-        self, candidates, return_utilities, reset=True, **check_candidates_params
+        self,
+        candidates,
+        return_utilities,
+        reset=True,
+        **check_candidates_params
     ):
         """Validate input data and set or check the `n_features_in_` attribute.
 

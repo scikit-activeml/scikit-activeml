@@ -48,7 +48,9 @@ class TestApproximation(unittest.TestCase):
 
         for parameter in illegal_argument_dict:
             for illegal_argument in illegal_argument_dict[parameter]:
-                param_dict = dict(X=X, func=dummy_func_1, reg=reg, method="quantile")
+                param_dict = dict(
+                    X=X, func=dummy_func_1, reg=reg, method="quantile"
+                )
                 param_dict[parameter] = illegal_argument
                 self.assertRaises(
                     (TypeError, ValueError), conditional_expect, **param_dict
@@ -56,7 +58,9 @@ class TestApproximation(unittest.TestCase):
 
         param_dict = dict(X=X, func=dummy_func_1, reg=reg, method="quantile")
         dummy_funcs = [dummy_func_1, dummy_func_2, dummy_func_3]
-        for include_idx, include_x in itertools.product([False, True], [False, True]):
+        for include_idx, include_x in itertools.product(
+            [False, True], [False, True]
+        ):
             n_free_parameters = include_x + include_idx
             correct_func = dummy_funcs[include_x + include_idx]
 
@@ -74,7 +78,9 @@ class TestApproximation(unittest.TestCase):
 
     def test_conditional_expectation(self):
 
-        reg = SklearnProbabilisticRegressor(estimator=GaussianProcessRegressor())
+        reg = SklearnProbabilisticRegressor(
+            estimator=GaussianProcessRegressor()
+        )
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         y_train = np.array([-1, 2, 1, 4])
         reg.fit(X_train, y_train)
@@ -101,7 +107,9 @@ class TestApproximation(unittest.TestCase):
 
         X = np.arange(2 * 3).reshape((2, 3))
 
-        for parameter_1, parameter_2 in itertools.product(parameters_1, parameters_2):
+        for parameter_1, parameter_2 in itertools.product(
+            parameters_1, parameters_2
+        ):
             parameter = {**parameter_1, **parameter_2}
 
             def dummy_func(idx, x, y):

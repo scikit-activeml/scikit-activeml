@@ -17,7 +17,9 @@ class TestUncertaintySampling(unittest.TestCase):
         self.y = np.array([0, 0, 1, 1])
         self.classes = np.array([0, 1])
         self.clf = ParzenWindowClassifier()
-        self.kwargs = dict(X=self.X, y=self.y, candidates=self.candidates, clf=self.clf)
+        self.kwargs = dict(
+            X=self.X, y=self.y, candidates=self.candidates, clf=self.clf
+        )
 
     def test_init_param_method(self):
         selector = UncertaintySampling()
@@ -59,7 +61,10 @@ class TestUncertaintySampling(unittest.TestCase):
             ValueError, selector.query, **self.kwargs, sample_weight="string"
         )
         self.assertRaises(
-            ValueError, selector.query, **self.kwargs, sample_weight=self.candidates
+            ValueError,
+            selector.query,
+            **self.kwargs,
+            sample_weight=self.candidates
         )
         self.assertRaises(
             ValueError,
@@ -100,11 +105,15 @@ class TestUncertaintySampling(unittest.TestCase):
 
     def test_query_param_fit_clf(self):
         selector = UncertaintySampling()
-        self.assertRaises(TypeError, selector.query, **self.kwargs, fit_clf="string")
+        self.assertRaises(
+            TypeError, selector.query, **self.kwargs, fit_clf="string"
+        )
         self.assertRaises(
             TypeError, selector.query, **self.kwargs, fit_clf=self.candidates
         )
-        self.assertRaises(TypeError, selector.query, **self.kwargs, fit_clf=None)
+        self.assertRaises(
+            TypeError, selector.query, **self.kwargs, fit_clf=None
+        )
 
     def test_query(self):
         compare_list = []
@@ -156,7 +165,9 @@ class TestUncertaintySampling(unittest.TestCase):
 
         selector = UncertaintySampling(method="expected_average_precision")
         selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-        best_indices, utilities = selector.query(**self.kwargs, return_utilities=True)
+        best_indices, utilities = selector.query(
+            **self.kwargs, return_utilities=True
+        )
         self.assertEqual(utilities.shape, (1, len(self.candidates)))
         self.assertEqual(best_indices.shape, (1,))
 
@@ -227,7 +238,9 @@ class TestExpectedAveragePrecision(unittest.TestCase):
 
     def test_expected_average_precision(self):
         expected_average_precision(classes=self.classes, probas=[[0.0, 1.0]])
-        scores = expected_average_precision(classes=self.classes, probas=self.probas)
+        scores = expected_average_precision(
+            classes=self.classes, probas=self.probas
+        )
         self.assertTrue(scores.shape == (len(self.probas),))
         np.testing.assert_array_equal(scores, self.scores_val)
 
@@ -241,11 +254,15 @@ class TestUncertaintyScores(unittest.TestCase):
     def test_param_probas(self):
         self.assertRaises(ValueError, uncertainty_scores, probas=[1])
         self.assertRaises(ValueError, uncertainty_scores, probas=[[[1]]])
-        self.assertRaises(ValueError, uncertainty_scores, probas=[[0.6, 0.1, 0.2]])
+        self.assertRaises(
+            ValueError, uncertainty_scores, probas=[[0.6, 0.1, 0.2]]
+        )
         self.assertRaises(ValueError, uncertainty_scores, probas="string")
 
     def test_init_param_method(self):
-        self.assertRaises(ValueError, uncertainty_scores, self.probas, method="String")
+        self.assertRaises(
+            ValueError, uncertainty_scores, self.probas, method="String"
+        )
         self.assertRaises(ValueError, uncertainty_scores, self.probas, method=1)
 
     def test_param_cost_matrix(self):

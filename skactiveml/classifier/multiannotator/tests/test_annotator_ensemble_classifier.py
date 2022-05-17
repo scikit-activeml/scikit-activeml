@@ -63,7 +63,9 @@ class TestAnnotatorEnsembleClassifier(unittest.TestCase):
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
         perc = SklearnClassifier(Perceptron())
-        clf = AnnotatorEnsembleClassifier(estimators=[("perc", perc)], voting="soft")
+        clf = AnnotatorEnsembleClassifier(
+            estimators=[("perc", perc)], voting="soft"
+        )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
 
     def test_init_param_voting(self):

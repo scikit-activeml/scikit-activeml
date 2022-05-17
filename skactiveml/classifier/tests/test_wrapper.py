@@ -62,7 +62,9 @@ class TestSklearnClassifier(unittest.TestCase):
         clf.fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "kernel_"))
-        np.testing.assert_array_equal(clf.classes_, ["new york", "paris", "tokyo"])
+        np.testing.assert_array_equal(
+            clf.classes_, ["new york", "paris", "tokyo"]
+        )
         self.assertEqual(clf.missing_label, "nan")
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -89,7 +91,9 @@ class TestSklearnClassifier(unittest.TestCase):
         clf.partial_fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "class_count_"))
-        np.testing.assert_array_equal(clf.classes_, ["new york", "paris", "tokyo"])
+        np.testing.assert_array_equal(
+            clf.classes_, ["new york", "paris", "tokyo"]
+        )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
         self.assertTrue(clf.is_fitted_)

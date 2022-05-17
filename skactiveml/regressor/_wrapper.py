@@ -12,7 +12,11 @@ from sklearn.utils.metaestimators import (
     _AvailableIfDescriptor,
     available_if,
 )
-from sklearn.utils.validation import has_fit_parameter, check_array, check_is_fitted
+from sklearn.utils.validation import (
+    has_fit_parameter,
+    check_array,
+    check_is_fitted,
+)
 
 from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
 from skactiveml.utils import check_type
@@ -39,7 +43,8 @@ def if_delegate_has_alternative_methods(delegate, *alternative_methods):
     def if_obj_has_alternative_methods(obj):
         delegate_obj = attrgetter(delegate)(obj)
         return any(
-            hasattr(delegate_obj, method_name) for method_name in alternative_methods
+            hasattr(delegate_obj, method_name)
+            for method_name in alternative_methods
         )
 
     return available_if(if_obj_has_alternative_methods)
@@ -64,7 +69,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         reproducible results across multiple method calls.
     """
 
-    def __init__(self, estimator, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(
+        self, estimator, missing_label=MISSING_LABEL, random_state=None
+    ):
         super().__init__(random_state=random_state, missing_label=missing_label)
         self.estimator = estimator
 
@@ -92,7 +99,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
-                "'{}' must be a scikit-learn " "regressor.".format(self.estimator)
+                "'{}' must be a scikit-learn "
+                "regressor.".format(self.estimator)
             )
 
         self.estimator_ = deepcopy(self.estimator)
@@ -102,7 +110,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
         X_labeled = X[is_lbld]
         y_labeled = y[is_lbld]
-        estimator_parameters = dict(fit_kwargs) if fit_kwargs is not None else {}
+        estimator_parameters = (
+            dict(fit_kwargs) if fit_kwargs is not None else {}
+        )
 
         if (
             has_fit_parameter(self.estimator_, "sample_weight")
@@ -192,7 +202,9 @@ class SklearnProbabilisticRegressor(ProbabilisticRegressor, SklearnRegressor):
         reproducible results across multiple method calls.
     """
 
-    def __init__(self, estimator, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(
+        self, estimator, missing_label=MISSING_LABEL, random_state=None
+    ):
         super(SklearnProbabilisticRegressor, self).__init__(
             estimator, missing_label=missing_label, random_state=random_state
         )

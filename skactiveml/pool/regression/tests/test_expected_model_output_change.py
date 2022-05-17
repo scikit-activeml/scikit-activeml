@@ -59,7 +59,9 @@ class TestExpectedModelOutputChange(unittest.TestCase):
             qs = ExpectedModelOutputChange(
                 random_state=self.random_state, loss=illegal_loss
             )
-            self.assertRaises((TypeError, ValueError), qs.query, **self.query_kwargs)
+            self.assertRaises(
+                (TypeError, ValueError), qs.query, **self.query_kwargs
+            )
 
     def test_init_param_integration_dict(self):
         provide_test_regression_query_strategy_init_integration_dict(
@@ -67,10 +69,14 @@ class TestExpectedModelOutputChange(unittest.TestCase):
         )
 
     def test_query_param_X(self):
-        provide_test_regression_query_strategy_query_X(self, ExpectedModelOutputChange)
+        provide_test_regression_query_strategy_query_X(
+            self, ExpectedModelOutputChange
+        )
 
     def test_query_param_y(self):
-        provide_test_regression_query_strategy_query_y(self, ExpectedModelOutputChange)
+        provide_test_regression_query_strategy_query_y(
+            self, ExpectedModelOutputChange
+        )
 
     def test_query_param_reg(self):
         provide_test_regression_query_strategy_query_reg(

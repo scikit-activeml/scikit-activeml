@@ -142,7 +142,9 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         else:
             return queried_indices
 
-    def update(self, candidates, queried_indices, budget_manager_param_dict=None):
+    def update(
+        self, candidates, queried_indices, budget_manager_param_dict=None
+    ):
         """Updates the budget manager and the count for seen and queried
         instances
 
@@ -179,7 +181,9 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             )
 
         budget_manager_param_dict = (
-            {} if budget_manager_param_dict is None else budget_manager_param_dict
+            {}
+            if budget_manager_param_dict is None
+            else budget_manager_param_dict
         )
 
         call_func(

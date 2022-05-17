@@ -215,7 +215,13 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
 
 
 def table_from_array(
-    a, title="", caption="", widths=None, header_rows=0, section_level="-", indent=0
+    a,
+    title="",
+    caption="",
+    widths=None,
+    header_rows=0,
+    section_level="-",
+    indent=0,
 ):
     """Generates a rst-table and returns it as a string.
 
@@ -288,7 +294,9 @@ def generate_examples(gen_path, package, json_path):
         gen_path, "examples", package.__name__.split(".")[1], ""
     )
 
-    rel_api_path = os.path.join(os.path.basename(gen_path), "api").replace("\\", "/")
+    rel_api_path = os.path.join(os.path.basename(gen_path), "api").replace(
+        "\\", "/"
+    )
 
     # create directory if it does not exist.
     os.makedirs(dir_path_package, exist_ok=True)
@@ -329,13 +337,19 @@ def generate_examples(gen_path, package, json_path):
                 for ref in data["refs"]:
                     ref_text += f":footcite:t:`{ref}`, "
                 ref_text = ref_text[0:-2]
-                category = data["categories"] if "categories" in data.keys() else {}
+                category = (
+                    data["categories"] if "categories" in data.keys() else {}
+                )
                 table = np.append(
-                    table, [[methods_text, strategy_text, ref_text, category]], axis=0
+                    table,
+                    [[methods_text, strategy_text, ref_text, category]],
+                    axis=0,
                 )
 
                 # create the example python script
-                plot_filename = "plot_" + data["class"] + "_" + method.replace(" ", "_")
+                plot_filename = (
+                    "plot_" + data["class"] + "_" + method.replace(" ", "_")
+                )
                 generate_example_script(
                     filename=plot_filename + ".py",
                     dir_path=dir_path_package,
@@ -441,7 +455,10 @@ def format_title(title, first_title):
     """
     if first_title:
         block_str = (
-            '"""\n' "" + title + "\n" "".ljust(len(title) + 1, "=") + "\n" '"""\n'
+            '"""\n'
+            "" + title + "\n"
+            "".ljust(len(title) + 1, "=") + "\n"
+            '"""\n'
         )
     else:
         block_str = "# %%\n" "# .. rubric:: " + title + ":\n"
@@ -463,7 +480,9 @@ def format_subtitle(title):
     -------
     string : The formatted string for the example script.
     """
-    block_str = "# %%\n" "# " + title + "\n" "# ".ljust(len(title) + 1, "-") + "\n\n"
+    block_str = (
+        "# %%\n" "# " + title + "\n" "# ".ljust(len(title) + 1, "-") + "\n\n"
+    )
     return block_str
 
 
@@ -527,14 +546,14 @@ def format_plot(data, template_path):
         for line in template:
             if "#_" or "# _" in line:
                 if "# _import" in line:
-                    line = f'from skactiveml.pool import {data["qs"].__name__}\n'
+                    line = (
+                        f'from skactiveml.pool import {data["qs"].__name__}\n'
+                    )
                     if (
                         "clf" not in data.keys()
                         and "clf" not in data["init_params"].keys()
                     ):
-                        line += (
-                            "from skactiveml.classifier import ParzenWindowClassifier\n"
-                        )
+                        line += "from skactiveml.classifier import ParzenWindowClassifier\n"
                 elif "init_clf" in line:
                     # Decide which classifier to use, if clf is None.
                     if "clf" not in data.keys():
@@ -548,7 +567,8 @@ def format_plot(data, template_path):
                 elif "init_qs" in line:
                     if (
                         "clf" not in data["init_params"].keys()
-                        and "clf" in inspect.signature(data["qs"].__init__).parameters
+                        and "clf"
+                        in inspect.signature(data["qs"].__init__).parameters
                     ):
                         data["init_params"]["clf"] = "clf"
                     # Set the random state if it is not set in the json file.
@@ -569,7 +589,9 @@ def format_plot(data, template_path):
                         line[:start]
                         + "{"
                         + dict_to_str(
-                            data["query_params"], allocator=": ", key_as_string=True
+                            data["query_params"],
+                            allocator=": ",
+                            key_as_string=True,
                         )
                         + "}\n"
                     )

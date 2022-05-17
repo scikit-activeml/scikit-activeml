@@ -22,7 +22,9 @@ from skactiveml.utils._validation import check_callable
 class TestValidation(unittest.TestCase):
     def test_check_scalar(self):
         x = 5
-        self.assertRaises(TypeError, check_scalar, x=x, target_type=float, name="x")
+        self.assertRaises(
+            TypeError, check_scalar, x=x, target_type=float, name="x"
+        )
         self.assertRaises(
             ValueError, check_scalar, x=x, target_type=int, max_val=4, name="x"
         )
@@ -170,7 +172,9 @@ class TestValidation(unittest.TestCase):
         X_cand = [[5, 6]]
         X, y, sample_weight = check_X_y(X, y)
         np.testing.assert_array_equal(sample_weight, np.array([1.0, 1.0]))
-        X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(X, y, X_cand)
+        X, y, X_cand, sample_weight, sample_weight_cand = check_X_y(
+            X, y, X_cand
+        )
         np.testing.assert_array_equal(sample_weight_cand, np.array([1.0]))
         sample_weight = [0.4, 0.6]
         X, y, X_cand, sample_weight, _ = check_X_y(X, y, X_cand, sample_weight)
@@ -241,7 +245,11 @@ class TestValidation(unittest.TestCase):
         )
 
         self.assertRaises(
-            ValueError, check_callable, lambda x, y: x, "name", n_free_parameters=1
+            ValueError,
+            check_callable,
+            lambda x, y: x,
+            "name",
+            n_free_parameters=1,
         )
 
         self.assertRaises(TypeError, check_callable, "illegal", "name")
@@ -301,10 +309,14 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(ValueError, check_bound, X=wrong_X)
         self.assertRaises(ValueError, check_bound, bound=wrong_bound)
         self.assertRaises(ValueError, check_bound)
-        self.assertRaises(ValueError, check_bound, X=X, bound_must_be_given=True)
+        self.assertRaises(
+            ValueError, check_bound, X=X, bound_must_be_given=True
+        )
 
     def test_check_budget_manager(self):
-        self.assertIsNotNone(check_budget_manager(0.1, None, SplitBudgetManager))
+        self.assertIsNotNone(
+            check_budget_manager(0.1, None, SplitBudgetManager)
+        )
         with self.assertWarns(Warning):
             check_budget_manager(
                 0.1, SplitBudgetManager(budget=0.2), SplitBudgetManager

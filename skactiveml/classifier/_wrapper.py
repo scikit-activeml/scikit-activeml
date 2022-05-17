@@ -162,7 +162,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             else:
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
-                y_pred = rand_argmin(costs, random_state=self.random_state_, axis=1)
+                y_pred = rand_argmin(
+                    costs, random_state=self.random_state_, axis=1
+                )
         else:
             p = self.predict_proba([X[0]])[0]
             y_pred = self.random_state_.choice(
@@ -213,7 +215,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if sum(self._label_counts) == 0:
             return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
         else:
-            return np.tile(self._label_counts / np.sum(self._label_counts), [len(X), 1])
+            return np.tile(
+                self._label_counts / np.sum(self._label_counts), [len(X), 1]
+            )
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
@@ -233,7 +237,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         # Check whether estimator is a valid classifier.
         if not is_classifier(estimator=self.estimator):
             raise TypeError(
-                "'{}' must be a scikit-learn " "classifier.".format(self.estimator)
+                "'{}' must be a scikit-learn "
+                "classifier.".format(self.estimator)
             )
 
         # Check whether estimator can deal with cost matrix.

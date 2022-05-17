@@ -57,7 +57,9 @@ class TestExpectedModelChange(unittest.TestCase):
             self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
         qs = ExpectedModelChange(feature_map=lambda x: np.zeros((len(x), 1)))
-        utilities = qs.query(self.X, self.y, reg=self.reg, return_utilities=True)[1]
+        utilities = qs.query(
+            self.X, self.y, reg=self.reg, return_utilities=True
+        )[1]
         np.testing.assert_array_equal(np.zeros(2), utilities[0, :2])
 
     def test_init_param_ord(self):
@@ -65,16 +67,24 @@ class TestExpectedModelChange(unittest.TestCase):
         self.assertRaises(ValueError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):
-        provide_test_regression_query_strategy_query_X(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_X(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_y(self):
-        provide_test_regression_query_strategy_query_y(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_y(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_reg(self):
-        provide_test_regression_query_strategy_query_reg(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_reg(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_fit_reg(self):
-        provide_test_regression_query_strategy_query_fit_reg(self, ExpectedModelChange)
+        provide_test_regression_query_strategy_query_fit_reg(
+            self, ExpectedModelChange
+        )
 
     def test_query_param_sample_weight(self):
         provide_test_regression_query_strategy_query_sample_weight(

@@ -14,7 +14,9 @@ from ...base import SkactivemlClassifier
 from ...utils import MISSING_LABEL, is_labeled, compute_vote_vectors
 
 
-class AnnotatorEnsembleClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifier):
+class AnnotatorEnsembleClassifier(
+    _BaseHeterogeneousEnsemble, SkactivemlClassifier
+):
     """AnnotatorEnsembleClassifier
 
     This strategy consists of fitting one classifier per annotator.
@@ -137,7 +139,8 @@ class AnnotatorEnsembleClassifier(_BaseHeterogeneousEnsemble, SkactivemlClassifi
         # Check voting scheme.
         if self.voting not in ("soft", "hard"):
             raise ValueError(
-                f"Voting must be 'soft' or 'hard'; " f"got `voting='{self.voting}'`)"
+                f"Voting must be 'soft' or 'hard'; "
+                f"got `voting='{self.voting}'`)"
             )
 
         # Fit each estimator

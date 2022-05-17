@@ -46,7 +46,9 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         random_state=None,
     ):
         super().__init__(random_state=random_state, missing_label=missing_label)
-        self.loss = loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
+        self.loss = (
+            loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
+        )
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:

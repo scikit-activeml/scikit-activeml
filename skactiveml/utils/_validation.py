@@ -54,21 +54,31 @@ def check_scalar(
     """
     if not isinstance(x, target_type):
         raise TypeError(
-            "`{}` must be an instance of {}, not {}.".format(name, target_type, type(x))
+            "`{}` must be an instance of {}, not {}.".format(
+                name, target_type, type(x)
+            )
         )
     if min_inclusive:
         if min_val is not None and x < min_val:
-            raise ValueError("`{}`= {}, must be >= " "{}.".format(name, x, min_val))
+            raise ValueError(
+                "`{}`= {}, must be >= " "{}.".format(name, x, min_val)
+            )
     else:
         if min_val is not None and x <= min_val:
-            raise ValueError("`{}`= {}, must be > " "{}.".format(name, x, min_val))
+            raise ValueError(
+                "`{}`= {}, must be > " "{}.".format(name, x, min_val)
+            )
 
     if max_inclusive:
         if max_val is not None and x > max_val:
-            raise ValueError("`{}`= {}, must be <= " "{}.".format(name, x, max_val))
+            raise ValueError(
+                "`{}`= {}, must be <= " "{}.".format(name, x, max_val)
+            )
     else:
         if max_val is not None and x >= max_val:
-            raise ValueError("`{}`= {}, must be < " "{}.".format(name, x, max_val))
+            raise ValueError(
+                "`{}`= {}, must be < " "{}.".format(name, x, max_val)
+            )
 
 
 def check_classifier_params(classes, missing_label, cost_matrix=None):
@@ -92,14 +102,16 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
         n_labeled = is_unlabeled(y=classes, missing_label=missing_label).sum()
         if n_labeled > 0:
             raise ValueError(
-                f"`classes={classes}` contains " f"`missing_label={missing_label}.`"
+                f"`classes={classes}` contains "
+                f"`missing_label={missing_label}.`"
             )
         if cost_matrix is not None:
             check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
     else:
         if cost_matrix is not None:
             raise ValueError(
-                "You cannot specify 'cost_matrix' without " "specifying 'classes'."
+                "You cannot specify 'cost_matrix' without "
+                "specifying 'classes'."
             )
 
 
@@ -112,7 +124,9 @@ def check_classes(classes):
         Array of class labels.
     """
     if not isinstance(classes, Iterable):
-        raise TypeError("'classes' is not iterable. Got {}".format(type(classes)))
+        raise TypeError(
+            "'classes' is not iterable. Got {}".format(type(classes))
+        )
     try:
         classes_sorted = np.array(sorted(set(classes)))
         if len(classes) != len(classes_sorted):
@@ -120,7 +134,9 @@ def check_classes(classes):
     except TypeError:
         types = sorted(t.__qualname__ for t in set(type(v) for v in classes))
         raise TypeError(
-            "'classes' must be uniformly strings or numbers. Got {}".format(types)
+            "'classes' must be uniformly strings or numbers. Got {}".format(
+                types
+            )
         )
 
 
@@ -193,7 +209,9 @@ def check_cost_matrix(
         Numpy array as cost matrix.
     """
     check_scalar(n_classes, target_type=int, name="n_classes", min_val=1)
-    cost_matrix_new = check_array(np.array(cost_matrix, dtype=float), ensure_2d=True)
+    cost_matrix_new = check_array(
+        np.array(cost_matrix, dtype=float), ensure_2d=True
+    )
     if cost_matrix_new.shape != (n_classes, n_classes):
         raise ValueError(
             "'cost_matrix' must have shape ({}, {}). "
@@ -209,10 +227,13 @@ def check_cost_matrix(
     if n_classes != 1 and np.sum(cost_matrix_new != 0) == 0:
         if contains_non_zero:
             raise ValueError(
-                "'cost_matrix' must contain at least one non-zero cost " "entry."
+                "'cost_matrix' must contain at least one non-zero cost "
+                "entry."
             )
         else:
-            warnings.warn("'cost_matrix' contains contains no non-zero cost entry.")
+            warnings.warn(
+                "'cost_matrix' contains contains no non-zero cost entry."
+            )
     if np.sum(np.diag(cost_matrix_new) != 0) > 0:
         if diagonal_is_zero:
             raise ValueError(
@@ -474,7 +495,9 @@ def check_random_state(random_state, seed_multiplier=None):
     if random_state is None or seed_multiplier is None:
         return check_random_state_sklearn(random_state)
 
-    check_scalar(seed_multiplier, name="seed_multiplier", target_type=int, min_val=1)
+    check_scalar(
+        seed_multiplier, name="seed_multiplier", target_type=int, min_val=1
+    )
     random_state = copy.deepcopy(random_state)
     random_state = check_random_state_sklearn(random_state)
 
@@ -515,7 +538,8 @@ def check_indices(indices, A, dim="adaptive", unique=True):
             n_unique_indices = len(np.unique(indices, axis=0))
         if n_unique_indices < len(indices):
             raise ValueError(
-                f"`indices` contains two different indices of the " f"same value."
+                f"`indices` contains two different indices of the "
+                f"same value."
             )
     elif unique:
         if indices.ndim == 1:
@@ -580,10 +604,14 @@ def check_type(obj, name, *target_types):
 
     """
     target_vals = [
-        target_val for target_val in target_types if not isinstance(target_val, type)
+        target_val
+        for target_val in target_types
+        if not isinstance(target_val, type)
     ]
     target_types = [
-        target_type for target_type in target_types if isinstance(target_type, type)
+        target_type
+        for target_type in target_types
+        if isinstance(target_type, type)
     ]
 
     if (
@@ -608,12 +636,16 @@ def check_type(obj, name, *target_types):
                 error_str += f"`{target_types[i]}`,"
             error_str += f" or `{target_types[len(target_types) - 1]}` "
         elif len(target_types) > 3:
-            error_str += f"have one of the following types: {set(target_types)} "
+            error_str += (
+                f"have one of the following types: {set(target_types)} "
+            )
 
         if len(target_vals) >= 1:
             if len(target_types) > 0:
-                error_str = "or "
-            error_str += f"equal one of the following values: {set(target_vals)}"
+                error_str += "or "
+            error_str += (
+                f"equal one of the following values: {set(target_vals)}"
+            )
         raise TypeError(error_str + ".")
 
 
@@ -658,7 +690,9 @@ def check_callable(func, name, n_free_parameters=None):
         )
 
 
-def check_bound(bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False):
+def check_bound(
+    bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False
+):
     """Validates bound and returns the bound of X if bound is None.
     `bound` or `X` must not be None.
 

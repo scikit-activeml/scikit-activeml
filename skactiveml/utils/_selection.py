@@ -79,7 +79,9 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
     return index_array
 
 
-def simple_batch(utilities, random_state=None, batch_size=1, return_utilities=False):
+def simple_batch(
+    utilities, random_state=None, batch_size=1, return_utilities=False
+):
     """Generates a batch by selecting the highest values in the 'utilities'.
     If utilities is an ND-array, the returned utilities will be an
     (N+1)D-array, with the shape batch_size x utilities.shape, filled the given
@@ -196,7 +198,10 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         next_ranking = iter_ranking[idx]
         cr_shape = combined_ranking.shape
         if rank_per_batch:
-            rank_shape = (cr_shape[0], max(reduce(operator.mul, cr_shape[1:], 1), 1))
+            rank_shape = (
+                cr_shape[0],
+                max(reduce(operator.mul, cr_shape[1:], 1), 1),
+            )
             rank_dict = {"method": rank_method, "axis": 1}
         else:
             rank_shape = reduce(operator.mul, cr_shape, 1)
@@ -211,6 +216,8 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         combined_ranking[nan_values] = np.nan
         combined_ranking = combined_ranking.reshape(cr_shape)
 
-        combined_ranking = combined_ranking + 1 / (1 + np.exp(-next_ranking))  # sigmoid
+        combined_ranking = combined_ranking + 1 / (
+            1 + np.exp(-next_ranking)
+        )  # sigmoid
 
     return combined_ranking

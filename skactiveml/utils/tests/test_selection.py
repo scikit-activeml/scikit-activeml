@@ -22,12 +22,16 @@ class TestSelection(unittest.TestCase):
         np.testing.assert_array_equal(
             [1, 0], rand_argmin(self.d, axis=1, random_state=42)
         )
-        np.testing.assert_array_equal([1, 0], rand_argmin(self.d, random_state=42))
+        np.testing.assert_array_equal(
+            [1, 0], rand_argmin(self.d, random_state=42)
+        )
         np.testing.assert_array_equal([3], rand_argmin(self.c, random_state=1))
         np.testing.assert_array_equal(
             [1, 1], rand_argmin(self.d, axis=1, random_state=1)
         )
-        np.testing.assert_array_equal([1, 1], rand_argmin(self.d, random_state=1))
+        np.testing.assert_array_equal(
+            [1, 1], rand_argmin(self.d, random_state=1)
+        )
         np.testing.assert_array_equal([1], rand_argmin(self.e))
 
     def test_rand_argmax(self):
@@ -38,12 +42,16 @@ class TestSelection(unittest.TestCase):
         np.testing.assert_array_equal(
             [1, 0], rand_argmax(self.d, axis=1, random_state=42)
         )
-        np.testing.assert_array_equal([0, 1], rand_argmax(self.d, random_state=42))
+        np.testing.assert_array_equal(
+            [0, 1], rand_argmax(self.d, random_state=42)
+        )
         np.testing.assert_array_equal([0], rand_argmax(self.c, random_state=10))
         np.testing.assert_array_equal(
             [1, 1], rand_argmax(self.d, axis=1, random_state=1)
         )
-        np.testing.assert_array_equal([0, 0], rand_argmax(self.d, random_state=10))
+        np.testing.assert_array_equal(
+            [0, 0], rand_argmax(self.d, random_state=10)
+        )
         np.testing.assert_array_equal([1], rand_argmax(self.e))
 
     def test_simple_batch(self):
@@ -104,7 +112,10 @@ class TestSelection(unittest.TestCase):
     def test_combine_ranking(self):
 
         self.assertRaises(
-            ValueError, combine_ranking, np.array([0, 1]), np.array([[0, 1], [1, 2]])
+            ValueError,
+            combine_ranking,
+            np.array([0, 1]),
+            np.array([[0, 1], [1, 2]]),
         )
 
         ranking_1 = np.array([0, 1, 1])

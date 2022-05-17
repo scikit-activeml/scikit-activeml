@@ -123,7 +123,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
     def test_query_param_query_params_dict(self):
 
         uncertainty = UncertaintySampling(method="entropy")
-        wrapper = SingleAnnotatorWrapper(uncertainty, random_state=self.random_state)
+        wrapper = SingleAnnotatorWrapper(
+            uncertainty, random_state=self.random_state
+        )
 
         self.assertRaises(
             TypeError,
@@ -142,7 +144,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             random_state=self.random_state,
         )
         uncertainty = UncertaintySampling(method="entropy")
-        wrapper = SingleAnnotatorWrapper(uncertainty, random_state=self.random_state)
+        wrapper = SingleAnnotatorWrapper(
+            uncertainty, random_state=self.random_state
+        )
 
         y = np.array([[[1, 0], [0, 1], [1, 1], [0, 0]]])
 
@@ -163,7 +167,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             random_state=self.random_state,
         )
         uncertainty = UncertaintySampling(method="entropy")
-        wrapper = SingleAnnotatorWrapper(uncertainty, random_state=self.random_state)
+        wrapper = SingleAnnotatorWrapper(
+            uncertainty, random_state=self.random_state
+        )
 
         X = np.array([[1, 0, 4], [0, 1, 3], [1, 4, 0], [0, 0, 2]])
 
@@ -195,7 +201,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
     def test_query_param_batch_size(self):
         random = RandomSampling(self.random_state)
         wrapper = SingleAnnotatorWrapper(random, random_state=self.random_state)
-        self.assertRaises(TypeError, wrapper.query, self.X, self.y, batch_size=None)
+        self.assertRaises(
+            TypeError, wrapper.query, self.X, self.y, batch_size=None
+        )
 
     def test_query_param_return_utilities(self):
         random = RandomSampling(self.random_state)
@@ -271,7 +279,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         uncertainty = UncertaintySampling(method="entropy")
 
         def y_aggregate(y_t):
-            w = np.repeat(np.arange(y.shape[1]).reshape(1, -1), y.shape[0], axis=0)
+            w = np.repeat(
+                np.arange(y.shape[1]).reshape(1, -1), y.shape[0], axis=0
+            )
             return majority_vote(y_t, w=w, random_state=0)
 
         wrapper = SingleAnnotatorWrapper(
@@ -347,7 +357,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         wrapper = SingleAnnotatorWrapper(random, random_state=self.random_state)
 
-        re_val = wrapper.query(self.X, self.y, batch_size=4, return_utilities=True)
+        re_val = wrapper.query(
+            self.X, self.y, batch_size=4, return_utilities=True
+        )
 
         best_cand_indices, utilities = re_val
         self.assertEqual((4, 2), best_cand_indices.shape)
@@ -571,13 +583,20 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         best_value_indices = best_cand_indices[:, 0]
         best_annotator_indices = best_cand_indices[:, 1]
 
-        self.assertEqual(best_value_indices.shape[0], best_annotator_indices.shape[0])
+        self.assertEqual(
+            best_value_indices.shape[0], best_annotator_indices.shape[0]
+        )
 
         for i in range(best_value_indices.shape[0]):
-            self.assertTrue(A_cand[best_value_indices[i], best_annotator_indices[i]])
+            self.assertTrue(
+                A_cand[best_value_indices[i], best_annotator_indices[i]]
+            )
 
     def check_max(self, best_cand_indices, utilities):
         for i in range(best_cand_indices.shape[0]):
             a = np.nanargmax(utilities[i])
-            b = best_cand_indices[i, 0] * utilities.shape[2] + best_cand_indices[i, 1]
+            b = (
+                best_cand_indices[i, 0] * utilities.shape[2]
+                + best_cand_indices[i, 1]
+            )
             self.assertEqual(a, b)

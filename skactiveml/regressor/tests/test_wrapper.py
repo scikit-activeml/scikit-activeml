@@ -133,7 +133,9 @@ class TestCondEstWrapper(unittest.TestCase):
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_estimate_cond(self):
-        reg = SklearnProbabilisticRegressor(estimator=GaussianProcessRegressor())
+        reg = SklearnProbabilisticRegressor(
+            estimator=GaussianProcessRegressor()
+        )
         reg.fit(self.X, self.y)
 
         y_pred = reg.predict_target_distribution(self.X_cand).logpdf(0)
@@ -141,4 +143,6 @@ class TestCondEstWrapper(unittest.TestCase):
 
         reg = SklearnProbabilisticRegressor(estimator=LinearRegression())
         reg.fit(self.X, self.y)
-        self.assertRaises(ValueError, reg.predict_target_distribution, self.X_cand)
+        self.assertRaises(
+            ValueError, reg.predict_target_distribution, self.X_cand
+        )

@@ -89,7 +89,10 @@ class TestBudgetManager(unittest.TestCase):
 
                 # Get class to check.
                 class_filename = path.basename(inspect.getfile(bm_class))[:-3]
-                mod = "skactiveml.stream.budgetmanager.tests.test" + class_filename
+                mod = (
+                    "skactiveml.stream.budgetmanager.tests.test"
+                    + class_filename
+                )
                 mod = import_module(mod)
                 test_class_name = "Test" + bm_class.__name__
                 msg = f"{bm_class} has no test called {test_class_name}."

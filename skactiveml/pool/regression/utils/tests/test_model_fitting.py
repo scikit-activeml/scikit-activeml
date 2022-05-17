@@ -23,7 +23,9 @@ class TestFunctions(unittest.TestCase):
 
     def test_update_X_y(self):
 
-        X_new, y_new = update_X_y(self.X, self.y, self.y_pot, X_update=self.x_pot)
+        X_new, y_new = update_X_y(
+            self.X, self.y, self.y_pot, X_update=self.x_pot
+        )
 
         self.assertEqual(X_new.shape, (8, 2))
         self.assertEqual(y_new.shape, (8,))
@@ -63,9 +65,16 @@ class TestFunctions(unittest.TestCase):
         )
         self.reg.fit(self.X, self.y)
         reg_new = update_reg(
-            self.reg, self.X, self.y, self.y_pot, mapping=self.mapping, idx_update=1
+            self.reg,
+            self.X,
+            self.y,
+            self.y_pot,
+            mapping=self.mapping,
+            idx_update=1,
         )
-        self.assertTrue(np.any(reg_new.predict(self.X) != self.reg.predict(self.X)))
+        self.assertTrue(
+            np.any(reg_new.predict(self.X) != self.reg.predict(self.X))
+        )
         reg_new = update_reg(
             self.reg,
             self.X,
@@ -74,7 +83,9 @@ class TestFunctions(unittest.TestCase):
             mapping=self.mapping,
             idx_update=np.array([1]),
         )
-        self.assertTrue(np.any(reg_new.predict(self.X) != self.reg.predict(self.X)))
+        self.assertTrue(
+            np.any(reg_new.predict(self.X) != self.reg.predict(self.X))
+        )
         reg_new = update_reg(
             self.reg,
             self.X,
@@ -83,7 +94,9 @@ class TestFunctions(unittest.TestCase):
             mapping=None,
             X_update=np.array([8, 4]),
         )
-        self.assertTrue(np.any(reg_new.predict(self.X) != self.reg.predict(self.X)))
+        self.assertTrue(
+            np.any(reg_new.predict(self.X) != self.reg.predict(self.X))
+        )
         self.assertRaises(
             ValueError,
             update_reg,
@@ -101,6 +114,10 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(len(reg_s), 5)
 
         reg_s = bootstrap_estimators(
-            self.reg, self.X, self.y, sample_weight=self.sample_weight, k_bootstrap=5
+            self.reg,
+            self.X,
+            self.y,
+            sample_weight=self.sample_weight,
+            k_bootstrap=5,
         )
         self.assertEqual(len(reg_s), 5)

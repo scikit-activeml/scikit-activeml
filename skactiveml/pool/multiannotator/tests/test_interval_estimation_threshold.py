@@ -73,18 +73,24 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
             y=self.y,
             sample_weight=np.ones(len(self.y)),
         )
-        self.assertRaises(TypeError, ie_model.fit, y=self.y, sample_weight="test")
+        self.assertRaises(
+            TypeError, ie_model.fit, y=self.y, sample_weight="test"
+        )
 
     def test_predict_annot_perf_param_X(self):
         ie_model = IntervalEstimationAnnotModel().fit(self.X, self.y)
         self.assertRaises(ValueError, ie_model.predict_annotator_perf, X=None)
-        self.assertRaises(ValueError, ie_model.predict_annotator_perf, X=np.ones(2))
+        self.assertRaises(
+            ValueError, ie_model.predict_annotator_perf, X=np.ones(2)
+        )
 
     def test_fit(self):
         ie_model = IntervalEstimationAnnotModel().fit(
             self.X, self.y, sample_weight=self.sample_weight
         )
-        np.testing.assert_array_equal(ie_model.A_perf_.shape, (self.y.shape[1], 3))
+        np.testing.assert_array_equal(
+            ie_model.A_perf_.shape, (self.y.shape[1], 3)
+        )
         self.assertEqual(ie_model.A_perf_[2, 1], 5 / 6)
         a_idx, mode_idx = np.unravel_index(
             np.argmax(ie_model.A_perf_), ie_model.A_perf_.shape

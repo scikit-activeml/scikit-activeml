@@ -124,7 +124,9 @@ class TestClassifier(unittest.TestCase):
             clf_mdl.fit(X=self.X, y=self.y_missing_label)
             score = clf_mdl.score(self.X, self.y_true)
             self.assertTrue(score > 0)
-            P_exp = np.ones((len(self.X), len(self.classes))) / len(self.classes)
+            P_exp = np.ones((len(self.X), len(self.classes))) / len(
+                self.classes
+            )
             P = clf_mdl.predict_proba(self.X)
             np.testing.assert_array_equal(P_exp, P)
             if hasattr(clf_mdl, "predict_freq"):
@@ -190,7 +192,9 @@ class TestClassifier(unittest.TestCase):
                 test_class_name = "Test" + clf_class.__name__
                 self.assertTrue(
                     hasattr(mod, test_class_name),
-                    msg="{} has no test called {}.".format(clf, test_class_name),
+                    msg="{} has no test called {}.".format(
+                        clf, test_class_name
+                    ),
                 )
                 test_obj = getattr(mod, test_class_name)
 
@@ -407,7 +411,9 @@ class TestClassifier(unittest.TestCase):
         )
         X = [[0], [1]]
         y = [0, 1]
-        self.assertRaises(ValueError, clf_mdl.fit, X=X, y=y, sample_weight=[0, 1, 1])
+        self.assertRaises(
+            ValueError, clf_mdl.fit, X=X, y=y, sample_weight=[0, 1, 1]
+        )
         self.assertRaises(
             ValueError, clf_mdl.fit, X=X, y=y, sample_weight=[[1, 1], [1, 1]]
         )
@@ -457,8 +463,12 @@ class TestClassifier(unittest.TestCase):
         )
         clf_mdl.fit(X=self.X, y=self.y)
         self.assertRaises(ValueError, clf_mdl.predict_annotator_perf, X=[0, 0])
-        self.assertRaises(ValueError, clf_mdl.predict_annotator_perf, X=[[0], [0]])
-        self.assertRaises(ValueError, clf_mdl.predict_annotator_perf, X=[["x", "y"]])
+        self.assertRaises(
+            ValueError, clf_mdl.predict_annotator_perf, X=[[0], [0]]
+        )
+        self.assertRaises(
+            ValueError, clf_mdl.predict_annotator_perf, X=[["x", "y"]]
+        )
 
 
 class Dummy:

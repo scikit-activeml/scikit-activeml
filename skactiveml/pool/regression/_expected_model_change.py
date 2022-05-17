@@ -5,7 +5,12 @@ from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, simple_batch, check_scalar, MISSING_LABEL
+from skactiveml.utils import (
+    check_type,
+    simple_batch,
+    check_scalar,
+    MISSING_LABEL,
+)
 from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 from skactiveml.utils._validation import check_callable
 
@@ -53,7 +58,9 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         self.k_bootstraps = k_bootstraps
         self.n_train = n_train
         self.ord = ord
-        self.feature_map = feature_map if feature_map is not None else lambda x: x
+        self.feature_map = (
+            feature_map if feature_map is not None else lambda x: x
+        )
 
     def query(
         self,
@@ -153,7 +160,9 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             random_state=self.random_state_,
         )
 
-        results_learner = np.array([learner.predict(X_cand) for learner in learners])
+        results_learner = np.array(
+            [learner.predict(X_cand) for learner in learners]
+        )
         pred = reg.predict(X_cand).reshape(1, -1)
         scalars = np.average(np.abs(results_learner - pred), axis=0)
         X_cand_mapped_features = self.feature_map(X_cand)

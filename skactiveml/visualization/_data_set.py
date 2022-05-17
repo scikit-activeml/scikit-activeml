@@ -38,7 +38,11 @@ def gaussian_noise_generator_1d(
     X = check_array(X, allow_nd=False, ensure_2d=True)
     check_type(X.shape[1], "X.shape[1]", 1)
     check_scalar(
-        interval_std, "interval_std", (int, float), min_val=0, min_inclusive=False
+        interval_std,
+        "interval_std",
+        (int, float),
+        min_val=0,
+        min_inclusive=False,
     )
     check_scalar(default_std, "default_std", (int, float), min_val=0)
     random_state = check_random_state(random_state)
@@ -48,15 +52,21 @@ def gaussian_noise_generator_1d(
     x = X.flatten()
     noise = np.zeros_like(x, dtype=float)
     for a, b, std_itv in intervals:
-        noise_itv = norm.rvs(scale=std_itv, size=x.shape, random_state=random_state)
+        noise_itv = norm.rvs(
+            scale=std_itv, size=x.shape, random_state=random_state
+        )
         noise = noise + np.where((a <= x) & (x < b), noise_itv, 0)
 
     if default_std != 0:
-        noise += norm.rvs(scale=default_std, size=x.shape, random_state=random_state)
+        noise += norm.rvs(
+            scale=default_std, size=x.shape, random_state=random_state
+        )
     return noise
 
 
-def sample_generator_1d(n_samples, *intervals, interval_density=1, random_state=None):
+def sample_generator_1d(
+    n_samples, *intervals, interval_density=1, random_state=None
+):
     """Generate samples in a 1d space.
 
     Parameters
@@ -89,7 +99,9 @@ def sample_generator_1d(n_samples, *intervals, interval_density=1, random_state=
     random_state = check_random_state(random_state)
     intervals = _check_interval_and_assign(list(intervals), interval_density)
 
-    total_weight = sum(((b - a) * density_itv for a, b, density_itv in intervals))
+    total_weight = sum(
+        ((b - a) * density_itv for a, b, density_itv in intervals)
+    )
     interval_sizes = [
         int(n_samples * (b - a) * density_itv / total_weight)
         for a, b, density_itv in intervals

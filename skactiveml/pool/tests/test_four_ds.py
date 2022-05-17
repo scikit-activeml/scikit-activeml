@@ -72,7 +72,9 @@ class TestFourDs(unittest.TestCase):
     def test_query(self):
         al4ds = FourDs(missing_label=-1, random_state=self.random_state)
         clf = self.clf.fit(self.X, self.y_unlblb)
-        query_indices = al4ds.query(X=self.X, y=self.y_unlblb, clf=clf, fit_clf=False)
+        query_indices = al4ds.query(
+            X=self.X, y=self.y_unlblb, clf=clf, fit_clf=False
+        )
         self.assertEqual(1, len(query_indices))
         query_indices, utilities = al4ds.query(
             X=self.X,
@@ -105,4 +107,6 @@ class TestFourDs(unittest.TestCase):
         )
         self.assertEqual(len(self.y), len(query_indices))
         self.assertEqual((len(self.y), len(self.y)), utilities.shape)
-        self.assertEqual(np.sum(np.arange(0, len(self.y))), np.sum(np.isnan(utilities)))
+        self.assertEqual(
+            np.sum(np.arange(0, len(self.y))), np.sum(np.isnan(utilities))
+        )

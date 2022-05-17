@@ -89,7 +89,12 @@ class NICKernelRegressor(ProbabilisticRegressor):
         self.X_ = X[is_lbld]
         self.y_ = y[is_lbld]
 
-        self.prior_params_ = (self.kappa_0, self.nu_0, self.mu_0, self.sigma_sq_0)
+        self.prior_params_ = (
+            self.kappa_0,
+            self.nu_0,
+            self.mu_0,
+            self.sigma_sq_0,
+        )
         if sample_weight is not None:
             weights_ = sample_weight[is_lbld]
             self.y_ = (weights_ * self.y_) / np.average(weights_)

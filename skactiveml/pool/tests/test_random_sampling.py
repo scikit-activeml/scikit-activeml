@@ -16,8 +16,12 @@ class TestRandomSampling(unittest.TestCase):
         rand1 = RandomSampling(random_state=RandomState(14))
         rand2 = RandomSampling(random_state=14)
 
-        self.assertEqual(rand1.query(self.X, self.y), rand1.query(self.X, self.y))
-        self.assertEqual(rand1.query(self.X, self.y), rand2.query(self.X, self.y))
+        self.assertEqual(
+            rand1.query(self.X, self.y), rand1.query(self.X, self.y)
+        )
+        self.assertEqual(
+            rand1.query(self.X, self.y), rand2.query(self.X, self.y)
+        )
 
         qidx = rand1.query(self.X, self.y)
         self.assertEqual(len(qidx), 1)

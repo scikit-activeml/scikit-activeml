@@ -5,7 +5,12 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
 )
-from skactiveml.utils import check_type, simple_batch, MISSING_LABEL, check_random_state
+from skactiveml.utils import (
+    check_type,
+    simple_batch,
+    MISSING_LABEL,
+    check_random_state,
+)
 from skactiveml.pool.regression.utils._integration import (
     conditional_expect,
     reshape_dist,
@@ -219,7 +224,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    integration_dict_potential_y_val: dict, optional (default=None)
+    integration_dict_target_val: dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
@@ -243,17 +248,17 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
         self,
-        integration_dict_potential_y_val=None,
+        integration_dict_target_val=None,
         integration_dict_cross_entropy=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(random_state=random_state, missing_label=missing_label)
 
-        if integration_dict_potential_y_val is not None:
-            self.integration_dict_potential_y_val = integration_dict_potential_y_val
+        if integration_dict_target_val is not None:
+            self.integration_dict_target_val = integration_dict_target_val
         else:
-            self.integration_dict_potential_y_val = {"method": "assume_linear"}
+            self.integration_dict_target_val = {"method": "assume_linear"}
 
         if integration_dict_cross_entropy is not None:
             self.integration_dict_cross_entropy = integration_dict_cross_entropy
@@ -399,7 +404,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 X_update=x_cand,
                 mapping=mapping,
             )
-            entropy_post = np.sum(reg_new.predict(X_eval, return_entropy=True)[1])
+            entropy_post = np.sum(
+                reg_new.predict(X_eval, return_entropy=True)[1]
+            )
             cross_ent = np.sum(
                 cross_entropy(
                     X_eval,
@@ -418,7 +425,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             random_state=self.random_state_,
             include_idx=True,
             include_x=True,
-            **self.integration_dict_potential_y_val
+            **self.integration_dict_target_val
         )
 
         return kl_div

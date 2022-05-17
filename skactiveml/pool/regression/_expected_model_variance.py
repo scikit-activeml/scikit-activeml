@@ -124,7 +124,9 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)
 
-        old_model_variance = np.average(reg.predict(X_eval, return_std=True)[1] ** 2)
+        old_model_variance = np.average(
+            reg.predict(X_eval, return_std=True)[1] ** 2
+        )
 
         def new_model_variance(idx, x_cand, y_pot):
             reg_new = update_reg(

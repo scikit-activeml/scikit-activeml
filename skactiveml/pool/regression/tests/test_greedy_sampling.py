@@ -28,10 +28,14 @@ class TestGreedySamplingX(unittest.TestCase):
         self.query_kwargs = dict(X=self.X, y=self.y, candidates=self.candidates)
 
     def test_init_param_random_state(self):
-        provide_test_regression_query_strategy_init_random_state(self, GreedySamplingX)
+        provide_test_regression_query_strategy_init_random_state(
+            self, GreedySamplingX
+        )
 
     def test_init_param_missing_label(self):
-        provide_test_regression_query_strategy_init_missing_label(self, GreedySamplingX)
+        provide_test_regression_query_strategy_init_missing_label(
+            self, GreedySamplingX
+        )
 
     def test_init_param_metric(self):
         qs = GreedySamplingX(metric="illegal", random_state=self.random_state)
@@ -44,10 +48,14 @@ class TestGreedySamplingX(unittest.TestCase):
         provide_test_regression_query_strategy_query_y(self, GreedySamplingX)
 
     def test_query_param_candidates(self):
-        provide_test_regression_query_strategy_query_candidates(self, GreedySamplingX)
+        provide_test_regression_query_strategy_query_candidates(
+            self, GreedySamplingX
+        )
 
     def test_query_param_batch_size(self):
-        provide_test_regression_query_strategy_query_batch_size(self, GreedySamplingX)
+        provide_test_regression_query_strategy_query_batch_size(
+            self, GreedySamplingX
+        )
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
@@ -67,10 +75,14 @@ class TestGreedySamplingY(unittest.TestCase):
         )
 
     def test_init_param_random_state(self):
-        provide_test_regression_query_strategy_init_random_state(self, GreedySamplingY)
+        provide_test_regression_query_strategy_init_random_state(
+            self, GreedySamplingY
+        )
 
     def test_init_param_missing_label(self):
-        provide_test_regression_query_strategy_init_missing_label(self, GreedySamplingY)
+        provide_test_regression_query_strategy_init_missing_label(
+            self, GreedySamplingY
+        )
 
     def test_init_param_x_metric(self):
         self.query_kwargs["y"] = np.full(len(self.y), MISSING_LABEL)
@@ -91,7 +103,9 @@ class TestGreedySamplingY(unittest.TestCase):
         provide_test_regression_query_strategy_query_reg(self, GreedySamplingY)
 
     def test_query_param_fit_reg(self):
-        provide_test_regression_query_strategy_query_fit_reg(self, GreedySamplingY)
+        provide_test_regression_query_strategy_query_fit_reg(
+            self, GreedySamplingY
+        )
 
     def test_query_param_sample_weight(self):
         provide_test_regression_query_strategy_query_sample_weight(
@@ -99,10 +113,14 @@ class TestGreedySamplingY(unittest.TestCase):
         )
 
     def test_query_param_candidates(self):
-        provide_test_regression_query_strategy_query_candidates(self, GreedySamplingY)
+        provide_test_regression_query_strategy_query_candidates(
+            self, GreedySamplingY
+        )
 
     def test_query_param_batch_size(self):
-        provide_test_regression_query_strategy_query_batch_size(self, GreedySamplingY)
+        provide_test_regression_query_strategy_query_batch_size(
+            self, GreedySamplingY
+        )
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(

@@ -146,7 +146,13 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
             refers to samples in candidates.
         """
         # Check standard parameters.
-        (X, y, candidates, batch_size, return_utilities,) = super()._validate_data(
+        (
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+        ) = super()._validate_data(
             X=X,
             y=y,
             candidates=candidates,
@@ -404,7 +410,10 @@ def _smacof_single_p(
     V[np.arange(len(V)), np.arange(len(V))] = W.sum(axis=1)
     e = np.ones((n_samples, 1))
 
-    Vp = np.linalg.inv(V + np.dot(e, e.T) / n_samples) - np.dot(e, e.T) / n_samples
+    Vp = (
+        np.linalg.inv(V + np.dot(e, e.T) / n_samples)
+        - np.dot(e, e.T) / n_samples
+    )
 
     sim_flat = similarities.ravel()
     sim_flat_w = sim_flat[sim_flat != 0]
@@ -417,7 +426,8 @@ def _smacof_single_p(
         n_components = init.shape[1]
         if n_samples != init.shape[0]:
             raise ValueError(
-                "init matrix should be of shape (%d, %d)" % (n_samples, n_components)
+                "init matrix should be of shape (%d, %d)"
+                % (n_samples, n_components)
             )
         X = init
 

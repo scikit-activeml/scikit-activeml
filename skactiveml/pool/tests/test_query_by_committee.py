@@ -198,7 +198,9 @@ class TestQueryByCommittee(unittest.TestCase):
 
 class TestAverageKlDivergence(unittest.TestCase):
     def setUp(self):
-        self.probas = np.array([[[0.3, 0.7], [0.4, 0.6]], [[0.2, 0.8], [0.5, 0.5]]])
+        self.probas = np.array(
+            [[[0.3, 0.7], [0.4, 0.6]], [[0.2, 0.8], [0.5, 0.5]]]
+        )
         self.scores = np.array([0.00670178182226764, 0.005059389928987596])
 
     def test_param_probas(self):
@@ -206,7 +208,9 @@ class TestAverageKlDivergence(unittest.TestCase):
         self.assertRaises(ValueError, average_kl_divergence, 1)
         self.assertRaises(ValueError, average_kl_divergence, np.ones((1,)))
         self.assertRaises(ValueError, average_kl_divergence, np.ones((1, 1)))
-        self.assertRaises(ValueError, average_kl_divergence, np.ones((1, 1, 1, 1)))
+        self.assertRaises(
+            ValueError, average_kl_divergence, np.ones((1, 1, 1, 1))
+        )
 
     def test_average_kl_divergence(self):
         average_kl_divergence(np.full((10, 10, 10), 0.5))
@@ -225,9 +229,15 @@ class TestVoteEntropy(unittest.TestCase):
         self.assertRaises(
             ValueError, vote_entropy, votes="string", classes=self.classes
         )
-        self.assertRaises(ValueError, vote_entropy, votes=1, classes=self.classes)
-        self.assertRaises(ValueError, vote_entropy, votes=[1], classes=self.classes)
-        self.assertRaises(ValueError, vote_entropy, votes=[[[1]]], classes=self.classes)
+        self.assertRaises(
+            ValueError, vote_entropy, votes=1, classes=self.classes
+        )
+        self.assertRaises(
+            ValueError, vote_entropy, votes=[1], classes=self.classes
+        )
+        self.assertRaises(
+            ValueError, vote_entropy, votes=[[[1]]], classes=self.classes
+        )
         self.assertRaises(
             ValueError,
             vote_entropy,
@@ -242,10 +252,16 @@ class TestVoteEntropy(unittest.TestCase):
         )
 
     def test_param_classes(self):
-        self.assertRaises(ValueError, vote_entropy, votes=self.votes, classes="string")
-        self.assertRaises(ValueError, vote_entropy, votes=self.votes, classes="class")
+        self.assertRaises(
+            ValueError, vote_entropy, votes=self.votes, classes="string"
+        )
+        self.assertRaises(
+            ValueError, vote_entropy, votes=self.votes, classes="class"
+        )
         self.assertRaises(TypeError, vote_entropy, votes=self.votes, classes=1)
-        self.assertRaises(TypeError, vote_entropy, votes=self.votes, classes=[[1]])
+        self.assertRaises(
+            TypeError, vote_entropy, votes=self.votes, classes=[[1]]
+        )
         self.assertRaises(
             ValueError,
             vote_entropy,

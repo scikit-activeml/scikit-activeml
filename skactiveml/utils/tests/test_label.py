@@ -25,21 +25,35 @@ class TestLabel(unittest.TestCase):
     def test_is_unlabeled(self):
         self.assertRaises(TypeError, is_unlabeled, y=self.y1, missing_label="2")
         self.assertRaises(ValueError, is_unlabeled, [[]], missing_label="2")
-        self.assertRaises(TypeError, is_unlabeled, y=self.y2, missing_label=np.nan)
+        self.assertRaises(
+            TypeError, is_unlabeled, y=self.y2, missing_label=np.nan
+        )
         self.assertRaises(TypeError, is_unlabeled, y=self.y2, missing_label="2")
-        self.assertRaises(TypeError, is_unlabeled, y=self.y2, missing_label=None)
+        self.assertRaises(
+            TypeError, is_unlabeled, y=self.y2, missing_label=None
+        )
         self.assertRaises(TypeError, is_unlabeled, y=self.y3, missing_label="2")
-        self.assertRaises(TypeError, is_unlabeled, y=self.y3, missing_label=np.nan)
+        self.assertRaises(
+            TypeError, is_unlabeled, y=self.y3, missing_label=np.nan
+        )
         self.assertRaises(TypeError, is_unlabeled, y=self.y4, missing_label=2)
         self.assertRaises(TypeError, is_unlabeled, y=self.y4, missing_label="2")
         self.assertRaises(TypeError, is_unlabeled, y=self.y5, missing_label="2")
         self.assertRaises(TypeError, is_unlabeled, y=self.y6, missing_label=2)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y6, missing_label=np.nan)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=np.nan)
-        self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=None)
+        self.assertRaises(
+            TypeError, is_unlabeled, y=self.y6, missing_label=np.nan
+        )
+        self.assertRaises(
+            TypeError, is_unlabeled, y=self.y7, missing_label=np.nan
+        )
+        self.assertRaises(
+            TypeError, is_unlabeled, y=self.y7, missing_label=None
+        )
         self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label="2")
         self.assertRaises(TypeError, is_unlabeled, y=self.y7, missing_label=-1)
-        np.testing.assert_array_equal(np.array([], dtype=bool), is_unlabeled([]))
+        np.testing.assert_array_equal(
+            np.array([], dtype=bool), is_unlabeled([])
+        )
         np.testing.assert_array_equal(
             np.array([1, 0, 0, 0, 1], dtype=bool), is_unlabeled(self.y1)
         )

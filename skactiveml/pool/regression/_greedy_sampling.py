@@ -48,7 +48,9 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         super().__init__(random_state=random_state, missing_label=missing_label)
         self.metric = metric if metric is not None else "euclidean"
 
-    def query(self, X, y, candidates=None, batch_size=1, return_utilities=False):
+    def query(
+        self, X, y, candidates=None, batch_size=1, return_utilities=False
+    ):
         """Determines for which candidate samples labels are to be queried.
 
         Parameters
@@ -275,7 +277,9 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
             utilities = np.full((batch_size, len(X)), np.nan)
 
         if batch_size_x > 0:
-            gs = GreedySamplingX(metric=self.x_metric, random_state=self.random_state)
+            gs = GreedySamplingX(
+                metric=self.x_metric, random_state=self.random_state
+            )
             query_indices_x, utilities_x = gs.query(
                 X=X,
                 y=y,
@@ -311,9 +315,11 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
                 y_to_X[mapping] = y_pred
                 y_candidate = mapping[~is_queried]
 
-            gs = GreedySamplingX(metric=self.y_metric, random_state=self.random_state)
+            gs = GreedySamplingX(
+                metric=self.y_metric, random_state=self.random_state
+            )
             query_indices_y, utilities_y = gs.query(
-                # replace missing_value by 0, since it does not implement
+                # left missing_values are not used, so replace by zero
                 X=np.where(is_labeled(y_to_X), y_to_X, 0).reshape(-1, 1),
                 y=y_new,
                 candidates=y_candidate,
@@ -322,7 +328,9 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
             )
 
             if mapping is None:
-                query_indices[batch_size_x:batch_size] = indices_nq[query_indices_y]
+                query_indices[batch_size_x:batch_size] = indices_nq[
+                    query_indices_y
+                ]
                 utilities[batch_size_x:batch_size][:, indices_nq] = utilities_y
             else:
                 query_indices[batch_size_x:batch_size] = query_indices_y

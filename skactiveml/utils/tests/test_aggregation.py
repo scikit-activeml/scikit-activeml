@@ -21,7 +21,9 @@ class TestAggregation(unittest.TestCase):
 
         y = [[np.nan, np.nan, np.nan], [np.nan, np.nan, np.nan]]
         w = [[0.5, 1, 2], [0, 1, 0]]
-        v_rec = compute_vote_vectors(y=y, w=w, classes=[2, 4, 5], missing_label=np.nan)
+        v_rec = compute_vote_vectors(
+            y=y, w=w, classes=[2, 4, 5], missing_label=np.nan
+        )
         v_exp = [[0, 0, 0], [0, 0, 0]]
         np.testing.assert_array_equal(v_rec, v_exp)
 

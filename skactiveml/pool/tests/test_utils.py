@@ -24,7 +24,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.y3 = np.array([0, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
         self.clf = ParzenWindowClassifier(classes=[0, 1])
         self.kwargs = dict(X=self.X, y=self.y, clf=self.clf)
-        self.iclf = lambda **kw: IndexClassifierWrapper(self.clf, self.X, self.y, **kw)
+        self.iclf = lambda **kw: IndexClassifierWrapper(
+            self.clf, self.X, self.y, **kw
+        )
 
     def test_init_param_clf(self):
         self.assertTrue(hasattr(self.iclf(), "clf"))
@@ -83,7 +85,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises(NotFittedError, self.iclf, set_base_clf=True)
 
         clf = self.clf.fit(self.X, self.y)
-        iclf = IndexClassifierWrapper(clf=clf, X=self.X, y=self.y, set_base_clf=True)
+        iclf = IndexClassifierWrapper(
+            clf=clf, X=self.X, y=self.y, set_base_clf=True
+        )
         np.testing.assert_array_equal(clf.X_, iclf.base_clf_.X_)
 
     def test_init_param_ignore_partial_fit(self):
@@ -116,7 +120,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
     def test_init_param_missing_label(self):
         self.assertTrue(hasattr(self.iclf(), "missing_label"))
         self.assertTrue(
-            is_unlabeled([self.iclf().missing_label], missing_label=MISSING_LABEL)
+            is_unlabeled(
+                [self.iclf().missing_label], missing_label=MISSING_LABEL
+            )
         )
 
         self.assertRaises(TypeError, self.iclf, missing_label="string")
@@ -164,7 +170,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
             ("labeled", labeled_indices(self.y)),
             ("unlabeled", unlabeled_indices(self.y)),
         ]
-        for (fit_str, fit_idx), (pred_str, pred_idx) in list(product(params, params)):
+        for (fit_str, fit_idx), (pred_str, pred_idx) in list(
+            product(params, params)
+        ):
             with self.subTest(msg="Sub", fit_str=fit_str, pred_str=pred_str):
                 iclf = self.iclf(use_speed_up=True)
                 iclf.precompute(
@@ -190,8 +198,12 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
     def test_fit_param_sample_weight(self):
         iclf = self.iclf()
-        self.assertRaises((ValueError, TypeError), iclf.fit, [0], sample_weight="str")
-        self.assertRaises((ValueError, TypeError), iclf.fit, [0], sample_weight=[0, 0])
+        self.assertRaises(
+            (ValueError, TypeError), iclf.fit, [0], sample_weight="str"
+        )
+        self.assertRaises(
+            (ValueError, TypeError), iclf.fit, [0], sample_weight=[0, 0]
+        )
 
     def test_fit_param_set_base_clf(self):
         iclf = self.iclf()
@@ -205,8 +217,12 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
     def test_partial_fit_param_y(self):
         iclf = self.iclf().fit([0])
-        self.assertRaises((ValueError, TypeError), iclf.partial_fit, [0], y="str")
-        self.assertRaises((ValueError, TypeError), iclf.partial_fit, [0], y=[0, 0])
+        self.assertRaises(
+            (ValueError, TypeError), iclf.partial_fit, [0], y="str"
+        )
+        self.assertRaises(
+            (ValueError, TypeError), iclf.partial_fit, [0], y=[0, 0]
+        )
 
     def test_partial_fit_param_sample_weight(self):
         iclf = self.iclf().fit([0])
@@ -222,37 +238,55 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
     def test_partial_fit_param_use_base_clf(self):
         iclf = self.iclf().fit([0])
-        self.assertRaises(TypeError, iclf.partial_fit, [0], use_base_clf="string")
+        self.assertRaises(
+            TypeError, iclf.partial_fit, [0], use_base_clf="string"
+        )
 
     def test_partial_fit_param_set_base_clf(self):
         iclf = self.iclf().fit([0])
-        self.assertRaises(TypeError, iclf.partial_fit, [0], set_base_clf="string")
+        self.assertRaises(
+            TypeError, iclf.partial_fit, [0], set_base_clf="string"
+        )
 
     def test_predict_param_idx(self):
         iclf = self.iclf().fit([0])
         self.assertRaises((ValueError, TypeError, IndexError), iclf.predict, 0)
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict, "str")
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict, [10])
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict, "str"
+        )
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict, [10]
+        )
 
         iclf = self.iclf(use_speed_up=True).fit([0])
         self.assertRaises(ValueError, iclf.predict, [1])
 
     def test_predict_proba_param_idx(self):
         iclf = self.iclf().fit([0])
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict_proba, 0)
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict_proba, 0
+        )
         self.assertRaises(
             (ValueError, TypeError, IndexError), iclf.predict_proba, "str"
         )
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict_proba, [10])
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict_proba, [10]
+        )
 
         iclf = self.iclf(use_speed_up=True).fit([0])
         self.assertRaises(ValueError, iclf.predict_proba, [1])
 
     def test_predict_freq_param_idx(self):
         iclf = self.iclf().fit([0])
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict_freq, 0)
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict_freq, "str")
-        self.assertRaises((ValueError, TypeError, IndexError), iclf.predict_freq, [10])
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict_freq, 0
+        )
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict_freq, "str"
+        )
+        self.assertRaises(
+            (ValueError, TypeError, IndexError), iclf.predict_freq, [10]
+        )
 
         iclf = self.iclf(use_speed_up=True).fit([0])
         self.assertRaises(ValueError, iclf.predict_freq, [1])
@@ -265,11 +299,15 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertEqual(iclf.clf_.classes, iclf.classes)
 
     def test__concat_sw(self):
-        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier(), X=self.X, y=self.y)
+        iclf = IndexClassifierWrapper(
+            clf=ParzenWindowClassifier(), X=self.X, y=self.y
+        )
         self.assertRaises(ValueError, iclf._concat_sw, [1], None)
 
     def test_fit(self):
-        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier(), X=self.X, y=self.y)
+        iclf = IndexClassifierWrapper(
+            clf=ParzenWindowClassifier(), X=self.X, y=self.y
+        )
         # self.assertWarns(Warning, iclf.fit, [2, 3])
         self.assertRaises(ValueError, iclf.fit, [2, 3])
 
@@ -281,9 +319,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         sample_weights = [None, np.linspace(0.2, 1, 4)]
         preds = ["predict", "predict_proba", "predict_freq"]
 
-        params = list(product(base_clfs[:1], speed_ups, sample_weights, preds)) + list(
-            product(base_clfs[1:], speed_ups, sample_weights, preds[:2])
-        )
+        params = list(
+            product(base_clfs[:1], speed_ups, sample_weights, preds)
+        ) + list(product(base_clfs[1:], speed_ups, sample_weights, preds[:2]))
 
         for BaseClf, speed_up, sample_weight, pred in params:
             with self.subTest(
@@ -345,18 +383,28 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
     def test_partial_fit(self):
         iclf = self.iclf()
-        self.assertRaises(NotFittedError, iclf.partial_fit, [0], use_base_clf=False)
-        self.assertRaises(NotFittedError, iclf.partial_fit, [0], use_base_clf=True)
+        self.assertRaises(
+            NotFittedError, iclf.partial_fit, [0], use_base_clf=False
+        )
+        self.assertRaises(
+            NotFittedError, iclf.partial_fit, [0], use_base_clf=True
+        )
         iclf = IndexClassifierWrapper(
             clf=ParzenWindowClassifier().fit(self.X, self.y),
             X=self.X,
             y=self.y,
             set_base_clf=True,
         )
-        self.assertRaises(NotFittedError, iclf.partial_fit, [0], use_base_clf=False)
-        self.assertRaises(NotFittedError, iclf.partial_fit, [0], use_base_clf=True)
+        self.assertRaises(
+            NotFittedError, iclf.partial_fit, [0], use_base_clf=False
+        )
+        self.assertRaises(
+            NotFittedError, iclf.partial_fit, [0], use_base_clf=True
+        )
 
-        iclf = IndexClassifierWrapper(clf=ParzenWindowClassifier(), X=self.X, y=self.y)
+        iclf = IndexClassifierWrapper(
+            clf=ParzenWindowClassifier(), X=self.X, y=self.y
+        )
         iclf.fit([0, 1])
         self.assertWarns(Warning, iclf.partial_fit, [2, 3])
 
@@ -407,8 +455,14 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     if enforce_unique:
                         all_idx = np.unique(all_idx)
                     clf = BaseClf()
-                    sw_ = None if sample_weight is None else sample_weight[all_idx]
-                    clf.fit(self.X[all_idx], self.y2[all_idx], sample_weight=sw_)
+                    sw_ = (
+                        None
+                        if sample_weight is None
+                        else sample_weight[all_idx]
+                    )
+                    clf.fit(
+                        self.X[all_idx], self.y2[all_idx], sample_weight=sw_
+                    )
 
                     iclf.partial_fit(add_idx)
                     np.testing.assert_array_equal(
@@ -444,11 +498,23 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     if enforce_unique:
                         all_idx = np.unique(all_idx)
                     clf = BaseClf()
-                    sw_ = None if sample_weight is None else sample_weight[all_idx]
-                    clf.fit(self.X[all_idx], self.y2[all_idx], sample_weight=sw_)
+                    sw_ = (
+                        None
+                        if sample_weight is None
+                        else sample_weight[all_idx]
+                    )
+                    clf.fit(
+                        self.X[all_idx], self.y2[all_idx], sample_weight=sw_
+                    )
 
-                    sw_add_ = None if sample_weight is None else sample_weight[add_idx]
-                    iclf.partial_fit(add_idx, y=self.y2[add_idx], sample_weight=sw_add_)
+                    sw_add_ = (
+                        None
+                        if sample_weight is None
+                        else sample_weight[add_idx]
+                    )
+                    iclf.partial_fit(
+                        add_idx, y=self.y2[add_idx], sample_weight=sw_add_
+                    )
                     np.testing.assert_array_equal(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
@@ -482,10 +548,20 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     if enforce_unique:
                         all_idx = np.unique(all_idx)
                     clf = BaseClf()
-                    sw_ = None if sample_weight is None else sample_weight[all_idx]
-                    clf.fit(self.X[all_idx], self.y2[all_idx], sample_weight=sw_)
+                    sw_ = (
+                        None
+                        if sample_weight is None
+                        else sample_weight[all_idx]
+                    )
+                    clf.fit(
+                        self.X[all_idx], self.y2[all_idx], sample_weight=sw_
+                    )
 
-                    sw_add_ = None if sample_weight is None else sample_weight[add_idx]
+                    sw_add_ = (
+                        None
+                        if sample_weight is None
+                        else sample_weight[add_idx]
+                    )
                     iclf.partial_fit(
                         add_idx,
                         y=self.y2[add_idx],
@@ -498,7 +574,9 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         getattr(clf, pred)(self.X),
                     )
 
-        params = list(product(base_clfs[1:], speed_ups, sample_weights, preds[:2]))
+        params = list(
+            product(base_clfs[1:], speed_ups, sample_weights, preds[:2])
+        )
 
         for BaseClf, speed_up, sample_weight, pred in params:
 
@@ -526,7 +604,11 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                 clf.fit(self.X[init_idx], self.y2[init_idx], sample_weight=sw_)
 
                 for add_idx in [[2], [3]]:
-                    sw_add_ = None if sample_weight is None else sample_weight[add_idx]
+                    sw_add_ = (
+                        None
+                        if sample_weight is None
+                        else sample_weight[add_idx]
+                    )
                     iclf.partial_fit(
                         add_idx,
                         y=self.y2[add_idx],

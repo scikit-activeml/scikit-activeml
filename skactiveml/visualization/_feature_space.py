@@ -89,7 +89,9 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         The axis on which the utilities were plotted.
     """
     check_type(qs, "qs", SingleAnnotatorPoolQueryStrategy)
-    return _general_plot_utilities(qs=qs, X=X, y=y, candidates=candidates, **kwargs)
+    return _general_plot_utilities(
+        qs=qs, X=X, y=y, candidates=candidates, **kwargs
+    )
 
 
 def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
@@ -152,7 +154,9 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
         The axes on which the utilities were plotted.
     """
     check_type(qs, "qs", MultiAnnotatorPoolQueryStrategy)
-    return _general_plot_utilities(qs=qs, X=X, y=y, candidates=candidates, **kwargs)
+    return _general_plot_utilities(
+        qs=qs, X=X, y=y, candidates=candidates, **kwargs
+    )
 
 
 def plot_decision_boundary(
@@ -243,7 +247,9 @@ def plot_decision_boundary(
         for idx, y in enumerate(predicted_classes):
             predictions[idx, y] = 1
     else:
-        raise AttributeError("'clf' must implement 'predict' or " "'predict_proba'")
+        raise AttributeError(
+            "'clf' must implement 'predict' or " "'predict_proba'"
+        )
 
     posterior_list = []
 
@@ -402,7 +408,9 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
          The axes on which the utilities were plotted.
     """
     replace_nan = kwargs.pop("replace_nan", 0.0)
-    ignore_undefined_query_params = kwargs.pop("ignore_undefined_query_params", False)
+    ignore_undefined_query_params = kwargs.pop(
+        "ignore_undefined_query_params", False
+    )
     feature_bound = kwargs.pop("feature_bound", None)
     ax = kwargs.pop("ax", None)
     axes = kwargs.pop("axes", None)
@@ -431,7 +439,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         n_annotators = None
         if plot_annotators is not None:
             raise TypeError(
-                "`plot_annotator` can be only used in the multi-annotator " "setting."
+                "`plot_annotator` can be only used in the multi-annotator "
+                "setting."
             )
         else:
             plot_annotators = np.arange(1)
@@ -481,7 +490,9 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
                     qs.query, X=X, y=y, candidates=mesh_instances, **kwargs
                 )
             else:
-                _, utilities = qs.query(X=X, y=y, candidates=mesh_instances, **kwargs)
+                _, utilities = qs.query(
+                    X=X, y=y, candidates=mesh_instances, **kwargs
+                )
 
             for a_idx, ax_ in zip(plot_annotators, axes):
                 if n_annotators is not None:
@@ -519,7 +530,9 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         X_utils = candidates
 
     if ignore_undefined_query_params:
-        _, utilities = call_func(qs.query, X=X, y=y, candidates=candidates, **kwargs)
+        _, utilities = call_func(
+            qs.query, X=X, y=y, candidates=candidates, **kwargs
+        )
     else:
         _, utilities = qs.query(X=X, y=y, candidates=candidates, **kwargs)
 

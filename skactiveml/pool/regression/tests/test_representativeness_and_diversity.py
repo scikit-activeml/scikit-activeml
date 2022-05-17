@@ -2,7 +2,10 @@ import unittest
 
 import numpy as np
 
-from skactiveml.pool.regression import RepresentativenessDiversity, QueryByCommittee
+from skactiveml.pool.regression import (
+    RepresentativenessDiversity,
+    QueryByCommittee,
+)
 from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
@@ -37,7 +40,9 @@ class TestRepresentativenessDiversity(unittest.TestCase):
     def test_init_param_inner_qs(self):
         for illegal_qs in ["illegal", dict]:
             qs = RepresentativenessDiversity(inner_qs=illegal_qs)
-            self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
+            self.assertRaises(
+                (ValueError, TypeError), qs.query, **self.query_dict
+            )
 
         inner_qs = QueryByCommittee()
         qs = RepresentativenessDiversity(inner_qs=inner_qs)
@@ -60,13 +65,17 @@ class TestRepresentativenessDiversity(unittest.TestCase):
         for illegal_sample_weight in ["illegal", dict]:
             self.query_dict["sample_weight"] = illegal_sample_weight
             qs = RepresentativenessDiversity()
-            self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
+            self.assertRaises(
+                (ValueError, TypeError), qs.query, **self.query_dict
+            )
 
     def test_query_param_inner_qs_dict(self):
         for qs_dict in ["illegal", dict]:
             self.query_dict["inner_qs_dict"] = qs_dict
             qs = RepresentativenessDiversity()
-            self.assertRaises((ValueError, TypeError), qs.query, **self.query_dict)
+            self.assertRaises(
+                (ValueError, TypeError), qs.query, **self.query_dict
+            )
 
     def test_query_param_candidates(self):
         provide_test_regression_query_strategy_query_candidates(

@@ -37,7 +37,9 @@ class TemplateTestStreamRandomSampling:
         query_strategy = self.get_query_strategy()()
         self.assertRaises(ValueError, query_strategy.query, candidates=1)
         self.assertRaises(ValueError, query_strategy.query, candidates=None)
-        self.assertRaises(ValueError, query_strategy.query, candidates=np.ones(5))
+        self.assertRaises(
+            ValueError, query_strategy.query, candidates=np.ones(5)
+        )
 
     def test_init_param_random_state(self):
         query_strategy = self.get_query_strategy()(
@@ -66,13 +68,17 @@ class TemplateTestStreamRandomSampling:
         qs.update(np.array([[0], [1], [2]]), np.array([0, 2]))
 
 
-class TestStreamRandomSampling(TemplateTestStreamRandomSampling, unittest.TestCase):
+class TestStreamRandomSampling(
+    TemplateTestStreamRandomSampling, unittest.TestCase
+):
     def get_query_strategy(self):
         return StreamRandomSampling
 
     def test_init_param_allow_exceeding_budget(self):
         # budget must be defined as a float greater than 0
-        query_strategy = self.get_query_strategy()(allow_exceeding_budget="string")
+        query_strategy = self.get_query_strategy()(
+            allow_exceeding_budget="string"
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         query_strategy = self.get_query_strategy()(allow_exceeding_budget=-1)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))

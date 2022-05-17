@@ -39,7 +39,9 @@ class TestNICKernelEstimator(unittest.TestCase):
         reg_usual_missing_label = NICKernelRegressor(**self.start_parameter)
         X = np.array([[0, 1], [0, 1], [1, 0], [0, 0]])
         y_other_missing_label = np.array([0.1, 0.2, -1, -1])
-        y_usual_missing_label = np.array([0.1, 0.2, MISSING_LABEL, MISSING_LABEL])
+        y_usual_missing_label = np.array(
+            [0.1, 0.2, MISSING_LABEL, MISSING_LABEL]
+        )
         reg_other_missing_label.fit(X, y_other_missing_label)
         reg_usual_missing_label.fit(X, y_usual_missing_label)
         y_return_other = reg_other_missing_label.predict([[0, 0]])[0]

@@ -199,7 +199,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         random_state = self.random_state_
 
         # check strategy
-        check_type(self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy)
+        check_type(
+            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
+        )
 
         # check query_params_dict
         if query_params_dict is None:
@@ -254,7 +256,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
             pref_n_annotators = n_annotators_per_sample * np.ones(batch_size_sq)
         elif _is_arraylike(n_annotators_per_sample):
-            pref_n_annotators = check_array(n_annotators_per_sample, ensure_2d=False)
+            pref_n_annotators = check_array(
+                n_annotators_per_sample, ensure_2d=False
+            )
 
             if pref_n_annotators.ndim != 1:
                 raise ValueError(
@@ -286,7 +290,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             A_perf = check_array(A_perf, ensure_2d=False)
             # ensure A_perf lies in [0, 1)
             if A_perf.min() != A_perf.max():
-                A_perf = 1 / (A_perf.max() - A_perf.min() + 1) * (A_perf - A_perf.min())
+                A_perf = (
+                    1
+                    / (A_perf.max() - A_perf.min() + 1)
+                    * (A_perf - A_perf.min())
+                )
             else:
                 A_perf = np.zeros_like(A_perf, dtype=float)
 
@@ -409,7 +417,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             return query_indices
 
     @staticmethod
-    def _get_order_preserving_s_query(A, candidate_utilities, annotator_utilities):
+    def _get_order_preserving_s_query(
+        A, candidate_utilities, annotator_utilities
+    ):
 
         nan_indices = np.argwhere(np.isnan(candidate_utilities))
 
@@ -437,12 +447,16 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         n_max_annotators = np.sum(A, axis=1)
         n_max_chosen_annotators = n_max_annotators[s_indices]
-        annot_per_sample = np.minimum(n_max_chosen_annotators, pref_n_annotators)
+        annot_per_sample = np.minimum(
+            n_max_chosen_annotators, pref_n_annotators
+        )
 
         n_annotator_sample_pairs = np.sum(annot_per_sample)
 
         while n_annotator_sample_pairs < batch_size:
-            annot_per_sample = np.minimum(n_max_chosen_annotators, annot_per_sample + 1)
+            annot_per_sample = np.minimum(
+                n_max_chosen_annotators, annot_per_sample + 1
+            )
 
             n_annotator_sample_pairs = np.sum(annot_per_sample)
 
