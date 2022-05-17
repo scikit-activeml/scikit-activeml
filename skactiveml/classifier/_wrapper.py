@@ -4,34 +4,22 @@ from multiple annotators.
 """
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
-
-
 import warnings
 import numpy as np
 
 from copy import deepcopy
 
 from sklearn.base import MetaEstimatorMixin, is_classifier
-try:
-    from sklearn.utils.metaestimators import available_if
-    decorator_partial_fit = available_if(
-        lambda self: hasattr(self.estimator, "partial_fit")
-    )
-    decorator_predict_proba = available_if(
-        lambda self: hasattr(self.estimator, "predict_proba")
-    )
-except ImportError:
-    from sklearn.utils.metaestimators import if_delegate_has_method
-    decorator_partial_fit = if_delegate_has_method(delegate="estimator")
-    decorator_predict_proba = if_delegate_has_method(delegate="estimator")
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
 )
+from sklearn.utils import metaestimators
 
 from ..base import SkactivemlClassifier
 from ..utils import rand_argmin, MISSING_LABEL, is_labeled
+from ..utils._functions import _available_if
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -116,7 +104,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @decorator_partial_fit
+    @_available_if("partial_fit", hasattr(metaestimators, "available_if"))
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -186,7 +174,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
-    @decorator_predict_proba
+    @_available_if("predict_proba", hasattr(metaestimators, "available_if"))
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
