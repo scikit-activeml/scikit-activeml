@@ -3,6 +3,8 @@ import unittest
 from skactiveml.utils import call_func
 from skactiveml.utils._functions import _available_if
 
+from sklearn.utils import metaestimators
+
 
 class TestFunctions(unittest.TestCase):
     def test_call_func(self):
@@ -15,8 +17,6 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(result, 12)
 
     def test__available_if(self):
-        try:
+        if hasattr(metaestimators, "available_if"):
             _available_if("predict_proba", True)
-        except ImportError:
-            pass
         _available_if("predict_proba", False)
