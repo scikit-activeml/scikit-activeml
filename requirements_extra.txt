@@ -3,9 +3,9 @@ pytest
 pytest-cov
 jupyter
 sphinx==4.2.0
-sphinxcontrib-bibtex>=2.3.0
-numpydoc>=1.1.0
-nbsphinx>=0.8.2
-sphinx-gallery>=0.8.2
-pybtex>=0.23.0
-pydata_sphinx_theme>=0.7.1
+sphinxcontrib-bibtex~=2.3
+numpydoc~=1.1
+nbsphinx~=0.8
+sphinx-gallery~=0.8
+pybtex~=0.23
+pydata_sphinx_theme~=0.7
