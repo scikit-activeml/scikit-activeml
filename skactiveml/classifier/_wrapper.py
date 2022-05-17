@@ -7,11 +7,23 @@ from multiple annotators.
 
 
 import warnings
+import numpy as np
+
 from copy import deepcopy
 
-import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
-from sklearn.utils.metaestimators import if_delegate_has_method
+try:
+    from sklearn.utils.metaestimators import available_if
+    decorator_partial_fit = available_if(
+        lambda self: hasattr(self.estimator, "partial_fit")
+    )
+    decorator_predict_proba = available_if(
+        lambda self: hasattr(self.estimator, "predict_proba")
+    )
+except ImportError:
+    from sklearn.utils.metaestimators import if_delegate_has_method
+    decorator_partial_fit = if_delegate_has_method(delegate="estimator")
+    decorator_predict_proba = if_delegate_has_method(delegate="estimator")
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
@@ -104,7 +116,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @if_delegate_has_method(delegate="estimator")
+    @decorator_partial_fit
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -174,7 +186,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
-    @if_delegate_has_method(delegate="estimator")
+    @decorator_predict_proba
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
