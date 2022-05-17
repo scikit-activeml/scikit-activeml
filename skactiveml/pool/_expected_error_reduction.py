@@ -70,7 +70,9 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(missing_label=missing_label, random_state=random_state)
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.cost_matrix = cost_matrix
         self.enforce_mapping = enforce_mapping
 
@@ -400,14 +402,16 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
 
         if sample_weight is not None and len(X) != len(sample_weight):
             raise ValueError(
-                "If `sample_weight` is set, it must have same " "length as `X`."
+                "If `sample_weight` is set, it must have same "
+                "length as `X`."
             )
 
         if sample_weight_candidates is not None and len(candidates) != len(
             sample_weight_candidates
         ):
             raise ValueError(
-                "If `sample_weight` is set, it must have same " "length as `X`."
+                "If `sample_weight` is set, it must have same "
+                "length as `X`."
             )
 
         # Concatenate samples
@@ -492,7 +496,9 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
                 * cost_est[np.newaxis, :]
             )
         else:
-            prob_mat = prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis, :]
+            prob_mat = (
+                prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis, :]
+            )
             return np.sum(
                 sample_weight[:, np.newaxis, np.newaxis]
                 * prob_mat
@@ -522,6 +528,9 @@ class MonteCarloEER(ExpectedErrorReduction):
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`.
         Used for misclassification loss and ignored for log loss.
+    subtract_current : bool, optional (default=False)
+        If True, the current error estimate is subtracted from the simulated
+        score. This might be helpful to define a stopping criterion.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : numeric or np.random.RandomState
@@ -536,6 +545,7 @@ class MonteCarloEER(ExpectedErrorReduction):
         self,
         method="misclassification_loss",
         cost_matrix=None,
+        subtract_current=False,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -546,11 +556,10 @@ class MonteCarloEER(ExpectedErrorReduction):
             random_state=random_state,
         )
         self.method = method
+        self.subtract_current = subtract_current
 
     def _validate_init_params(self):
         super()._validate_init_params()
-        # TODO check if cost_matrix is None for log_loss
-
         # Validate method.
         if not isinstance(self.method, str):
             raise TypeError(
@@ -563,16 +572,33 @@ class MonteCarloEER(ExpectedErrorReduction):
                 f"`log_loss` the given one is: {self.method}"
             )
 
+        check_type(self.subtract_current, "subtract_current", bool)
+
+        if self.method == "log_loss" and self.cost_matrix is not None:
+            raise ValueError(
+                "`cost_matrix` must be None if `method` is set to `log_loss`"
+            )
+
     def _estimate_current_error(
-        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
+            self, id_clf, idx_train, idx_cand, idx_eval, w_eval
     ):
-        # TODO: implement
-        return super()._estimate_current_error(
-            id_clf, idx_train, idx_cand, idx_eval, w_eval
-        )
+        if self.subtract_current:
+            probs = id_clf.predict_proba(idx_eval)
+            if self.method == "misclassification_loss":
+                preds = np.argmin(np.dot(probs, self.cost_matrix_), axis=1)
+                err = self._risk_estimation(
+                    probs, preds, self.cost_matrix_, w_eval[idx_eval]
+                )
+            elif self.method == "log_loss":
+                err = self._logloss_estimation(probs, probs)
+            return err
+        else:
+            return super()._estimate_current_error(
+                id_clf, idx_train, idx_cand, idx_eval, w_eval
+            )
 
     def _estimate_error_for_candidate(
-        self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
+            self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
     ):
         id_clf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
         probs = id_clf.predict_proba(idx_eval)
@@ -584,7 +610,6 @@ class MonteCarloEER(ExpectedErrorReduction):
             )
         elif self.method == "log_loss":
             err = self._logloss_estimation(probs, probs)
-
         return err
 
     def _precompute_and_fit_clf(
@@ -812,7 +837,10 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             )
 
         if self.normalize:
-            return err / norm
+            if norm == 0:
+                return 0.0
+            else:
+                return err / norm
         else:
             return err
 
@@ -854,7 +882,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             else:
                 return err
         else:
-            return 0.0
+            return super()._estimate_current_error(
+                id_clf, idx_train, idx_cand, idx_eval, w_eval
+            )
 
     def _precompute_and_fit_clf(
         self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf

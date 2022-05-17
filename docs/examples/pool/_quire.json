@@ -1,0 +1,23 @@
+[
+  {
+    "class" : "Quire",
+    "method" : "Querying Informative and Representative Examples (QUIRE)",
+    "categories" : {
+      "Settles2012" : ""
+    },
+    "tags" : ["pool"],
+    "title" : "Querying Informative and Representative Examples",
+    "refs" : ["huang2010active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "bp_add_imports" : [],
+    "init_params" : {
+      "classes" : "[0, 1]",
+      "lmbda" : "1.0",
+      "metric" : "'rbf'",
+      "metric_dict" : "{'gamma': 0.1}"
+    },
+    "query_params" : {},
+    "bp_preproc" : []
+  }
+]

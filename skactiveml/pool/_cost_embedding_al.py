@@ -77,7 +77,9 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(missing_label=missing_label, random_state=random_state)
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.classes = classes
         self.base_regressor = base_regressor
         self.cost_matrix = cost_matrix
@@ -88,13 +90,13 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         self.nn_params = nn_params
 
     def query(
-        self,
-        X,
-        y,
-        sample_weight=None,
-        candidates=None,
-        batch_size=1,
-        return_utilities=False,
+            self,
+            X,
+            y,
+            sample_weight=None,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
     ):
         """Query the next instance to be labeled.
 
@@ -455,7 +457,9 @@ def _smacof_single_p(
             disparities[similarities == 0] = 0
 
         # Compute stress
-        _stress = (W.ravel() * ((dis.ravel() - disparities.ravel()) ** 2)).sum()
+        _stress = (
+            W.ravel() * ((dis.ravel() - disparities.ravel()) ** 2)
+        ).sum()
         _stress /= 2
 
         # Update X using the Guttman transform
@@ -466,7 +470,7 @@ def _smacof_single_p(
 
         X = np.dot(Vp, np.dot(_B, X))
 
-        dis = np.sqrt((X**2).sum(axis=1)).sum()
+        dis = np.sqrt((X ** 2).sum(axis=1)).sum()
 
         if verbose >= 2:
             print("it: %d, stress %s" % (it, _stress))

@@ -8,4 +8,4 @@ __all__ = [
     "exceptions",
 ]
 
-__version__ = "0.2.0"
+__version__ = "latest"
