@@ -28,3 +28,17 @@ def call_func(f_callable, only_mandatory=False, **kwargs):
     vars = dict(filter(lambda e: e[0] in param_keys, kwargs.items()))
 
     return f_callable(**vars)
+
+
+def _available_if(method_name, has_available_if):
+    if has_available_if:
+        from sklearn.utils.metaestimators import available_if
+
+        decorator = available_if(
+            lambda self: hasattr(self.estimator, method_name)
+        )
+    else:
+        from sklearn.utils.metaestimators import if_delegate_has_method
+
+        decorator = if_delegate_has_method(delegate="estimator")
+    return decorator

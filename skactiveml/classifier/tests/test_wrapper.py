@@ -99,6 +99,12 @@ class TestSklearnClassifier(unittest.TestCase):
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertTrue(hasattr(clf, "partial_fit"))
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            classes=["tokyo", "paris", "new york"],
+            missing_label="nan",
+        )
+        self.assertFalse(hasattr(clf, "partial_fit"))
 
     def test_predict_proba(self):
         clf = SklearnClassifier(
@@ -134,6 +140,12 @@ class TestSklearnClassifier(unittest.TestCase):
         P_exp = np.zeros((len(self.X), 3))
         P_exp[:, 1:] = est.predict_proba(X=self.X)
         np.testing.assert_array_equal(P_exp, P)
+        clf = SklearnClassifier(
+            estimator=Perceptron(),
+            classes=["ny", "paris", "tokyo"],
+            missing_label="nan",
+        )
+        self.assertFalse(hasattr(clf, "predict_proba"))
 
     def test_predict(self):
         clf = SklearnClassifier(
