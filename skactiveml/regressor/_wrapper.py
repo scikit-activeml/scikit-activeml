@@ -1,15 +1,11 @@
 import inspect
+from copy import deepcopy
 from operator import attrgetter
 
 import numpy as np
-from copy import deepcopy
-
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.utils.metaestimators import (
-    _IffHasAttrDescriptor,
-    if_delegate_has_method,
-    _AvailableIfDescriptor,
     available_if,
 )
 from sklearn.utils.validation import (
@@ -19,9 +15,7 @@ from sklearn.utils.validation import (
 )
 
 from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
-from skactiveml.utils import check_type
 from skactiveml.utils._label import is_labeled, MISSING_LABEL
-from skactiveml.utils._validation import check_callable
 
 
 def if_delegate_has_alternative_methods(delegate, *alternative_methods):
