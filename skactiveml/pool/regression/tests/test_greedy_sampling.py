@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 
+from skactiveml.base import SkactivemlRegressor
 from skactiveml.pool.regression import GreedySamplingX, GreedySamplingY
 from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
@@ -16,7 +17,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_return_utilities,
 )
 from skactiveml.regressor import NICKernelRegressor
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, is_labeled
 
 
 class TestGreedySamplingX(unittest.TestCase):
@@ -60,6 +61,16 @@ class TestGreedySamplingX(unittest.TestCase):
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
             self, GreedySamplingX
+        )
+
+    def test_logic(self):
+        X = np.arange(7).reshape(7, 1)
+        y = np.append([1], np.full(6, MISSING_LABEL))
+
+        qs = GreedySamplingX()
+        utilities = qs.query(X, y, return_utilities=True)[1][0]
+        np.testing.assert_array_equal(
+            utilities, np.append([MISSING_LABEL], np.arange(1, 7))
         )
 
 
@@ -125,4 +136,22 @@ class TestGreedySamplingY(unittest.TestCase):
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
             self, GreedySamplingY
+        )
+
+    def test_logic(self):
+        X = (1 / 2 * np.arange(2 * 7) + 3.7).reshape(7, 2)
+        y = [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL, 0, 0, 0, 0]
+
+        class ZeroRegressor(SkactivemlRegressor):
+            def fit(self, *args, **kwargs):
+                return self
+
+            def predict(self, X):
+                return np.zeros(len(X))
+
+        reg = ZeroRegressor()
+        qs = GreedySamplingY()
+        utilities = qs.query(X, y, reg, return_utilities=True)[1][0]
+        np.testing.assert_array_equal(
+            utilities, np.where(is_labeled(y), np.nan, 0)
         )

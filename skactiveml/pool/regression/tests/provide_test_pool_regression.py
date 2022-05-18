@@ -1,8 +1,10 @@
 from itertools import product
 
 import numpy as np
+from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 
+from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.regressor import (
     NICKernelRegressor,
@@ -156,7 +158,7 @@ def provide_test_regression_query_strategy_query_X(
     # correct argument
     X = np.arange(5).reshape(5, 1)
     update_query_dict_for_one_batch(query_dict, X, y)
-    indices = call_func(qs.query, **query_dict)
+    call_func(qs.query, **query_dict)
 
     # wrong shape dimension, wrong shape form, None and str not allowed
     for X_illegal in [
@@ -276,7 +278,7 @@ def provide_test_regression_query_strategy_query_fit_reg(
     for poss_fit_reg in [True, False]:
         query_dict["fit_reg"] = poss_fit_reg
         call_status_dict["fit"] = False
-        indices = call_func(qs.query, **query_dict)
+        call_func(qs.query, **query_dict)
         test_instance.assertTrue(not poss_fit_reg or call_status_dict["fit"])
 
     # illegal arguments
@@ -457,6 +459,36 @@ def provide_test_regression_query_strategy_query_return_utilities(
     for illegal_return_utilities in ["illegal", dict, 5]:
         query_dict["return_utilities"] = illegal_return_utilities
         test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
+
+
+def provide_test_regression_query_strategy_change_dependence(
+    test_instance, qs_class, init_dict=None, query_dict=None, reg_name="reg"
+):
+    # initialisation
+    if init_dict is None:
+        init_dict = get_default_init_dict()
+    if query_dict is None:
+        query_dict = get_default_query_dict()
+
+    X, y = get_regression_test_data()
+    update_query_dict_for_one_batch(query_dict, X, y)
+    qs = call_func(qs_class, **init_dict)
+
+    class ZeroRegressor(ProbabilisticRegressor):
+        def predict_target_distribution(self, X):
+            return norm(loc=np.zeros(len(X)))
+
+        def fit(self, *args, **kwargs):
+            return self
+
+    query_dict[reg_name] = ZeroRegressor()
+    query_dict["return_utilities"] = True
+
+    utilities = call_func(qs.query, **query_dict)[1][0]
+    np.testing.assert_array_equal(
+        np.zeros_like(y),
+        np.where(is_unlabeled(utilities), 0, utilities),
+    )
 
 
 def get_list_of_regression_test_data(missing_label=MISSING_LABEL):

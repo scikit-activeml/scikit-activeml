@@ -15,6 +15,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_candidates,
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
+    provide_test_regression_query_strategy_change_dependence,
 )
 from skactiveml.regressor import SklearnRegressor
 
@@ -103,5 +104,10 @@ class TestExpectedModelChange(unittest.TestCase):
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
+            self, ExpectedModelChange
+        )
+
+    def test_logic(self):
+        provide_test_regression_query_strategy_change_dependence(
             self, ExpectedModelChange
         )

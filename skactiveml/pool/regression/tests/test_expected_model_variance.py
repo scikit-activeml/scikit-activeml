@@ -14,6 +14,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_return_utilities,
     provide_test_regression_query_strategy_init_integration_dict,
     provide_test_regression_query_strategy_query_X_eval,
+    provide_test_regression_query_strategy_change_dependence,
 )
 
 
@@ -75,5 +76,10 @@ class TestExpectedModelVarianceMinimization(unittest.TestCase):
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
+            self, ExpectedModelVarianceReduction
+        )
+
+    def test_logic(self):
+        provide_test_regression_query_strategy_change_dependence(
             self, ExpectedModelVarianceReduction
         )

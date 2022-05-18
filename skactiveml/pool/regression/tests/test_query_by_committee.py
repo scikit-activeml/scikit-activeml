@@ -19,6 +19,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_candidates,
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
+    provide_test_regression_query_strategy_change_dependence,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 
@@ -158,3 +159,8 @@ class TestQueryByCommittee(unittest.TestCase):
             indices, utilities = qs.query(**self.query_dict)
             self.assertEqual(indices.shape, (1,))
             self.assertEqual(utilities.shape, (1, len(self.candidates)))
+
+    def test_logic(self):
+        provide_test_regression_query_strategy_change_dependence(
+            self, QueryByCommittee, reg_name="ensemble"
+        )
