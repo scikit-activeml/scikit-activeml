@@ -353,7 +353,6 @@ def provide_test_regression_query_strategy_query_candidates(
     utilities_s = []
     for poss_candidates in [None, lbld_indices, X[lbld_indices]]:
         query_dict["candidates"] = poss_candidates
-        # add expect MappingError occurs
         utilities_s.append(call_func(qs.query, **query_dict)[1])
 
     np.testing.assert_array_equal(utilities_s[0], utilities_s[1])
@@ -366,6 +365,35 @@ def provide_test_regression_query_strategy_query_candidates(
 
     for illegal_candidates in [np.arange(4) + 7, "illegal", dict]:
         query_dict["candidates"] = illegal_candidates
+        test_instance.assertRaises(
+            (ValueError, TypeError), call_func, qs.query, **query_dict
+        )
+
+
+def provide_test_regression_query_strategy_query_X_eval(
+    test_instance, qs_class, init_dict=None, query_dict=None
+):
+    # initialisation
+    if init_dict is None:
+        init_dict = get_default_init_dict()
+    if query_dict is None:
+        query_dict = get_default_query_dict()
+
+    X, y = get_regression_test_data()
+    update_query_dict_for_one_batch(query_dict, X, y)
+
+    qs = call_func(qs_class, **init_dict)
+
+    # correct arguments
+
+    for poss_X_eval in [None, np.arange(3).reshape(-1, 1)]:
+        query_dict["X_eval"] = poss_X_eval
+        call_func(qs.query, **query_dict)
+
+    # illegal arguments
+
+    for illegal_X_eval in [np.arange(3), "illegal", dict]:
+        query_dict["X_eval"] = illegal_X_eval
         test_instance.assertRaises(
             (ValueError, TypeError), call_func, qs.query, **query_dict
         )

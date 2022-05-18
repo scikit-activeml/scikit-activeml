@@ -5,13 +5,13 @@ from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 from skactiveml.utils import (
     check_type,
     simple_batch,
     check_scalar,
     MISSING_LABEL,
 )
-from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 from skactiveml.utils._validation import check_callable
 
 

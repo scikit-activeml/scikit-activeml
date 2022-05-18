@@ -13,6 +13,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
     provide_test_regression_query_strategy_init_integration_dict,
+    provide_test_regression_query_strategy_query_X_eval,
 )
 
 
@@ -59,6 +60,11 @@ class TestExpectedModelVarianceMinimization(unittest.TestCase):
 
     def test_query_param_candidates(self):
         provide_test_regression_query_strategy_query_candidates(
+            self, ExpectedModelVarianceReduction
+        )
+
+    def test_query_param_X_eval(self):
+        provide_test_regression_query_strategy_query_X_eval(
             self, ExpectedModelVarianceReduction
         )
 

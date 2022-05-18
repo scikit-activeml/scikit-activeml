@@ -20,6 +20,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
     provide_test_regression_query_strategy_init_integration_dict,
+    provide_test_regression_query_strategy_query_X_eval,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 
@@ -67,6 +68,11 @@ class TestMutualInformationGainMaximization(unittest.TestCase):
 
     def test_query_param_candidates(self):
         provide_test_regression_query_strategy_query_candidates(
+            self, MutualInformationGainMaximization
+        )
+
+    def test_query_param_X_eval(self):
+        provide_test_regression_query_strategy_query_X_eval(
             self, MutualInformationGainMaximization
         )
 
@@ -146,6 +152,11 @@ class TestKLDivergenceMaximization(unittest.TestCase):
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
+            self, KLDivergenceMaximization
+        )
+
+    def test_query_param_X_eval(self):
+        provide_test_regression_query_strategy_query_X_eval(
             self, KLDivergenceMaximization
         )
 

@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn import clone
+from sklearn.utils import check_array
 
 from skactiveml.base import (
     ProbabilisticRegressor,
@@ -55,6 +56,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         fit_reg=True,
         sample_weight=None,
         candidates=None,
+        X_eval=None,
         batch_size=1,
         return_utilities=False,
     ):
@@ -85,6 +87,9 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
+        X_eval : array-like of shape (n_eval_samples, n_features),
+            optional (default=None) Evaluation data set that is used for
+            estimating the probability distribution of the feature space.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -116,10 +121,15 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(self.integration_dict, "self.integration_dict", dict)
         check_type(fit_reg, "fit_reg", bool)
+        if X_eval is None:
+            X_eval = X
+        else:
+            X_eval = check_array(X_eval)
+            self._check_n_features(X_eval, reset=False)
+        check_type(self.integration_dict, "self.integration_dict", dict)
+
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-        X_eval = X
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)

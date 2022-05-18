@@ -17,6 +17,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
     provide_test_regression_query_strategy_init_integration_dict,
+    provide_test_regression_query_strategy_query_X_eval,
 )
 from skactiveml.regressor import NICKernelRegressor
 
@@ -34,6 +35,10 @@ class TestExpectedModelOutputChange(unittest.TestCase):
             candidates=self.candidates,
             reg=self.reg,
         )
+
+    def test_s(self):
+        qs = ExpectedModelOutputChange()
+        qs.query(**self.query_kwargs, X_eval=np.array([[0, 1]]))
 
     def test_init_param_random_state(self):
         provide_test_regression_query_strategy_init_random_state(
@@ -95,6 +100,11 @@ class TestExpectedModelOutputChange(unittest.TestCase):
 
     def test_query_param_candidates(self):
         provide_test_regression_query_strategy_query_candidates(
+            self, ExpectedModelOutputChange
+        )
+
+    def test_query_param_X_eval(self):
+        provide_test_regression_query_strategy_query_X_eval(
             self, ExpectedModelOutputChange
         )
 
