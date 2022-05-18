@@ -4,22 +4,22 @@ from multiple annotators.
 """
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
-
-
 import warnings
+import numpy as np
+
 from copy import deepcopy
 
-import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
-from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
 )
+from sklearn.utils import metaestimators
 
 from ..base import SkactivemlClassifier
 from ..utils import rand_argmin, MISSING_LABEL, is_labeled
+from ..utils._functions import _available_if
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -104,7 +104,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @if_delegate_has_method(delegate="estimator")
+    @_available_if("partial_fit", hasattr(metaestimators, "available_if"))
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -174,7 +174,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
-    @if_delegate_has_method(delegate="estimator")
+    @_available_if("predict_proba", hasattr(metaestimators, "available_if"))
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 

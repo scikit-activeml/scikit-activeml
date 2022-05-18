@@ -43,6 +43,7 @@ setuptools.setup(
     ],
     url="https://github.com/scikit-activeml/scikit-activeml",
     author="Daniel Kottke",
+    python_requires=">=3.7",
     author_email="daniel.kottke@uni-kassel.de",
     license="BSD 3-Clause License",
     packages=setuptools.find_packages(),
