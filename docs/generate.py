@@ -3,6 +3,7 @@ import importlib
 import inspect
 import json
 import os
+import re
 import warnings
 
 import numpy as np
@@ -510,9 +511,44 @@ def format_plot(data, template_path):
     -------
     string : The formatted string for the example script.
     """
+    pattern = r'"""\$[^"""]*"""|"\$[^"&^\n]*"|' + \
+              r"'''\$[^''']*'''|'\$[^'&^\n]*'"
+    pattern_group = r'"""\$([^"""]*)"""|"\$([^"&^\n]*)"|' + \
+                    r"'''\$([^''']*)'''|'\$([^'&^\n]*)'"
     block_str = ''
     with open(template_path, "r") as template:
+        template_str = template.read()
+
+        findings = re.findall(pattern, template_str)
+
+        for finding in findings:
+            r = re.match(pattern_group, finding)
+            s = filter( lambda x: x is not None, r.groups() ).__next__()
+            splits = s.split("|")
+            key = splits[0]
+
+            if "FULLEXAMPLES" not in os.environ:
+                if key == "n_samples":
+                    data[key] = "10"
+                elif key == "n_cycles":
+                    data[key] = "2"
+                elif key == "res":
+                    data[key] = "3"
+            if key in data.keys():
+                new_str = data[key]
+            else:
+                if len(splits) > 1:
+                    new_str = splits[1]
+                else:
+                    new_str = ""
+
+            template_str = template_str.replace(finding, new_str)
+    return template_str + "\n"
+
+"""
         for line in template:
+
+
             if '#_' in line:
                 if '#_import' in line:
                     line = f'from skactiveml.pool import {data["qs"].__name__}\n'
@@ -573,10 +609,10 @@ def format_plot(data, template_path):
                             line += prefix + l + '\n'
                     except KeyError:
                         pass
-
             block_str += line
 
     return block_str + '\n'
+"""
 
 
 def format_refs(refs: list):

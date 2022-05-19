@@ -11,12 +11,10 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "" : [],
-    "init_params" : {
-      "method" : "'margin_sampling'"
-    },
-    "query_params" : {
-      "clf" : "clf"
-    }
+    "import_misc" : "from skactiveml.pool import UncertaintySampling",
+    "init_qs" : "UncertaintySampling(method='margin_sampling')",
+    "query_params" : "X=X, y=y, clf=clf",
+    "plot_utility_params" : "candidates=None"
   },
   {
     "class" : "UncertaintySampling",
