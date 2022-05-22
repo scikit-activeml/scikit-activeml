@@ -65,7 +65,9 @@ class Test_IffHasAMethod(unittest.TestCase):
 
         w = WrapperOfAB()
         self.assertFalse(hasattr(w, "wrapped"))
-        w = WrapperOfAB(var=B())
+        b = B()
+        b.do_2()
+        w = WrapperOfAB(var=b)
         self.assertTrue(hasattr(w, "wrapped"))
         res = w.wrapped()
         self.assertEqual(res, "method_result")
