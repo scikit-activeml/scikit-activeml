@@ -70,9 +70,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
-        )
+        super().__init__(missing_label=missing_label, random_state=random_state)
         self.cost_matrix = cost_matrix
         self.enforce_mapping = enforce_mapping
 
@@ -402,16 +400,14 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
 
         if sample_weight is not None and len(X) != len(sample_weight):
             raise ValueError(
-                "If `sample_weight` is set, it must have same "
-                "length as `X`."
+                "If `sample_weight` is set, it must have same " "length as `X`."
             )
 
         if sample_weight_candidates is not None and len(candidates) != len(
             sample_weight_candidates
         ):
             raise ValueError(
-                "If `sample_weight` is set, it must have same "
-                "length as `X`."
+                "If `sample_weight` is set, it must have same " "length as `X`."
             )
 
         # Concatenate samples
@@ -496,9 +492,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
                 * cost_est[np.newaxis, :]
             )
         else:
-            prob_mat = (
-                prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis, :]
-            )
+            prob_mat = prob_true[:, :, np.newaxis] @ prob_pred[:, np.newaxis, :]
             return np.sum(
                 sample_weight[:, np.newaxis, np.newaxis]
                 * prob_mat
@@ -580,7 +574,7 @@ class MonteCarloEER(ExpectedErrorReduction):
             )
 
     def _estimate_current_error(
-            self, id_clf, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_train, idx_cand, idx_eval, w_eval
     ):
         if self.subtract_current:
             probs = id_clf.predict_proba(idx_eval)
@@ -598,7 +592,7 @@ class MonteCarloEER(ExpectedErrorReduction):
             )
 
     def _estimate_error_for_candidate(
-            self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
+        self, id_clf, idx_cx, cy, idx_train, idx_cand, idx_eval, w_eval
     ):
         id_clf.partial_fit(idx_cx, cy, use_base_clf=True, set_base_clf=False)
         probs = id_clf.predict_proba(idx_eval)
