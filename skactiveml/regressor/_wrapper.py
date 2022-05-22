@@ -5,9 +5,7 @@ from operator import attrgetter
 import numpy as np
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
-from sklearn.utils.metaestimators import (
-    available_if,
-)
+from sklearn.utils import metaestimators
 from sklearn.utils.validation import (
     has_fit_parameter,
     check_array,
@@ -15,33 +13,8 @@ from sklearn.utils.validation import (
 )
 
 from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
+from skactiveml.utils._functions import _available_if
 from skactiveml.utils._label import is_labeled, MISSING_LABEL
-
-
-def if_delegate_has_alternative_methods(delegate, *alternative_methods):
-    """Create a decorator for methods that are delegated to alternative methods
-     of a sub-estimator
-
-    This enables ducktyping by hasattr returning True according to the
-    sub-estimator.
-
-    Parameters
-    ----------
-    delegate : str
-        Name of the sub-estimator that can be accessed as an attribute of the
-        base object.
-    alternative_methods : iterable of str
-        Names of the alternative methods.
-    """
-
-    def if_obj_has_alternative_methods(obj):
-        delegate_obj = attrgetter(delegate)(obj)
-        return any(
-            hasattr(delegate_obj, method_name)
-            for method_name in alternative_methods
-        )
-
-    return available_if(if_obj_has_alternative_methods)
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -138,7 +111,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         """
         return self.estimator_.predict(X, **predict_kwargs)
 
-    @if_delegate_has_alternative_methods("estimator", "sample_y", "sample")
+    @_available_if(
+        ("sample_y", "sample"), hasattr(metaestimators, "available_if")
+    )
     def sample_y(self, X, n_samples, random_state=None):
         """Assumes a conditional probability estimator. Samples are drawn from
         the posterior or prior conditional probability estimator.
