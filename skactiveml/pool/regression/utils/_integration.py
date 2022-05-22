@@ -71,7 +71,8 @@ def conditional_expect(
         -'quadrature' Gaussian quadrature method for integration.
         If `quantile_method is None` quadrature is used.
     n_integration_samples: int, optional (default=10)
-        The number of integration samples used in 'quantile' and 'monte_carlo'.
+        The number of integration samples used in 'quantile', 'monte_carlo' and
+        'gauss-hermite'.
     quad_dict: dict, optional (default=None)
         Further arguments for using `scipy's` `expect`
     random_state: numeric | np.random.RandomState, optional (default=None)

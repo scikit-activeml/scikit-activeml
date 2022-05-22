@@ -98,8 +98,9 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
         X_eval : array-like of shape (n_eval_samples, n_features),
-            optional (default=None) Evaluation data set that is used for
-            estimating the probability distribution of the feature space.
+        optional (default=None)
+            Evaluation data set that is used for estimating the probability
+            distribution of the feature space.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -177,7 +178,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             The potential mapping between the candidate samples and the
             training data set.
         reg: ProbabilisticRegressor
-            Estimates the entropy, predicts values.
+            Predict output values and entropy.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
@@ -319,8 +320,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
         X_eval : array-like of shape (n_eval_samples, n_features),
-            optional (default=None) Evaluation data set that is used for
-            estimating the probability distribution of the feature space.
+        optional (default=None)
+            Evaluation data set that is used for estimating the probability
+            distribution of the feature space.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
