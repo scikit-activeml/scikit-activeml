@@ -10,37 +10,8 @@ from sklearn.svm import SVC
 from skactiveml.regressor._wrapper import (
     SklearnRegressor,
     SklearnProbabilisticRegressor,
-    if_delegate_has_alternative_methods,
 )
 from skactiveml.utils import MISSING_LABEL
-
-
-class TestIfDelegateHasAlternativeMethods(unittest.TestCase):
-    def test_ifDelegateHasAlternativeMethods(self):
-        class DelegateDummy1:
-            def __init__(self, name):
-                self.name = name
-
-            def say_name(self):
-                return self.name
-
-        class DelegateDummy2:
-            def __init__(self, name):
-                self.name = name
-
-        class Dummy:
-            def __init__(self, d):
-                self.d = d
-
-            @if_delegate_has_alternative_methods("d", "say_name")
-            def do_something(self):
-                return self.d.say_name()
-
-        dummy = Dummy(DelegateDummy1("test_name"))
-        self.assertTrue(hasattr(dummy, "do_something"))
-        self.assertEqual(dummy.do_something(), "test_name")
-        dummy = Dummy(DelegateDummy2("test_name"))
-        self.assertFalse(hasattr(dummy, "do_something"))
 
 
 class TestWrapper(unittest.TestCase):
