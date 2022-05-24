@@ -57,9 +57,12 @@ class TestExpectedModelChange(unittest.TestCase):
             qs = ExpectedModelChange(feature_map=wrong_val)
             self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
-        qs = ExpectedModelChange(feature_map=lambda x: np.zeros((len(x), 1)))
+        qs = ExpectedModelChange(
+            feature_map=lambda x: np.zeros((len(x), 1)),
+            random_state=self.random_state,
+        )
         utilities = qs.query(
-            self.X, self.y, reg=self.reg, return_utilities=True
+            self.X, self.y, reg=self.reg, return_utilities=True, fit_reg=True
         )[1]
         np.testing.assert_array_equal(np.zeros(2), utilities[0, :2])
 
