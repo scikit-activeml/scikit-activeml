@@ -37,10 +37,6 @@ class TestExpectedModelOutputChange(unittest.TestCase):
             reg=self.reg,
         )
 
-    def test_s(self):
-        qs = ExpectedModelOutputChange()
-        qs.query(**self.query_kwargs, X_eval=np.array([[0, 1]]))
-
     def test_init_param_random_state(self):
         provide_test_regression_query_strategy_init_random_state(
             self, ExpectedModelOutputChange
