@@ -343,7 +343,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             self.X, self.y1, sample_weight=np.ones_like(self.y1)
         )
         self.assertTrue(clf.is_fitted_)
-        # test if clf functions with with complete data
+        # test if clf functions with complete data
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 GaussianNB(),
