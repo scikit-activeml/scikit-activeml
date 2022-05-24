@@ -219,6 +219,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
 
     def test_fit(self):
+        # check if clf is correctly initialized
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 GaussianProcessClassifier(),
@@ -232,6 +233,8 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         np.testing.assert_array_equal(["tokyo", "paris"], clf.classes)
         self.assertEqual(clf.estimator.kernel, clf.estimator.estimator.kernel)
         self.assertFalse(hasattr(clf, "kernel_"))
+
+        # check cost matrix
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(Perceptron(), missing_label="nan"),
             missing_label="nan",
@@ -240,8 +243,11 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             random_state=0,
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        
         clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
+
+        # check if classifier is correctly fitted
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 GaussianProcessClassifier(),
@@ -252,7 +258,6 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             missing_label="nan",
             only_labeled=True,
         )
-        self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf.fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "kernel_"))
@@ -260,6 +265,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             clf.estimator_.classes_, ["new york", "paris", "tokyo"]
         )
         self.assertEqual(clf.missing_label, "nan")
+        # test if warnings are correctly handeled 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             clf.fit(self.X, self.y2)
@@ -267,7 +273,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(clf.estimator_.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
-
+        # fit clf with no prior classes and no labels
         clf = SlidingWindowClassifier(
             SklearnClassifier(
                 GaussianProcessClassifier(), missing_label="nan"
@@ -275,6 +281,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             missing_label="nan",
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
+        # fit clf with correct data and sample_weight
         clf = SlidingWindowClassifier(
             SklearnClassifier(
                 GaussianProcessClassifier(), missing_label="nan"
@@ -295,6 +302,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         self.assertTrue(ensemble.is_fitted_, True)
 
     def test_partial_fit(self):
+        # check if clf is correctly initialized
         clf = SlidingWindowClassifier(
             SklearnClassifier(estimator=GaussianNB(), missing_label="nan"),
             classes=["tokyo", "paris", "new york"],
@@ -304,6 +312,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         clf.partial_fit(self.X, self.y1)
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "class_count_"))
+        # check if cost matrix is equal
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 BaggingClassifier(),
@@ -317,6 +326,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             window_size=5,
             cost_matrix=[[1, 1, 1], [2, 1, 1], [2, 1, 3]],
         )
+        # test if clf functions complete data and only_labeled=True
         self.assertRaises(ValueError, clf.partial_fit, X=self.X, y=self.y1)
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
@@ -333,6 +343,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             self.X, self.y1, sample_weight=np.ones_like(self.y1)
         )
         self.assertTrue(clf.is_fitted_)
+        # test if clf functions with with complete data
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 GaussianNB(),
@@ -356,6 +367,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         clf.partial_fit(
             self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
         )
+        # test clf with classes and empty data
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 GaussianNB(),
