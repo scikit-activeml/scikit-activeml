@@ -9,7 +9,7 @@ from skactiveml.visualization._misc import _check_interval_and_assign
 def gaussian_noise_generator_1d(
     X, *intervals, interval_std=1, default_std=0.5, random_state=None
 ):
-    """Add gaussian distributed noise to each sample.
+    """Generates gaussian distributed noise for each sample.
 
     Parameters
     ----------
@@ -23,11 +23,10 @@ def gaussian_noise_generator_1d(
     interval_std : numeric, optional (default=0.5)
         The default standard deviation for an interval with no `std` specified.
     default_std : numeric or None, optional (default=0.0)
-        The default standard deviation added everywhere. This value might be
-        zero.
+        The standard deviation of a gaussian noise added everywhere. This value
+        might be zero.
     random_state : numeric | np.random.RandomState (default=None)
-        The random state to use. If `random_state is None` random
-        `random_state` is used.
+        The random state to use.
 
     Returns
     -------
@@ -76,11 +75,10 @@ def sample_generator_1d(
     intervals : tuple of shape (x_low, x_up) or (x_low, x_up, density)
         The relative amount of samples in the region from `x_low` to `x_up`.
         If `density` is not given `interval_density` is used.
-    interval_density : numeric, optional (default=0.5)
-        The default density in an `interval`.
+    interval_density : numeric, optional (default=1)
+        The default density in an interval.
     random_state : numeric | np.random.RandomState (default=None)
-        The random state to use. If `random_state is None` random
-        `random_state` is used.
+        The random state to use.
 
     Returns
     -------
