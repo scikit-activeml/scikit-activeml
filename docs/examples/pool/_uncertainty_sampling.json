@@ -5,12 +5,12 @@
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Uncertainty Sampling with Margin",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "" : [],
     "import_misc" : "from skactiveml.pool import UncertaintySampling",
     "init_qs" : "UncertaintySampling(method='margin_sampling')",
     "query_params" : "X=X, y=y, clf=clf",
@@ -22,18 +22,15 @@
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Uncertainty Sampling with Least-Confidence",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "" : [],
-    "init_params" : {
-      "method" : "'least_confident'"
-    },
-    "query_params" : {
-      "clf" : "clf"
-    }
+    "import_misc" : "from skactiveml.pool import UncertaintySampling",
+    "init_qs" : "UncertaintySampling(method='least_confident')",
+    "query_params" : "X=X, y=y, clf=clf"
   },
   {
     "class" : "UncertaintySampling",
@@ -41,18 +38,15 @@
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Uncertainty Sampling with Entropy",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "" : [],
-    "init_params" : {
-      "method" : "'entropy'"
-    },
-    "query_params" : {
-      "clf" : "clf"
-    }
+    "import_misc" : "from skactiveml.pool import UncertaintySampling",
+    "init_qs" : "UncertaintySampling(method='entropy')",
+    "query_params" : "X=X, y=y, clf=clf"
   },
   {
     "class" : "UncertaintySampling",
@@ -60,6 +54,7 @@
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title": "Expected Average Precision",
     "refs": [
@@ -72,13 +67,9 @@
       "refs"
     ],
     "text_0": "",
-    "bp_add_imports": [],
-    "init_params": {
-      "method": "'expected_average_precision'"
-    },
-    "query_params": {
-      "clf": "clf"
-    },
+    "import_misc" : "from skactiveml.pool import UncertaintySampling",
+    "init_qs" : "UncertaintySampling(method='expected_average_precision')",
+    "query_params" : "X=X, y=y, clf=clf",
     "use_candidate_plotting": true
   }
 ]

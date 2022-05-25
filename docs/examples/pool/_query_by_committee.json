@@ -5,20 +5,18 @@
     "categories" : {
       "Settles2012" : "Query-by-Committee"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Query-by-Committee with Kullback-Leibler Divergence",
     "refs" : ["seung1992query","mccallum1998employing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
-                        "from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier"],
-    "clf" : "SklearnClassifier(BaggingClassifier(ParzenWindowClassifier()), classes=np.unique(y_true))",
-    "init_params" : {
-        "method" : "'KL_divergence'"
-    },
-    "query_params" : {
-      "ensemble" : "clf"
-    }
+    "import_misc" : ["from sklearn.ensemble import BaggingClassifier",
+                     "from skactiveml.pool import QueryByCommittee"],
+    "import_clf" : "from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier",
+    "init_clf" : "SklearnClassifier(BaggingClassifier(ParzenWindowClassifier()), classes=np.unique(y_true))",
+    "init_qs" : "QueryByCommittee(method='KL_divergence')",
+    "query_params" : "X=X, y=y, ensemble=clf"
   },
   {
     "class" : "QueryByCommittee",
@@ -26,19 +24,17 @@
     "categories" : {
       "Settles2012" : "Query-by-Committee"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Query-by-Committee with Vote Entropy",
     "refs" : ["seung1992query","engelson1996minimizing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : ["from sklearn.ensemble import BaggingClassifier",
-                        "from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier"],
-    "clf" : "SklearnClassifier(BaggingClassifier(ParzenWindowClassifier()), classes=np.unique(y_true))",
-    "init_params" : {
-        "method" : "'vote_entropy'"
-    },
-    "query_params" : {
-      "ensemble" : "clf"
-    }
+    "import_misc" : ["from sklearn.ensemble import BaggingClassifier",
+                     "from skactiveml.pool import QueryByCommittee"],
+    "import_clf" : "from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier",
+    "init_clf" : "SklearnClassifier(BaggingClassifier(ParzenWindowClassifier()), classes=np.unique(y_true))",
+    "init_qs" : "QueryByCommittee(method='vote_entropy')",
+    "query_params" : "X=X, y=y, ensemble=clf"
   }
 ]

@@ -484,6 +484,7 @@ class TestGeneral(unittest.TestCase):
 class TestExamples(unittest.TestCase):
     def setUp(self):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
+        self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples", "pool")
         self.exceptions = []
         self.working_dir = os.curdir
@@ -493,7 +494,9 @@ class TestExamples(unittest.TestCase):
         examples_path = path.join(
             self.skaml_path, "docs", "temp_examples_pool"
         )
+        os.chdir(self.docs_path)
         generate_examples(examples_path, pool, self.json_path)
+        os.chdir(self.working_dir)
 
         # Execute the examples.
         pool_examples_path = path.join(examples_path, "examples", "pool")

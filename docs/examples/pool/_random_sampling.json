@@ -5,13 +5,14 @@
     "categories" : {
       "Settles2012" : "Random Sampling"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Random Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {},
-    "query_params" : {}
+    "import_misc" : "from skactiveml.pool import RandomSampling",
+    "init_qs" : "RandomSampling()",
+    "query_params" : "X=X, y=y"
   }
 ]

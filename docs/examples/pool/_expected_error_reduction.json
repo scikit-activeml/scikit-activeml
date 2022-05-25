@@ -5,23 +5,19 @@
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Value of Information on Unlabeled Samples",
     "refs" : ["joshi2009multi"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "consider_unlabeled" : "True",
-      "consider_labeled" : "False",
-      "candidate_to_labeled" : "True",
-      "subtract_current" : "True",
-      "normalize": "True"
-    },
-    "query_params" : {
-      "clf" : "clf",
-      "ignore_partial_fit" : "True"
-    }
+    "import_misc" : "from skactiveml.pool import ValueOfInformationEER",
+    "init_qs" : ["ValueOfInformationEER(consider_unlabeled=True,",
+                 "                      consider_labeled=False,",
+                 "                      candidate_to_labeled=True,",
+                 "                      subtract_current=True,",
+                 "                      normalize=True)"],
+    "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
     "class" : "ValueOfInformationEER",
@@ -29,22 +25,18 @@
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Value of Information on Labeled Samples",
     "refs" : ["margineantu2005active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "consider_unlabeled" : "False",
-      "consider_labeled" : "True",
-      "candidate_to_labeled" : "False",
-      "subtract_current" : "False"
-    },
-    "query_params" : {
-      "clf" : "clf",
-      "ignore_partial_fit" : "True"
-    }
+    "import_misc" : "from skactiveml.pool import ValueOfInformationEER",
+    "init_qs" : ["ValueOfInformationEER(consider_unlabeled=False,",
+                 "                      consider_labeled=True,",
+                 "                      candidate_to_labeled=False,",
+                 "                      subtract_current=False)"],
+    "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
     "class" : "ValueOfInformationEER",
@@ -52,22 +44,18 @@
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Value of Information",
     "refs" : ["kapoor2007selective"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "consider_unlabeled" : "True",
-      "consider_labeled" : "True",
-      "candidate_to_labeled" : "True",
-      "subtract_current" : "True"
-    },
-    "query_params" : {
-      "clf" : "clf",
-      "ignore_partial_fit" : "True"
-    }
+    "import_misc" : "from skactiveml.pool import ValueOfInformationEER",
+    "init_qs" : ["ValueOfInformationEER(consider_unlabeled=True,",
+                 "                      consider_labeled=True,",
+                 "                      candidate_to_labeled=True,",
+                 "                      subtract_current=True)"],
+    "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
     "class" : "MonteCarloEER",
@@ -75,19 +63,15 @@
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Monte-Carlo EER with Log-Loss",
     "refs" : ["roy2001toward"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "method" : "'log_loss'"
-    },
-    "query_params" : {
-      "clf" : "clf",
-      "ignore_partial_fit" : "True"
-    }
+    "import_misc" : "from skactiveml.pool import MonteCarloEER",
+    "init_qs" : "MonteCarloEER(method='log_loss')",
+    "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   },
   {
     "class" : "MonteCarloEER",
@@ -95,18 +79,14 @@
     "categories" : {
       "Settles2012" : "Expected Error Reduction"
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Monte-Carlo EER with Misclassification-Loss",
     "refs" : ["roy2001toward"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "method" : "'misclassification_loss'"
-    },
-    "query_params" : {
-      "clf" : "clf",
-      "ignore_partial_fit" : "True"
-    }
+    "import_misc" : "from skactiveml.pool import MonteCarloEER",
+    "init_qs" : "MonteCarloEER(method='misclassification_loss')",
+    "query_params" : "X=X, y=y, clf=clf, ignore_partial_fit=True"
   }
 ]

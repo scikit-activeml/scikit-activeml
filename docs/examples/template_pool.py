@@ -33,6 +33,8 @@ n_cycles = "$n_cycles|20"
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
+    """$test|# Kommentar 1
+    # Kommentar 2"""
 
     # Get labeled instances.
     X_labeled = X[labeled_indices(y)]

@@ -327,7 +327,7 @@ def generate_examples(gen_path, package, json_path):
                     dir_path=dir_path_package,
                     data=data,
                     package=package,
-                    template_path=os.path.join(json_path, 'template.py')
+                    template_path=os.path.abspath(data["template"])
                 )
 
     # Sort the table alphabetically.
@@ -515,7 +515,6 @@ def format_plot(data, template_path):
               r"'''\$[^''']*'''|'\$[^'&^\n]*'"
     pattern_group = r'"""\$([^"""]*)"""|"\$([^"&^\n]*)"|' + \
                     r"'''\$([^''']*)'''|'\$([^'&^\n]*)'"
-    block_str = ''
     with open(template_path, "r") as template:
         template_str = template.read()
 
@@ -523,7 +522,7 @@ def format_plot(data, template_path):
 
         for finding in findings:
             r = re.match(pattern_group, finding)
-            s = filter( lambda x: x is not None, r.groups() ).__next__()
+            s = filter(lambda x: x is not None, r.groups()).__next__()
             splits = s.split("|")
             key = splits[0]
 
@@ -535,7 +534,14 @@ def format_plot(data, template_path):
                 elif key == "res":
                     data[key] = "3"
             if key in data.keys():
-                new_str = data[key]
+                if isinstance(data[key], list):
+                    new_str = ''
+                    indent = "".ljust(0, " ")  # TODO
+                    for line in data[key]:
+                        new_str += indent + line + "\n"
+                    new_str = new_str[0:-1]
+                else:
+                    new_str = data[key]
             else:
                 if len(splits) > 1:
                     new_str = splits[1]
@@ -544,75 +550,6 @@ def format_plot(data, template_path):
 
             template_str = template_str.replace(finding, new_str)
     return template_str + "\n"
-
-"""
-        for line in template:
-
-
-            if '#_' in line:
-                if '#_import' in line:
-                    line = f'from skactiveml.pool import {data["qs"].__name__}\n'
-                    if 'clf' not in data.keys() and \
-                            'clf' not in data['init_params'].keys():
-                        line += 'from skactiveml.classifier import ParzenWindowClassifier\n'
-                elif 'init_clf' in line:
-                    # Decide which classifier to use, if clf is None.
-                    if 'clf' not in data.keys():
-                        if 'clf' not in data['init_params'].keys():
-                            clf = 'ParzenWindowClassifier(classes=[0, 1], random_state=random_state)'
-                        else:
-                            clf = data['init_params']['clf']
-                    else:
-                        clf = data['clf']
-                    line = ('clf = ' + clf + '\n')
-                elif 'init_qs' in line:
-                    if 'clf' not in data['init_params'].keys() and 'clf' in \
-                            inspect.signature(data["qs"].__init__).parameters:
-                        data['init_params']['clf'] = 'clf'
-                    # Set the random state if it is not set in the json file.
-                    if 'random_state' not in data[
-                        'init_params'].keys() and 'random_state' in \
-                            inspect.signature(data["qs"].__init__).parameters:
-                        data['init_params']['random_state'] = 'random_state'
-                    # Initialise the query strategy.
-                    line = f'qs = {data["qs"].__name__}' \
-                           f'({dict_to_str(data["init_params"])})\n'
-                elif '#_query_params' in line:
-                    start = line.find('#_query_params') - 1
-                    line = line[:start] + '{' + \
-                           dict_to_str(data['query_params'], allocator=': ',
-                                       key_as_string=True) + '}\n'
-                elif '"#_n_cycles"' in line:
-                    n_cycles = os.getenv('N_CYCLES', default='2')
-                    line = line.replace('"#_n_cycles"', n_cycles)
-                elif '"#_n_samples"' in line:
-                    n_samples = os.getenv('N_SAMPLES', default='10')
-                    line = line.replace('"#_n_samples"', n_samples)
-                elif '"#_res"' in line:
-                    res = os.getenv('RES', default='3')
-                    line = line.replace('"#_res"', res)
-                elif '"#_candidates"' in line:
-                    if 'use_candidate_plotting' not in data.keys():
-                        cand = 'None'
-                    else:
-                        cand = "np.arange(len(X))"
-                    line = line.replace('"#_candidates"', cand)
-                elif '#_bp' in line:
-                    try:
-                        s = line.find('#_')
-                        bp = line[s + 2:].split()[0]
-                        prefix = line[:s]
-                        line = ''
-                        if type(data[bp]) != list:
-                            data[bp] = [data[bp]]
-                        for l in data[bp]:
-                            line += prefix + l + '\n'
-                    except KeyError:
-                        pass
-            block_str += line
-
-    return block_str + '\n'
-"""
 
 
 def format_refs(refs: list):
