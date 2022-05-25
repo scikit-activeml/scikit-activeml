@@ -1,10 +1,11 @@
 import inspect
+import warnings
 from copy import deepcopy
-from operator import attrgetter
 
 import numpy as np
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
+from sklearn.exceptions import NotFittedError
 from sklearn.utils import metaestimators
 from sklearn.utils.validation import (
     has_fit_parameter,
@@ -72,24 +73,44 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         self.estimator_ = deepcopy(self.estimator)
 
+        self._label_mean = 0
+        self._label_std = 1
+
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
 
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
         X_labeled = X[is_lbld]
         y_labeled = y[is_lbld]
-        estimator_parameters = (
-            dict(fit_kwargs) if fit_kwargs is not None else {}
-        )
+        estimator_params = dict(fit_kwargs) if fit_kwargs is not None else {}
 
         if (
             has_fit_parameter(self.estimator_, "sample_weight")
             and sample_weight is not None
         ):
             sample_weight_labeled = sample_weight[is_lbld]
-            estimator_parameters["sample_weight"] = sample_weight_labeled
+            estimator_params["sample_weight"] = sample_weight_labeled
 
         if np.sum(is_lbld) != 0:
-            self.estimator_.fit(X_labeled, y_labeled, **estimator_parameters)
+            self._label_mean = np.mean(y[is_lbld])
+            self._label_std = np.std(y[is_lbld])
+            try:
+                self.estimator_.fit(X_labeled, y_labeled, **estimator_params)
+            except Exception as e:
+                warnings.warn(
+                    f"The 'estimator' could not be fitted because of"
+                    f" '{e}'. Therefore, the empirical label mean "
+                    f"`_label_mean={self._label_mean}` and the "
+                    f"empirical label standard deviation "
+                    f"`_label_std={self._label_std}` will be used to make "
+                    f"predictions."
+                )
 
         return self
 
@@ -102,14 +123,35 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             Input samples.
         predict_kwargs : dict-like
             Further parameters as input to the 'predict' method of the
-            'estimator'.
+            'estimator'. If the estimator could not be fitted, only `return_std`
+            is supported as keyword argument.
 
         Returns
         -------
         y :  array-like, shape (n_samples) or (n_samples, n_targets)
             Predicted labels of the input samples.
         """
-        return self.estimator_.predict(X, **predict_kwargs)
+        check_is_fitted(self)
+        X = check_array(X, **self.check_X_dict_)
+        self._check_n_features(X, reset=False)
+        try:
+            return self.estimator_.predict(X, **predict_kwargs)
+        except NotFittedError:
+            warnings.warn(
+                f"Since the 'estimator' could not be fitted when"
+                f" calling the `fit` method, the label "
+                f"mean `_label_mean={self._label_mean}` and optionally the label"
+                f"standard deviation `_label_std={self._label_std}` is used to "
+                f"make the predictions."
+            )
+            has_std = predict_kwargs.pop("return_std", False)
+            if has_std:
+                return (
+                    np.full(len(X), self._label_mean),
+                    np.full(len(X), self._label_std),
+                )
+            else:
+                return np.full(len(X), self._label_mean)
 
     @_available_if(
         ("sample_y", "sample"), hasattr(metaestimators, "available_if")
@@ -205,5 +247,5 @@ class SklearnProbabilisticRegressor(ProbabilisticRegressor, SklearnRegressor):
             )
 
         X = check_array(X)
-        loc, scale = self.estimator_.predict(X, return_std=True)
+        loc, scale = self.predict(X, return_std=True)
         return norm(loc=loc, scale=scale)
