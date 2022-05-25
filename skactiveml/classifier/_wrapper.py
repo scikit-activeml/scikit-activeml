@@ -528,7 +528,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.X_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "y_train_"):
             self.y_train_ = deque(maxlen=self.window_size)
-        if not hasattr(self, "sample_weight_"):
+        if not hasattr(self, "sample_weight_train_"):
             self.sample_weight_train_ = deque(maxlen=self.window_size)
         if self.only_labeled:
             is_lbld = is_labeled(y, self.missing_label)
