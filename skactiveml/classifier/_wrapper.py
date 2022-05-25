@@ -415,12 +415,36 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self: SlidingWindowClassifier,
             The SlidingWindowClassifier is fitted on the training data.
         """
+        # Check whether estimator is a valid classifier.
+        if not isinstance(self.estimator, SkactivemlClassifier):
+            raise TypeError(
+                "'{}' must be a SkactivemlClassifier"
+                "classifier.".format(self.estimator)
+            )
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+        X, y, sample_weight = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+        )
+
         self._add_samples("fit", X, y, sample_weight)
+        X_train = np.array(self.X_train_)
+        y_train = np.array(self.y_train_)
+        sample_weight_train = None
+        if self.sample_weight_train_ is not None:
+            sample_weight_train = np.array(self.sample_weight_train_)
         return self._fit(
             "fit",
-            X=self.X_train_,
-            y=self.y_train_,
-            sample_weight=self.sample_weight_,
+            X=X_train,
+            y=y_train,
+            sample_weight=sample_weight_train,
             **fit_kwargs,
         )
 
@@ -449,65 +473,63 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self : SlidingWindowClassifier,
             The SlidingWindowClassifier is fitted on the training data.
         """
-        self._add_samples("partial_fit", X, y, sample_weight)
-
-        if hasattr(self.estimator, "partial_fit"):
-            if self.ignore_estimator_partial_fit:
-                return self._fit(
-                    "fit",
-                    X=self.X_train_,
-                    y=self.y_train_,
-                    sample_weight=self.sample_weight_,
-                    **fit_kwargs,
-                )
-            else:
-                warnings.warn(
-                    "The partial_fit method in estimator is used but the "
-                    "sliding window has no effect. To avoid this set "
-                    "`ignore_estimator_partial_fit`=True"
-                )
-                return self._fit(
-                    "partial_fit",
-                    X=X,
-                    y=y,
-                    sample_weight=sample_weight,
-                    **fit_kwargs,
-                )
-        else:
-            return self._fit(
-                "fit",
-                X=self.X_train_,
-                y=self.y_train_,
-                sample_weight=self.sample_weight_,
-                **fit_kwargs,
+        # Check whether estimator is a valid classifier.
+        if not isinstance(self.estimator, SkactivemlClassifier):
+            raise TypeError(
+                "'{}' must be a SkactivemlClassifier"
+                "classifier.".format(self.estimator)
             )
-
-    def _add_samples(self, fit_func, X, y, sample_weight=None):
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "allow_nd": True,
             "dtype": None,
         }
-        check_y_dict = {
-            "ensure_min_samples": 0,
-            "ensure_min_features": 0,
-            "ensure_2d": False,
-            "force_all_finite": False,
-            "dtype": None,
-        }
-        y = check_array(y, **check_y_dict)
-        if len(y) == 0:
-            self.check_X_dict_["ensure_2d"] = False
-        X = check_array(X, **self.check_X_dict_)
-        check_consistent_length(X, y)
+
+        X, y, sample_weight = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+        )
+
+        self._add_samples("partial_fit", X, y, sample_weight)
+
+        if hasattr(self.estimator, "partial_fit") and not self.ignore_estimator_partial_fit:
+            warnings.warn(
+                    "The partial_fit method in estimator is used but the "
+                    "sliding window has no effect. To avoid this set "
+                    "`ignore_estimator_partial_fit`=True"
+                )
+            return self._fit(
+                "partial_fit",
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                **fit_kwargs,
+            )
+        else:
+            X_train = np.array(self.X_train_)
+            y_train = np.array(self.y_train_)
+            sample_weight_train = None
+            if self.sample_weight_train_ is not None:
+                sample_weight_train = np.array(self.sample_weight_train_)
+            return self._fit(
+                "fit",
+                X=X_train,
+                y=y_train,
+                sample_weight=sample_weight_train,
+                **fit_kwargs,
+            )
+
+    def _add_samples(self, fit_func, X, y, sample_weight=None):
 
         if not hasattr(self, "X_train_"):
             self.X_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "y_train_"):
             self.y_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "sample_weight_"):
-            self.sample_weight_ = deque(maxlen=self.window_size)
+            self.sample_weight_train_ = deque(maxlen=self.window_size)
         if self.only_labeled:
             is_lbld = is_labeled(y, self.missing_label)
             X = X[is_lbld]
@@ -521,36 +543,15 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if fit_func == "fit":
             self.X_train_ = deque(maxlen=self.window_size)
             self.y_train_ = deque(maxlen=self.window_size)
-            self.sample_weight_ = deque(maxlen=self.window_size)
+            self.sample_weight_train_ = deque(maxlen=self.window_size)
         self.X_train_.extend(X)
         self.y_train_.extend(y)
         if sample_weight is not None:
-            self.sample_weight_.extend(sample_weight)
+            self.sample_weight_train_.extend(sample_weight)
         else:
-            self.sample_weight_ = None
+            self.sample_weight_train_ = None
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
-        # Check input parameters.
-        self.check_X_dict_ = {
-            "ensure_min_samples": 0,
-            "ensure_min_features": 0,
-            "allow_nd": True,
-            "dtype": None,
-        }
-
-        # Check whether estimator is a valid classifier.
-        if not isinstance(self.estimator, SkactivemlClassifier):
-            raise TypeError(
-                "'{}' must be a SkactivemlClassifier"
-                "classifier.".format(self.estimator)
-            )
-
-        X, y, sample_weight = self._validate_data(
-            X=X,
-            y=y,
-            sample_weight=sample_weight,
-            check_X_dict=self.check_X_dict_,
-        )
 
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(
@@ -572,22 +573,24 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             self.estimator_ = deepcopy(self.estimator)
 
-        sample_weight_train = sample_weight
         if fit_function == "fit":
             self.estimator_.fit(
-                X=X, y=y, sample_weight=sample_weight_train, **fit_kwargs
+                X=X, y=y, sample_weight=sample_weight, **fit_kwargs
             )
         elif fit_function == "partial_fit":
             self.estimator_.partial_fit(
-                X=X, y=y, sample_weight=sample_weight_train, **fit_kwargs
+                X=X, y=y, sample_weight=sample_weight, **fit_kwargs
             )
 
         return self
 
     def _validate_data(
-        self, X, y, sample_weight=None, check_X_dict=None, check_y_dict=None,
+        self, X, y, sample_weight=None, check_X_dict=None
     ):
-
+        # super._validate_data is not called because training with partial fit
+        # with only one single available class in y leads to an error if
+        # self.classes is not set, even though self.classes has no function in
+        # this class.
         if self.window_size is not None:
             check_scalar(
                 self.window_size,
@@ -603,14 +606,28 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "ignore_estimator_partial_fit",
             bool,
         )
-        if check_y_dict is None:
-            check_y_dict = {
-                "ensure_min_samples": 0,
-                "ensure_min_features": 0,
-                "ensure_2d": False,
-                "force_all_finite": False,
-                "dtype": None,
-            }
+        check_y_dict = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "ensure_2d": False,
+            "force_all_finite": False,
+            "dtype": None,
+        }
+
+        # Check input parameters.
+        y = check_array(y, **check_y_dict)
+        if len(y) == 0:
+            check_X_dict["ensure_2d"] = False
+        X = check_array(X, **check_X_dict)
+        check_consistent_length(X, y)
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, **check_y_dict)
+            if not np.array_equal(y.shape, sample_weight.shape):
+                raise ValueError(
+                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"shape {sample_weight.shape}. Both need to have "
+                    f"identical shapes."
+                )
 
         # Check common classifier parameters.
         check_classifier_params(
@@ -654,23 +671,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
-
-        # Check input parameters.
-        y = check_array(y, **check_y_dict)
-        if len(y) == 0:
-            check_X_dict["ensure_2d"] = False
-        X = check_array(X, **check_X_dict)
-        check_consistent_length(X, y)
-
-        # Check classes.
-        if sample_weight is not None:
-            sample_weight = check_array(sample_weight, **check_y_dict)
-            if not np.array_equal(y.shape, sample_weight.shape):
-                raise ValueError(
-                    f"`y` has the shape {y.shape} and `sample_weight` has the "
-                    f"shape {sample_weight.shape}. Both need to have "
-                    f"identical shapes."
-                )
 
         return X, y, sample_weight
 
@@ -717,6 +717,27 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._check_n_features(X, reset=False)
         proba = self.estimator_.predict_proba(X)
         return proba
+
+    @_available_if("predict_freq", hasattr(metaestimators, "available_if"))
+    def predict_freq(self, X):
+        """Return class frequency estimates for the test samples `X`.
+
+        Parameters
+        ----------
+        X: array-like of shape (n_samples, n_features)
+            Test samples whose class frequencies are to be estimated.
+
+        Returns
+        -------
+        F: array-like of shape (n_samples, classes)
+            The class frequency estimates of the test samples 'X'. Classes are
+            ordered according to attribute 'classes_'.
+        """
+        check_is_fitted(self)
+        X = check_array(X, **self.check_X_dict_)
+        self._check_n_features(X, reset=False)
+        freq = self.estimator_.predict_freq(X)
+        return freq
 
     def __getattr__(self, item):
         if "estimator_" in self.__dict__ and hasattr(self.estimator_, item):

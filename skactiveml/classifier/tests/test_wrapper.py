@@ -357,7 +357,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
         )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(
-            self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
+            self.X, self.y_nan, sample_weight=np.ones_like(self.y_nan)
         )
         clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
         self.assertTrue(clf.is_fitted_)
