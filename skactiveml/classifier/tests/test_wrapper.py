@@ -343,6 +343,10 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             self.X, self.y1, sample_weight=np.ones_like(self.y1)
         )
         self.assertTrue(clf.is_fitted_)
+
+        clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
+        self.assertRaises(TypeError, clf.partial_fit, self.X, self.y1)
+
         # test if clf functions with complete data
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
@@ -453,3 +457,32 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             self.assertEqual(len(w), 1)
         y_exp = ["tokyo"] * len(self.X)
         np.testing.assert_array_equal(y_exp, y)
+
+    def test_predict_freq(self):
+        clf = SlidingWindowClassifier(
+            estimator=SklearnClassifier(
+                ParzenWindowClassifier(), missing_label="nan"
+            ),
+            missing_label="nan",
+        )
+        self.assertRaises(NotFittedError, clf.predict_freq, X=self.X)
+        clf.fit(X=self.X, y=self.y1)
+        freq = clf.predict_freq(X=self.X)
+
+        self.assertEqual(len(np.unique(freq)), 2)
+        est = ParzenWindowClassifier(missing_label="nan").fit(
+            X=self.X, y=self.y1
+        )
+        clf = SlidingWindowClassifier(
+            estimator=SklearnClassifier(
+                ParzenWindowClassifier(), missing_label="nan"
+            ),
+            missing_label="nan",
+        )
+
+        clf.fit(X=self.X, y=self.y1)
+        freq = clf.predict_freq(X=self.X)
+        est.fit(X=self.X, y=self.y1)
+        freq_est = est.predict_freq(X=self.X)
+        np.testing.assert_array_equal(freq, freq_est)
+        np.testing.assert_array_equal(clf.classes_, est.classes_)
