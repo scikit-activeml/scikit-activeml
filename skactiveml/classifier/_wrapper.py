@@ -5,17 +5,16 @@ from multiple annotators.
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 import warnings
-import numpy as np
-
 from copy import deepcopy
 
+import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
+from sklearn.utils import metaestimators
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
 )
-from sklearn.utils import metaestimators
 
 from ..base import SkactivemlClassifier
 from ..utils import rand_argmin, MISSING_LABEL, is_labeled

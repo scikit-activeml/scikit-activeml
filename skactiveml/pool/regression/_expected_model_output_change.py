@@ -6,9 +6,9 @@ from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.regression.utils._integration import conditional_expect
 from skactiveml.pool.regression.utils._model_fitting import update_reg
+from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.utils._validation import check_callable
 
 

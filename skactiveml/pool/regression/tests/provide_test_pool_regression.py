@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
+from skactiveml.base import ProbabilisticRegressor
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.regressor import (
     NICKernelRegressor,

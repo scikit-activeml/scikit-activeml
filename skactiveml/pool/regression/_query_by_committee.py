@@ -8,13 +8,13 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlRegressor,
 )
+from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 from skactiveml.utils import (
     simple_batch,
     check_type,
     check_scalar,
     MISSING_LABEL,
 )
-from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
 
 
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
