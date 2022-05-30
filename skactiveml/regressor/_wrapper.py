@@ -43,17 +43,17 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         self.estimator = estimator
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
-        """Fit the model using X as training data and y as class labels.
+        """Fit the model using X as training data and y as labels.
 
         Parameters
         ----------
         X : matrix-like, shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_outputs)
+        y : array-like, shape (n_samples)
             It contains the values of the training samples.
             Missing labels are represented as 'np.nan'.
-        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
+        sample_weight : array-like, shape (n_samples), optional (default=None)
+            It contains the weights of the training samples´ labels. It
             must have the same shape as y.
         fit_kwargs : dict-like
             Further parameters as input to the 'fit' method of the 'estimator'.
@@ -127,7 +127,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         Returns
         -------
-        y :  array-like, shape (n_samples) or (n_samples, n_targets)
+        y :  array-like, shape (n_samples)
             Predicted labels of the input samples.
         """
         check_is_fitted(self)
@@ -139,9 +139,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             warnings.warn(
                 f"Since the 'estimator' could not be fitted when"
                 f" calling the `fit` method, the label "
-                f"mean `_label_mean={self._label_mean}` and optionally the label"
-                f"standard deviation `_label_std={self._label_std}` is used to "
-                f"make the predictions."
+                f"mean `_label_mean={self._label_mean}` and optionally the "
+                f"label standard deviation `_label_std={self._label_std}` is "
+                f"used to make the predictions."
             )
             has_std = predict_kwargs.pop("return_std", False)
             if has_std:
@@ -155,27 +155,25 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     @_available_if(
         ("sample_y", "sample"), hasattr(metaestimators, "available_if")
     )
-    def sample_y(self, X, n_samples, random_state=None):
-        """Assumes a conditional probability estimator. Samples are drawn from
-        the posterior or prior conditional probability estimator.
+    def sample_y(self, X, n_samples=1, random_state=None):
+        """Assumes a probabilistic regressor. Samples are drawn from
+        a predicted target distribution.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples_X, n_features) or list of object
-            Query points where the GP is evaluated.
-        n_samples : int, default=1
-            Number of samples drawn from the Gaussian process per query point.
-        random_state : int, RandomState instance or None, default=0
-            Determines random number generation to randomly draw samples.
-            Pass an int for reproducible results across multiple function
-            calls.
+        X :  array-like, shape (n_samples_X, n_features)
+            Input samples, where the target values are drawn from.
+        n_samples: int, optional (default=1)
+            Number of random variate samples to be drawn.
+        random_state : int, RandomState instance or None, optional
+        (default=None)
+            Determines random number generation to randomly draw samples. Pass
+            an int for reproducible results across multiple method calls.
 
         Returns
         -------
-        y_samples : ndarray of shape (n_samples_X, n_samples), or \
-            (n_samples_X, n_targets, n_samples)
-            Values of n_samples samples drawn from Gaussian process and
-            evaluated at query points.
+        y_samples : ndarray of shape (n_samples_X, n_samples)
+            Drawn random target samples.
         """
         check_is_fitted(self)
         if hasattr(self.estimator_, "sample_y"):

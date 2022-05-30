@@ -171,7 +171,7 @@ def conditional_expect(
         else:  # method equals "monte_carlo"
             potential_y = reg.sample_y(
                 X=X,
-                n_rv_samples=n_integration_samples,
+                n_samples=n_integration_samples,
                 random_state=random_state,
             )
         expectation = np.average(evaluate_func(potential_y), axis=1)

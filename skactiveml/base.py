@@ -1486,25 +1486,28 @@ class ProbabilisticRegressor(SkactivemlRegressor):
             result = result[0]
         return result
 
-    def sample_y(self, X, n_rv_samples=1, random_state=None):
+    def sample_y(self, X, n_samples=1, random_state=None):
         """Returns random variate samples from the predicted target distribution
         conditioned on the test samples `X`.
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features)
-            Input samples.
-        n_rv_samples: int,
+        X :  array-like, shape (n_samples_X, n_features)
+            Input samples, where the target values are drawn from.
+        n_samples: int, optional (default=1)
             Number of random variate samples to be drawn.
+        random_state : int, RandomState instance or None, optional
+        (default=None)
+            Determines random number generation to randomly draw samples. Pass
+            an int for reproducible results across multiple method calls.
+
         Returns
         -------
-        y_samples : numpy.ndarray, shape (n_samples, n_rv_samples)
-            Drawn random variate samples.
+        y_samples : numpy.ndarray, shape (n_samples_X, n_samples)
+            Drawn random target samples.
         """
         rv = self.predict_target_distribution(X)
-        rv_samples = rv.rvs(
-            size=(n_rv_samples, len(X)), random_state=random_state
-        )
+        rv_samples = rv.rvs(size=(n_samples, len(X)), random_state=random_state)
         return rv_samples.T
 
 
