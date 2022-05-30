@@ -22,9 +22,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     """SklearnRegressor
 
     Implementation of a wrapper class for scikit-learn regressors such that
-    missing labels can be handled and multiple labels per sample. Therefore,
-    samples with missing values are filtered and one output regressor are
-    wrapped by a multi output regressor.
+    missing labels can be handled. Therefore, samples with missing values are
+    filtered.
 
     Parameters
     ----------
@@ -99,7 +98,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         if np.sum(is_lbld) != 0:
             self._label_mean = np.mean(y[is_lbld])
-            self._label_std = np.std(y[is_lbld])
+            self._label_std = np.std(y[is_lbld]) if np.sum(is_lbld) > 1 else 1
             try:
                 self.estimator_.fit(X_labeled, y_labeled, **estimator_params)
             except Exception as e:
@@ -216,7 +215,7 @@ class SklearnProbabilisticRegressor(ProbabilisticRegressor, SklearnRegressor):
     def __init__(
         self, estimator, missing_label=MISSING_LABEL, random_state=None
     ):
-        super(SklearnProbabilisticRegressor, self).__init__(
+        super().__init__(
             estimator, missing_label=missing_label, random_state=random_state
         )
 
@@ -247,5 +246,5 @@ class SklearnProbabilisticRegressor(ProbabilisticRegressor, SklearnRegressor):
             )
 
         X = check_array(X)
-        loc, scale = self.predict(X, return_std=True)
+        loc, scale = SklearnRegressor.predict(self, X, return_std=True)
         return norm(loc=loc, scale=scale)

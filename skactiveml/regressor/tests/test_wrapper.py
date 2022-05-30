@@ -2,11 +2,13 @@ import unittest
 
 import numpy as np
 from sklearn import clone
+from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, ARDRegression
 from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVC
 
+from skactiveml.base import SkactivemlRegressor
 from skactiveml.regressor._wrapper import (
     SklearnRegressor,
     SklearnProbabilisticRegressor,
@@ -66,6 +68,37 @@ class TestWrapper(unittest.TestCase):
         reg_2.fit(X, y)
         self.assertTrue(np.any(reg_1.predict(X) != reg_2.predict(X)))
 
+    def test_fit(self):
+        class DummyRegressor(SkactivemlRegressor):
+            def predict(self, X):
+                raise NotFittedError()
+
+            def fit(self, X, y, sample_weight=None):
+                raise ValueError()
+
+        reg = SklearnRegressor(DummyRegressor())
+
+        X = np.arange(3 * 2).reshape(3, 2)
+        y = np.append(np.full(2, MISSING_LABEL), [1.7])
+
+        self.assertWarns(Warning, reg.fit, X=X, y=y)
+        self.assertWarns(Warning, reg.predict, X=X)
+
+    def test_predict(self):
+        reg = SklearnRegressor(
+            estimator=ARDRegression(),
+            random_state=self.random_state,
+        )
+
+        X = np.arange(3 * 2).reshape(3, 2)
+        y = np.full(3, MISSING_LABEL)
+
+        reg.fit(X, y)
+        y_pred = reg.predict(X)
+        np.testing.assert_array_equal(np.zeros(3), y_pred)
+        _, std_pred = reg.predict(X, return_std=True)
+        np.testing.assert_array_equal(np.ones(3), std_pred)
+
     def test_getattr(self):
         reg = SklearnRegressor(
             estimator=LinearRegression(),
@@ -97,13 +130,13 @@ class TestWrapper(unittest.TestCase):
         self.assertEqual(reg.sample_y("a", 10), "a")
 
 
-class TestCondEstWrapper(unittest.TestCase):
+class TestSklearnProbabilisticRegressor(unittest.TestCase):
     def setUp(self):
         self.X = np.array([[0, 1], [1, 0], [2, 3]])
         self.y = np.array([1, 2, 3])
         self.X_cand = np.array([[2, 1], [3, 5]])
 
-    def test_estimate_cond(self):
+    def test_predict_target_distribution(self):
         reg = SklearnProbabilisticRegressor(
             estimator=GaussianProcessRegressor()
         )
