@@ -102,7 +102,7 @@ def simple_batch(
     Returns
     -------
     best_indices : np.ndarray, shape (batch_size) if ndim == 1
-        (batch_size, ndim) else
+    (batch_size, ndim) else
         The index of the batch instance.
     batch_utilities : np.ndarray,  shape (batch_size, len(utilities))
         The utilities of the batch (if return_utilities=True).
@@ -147,8 +147,7 @@ def simple_batch(
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     """Combine different rankings hierarchically to one ranking assignment.
-    For a ranking index i is ranked higher than index j iff
-    ranking[i] > ranking[j].
+    A ranking index i is ranked higher than index j iff ranking[i] > ranking[j].
     For the combined ranking it will hold that the first ranking of iter_ranking
     always determines the ranking position at an index, and only when
     two ranking assignments are equal the second ranking will determine
@@ -158,8 +157,8 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     ----------
     iter_ranking : iterable of array-like
         The different rankings. They must share a common shape in the sense
-        that the have the same number of dimensions and are broadcastable by
-        numpy. If the common shape has more than two dimensions.
+        that they have the same number of dimensions and are broadcastable by
+        numpy.
     rank_method : string, optional (default = None)
         The method by which the utilities are ranked. See `scipy.rankdata`s
         argument `method` for details.

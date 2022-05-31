@@ -13,7 +13,7 @@ from skactiveml.utils._validation import check_callable
 
 
 class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Expected Model Output Change
+    """Regression based Expected Model Output Change.
 
     This class implements an expected model output change based approach for
     regression, where samples are queried that change the output of the model
@@ -25,6 +25,10 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
+    loss: callable, optional (default=None)
+        The loss for predicting a target value instead of the true value.
+        Takes in the predicted values of an evaluation set and the true values
+        of the evaluation set and returns the error, a scalar value.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional (default=None)
@@ -76,9 +80,9 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         reg: ProbabilisticRegressor
-            Predicts the output and the conditional distribution.
+            Predicts the output and the target distribution.
         fit_reg: bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -93,7 +97,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         X_eval : array-like of shape (n_eval_samples, n_features),
         optional (default=None)
             Evaluation data set that is used for estimating the probability

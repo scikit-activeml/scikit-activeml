@@ -12,7 +12,7 @@ from .utils._model_fitting import update_reg
 
 
 class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
-    """Expected model variance reduction
+    """Expected model variance reduction.
 
     This class implements the active learning strategy expected model variance
     minimization, which tries to select the sample that minimizes the expected
@@ -69,7 +69,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         reg: ProbabilisticRegressor
             Predicts the output and the conditional distribution.
         fit_reg : bool, optional (default=True)
@@ -86,7 +86,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         X_eval : array-like of shape (n_eval_samples, n_features),
         optional (default=None)
             Evaluation data set that is used for estimating the probability

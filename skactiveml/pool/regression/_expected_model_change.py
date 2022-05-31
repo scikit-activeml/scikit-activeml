@@ -16,7 +16,7 @@ from skactiveml.utils._validation import check_callable
 
 
 class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
-    """Expected Model Change
+    """Expected Model Change.
 
     This class implements expected model change, an active learning
     query strategy for linear regression.
@@ -82,7 +82,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         reg: SkactivemlRegressor
             Regressor to predict the data. Assumes a linear regressor with respect
             to the parameters.
@@ -100,7 +100,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)

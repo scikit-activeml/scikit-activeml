@@ -9,7 +9,7 @@ from skactiveml.utils._selection import combine_ranking
 
 class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
     """RD ALR, Representativeness and Diversity in active learning for
-    regression
+    regression.
 
     This class implements the active learning for regression based query
     strategy RD ALR.
@@ -61,7 +61,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
             the space into clusters, by the query strategy.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         inner_qs_dict : dict
             Dictionary for the further arguments of the query strategy besides
             `X`, `y` and `candidates`.
@@ -76,7 +76,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)

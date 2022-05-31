@@ -1358,15 +1358,17 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         X : matrix-like, shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
         y : array-like, shape (n_samples) or (n_samples, n_targets)
-            Contains the values of the samples, where
-            missing values are represented the attribute 'np.nan'.
+            It contains the labels of the training samples.
+            The number of class labels may be variable for the samples, where
+            missing labels are represented the attribute 'missing_label'.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
         Returns
         -------
-        self: SkactivemlRegressor,
-            The SkactivemlRegressor is fitted on the training data.
+        self: skactiveml.base.SkactivemlRegressor,
+            The `skactiveml.base.SkactivemlRegressor` object fitted on the
+            training data.
         """
         raise NotImplementedError
 
@@ -1470,9 +1472,9 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         Returns
         -------
         mu : numpy.ndarray, shape (n_samples)
-            Predicted mu conditioned on `X`.
+            Predicted mean conditioned on `X`.
         std : numpy.ndarray, shape (n_samples), optional
-            Predicted std conditioned on `X`.
+            Predicted standard deviation conditioned on `X`.
         entropy : numpy..ndarray, optional
             Predicted differential entropy conditioned on `X`.
         """

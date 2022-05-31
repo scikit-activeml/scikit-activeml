@@ -14,8 +14,7 @@ def gaussian_noise_generator_1d(
     Parameters
     ----------
     X : array-like of shape (n_samples, 1)
-        Training data set, usually complete, i.e. including the labeled and
-        unlabeled samples.
+        Data set for which the noise is generated.
     intervals : tuple of shape (x_low, x_up) or (x_low, x_up, std)
         Adds further noise, with a standard deviation of `std` in the interval
         from `x_low` to `x_up`. If no standard deviation is specified, the

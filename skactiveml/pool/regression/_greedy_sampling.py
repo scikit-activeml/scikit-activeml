@@ -17,7 +17,7 @@ from skactiveml.utils import (
 
 
 class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
-    """Greedy Sampling on the feature space
+    """Greedy Sampling on the feature space.
 
     This class implements greedy sampling on the feature space.
 
@@ -70,7 +70,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -146,7 +146,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
 
 
 class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
-    """Greedy Sampling on the target space
+    """Greedy Sampling on the target space.
 
     This class implements greedy sampling on the target space.
 
@@ -207,7 +207,7 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         reg: SkactivemlRegressor
             Regressor to predict the data.
         fit_reg : bool, optional (default=True)
@@ -224,7 +224,7 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)

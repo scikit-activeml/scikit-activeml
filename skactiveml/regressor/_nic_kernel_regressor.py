@@ -12,7 +12,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
     """NICKernelRegressor
 
     The NICKernelRegressor (Normal inverse chi kernel regressor) locally
-    fits a t distribution using the training data weighting the samples
+    fits a t-distribution using the training data, weighting the samples
     by a kernel.
 
     Parameters
@@ -63,10 +63,11 @@ class NICKernelRegressor(ProbabilisticRegressor):
         Parameters
         ----------
         X : matrix-like, shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
         y : array-like, shape (n_samples) or (n_samples, n_targets)
-            Contains the values of the samples, where
-            missing values are represented the attribute 'np.nan'.
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -95,13 +96,24 @@ class NICKernelRegressor(ProbabilisticRegressor):
             self.mu_0,
             self.sigma_sq_0,
         )
+
         if sample_weight is not None:
-            weights_ = sample_weight[is_lbld]
-            self.y_ = (weights_ * self.y_) / np.average(weights_)
+            self.weights_ = sample_weight[is_lbld]
+            if np.sum(self.weights_) == 0:
+                raise ValueError(
+                    "The sample weights of the labeled samples "
+                    "must not be all zero."
+                )
+        else:
+            self.weights_ = None
+
         return self
 
     def _estimate_ml_params(self, X):
         K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict)
+
+        if self.weights_ is not None:
+            K = self.weights_.reshape(1, -1) * K
 
         N = np.sum(K, axis=1)
         mu_ml = K @ self.y_ / N
@@ -133,7 +145,8 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         Returns
         -------
-        dist : scipy.stats.rv_continuous
+        dist : scipy.stats._distn_infrastructure.rv_frozen
+            The distribution of the targets at the test samples.
 
         """
         check_is_fitted(self)

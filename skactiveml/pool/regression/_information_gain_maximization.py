@@ -20,7 +20,7 @@ from skactiveml.utils import (
 
 
 class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Mutual Information Gain Maximization
+    """Regression based Mutual Information Gain Maximization.
 
     This class implements a mutual information based selection strategies, where
     it is assumed that the prediction probability for different samples
@@ -78,7 +78,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         reg: ProbabilisticRegressor
             Predicts the entropy and the y-values the candidate samples
             could have.
@@ -96,7 +96,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         X_eval : array-like of shape (n_eval_samples, n_features),
         optional (default=None)
             Evaluation data set that is used for estimating the probability
@@ -184,7 +184,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
 
@@ -227,7 +227,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 
 
 class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Kullback Leibler Divergence Maximization
+    """Regression based Kullback Leibler Divergence Maximization.
 
     This class implements a Kullback Leibler divergence based selection
     strategies, where it is assumed that the prediction probability for
@@ -300,9 +300,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         reg: ProbabilisticRegressor
-            Estimates the entropy and the cross entropy and the potential
+            Predicts the entropy and the cross entropy and the potential
             y-values for the candidate samples.
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
@@ -318,7 +318,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         X_eval : array-like of shape (n_eval_samples, n_features),
         optional (default=None)
             Evaluation data set that is used for estimating the probability
@@ -398,13 +398,13 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         mapping : array-like of shape (n_candidate_samples,) or None
             A mapping between `X_cand` and `X` if it exists.
         reg: ProbabilisticRegressor
-            Estimates the entropy, predicts values.
+            Predicts the entropy, predicts values.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
 

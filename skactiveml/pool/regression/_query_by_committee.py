@@ -18,7 +18,7 @@ from skactiveml.utils import (
 
 
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Query-by-Committee
+    """Regression based Query-by-Committee.
 
     This class implements an Regression adaption of Query by Committee. It
     tries to estimate the model variance by a Committee of estimators.
@@ -74,7 +74,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         ensemble: {SkactivemlRegressor, array-like}
             Regressor to predict the data.
         fit_ensemble : bool, optional (default=True)
@@ -91,7 +91,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             candidates is considered as the indices of the samples in (X,y).
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            contained in X).
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)

@@ -56,7 +56,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             It contains the weights of the training samples´ labels. It
             must have the same shape as y.
         fit_kwargs : dict-like
-            Further parameters as input to the 'fit' method of the 'estimator'.
+            Further parameters are passed as input to the 'fit' method of the
+            'estimator'.
 
         Returns
         -------
@@ -121,9 +122,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         X :  array-like, shape (n_samples, n_features)
             Input samples.
         predict_kwargs : dict-like
-            Further parameters as input to the 'predict' method of the
-            'estimator'. If the estimator could not be fitted, only `return_std`
-            is supported as keyword argument.
+            Further parameters are passed as input to the 'predict' method of
+            the 'estimator'. If the estimator could not be fitted, only
+            `return_std` is supported as keyword argument.
 
         Returns
         -------
