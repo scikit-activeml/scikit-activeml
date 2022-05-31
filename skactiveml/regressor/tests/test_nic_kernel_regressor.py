@@ -55,6 +55,9 @@ class TestNICKernelEstimator(unittest.TestCase):
         y = 7
         self.assertRaises(ValueError, reg.fit, X, y)
 
+        w = np.zeros_like(self.y)
+        self.assertRaises(ValueError, reg.fit, self.X, self.y, w)
+
     def test_predict(self):
         reg = NICKernelRegressor(**self.start_parameter)
         X = np.array([[0, 0], [1, 1], [2, 2]])
