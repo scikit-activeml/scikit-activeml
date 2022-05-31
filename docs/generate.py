@@ -247,7 +247,7 @@ def table_from_array(a, title='', caption='', widths=None, header_rows=0,
     return table + '\n'
 
 
-def generate_examples(gen_path, package, json_path):
+def generate_examples(gen_path, package, json_path, recursive=True):
     """
     Creates all example scripts for the specified package and returns the data
     needed to create the strategy overview.
@@ -263,6 +263,8 @@ def generate_examples(gen_path, package, json_path):
     json_path : string
         The path of the directory where to find the json example files for the
         specified package.
+    recursive : bool, default=True
+        If True, examples for sub-packagers are also created.
 
     Returns
     -------
@@ -291,44 +293,52 @@ def generate_examples(gen_path, package, json_path):
     examples_data = {}  # (Tab, Category, Collum, Row)
     table = np.ndarray(shape=(0, 4))
     # iterate over jason example files
-    for filename in os.listdir(json_path):
-        if not filename.endswith('.json'):
-            continue
-        with open(os.path.join(json_path, filename)) as file:
-            # iterate over the examples in the json file
-            for data in json.load(file):
-                # Collect the data needed to generate the strategy overview.
-                qs_name = data["class"]
-                method = data['method']
-                package_name = package.__name__.replace('skactiveml.', '')
-                methods_text = \
-                    f':doc:`{method} </generated/sphinx_gallery_examples/' \
-                    f'{package_name}/plot_{qs_name}_' \
-                    f'{method.replace(" ", "_")}>`'
-                strategy_text = f':doc:`{qs_name} </{rel_api_path}/' \
-                                f'{package.__name__}.{qs_name}>`'
-                ref_text = ''
-                for ref in data['refs']:
-                    ref_text += f':footcite:t:`{ref}`, '
-                ref_text = ref_text[0:-2]
-                category = data['categories'] if 'categories' in data.keys() \
-                    else {}
-                table = np.append(
-                    table,
-                    [[methods_text, strategy_text, ref_text, category]],
-                    axis=0
-                )
+    for (root, dirs, files) in os.walk(json_path, topdown=True):
+        sub_package_str = root.replace(json_path, '').strip(os.sep)
+        sub_package = package
+        for p in sub_package_str.split(os.sep):
+            if p == '': continue
+            sub_package = getattr(sub_package, p)
+        for filename in files:
+            if not filename.endswith('.json'):
+                continue
+            with open(os.path.join(root, filename)) as file:
+                # iterate over the examples in the json file
+                for data in json.load(file):
+                    # Collect the data needed to generate the strategy overview.
+                    qs_name = data["class"]
+                    method = data['method']
+                    package_name = sub_package.__name__.replace('skactiveml.', '')
+                    methods_text = \
+                        f':doc:`{method} </generated/sphinx_gallery_examples/' \
+                        f'{package_name}/plot_{qs_name}_' \
+                        f'{method.replace(" ", "_")}>`'
+                    strategy_text = f':doc:`{qs_name} </{rel_api_path}/' \
+                                    f'{sub_package.__name__}.{qs_name}>`'
+                    ref_text = ''
+                    for ref in data['refs']:
+                        ref_text += f':footcite:t:`{ref}`, '
+                    ref_text = ref_text[0:-2]
+                    category = data['categories'] if 'categories' in data.keys() \
+                        else {}
+                    table = np.append(
+                        table,
+                        [[methods_text, strategy_text, ref_text, category]],
+                        axis=0
+                    )
 
-                # create the example python script
-                plot_filename = \
-                    'plot_' + data["class"] + "_" + method.replace(' ', '_')
-                generate_example_script(
-                    filename=plot_filename + '.py',
-                    dir_path=dir_path_package,
-                    data=data,
-                    package=package,
-                    template_path=os.path.abspath(data["template"])
-                )
+                    # create the example python script
+                    plot_filename = \
+                        'plot_' + data["class"] + "_" + method.replace(' ', '_')
+                    generate_example_script(
+                        filename=plot_filename + '.py',
+                        dir_path=dir_path_package,
+                        data=data,
+                        package=sub_package,
+                        template_path=os.path.abspath(data["template"])
+                    )
+        if not recursive:
+            break
 
     # Sort the table alphabetically.
     table = sorted(table, key=lambda row: row[1])
