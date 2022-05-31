@@ -50,7 +50,7 @@ class TestDiscriminativeAL(unittest.TestCase):
                 random_state=self.random_state,
                 greedy_selection=greedy_selection,
             )
-            for candidates in [None, np.arange(len(self.X)), self.X]:
+            for candidates in [None, np.arange(len(self.X))]:
                 if candidates is None:
                     n_candidates = len(self.y_unlblb)
                 else:

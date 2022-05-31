@@ -76,6 +76,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             indicated by `self.missing_label`).
         discriminator : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
+            The parameters `classes` and `missing_label` will be internally
+            redefined.
         candidates : None or array-like of shape (n_candidates), dtype=int or
         array-like of shape (n_candidates, n_features), optional (default=None)
             If `candidates` is `None`, the unlabeled samples from `(X, y)` are
@@ -121,7 +123,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
 
         # Retransform candidates and create a potential mapping to the samples
         # in `X`.
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, enforce_mapping=True
+        )
 
         # Re-define discriminator to fit the setting of classifying
         # labeled (y=0) and unlabeled samples (y=1).
@@ -138,11 +142,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             utilities_cand = discriminator.predict_proba(X_cand)[:, 1]
 
             # Remapping of `utilities` and `query_indices` if required.
-            if mapping is None:
-                utilities = utilities_cand
-            else:
-                utilities = np.full(len(X), np.nan)
-                utilities[mapping] = utilities_cand
+            utilities = np.full(len(X), np.nan)
+            utilities[mapping] = utilities_cand
 
             # Return `query_indices` and potential `utilities`.
             return simple_batch(
@@ -158,38 +159,29 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             query_indices_cand = []
             utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
             for i in range(batch_size):
+                # Determine unlabeled vs. labeled samples.
                 y_discriminator = is_unlabeled(
                     y, missing_label=self.missing_label
                 )
                 y_discriminator = y_discriminator.astype(int)
-                if i > 0:
-                    if mapping is not None:
-                        # Mark already selected samples as labeled.
-                        X_discriminator = X
-                        y_discriminator[mapping[query_indices_cand]] = 0
-                    else:
-                        # Add and mark already selected samples as labeled ones
-                        # to the training set of the `discriminator`.
-                        X_discriminator = np.vstack(
-                            (X, X_cand[query_indices_cand])
-                        )
-                        y_ext = np.zeros(len(query_indices_cand))
-                        y_discriminator = np.append(y_discriminator, y_ext)
+
+                # Mark already selected samples as labeled.
+                y_discriminator[mapping[query_indices_cand]] = 0
+
+                # Fit discriminator to classify unlabeled vs. labeled samples.
                 discriminator.fit(X_discriminator, y_discriminator)
+
+                # Compute utilities as probabilities of being unlabeled.
                 utilities_cand[i] = discriminator.predict_proba(X_cand)[:, 1]
                 utilities_cand[i, query_indices_cand] = np.nan
                 query_indices_cand.append(
                     rand_argmax(utilities_cand[i], self.random_state_)[0]
                 )
 
-            # Remapping of `utilities` and `query_indices` if required.
-            if mapping is None:
-                utilities = utilities_cand
-                query_indices = np.array(query_indices_cand, dtype=int)
-            else:
-                utilities = np.full((batch_size, len(X)), np.nan)
-                utilities[:, mapping] = utilities_cand
-                query_indices = mapping[query_indices_cand]
+            # Remapping of `utilities` and `query_indices`
+            utilities = np.full((batch_size, len(X)), np.nan)
+            utilities[:, mapping] = utilities_cand
+            query_indices = mapping[query_indices_cand]
 
             # Check whether `utilities` are to be returned.
             if return_utilities:
