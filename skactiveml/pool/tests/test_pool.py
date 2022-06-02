@@ -92,6 +92,7 @@ class TestGeneral(unittest.TestCase):
                     clf=clf,
                     X_eval=self.X,
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     return_utilities=True,
                 )
                 id2, u2 = call_func(
@@ -101,6 +102,7 @@ class TestGeneral(unittest.TestCase):
                     clf=clf,
                     X_eval=self.X,
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     return_utilities=True,
                 )
                 self.assertEqual(len(u1[0]), len(self.X))
@@ -116,6 +118,7 @@ class TestGeneral(unittest.TestCase):
                     missing_label=self.MISSING_LABEL,
                     classes=np.unique(self.y_true),
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     random_state=np.random.RandomState(0),
                 )
 
@@ -127,6 +130,7 @@ class TestGeneral(unittest.TestCase):
                     X_eval=self.X,
                     batch_size=5,
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     return_utilities=True,
                 )
 
@@ -154,6 +158,7 @@ class TestGeneral(unittest.TestCase):
                     clf=clf,
                     X_eval=self.X,
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     batch_size=15,
                 )
 
@@ -166,6 +171,7 @@ class TestGeneral(unittest.TestCase):
                         clf=clf,
                         X_eval=self.X,
                         ensemble=self.ensemble,
+                        discriminator=self.clf,
                         batch_size=15,
                     )
                     self.assertEqual(len(ids), len(unlabeled))
@@ -179,6 +185,7 @@ class TestGeneral(unittest.TestCase):
                     missing_label=self.MISSING_LABEL,
                     classes=np.unique(self.y_true),
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     random_state=np.random.RandomState(0),
                 )
 
@@ -190,6 +197,7 @@ class TestGeneral(unittest.TestCase):
                     clf=clf,
                     X_eval=self.X,
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     return_utilities=True,
                 )
                 ids2, u2 = call_func(
@@ -200,6 +208,7 @@ class TestGeneral(unittest.TestCase):
                     X_eval=self.X,
                     candidates=unld_idx,
                     ensemble=self.ensemble,
+                    discriminator=self.clf,
                     return_utilities=True,
                 )
                 np.testing.assert_array_equal(u1, u2)
@@ -213,6 +222,7 @@ class TestGeneral(unittest.TestCase):
                         clf=clf,
                         X_eval=self.X,
                         ensemble=self.ensemble,
+                        discriminator=self.clf,
                         return_utilities=True,
                     )
                     ids2, u2 = call_func(
@@ -223,6 +233,7 @@ class TestGeneral(unittest.TestCase):
                         X_eval=self.X,
                         candidates=unld_idx,
                         ensemble=self.ensemble,
+                        discriminator=self.clf,
                         return_utilities=True,
                     )
                     np.testing.assert_allclose(
@@ -239,6 +250,7 @@ class TestGeneral(unittest.TestCase):
                         X_eval=self.X,
                         candidates=self.X[unld_idx],
                         ensemble=self.ensemble,
+                        discriminator=self.clf,
                         return_utilities=True,
                     )
                     np.testing.assert_array_equal(u1[0][unld_idx], u3[0])
@@ -271,6 +283,7 @@ class TestGeneral(unittest.TestCase):
                             clf=clf,
                             X_eval=self.X,
                             ensemble=self.ensemble,
+                            discriminator=self.clf,
                         )
                         y[q_id] = self.y_true[q_id]
 
@@ -364,6 +377,7 @@ class TestGeneral(unittest.TestCase):
             X=self.X,
             y=self.y,
             ensemble=self.ensemble,
+            discriminator=self.clf,
         )
 
     def _test_init_param_missing_label(self, qs_class, clf):
@@ -418,6 +432,7 @@ class TestGeneral(unittest.TestCase):
             X=self.X,
             y=self.y[:-2],
             ensemble=self.ensemble,
+            discriminator=self.clf,
         )
 
     def _test_query_param_candidates(self, qs_class, clf):
@@ -432,6 +447,7 @@ class TestGeneral(unittest.TestCase):
                 X=self.X,
                 y=self.y,
                 ensemble=self.ensemble,
+                discriminator=self.clf,
             )
         self.assertRaises(
             (TypeError, ValueError),
@@ -442,6 +458,7 @@ class TestGeneral(unittest.TestCase):
             X=self.X,
             y=self.y,
             ensemble=self.ensemble,
+            discriminator=self.clf,
         )
 
     def _test_query_param_batch_size(self, qs_class, clf):
@@ -455,6 +472,7 @@ class TestGeneral(unittest.TestCase):
             y=self.y,
             batch_size=0,
             ensemble=self.ensemble,
+            discriminator=self.clf,
         )
         self.assertRaises(
             TypeError,
@@ -465,6 +483,7 @@ class TestGeneral(unittest.TestCase):
             y=self.y,
             batch_size=1.2,
             ensemble=self.ensemble,
+            discriminator=self.clf,
         )
 
     def _test_query_param_return_utilities(self, qs_class, clf):
@@ -478,6 +497,7 @@ class TestGeneral(unittest.TestCase):
             y=self.y,
             return_utilities="test",
             ensemble=self.ensemble,
+            discriminator=self.clf,
         )
 
 
