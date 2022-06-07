@@ -2,14 +2,14 @@ import numpy as np
 from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
 
-from skactiveml.stream.budgetmanager import BalancedIncrementalQuantileFilter
-from skactiveml.base import (
+from .budgetmanager import BalancedIncrementalQuantileFilter
+from ..base import (
     SingleAnnotatorStreamQueryStrategy,
     SkactivemlClassifier,
     BudgetManager,
 )
-from skactiveml.pool import cost_reduction
-from skactiveml.utils import (
+from ..pool import cost_reduction
+from ..utils import (
     check_type,
     check_random_state,
     check_scalar,
@@ -97,7 +97,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : SkactivemlClassifier
-            Model implementing the methods `fit`.
+            Model implementing the methods `fit` and `predict_proba`.
         X : array-like of shape (n_samples, n_features), optional
         (default=None)
             Input samples used to fit the classifier.
@@ -107,11 +107,12 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Sample weights for X, used to fit the clf.
         frequency_estimation: callable, default=None
             frequency_estimation function that returns freqencies of
-            candidates. The function can implement candidates, clf, X, y,
-            sample_weight and fit_clf. If None, the `predict_freq` function of
-            the clf will be used.
+            candidates. The function allows the following parameters:
+            candidates, clf, X, y, sample_weight and fit_clf. If
+            frequency_estimation is set to None, the `predict_freq` function
+            of the clf will be used instead.
         fit_clf : bool,
-            If true, refit the classifier also requires X and y to be given.
+            If True, refit the classifier also requires X and y to be given.
         utility_weight: array-like of shape (n_candidate_samples), optional
         (default=None)
             Densities for each sample in `candidates`.
@@ -238,7 +239,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         candidates: array-like, shape (n_candidates, n_features)
             Candidate samples.
         clf : SkactivemlClassifier
-            Model implementing the methods `fit`.
+            Model implementing the methods `fit` and `predict_proba`.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
@@ -275,7 +276,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         sampling_weight: np.ndarray, shape (n_candidates)
             Checked training sample weight
         frequency_estimation: callable, default=None
-            Checked frequency_estimation or `predict_freq`from clf
+            Checked frequency_estimation callable
         fit_clf : bool,
             Checked boolean value of `fit_clf`
         utility_weight: array-like of shape (n_candidate_samples), optional
@@ -314,7 +315,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates
         )
-        frequency_estimation = self._validate_frequency_estimation(frequency_estimation, clf)
+        frequency_estimation = self._validate_frequency_estimation(
+            frequency_estimation,
+            clf
+        )
         check_scalar(
             self.prior, "prior", float, min_val=0, min_inclusive=False
         )
@@ -388,7 +392,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
         return clf
-    
+
     def _validate_frequency_estimation(self, frequency_estimation, clf):
         """Validate if clf is a valid SkactivemlClassifier. If clf is
         untrained, clf is trained using X, y and sample_weight.
@@ -409,13 +413,16 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             if hasattr(clf, "predict_freq"):
                 frequency_estimation = self._freqency_estimation
             else:
-                raise ValueError("clf has no predict_freq and no frequency_estimation was given")
+                raise ValueError(
+                    "clf has no predict_freq and "
+                    + "frequency_estimation was set to None")
         if not callable(frequency_estimation):
             raise TypeError("frequency_estimation needs to be a callable")
         return frequency_estimation
 
     def _validate_utility_weight(self, utility_weight, candidates):
-        """Validate if utility_weight is numeric and of equal length as candidates.
+        """Validate if utility_weight is numeric and of equal length as
+        candidates.
 
         Parameters
         ----------
