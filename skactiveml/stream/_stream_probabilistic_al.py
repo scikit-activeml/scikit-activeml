@@ -90,11 +90,6 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     ):
         """Ask the query strategy which instances in candidates to acquire.
 
-        Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query
-        strategy can be updated later with update(...) with the final sampling.
-        This is especially helpful, when developing wrapper query strategies.
-
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape
