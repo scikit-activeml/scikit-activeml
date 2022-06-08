@@ -32,7 +32,8 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
@@ -190,7 +191,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (n_candidate_samples)
+        mi_gain : numpy.ndarray of shape (n_candidate_samples)
             The expected information gain for each candidate sample.
         """
 
@@ -244,9 +245,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         used for calculating the cross entropy between the updated conditional
         estimator by the `X_cand` value and the old conditional estimator.
         For details see method `conditional_expect`.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
@@ -410,8 +412,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (n_candidate_samples)
-            The expected information gain for each candidate sample.
+        kl_div : numpy.ndarray of shape (n_candidate_samples)
+            The expected cross entropy given the new candidate samples.
         """
 
         def new_kl_divergence(idx, x_cand, y_pot):

@@ -24,7 +24,8 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.

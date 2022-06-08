@@ -27,15 +27,17 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         The number of bootstraps used to estimate the true model.
     n_train: int or float, optional (default=0.5)
         The size of a bootstrap compared to the training data.
-    ord: int or string (default=2)
+    ord: int or string, optional (default=2)
         The Norm to measure the gradient. Argument will be passed to
         `np.linalg.norm`.
-    feature_map: callable
+    feature_map: callable, optional (default=None)
         The feature map of the linear regressor. Takes in the feature data. Must
-        output a np.array of dimension 2.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+        output a np.array of dimension 2. The default value is the identity
+        function.
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References

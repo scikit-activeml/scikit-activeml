@@ -53,9 +53,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
-        )
+        super().__init__(missing_label=missing_label, random_state=random_state)
         self.classes = classes
         self.lmbda = lmbda
         self.metric = metric
@@ -111,13 +109,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         """
         # --- Validation -----------------------------------------------------
         # Check standard parameters.
-        (
-            X,
-            y,
-            candidates,
-            batch_size,
-            return_utilities,
-        ) = self._validate_data(
+        (X, y, candidates, batch_size, return_utilities,) = self._validate_data(
             X=X,
             y=y,
             candidates=candidates,

@@ -16,11 +16,14 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    inner_qs: SingleAnnotPoolBasedQueryStrategy
-        Query strategy used for further selection of the samples.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    inner_qs: SingleAnnotPoolBasedQueryStrategy, optional (default=None)
+        Query strategy used for further selection of the samples. If None
+        the further selection is based on the closeness to the center of the
+        cluster.
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References

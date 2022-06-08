@@ -1334,7 +1334,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
     """SkactivemlRegressor
 
-    Bass class for scikit-activeml regressors.
+    Base class for scikit-activeml regressors.
 
     Parameters
     __________
@@ -1433,7 +1433,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 class ProbabilisticRegressor(SkactivemlRegressor):
     """ProbabilisticRegressor
 
-    Bass class for scikit-activeml probabilistic regressors.
+    Base class for scikit-activeml probabilistic regressors.
 
     """
 
@@ -1489,7 +1489,7 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         return result
 
     def sample_y(self, X, n_samples=1, random_state=None):
-        """Returns random variate samples from the predicted target distribution
+        """Returns random samples from the predicted target distribution
         conditioned on the test samples `X`.
 
         Parameters
@@ -1497,7 +1497,7 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         X :  array-like, shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
         n_samples: int, optional (default=1)
-            Number of random variate samples to be drawn.
+            Number of random samples to be drawn.
         random_state : int, RandomState instance or None, optional
         (default=None)
             Determines random number generation to randomly draw samples. Pass

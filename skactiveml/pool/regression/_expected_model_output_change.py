@@ -29,7 +29,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         The loss for predicting a target value instead of the true value.
         Takes in the predicted values of an evaluation set and the true values
         of the evaluation set and returns the error, a scalar value.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.

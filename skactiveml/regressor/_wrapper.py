@@ -165,7 +165,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         X :  array-like, shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
         n_samples: int, optional (default=1)
-            Number of random variate samples to be drawn.
+            Number of random samples to be drawn.
         random_state : int, RandomState instance or None, optional
         (default=None)
             Determines random number generation to randomly draw samples. Pass

@@ -26,10 +26,17 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     Parameters
     ----------
     k_bootstraps: int, optional (default=3)
-        The number of bootstraps used to estimate the true model.
+        The number of bootstraps used to estimate the true model. Only needed
+        if the `estimator` parameter in the query method is not an ensemble
+        regressor and boostrap regressors will be fitted. The argument is
+        passed to the method `bootstrap_estimators`.
     n_train: int or float, optional (default=0.5)
-        The size of a bootstrap compared to the training data.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+        The size of a bootstrap compared to the training data. Only needed
+        if the `estimator` parameter in the query method is not an ensemble
+        regressor and boostrap regressors will be fitted. The argument is
+        passed to the method `bootstrap_estimators`.
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
@@ -76,10 +83,18 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         ensemble: {SkactivemlRegressor, array-like}
-            Regressor to predict the data.
+            Regressor or array of regressors to predict the data. If the
+            `ensemble` is a regressor and has the attribute `n_estimators`,
+            the different estimators are used to predict the differences in the
+            output. If the `ensemble` is a regressor and does not have the
+            attribute `n_estimators` boostrap estimators are generated using
+            the parameters of the init method. If the `ensemble` is an array of
+            regressors, the different regressors are used to predict the output
+            difference.
         fit_ensemble : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
+            Defines whether the `ensemble` should be fitted on `X`, `y`, and
+            `sample_weight`. If `ensemble` is an regressor and not an ensemble
+            regressor the parameter has no effect.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or

@@ -488,9 +488,7 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
             None,
             np.empty((len(self.X_eval) - 1)),
         ]:
-            with self.assertRaises(
-                ValueError, msg=f"sample_weight_eval={swe}"
-            ):
+            with self.assertRaises(ValueError, msg=f"sample_weight_eval={swe}"):
                 qs.query(
                     **self.kwargs,
                     X_eval=self.X_eval,

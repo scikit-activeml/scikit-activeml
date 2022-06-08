@@ -27,7 +27,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Metric used for calculating the distances of points in the feature
         space must be a valid argument for `sklearn.metrics.pairwise_distances`
         argument `metric`.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
@@ -162,7 +163,8 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
         argument `metric`.
     k_0: int, optional (default=1)
         The minimum number of samples the estimator requires.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None,
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.

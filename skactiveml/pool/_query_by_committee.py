@@ -53,9 +53,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
-        )
+        super().__init__(missing_label=missing_label, random_state=random_state)
         self.method = method
 
     def query(
@@ -146,8 +144,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
         # Check if the parameter `ensemble` is valid.
         if isinstance(ensemble, SkactivemlClassifier) and (
-            hasattr(ensemble, "n_estimators")
-            or hasattr(ensemble, "estimators")
+            hasattr(ensemble, "n_estimators") or hasattr(ensemble, "estimators")
         ):
             check_equal_missing_label(
                 ensemble.missing_label, self.missing_label_
