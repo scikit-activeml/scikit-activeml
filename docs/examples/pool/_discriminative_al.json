@@ -5,14 +5,16 @@
     "categories" : {
       "Settles2012" : ""
     },
+    "template" : "examples/template_pool.py",
     "tags" : ["pool"],
     "title" : "Discriminative Active Learning",
     "refs" : ["gissin2019discriminative"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : ["from sklearn import clone"],
-    "init_params" : {},
-    "query_params" : {"discriminator": "discriminator"},
-    "bp_preproc" : ["discriminator=clone(clf)"]
+    "import_misc" : ["from skactiveml.pool import DiscriminativeAL",
+                     "from sklearn import clone"],
+    "init_qs" : "DiscriminativeAL()",
+    "query_params" : "X=X, y=y, discriminator=discriminator",
+    "preproc" : ["discriminator=clone(clf)"]
   }
 ]
