@@ -1,6 +1,14 @@
 $(document).ready( function () {
-    var $filterableRows = $('.table').find('tr').not(':first'),
+    var $filterableRows = $('.table').find('tbody>tr').not(':first'),
         $inputs = $('.input-tag');
+
+    $('.table').find('tr').each(function () {
+        $(this).find('td').eq(2).hide()
+        $(this).find('th').eq(2).hide()
+    });
+    $('.table').find('colgroup').each(function () {
+        $(this).find('col').eq(2).hide()
+    });
 
     $inputs.on('input', function () {
 
