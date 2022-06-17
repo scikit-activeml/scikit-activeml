@@ -177,6 +177,17 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
             file.write('Pool Strategies\n')
             file.write('---------------\n')
             file.write('\n')
+            # TODO: generate tag inputs automatically
+            file.write("""
+.. raw:: html
+
+\t<input type="checkbox" class="input-tag" value="pool">
+\t<label>Pool</label>
+\t<input type="checkbox" class="input-tag" value="stream">
+\t<label>Stream</label>
+
+
+""")
 
             # Iterate over the categories in the current tab.
             for cat in sorted(cats):
@@ -289,9 +300,9 @@ def generate_examples(gen_path, package, json_path, recursive=True):
         file.write(title + '\n')
         file.write(''.ljust(len(title), '-'))
 
-    head_line = ['Method', 'Base Class', 'Reference']
+    head_line = ['Method', 'Base Class', 'Tags', 'Reference']
     examples_data = {}  # (Tab, Category, Collum, Row)
-    table = np.ndarray(shape=(0, 4))
+    table = np.ndarray(shape=(0, 5))
     # iterate over jason example files
     for (root, dirs, files) in os.walk(json_path, topdown=True):
         sub_package_str = root.replace(json_path, '').strip(os.sep)
@@ -321,9 +332,10 @@ def generate_examples(gen_path, package, json_path, recursive=True):
                     ref_text = ref_text[0:-2]
                     category = data['categories'] if 'categories' in data.keys() \
                         else {}
+                    tags = " ".join(data['tags'])
                     table = np.append(
                         table,
-                        [[methods_text, strategy_text, ref_text, category]],
+                        [[methods_text, strategy_text, tags, ref_text, category]],
                         axis=0
                     )
 
@@ -345,21 +357,21 @@ def generate_examples(gen_path, package, json_path, recursive=True):
 
     # Collect the different tabs and categories.
     for i, row in enumerate(table):
-        for tab in row[3].keys():
+        for tab in row[-1].keys():
             if tab not in examples_data.keys():
                 examples_data[tab] = {}
-            if row[3][tab] == '':
-                table[i][3][tab] = 'Others'
-            if row[3][tab] not in examples_data[tab].keys():
-                examples_data[tab][row[3][tab]] = np.array([head_line])
+            if row[-1][tab] == '':
+                table[i][-1][tab] = 'Others'
+            if row[-1][tab] not in examples_data[tab].keys():
+                examples_data[tab][row[-1][tab]] = np.array([head_line])
 
     # Build the dict that holds the data.
     for row in table:
         for tab in examples_data:
-            if tab in row[3].keys():
-                cat = row[3][tab] if tab in row[3].keys() else 'Others'
+            if tab in row[-1].keys():
+                cat = row[-1][tab] if tab in row[-1].keys() else 'Others'
             examples_data[tab][cat] = \
-                np.append(examples_data[tab][cat], [row[:3]], axis=0)
+                np.append(examples_data[tab][cat], [row[:-1]], axis=0)
 
     return examples_data
 
