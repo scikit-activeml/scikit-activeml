@@ -545,7 +545,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
             indices = np.unique(indices)
         else:
             indices = np.unique(indices, axis=0)
-    check_type(dim, "dim", int, tuple, "adaptive")
+    check_type(dim, "dim", int, tuple, target_vals=["adaptive"])
     if dim == "adaptive":
         if indices.ndim == 1:
             dim = 0
@@ -589,8 +589,13 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         return indices
 
 
-def check_type(obj, name, *target_types):
-    """Check if obj is one of the given types.
+def check_type(
+    obj, name, *target_types, target_vals=None, indicator_funcs=None
+):
+    """Check if obj is one of the given types. It is also possible to allow
+    specific values. Further it is possible to pass indicator functions
+    that can also accept obj. Thereby obj must either have a correct type
+    a correct value or be accepted by an indicator function.
 
     Parameters
     ----------
@@ -599,41 +604,63 @@ def check_type(obj, name, *target_types):
     name: str
         The variable name of the object.
     target_types : iterable
-        The possible types. If a target_val in `target_types` is not of type
-        `type` `obj` is allowed to be equal to the target_val.
+        The possible types.
+    target_vals : iterable, optional (default=None)
+        Possible further values that the object is allowed to equal.
+    indicator_funcs : iterable, optional (default=None)
+        Possible further custom indicator (boolean) functions that accept
+        the object by returning `True` if the object is passed as a parameter.
 
     """
-    target_vals = [
-        target_val
-        for target_val in target_types
-        if not isinstance(target_val, type)
-    ]
-    target_types = [
-        target_type
-        for target_type in target_types
-        if isinstance(target_type, type)
-    ]
 
-    if (
-        all(not isinstance(obj, target_type) for target_type in target_types)
-        and obj not in target_vals
-    ):
+    target_vals = target_vals if target_vals is not None else []
+    indicator_funcs = indicator_funcs if indicator_funcs is not None else []
 
-        error_str = f"`{name}` has type `{type(obj)}` but must have "
-        if len(target_types) == 1:
-            error_str += f"type `{target_types[0]}`"
-        elif len(target_types) <= 3:
-            error_str += "type "
-            for i in range(len(target_types) - 1):
-                error_str += f"`{target_types[i]}`,"
-            error_str += f" or `{target_types[len(target_types) - 1]}`"
+    wrong_type = not isinstance(obj, target_types)
+    wrong_value = obj not in target_vals
+    wrong_index = all(not i_func(obj) for i_func in indicator_funcs)
+
+    if wrong_type and wrong_value and wrong_index:
+
+        error_str = f"`{name}` "
+        if len(target_types) == 0 and len(target_vals) == 0:
+            error_str += f" must"
+        if len(target_vals) == 0 and len(target_types) > 0:
+            error_str += f" has type `{type(obj)}`, but must"
+        elif len(target_vals) > 0 and len(target_types) == 0:
+            error_str += f" has value `{obj}`, but must"
         else:
-            error_str += f"one of the following types: {set(target_types)}"
+            error_str += f" has type `{type(obj)}` and value `{obj}`, but must"
 
-        if len(list(target_vals)) >= 1:
+        if len(target_types) == 1:
+            error_str += f" have type `{target_types[0]}`"
+        elif 1 <= len(target_types) <= 3:
+            error_str += " have type"
+            for i in range(len(target_types) - 1):
+                error_str += f" `{target_types[i]}`,"
+            error_str += f" or `{target_types[len(target_types) - 1]}`"
+        elif len(target_types) > 3:
             error_str += (
-                f" or equal one of the following values: {set(target_vals)}"
+                f" have one of the following types: {set(target_types)}"
             )
+
+        if len(target_vals) > 0:
+            if len(target_types) > 0 and len(indicator_funcs) == 0:
+                error_str += " or"
+            elif len(target_types) > 0 and len(indicator_funcs) > 0:
+                error_str += ","
+            error_str += (
+                f" equal one of the following values: {set(target_vals)}"
+            )
+
+        if len(indicator_funcs) > 0:
+            if len(target_types) > 0 or len(target_vals) > 0:
+                error_str += " or"
+            error_str += (
+                f" be accepted by one of the following custom boolean "
+                f"functions: {set(i_f.__name__ for i_f in indicator_funcs)}"
+            )
+
         raise TypeError(error_str + ".")
 
 
