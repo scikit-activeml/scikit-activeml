@@ -4,6 +4,7 @@ import inspect
 import json
 import os
 import re
+import shutil
 import warnings
 
 import numpy as np
@@ -117,7 +118,7 @@ def automodule(module, level=0):
     return rst_str
 
 
-def generate_strategy_overview_rst(gen_path, examples_data={}):
+def generate_strategy_overview_rst(gen_path, json_data):
     """Creates the strategy_overview.rst file in the specified path.
     
     Parameters
@@ -138,6 +139,11 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
     # Load bibtex database.
     bib_data = parse_file('refs.bib')
 
+    table_data = json_data_to_table_data(json_data, gen_path)
+    sections = {}
+    for section, table in table_data.items():
+        sections[section] = table_data_to_array(table)
+
     # create directory if it does not exist.
     os.makedirs(os.path.join(gen_path, 'strategy_overview'), exist_ok=True)
 
@@ -145,9 +151,9 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
     with open(
             os.path.join(gen_path, 'strategy_overview.rst'),
             'w') as file:
-        file.write('=================\n')
+        file.write('#################\n')
         file.write('Strategy Overview\n')
-        file.write('=================\n')
+        file.write('#################\n')
         file.write('\n')
         file.write('In the following you\'ll find summaries of all implemented'
                    ' "Query Strategies", based on the categorization of '
@@ -156,53 +162,132 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
         file.write('.. toctree::\n')
         file.write('   :maxdepth: 1\n')
         file.write('\n')
-        for tab in examples_data.keys():
-            file.write(f'   strategy_overview/strategy_overview-{tab}\n')
+        for paper in list(sections.values())[0].keys():
+            file.write(f'   strategy_overview/strategy_overview-{paper}\n')
 
-    # Iterate over the tabs.
-    for tab, cats in examples_data.items():
-        author = bib_data.entries[tab].persons["author"][0].last_names[0]
+    # Iterate over the papers.
+    for paper, cats in examples_data.items():
+        author = bib_data.entries[paper].persons["author"][0].last_names[0]
         path = os.path.join(gen_path,
                             'strategy_overview',
-                            f'strategy_overview-{tab}.rst')
+                            f'strategy_overview-{paper}.rst')
         with open(path, 'w') as file:
             title = f'Strategy Overview By {author}\n'
             file.write(title)
             file.write(''.ljust(len(title) + 1, '=') + '\n')
             file.write('\n')
-            file.write(f'This is an overview of all implemented AL strategies. '
-                       f'The strategies are categorized according to '
-                       f':footcite:t:`{tab}`.\n')
+            file.write(f'This is an overview of all implemented AL strategies.'
+                       f' The strategies are categorized according to '
+                       f':footcite:t:`{paper}`.\n')
             file.write('\n')
             file.write('Pool Strategies\n')
             file.write('---------------\n')
             file.write('\n')
 
-            # Iterate over the categories in the current tab.
-            for cat in sorted(cats):
-                if cat != 'Others':
-                    file.write(table_from_array(cats[cat], title=cat,
-                                                section_level='~',
-                                                header_rows=1, indent=0))
-            if 'Others' in cats.keys():
-                # 'Others' is the fallback, if no category is specified
-                # in the json file
-                file.write(table_from_array(cats['Others'], title='Others',
-                                            section_level='~',
-                                            header_rows=1, indent=0))
+            # Iterate over the examples.
+            tabs = None
+            file.write(format_overview_tabs(tabs, cats))
+            file.write('\n')
+
             file.write('References\n')
             file.write('----------\n')
             file.write('.. footbibliography::')
-            # TODO stream
-            # file.write('\n')
-            # file.write('Stream Strategies:\n')
-            # file.write('------------------\n')
-            # file.write('\n')
             file.write('\n')
 
 
-def table_from_array(a, title='', caption='', widths=None, header_rows=0,
-                     section_level='-', indent=0):
+def json_data_to_table_data(json_data, gen_path):
+    tables = {}
+    rel_api_path = os.path.join(
+        os.path.basename(gen_path), 'api'
+    ).replace('\\', '/')
+    for section_name, section_items in json_data.items():
+        table = np.ndarray(shape=(0, 4))
+        for data in section_items['data']:
+            # Collect the data needed to generate the strategy overview.
+            qs_name = data["class"]
+            method = data['method']
+            package = getattr(skactiveml, data['package'])
+            package_name = package.__name__.replace('skactiveml.', '')
+            methods_text = \
+                f':doc:`{method} </generated/sphinx_gallery_examples/' \
+                f'{package_name}/plot_{qs_name}_' \
+                f'{method.replace(" ", "_")}>`'
+            strategy_text = f':doc:`{qs_name} </{rel_api_path}/' \
+                            f'{package.__name__}.{qs_name}>`'
+            ref_text = ''
+            for ref in data['refs']:
+                ref_text += f':footcite:t:`{ref}`, '
+            ref_text = ref_text[0:-2]
+            category = data['categories'] if 'categories' in data.keys() \
+                else {}
+            table = np.append(
+                table,
+                [[methods_text, strategy_text, ref_text, category]],
+                axis=0
+            )
+
+        # Sort the table alphabetically.
+        table = sorted(table, key=lambda row: row[1])
+
+        tables[section_name] = table
+
+    return tables
+
+
+def table_data_to_array(table):
+    examples_data = {}  # (Tab, Category, Collum, Row)
+    head_line = ['Method', 'Base Class', 'Reference']
+    # Collect the different tabs and categories.
+    for i, row in enumerate(table):
+        for paper in row[3].keys():
+            if paper not in examples_data.keys():
+                examples_data[paper] = {}
+            if row[3][paper] == '':
+                table[i][3][paper] = 'Others'
+            if row[3][paper] not in examples_data[paper].keys():
+                examples_data[paper][row[3][paper]] = np.array([head_line])
+
+    # Build the dict that holds the data.
+    for row in table:
+        for paper in examples_data:
+            if paper in row[3].keys():
+                cat = row[3][paper] if paper in row[3].keys() else 'Others'
+            examples_data[paper][cat] = \
+                np.append(examples_data[paper][cat], [row[:3]], axis=0)
+
+    return examples_data
+
+
+def format_overview_tabs(tabs, cats, header=None, indent=0):
+    string = ''.ljust(indent, ' ') + '.. tabs::\n\n'
+    indents = ''.ljust(indent + 4, ' ')
+
+    # Iterate over the categories in the current paper.
+    for cat in sorted(cats):
+        if cat != 'Others':
+            string += f'{cat}\n'
+            string += ''.ljust(len(cat), '~') + '\n'
+            string += table_data_to_rst_table(cats[cat],
+                                              header=header,
+                                              indent=0)
+    if 'Others' in cats.keys():
+        # 'Others' is the fallback, if no category is specified
+        # in the json file
+        string += 'Others\n'
+        string += '~~~~~~\n'
+        string += table_data_to_rst_table(cats['Others'],
+                                          header=header,
+                                          indent=0)
+    string += 'References\n'
+    string += '----------\n'
+    string += '.. footbibliography::'
+    string += '\n'
+
+    return string
+
+
+def table_data_to_rst_table(a, caption='', widths=None, header=None,
+                            indent=0):
     """Generates a rst-table and returns it as a string.
 
     Parameters
@@ -229,16 +314,19 @@ def table_from_array(a, title='', caption='', widths=None, header_rows=0,
     """
     a = np.asarray(a)
     indents = ''.ljust(indent, ' ')
-    table = title + '\n'
-    table += ''.ljust(len(title), section_level) + '\n'
-    table += f'{indents}.. list-table:: {caption}\n' \
-             f'{indents}   :header-rows: {header_rows}\n'
+    table = f'{indents}.. list-table:: {caption}\n' \
+            f'{indents}   :header-rows: {0 if header is None else 1}\n'
     if widths is None:
         table += '\n'
     elif widths == 'auto':
         table += f'{indents}   :widths: auto\n\n'
     else:
         table += f'{indents}   :widths: {widths}\n\n'
+    if header is not None:
+        table += f'{indents}   *'
+        for column in header:
+            table += ' - ' + str(column) + f'\n{indents}    '
+        table = table[0: -4 - indent]
     for row in a:
         table += f'{indents}   *'
         for column in row:
@@ -270,96 +358,59 @@ def generate_examples(gen_path, package, json_path, recursive=True):
     -------
     dict : Holds the data needed to create the strategy overview.
     """
-    dir_path_package = os.path.join(gen_path, 'examples',
-                                    package.__name__.split('.')[1], '')
-
-    rel_api_path = os.path.join(
-        os.path.basename(gen_path), 'api'
-    ).replace('\\', '/')
 
     # create directory if it does not exist.
-    os.makedirs(dir_path_package, exist_ok=True)
+    os.makedirs(gen_path, exist_ok=True)
 
-    # create README.rst files needed for 'sphinx-gallery'
-    with open(os.path.join(gen_path, 'examples', 'README.rst'), 'w') as file:
-        file.write('Examples\n')
-        file.write('========')
-    with open(os.path.join(dir_path_package, 'README.rst'), 'w') as file:
-        title = f'{package.__name__.split(".")[1]} based'.title()
-        file.write(title + '\n')
-        file.write(''.ljust(len(title), '-'))
-
-    head_line = ['Method', 'Base Class', 'Reference']
-    examples_data = {}  # (Tab, Category, Collum, Row)
-    table = np.ndarray(shape=(0, 4))
+    examples_data = dict()  # (Tab, Category, Collum, Row)
     # iterate over jason example files
     for (root, dirs, files) in os.walk(json_path, topdown=True):
-        sub_package_str = root.replace(json_path, '').strip(os.sep)
-        sub_package = package
-        for p in sub_package_str.split(os.sep):
-            if p == '': continue
-            sub_package = getattr(sub_package, p)
-        for filename in files:
-            if not filename.endswith('.json'):
-                continue
-            with open(os.path.join(root, filename)) as file:
-                # iterate over the examples in the json file
-                for data in json.load(file):
-                    # Collect the data needed to generate the strategy overview.
-                    qs_name = data["class"]
-                    method = data['method']
-                    package_name = sub_package.__name__.replace('skactiveml.', '')
-                    methods_text = \
-                        f':doc:`{method} </generated/sphinx_gallery_examples/' \
-                        f'{package_name}/plot_{qs_name}_' \
-                        f'{method.replace(" ", "_")}>`'
-                    strategy_text = f':doc:`{qs_name} </{rel_api_path}/' \
-                                    f'{sub_package.__name__}.{qs_name}>`'
-                    ref_text = ''
-                    for ref in data['refs']:
-                        ref_text += f':footcite:t:`{ref}`, '
-                    ref_text = ref_text[0:-2]
-                    category = data['categories'] if 'categories' in data.keys() \
-                        else {}
-                    table = np.append(
-                        table,
-                        [[methods_text, strategy_text, ref_text, category]],
-                        axis=0
-                    )
+        if 'README.rst' not in files and 'README.txt' not in files:
+            raise FileNotFoundError(f'No README.rst or README.txt found in \n'
+                                    f'"{root}"')
 
-                    # create the example python script
-                    plot_filename = \
-                        'plot_' + data["class"] + "_" + method.replace(' ', '_')
-                    generate_example_script(
-                        filename=plot_filename + '.py',
-                        dir_path=dir_path_package,
-                        data=data,
-                        package=sub_package,
-                        template_path=os.path.abspath(data["template"])
-                    )
+        sub_package_str = root.replace(json_path, '').strip(os.sep)
+        # sub_package = package
+        dst = os.path.join(gen_path, sub_package_str)
+        os.makedirs(dst, exist_ok=True)
+        # Get the sub package.
+        # for p in sub_package_str.split(os.sep):
+        #     if p == '': continue
+        #     sub_package = getattr(sub_package, p)
+        # Iterate over all files in 'root'.
+        for filename in files:
+            # Copy the readme file.
+            if filename.endswith('.rst') or filename.endswith('.txt'):
+                src = os.path.join(root, filename)
+                shutil.copyfile(src, os.path.join(dst, filename))
+
+            elif filename.endswith('.json'):
+                with open(os.path.join(root, filename)) as file:
+                    # iterate over the examples in the json file
+                    for data in json.load(file):
+                        sub_package_dict = examples_data
+                        package_structure = sub_package_str.split('.')
+                        for sp in package_structure:
+                            if sp not in sub_package_dict.keys():
+                                sub_package_dict[sp] = dict()
+                            sub_package_dict = sub_package_dict[sp]
+                        if 'data' not in sub_package_dict.keys():
+                            sub_package_dict['data'] = list()
+
+                        sub_package_dict['data'].append(data)
+                        # create the example python script
+                        plot_filename = \
+                            'plot-' + data["class"] + "-" + data['method'].replace(
+                                ' ', '_')
+                        generate_example_script(
+                            filename=plot_filename + '.py',
+                            dir_path=dst,
+                            data=data,
+                            package=getattr(skactiveml, data['package']),
+                            template_path=os.path.abspath(data["template"])
+                        )
         if not recursive:
             break
-
-    # Sort the table alphabetically.
-    table = sorted(table, key=lambda row: row[1])
-
-    # Collect the different tabs and categories.
-    for i, row in enumerate(table):
-        for tab in row[3].keys():
-            if tab not in examples_data.keys():
-                examples_data[tab] = {}
-            if row[3][tab] == '':
-                table[i][3][tab] = 'Others'
-            if row[3][tab] not in examples_data[tab].keys():
-                examples_data[tab][row[3][tab]] = np.array([head_line])
-
-    # Build the dict that holds the data.
-    for row in table:
-        for tab in examples_data:
-            if tab in row[3].keys():
-                cat = row[3][tab] if tab in row[3].keys() else 'Others'
-            examples_data[tab][cat] = \
-                np.append(examples_data[tab][cat], [row[:3]], axis=0)
 
     return examples_data
 
@@ -388,7 +439,6 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     # Validation of 'data'.
     if data['class'] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
-    data["qs"] = getattr(package, data["class"])
 
     first_title = True
     # Create the file.

@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath('..'))
-from skactiveml import pool, __version__
+import skactiveml
 
 from docs.generate import generate_strategy_overview_rst, \
     generate_api_reference_rst, generate_examples, generate_tutorials
@@ -28,9 +28,9 @@ copyright = '2020'
 author = 'Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergard, Christoph Sandrock'
 
 # The short X.Y version
-version = __version__
+version = skactiveml.__version__
 # The full version, including alpha/beta/rc tags
-release = __version__
+release = skactiveml.__version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -215,21 +215,22 @@ autodoc_default_options = {
 
 autoclass_content = 'class'
 
-generate_api_reference_rst(
-    gen_path=os.path.abspath('generated')
-)
+if True:
+    generate_api_reference_rst(
+        gen_path=os.path.abspath('generated')
+    )
 
-examples_data = generate_examples(
-    gen_path=os.path.abspath('generated'),
-    package=pool,
-    json_path=os.path.abspath('examples/pool'))
+    examples_data = generate_examples(
+        gen_path=os.path.abspath('generated/examples'),
+        package=skactiveml,
+        json_path=os.path.abspath('examples'))
 
-generate_strategy_overview_rst(
-    gen_path=os.path.abspath('generated'),
-    examples_data=examples_data
-)
+    generate_strategy_overview_rst(
+        gen_path=os.path.abspath('generated'),
+        json_data=examples_data
+    )
 
-generate_tutorials(
-    src_path=os.path.abspath('../tutorials/'),
-    dst_path=os.path.abspath('generated/tutorials/'),
-)
+    generate_tutorials(
+        src_path=os.path.abspath('../tutorials/'),
+        dst_path=os.path.abspath('generated/tutorials/'),
+    )
