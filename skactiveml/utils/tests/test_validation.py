@@ -234,8 +234,27 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_type, 10, "a", str, bool)
         self.assertRaises(TypeError, check_type, 10, "a", str, bool, map, list)
         check_type(10, "a", int)
-        check_type("number", "a", "number")
-        self.assertRaises(TypeError, check_type, 10, "a", str, 12)
+        check_type("number", "a", target_vals=["number"])
+        self.assertRaises(
+            TypeError, check_type, "number", "a", target_vals=["nonumber"]
+        )
+        self.assertRaises(
+            TypeError, check_type, 10, "a", str, target_vals=[12]
+        )
+
+        def is_prime(x):
+            return all(x % n != 0 for n in range(2, x))
+
+        self.assertRaises(
+            ValueError, check_type, 10, "a", int, validation_funcs=[is_prime]
+        )
+        self.assertRaises(
+            TypeError, check_type, 7, "a", str, validation_funcs=[is_prime]
+        )
+        self.assertRaises(
+            TypeError, check_type, 10, "a", str, validation_funcs=[is_prime]
+        )
+        check_type(7, "a", int, validation_funcs=[is_prime])
 
     def test_check_indices_single_dimension(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])

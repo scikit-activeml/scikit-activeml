@@ -589,8 +589,12 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         return indices
 
 
-def check_type(obj, name, *target_types):
-    """Check if obj is one of the given types.
+def check_type(
+    obj, name, *target_types, target_vals=None, validation_funcs=None
+):
+    """Check if obj is one of the given types. It is also possible to allow
+    specific values. Further it is possible to pass validation functions to
+    define conditions, that must be satisfied.
 
     Parameters
     ----------
@@ -599,42 +603,66 @@ def check_type(obj, name, *target_types):
     name: str
         The variable name of the object.
     target_types : iterable
-        The possible types. If a target_val in `target_types` is not of type
-        `type` `obj` is allowed to be equal to the target_val.
+        The possible types.
+    target_vals : iterable, optional (default=None)
+        Possible further values that the object is allowed to have if the
+        object is not one of the possible target types.
+    validation_funcs : iterable, optional (default=None)
+        Custom boolean functions, that define further conditions that the
+        object must satisfy.
 
     """
-    target_vals = [
-        target_val
-        for target_val in target_types
-        if not isinstance(target_val, type)
-    ]
-    target_types = [
-        target_type
-        for target_type in target_types
-        if isinstance(target_type, type)
-    ]
 
-    if (
-        all(not isinstance(obj, target_type) for target_type in target_types)
-        and obj not in target_vals
-    ):
+    target_vals = target_vals if target_vals is not None else []
+    validation_funcs = validation_funcs if validation_funcs is not None else []
 
-        error_str = f"`{name}` has type `{type(obj)}` but must have "
-        if len(target_types) == 1:
-            error_str += f"type `{target_types[0]}`"
-        elif len(target_types) <= 3:
-            error_str += "type "
-            for i in range(len(target_types) - 1):
-                error_str += f"`{target_types[i]}`,"
-            error_str += f" or `{target_types[len(target_types) - 1]}`"
+    wrong_valtype = (
+        not isinstance(obj, target_types) and obj not in target_vals
+    )
+    if wrong_valtype:
+        error_str = f"`{name}` "
+        if len(target_vals) == 0 and len(target_types) > 0:
+            error_str += f" has type `{type(obj)}`, but must"
+        elif len(target_vals) > 0 and len(target_types) == 0:
+            error_str += f" has value `{obj}`, but must"
         else:
-            error_str += f"one of the following types: {set(target_types)}"
+            error_str += f" has type `{type(obj)}` and value `{obj}`, but must"
 
-        if len(list(target_vals)) >= 1:
+        if len(target_types) == 1:
+            error_str += f" have type `{target_types[0]}`"
+        elif 1 <= len(target_types) <= 3:
+            error_str += " have type"
+            for i in range(len(target_types) - 1):
+                error_str += f" `{target_types[i]}`,"
+            error_str += f" or `{target_types[len(target_types) - 1]}`"
+        elif len(target_types) > 3:
             error_str += (
-                f" or equal one of the following values: {set(target_vals)}"
+                f" have one of the following types: {set(target_types)}"
             )
+
+        if len(target_vals) > 0:
+            if len(target_types) > 0:
+                error_str += " or"
+            error_str += (
+                f" equal one of the following values: {set(target_vals)}"
+            )
+    else:
+        error_str = f"`{name}` must"
+
+    wrong_condition = any(not v_func(obj) for v_func in validation_funcs)
+    if wrong_condition:
+        if wrong_valtype:
+            error_str += " and"
+        error_str += (
+            f" satisfy the conditions defined by the following "
+            f"custom boolean functions: "
+            f"{set(v_f.__name__ for v_f in validation_funcs)}"
+        )
+
+    if wrong_valtype:
         raise TypeError(error_str + ".")
+    if wrong_condition:
+        raise ValueError(error_str + ".")
 
 
 def check_bound(
