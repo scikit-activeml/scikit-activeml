@@ -545,7 +545,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
             indices = np.unique(indices)
         else:
             indices = np.unique(indices, axis=0)
-    check_type(dim, "dim", int, tuple, "adaptive")
+    check_type(dim, "dim", int, tuple, target_vals=["adaptive"])
     if dim == "adaptive":
         if indices.ndim == 1:
             dim = 0
