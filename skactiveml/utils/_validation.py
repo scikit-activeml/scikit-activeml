@@ -590,11 +590,12 @@ def check_indices(indices, A, dim="adaptive", unique=True):
 
 
 def check_type(
-    obj, name, *target_types, target_vals=None, validation_funcs=None
+    obj, name, *target_types, target_vals=None, indicator_funcs=None
 ):
     """Check if obj is one of the given types. It is also possible to allow
-    specific values. Further it is possible to pass validation functions to
-    define conditions, that must be satisfied.
+    specific values. Further it is possible to pass indicator functions
+    that can also accept obj. Thereby obj must either have a correct type
+    a correct value or be accepted by an indicator function.
 
     Parameters
     ----------
@@ -605,22 +606,25 @@ def check_type(
     target_types : iterable
         The possible types.
     target_vals : iterable, optional (default=None)
-        Possible further values that the object is allowed to have if the
-        object is not one of the possible target types.
-    validation_funcs : iterable, optional (default=None)
-        Custom boolean functions, that define further conditions that the
-        object must satisfy.
+        Possible further values that the object is allowed to equal.
+    indicator_funcs : iterable, optional (default=None)
+        Possible further custom indicator (boolean) functions that accept
+        the object by returning `True` if the object is passed as a parameter.
 
     """
 
     target_vals = target_vals if target_vals is not None else []
-    validation_funcs = validation_funcs if validation_funcs is not None else []
+    indicator_funcs = indicator_funcs if indicator_funcs is not None else []
 
-    wrong_valtype = (
-        not isinstance(obj, target_types) and obj not in target_vals
-    )
-    if wrong_valtype:
+    wrong_type = not isinstance(obj, target_types)
+    wrong_value = obj not in target_vals
+    wrong_index = all(not i_func(obj) for i_func in indicator_funcs)
+
+    if wrong_type and wrong_value and wrong_index:
+
         error_str = f"`{name}` "
+        if len(target_types) == 0 and len(target_vals) == 0:
+            error_str += f" must"
         if len(target_vals) == 0 and len(target_types) > 0:
             error_str += f" has type `{type(obj)}`, but must"
         elif len(target_vals) > 0 and len(target_types) == 0:
@@ -641,28 +645,23 @@ def check_type(
             )
 
         if len(target_vals) > 0:
-            if len(target_types) > 0:
+            if len(target_types) > 0 and len(indicator_funcs) == 0:
                 error_str += " or"
+            elif len(target_types) > 0 and len(indicator_funcs) > 0:
+                error_str += ","
             error_str += (
                 f" equal one of the following values: {set(target_vals)}"
             )
-    else:
-        error_str = f"`{name}` must"
 
-    wrong_condition = any(not v_func(obj) for v_func in validation_funcs)
-    if wrong_condition:
-        if wrong_valtype:
-            error_str += " and"
-        error_str += (
-            f" satisfy the conditions defined by the following "
-            f"custom boolean functions: "
-            f"{set(v_f.__name__ for v_f in validation_funcs)}"
-        )
+        if len(indicator_funcs) > 0:
+            if len(target_types) > 0 or len(target_vals) > 0:
+                error_str += " or"
+            error_str += (
+                f" be accepted by one of the following custom boolean "
+                f"functions: {set(i_f.__name__ for i_f in indicator_funcs)}"
+            )
 
-    if wrong_valtype:
         raise TypeError(error_str + ".")
-    if wrong_condition:
-        raise ValueError(error_str + ".")
 
 
 def check_bound(
