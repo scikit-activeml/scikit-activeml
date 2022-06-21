@@ -63,6 +63,26 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         query_strategy = StreamProbabilisticAL(m_max=-1)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
+    def test_init_param_metric_dict(self):
+        query_strategy = StreamProbabilisticAL(metric_dict=["gamma"])
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+
+    def test_init_param_metric(self):
+        query_strategy = StreamProbabilisticAL(metric="string")
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL(metric=0)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL()
+        clf = SklearnClassifier(GaussianNB())
+        self.assertRaises(
+            ValueError,
+            query_strategy.query,
+            candidates=self.candidates,
+            clf=clf,
+            X=self.X,
+            y=self.y,
+        )
+
     def test_init_param_random_state(self):
         query_strategy = StreamProbabilisticAL(random_state="string",)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
@@ -298,46 +318,3 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             y=self.y,
             fit_clf=1,
         )
-
-    def test_query_param_frequency_estimation(self):
-        query_strategy = StreamProbabilisticAL()
-        self.assertRaises(
-            TypeError,
-            query_strategy.query,
-            candidates=self.candidates,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            frequency_estimation="string",
-        )
-        queried_indices_1 = query_strategy.query(
-            self.candidates,
-            self.clf,
-            self.X,
-            self.y,
-            fit_clf=True,
-            frequency_estimation=_frequency_estimation,
-        )
-        queried_indices_2 = query_strategy.query(
-            self.candidates, self.clf, self.X, self.y, fit_clf=True
-        )
-        self.assertEqual(queried_indices_1, queried_indices_2)
-        clf = SklearnClassifier(GaussianNB())
-        self.assertRaises(
-            ValueError,
-            query_strategy.query,
-            candidates=self.candidates,
-            clf=clf,
-            X=self.X,
-            y=self.y,
-        )
-
-
-def _frequency_estimation(candidates, clf, X, y, sample_weight=None):
-    freq_estimation = ParzenWindowClassifier(
-        missing_label=clf.missing_label
-    )
-    freq_estimation.fit(X, y, sample_weight)
-    return freq_estimation.predict_freq(
-        np.array(candidates).reshape([1, -1])
-    )
