@@ -82,6 +82,11 @@ class TestStreamProbabilisticAL(unittest.TestCase):
             X=self.X,
             y=self.y,
         )
+        query_strategy = StreamProbabilisticAL(metric="rbf")
+        clf = SklearnClassifier(GaussianNB())
+        query_strategy.query(
+            candidates=self.candidates, clf=clf, X=self.X, y=self.y, fit_clf=True
+        )
 
     def test_init_param_random_state(self):
         query_strategy = StreamProbabilisticAL(random_state="string",)
