@@ -149,7 +149,13 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             utility_weight=utility_weight,
             return_utilities=return_utilities,
         )
-        k_vec = self.predict_freq_(X=candidates)
+        frequencies = self.predict_freq_(X=candidates)
+        if self.metric is not None:
+            marginal_frequencies = np.sum(frequencies, axis=1, keepdims=True)
+            pred_proba = clf.predict_proba(candidates)
+            k_vec = marginal_frequencies * pred_proba
+        else:
+            k_vec = frequencies
         utilities = cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
 
         utilities *= utility_weight
