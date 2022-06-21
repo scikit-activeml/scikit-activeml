@@ -14,6 +14,7 @@ from ._estimated_budget_zliobaite import (
     VariableUncertaintyBudgetManager,
     SplitBudgetManager,
     RandomVariableUncertaintyBudgetManager,
+    RandomBudgetManager,
 )
 from ._threshold_budget import DensityBasedBudgetManager
 
@@ -25,4 +26,5 @@ __all__ = [
     "BalancedIncrementalQuantileFilter",
     "RandomVariableUncertaintyBudgetManager",
     "DensityBasedBudgetManager",
+    "RandomBudgetManager",
 ]

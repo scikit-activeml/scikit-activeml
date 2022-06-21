@@ -148,7 +148,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             if d:
                 queried_indices.append(i)
 
-            return queried_indices
+        return queried_indices
 
     def update(self, candidates, queried_indices):
         """Updates the budget manager.
@@ -695,6 +695,111 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
+
+    def _validate_random_state(self):
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
+        """
+        if not hasattr(self, "random_state_"):
+            self.random_state_ = deepcopy(self.random_state)
+        self.random_state_ = check_random_state(self.random_state_)
+
+
+class RandomBudgetManager(EstimatedBudgetZliobaite):
+    def __init__(self, budget=None, w=100, random_state=0):
+        super().__init__(budget, w)
+        self.random_state = random_state
+
+    def query_by_utility(self, utilities):
+        """Ask the budget manager which utilities are sufficient to query the
+        corresponding instance.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy, which are used to determine whether sampling an instance
+            is worth it given the budgeting constraint.
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
+
+        Returns
+        -------
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances represented by utilities which should be
+            queried, with 0 <= n_queried_instances <= n_samples.
+        """
+        utilities = self._validate_data(utilities)
+
+        # intialize return parameters
+        queried_indices = []
+
+        # keep the internal state to reset it later if simulate is true
+        tmp_u_t = self.u_t_
+
+        prior_random_state = self.random_state_.get_state()
+
+        samples = (
+            self.random_state_.random_sample(len(utilities)) <= self.budget_
+        )
+        # check for each sample separately if budget is left and the utility is
+        # high enough
+        for i, d in enumerate(samples):
+            budget_left = tmp_u_t / self.w < self.budget_
+            if not budget_left:
+                d = False
+            tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + (d and not np.isnan(utilities[i]))
+            # get the indices instances that should be queried
+            if d and not np.isnan(utilities[i]):
+                queried_indices.append(i)
+
+        self.random_state_.set_state(prior_random_state)
+
+        return queried_indices
+
+    def update(self, candidates, queried_indices):
+        """Updates the budget manager.
+
+        Parameters
+        ----------
+        queried_indices : array-like of shape (n_samples,)
+            Indicates which instances from candidates have been queried.
+
+        Returns
+        -------
+        self : FixedUncertaintyBudgetManager
+            The FixedUncertaintyBudget returns itself, after it is updated.
+        """
+        self._validate_data(np.array([]))
+        # TODO np.nan auswerten für alle random sachen
+        # for x_cand in candidates:
+        #     if not np.isnan(x_cand):
+        self.random_state_.random_sample(len(candidates))
+        super().update(candidates, queried_indices)
+        return self
+
+    def _validate_data(self, utilities):
+        """Validate input data.
+
+        Parameters
+        ----------
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
+
+        Returns
+        -------
+        utilities : ndarray of shape (n_samples,)
+            Checked utilities.
+        """
+
+        utilities = super()._validate_data(utilities)
+        check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
+        self._validate_random_state()
+
+        return utilities
 
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of
