@@ -585,7 +585,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
-            annotators = check_array(annotators, ensure_2d=False, allow_nd=True)
+            annotators = check_array(
+                annotators, ensure_2d=False, allow_nd=True
+            )
 
             if annotators.ndim == 1:
                 annotators = check_indices(annotators, y, dim=1)
@@ -1338,10 +1340,11 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 
     Parameters
     __________
-    missing_label : scalar, string, np.nan, or None, default=np.nan
+    missing_label : scalar, string, np.nan, or None, optional
+    (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : int, RandomState instance or None, optional (default=None)
-        Determines random number for 'predict' method. Pass an int for
+    random_state : int, RandomState or None, optional (default=None)
+        Determines random number for 'fit' and 'predict' method. Pass an int for
         reproducible results across multiple method calls.
     """
 
@@ -1351,7 +1354,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
+        """Fit the model using X as training data and y as numerical labels.
 
         Parameters
         ----------
@@ -1359,8 +1362,8 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
             The sample matrix X is the feature matrix representing the samples.
         y : array-like, shape (n_samples) or (n_samples, n_targets)
             It contains the labels of the training samples.
-            The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
+            The number of numerical labels may be variable for the samples,
+            where missing labels are represented the attribute 'missing_label'.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -1372,6 +1375,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
     def predict(self, X):
         """Return value predictions for the test samples X.
 
@@ -1509,7 +1513,9 @@ class ProbabilisticRegressor(SkactivemlRegressor):
             Drawn random target samples.
         """
         rv = self.predict_target_distribution(X)
-        rv_samples = rv.rvs(size=(n_samples, len(X)), random_state=random_state)
+        rv_samples = rv.rvs(
+            size=(n_samples, len(X)), random_state=random_state
+        )
         return rv_samples.T
 
 

@@ -62,13 +62,20 @@ def provide_test_regression_query_strategy_init_random_state(
 
 
 def provide_test_regression_query_strategy_init_missing_label(
-    test_instance, qs_class, init_dict=None, query_dict=None
+    test_instance,
+    qs_class,
+    init_dict=None,
+    query_dict=None,
+    missing_label_params_query_dict=None,
 ):
+
     # initialisation
     if init_dict is None:
         init_dict = {}
     if query_dict is None:
         query_dict = get_default_query_dict()
+    if missing_label_params_query_dict is None:
+        missing_label_params_query_dict = []
 
     init_dict["random_state"] = 0
     for name, value in [
@@ -90,6 +97,9 @@ def provide_test_regression_query_strategy_init_missing_label(
             query_dict[name] = value
         qs = call_func(qs_class, **init_dict)
 
+        for param in missing_label_params_query_dict:
+            query_dict[param].missing_label = poss_missing_label
+
         indices = call_func(qs.query, **query_dict)
         np.testing.assert_array_equal(
             indices.sort(), unlabeled_indices(y).sort()
@@ -102,7 +112,9 @@ def provide_test_regression_query_strategy_init_missing_label(
             query_dict[name] = value
         qs = call_func(qs_class, **init_dict)
 
-        test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
+        test_instance.assertRaises(
+            TypeError, call_func, qs.query, **query_dict
+        )
 
 
 def provide_test_regression_query_strategy_init_integration_dict(
@@ -249,7 +261,9 @@ def provide_test_regression_query_strategy_query_reg(
 
     for illegal_reg in illegal_regs:
         query_dict["reg"] = illegal_reg
-        test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
+        test_instance.assertRaises(
+            TypeError, call_func, qs.query, **query_dict
+        )
 
 
 def provide_test_regression_query_strategy_query_fit_reg(
@@ -285,7 +299,9 @@ def provide_test_regression_query_strategy_query_fit_reg(
 
     for illegal_fit_reg in ["illegal", 15]:
         query_dict["fit_reg"] = illegal_fit_reg
-        test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
+        test_instance.assertRaises(
+            TypeError, call_func, qs.query, **query_dict
+        )
 
 
 def provide_test_regression_query_strategy_query_sample_weight(
@@ -298,11 +314,10 @@ def provide_test_regression_query_strategy_query_sample_weight(
     if query_dict is None:
 
         class SpyRegressor(NICKernelRegressor):
-            def fit(self, *args, **kwargs):
-                if (
-                    "sample_weight" in kwargs
-                    and kwargs["sample_weight"] is not None
-                ) or (len(args) >= 3 and args[2] is not None):
+            def fit(self, *args, sample_weight=None, **kwargs):
+                if (sample_weight is not None) or (
+                    len(args) >= 3 and args[2] is not None
+                ):
                     call_status_dict["used_sample_weight"] = True
                 return super().fit(*args, **kwargs)
 
@@ -316,9 +331,7 @@ def provide_test_regression_query_strategy_query_sample_weight(
     for poss_sample_weight in [None, np.arange(len(y)) + 1]:
         query_dict["sample_weight"] = poss_sample_weight
         call_func(qs.query, **query_dict)
-        if poss_sample_weight is None:
-            test_instance.assertFalse(call_status_dict["used_sample_weight"])
-        else:
+        if poss_sample_weight is not None:
             test_instance.assertTrue(call_status_dict["used_sample_weight"])
 
     # illegal arguments
@@ -458,7 +471,9 @@ def provide_test_regression_query_strategy_query_return_utilities(
 
     for illegal_return_utilities in ["illegal", dict, 5]:
         query_dict["return_utilities"] = illegal_return_utilities
-        test_instance.assertRaises(TypeError, call_func, qs.query, **query_dict)
+        test_instance.assertRaises(
+            TypeError, call_func, qs.query, **query_dict
+        )
 
 
 def provide_test_regression_query_strategy_change_dependence(

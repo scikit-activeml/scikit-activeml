@@ -5,7 +5,9 @@ from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.pool.regression.utils._model_fitting import bootstrap_estimators
+from skactiveml.pool.regression.utils._model_fitting import (
+    bootstrap_estimators,
+)
 from skactiveml.utils import (
     check_type,
     simple_batch,
@@ -56,7 +58,9 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         self.k_bootstraps = k_bootstraps
         self.n_train = n_train
         self.ord = ord

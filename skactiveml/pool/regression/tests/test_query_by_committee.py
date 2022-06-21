@@ -10,7 +10,7 @@ from sklearn.ensemble import (
 from sklearn.gaussian_process import GaussianProcessRegressor
 
 from skactiveml.classifier import ParzenWindowClassifier
-from skactiveml.pool.regression import QueryByCommittee
+from skactiveml.pool import QueryByCommittee
 from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
@@ -19,9 +19,9 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_candidates,
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
-    provide_test_regression_query_strategy_change_dependence,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestQueryByCommittee(unittest.TestCase):
@@ -30,10 +30,16 @@ class TestQueryByCommittee(unittest.TestCase):
         self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 1, 2, -2])
-        self.ensemble = NICKernelRegressor()
+        self.ensemble = SklearnRegressor(
+            BaggingRegressor(
+                NICKernelRegressor(), random_state=self.random_state
+            ),
+            random_state=self.random_state,
+        )
         self.query_dict_regression_test = dict(ensemble=self.ensemble)
         self.query_dict = dict(
             ensemble=self.ensemble,
+            fit_ensemble=True,
             X=self.X,
             y=self.y,
             candidates=self.candidates,
@@ -46,7 +52,11 @@ class TestQueryByCommittee(unittest.TestCase):
 
     def test_init_param_missing_label(self):
         provide_test_regression_query_strategy_init_missing_label(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
+            self,
+            QueryByCommittee,
+            init_dict={"missing_label": MISSING_LABEL},
+            query_dict=self.query_dict_regression_test,
+            missing_label_params_query_dict=["ensemble"],
         )
 
     def test_init_param_k_boostrap(self):
@@ -159,8 +169,3 @@ class TestQueryByCommittee(unittest.TestCase):
             indices, utilities = qs.query(**self.query_dict)
             self.assertEqual(indices.shape, (1,))
             self.assertEqual(utilities.shape, (1, len(self.candidates)))
-
-    def test_logic(self):
-        provide_test_regression_query_strategy_change_dependence(
-            self, QueryByCommittee, reg_name="ensemble"
-        )

@@ -12,7 +12,11 @@ from sklearn.utils.validation import (
     check_random_state as check_random_state_sklearn,
 )
 
-from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
+from ._label import (
+    MISSING_LABEL,
+    check_missing_label,
+    is_unlabeled,
+)
 
 
 def check_scalar(
@@ -578,7 +582,8 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     else:
         if A.ndim <= dim:
             raise ValueError(
-                f"`dim` has value {dim}, but must be smaller than " f"{A.ndim}."
+                f"`dim` has value {dim}, but must be smaller than "
+                f"{A.ndim}."
             )
         if np.any(indices >= A.shape[dim]):
             raise ValueError(
