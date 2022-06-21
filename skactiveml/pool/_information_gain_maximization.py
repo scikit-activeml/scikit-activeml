@@ -6,11 +6,11 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
 )
-from skactiveml.pool.regression.utils._integration import (
+from skactiveml.utils._regression import (
     conditional_expect,
-    reshape_dist,
+    _reshape_scipy_dist,
 )
-from skactiveml.pool.regression.utils._model_fitting import update_reg
+from skactiveml.utils._regression import _update_reg
 from skactiveml.utils import (
     check_type,
     simple_batch,
@@ -52,7 +52,9 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
@@ -198,7 +200,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         prior_entropy = np.sum(reg.predict(X_eval, return_entropy=True)[1])
 
         def new_entropy(idx, x_cand, y_pot):
-            reg_new = update_reg(
+            reg_new = _update_reg(
                 reg,
                 X,
                 y,
@@ -266,7 +268,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
 
         if integration_dict_target_val is not None:
             self.integration_dict_target_val = integration_dict_target_val
@@ -274,7 +278,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             self.integration_dict_target_val = {"method": "assume_linear"}
 
         if integration_dict_cross_entropy is not None:
-            self.integration_dict_cross_entropy = integration_dict_cross_entropy
+            self.integration_dict_cross_entropy = (
+                integration_dict_cross_entropy
+            )
         else:
             self.integration_dict_cross_entropy = {
                 "method": "gauss_hermite",
@@ -417,7 +423,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         """
 
         def new_kl_divergence(idx, x_cand, y_pot):
-            reg_new = update_reg(
+            reg_new = _update_reg(
                 reg,
                 X,
                 y,
@@ -487,7 +493,7 @@ def cross_entropy(
     check_type(other_reg, "other_reg", ProbabilisticRegressor)
     random_state = check_random_state(random_state)
 
-    dist = reshape_dist(
+    dist = _reshape_scipy_dist(
         other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
     )
 

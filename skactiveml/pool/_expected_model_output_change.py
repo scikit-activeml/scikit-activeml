@@ -6,17 +6,17 @@ from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
+from skactiveml.utils._regression import conditional_expect, _update_reg
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
-from .utils._integration import conditional_expect
-from .utils._model_fitting import update_reg
+from skactiveml.utils._validation import check_callable
 
 
-class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
-    """Expected model variance reduction.
+class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
+    """Regression based Expected Model Output Change.
 
-    This class implements the active learning strategy expected model variance
-    minimization, which tries to select the sample that minimizes the expected
-    model variance.
+    This class implements an expected model output change based approach for
+    regression, where samples are queried that change the output of the model
+    the most.
 
     Parameters
     ----------
@@ -24,6 +24,10 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
+    loss: callable, optional (default=None)
+        The loss for predicting a target value instead of the true value.
+        Takes in the predicted values of an evaluation set and the true values
+        of the evaluation set and returns the error, a scalar value.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
@@ -32,18 +36,26 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Cohn, David A and Ghahramani, Zoubin and Jordan, Michael I. Active
-        learning with statistical models, pages 129--145, 1996.
+    [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
+        Oliver and Barz, Bjoern and Denzler, Joachim and AG, Carl Zeiss. Active
+        Learning for Regression Tasks with Expected Model Output Change,
+        page 103 and subsequently, 2018.
 
     """
 
     def __init__(
         self,
         integration_dict=None,
+        loss=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
+        self.loss = (
+            loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
+        )
         if integration_dict is not None:
             self.integration_dict = integration_dict
         else:
@@ -72,8 +84,8 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         reg: ProbabilisticRegressor
-            Predicts the output and the conditional distribution.
-        fit_reg : bool, optional (default=True)
+            Predicts the output and the target distribution.
+        fit_reg: bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
@@ -123,25 +135,25 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(fit_reg, "fit_reg", bool)
+        check_type(self.integration_dict, "self.integration_dict", dict)
         if X_eval is None:
             X_eval = X
         else:
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)
-        check_type(self.integration_dict, "self.integration_dict", dict)
+        check_type(fit_reg, "fit_reg", bool)
+        loss = self.loss
+        check_callable(loss, "self.loss", n_free_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)
 
-        old_model_variance = np.average(
-            reg.predict(X_eval, return_std=True)[1] ** 2
-        )
+        y_pred = reg.predict(X_eval)
 
-        def new_model_variance(idx, x_cand, y_pot):
-            reg_new = update_reg(
+        def model_output_change(idx, x_cand, y_pot):
+            reg_new = _update_reg(
                 reg,
                 X,
                 y,
@@ -151,27 +163,25 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
                 X_update=x_cand,
                 mapping=mapping,
             )
-            _, new_model_std = reg_new.predict(X_eval, return_std=True)
+            y_pred_new = reg_new.predict(X_eval)
 
-            return np.average(new_model_std**2)
+            return loss(y_pred, y_pred_new)
 
-        ex_model_variance = conditional_expect(
+        change = conditional_expect(
             X_cand,
-            new_model_variance,
+            model_output_change,
             reg,
             random_state=self.random_state_,
-            include_x=True,
             include_idx=True,
+            include_x=True,
             **self.integration_dict
         )
 
-        utilities_cand = old_model_variance - ex_model_variance
-
         if mapping is None:
-            utilities = utilities_cand
+            utilities = change
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping] = utilities_cand
+            utilities[mapping] = change
 
         return simple_batch(
             utilities,

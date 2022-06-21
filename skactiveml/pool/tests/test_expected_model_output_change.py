@@ -2,10 +2,9 @@ import unittest
 
 import numpy as np
 
-from skactiveml.pool.regression._expected_model_output_change import (
-    ExpectedModelOutputChange,
-)
-from skactiveml.pool.regression.tests.provide_test_pool_regression import (
+from skactiveml.pool import ExpectedModelOutputChange
+
+from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
     provide_test_regression_query_strategy_query_X,

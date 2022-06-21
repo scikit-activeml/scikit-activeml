@@ -1,12 +1,13 @@
 import unittest
 
 import numpy as np
+from sklearn.ensemble import BaggingRegressor
 
-from skactiveml.pool.regression import (
+from skactiveml.pool import (
     RepresentativenessDiversity,
     QueryByCommittee,
 )
-from skactiveml.pool.regression.tests.provide_test_pool_regression import (
+from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
     provide_test_regression_query_strategy_query_X,
@@ -15,7 +16,7 @@ from skactiveml.pool.regression.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_batch_size,
     provide_test_regression_query_strategy_query_return_utilities,
 )
-from skactiveml.regressor import NICKernelRegressor
+from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 
 
 class TestRepresentativenessDiversity(unittest.TestCase):
@@ -46,7 +47,14 @@ class TestRepresentativenessDiversity(unittest.TestCase):
 
         inner_qs = QueryByCommittee()
         qs = RepresentativenessDiversity(inner_qs=inner_qs)
-        self.query_dict["inner_qs_dict"] = dict(ensemble=NICKernelRegressor())
+        self.query_dict["inner_qs_dict"] = {
+            "ensemble": SklearnRegressor(
+                BaggingRegressor(
+                    NICKernelRegressor(), random_state=self.random_state
+                ),
+                random_state=self.random_state,
+            )
+        }
         indices, utilities = qs.query(**self.query_dict, return_utilities=True)
         self.assertEqual(indices.shape, (1,))
         self.assertEqual(utilities.shape, (1, len(self.candidates)))

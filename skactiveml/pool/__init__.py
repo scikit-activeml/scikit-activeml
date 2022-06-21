@@ -4,12 +4,20 @@ pool-based active learning.
 """
 
 from . import multiannotator
-from . import regression
 from . import utils
 from ._cost_embedding_al import CostEmbeddingAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
 from ._expected_error_reduction import MonteCarloEER, ValueOfInformationEER
+from ._expected_model_change import ExpectedModelChange
+from ._expected_model_output_change import ExpectedModelOutputChange
+from ._expected_model_variance import ExpectedModelVarianceReduction
 from ._four_ds import FourDs
+from ._greedy_sampling import GreedySamplingX, GreedySamplingY
+from ._information_gain_maximization import (
+    KLDivergenceMaximization,
+    cross_entropy,
+    MutualInformationGainMaximization,
+)
 from ._probabilistic_al import ProbabilisticAL, cost_reduction
 from ._query_by_committee import (
     QueryByCommittee,
@@ -18,6 +26,7 @@ from ._query_by_committee import (
 )
 from ._quire import Quire
 from ._random_sampling import RandomSampling
+from ._representativeness_and_diversity import RepresentativenessDiversity
 from ._uncertainty_sampling import (
     UncertaintySampling,
     uncertainty_scores,
@@ -26,7 +35,6 @@ from ._uncertainty_sampling import (
 
 __all__ = [
     "multiannotator",
-    "regression",
     "utils",
     "RandomSampling",
     "ProbabilisticAL",
@@ -43,4 +51,13 @@ __all__ = [
     "vote_entropy",
     "FourDs",
     "CostEmbeddingAL",
+    "ExpectedModelChange",
+    "ExpectedModelOutputChange",
+    "ExpectedModelVarianceReduction",
+    "KLDivergenceMaximization",
+    "cross_entropy",
+    "MutualInformationGainMaximization",
+    "RepresentativenessDiversity",
+    "GreedySamplingX",
+    "GreedySamplingY",
 ]

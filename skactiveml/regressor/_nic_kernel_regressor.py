@@ -1,11 +1,16 @@
 import numpy as np
 from scipy.stats import t
-from sklearn.metrics.pairwise import pairwise_kernels
+from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from skactiveml.base import ProbabilisticRegressor
-from skactiveml.utils import is_labeled, MISSING_LABEL, check_scalar
+from skactiveml.utils import (
+    is_labeled,
+    MISSING_LABEL,
+    check_scalar,
+    check_type,
+)
 
 
 class NICKernelRegressor(ProbabilisticRegressor):
@@ -37,6 +42,8 @@ class NICKernelRegressor(ProbabilisticRegressor):
         reproducible results across multiple method calls.
     """
 
+    METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
+
     def __init__(
         self,
         metric="rbf",
@@ -48,14 +55,15 @@ class NICKernelRegressor(ProbabilisticRegressor):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         self.kappa_0 = kappa_0
         self.nu_0 = nu_0
         self.mu_0 = mu_0
         self.sigma_sq_0 = sigma_sq_0
         self.metric = metric
-        self.metric_dict = {} if metric_dict is None else metric_dict
-        self.missing_label = missing_label
+        self.metric_dict = metric_dict
 
     def fit(self, X, y, sample_weight=None):
         """Fit the model using X as training data and y as class labels.
@@ -107,10 +115,18 @@ class NICKernelRegressor(ProbabilisticRegressor):
         else:
             self.weights_ = None
 
+        check_type(self.metric, "self.metric", target_vals=self.METRICS)
+        self.metric_dict = {} if self.metric_dict is None else self.metric_dict
+        check_type(
+            self.metric_dict, "self.metric_dict", dict, target_vals=[None]
+        )
+
         return self
 
     def _estimate_ml_params(self, X):
-        K = pairwise_kernels(X, self.X_, metric=self.metric, **self.metric_dict)
+        K = pairwise_kernels(
+            X, self.X_, metric=self.metric, **self.metric_dict
+        )
 
         if self.weights_ is not None:
             K = self.weights_.reshape(1, -1) * K

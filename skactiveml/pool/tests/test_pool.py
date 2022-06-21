@@ -20,7 +20,17 @@ from skactiveml.classifier import (
     SklearnClassifier,
 )
 from skactiveml.exceptions import MappingError
-from skactiveml.pool import FourDs
+from skactiveml.pool import (
+    FourDs,
+    ExpectedModelVarianceReduction,
+    ExpectedModelOutputChange,
+    GreedySamplingX,
+    GreedySamplingY,
+    RepresentativenessDiversity,
+    KLDivergenceMaximization,
+    MutualInformationGainMaximization,
+)
+from skactiveml.pool._expected_model_change import ExpectedModelChange
 from skactiveml.utils import (
     call_func,
     is_unlabeled,
@@ -31,9 +41,22 @@ from skactiveml.utils import (
 from skactiveml.utils._label import check_equal_missing_label
 
 
+REGRESSION_STRATEGIES = [
+    ExpectedModelChange,
+    ExpectedModelVarianceReduction,
+    ExpectedModelOutputChange,
+    KLDivergenceMaximization,
+    MutualInformationGainMaximization,
+    GreedySamplingX,
+    GreedySamplingY,
+    RepresentativenessDiversity,
+]
+
+
 class TestGeneral(unittest.TestCase):
     def setUp(self):
         self.MISSING_LABEL = MISSING_LABEL
+
         self.X, self.y_true = make_blobs(
             n_samples=10,
             n_features=2,
@@ -65,8 +88,10 @@ class TestGeneral(unittest.TestCase):
         self.query_strategies = {}
         for qs_name in pool.__all__:
             qs = getattr(pool, qs_name)
-            if inspect.isclass(qs) and issubclass(
-                qs, SingleAnnotatorPoolQueryStrategy
+            if (
+                inspect.isclass(qs)
+                and issubclass(qs, SingleAnnotatorPoolQueryStrategy)
+                and qs not in REGRESSION_STRATEGIES
             ):
                 self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())
@@ -225,7 +250,9 @@ class TestGeneral(unittest.TestCase):
                         ensemble=self.ensemble,
                         return_utilities=True,
                     )
-                    np.testing.assert_allclose(u1[0][unld_idx], u2[0][unld_idx])
+                    np.testing.assert_allclose(
+                        u1[0][unld_idx], u2[0][unld_idx]
+                    )
 
                 try:
                     unld_idx = unlabeled_indices(y, self.MISSING_LABEL)
@@ -483,12 +510,14 @@ class TestExamples(unittest.TestCase):
     def setUp(self):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.json_path = path.join(self.skaml_path, "docs", "examples", "pool")
-        self.exceptions = []
+        self.exceptions = [qs.__name__ for qs in REGRESSION_STRATEGIES]
         self.working_dir = os.curdir
 
     def test_pool_example_files(self):
         # Temporary generate the examples from the json files.
-        examples_path = path.join(self.skaml_path, "docs", "temp_examples_pool")
+        examples_path = path.join(
+            self.skaml_path, "docs", "temp_examples_pool"
+        )
         generate_examples(examples_path, pool, self.json_path)
 
         # Execute the examples.

@@ -11,7 +11,7 @@ from sklearn.svm import SVC
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.regressor._wrapper import (
     SklearnRegressor,
-    SklearnProbabilisticRegressor,
+    SklearnNormalRegressor,
 )
 from skactiveml.utils import MISSING_LABEL
 
@@ -137,15 +137,13 @@ class TestSklearnProbabilisticRegressor(unittest.TestCase):
         self.X_cand = np.array([[2, 1], [3, 5]])
 
     def test_predict_target_distribution(self):
-        reg = SklearnProbabilisticRegressor(
-            estimator=GaussianProcessRegressor()
-        )
+        reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         reg.fit(self.X, self.y)
 
         y_pred = reg.predict_target_distribution(self.X_cand).logpdf(0)
         self.assertEqual(y_pred.shape, (len(self.X_cand),))
 
-        reg = SklearnProbabilisticRegressor(estimator=LinearRegression())
+        reg = SklearnNormalRegressor(estimator=LinearRegression())
         reg.fit(self.X, self.y)
         self.assertRaises(
             ValueError, reg.predict_target_distribution, self.X_cand

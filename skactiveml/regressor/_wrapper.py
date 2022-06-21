@@ -1,6 +1,7 @@
 import inspect
 import warnings
 from copy import deepcopy
+from operator import attrgetter
 
 import numpy as np
 from scipy.stats import norm
@@ -39,7 +40,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     def __init__(
         self, estimator, missing_label=MISSING_LABEL, random_state=None
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         self.estimator = estimator
 
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
@@ -65,6 +68,49 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             The SklearnRegressor is fitted on the training data.
         """
 
+        return self._fit(
+            fit_function="fit",
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            **fit_kwargs,
+        )
+
+    @_available_if("partial_fit", hasattr(metaestimators, "available_if"))
+    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+        """Partially fitting the model using X as training data and y as class
+        labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the numeric labels of the training samples.
+            Missing labels are represented the attribute 'missing_label'.
+            In case of multiple labels per sample (i.e., n_outputs > 1), the
+            samples are duplicated.
+        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+            It contains the weights of the training samples' numeric labels. It
+            must have the same shape as y.
+        fit_kwargs : dict-like
+            Further parameters as input to the 'fit' method of the 'estimator'.
+
+        Returns
+        -------
+        self : SklearnRegressor,
+            The SklearnRegressor is fitted on the training data.
+        """
+        return self._fit(
+            fit_function="partial_fit",
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            **fit_kwargs,
+        )
+
+    def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
+
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
                 "'{}' must be a scikit-learn "
@@ -83,7 +129,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             "dtype": None,
         }
 
-        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(
+            X, y, sample_weight, check_X_dict=self.check_X_dict
+        )
 
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
         X_labeled = X[is_lbld]
@@ -101,7 +149,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             self._label_mean = np.mean(y[is_lbld])
             self._label_std = np.std(y[is_lbld]) if np.sum(is_lbld) > 1 else 1
             try:
-                self.estimator_.fit(X_labeled, y_labeled, **estimator_params)
+                attrgetter(fit_function)(self.estimator_)(
+                    X_labeled, y_labeled, **estimator_params
+                )
             except Exception as e:
                 warnings.warn(
                     f"The 'estimator' could not be fitted because of"
@@ -189,8 +239,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             return getattr(self.estimator, item)
 
 
-class SklearnProbabilisticRegressor(ProbabilisticRegressor, SklearnRegressor):
-    """SklearnProbabilisticRegressor
+class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
+    """SklearnNormalRegressor
 
     Implementation of a wrapper class for scikit-learn probabilistic regressors
     such that missing labels can be handled and the target distribution can be
@@ -219,8 +269,8 @@ class SklearnProbabilisticRegressor(ProbabilisticRegressor, SklearnRegressor):
         )
 
     def predict_target_distribution(self, X):
-        """Returns the estimated target distribution conditioned on the test
-        samples `X`.
+        """Returns the estimated target normal distribution conditioned on the
+        test samples `X`.
 
         Parameters
         ----------

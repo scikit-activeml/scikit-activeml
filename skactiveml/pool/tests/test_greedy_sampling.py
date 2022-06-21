@@ -4,7 +4,7 @@ import numpy as np
 
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.pool.regression import GreedySamplingX, GreedySamplingY
-from skactiveml.pool.regression.tests.provide_test_pool_regression import (
+from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
     provide_test_regression_query_strategy_query_X,
@@ -26,7 +26,9 @@ class TestGreedySamplingX(unittest.TestCase):
         self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.y = np.array([0, 1, 2, -2])
-        self.query_kwargs = dict(X=self.X, y=self.y, candidates=self.candidates)
+        self.query_kwargs = dict(
+            X=self.X, y=self.y, candidates=self.candidates
+        )
 
     def test_init_param_random_state(self):
         provide_test_regression_query_strategy_init_random_state(
@@ -97,11 +99,15 @@ class TestGreedySamplingY(unittest.TestCase):
 
     def test_init_param_x_metric(self):
         self.query_kwargs["y"] = np.full(len(self.y), MISSING_LABEL)
-        qs = GreedySamplingY(x_metric="illegal", random_state=self.random_state)
+        qs = GreedySamplingY(
+            x_metric="illegal", random_state=self.random_state
+        )
         self.assertRaises(ValueError, qs.query, **self.query_kwargs)
 
     def test_init_param_y_metric(self):
-        qs = GreedySamplingY(y_metric="illegal", random_state=self.random_state)
+        qs = GreedySamplingY(
+            y_metric="illegal", random_state=self.random_state
+        )
         self.assertRaises(ValueError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):

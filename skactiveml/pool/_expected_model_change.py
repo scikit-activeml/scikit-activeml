@@ -1,34 +1,39 @@
 import numpy as np
 from sklearn import clone
-from sklearn.utils import check_array
 
 from skactiveml.base import (
-    ProbabilisticRegressor,
+    SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.pool.regression.utils._integration import conditional_expect
-from skactiveml.pool.regression.utils._model_fitting import update_reg
-from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
+from skactiveml.utils._regression import bootstrap_estimators
+from skactiveml.utils import (
+    check_type,
+    simple_batch,
+    check_scalar,
+    MISSING_LABEL,
+)
 from skactiveml.utils._validation import check_callable
 
 
-class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Expected Model Output Change.
+class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
+    """Expected Model Change.
 
-    This class implements an expected model output change based approach for
-    regression, where samples are queried that change the output of the model
-    the most.
+    This class implements expected model change, an active learning
+    query strategy for linear regression.
 
     Parameters
     ----------
-    integration_dict: dict, optional (default=None)
-        Dictionary for integration arguments, i.e. `integration method` etc.,
-        used for calculating the expected `y` value for the candidate samples.
-        For details see method `conditional_expect`.
-    loss: callable, optional (default=None)
-        The loss for predicting a target value instead of the true value.
-        Takes in the predicted values of an evaluation set and the true values
-        of the evaluation set and returns the error, a scalar value.
+    k_bootstraps: int, optional (default=3)
+        The number of bootstraps used to estimate the true model.
+    n_train: int or float, optional (default=0.5)
+        The size of a bootstrap compared to the training data.
+    ord: int or string, optional (default=2)
+        The Norm to measure the gradient. Argument will be passed to
+        `np.linalg.norm`.
+    feature_map: callable, optional (default=None)
+        The feature map of the linear regressor. Takes in the feature data. Must
+        output a np.array of dimension 2. The default value is the identity
+        function.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
@@ -37,28 +42,29 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
-        Oliver and Barz, Bjoern and Denzler, Joachim and AG, Carl Zeiss. Active
-        Learning for Regression Tasks with Expected Model Output Change,
-        page 103 and subsequently, 2018.
+    [1] Cai, Wenbin, Ya Zhang, and Jun Zhou. Maximizing expected model change
+    for active learning in regression, pages 51--60, 2013.
 
     """
 
     def __init__(
         self,
-        integration_dict=None,
-        loss=None,
+        k_bootstraps=3,
+        n_train=0.5,
+        ord=2,
+        feature_map=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
-        self.loss = (
-            loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
         )
-        if integration_dict is not None:
-            self.integration_dict = integration_dict
-        else:
-            self.integration_dict = {"method": "assume_linear"}
+        self.k_bootstraps = k_bootstraps
+        self.n_train = n_train
+        self.ord = ord
+        self.feature_map = (
+            feature_map if feature_map is not None else lambda x: x
+        )
 
     def query(
         self,
@@ -68,7 +74,6 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         fit_reg=True,
         sample_weight=None,
         candidates=None,
-        X_eval=None,
         batch_size=1,
         return_utilities=False,
     ):
@@ -82,9 +87,10 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        reg: ProbabilisticRegressor
-            Predicts the output and the target distribution.
-        fit_reg: bool, optional (default=True)
+        reg: SkactivemlRegressor
+            Regressor to predict the data. Assumes a linear regressor with respect
+            to the parameters.
+        fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
@@ -99,10 +105,6 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X).
-        X_eval : array-like of shape (n_eval_samples, n_features),
-        optional (default=None)
-            Evaluation data set that is used for estimating the probability
-            distribution of the feature space.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -129,62 +131,57 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        check_type(reg, "reg", ProbabilisticRegressor)
-        check_type(self.integration_dict, "self.integration_dict", dict)
-        if X_eval is None:
-            X_eval = X
-        else:
-            X_eval = check_array(X_eval)
-            self._check_n_features(X_eval, reset=False)
+        check_type(reg, "reg", SkactivemlRegressor)
         check_type(fit_reg, "fit_reg", bool)
-        loss = self.loss
-        check_callable(loss, "self.loss", n_free_parameters=2)
-
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        check_scalar(
+            self.n_train,
+            "self.n_train",
+            (int, float),
+            min_val=0,
+            max_val=1,
+            min_inclusive=False,
+        )
+        check_scalar(self.k_bootstraps, "self.k_bootstraps", int, min_val=1)
+        check_callable(self.feature_map, "self.feature_map")
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)
 
-        y_pred = reg.predict(X_eval)
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        def model_output_change(idx, x_cand, y_pot):
-            reg_new = update_reg(
-                reg,
-                X,
-                y,
-                sample_weight=sample_weight,
-                y_update=y_pot,
-                idx_update=idx,
-                X_update=x_cand,
-                mapping=mapping,
-            )
-            y_pred_new = reg_new.predict(X_eval)
-
-            return loss(y_pred, y_pred_new)
-
-        change = conditional_expect(
-            X_cand,
-            model_output_change,
+        learners = bootstrap_estimators(
             reg,
+            X,
+            y,
+            k_bootstrap=self.k_bootstraps,
+            n_train=self.n_train,
+            sample_weight=sample_weight,
             random_state=self.random_state_,
-            include_idx=True,
-            include_x=True,
-            **self.integration_dict
         )
 
+        results_learner = np.array(
+            [learner.predict(X_cand) for learner in learners]
+        )
+        pred = reg.predict(X_cand).reshape(1, -1)
+        scalars = np.average(np.abs(results_learner - pred), axis=0)
+        X_cand_mapped_features = self.feature_map(X_cand)
+        norms = np.linalg.norm(X_cand_mapped_features, ord=self.ord, axis=1)
+        utilities_cand = np.multiply(scalars, norms)
+
         if mapping is None:
-            utilities = change
+            utilities = utilities_cand
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping] = change
+            utilities[mapping] = utilities_cand
 
         return simple_batch(
             utilities,
+            self.random_state_,
             batch_size=batch_size,
-            random_state=self.random_state_,
             return_utilities=return_utilities,
         )

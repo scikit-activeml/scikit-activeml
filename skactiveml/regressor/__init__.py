@@ -7,12 +7,12 @@ from skactiveml.regressor._nadaraya_watson_regressor import (
 from skactiveml.regressor._nic_kernel_regressor import NICKernelRegressor
 from skactiveml.regressor._wrapper import (
     SklearnRegressor,
-    SklearnProbabilisticRegressor,
+    SklearnNormalRegressor,
 )
 
 __all__ = [
     "NICKernelRegressor",
     "NadarayaWatsonRegressor",
     "SklearnRegressor",
-    "SklearnProbabilisticRegressor",
+    "SklearnNormalRegressor",
 ]

@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.pool.regression import ExpectedModelChange
-from skactiveml.pool.regression.tests.provide_test_pool_regression import (
+from skactiveml.pool import ExpectedModelChange
+from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
     provide_test_regression_query_strategy_query_X,
