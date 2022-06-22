@@ -51,7 +51,7 @@ class TestQueryByCommittee(unittest.TestCase):
         for method in ["test", 0]:
             selector = QueryByCommittee(method=method)
             self.assertRaises(
-                ValueError,
+                TypeError,
                 selector.query,
                 candidates=self.candidates,
                 X=self.X,
@@ -324,22 +324,6 @@ class TestQueryByCommitteeForRegression(unittest.TestCase):
             query_dict=self.query_dict_regression_test,
             missing_label_params_query_dict=["ensemble"],
         )
-
-    def test_init_param_k_boostrap(self):
-        for illegal_k_boostrap in [7.4, "illegal"]:
-            self.query_dict["ensemble"] = illegal_k_boostrap
-            qs = QueryByCommittee()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.query_dict
-            )
-
-    def test_init_param_n_train(self):
-        for illegal_k_boostrap in [6.0, "illegal"]:
-            self.query_dict["ensemble"] = illegal_k_boostrap
-            qs = QueryByCommittee()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.query_dict
-            )
 
     def test_query_param_X(self):
         provide_test_regression_query_strategy_query_X(

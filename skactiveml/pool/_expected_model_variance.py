@@ -7,7 +7,7 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
-from skactiveml.utils._regression import conditional_expect, _update_reg
+from skactiveml.pool.utils import _update_reg, conditional_expect
 
 
 class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):

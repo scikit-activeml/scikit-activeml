@@ -235,13 +235,44 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_type, 10, "a", str, bool)
         self.assertRaises(TypeError, check_type, 10, "a", str, bool, map, list)
         check_type(10, "a", int)
-        check_type("number", "a", "number")
-        self.assertRaises(TypeError, check_type, 10, "a", str, 12)
+        check_type("number", "a", target_vals=["number"])
+        self.assertRaises(
+            TypeError, check_type, "number", "a", target_vals=["nonumber"]
+        )
+        self.assertRaises(
+            TypeError, check_type, 10, "a", str, target_vals=[12]
+        )
+
+        def is_prime(x):
+            return (
+                len(list(filter(lambda n: x % n == 0, range(1, x + 1)))) == 2
+            )
+
+        self.assertRaises(
+            TypeError, check_type, 10, "a", indicator_funcs=[is_prime]
+        )
+        self.assertRaises(
+            TypeError, check_type, 10, "a", str, indicator_funcs=[is_prime]
+        )
+        check_type(7, "a", str, indicator_funcs=[is_prime])
+        self.assertRaises(
+            TypeError,
+            check_type,
+            10,
+            "a",
+            dict,
+            target_vals=["undefined"],
+            indicator_funcs=[is_prime],
+        )
 
     def test_check_callable(self):
 
         self.assertRaises(
-            ValueError, check_callable, lambda x: x, "name", n_free_parameters=2
+            ValueError,
+            check_callable,
+            lambda x: x,
+            "name",
+            n_free_parameters=2,
         )
 
         self.assertRaises(

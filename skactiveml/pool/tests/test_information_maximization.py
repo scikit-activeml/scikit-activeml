@@ -3,10 +3,9 @@ import unittest
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 
-from skactiveml.pool.regression import (
+from skactiveml.pool import (
     MutualInformationGainMaximization,
     KLDivergenceMaximization,
-    cross_entropy,
 )
 from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
@@ -165,42 +164,6 @@ class TestKLDivergenceMaximization(unittest.TestCase):
         provide_test_regression_query_strategy_query_X_eval(
             self, KLDivergenceMaximization
         )
-
-    def test_cross_entropy(self):
-        X_1 = np.arange(3 * 2).reshape(3, 2)
-        y_1 = np.arange(3, dtype=float) + 2
-        X_2 = np.arange(5 * 2).reshape(5, 2)
-        y_2 = 2 * np.arange(5, dtype=float) - 5
-        reg_1 = NICKernelRegressor().fit(X_1, y_1)
-        reg_2 = NICKernelRegressor().fit(X_2, y_2)
-
-        result = cross_entropy(X_eval=X_1, true_reg=reg_1, other_reg=reg_2)
-        self.assertEqual(y_1.shape, result.shape)
-
-        for name, val in [
-            ("X_eval", "illegal"),
-            (
-                "true_reg",
-                SklearnRegressor(GaussianProcessRegressor()).fit(X_1, y_1),
-            ),
-            (
-                "other_reg",
-                SklearnRegressor(GaussianProcessRegressor()).fit(X_1, y_1),
-            ),
-            ("random_state", "illegal"),
-            ("integration_dict", "illegal"),
-        ]:
-            cross_entropy_dict = dict(
-                X_eval=X_1,
-                true_reg=reg_1,
-                other_reg=reg_2,
-                random_state=self.random_state,
-                integration_dict={},
-            )
-            cross_entropy_dict[name] = val
-            self.assertRaises(
-                (TypeError, ValueError), cross_entropy, **cross_entropy_dict
-            )
 
     def test_logic(self):
         provide_test_regression_query_strategy_change_dependence(

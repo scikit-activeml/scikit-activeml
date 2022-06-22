@@ -5,7 +5,7 @@ from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils._regression import bootstrap_estimators
+from skactiveml.pool.utils import bootstrap_estimators
 from skactiveml.utils import (
     check_type,
     simple_batch,

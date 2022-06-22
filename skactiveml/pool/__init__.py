@@ -16,9 +16,9 @@ from ._four_ds import FourDs
 from ._greedy_sampling import GreedySamplingX, GreedySamplingY
 from ._information_gain_maximization import (
     KLDivergenceMaximization,
-    cross_entropy,
     MutualInformationGainMaximization,
 )
+from .utils import cross_entropy
 from ._probabilistic_al import ProbabilisticAL, cost_reduction
 from ._query_by_committee import (
     QueryByCommittee,
@@ -56,10 +56,10 @@ __all__ = [
     "ExpectedModelOutputChange",
     "ExpectedModelVarianceReduction",
     "KLDivergenceMaximization",
-    "cross_entropy",
     "MutualInformationGainMaximization",
     "RepresentativenessDiversity",
     "GreedySamplingX",
     "GreedySamplingY",
+    "cross_entropy",
     "DiscriminativeAL",
 ]

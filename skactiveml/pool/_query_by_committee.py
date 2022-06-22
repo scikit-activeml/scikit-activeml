@@ -86,7 +86,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.)
-        ensemble : list or tuple of SkactivemlClassifier, list or tuple of
+        ensemble : list or tuple of SkactivemlClassifier or list or tuple of
         SkactivemlRegressor, SkactivemlClassifier or SkactivemlRegressor
             If `ensemble` is a `SkactivemlClassifier` or a `SkactivemlRegressor`
             , it must have `n_estimators` and `estimators_` after fitting as
@@ -144,27 +144,22 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         # Validate classifier type.
         check_type(fit_ensemble, "fit_ensemble", bool)
 
-        check_ensemble_dict = {
-            "ensemble": ensemble,
-            "X": X,
-            "y": y,
-            "sample_weight": sample_weight,
-            "fit_ensemble": fit_ensemble,
-            "missing_label": self.missing_label_,
-            "estimator_types": [SkactivemlClassifier, SkactivemlRegressor],
-        }
-        if isinstance(ensemble, SkactivemlClassifier) or (
-            isinstance(ensemble, list)
-            and isinstance(ensemble[0], SkactivemlClassifier)
-        ):
-            # Check attributed `method`.
-            if self.method not in ["KL_divergence", "vote_entropy"]:
-                raise ValueError(
-                    f"The given method {self.method} is not valid. "
-                    f"Supported methods are 'KL_divergence' and 'vote_entropy'"
-                )
-
-            ensemble, est_arr, classes = _check_ensemble(**check_ensemble_dict)
+        ensemble, est_arr, classes = _check_ensemble(
+            ensemble=ensemble,
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            fit_ensemble=fit_ensemble,
+            missing_label=self.missing_label_,
+            estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
+        )
+        # classes is None if the ensemble is a regressor
+        if classes is not None:
+            check_type(
+                self.method,
+                "method",
+                target_vals=["KL_divergence", "vote_entropy"],
+            )
 
             # Compute utilities.
             if self.method == "KL_divergence":
@@ -176,8 +171,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 votes = np.array([est.predict(X_cand) for est in est_arr]).T
                 utilities_cand = vote_entropy(votes, classes)
 
-        else:  # ensemble is a regressor or an array of regressors
-            ensemble, est_arr = _check_ensemble(**check_ensemble_dict)
+        else:
             results = np.array(
                 [learner.predict(X_cand) for learner in est_arr]
             )
@@ -304,14 +298,16 @@ def _check_ensemble(
             if estimator_type == SkactivemlClassifier:
                 return ensemble, est_arr, ensemble.classes_
             else:
-                return ensemble, est_arr
+                return ensemble, est_arr, None
 
         elif isinstance(ensemble, (list, tuple)) and isinstance(
             ensemble[0], estimator_type
         ):
             est_arr = copy.deepcopy(ensemble)
             for i in range(len(est_arr)):
-                check_type(est_arr[i], f"ensemble[{i}]", estimator_type)
+                check_type(
+                    est_arr[i], f"ensemble[{i}]", estimator_type
+                )  # better error message
                 check_equal_missing_label(
                     est_arr[i].missing_label, missing_label
                 )
@@ -331,7 +327,7 @@ def _check_ensemble(
             if estimator_type == SkactivemlClassifier:
                 return ensemble, est_arr, est_arr[0].classes_
             else:
-                return ensemble, est_arr
+                return ensemble, est_arr, None
 
     raise TypeError(
         f"`ensemble` must either be a `{estimator_types} "

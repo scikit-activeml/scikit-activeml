@@ -6,16 +6,16 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
 )
-from skactiveml.utils._regression import (
+
+from skactiveml.pool.utils import (
+    _update_reg,
     conditional_expect,
-    _reshape_scipy_dist,
+    cross_entropy,
 )
-from skactiveml.utils._regression import _update_reg
 from skactiveml.utils import (
     check_type,
     simple_batch,
     MISSING_LABEL,
-    check_random_state,
 )
 
 
@@ -458,52 +458,3 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         )
 
         return kl_div
-
-
-def cross_entropy(
-    X_eval, true_reg, other_reg, integration_dict=None, random_state=None
-):
-    """Calculates the cross entropy.
-
-    Parameters
-    ----------
-    X_eval : array-like of shape (n_samples, n_features)
-        The samples where the cross entropy should be evaluated.
-    true_reg: ProbabilisticRegressor
-        True distribution of the cross entropy.
-    other_reg: ProbabilisticRegressor
-        Evaluated distribution of the cross entropy.
-    integration_dict: dict, optional default = None
-        Dictionary for integration arguments, i.e. `integration method` etc..
-        For details see method `conditional_expect`.
-    random_state: numeric | np.random.RandomState, optional
-        Random state for cross entropy calculation.
-
-    Returns
-    -------
-    cross_ent : numpy.ndarray of shape (n_samples)
-        The cross entropy.
-    """
-
-    if integration_dict is None:
-        integration_dict = {}
-
-    check_type(integration_dict, "integration_dict", dict)
-    check_type(true_reg, "true_reg", ProbabilisticRegressor)
-    check_type(other_reg, "other_reg", ProbabilisticRegressor)
-    random_state = check_random_state(random_state)
-
-    dist = _reshape_scipy_dist(
-        other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
-    )
-
-    cross_ent = -conditional_expect(
-        X_eval,
-        dist.logpdf,
-        reg=true_reg,
-        random_state=random_state,
-        **integration_dict,
-        vector_func="both"
-    )
-
-    return cross_ent

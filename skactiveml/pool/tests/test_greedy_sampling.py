@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.base import SkactivemlRegressor
-from skactiveml.pool.regression import GreedySamplingX, GreedySamplingY
+from skactiveml.pool import GreedySamplingX, GreedySamplingY
 from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,

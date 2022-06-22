@@ -130,7 +130,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         }
 
         X, y, sample_weight = self._validate_data(
-            X, y, sample_weight, check_X_dict=self.check_X_dict
+            X, y, sample_weight, check_X_dict=self.check_X_dict_
         )
 
         is_lbld = is_labeled(y, missing_label=self.missing_label_)

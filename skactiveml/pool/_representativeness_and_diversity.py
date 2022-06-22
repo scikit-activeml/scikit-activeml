@@ -3,7 +3,12 @@ from scipy.stats import rankdata
 from sklearn.cluster import KMeans
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
-from skactiveml.utils import is_labeled, check_type, simple_batch, MISSING_LABEL
+from skactiveml.utils import (
+    is_labeled,
+    check_type,
+    simple_batch,
+    MISSING_LABEL,
+)
 from skactiveml.utils._selection import combine_ranking
 
 
@@ -40,7 +45,9 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(random_state=random_state, missing_label=missing_label)
+        super().__init__(
+            random_state=random_state, missing_label=missing_label
+        )
         self.inner_qs = inner_qs
         self.X_ = None
         self.k_means_ = None
@@ -112,9 +119,12 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(
-            self.inner_qs, "self.qs", SingleAnnotatorPoolQueryStrategy, None
+            self.inner_qs,
+            "self.qs",
+            SingleAnnotatorPoolQueryStrategy,
+            target_vals=[None],
         )
-        check_type(inner_qs_dict, "qs_dict", dict, None)
+        check_type(inner_qs_dict, "qs_dict", dict, target_vals=[None])
         if inner_qs_dict is None:
             inner_qs_dict = {}
 
@@ -177,7 +187,8 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
             )
             cand_clusters = self.k_means_.predict(X_cand)
             cluster_ranking = rankdata(
-                combine_ranking(-l_sample_count, t_sample_count), method="dense"
+                combine_ranking(-l_sample_count, t_sample_count),
+                method="dense",
             )
             sorted_clusters = np.argsort(cluster_ranking)
 

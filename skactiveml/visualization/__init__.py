@@ -2,7 +2,7 @@
 The :mod:`skactiveml.visualization` module includes various tools for
 visualization.
 """
-from ._data_set import gaussian_noise_generator_1d, sample_generator_1d
+from ._data_sets import gaussian_noise_generator_1d, sample_generator_1d
 from ._feature_space import (
     plot_utilities,
     plot_decision_boundary,
