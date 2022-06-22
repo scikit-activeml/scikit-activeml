@@ -33,8 +33,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     Parameters
     ----------
     method : string, default='KL_divergence'
-        The method to calculate the disagreement. KL_divergence or
-        vote_entropy are possible.
+        The method to calculate the disagreement in the case of classification.
+        KL_divergence or vote_entropy are possible. In the case of regression
+        the empirical variance is used.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state: numeric or np.random.RandomState, default=None
