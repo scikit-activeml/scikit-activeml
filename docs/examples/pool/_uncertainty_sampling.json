@@ -1,12 +1,13 @@
 [
   {
     "class" : "UncertaintySampling",
+    "package" : "pool",
     "method" : "Uncertainty Sampling with Margin",
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Uncertainty Sampling with Margin",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -18,12 +19,13 @@
   },
   {
     "class" : "UncertaintySampling",
+    "package" : "pool",
     "method" : "Uncertainty Sampling with Least-Confidence",
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Uncertainty Sampling with Least-Confidence",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -34,12 +36,13 @@
   },
   {
     "class" : "UncertaintySampling",
+    "package" : "pool",
     "method" : "Uncertainty Sampling with Entropy",
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Uncertainty Sampling with Entropy",
     "refs" : ["settles2009active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -50,12 +53,13 @@
   },
   {
     "class" : "UncertaintySampling",
+    "package" : "pool",
     "method" : "Expected Average Precision",
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title": "Expected Average Precision",
     "refs": [
       "wang2018uncertainty"

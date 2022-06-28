@@ -1,12 +1,13 @@
 [
   {
     "class" : "Quire",
+    "package" : "pool",
     "method" : "Querying Informative and Representative Examples (QUIRE)",
     "categories" : {
       "Settles2012" : ""
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Querying Informative and Representative Examples",
     "refs" : ["huang2010active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

@@ -1,12 +1,13 @@
 [
   {
     "class" : "CostEmbeddingAL",
+    "package" : "pool",
     "method" : "Active Learning with Cost Embedding (ALCE)",
     "categories" : {
       "Settles2012" : ""
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Active Learning with Cost Embedding",
     "refs" : ["huang2016novel"],
     "sequence" : ["title", "text_0", "plot", "refs"],

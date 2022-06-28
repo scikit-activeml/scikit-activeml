@@ -1,12 +1,13 @@
 [
   {
     "class" : "EpistemicUncertaintySampling",
+    "package" : "pool",
     "method" : "Epistemic Uncertainty Sampling",
     "categories" : {
       "Settles2012" : "Uncertainty Sampling"
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Epistemic Uncertainty Sampling",
     "refs" : ["nguyen2019epistemic"],
     "sequence" : ["title", "text_0", "plot", "refs"],

@@ -150,7 +150,12 @@ html_theme_options = {
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = []
+html_static_path = ['_static']
+
+html_js_files = [
+    "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js",
+    "filter_examples.js"
+]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -222,7 +227,6 @@ if True:
 
     examples_data = generate_examples(
         gen_path=os.path.abspath('generated/examples'),
-        package=skactiveml,
         json_path=os.path.abspath('examples'))
 
     generate_strategy_overview_rst(
