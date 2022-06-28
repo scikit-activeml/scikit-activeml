@@ -64,8 +64,14 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_metric_dict(self):
-        query_strategy = StreamProbabilisticAL(metric_dict=["gamma"])
-        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL(
+            metric="rbf", metric_dict=["gamma"]
+        )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL(
+            metric="rbf", metric_dict={"test": 0}
+        )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_metric(self):
         query_strategy = StreamProbabilisticAL(metric="string")
@@ -75,7 +81,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         query_strategy = StreamProbabilisticAL()
         clf = SklearnClassifier(GaussianNB())
         self.assertRaises(
-            ValueError,
+            TypeError,
             query_strategy.query,
             candidates=self.candidates,
             clf=clf,
@@ -85,7 +91,11 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         query_strategy = StreamProbabilisticAL(metric="rbf")
         clf = SklearnClassifier(GaussianNB())
         query_strategy.query(
-            candidates=self.candidates, clf=clf, X=self.X, y=self.y, fit_clf=True
+            candidates=self.candidates,
+            clf=clf,
+            X=self.X,
+            y=self.y,
+            fit_clf=True,
         )
 
     def test_init_param_random_state(self):

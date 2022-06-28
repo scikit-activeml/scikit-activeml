@@ -21,6 +21,7 @@ from ..utils import (
 
 class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     """Probabilistic Active Learning in Datastreams.
+
     Probabilistic Active Learning in Datastreams (StreamProbabilisticAL) is an
     extension to Multi-Class Probabilistic Active Learning (McPAL)
     (see pool.ProbabilisticAL). It assesses McPAL spatial to assess the spatial
@@ -28,6 +29,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     (BalancedIncrementalQuantileFilter), that is implemented within the
     default budget manager, is used to evaluate the temporal utility
     (see stream.budgetmanager.BalancedIncrementalQuantileFilter).
+
     Parameters
     ----------
     budget : float, default=None
@@ -61,6 +63,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     m_max : float
         The m_max value that is passed onto ProbabilisticAL
         (see pool.ProbabilisticAL).
+
     References
     ----------
     [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active
@@ -98,6 +101,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities=False,
     ):
         """Ask the query strategy which instances in candidates to acquire.
+
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape
@@ -121,6 +125,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool, optional
             If true, also return the utilities based on the query strategy.
             The default is False.
+
         Returns
         -------
         queried_indices : ndarray of shape (n_queried_instances,)
@@ -149,7 +154,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             utility_weight=utility_weight,
             return_utilities=return_utilities,
         )
-        frequencies = self.predict_freq_(X=candidates)
+        frequencies = self.predict_freq_callback(X=candidates)
         if self.metric is not None:
             marginal_frequencies = np.sum(frequencies, axis=1, keepdims=True)
             pred_proba = clf.predict_proba(candidates)
@@ -170,7 +175,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     def update(
         self, candidates, queried_indices, budget_manager_param_dict=None
     ):
-        """Updates the budget manager
+        """Updates the budget manager.
+
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape
@@ -181,6 +187,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Indicates which instances from candidates have been queried.
         budget_manager_param_dict : kwargs, optional
             Optional kwargs for budgetmanager.
+
         Returns
         -------
         self : StreamProbabilisticAL
@@ -373,7 +380,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
 
     def _validate_kernel(self, clf, X, y, sample_weight):
         """Validate if a kernel is used or the clf `predict_freq`. If a kernel
-        is given a ParzenWindowClassifier is trained using X, y and 
+        is given a ParzenWindowClassifier is trained using X, y and
         sample_weight.
         Parameters
         ----------
@@ -388,10 +395,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         """
         if self.metric is None:
             if hasattr(clf, "predict_freq"):
-                self.predict_freq_ = clf.predict_freq
+                self.predict_freq_callback = clf.predict_freq
             else:
-                raise ValueError(
-                    "clf has no predict_freq and " + "metric was set to None"
+                raise TypeError(
+                    "clf has no predict_freq and metric was set to None"
                 )
         else:
             if not hasattr(self, "_pwc"):
@@ -401,7 +408,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
                     missing_label=clf.missing_label,
                     classes=clf.classes,
                 )
-                self.predict_freq_ = self._pwc.predict_freq
+                self.predict_freq_callback = self._pwc.predict_freq
             self._pwc.fit(X=X, y=y, sample_weight=sample_weight)
 
     def _validate_utility_weight(self, utility_weight, candidates):
