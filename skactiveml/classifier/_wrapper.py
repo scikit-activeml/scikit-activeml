@@ -495,12 +495,15 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         self._add_samples("partial_fit", X, y, sample_weight)
 
-        if hasattr(self.estimator, "partial_fit") and not self.ignore_estimator_partial_fit:
+        if (
+            hasattr(self.estimator, "partial_fit")
+            and not self.ignore_estimator_partial_fit
+        ):
             warnings.warn(
-                    "The partial_fit method in estimator is used but the "
-                    "sliding window has no effect. To avoid this set "
-                    "`ignore_estimator_partial_fit`=True"
-                )
+                "The partial_fit method in estimator is used but the "
+                "sliding window has no effect. To avoid this set "
+                "`ignore_estimator_partial_fit`=True"
+            )
             return self._fit(
                 "partial_fit",
                 X=X,
@@ -584,9 +587,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         return self
 
-    def _validate_data(
-        self, X, y, sample_weight=None, check_X_dict=None
-    ):
+    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None):
         # super._validate_data is not called because training with partial fit
         # with only one single available class in y leads to an error if
         # self.classes is not set, even though self.classes has no function in
@@ -653,7 +654,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         _ = is_labeled(y, missing_label=self.missing_label)
 
         check_equal_missing_label(
-            self.missing_label, self.estimator.missing_label,
+            self.missing_label,
+            self.estimator.missing_label,
         )
         # if self.classes=None or self.estimator.classes=None then no checks
         # are done if general test is removed it should be checked again

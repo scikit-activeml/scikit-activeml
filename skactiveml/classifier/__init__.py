@@ -10,5 +10,5 @@ __all__ = [
     "ParzenWindowClassifier",
     "MixtureModelClassifier",
     "SklearnClassifier",
-    "SlidingWindowClassifier"
+    "SlidingWindowClassifier",
 ]

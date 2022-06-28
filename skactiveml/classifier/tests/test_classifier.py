@@ -120,10 +120,10 @@ class TestClassifier(unittest.TestCase):
             self.assertRaises(ValueError, clf_mdl_cls.predict, X=self.X)
             clf_mdl.fit(X=[], y=[])
             P = clf_mdl.predict_proba(X=self.X)
-            np.testing.assert_array_equal(P, np.ones((len(self.X), 3)) / 3)
+            np.testing.assert_allclose(P, np.ones((len(self.X), 3)) / 3)
             if hasattr(clf_mdl, "predict_annotator_perf"):
                 P = clf_mdl.predict_annotator_perf(X=self.X)
-                np.testing.assert_array_equal(P, np.ones((len(self.X), 1)) / 3)
+                np.testing.assert_allclose(P, np.ones((len(self.X), 1)) / 3)
 
         with self.subTest(msg="Labels Shape Test", clf_name=clf):
             self.assertRaises(
@@ -142,11 +142,11 @@ class TestClassifier(unittest.TestCase):
                 self.classes
             )
             P = clf_mdl.predict_proba(self.X)
-            np.testing.assert_array_equal(P_exp, P)
+            np.testing.assert_allclose(P_exp, P)
             if hasattr(clf_mdl, "predict_freq"):
                 F_exp = np.zeros((len(self.X), len(self.classes)))
                 F = clf_mdl.predict_freq(self.X)
-                np.testing.assert_array_equal(F_exp, F)
+                np.testing.assert_allclose(F_exp, F)
 
         # Test classifier on full data set.
         with self.subTest(msg="Full Data Test", clf_name=clf):
