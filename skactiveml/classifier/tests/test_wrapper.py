@@ -243,7 +243,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             random_state=0,
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
-        
+
         clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
 
@@ -265,7 +265,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             clf.estimator_.classes_, ["new york", "paris", "tokyo"]
         )
         self.assertEqual(clf.missing_label, "nan")
-        # test if warnings are correctly handeled 
+        # test if warnings are correctly handeled
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             clf.fit(self.X, self.y2)
@@ -339,9 +339,7 @@ class TestSlidingWindowClassifier(unittest.TestCase):
             only_labeled=True,
             window_size=5,
         )
-        clf.partial_fit(
-            self.X, self.y1, sample_weight=np.ones_like(self.y1)
-        )
+        clf.partial_fit(self.X, self.y1, sample_weight=np.ones_like(self.y1))
         self.assertTrue(clf.is_fitted_)
 
         clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
