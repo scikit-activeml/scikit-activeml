@@ -160,14 +160,14 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
 
 
 def plot_decision_boundary(
-        clf,
-        feature_bound,
-        ax=None,
-        res=21,
-        boundary_dict=None,
-        confidence=0.75,
-        cmap="coolwarm",
-        confidence_dict=None,
+    clf,
+    feature_bound,
+    ax=None,
+    res=21,
+    boundary_dict=None,
+    confidence=0.75,
+    cmap="coolwarm",
+    confidence_dict=None,
 ):
     """Plot the decision boundary of the given classifier.
 
@@ -282,13 +282,13 @@ def plot_decision_boundary(
 
 
 def plot_contour_for_samples(
-        X,
-        values,
-        replace_nan=0.0,
-        feature_bound=None,
-        ax=None,
-        res=101,
-        contour_dict=None,
+    X,
+    values,
+    replace_nan=0.0,
+    feature_bound=None,
+    ax=None,
+    res=101,
+    contour_dict=None,
 ):
     """Plot the utility for the given query strategy.
 

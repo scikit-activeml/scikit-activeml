@@ -74,15 +74,15 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
 
     def __init__(
-            self,
-            n_neighbors=None,
-            metric="rbf",
-            metric_dict=None,
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            class_prior=0.0,
-            random_state=None,
+        self,
+        n_neighbors=None,
+        metric="rbf",
+        metric_dict=None,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        class_prior=0.0,
+        random_state=None,
     ):
         super().__init__(
             classes=classes,
@@ -119,7 +119,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         # Check whether metric is available.
         if self.metric not in ParzenWindowClassifier.METRICS and not callable(
-                self.metric
+            self.metric
         ):
             raise ValueError(
                 "The parameter 'metric' must be callable or "
@@ -186,7 +186,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         if self.metric == "precomputed":
             K = X
             if np.size(K, 0) != np.size(X, 0) or np.size(K, 1) != np.size(
-                    self.X_, 0
+                self.X_, 0
             ):
                 raise ValueError(
                     "The kernel matrix 'X' must have the shape "
@@ -203,7 +203,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             F = K @ self.V_
         else:
             indices = np.argpartition(K, -self.n_neighbors, axis=1)
-            indices = indices[:, -self.n_neighbors:]
+            indices = indices[:, -self.n_neighbors :]
             F = np.empty((np.size(X, 0), len(self.classes_)))
             for i in range(np.size(X, 0)):
                 F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]

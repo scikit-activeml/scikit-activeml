@@ -6,6 +6,7 @@ pool-based active learning.
 from . import multiannotator
 from . import utils
 from ._cost_embedding_al import CostEmbeddingAL
+from ._discriminative_al import DiscriminativeAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
 from ._expected_error_reduction import MonteCarloEER, ValueOfInformationEER
 from ._four_ds import FourDs
@@ -15,6 +16,7 @@ from ._query_by_committee import (
     average_kl_divergence,
     vote_entropy,
 )
+from ._quire import Quire
 from ._random_sampling import RandomSampling
 from ._uncertainty_sampling import (
     UncertaintySampling,
@@ -35,8 +37,10 @@ __all__ = [
     "MonteCarloEER",
     "ValueOfInformationEER",
     "QueryByCommittee",
+    "Quire",
     "average_kl_divergence",
     "vote_entropy",
     "FourDs",
     "CostEmbeddingAL",
+    "DiscriminativeAL",
 ]

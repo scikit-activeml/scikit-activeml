@@ -64,12 +64,12 @@ class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
     """
 
     def __init__(
-            self,
-            classes=None,
-            missing_label=MISSING_LABEL,
-            alpha=0.05,
-            mode="upper",
-            random_state=None,
+        self,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        alpha=0.05,
+        mode="upper",
+        random_state=None,
     ):
         self.classes = classes
         self.missing_label = missing_label
@@ -210,11 +210,11 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            epsilon=0.9,
-            alpha=0.05,
-            random_state=None,
-            missing_label=MISSING_LABEL,
+        self,
+        epsilon=0.9,
+        alpha=0.05,
+        random_state=None,
+        missing_label=MISSING_LABEL,
     ):
         super().__init__(
             random_state=random_state, missing_label=missing_label
@@ -223,16 +223,16 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         self.alpha = alpha
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            candidates=None,
-            annotators=None,
-            sample_weight=None,
-            batch_size="adaptive",
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        candidates=None,
+        annotators=None,
+        sample_weight=None,
+        batch_size="adaptive",
+        return_utilities=False,
     ):
         """Determines which candidate sample is to be annotated by which
         annotator.

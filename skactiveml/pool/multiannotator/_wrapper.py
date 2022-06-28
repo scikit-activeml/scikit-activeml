@@ -46,11 +46,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            strategy,
-            y_aggregate=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        strategy,
+        y_aggregate=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             random_state=random_state, missing_label=missing_label
@@ -59,16 +59,16 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         self.y_aggregate = y_aggregate
 
     def query(
-            self,
-            X,
-            y,
-            candidates=None,
-            annotators=None,
-            batch_size=1,
-            query_params_dict=None,
-            n_annotators_per_sample=1,
-            A_perf=None,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        candidates=None,
+        annotators=None,
+        batch_size=1,
+        query_params_dict=None,
+        n_annotators_per_sample=1,
+        A_perf=None,
+        return_utilities=False,
     ):
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
@@ -295,9 +295,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             # ensure A_perf lies in [0, 1)
             if A_perf.min() != A_perf.max():
                 A_perf = (
-                        1
-                        / (A_perf.max() - A_perf.min() + 1)
-                        * (A_perf - A_perf.min())
+                    1
+                    / (A_perf.max() - A_perf.min() + 1)
+                    * (A_perf - A_perf.min())
                 )
             else:
                 A_perf = np.zeros_like(A_perf, dtype=float)
@@ -309,8 +309,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             elif A_perf.shape == (n_annotators,):
                 annotator_utilities = (
                     A_perf[np.newaxis, np.newaxis, :]
-                        .repeat(n_candidates, axis=1)
-                        .repeat(batch_size_sq, axis=0)
+                    .repeat(n_candidates, axis=1)
+                    .repeat(batch_size_sq, axis=0)
                 )
             else:
                 raise ValueError(
@@ -368,13 +368,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             return indices
 
     def _query_annotators(
-            self,
-            A_cand,
-            batch_size,
-            sample_utilities,
-            annotator_utilities,
-            return_utilities,
-            pref_n_annotators,
+        self,
+        A_cand,
+        batch_size,
+        sample_utilities,
+        annotator_utilities,
+        return_utilities,
+        pref_n_annotators,
     ):
 
         random_state = check_random_state(self.random_state)
@@ -406,7 +406,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
 
             s_utilities[
-            :, query_indices[batch_index, 0], query_indices[batch_index, 1]
+                :, query_indices[batch_index, 0], query_indices[batch_index, 1]
             ] = np.nan
 
             batch_index += 1
@@ -422,7 +422,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
     @staticmethod
     def _get_order_preserving_s_query(
-            A, candidate_utilities, annotator_utilities
+        A, candidate_utilities, annotator_utilities
     ):
 
         nan_indices = np.argwhere(np.isnan(candidate_utilities))

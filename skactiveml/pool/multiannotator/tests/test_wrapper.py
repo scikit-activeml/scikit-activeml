@@ -408,7 +408,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_availability(best_cand_indices, self.A_cand)
 
     def test_query_three_n_annotators_per_sample_batch_size_five_mismatch(
-            self,
+        self,
     ):
         random = RandomSampling(self.random_state)
 
@@ -630,7 +630,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         for i in range(best_cand_indices.shape[0]):
             a = np.nanargmax(utilities[i])
             b = (
-                    best_cand_indices[i, 0] * utilities.shape[2]
-                    + best_cand_indices[i, 1]
+                best_cand_indices[i, 0] * utilities.shape[2]
+                + best_cand_indices[i, 1]
             )
             self.assertEqual(a, b)

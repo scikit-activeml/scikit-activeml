@@ -14,7 +14,7 @@ class TemplateTestStreamRandomSampling:
         train_init_size = 10
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
-            random_state=rand.randint(2 ** 31 - 1),
+            random_state=rand.randint(2**31 - 1),
             shuffle=True,
         )
 

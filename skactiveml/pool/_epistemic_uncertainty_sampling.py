@@ -10,7 +10,7 @@ from scipy.interpolate import griddata
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
 from sklearn import clone
 from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model._logistic import _logistic_loss
+from sklearn.utils.extmath import safe_sparse_dot, log_logistic
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..classifier import SklearnClassifier, ParzenWindowClassifier
@@ -50,8 +50,7 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self, precompute=False, missing_label=MISSING_LABEL,
-            random_state=None
+        self, precompute=False, missing_label=MISSING_LABEL, random_state=None
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -59,15 +58,15 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         self.precompute = precompute
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            fit_clf=True,
-            sample_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        clf,
+        fit_clf=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -162,7 +161,7 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 self._precompute_array,
             ) = _epistemic_uncertainty_pwc(freq, self._precompute_array)
         elif isinstance(clf, SklearnClassifier) and isinstance(
-                clf.estimator_, LogisticRegression
+            clf.estimator_, LogisticRegression
         ):
             mask_labeled = is_labeled(y, self.missing_label_)
             if sample_weight is None:
@@ -341,8 +340,8 @@ def _pwc_ml_1(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta ** p) * ((1 - theta) ** n)) / (
-            ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
+    piH = ((theta**p) * ((1 - theta) ** n)) / (
+        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
     )
     return -np.minimum(piH, 2 * theta - 1)
 
@@ -367,8 +366,8 @@ def _pwc_ml_0(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta ** p) * ((1 - theta) ** n)) / (
-            ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
+    piH = ((theta**p) * ((1 - theta) ** n)) / (
+        ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
     )
     return -np.minimum(piH, 1 - 2 * theta)
 
@@ -405,7 +404,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
         Discovery Science. Springer, Cham, 2019.
     """
     if not isinstance(clf, SklearnClassifier) or not isinstance(
-            clf.estimator, LogisticRegression
+        clf.estimator, LogisticRegression
     ):
         raise TypeError(
             "clf has to be a wrapped LogisticRegression "
@@ -622,3 +621,87 @@ def _theta(func, alpha, x0, A, args=()):
         func, x0=x0, method="SLSQP", constraints=constraints, args=args
     )
     return res.x
+
+
+def _logistic_loss(w, X, y, alpha, sample_weight=None):
+    """Computes the logistic loss. This function is a copy taken from
+    https://github.com/scikit-learn/scikit-learn/blob/1.0.X/sklearn/
+    linear_model/_logistic.py.
+
+    Parameters
+    ----------
+    w : ndarray of shape (n_features,) or (n_features + 1,)
+        Coefficient vector.
+    X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        Training data.
+    y : ndarray of shape (n_samples,)
+        Array of labels.
+    alpha : float
+        Regularization parameter. alpha is equal to 1 / C.
+    sample_weight : array-like of shape (n_samples,) default=None
+        Array of weights that are assigned to individual samples.
+        If not provided, then each sample is given unit weight.
+
+    Returns
+    -------
+    out : float
+        Logistic loss.
+
+    References
+    ----------
+    [1] Pedregosa F, Varoquaux G, Gramfort A, Michel V, Thirion B,
+        Grisel O, Blondel M, Prettenhofer P, Weiss R, Dubourg V, Vanderplas J.
+        "Scikit-learn: Machine learning in Python." Journal of Machine
+        Learning Research. 2011.
+    """
+    w, c, yz = _intercept_dot(w, X, y)
+
+    if sample_weight is None:
+        sample_weight = np.ones(y.shape[0])
+
+    # Logistic loss is the negative of the log of the logistic function.
+    out = -np.sum(sample_weight * log_logistic(yz))
+    out += 0.5 * alpha * np.dot(w, w)
+    return out
+
+
+def _intercept_dot(w, X, y):
+    """Computes y * np.dot(X, w). It takes into consideration if the intercept
+    should be fit or not. This function is a copy taken from
+    https://github.com/scikit-learn/scikit-learn/blob/1.0.X/sklearn/
+    linear_model/_logistic.py.
+
+    Parameters
+    ----------
+    w : ndarray of shape (n_features,) or (n_features + 1,)
+        Coefficient vector.
+    X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        Training data.
+    y : ndarray of shape (n_samples,)
+        Array of labels.
+
+    Returns
+    -------
+    w : ndarray of shape (n_features,)
+        Coefficient vector without the intercept weight (w[-1]) if the
+        intercept should be fit. Unchanged otherwise.
+    c : float
+        The intercept.
+    yz : float
+        y * np.dot(X, w).
+
+    References
+    ----------
+    [1] Pedregosa F, Varoquaux G, Gramfort A, Michel V, Thirion B,
+        Grisel O, Blondel M, Prettenhofer P, Weiss R, Dubourg V, Vanderplas J.
+        "Scikit-learn: Machine learning in Python." Journal of Machine
+        Learning Research. 2011.
+    """
+    c = 0.0
+    if w.size == X.shape[1] + 1:
+        c = w[-1]
+        w = w[:-1]
+
+    z = safe_sparse_dot(X, w) + c
+    yz = y * z
+    return w, c, yz

@@ -117,19 +117,19 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
     """
 
     def __init__(
-            self,
-            tol=1.0e-2,
-            max_iter=100,
-            fit_intercept=True,
-            annot_prior_full=1,
-            annot_prior_diag=0,
-            weights_prior=1,
-            solver="Newton-CG",
-            solver_dict=None,
-            classes=None,
-            cost_matrix=None,
-            missing_label=MISSING_LABEL,
-            random_state=None,
+        self,
+        tol=1.0e-2,
+        max_iter=100,
+        fit_intercept=True,
+        annot_prior_full=1,
+        annot_prior_diag=0,
+        weights_prior=1,
+        solver="Newton-CG",
+        solver_dict=None,
+        classes=None,
+        cost_matrix=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
         super().__init__(
             classes=classes,
@@ -319,8 +319,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
             # Stop EM, if it converges (to a local maximum).
             if (
-                    current_expectation == new_expectation
-                    or (new_expectation - current_expectation) < self.tol
+                current_expectation == new_expectation
+                or (new_expectation - current_expectation) < self.tol
             ):
                 break
 
@@ -398,8 +398,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
                         D = np.diag(diagonal)
                         H_kj = X.T @ D @ X + Gamma
                         H[
-                        k * n_features: (k + 1) * n_features,
-                        j * n_features: (j + 1) * n_features,
+                            k * n_features : (k + 1) * n_features,
+                            j * n_features : (j + 1) * n_features,
                         ] = H_kj
                 return H / n_samples
 

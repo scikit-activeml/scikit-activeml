@@ -173,7 +173,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
             ("unlabeled", unlabeled_indices(self.y)),
         ]
         for (fit_str, fit_idx), (pred_str, pred_idx) in list(
-                product(params, params)
+            product(params, params)
         ):
             with self.subTest(msg="Sub", fit_str=fit_str, pred_str=pred_str):
                 iclf = self.iclf(use_speed_up=True)
@@ -327,11 +327,11 @@ class TestIndexClassifierWrapper(unittest.TestCase):
 
         for BaseClf, speed_up, sample_weight, pred in params:
             with self.subTest(
-                    msg="Test fit via init",
-                    BaseClf=BaseClf,
-                    speed_up=speed_up,
-                    sample_weight=sample_weight,
-                    pred=pred,
+                msg="Test fit via init",
+                BaseClf=BaseClf,
+                speed_up=speed_up,
+                sample_weight=sample_weight,
+                pred=pred,
             ):
                 for i in range(1, 4):
                     clf = BaseClf()
@@ -350,17 +350,17 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         iclf.precompute(np.arange(i), np.arange(4))
 
                     iclf.fit(np.arange(i))
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
 
             with self.subTest(
-                    msg="Test direct fit",
-                    BaseClf=BaseClf,
-                    speed_up=speed_up,
-                    sample_weight=sample_weight,
-                    pred=pred,
+                msg="Test direct fit",
+                BaseClf=BaseClf,
+                speed_up=speed_up,
+                sample_weight=sample_weight,
+                pred=pred,
             ):
                 for i in range(1, 4):
                     clf = BaseClf()
@@ -378,7 +378,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         iclf.precompute(np.arange(i), np.arange(4))
 
                     iclf.fit(np.arange(i), y=self.y2[:i], sample_weight=sw_)
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -432,12 +432,12 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
 
             with self.subTest(
-                    msg="ParzenWindowClassifier use base data",
-                    BaseClf=str(BaseClf()),
-                    speed_up=speed_up,
-                    sample_weight=sample_weight,
-                    pred=pred,
-                    enforce_unique=enforce_unique,
+                msg="ParzenWindowClassifier use base data",
+                BaseClf=str(BaseClf()),
+                speed_up=speed_up,
+                sample_weight=sample_weight,
+                pred=pred,
+                enforce_unique=enforce_unique,
             ):
                 iclf = IndexClassifierWrapper(
                     BaseClf(),
@@ -467,7 +467,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     )
 
                     iclf.partial_fit(add_idx)
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -475,12 +475,12 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
 
             with self.subTest(
-                    msg="ParzenWindowClassifier use fit data",
-                    BaseClf=str(BaseClf()),
-                    speed_up=speed_up,
-                    sample_weight=sample_weight,
-                    pred=pred,
-                    enforce_unique=enforce_unique,
+                msg="ParzenWindowClassifier use fit data",
+                BaseClf=str(BaseClf()),
+                speed_up=speed_up,
+                sample_weight=sample_weight,
+                pred=pred,
+                enforce_unique=enforce_unique,
             ):
                 iclf = IndexClassifierWrapper(
                     BaseClf(),
@@ -517,7 +517,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     iclf.partial_fit(
                         add_idx, y=self.y2[add_idx], sample_weight=sw_add_
                     )
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -525,12 +525,12 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
 
             with self.subTest(
-                    msg="ParzenWindowClassifier use fit data with base clf",
-                    BaseClf=str(BaseClf()),
-                    speed_up=speed_up,
-                    sample_weight=sample_weight,
-                    pred=pred,
-                    enforce_unique=enforce_unique,
+                msg="ParzenWindowClassifier use fit data with base clf",
+                BaseClf=str(BaseClf()),
+                speed_up=speed_up,
+                sample_weight=sample_weight,
+                pred=pred,
+                enforce_unique=enforce_unique,
             ):
                 iclf = IndexClassifierWrapper(
                     BaseClf(),
@@ -571,7 +571,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         use_base_clf=True,
                         set_base_clf=True,
                     )
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -583,11 +583,11 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         for BaseClf, speed_up, sample_weight, pred in params:
 
             with self.subTest(
-                    msg="NB use fit data",
-                    BaseClf=str(BaseClf()),
-                    speed_up=speed_up,
-                    sample_weight=sample_weight,
-                    pred=pred,
+                msg="NB use fit data",
+                BaseClf=str(BaseClf()),
+                speed_up=speed_up,
+                sample_weight=sample_weight,
+                pred=pred,
             ):
                 iclf = IndexClassifierWrapper(
                     BaseClf(),
@@ -625,7 +625,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         y=self.y2[add_idx],
                         sample_weight=sw_add_,
                     )
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
