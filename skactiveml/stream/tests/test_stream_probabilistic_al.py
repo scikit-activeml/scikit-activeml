@@ -16,7 +16,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         train_init_size = 10
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
-            random_state=rand.randint(2 ** 31 - 1),
+            random_state=rand.randint(2**31 - 1),
             shuffle=True,
         )
 
@@ -99,7 +99,7 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         )
 
     def test_init_param_random_state(self):
-        query_strategy = StreamProbabilisticAL(random_state="string",)
+        query_strategy = StreamProbabilisticAL(random_state="string")
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_query_param_candidates(self):
