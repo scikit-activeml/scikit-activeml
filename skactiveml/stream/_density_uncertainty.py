@@ -1,6 +1,7 @@
 from collections import deque
 
 from copy import copy
+import warnings
 import numpy as np
 from sklearn.utils import check_array, check_consistent_length, check_scalar
 from sklearn.base import clone
@@ -72,6 +73,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
     [1]
 
     """
+
     def __init__(
         self,
         budget_manager=None,
@@ -202,6 +204,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         self : UncertaintyZliobaite
             The UncertaintyZliobaite returns itself, after it is updated.
         """
+        self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             check_type(
@@ -237,7 +240,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
             local_density_factor = self._calculate_ldf([x_cand])
             if local_density_factor > 0:
                 new_candidates.append(x_cand)
-            else:
+            elif self.force_full_budget:
                 new_candidates.append(np.nan)
             self.window_.append(x_cand)
         call_func(
@@ -344,6 +347,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
             X=X, y=y, sample_weight=sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
+        self._validate_force_full_budget()
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -367,9 +371,6 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
 
         # check density_threshold
         check_scalar(self.window_size, "window_size", int, min_val=1)
-
-        # check force_full_budget
-        check_type(self.force_full_budget, "force_full_budget", bool)
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -406,6 +407,15 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
         return clf
+
+    def _validate_force_full_budget(self):
+        # check force_full_budget
+        check_type(self.force_full_budget, "force_full_budget", bool)
+        if not hasattr(self, "budget_manager_") and not self.force_full_budget:
+            warnings.warn(
+                "force_full_budget is set to False. "
+                "Therefore the full budget may not be utilised."
+            )
 
     def _validate_X_y_sample_weight(self, X, y, sample_weight):
         """Validate if X, y and sample_weight are numeric and of equal length.
@@ -500,6 +510,7 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
     [1]
 
     """
+
     def __init__(
         self,
         budget_manager=None,
@@ -590,15 +601,16 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         tmp_theta = copy(self.theta_)
         tmp_s = copy(self.s_)
         tmp_t_x = copy(self.t_x_)
-        f = (self.f_)
+        f = copy(self.f_)
         min_dist = copy(self.min_dist_)
         t = copy(self.t_)
         queried_indices = []
-
         for i, (u, x_cand) in enumerate(zip(utilities, candidates)):
             local_density_factor = self._calculate_ldf([x_cand])
             if local_density_factor >= self.density_threshold:
-                queried_indice = self.budget_manager_.query_by_utility(np.array([u]))
+                queried_indice = self.budget_manager_.query_by_utility(
+                    np.array([u])
+                )
                 if len(queried_indice) > 0:
                     queried_indices.append(i)
             elif self.force_full_budget:
@@ -642,6 +654,7 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         self : UncertaintyZliobaite
             The UncertaintyZliobaite returns itself, after it is updated.
         """
+        self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             check_type(
@@ -687,7 +700,7 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             local_density_factor = self._calculate_ldf([x_cand])
             if local_density_factor >= self.density_threshold:
                 new_candidates.append(x_cand)
-            else:
+            elif self.force_full_budget:
                 new_candidates.append(np.nan)
             self.t_ += 1
         call_func(
@@ -823,11 +836,14 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
 
         # check density_threshold
-        check_scalar(self.density_threshold, "density_threshold", int, min_val=0)
-        check_scalar(self.cognition_window_size, "cognition_window_size", int, min_val=1)
+        check_scalar(
+            self.density_threshold, "density_threshold", int, min_val=0
+        )
+        check_scalar(
+            self.cognition_window_size, "cognition_window_size", int, min_val=1
+        )
 
-        # check force_full_budget
-        check_type(self.force_full_budget, "force_full_budget", bool)
+        self._validate_force_full_budget()
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -895,6 +911,15 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             clf = clone(clf).fit(X, y, sample_weight)
         return clf
 
+    def _validate_force_full_budget(self):
+        # check force_full_budget
+        check_type(self.force_full_budget, "force_full_budget", bool)
+        if not hasattr(self, "budget_manager_") and not self.force_full_budget:
+            warnings.warn(
+                "force_full_budget is set to False. "
+                "Therefore the full budget may not be utilised."
+            )
+
     def _validate_X_y_sample_weight(self, X, y, sample_weight):
         """Validate if X, y and sample_weight are numeric and of equal length.
 
@@ -930,10 +955,9 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
 class CogDQSRan(CogDQS):
     """The CogDQS [1] query strategy
     samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a threshold calculated based on the budget
-    and the number of classes as well as the instance is at least the new
-    nearest neighbor of density_threshold instances in the cognition window.
+    the classifier's predictions. The instances is queried randomly if it is at
+    least the new nearest neighbor of density_threshold instances in the
+    cognition window. Therefore the full budget may not be utilised.
 
     Parameters
     ----------
@@ -978,6 +1002,7 @@ class CogDQSRan(CogDQS):
     [1]
 
     """
+
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
 
@@ -1040,6 +1065,7 @@ class CogDQSRanVarUn(CogDQS):
     [1]
 
     """
+
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
 
@@ -1102,6 +1128,7 @@ class CogDQSVarUn(CogDQS):
     [1]
 
     """
+
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
 
@@ -1120,6 +1147,8 @@ class CogDQSFixUn(CogDQS):
     of the most likely class exceeds a threshold calculated based on the budget
     and the number of classes as well as the instance is at least the new
     nearest neighbor of density_threshold instances in the cognition window.
+    The full budget may not be utilised since the threshold is fixed by
+    the number of classes.
 
     Parameters
     ----------
@@ -1164,6 +1193,7 @@ class CogDQSFixUn(CogDQS):
     [1]
 
     """
+
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
 
