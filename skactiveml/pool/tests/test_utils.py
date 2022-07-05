@@ -350,7 +350,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         iclf.precompute(np.arange(i), np.arange(4))
 
                     iclf.fit(np.arange(i))
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -378,7 +378,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         iclf.precompute(np.arange(i), np.arange(4))
 
                     iclf.fit(np.arange(i), y=self.y2[:i], sample_weight=sw_)
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -467,7 +467,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     )
 
                     iclf.partial_fit(add_idx)
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -517,7 +517,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     iclf.partial_fit(
                         add_idx, y=self.y2[add_idx], sample_weight=sw_add_
                     )
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -571,7 +571,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         use_base_clf=True,
                         set_base_clf=True,
                     )
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
@@ -625,7 +625,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                         y=self.y2[add_idx],
                         sample_weight=sw_add_,
                     )
-                    np.testing.assert_array_equal(
+                    np.testing.assert_allclose(
                         getattr(iclf, pred)(np.arange(4)),
                         getattr(clf, pred)(self.X),
                     )
