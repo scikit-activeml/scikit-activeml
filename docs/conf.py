@@ -220,21 +220,20 @@ autodoc_default_options = {
 
 autoclass_content = 'class'
 
-if True:
-    generate_api_reference_rst(
-        gen_path=os.path.abspath('generated')
-    )
+generate_api_reference_rst(
+    gen_path=os.path.abspath('generated')
+)
 
-    examples_data = generate_examples(
-        gen_path=os.path.abspath('generated/examples'),
-        json_path=os.path.abspath('examples'))
+json_data = generate_examples(
+    gen_path=os.path.abspath('generated/examples'),
+    json_path=os.path.abspath('examples'))
 
-    generate_strategy_overview_rst(
-        gen_path=os.path.abspath('generated'),
-        json_data=examples_data
-    )
+generate_strategy_overview_rst(
+    gen_path=os.path.abspath('generated'),
+    json_data=json_data
+)
 
-    generate_tutorials(
-        src_path=os.path.abspath('../tutorials/'),
-        dst_path=os.path.abspath('generated/tutorials/'),
-    )
+generate_tutorials(
+    src_path=os.path.abspath('../tutorials/'),
+    dst_path=os.path.abspath('generated/tutorials/'),
+)

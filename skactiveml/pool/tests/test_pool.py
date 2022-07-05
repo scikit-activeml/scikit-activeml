@@ -12,7 +12,7 @@ from sklearn.datasets import make_blobs
 from sklearn.ensemble import RandomForestClassifier
 
 from docs.generate import generate_examples
-from skactiveml import pool
+from skactiveml import pool, stream
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.classifier import (
     ParzenWindowClassifier,
@@ -505,26 +505,31 @@ class TestExamples(unittest.TestCase):
     def setUp(self):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.docs_path = path.join(self.skaml_path, "docs")
-        self.json_path = path.join(self.skaml_path, "docs", "examples", "pool")
+        self.json_path = path.join(self.skaml_path, "docs", "examples")
         self.exceptions = []
         self.working_dir = os.curdir
 
-    def test_pool_example_files(self):
+        # A list of all modules that should have a json file.
+        self.modules = [pool, stream]
+
+    def test_example_files(self):
         # Temporary generate the examples from the json files.
         examples_path = path.join(
-            self.skaml_path, "docs", "temp_examples_pool"
+            self.skaml_path, "docs", "temp_examples"
         )
         os.chdir(self.docs_path)
-        generate_examples(examples_path, pool, self.json_path)
+        generate_examples(examples_path, self.json_path)
         os.chdir(self.working_dir)
 
         # Execute the examples.
-        pool_examples_path = path.join(examples_path, "examples", "pool")
-        for filename in listdir(pool_examples_path):
-            if filename.endswith(".py"):
-                with self.subTest(msg=filename):
-                    file_path = path.join(pool_examples_path, filename)
-                    exec(open(file_path, "r").read(), locals())
+        for (root, dirs, files) in os.walk(examples_path, topdown=True):
+            for filename in files:
+                if filename.endswith(".py"):
+                    msg = os.path.join(root, filename)\
+                        .replace(examples_path, '')
+                    with self.subTest(msg=msg):
+                        file_path = path.join(root, filename)
+                        exec(open(file_path, "r").read(), locals())
 
         # Remove the created examples from disk.
         shutil.rmtree(examples_path)
@@ -532,32 +537,34 @@ class TestExamples(unittest.TestCase):
     def test_json(self):
         # Collect all strategies for which an example exists
         strats_with_json = []
-        for filename in listdir(self.json_path):
-            if not filename.endswith(".json"):
-                continue
-            with open(path.join(self.json_path, filename)) as file:
-                for example in json.load(file):
-                    if example["class"] not in strats_with_json:
-                        strats_with_json.append(example["class"])
+        for (root, dirs, files) in os.walk(self.json_path, topdown=True):
+            for filename in files:
+                if not filename.endswith(".json"):
+                    continue
+                with open(path.join(root, filename)) as file:
+                    for example in json.load(file):
+                        if example["class"] not in strats_with_json:
+                            strats_with_json.append(example["class"])
 
         # Test if there is a json example for every AL-strategy.
-        for item in pool.__all__:
-            with self.subTest(msg="JSON Test", qs_name=item):
-                item_missing = (
-                    inspect.isclass(getattr(pool, item))
-                    and item not in self.exceptions
-                    and item not in strats_with_json
-                )
-                self.assertFalse(
-                    item_missing,
-                    f'No json example found for "{item}". Please '
-                    f"add an example in\n"
-                    f"{self.json_path}.\n"
-                    f"For information how to create one, see the "
-                    f"Developers Guide. If {item} is not an "
-                    f'AL-strategy, add "{item}" to the '
-                    f'"exceptions" list in this test class.',
-                )
+        for module in self.modules:
+            for item in module.__all__:
+                with self.subTest(msg="JSON Test", qs_name=item):
+                    item_missing = (
+                        inspect.isclass(getattr(module, item))
+                        and item not in self.exceptions
+                        and item not in strats_with_json
+                    )
+                    self.assertFalse(
+                        item_missing,
+                        f'No json example found for "{item}". Please '
+                        f"add an example in\n"
+                        f"{self.json_path}.\n"
+                        f"For information how to create one, see the "
+                        f"Developers Guide. If {item} is not an "
+                        f'AL-strategy, add "{item}" to the '
+                        f'"exceptions" list in this test class.',
+                    )
 
 
 class Dummy:

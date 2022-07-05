@@ -374,30 +374,29 @@ def generate_examples(gen_path, json_path, recursive=True):
     # create directory if it does not exist.
     os.makedirs(gen_path, exist_ok=True)
 
-    examples_data = dict()  # (Tab, Category, Collum, Row)
-    # iterate over jason example files
+    json_data = dict()
+    # iterate over json example files
     for (root, dirs, files) in os.walk(json_path, topdown=True):
         if 'README.rst' not in files and 'README.txt' not in files:
             raise FileNotFoundError(f'No README.rst or README.txt found in \n'
                                     f'"{root}"')
 
-        sub_package_str = root.replace(json_path, '').strip(os.sep)
+        sub_dir_str = root.replace(json_path, '').strip(os.sep)
         # sub_package = package
-        dst = os.path.join(gen_path, sub_package_str)
+        dst = os.path.join(gen_path, sub_dir_str)
         os.makedirs(dst, exist_ok=True)
         # Get the sub package.
-        # for p in sub_package_str.split(os.sep):
+        # for p in sub_dir_str.split(os.sep):
         #     if p == '': continue
         #     sub_package = getattr(sub_package, p)
         # Iterate over all files in 'root'.
         for filename in files:
-            # Copy the readme file.
             if filename.endswith('.json'):
                 with open(os.path.join(root, filename)) as file:
                     # iterate over the examples in the json file
                     for data in json.load(file):
-                        sub_package_dict = examples_data
-                        package_structure = sub_package_str.split('.')
+                        sub_package_dict = json_data
+                        package_structure = sub_dir_str.split('.')
                         for sp in package_structure:
                             if sp not in sub_package_dict.keys():
                                 sub_package_dict[sp] = dict()
@@ -418,13 +417,14 @@ def generate_examples(gen_path, json_path, recursive=True):
                             template_path=os.path.abspath(data["template"])
                         )
             elif not filename.startswith('template'):
+                # Copy the all other files except for templates.
                 src = os.path.join(root, filename)
                 shutil.copyfile(src, os.path.join(dst, filename))
 
         if not recursive:
             break
 
-    return examples_data
+    return json_data
 
 
 def generate_example_script(filename, dir_path, data, package, template_path):
