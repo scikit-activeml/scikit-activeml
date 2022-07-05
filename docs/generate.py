@@ -147,9 +147,6 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
     strategy_table = json_data_to_strategy_table(json_data, gen_path)
 
-    # create directory if it does not exist.
-    os.makedirs(os.path.join(gen_path, 'strategy_overview'), exist_ok=True)
-
     # Generate file
     with open(
             os.path.join(gen_path, 'strategy_overview.rst'),
