@@ -144,10 +144,8 @@ def generate_strategy_overview_rst(gen_path, json_data):
     json_data : dict
         The data of the examples directory stored in a dictionary.
     """
-    # Load bibtex database.
-    bib_data = parse_file('refs.bib')
 
-    examples_data = json_data_to_table_data(json_data, gen_path)
+    strategy_table = json_data_to_strategy_table(json_data, gen_path)
 
     # create directory if it does not exist.
     os.makedirs(os.path.join(gen_path, 'strategy_overview'), exist_ok=True)
@@ -160,71 +158,56 @@ def generate_strategy_overview_rst(gen_path, json_data):
         file.write('Strategy Overview\n')
         file.write('#################\n')
         file.write('\n')
-        file.write('In the following you\'ll find summaries of all implemented'
-                   ' "Query Strategies", based on the categorization of '
-                   'different papers.\n')
+
+        file.write(f'This is an overview of all implemented active learning '
+                   f'strategies.\n')
         file.write('\n')
-        file.write('.. toctree::\n')
-        file.write('   :maxdepth: 1\n')
+        file.write(f'You can use the following checkboxes to filter the '
+                   f'tables below.\n')
         file.write('\n')
-        for paper in examples_data.keys():
-            file.write(f'   strategy_overview/strategy_overview-{paper}\n')
+        file.write(
+            '.. raw:: html\n'
+            '\n'
+            '   <input type="checkbox" class="input-tag" '
+            'value="regression">\n'
+            '   <label>Regression</label>\n'
+            '<input type="checkbox" class="input-tag" '
+            'value="classification">\n '
+            '   <label>Classification</label>\n'
+            '<input type="checkbox" class="input-tag" '
+            'value="multi-annotator">\n '
+            '   <label>Multi-Annotator</label>\n'
+            '<input type="checkbox" class="input-tag" '
+            'value="single-annotator">\n '
+            '   <label>Single-Annotator</label>\n'
+        )
+        file.write('\n')
 
-    # Iterate over the papers.
-    for paper, sections in examples_data.items():
-        author = bib_data.entries[paper].persons["author"][0].last_names[0]
-        path = os.path.join(gen_path,
-                            'strategy_overview',
-                            f'strategy_overview-{paper}.rst')
-        with open(path, 'w') as file:
-            title = f'Strategy Overview By {author}\n'
-            file.write(title)
-            file.write(''.ljust(len(title) + 1, '=') + '\n')
-            file.write('\n')
-            file.write(f'This is an overview of all implemented AL strategies.'
-                       f' The strategies are categorized according to '
-                       f':footcite:t:`{paper}`.\n')
-            file.write('\n')
-            file.write(f'You can use the following checkboxes to filter the '
-                       f'tables below.\n')
-            file.write('\n')
-            file.write(
-                '.. raw:: html\n'
-                '\n'
-                '   <input type="checkbox" class="input-tag" value="regression">\n'
-                '   <label>Regression</label>\n'
-                '   <input type="checkbox" class="input-tag" value="classification">\n'
-                '   <label>Classification</label>\n'
-                '   <input type="checkbox" class="input-tag" value="multi-annotator">\n'
-                '   <label>Multi-Annotator</label>\n'
-                '   <input type="checkbox" class="input-tag" value="single-annotator">\n'
-                '   <label>Single-Annotator</label>\n'
-            )
+        # Iterate over the sections.
+        for section_name, cats in strategy_table.items():
+            file.write(' '.join(
+                [s.capitalize() for s in section_name.split(os.sep)]
+            ) + '\n')
+            file.write(''.ljust(len(section_name), '-') + '\n')
             file.write('\n')
 
-            # Iterate over the sections.
-            for section_name, cats in sections.items():
-                file.write(' '.join(
-                    [s.capitalize() for s in section_name.split(os.sep)]
-                ) + '\n')
-                file.write(''.ljust(len(section_name), '-') + '\n')
-                file.write('\n')
-
-                # Iterate over the examples.
-                file.write(format_sections(cats))
-                file.write('\n')
-
-            file.write('References\n')
-            file.write('----------\n')
-            file.write('.. footbibliography::')
+            # Iterate over the examples.
+            file.write(format_sections(cats))
             file.write('\n')
 
+        file.write('References\n')
+        file.write('----------\n')
+        file.write('.. footbibliography::')
+        file.write('\n')
 
-def json_data_to_table_data(json_data, gen_path):
-    tables = {}
+
+def json_data_to_strategy_table(json_data, gen_path):
+    strategy_table = {}
+    head_line = ['Method', 'Base Class', 'Tags', 'Reference']
     rel_api_path = os.path.join(
         os.path.basename(gen_path), 'api'
     ).replace('\\', '/')
+
     for section_name, section_items in json_data.items():
         table = np.ndarray(shape=(0, 5))
         for data in section_items['data']:
@@ -244,8 +227,10 @@ def json_data_to_table_data(json_data, gen_path):
             for ref in data['refs']:
                 ref_text += f':footcite:t:`{ref}`, '
             ref_text = ref_text[0:-2]
-            category = data['categories'] if 'categories' in data.keys() \
-                else {}
+            category = data['category'] \
+                if 'category' in data.keys() and data['category'] != "" \
+                else "Others"
+
             table = np.append(
                 table,
                 [[methods_text, strategy_text, tags, ref_text, category]],
@@ -255,36 +240,17 @@ def json_data_to_table_data(json_data, gen_path):
         # Sort the table alphabetically.
         table = sorted(table, key=lambda row: row[1])
 
-        tables[section_name] = table
+        # Build the strategy table.
+        strategy_table[section_name] = {}
+        for i, row in enumerate(table):
+            category = row[-1]
+            if category not in strategy_table[section_name].keys():
+                strategy_table[section_name][category] = np.array([head_line])
+            strategy_table[section_name][category] = \
+                np.append(strategy_table[section_name][category],
+                          [row[:-1]], axis=0)
 
-
-    table_data = {}
-    head_line = ['Method', 'Base Class', 'Tags', 'Reference']
-    # Collect the different tabs and categories.
-    for section_name, section_data in tables.items():
-        for i, row in enumerate(section_data):
-            for paper in row[-1].keys():
-                if paper not in table_data.keys():
-                    table_data[paper] = {}
-                if section_name not in table_data[paper].keys():
-                    table_data[paper][section_name] = {}
-                if row[-1][paper] == '':
-                    section_data[i][-1][paper] = 'Others'
-                if row[-1][paper] not in \
-                        table_data[paper][section_name].keys():
-                    table_data[paper][section_name][row[-1][paper]] = \
-                        np.array([head_line])
-
-    # Build the dict that holds the data.
-    for section_name, section_data in tables.items():
-        for row in section_data:
-            for paper in table_data:
-                if paper in row[-1].keys():
-                    cat = row[-1][paper] if paper in row[-1].keys() else 'Others'
-                table_data[paper][section_name][cat] = \
-                    np.append(table_data[paper][section_name][cat], [row[:-1]], axis=0)
-
-    return table_data
+    return strategy_table
 
 
 def format_sections(cats, indent=0):
@@ -382,13 +348,8 @@ def generate_examples(gen_path, json_path, recursive=True):
                                     f'"{root}"')
 
         sub_dir_str = root.replace(json_path, '').strip(os.sep)
-        # sub_package = package
         dst = os.path.join(gen_path, sub_dir_str)
         os.makedirs(dst, exist_ok=True)
-        # Get the sub package.
-        # for p in sub_dir_str.split(os.sep):
-        #     if p == '': continue
-        #     sub_package = getattr(sub_package, p)
         # Iterate over all files in 'root'.
         for filename in files:
             if filename.endswith('.json'):
@@ -608,9 +569,8 @@ def format_plot(data, template_path):
             if key in data.keys():
                 if isinstance(data[key], list):
                     new_str = ''
-                    indent = "".ljust(0, " ")  # TODO
                     for line in data[key]:
-                        new_str += indent + line + "\n"
+                        new_str += line + "\n"
                     new_str = new_str[0:-1]
                 else:
                     new_str = data[key]
@@ -690,7 +650,7 @@ def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
             value = value[0]
         key = str(key)
         if key_as_string:
-            if not ((key.startswith('"') and key.endswith('"')) or \
+            if not ((key.startswith('"') and key.endswith('"')) or
                     (key.startswith('\'') and key.endswith('\''))):
                 key = '"' + key + '"'
         dd_str += str(key) + allocator + value + ", "

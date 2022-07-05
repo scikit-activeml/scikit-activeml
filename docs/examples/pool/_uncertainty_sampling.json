@@ -3,9 +3,7 @@
     "class" : "UncertaintySampling",
     "package" : "pool",
     "method" : "Uncertainty Sampling with Margin",
-    "categories" : {
-      "Settles2012" : "Uncertainty Sampling"
-    },
+    "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Uncertainty Sampling with Margin",
@@ -21,9 +19,7 @@
     "class" : "UncertaintySampling",
     "package" : "pool",
     "method" : "Uncertainty Sampling with Least-Confidence",
-    "categories" : {
-      "Settles2012" : "Uncertainty Sampling"
-    },
+    "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Uncertainty Sampling with Least-Confidence",
@@ -38,9 +34,7 @@
     "class" : "UncertaintySampling",
     "package" : "pool",
     "method" : "Uncertainty Sampling with Entropy",
-    "categories" : {
-      "Settles2012" : "Uncertainty Sampling"
-    },
+    "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Uncertainty Sampling with Entropy",
@@ -55,9 +49,7 @@
     "class" : "UncertaintySampling",
     "package" : "pool",
     "method" : "Expected Average Precision",
-    "categories" : {
-      "Settles2012" : "Uncertainty Sampling"
-    },
+    "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title": "Expected Average Precision",

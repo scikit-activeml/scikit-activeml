@@ -510,7 +510,7 @@ class TestExamples(unittest.TestCase):
         self.working_dir = os.curdir
 
         # A list of all modules that should have a json file.
-        self.modules = [pool, stream]
+        self.modules = [pool]
 
     def test_example_files(self):
         # Temporary generate the examples from the json files.

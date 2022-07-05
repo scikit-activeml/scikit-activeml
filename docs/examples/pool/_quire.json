@@ -3,9 +3,7 @@
     "class" : "Quire",
     "package" : "pool",
     "method" : "Querying Informative and Representative Examples (QUIRE)",
-    "categories" : {
-      "Settles2012" : ""
-    },
+    "category" : "",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Querying Informative and Representative Examples",

@@ -3,11 +3,9 @@
     "class" : "QueryByCommittee",
     "package" : "pool",
     "method" : "Query-by-Committee with Kullback-Leibler Divergence",
-    "categories" : {
-      "Settles2012" : "Query-by-Committee"
-    },
+    "category" :  "Query-by-Committee",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "regression", "single-annotator"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Query-by-Committee with Kullback-Leibler Divergence",
     "refs" : ["seung1992query","mccallum1998employing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
@@ -27,7 +25,7 @@
       "Settles2012" : "Query-by-Committee"
     },
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "regression", "single-annotator"],
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Query-by-Committee with Vote Entropy",
     "refs" : ["seung1992query","engelson1996minimizing"],
     "sequence" : ["title", "text_0", "plot", "refs"],

@@ -3,9 +3,7 @@
     "class" : "EpistemicUncertaintySampling",
     "package" : "pool",
     "method" : "Epistemic Uncertainty Sampling",
-    "categories" : {
-      "Settles2012" : "Uncertainty Sampling"
-    },
+    "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Epistemic Uncertainty Sampling",

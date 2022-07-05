@@ -3,9 +3,7 @@
     "class" : "RandomSampling",
     "package" : "pool",
     "method" : "Random Sampling",
-    "categories" : {
-      "Settles2012" : "Random Sampling"
-    },
+    "category" : "Random Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Random Sampling",

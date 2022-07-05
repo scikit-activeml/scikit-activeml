@@ -3,9 +3,7 @@
     "class" : "ValueOfInformationEER",
     "package" : "pool",
     "method" : "Value of Information on Unlabeled Samples",
-    "categories" : {
-      "Settles2012" : "Expected Error Reduction"
-    },
+    "category" : "Expected Error Reduction",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Value of Information on Unlabeled Samples",
@@ -24,9 +22,7 @@
     "class" : "ValueOfInformationEER",
     "package" : "pool",
     "method" : "Value of Information on Labeled Samples",
-    "categories" : {
-      "Settles2012" : "Expected Error Reduction"
-    },
+    "category" : "Expected Error Reduction",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Value of Information on Labeled Samples",
@@ -44,9 +40,7 @@
     "class" : "ValueOfInformationEER",
     "package" : "pool",
     "method" : "Value of Information (VOI)",
-    "categories" : {
-      "Settles2012" : "Expected Error Reduction"
-    },
+    "category" : "Expected Error Reduction",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Value of Information",
@@ -64,9 +58,7 @@
     "class" : "MonteCarloEER",
     "package" : "pool",
     "method" : "Monte-Carlo EER with Log-Loss",
-    "categories" : {
-      "Settles2012" : "Expected Error Reduction"
-    },
+    "category" : "Expected Error Reduction",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Monte-Carlo EER with Log-Loss",
@@ -81,9 +73,7 @@
     "class" : "MonteCarloEER",
     "package" : "pool",
     "method" : "Monte-Carlo EER with Misclassification-Loss",
-    "categories" : {
-      "Settles2012" : "Expected Error Reduction"
-    },
+    "category" : "Expected Error Reduction",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Monte-Carlo EER with Misclassification-Loss",
