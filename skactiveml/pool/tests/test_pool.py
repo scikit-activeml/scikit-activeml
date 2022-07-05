@@ -503,7 +503,8 @@ class TestGeneral(unittest.TestCase):
 
 class TestExamples(unittest.TestCase):
     def setUp(self):
-        self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
+        self.skaml_path = path.abspath(os.curdir).split("scikit-activeml")[0]\
+                          + "scikit-activeml"
         self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples")
         self.exceptions = []
