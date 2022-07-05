@@ -47,6 +47,21 @@ def generate_api_reference_rst(gen_path):
 
 
 def automodule(module, level=0):
+    """
+    This function generates the restructured text for the api reference and the
+     specified module.
+
+    Parameters
+    ----------
+    module : python module
+        Module for which to create the api reference.
+    level : int, default=0
+        This parameter is used for the recursive call of this function.
+
+    Returns
+    -------
+        String : The restructured text
+    """
     rst_str = ''
     modules = []
     classes = []
@@ -132,8 +147,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
     # Load bibtex database.
     bib_data = parse_file('refs.bib')
 
-    table_data = json_data_to_table_data(json_data, gen_path)
-    examples_data = table_data_to_examples_data(table_data)
+    examples_data = json_data_to_table_data(json_data, gen_path)
 
     # create directory if it does not exist.
     os.makedirs(os.path.join(gen_path, 'strategy_overview'), exist_ok=True)
@@ -171,7 +185,6 @@ def generate_strategy_overview_rst(gen_path, json_data):
                        f' The strategies are categorized according to '
                        f':footcite:t:`{paper}`.\n')
             file.write('\n')
-            # TODO: generate tag inputs automatically
             file.write(f'You can use the following checkboxes to filter the '
                        f'tables below.\n')
             file.write('\n')
@@ -187,6 +200,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
                 '   <input type="checkbox" class="input-tag" value="single-annotator">\n'
                 '   <label>Single-Annotator</label>\n'
             )
+            file.write('\n')
 
             # Iterate over the sections.
             for section_name, cats in sections.items():
@@ -243,37 +257,34 @@ def json_data_to_table_data(json_data, gen_path):
 
         tables[section_name] = table
 
-    return tables
 
-
-def table_data_to_examples_data(table):
-    examples_data = {}  # (Tab, Category, Collum, Row)
+    table_data = {}
     head_line = ['Method', 'Base Class', 'Tags', 'Reference']
     # Collect the different tabs and categories.
-    for section_name, section_data in table.items():
+    for section_name, section_data in tables.items():
         for i, row in enumerate(section_data):
             for paper in row[-1].keys():
-                if paper not in examples_data.keys():
-                    examples_data[paper] = {}
-                if section_name not in examples_data[paper].keys():
-                    examples_data[paper][section_name] = {}
+                if paper not in table_data.keys():
+                    table_data[paper] = {}
+                if section_name not in table_data[paper].keys():
+                    table_data[paper][section_name] = {}
                 if row[-1][paper] == '':
                     section_data[i][-1][paper] = 'Others'
                 if row[-1][paper] not in \
-                        examples_data[paper][section_name].keys():
-                    examples_data[paper][section_name][row[-1][paper]] = \
+                        table_data[paper][section_name].keys():
+                    table_data[paper][section_name][row[-1][paper]] = \
                         np.array([head_line])
 
     # Build the dict that holds the data.
-    for section_name, section_data in table.items():
+    for section_name, section_data in tables.items():
         for row in section_data:
-            for paper in examples_data:
+            for paper in table_data:
                 if paper in row[-1].keys():
                     cat = row[-1][paper] if paper in row[-1].keys() else 'Others'
-                examples_data[paper][section_name][cat] = \
-                    np.append(examples_data[paper][section_name][cat], [row[:-1]], axis=0)
+                table_data[paper][section_name][cat] = \
+                    np.append(table_data[paper][section_name][cat], [row[:-1]], axis=0)
 
-    return examples_data
+    return table_data
 
 
 def format_sections(cats, indent=0):
