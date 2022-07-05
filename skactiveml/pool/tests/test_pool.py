@@ -5,7 +5,7 @@ import shutil
 import unittest
 import warnings
 from importlib import import_module
-from os import path, listdir
+from os import path
 
 import numpy as np
 from sklearn.datasets import make_blobs
@@ -503,12 +503,11 @@ class TestGeneral(unittest.TestCase):
 
 class TestExamples(unittest.TestCase):
     def setUp(self):
-        self.skaml_path = path.abspath(os.curdir).split("scikit-activeml")[0]\
-                          + "scikit-activeml"
+        self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples")
         self.exceptions = []
-        self.working_dir = os.curdir
+        self.working_dir = os.path.abspath(os.curdir)
 
         # A list of all modules that should have a json file.
         self.modules = [pool]
