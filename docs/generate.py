@@ -13,7 +13,7 @@ from pybtex.database import parse_file
 import skactiveml
 
 for module in skactiveml.__all__:
-    importlib.import_module('skactiveml.' + module)
+    importlib.import_module("skactiveml." + module)
 
 warnings.filterwarnings("ignore")
 
@@ -27,20 +27,20 @@ def generate_api_reference_rst(gen_path):
         The path of the main directory in which all generated files should be
         created.
     """
-    path = os.path.join(os.path.basename(gen_path), 'api_reference.rst')
-    gen_path = os.path.join(os.path.basename(gen_path), 'api')
+    path = os.path.join(os.path.basename(gen_path), "api_reference.rst")
+    gen_path = os.path.join(os.path.basename(gen_path), "api")
     os.makedirs(os.path.abspath(gen_path), exist_ok=True)
-    with open(path, 'w') as file:
-        file.write('.. _api_reference:\n')
-        file.write('\n')
-        file.write('=============\n')
-        file.write('API Reference\n')
-        file.write('=============\n')
-        file.write('\n')
-        file.write('This is an overview of the API.\n')
-        file.write('\n')
-        file.write('.. module:: skactiveml\n')
-        file.write('\n')
+    with open(path, "w") as file:
+        file.write(".. _api_reference:\n")
+        file.write("\n")
+        file.write("=============\n")
+        file.write("API Reference\n")
+        file.write("=============\n")
+        file.write("\n")
+        file.write("This is an overview of the API.\n")
+        file.write("\n")
+        file.write(".. module:: skactiveml\n")
+        file.write("\n")
         for item in skactiveml.__all__:
             if inspect.ismodule(getattr(skactiveml, item)):
                 file.write(automodule(getattr(skactiveml, item)))
@@ -62,7 +62,7 @@ def automodule(module, level=0):
     -------
         String : The restructured text
     """
-    rst_str = ''
+    rst_str = ""
     modules = []
     classes = []
     functions = []
@@ -82,50 +82,50 @@ def automodule(module, level=0):
         if isinstance(getattr(module, item), object) and item.isupper():
             constants.append(item)
 
-    title = f':mod:`{module.__name__}`:'
-    rst_str += title + '\n'
-    rst_str += ''.ljust(len(title), '=') + '\n\n'
+    title = f":mod:`{module.__name__}`:"
+    rst_str += title + "\n"
+    rst_str += "".ljust(len(title), "=") + "\n\n"
 
-    rst_str += f'.. automodule:: {module.__name__}\n'
-    rst_str += f'    :no-members:\n'
-    rst_str += f'    :no-inherited-members:\n\n'
+    rst_str += f".. automodule:: {module.__name__}\n"
+    rst_str += f"    :no-members:\n"
+    rst_str += f"    :no-inherited-members:\n\n"
 
     rst_str += f'.. currentmodule:: {module.__name__.split(".")[0]}\n\n'
     if classes:
-        rst_str += f'Classes\n'
-        rst_str += f'-------\n\n'
+        rst_str += f"Classes\n"
+        rst_str += f"-------\n\n"
 
-        rst_str += f'.. autosummary::\n'
-        rst_str += f'   :nosignatures:\n'
-        rst_str += f'   :toctree: api\n'
-        rst_str += f'   :template: class.rst\n\n'
+        rst_str += f".. autosummary::\n"
+        rst_str += f"   :nosignatures:\n"
+        rst_str += f"   :toctree: api\n"
+        rst_str += f"   :template: class.rst\n\n"
         for item in classes:
             name = module.__name__
-            if 'skactiveml.' in name:
-                name = name.replace('skactiveml.', '')
+            if "skactiveml." in name:
+                name = name.replace("skactiveml.", "")
             if name:
-                name += '.'
+                name += "."
             name += item
-            rst_str += f'   {name}' + '\n'
-        rst_str += '\n'
+            rst_str += f"   {name}" + "\n"
+        rst_str += "\n"
 
     if functions:
-        rst_str += f'Functions\n'
-        rst_str += f'---------\n\n'
+        rst_str += f"Functions\n"
+        rst_str += f"---------\n\n"
 
-        rst_str += f'.. autosummary::\n'
-        rst_str += f'   :nosignatures:\n'
-        rst_str += f'   :toctree: api\n'
-        rst_str += f'   :template: function.rst\n\n'
+        rst_str += f".. autosummary::\n"
+        rst_str += f"   :nosignatures:\n"
+        rst_str += f"   :toctree: api\n"
+        rst_str += f"   :template: function.rst\n\n"
         for item in functions:
             name = module.__name__
-            if 'skactiveml.' in name:
-                name = name.replace('skactiveml.', '')
+            if "skactiveml." in name:
+                name = name.replace("skactiveml.", "")
             if name:
-                name += '.'
+                name += "."
             name += item
-            rst_str += f'   {name}' + '\n'
-        rst_str += '\n'
+            rst_str += f"   {name}" + "\n"
+        rst_str += "\n"
 
     for item in modules:
         rst_str += automodule(getattr(module, item), level=level + 1)
@@ -135,7 +135,7 @@ def automodule(module, level=0):
 
 def generate_strategy_overview_rst(gen_path, json_data):
     """Creates the strategy_overview.rst file in the specified path.
-    
+
     Parameters
     ----------
     gen_path : string
@@ -148,90 +148,98 @@ def generate_strategy_overview_rst(gen_path, json_data):
     strategy_table = json_data_to_strategy_table(json_data, gen_path)
 
     # Generate file
-    with open(
-            os.path.join(gen_path, 'strategy_overview.rst'),
-            'w') as file:
-        file.write('#################\n')
-        file.write('Strategy Overview\n')
-        file.write('#################\n')
-        file.write('\n')
+    with open(os.path.join(gen_path, "strategy_overview.rst"), "w") as file:
+        file.write("#################\n")
+        file.write("Strategy Overview\n")
+        file.write("#################\n")
+        file.write("\n")
 
-        file.write(f'This is an overview of all implemented active learning '
-                   f'strategies.\n')
-        file.write('\n')
-        file.write(f'You can use the following checkboxes to filter the '
-                   f'tables below.\n')
-        file.write('\n')
         file.write(
-            '.. raw:: html\n'
-            '\n'
+            f"This is an overview of all implemented active learning "
+            f"strategies.\n"
+        )
+        file.write("\n")
+        file.write(
+            f"You can use the following checkboxes to filter the "
+            f"tables below.\n"
+        )
+        file.write("\n")
+        file.write(
+            ".. raw:: html\n"
+            "\n"
             '   <input type="checkbox" class="input-tag" '
             'value="regression">\n'
-            '   <label>Regression</label>\n'
+            "   <label>Regression</label>\n"
             '<input type="checkbox" class="input-tag" '
             'value="classification">\n '
-            '   <label>Classification</label>\n'
+            "   <label>Classification</label>\n"
             '<input type="checkbox" class="input-tag" '
             'value="multi-annotator">\n '
-            '   <label>Multi-Annotator</label>\n'
+            "   <label>Multi-Annotator</label>\n"
             '<input type="checkbox" class="input-tag" '
             'value="single-annotator">\n '
-            '   <label>Single-Annotator</label>\n'
+            "   <label>Single-Annotator</label>\n"
         )
-        file.write('\n')
+        file.write("\n")
 
         # Iterate over the sections.
         for section_name, cats in strategy_table.items():
-            file.write(' '.join(
-                [s.capitalize() for s in section_name.split(os.sep)]
-            ) + '\n')
-            file.write(''.ljust(len(section_name), '-') + '\n')
-            file.write('\n')
+            file.write(
+                " ".join([s.capitalize() for s in section_name.split(os.sep)])
+                + "\n"
+            )
+            file.write("".ljust(len(section_name), "-") + "\n")
+            file.write("\n")
 
             # Iterate over the examples.
             file.write(format_sections(cats))
-            file.write('\n')
+            file.write("\n")
 
-        file.write('References\n')
-        file.write('----------\n')
-        file.write('.. footbibliography::')
-        file.write('\n')
+        file.write("References\n")
+        file.write("----------\n")
+        file.write(".. footbibliography::")
+        file.write("\n")
 
 
 def json_data_to_strategy_table(json_data, gen_path):
     strategy_table = {}
-    head_line = ['Method', 'Base Class', 'Tags', 'Reference']
-    rel_api_path = os.path.join(
-        os.path.basename(gen_path), 'api'
-    ).replace('\\', '/')
+    head_line = ["Method", "Base Class", "Tags", "Reference"]
+    rel_api_path = os.path.join(os.path.basename(gen_path), "api").replace(
+        "\\", "/"
+    )
 
     for section_name, section_items in json_data.items():
         table = np.ndarray(shape=(0, 5))
-        for data in section_items['data']:
+        for data in section_items["data"]:
             # Collect the data needed to generate the strategy overview.
             qs_name = data["class"]
-            method = data['method']
-            package = getattr(skactiveml, data['package'])
-            package_name = package.__name__.replace('skactiveml.', '')
-            methods_text = \
-                f':doc:`{method} </generated/sphinx_gallery_examples/' \
-                f'{package_name}/plot-{qs_name}-' \
+            method = data["method"]
+            package = getattr(skactiveml, data["package"])
+            package_name = package.__name__.replace("skactiveml.", "")
+            methods_text = (
+                f":doc:`{method} </generated/sphinx_gallery_examples/"
+                f"{package_name}/plot-{qs_name}-"
                 f'{method.replace(" ", "_")}>`'
-            strategy_text = f':doc:`{qs_name} </{rel_api_path}/' \
-                            f'{package.__name__}.{qs_name}>`'
-            tags = " ".join(data['tags'])
-            ref_text = ''
-            for ref in data['refs']:
-                ref_text += f':footcite:t:`{ref}`, '
+            )
+            strategy_text = (
+                f":doc:`{qs_name} </{rel_api_path}/"
+                f"{package.__name__}.{qs_name}>`"
+            )
+            tags = " ".join(data["tags"])
+            ref_text = ""
+            for ref in data["refs"]:
+                ref_text += f":footcite:t:`{ref}`, "
             ref_text = ref_text[0:-2]
-            category = data['category'] \
-                if 'category' in data.keys() and data['category'] != "" \
+            category = (
+                data["category"]
+                if "category" in data.keys() and data["category"] != ""
                 else "Others"
+            )
 
             table = np.append(
                 table,
                 [[methods_text, strategy_text, tags, ref_text, category]],
-                axis=0
+                axis=0,
             )
 
         # Sort the table alphabetically.
@@ -243,38 +251,39 @@ def json_data_to_strategy_table(json_data, gen_path):
             category = row[-1]
             if category not in strategy_table[section_name].keys():
                 strategy_table[section_name][category] = np.array([head_line])
-            strategy_table[section_name][category] = \
-                np.append(strategy_table[section_name][category],
-                          [row[:-1]], axis=0)
+            strategy_table[section_name][category] = np.append(
+                strategy_table[section_name][category], [row[:-1]], axis=0
+            )
 
     return strategy_table
 
 
 def format_sections(cats, indent=0):
-    string = ''
+    string = ""
 
     # Iterate over the categories in the current paper.
     for cat in sorted(cats):
-        if cat != 'Others':
-            string += f'{cat}\n'
-            string += ''.ljust(len(cat), '~') + '\n'
-            string += table_data_to_rst_table(cats[cat],
-                                              header_lines=1,
-                                              indent=indent)
-    if 'Others' in cats.keys():
+        if cat != "Others":
+            string += f"{cat}\n"
+            string += "".ljust(len(cat), "~") + "\n"
+            string += table_data_to_rst_table(
+                cats[cat], header_lines=1, indent=indent
+            )
+    if "Others" in cats.keys():
         # 'Others' is the fallback, if no category is specified
         # in the json file
-        string += 'Others\n'
-        string += '~~~~~~\n'
-        string += table_data_to_rst_table(cats['Others'],
-                                          header_lines=1,
-                                          indent=indent)
+        string += "Others\n"
+        string += "~~~~~~\n"
+        string += table_data_to_rst_table(
+            cats["Others"], header_lines=1, indent=indent
+        )
 
     return string
 
 
-def table_data_to_rst_table(a, caption='', widths=None, header_lines=0,
-                            indent=0):
+def table_data_to_rst_table(
+    a, caption="", widths=None, header_lines=0, indent=0
+):
     """Generates a rst-table and returns it as a string.
 
     Parameters
@@ -296,21 +305,23 @@ def table_data_to_rst_table(a, caption='', widths=None, header_lines=0,
     string : reStructuredText list-table as String.
     """
     a = np.asarray(a)
-    indents = ''.ljust(indent, ' ')
-    table = f'{indents}.. list-table:: {caption}\n' \
-            f'{indents}   :header-rows: {header_lines}\n'
+    indents = "".ljust(indent, " ")
+    table = (
+        f"{indents}.. list-table:: {caption}\n"
+        f"{indents}   :header-rows: {header_lines}\n"
+    )
     if widths is None:
-        table += '\n'
-    elif widths == 'auto':
-        table += f'{indents}   :widths: auto\n\n'
+        table += "\n"
+    elif widths == "auto":
+        table += f"{indents}   :widths: auto\n\n"
     else:
-        table += f'{indents}   :widths: {widths}\n\n'
+        table += f"{indents}   :widths: {widths}\n\n"
     for row in a:
-        table += f'{indents}   *'
+        table += f"{indents}   *"
         for column in row:
-            table += ' - ' + str(column) + f'\n{indents}    '
-        table = table[0: -4 - indent]
-    return table + '\n'
+            table += " - " + str(column) + f"\n{indents}    "
+        table = table[0 : -4 - indent]
+    return table + "\n"
 
 
 def generate_examples(gen_path, json_path, recursive=True):
@@ -340,41 +351,45 @@ def generate_examples(gen_path, json_path, recursive=True):
     json_data = dict()
     # iterate over json example files
     for (root, dirs, files) in os.walk(json_path, topdown=True):
-        if 'README.rst' not in files and 'README.txt' not in files:
-            raise FileNotFoundError(f'No README.rst or README.txt found in \n'
-                                    f'"{root}"')
+        if "README.rst" not in files and "README.txt" not in files:
+            raise FileNotFoundError(
+                f"No README.rst or README.txt found in \n" f'"{root}"'
+            )
 
-        sub_dir_str = root.replace(json_path, '').strip(os.sep)
+        sub_dir_str = root.replace(json_path, "").strip(os.sep)
         dst = os.path.join(gen_path, sub_dir_str)
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
         for filename in files:
-            if filename.endswith('.json'):
+            if filename.endswith(".json"):
                 with open(os.path.join(root, filename)) as file:
                     # iterate over the examples in the json file
                     for data in json.load(file):
                         sub_package_dict = json_data
-                        package_structure = sub_dir_str.split('.')
+                        package_structure = sub_dir_str.split(".")
                         for sp in package_structure:
                             if sp not in sub_package_dict.keys():
                                 sub_package_dict[sp] = dict()
                             sub_package_dict = sub_package_dict[sp]
-                        if 'data' not in sub_package_dict.keys():
-                            sub_package_dict['data'] = list()
+                        if "data" not in sub_package_dict.keys():
+                            sub_package_dict["data"] = list()
 
-                        sub_package_dict['data'].append(data)
+                        sub_package_dict["data"].append(data)
                         # create the example python script
-                        plot_filename = \
-                            'plot-' + data["class"] + "-" + data['method'].replace(
-                                ' ', '_')
+                        plot_filename = (
+                            "plot-"
+                            + data["class"]
+                            + "-"
+                            + data["method"].replace(" ", "_")
+                        )
                         generate_example_script(
-                            filename=plot_filename + '.py',
+                            filename=plot_filename + ".py",
                             dir_path=dst,
                             data=data,
-                            package=getattr(skactiveml, data['package']),
-                            template_path=os.path.abspath(data["template"])
+                            package=getattr(skactiveml, data["package"]),
+                            template_path=os.path.abspath(data["template"]),
                         )
-            elif not filename.startswith('template'):
+            elif not filename.startswith("template"):
                 # Copy the all other files except for templates.
                 src = os.path.join(root, filename)
                 shutil.copyfile(src, os.path.join(dst, filename))
@@ -407,12 +422,12 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     os.makedirs(dir_path, exist_ok=True)
 
     # Validation of 'data'.
-    if data['class'] not in package.__all__:
+    if data["class"] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
 
     first_title = True
     # Create the file.
-    with open(os.path.join(dir_path, filename), 'w') as file:
+    with open(os.path.join(dir_path, filename), "w") as file:
         code_blocks = []
         # Iterate over the 'blocks' and generate the corresponding strings
         # expected from sphinx-gallery.
@@ -455,15 +470,16 @@ def format_title(title, first_title):
     string : The formatted string for the example script.
     """
     if first_title:
-        block_str = '"""\n' \
-                    '' + title + '\n' \
-                                 ''.ljust(len(title) + 1, '=') + '\n' \
-                                                                 '"""\n'
+        block_str = (
+            '"""\n'
+            "" + title + "\n"
+            "".ljust(len(title) + 1, "=") + "\n"
+            '"""\n'
+        )
     else:
-        block_str = '# %%\n' \
-                    '# .. rubric:: ' + title + ':\n'
+        block_str = "# %%\n" "# .. rubric:: " + title + ":\n"
 
-    return block_str + '\n'
+    return block_str + "\n"
 
 
 def format_subtitle(title):
@@ -480,9 +496,9 @@ def format_subtitle(title):
     -------
     string : The formatted string for the example script.
     """
-    block_str = '# %%\n' \
-                '# ' + title + '\n' \
-                               '# '.ljust(len(title) + 1, '-') + '\n\n'
+    block_str = (
+        "# %%\n" "# " + title + "\n" "# ".ljust(len(title) + 1, "-") + "\n\n"
+    )
     return block_str
 
 
@@ -500,10 +516,10 @@ def format_text(text):
     -------
     string : The formatted string for the example script.
     """
-    block_str = '# %%\n'
-    for line in text.split('\n'):
-        block_str += '# ' + line + '\n'
-    return block_str + '\n'
+    block_str = "# %%\n"
+    for line in text.split("\n"):
+        block_str += "# " + line + "\n"
+    return block_str + "\n"
 
 
 def format_code(code):
@@ -520,10 +536,10 @@ def format_code(code):
     -------
     string : The formatted string for the example script.
     """
-    block_str = ''
+    block_str = ""
     for line in code:
-        block_str += line + '\n'
-    return block_str + '\n'
+        block_str += line + "\n"
+    return block_str + "\n"
 
 
 def format_plot(data, template_path):
@@ -541,10 +557,13 @@ def format_plot(data, template_path):
     -------
     string : The formatted string for the example script.
     """
-    pattern = r'"""\$[^"""]*"""|"\$[^"&^\n]*"|' + \
-              r"'''\$[^''']*'''|'\$[^'&^\n]*'"
-    pattern_group = r'"""\$([^"""]*)"""|"\$([^"&^\n]*)"|' + \
-                    r"'''\$([^''']*)'''|'\$([^'&^\n]*)'"
+    pattern = (
+        r'"""\$[^"""]*"""|"\$[^"&^\n]*"|' + r"'''\$[^''']*'''|'\$[^'&^\n]*'"
+    )
+    pattern_group = (
+        r'"""\$([^"""]*)"""|"\$([^"&^\n]*)"|'
+        + r"'''\$([^''']*)'''|'\$([^'&^\n]*)'"
+    )
     with open(template_path, "r") as template:
         template_str = template.read()
 
@@ -565,7 +584,7 @@ def format_plot(data, template_path):
                     data[key] = "3"
             if key in data.keys():
                 if isinstance(data[key], list):
-                    new_str = ''
+                    new_str = ""
                     for line in data[key]:
                         new_str += line + "\n"
                     new_str = new_str[0:-1]
@@ -596,27 +615,28 @@ def format_refs(refs: list):
     string : The formatted string for the example script.
     """
     if not refs:
-        return ''
-    block_str = '# %%\n' \
-                '# .. rubric:: References:\n' \
-                '# \n' \
-                '# The implementation of this strategy is based on '
+        return ""
+    block_str = (
+        "# %%\n"
+        "# .. rubric:: References:\n"
+        "# \n"
+        "# The implementation of this strategy is based on "
+    )
     if len(refs) > 1:
         for i in range(len(refs) - 1):
-            block_str += f':footcite:t:`{refs[i]}`, '
+            block_str += f":footcite:t:`{refs[i]}`, "
         block_str = block_str[0:-2]
-        block_str += f' and :footcite:t:`{refs[-1]}'
+        block_str += f" and :footcite:t:`{refs[-1]}"
     else:
-        block_str += f':footcite:t:`{refs[0]}'
-    block_str += '`.\n' \
-                 '#\n'
+        block_str += f":footcite:t:`{refs[0]}"
+    block_str += "`.\n" "#\n"
 
-    block_str += '# .. footbibliography::\n'
+    block_str += "# .. footbibliography::\n"
 
-    return block_str + '\n'
+    return block_str + "\n"
 
 
-def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
+def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
     """Converts a dictionary into a string.
     Parameters
     ----------
@@ -647,8 +667,10 @@ def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
             value = value[0]
         key = str(key)
         if key_as_string:
-            if not ((key.startswith('"') and key.endswith('"')) or
-                    (key.startswith('\'') and key.endswith('\''))):
+            if not (
+                (key.startswith('"') and key.endswith('"'))
+                or (key.startswith("'") and key.endswith("'"))
+            ):
                 key = '"' + key + '"'
         dd_str += str(key) + allocator + value + ", "
     return dd_str[0:-2]
@@ -656,7 +678,7 @@ def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
 
 def generate_tutorials(src_path, dst_path):
     """Includes the tutorials folder from the git root, such that tutorials are
-    included in the documentation. Effectively this function copies all 
+    included in the documentation. Effectively this function copies all
     contents from src_path to dst_path.
     Parameters
     ----------
