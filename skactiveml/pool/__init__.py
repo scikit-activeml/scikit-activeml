@@ -9,7 +9,9 @@ from ._cost_embedding_al import CostEmbeddingAL
 from ._discriminative_al import DiscriminativeAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
 from ._expected_error_reduction import MonteCarloEER, ValueOfInformationEER
-from ._expected_model_change import ExpectedModelChange
+from ._expected_model_change_maximization import (
+    ExpectedModelChangeMaximization,
+)
 from ._expected_model_output_change import ExpectedModelOutputChange
 from ._expected_model_variance import ExpectedModelVarianceReduction
 from ._four_ds import FourDs
@@ -52,7 +54,7 @@ __all__ = [
     "vote_entropy",
     "FourDs",
     "CostEmbeddingAL",
-    "ExpectedModelChange",
+    "ExpectedModelChangeMaximization",
     "ExpectedModelOutputChange",
     "ExpectedModelVarianceReduction",
     "KLDivergenceMaximization",

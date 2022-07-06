@@ -8,7 +8,7 @@ from scipy.special import roots_hermitenorm
 from sklearn import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.metrics import pairwise_kernels
-from sklearn.utils import check_array, column_or_1d, check_consistent_length
+from sklearn.utils import column_or_1d
 from sklearn.utils.validation import check_array, check_consistent_length
 
 from ..base import (
@@ -26,7 +26,6 @@ from ..utils import (
     check_type,
     check_indices,
     check_random_state,
-    check_X_y,
     check_scalar,
 )
 
@@ -611,7 +610,7 @@ def cross_entropy(
         other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
     )
 
-    cross_ent = -conditional_expect(
+    cross_ent = -expect_target_val(
         X_eval,
         dist.logpdf,
         reg=true_reg,
@@ -621,74 +620,6 @@ def cross_entropy(
     )
 
     return cross_ent
-
-
-def bootstrap_estimators(
-    est,
-    X,
-    y,
-    k_bootstrap=5,
-    n_train=0.5,
-    sample_weight=None,
-    random_state=None,
-):
-    """Train the estimator on bootstraps of `X` and `y`.
-
-    Parameters
-    ----------
-    est : SkactivemlClassifier or SkactivemlRegressor
-        The estimator to be be trained.
-    X : array-like of shape (n_samples, n_features)
-        Training data set, usually complete, i.e. including the labeled and
-        unlabeled samples.
-    y : array-like of shape (n_samples)
-        Labels of the training data set.
-    k_bootstrap : int, optional (default=5)
-        The number of trained bootstraps.
-    n_train : int or float, optional (default=0.5)
-        The size of each bootstrap training data set.
-    sample_weight: array-like of shape (n_samples), optional (default=None)
-        Weights of training samples in `X`.
-    random_state : numeric | np.random.RandomState (default=None)
-        The random state to use. If `random_state is None` random
-        `random_state` is used.
-
-    Returns
-    -------
-    bootstrap_est : list of SkactivemlClassifier or list of SkactivemlRegressor
-        The estimators trained on different bootstraps.
-    """
-
-    check_X_y(X=X, y=y, sample_weight=sample_weight)
-    check_scalar(k_bootstrap, "k_bootstrap", int, min_val=1)
-    check_scalar(
-        n_train,
-        "n_train",
-        (int, float),
-        min_val=0,
-        max_val=1,
-        min_inclusive=False,
-    )
-    check_type(est, "est", SkactivemlClassifier, SkactivemlRegressor)
-    random_state = check_random_state(random_state)
-
-    bootstrap_est = [clone(est) for _ in range(k_bootstrap)]
-    sample_indices = np.arange(len(X))
-    subsets_indices = [
-        random_state.choice(sample_indices, size=int(len(X) * n_train + 1))
-        for _ in range(k_bootstrap)
-    ]
-
-    for est_b, subset_indices in zip(bootstrap_est, subsets_indices):
-        X_for_learner = X[subset_indices]
-        y_for_learner = y[subset_indices]
-        if sample_weight is None:
-            est_b.fit(X_for_learner, y_for_learner)
-        else:
-            weight_for_learner = sample_weight[subset_indices]
-            est_b.fit(X_for_learner, y_for_learner, weight_for_learner)
-
-    return bootstrap_est
 
 
 def _update_reg(
@@ -842,31 +773,25 @@ def _reshape_scipy_dist(dist, shape):
     return dist
 
 
-def conditional_expect(
-    X,
-    func,
-    reg,
-    method=None,
-    quantile_method=None,
-    n_integration_samples=10,
-    quad_dict=None,
-    random_state=None,
-    include_x=False,
-    include_idx=False,
-    vector_func=False,
-):
-    """Calculates the conditional expectation, i.e. E[func(Y)|X=x_eval], where
-    Y | X ~ reg.predict_target_distribution, for x_eval in `X_eval`.
+def expect_target_val(X, target_func, reg, **kwargs):
+    """Calculates the conditional expectation of a function depending only on
+    the target value for each sample in `X`, i.e.
+    E[target_func(Y)|X=x], where Y | X=x ~ reg.predict_target_distribution,
+    for x in `X`.
 
     Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
         The samples where the expectation should be evaluated.
-    func : callable
+    target_func : callable
         The function that transforms the random variable.
     reg: ProbabilisticRegressor
-        Predicts the target distribution over which the expectation is calculated.
-    method: string, optional, optional (default=None)
+        Predicts the target distribution over which the expectation is
+        calculated.
+
+    Other Parameters
+    ----------------
+    method: string, optional, optional (default='gauss_hermite')
         The method by which the expectation is computed.
         -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
           thereby only takes the function value at the expected y value.
@@ -884,8 +809,7 @@ def conditional_expect(
           random variable of `reg`, which in turn uses a dynamic gaussian
           quadrature routine for calculating the integral. Performance is worse
           using a vector function.
-        If `method is None` 'gauss_hermite' is used.
-    quantile_method: string, optional (default=None)
+    quantile_method: string, optional (default='quadrature')
         Specifies the integration methods used after the quantile
         transformation.
         -'trapezoid' Trapezoidal method for integration using evenly spaced
@@ -898,7 +822,6 @@ def conditional_expect(
           samples used for integration is put to the smallest such number greater
           than `n_integration_samples`.
         -'quadrature' Gaussian quadrature method for integration.
-        If `quantile_method is None` quadrature is used.
     n_integration_samples: int, optional (default=10)
         The number of integration samples used in 'quantile', 'monte_carlo' and
         'gauss-hermite'.
@@ -906,11 +829,93 @@ def conditional_expect(
         Further arguments for using `scipy's` `expect`
     random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
-    include_x: bool, optional (default=False)
-        If `include_x` is `True`, `func` also takes the x value.
-    include_idx: bool, optional (default=False)
-        If `include_idx` is `True`, `func` also takes the index of the x value.
-    vector_func: bool or str, optional (default=False)
+    target_func : bool
+        If `True` only the target values will be passed to `func`.
+    vector_func : bool or str, optional (default=False)
+        If `vector_func` is `True`, the integration values are passed as a whole
+        to the function `func`. If `vector_func` is 'both', the integration
+        values might or might not be passed as a whole. The integration values
+        if passed as a whole are of the form (n_samples, n_integration), where
+        n_integration denotes the number of integration values.
+
+    Returns
+    -------
+    expectation : numpy.ndarray of shape (n_samples)
+        The conditional expectation for each value applied.
+    """
+
+    check_callable(target_func, "target_func", n_free_parameters=1)
+
+    def arg_filtered_func(idx_y, x_y, y):
+        return target_func(y)
+
+    return conditional_expect(X, arg_filtered_func, reg, **kwargs)
+
+
+def conditional_expect(
+    X,
+    func,
+    reg,
+    method=None,
+    quantile_method=None,
+    n_integration_samples=10,
+    quad_dict=None,
+    random_state=None,
+    vector_func=False,
+):
+    """Calculates the conditional expectation of a function depending on the
+    target value the corresponding feature value and an index for each sample
+    in `X`, i.e. E[func(Y, x, idx)|X=x], where
+    Y | X=x ~ reg.predict_target_distribution, for x in `X`.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        The samples where the expectation should be evaluated.
+    func : callable
+        The function that transforms the random variable.
+    reg: ProbabilisticRegressor
+        Predicts the target distribution over which the expectation is
+        calculated.
+    method: string, optional, optional (default='gauss_hermite')
+        The method by which the expectation is computed.
+        -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
+          thereby only takes the function value at the expected y value.
+        -'monte_carlo' Basic monte carlo integration. Taking the average
+          of randomly drawn samples. `n_integration_samples` specifies the
+          number of monte carlo samples.
+        -'quantile' Uses the quantile function to transform the integration
+          space into the interval from 0 to 1 and than uses the method from
+          'quantile_method' to calculate the integral. The number of integration
+          points is specified by `n_integration_samples`.
+        -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
+          to be gaussian distributed. The number of evaluation  points is given
+          by `n_integration_samples`.
+        -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
+          random variable of `reg`, which in turn uses a dynamic gaussian
+          quadrature routine for calculating the integral. Performance is worse
+          using a vector function.
+    quantile_method: string, optional (default='quadrature')
+        Specifies the integration methods used after the quantile
+        transformation.
+        -'trapezoid' Trapezoidal method for integration using evenly spaced
+          samples.
+        -'simpson' Simpson method for integration using evenly spaced samples.
+        -'average' Taking the average value for integration using evenly spaced
+          samples.
+        -'romberg' Romberg method for integration. If `n_integration_samples` is
+          not equal to `2**k + 1` for a natural number k, the number of
+          samples used for integration is put to the smallest such number
+          greater than `n_integration_samples`.
+        -'quadrature' Gaussian quadrature method for integration.
+    n_integration_samples: int, optional (default=10)
+        The number of integration samples used in 'quantile', 'monte_carlo' and
+        'gauss-hermite'.
+    quad_dict: dict, optional (default=None)
+        Further arguments for using `scipy's` `expect`
+    random_state: numeric | np.random.RandomState, optional (default=None)
+        Random state for fixing the number generation.
+    vector_func : bool or str, optional (default=False)
         If `vector_func` is `True`, the integration values are passed as a whole
         to the function `func`. If `vector_func` is 'both', the integration
         values might or might not be passed as a whole. The integration values
@@ -953,10 +958,8 @@ def conditional_expect(
     )
     check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
     check_type(quad_dict, "scipy_args", dict, target_vals=[None])
-    check_type(include_idx, "include_idx", bool)
-    check_type(include_x, "include_x", bool)
     check_type(vector_func, "vector_func", bool, target_vals=["both"])
-    check_callable(func, "func", n_free_parameters=1 + include_idx + include_x)
+    check_callable(func, "func", n_free_parameters=3)
 
     if method is None:
         method = "gauss_hermite"
@@ -975,27 +978,14 @@ def conditional_expect(
 
     random_state = check_random_state(random_state)
 
-    def arg_filter(idx_y, x_y, y):
-        ret = tuple()
-        if include_idx:
-            ret += (idx_y,)
-        if include_x:
-            ret += (x_y,)
-        ret += (y,)
-        return ret
-
     def evaluate_func(inner_potential_y):
         if vector_func:
-            inner_output = func(
-                *arg_filter(np.arange(len(X)), X, inner_potential_y)
-            )
+            inner_output = func(np.arange(len(X)), X, inner_potential_y)
         else:
             inner_output = np.zeros_like(inner_potential_y)
             for idx_x, inner_x in enumerate(X):
                 for idx_y, y_val in enumerate(inner_potential_y[idx_x]):
-                    inner_output[idx_x, idx_y] = func(
-                        *arg_filter(idx_x, inner_x, y_val)
-                    )
+                    inner_output[idx_x, idx_y] = func(idx_x, inner_x, y_val)
         return inner_output
 
     expectation = np.zeros(len(X))
@@ -1071,13 +1061,11 @@ def conditional_expect(
 
             def quad_function_wrapper(y):
                 if is_optional or not vector_func:
-                    return func(*arg_filter(idx, x, y))
+                    return func(idx, x, y)
                 else:
-                    return func(
-                        *arg_filter(
-                            np.arange(len(X)), X, np.full((len(X), 1), y)
-                        )
-                    )[idx]
+                    return func(np.arange(len(X)), X, np.full((len(X), 1), y))[
+                        idx
+                    ]
 
             expectation[idx] = cond_dist.expect(
                 quad_function_wrapper,

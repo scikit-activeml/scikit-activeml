@@ -55,10 +55,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state, missing_label=missing_label
         )
-        if integration_dict is not None:
-            self.integration_dict = integration_dict
-        else:
-            self.integration_dict = {"method": "assume_linear"}
+        self.integration_dict = integration_dict
 
     def query(
         self,
@@ -136,6 +133,8 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 
         check_type(reg, "reg", ProbabilisticRegressor)
         check_type(fit_reg, "fit_reg", bool)
+        if self.integration_dict is None:
+            self.integration_dict = {"method": "assume_linear"}
         check_type(self.integration_dict, "self.integration_dict", dict)
         if X_eval is None:
             X_eval = X
@@ -219,8 +218,6 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             new_entropy,
             reg,
             random_state=self.random_state_,
-            include_idx=True,
-            include_x=True,
             **self.integration_dict
         )
 
@@ -271,21 +268,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state, missing_label=missing_label
         )
-
-        if integration_dict_target_val is not None:
-            self.integration_dict_target_val = integration_dict_target_val
-        else:
-            self.integration_dict_target_val = {"method": "assume_linear"}
-
-        if integration_dict_cross_entropy is not None:
-            self.integration_dict_cross_entropy = (
-                integration_dict_cross_entropy
-            )
-        else:
-            self.integration_dict_cross_entropy = {
-                "method": "gauss_hermite",
-                "n_integration_samples": 10,
-            }
+        self.integration_dict_target_val = integration_dict_target_val
+        self.integration_dict_cross_entropy = integration_dict_cross_entropy
 
     def query(
         self,
@@ -369,6 +353,21 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)
 
+        if self.integration_dict_target_val is None:
+            self.integration_dict_target_val = {"method": "assume_linear"}
+
+        if self.integration_dict_cross_entropy is None:
+            self.integration_dict_cross_entropy = {
+                "method": "gauss_hermite",
+                "n_integration_samples": 10,
+            }
+        check_type(
+            self.integration_dict_target_val, "self.integration_dict", dict
+        )
+        check_type(
+            self.integration_dict_cross_entropy, "self.integration_dict", dict
+        )
+
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if fit_reg:
@@ -394,8 +393,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     def _kullback_leibler_divergence(
         self, X_eval, X_cand, mapping, reg, X, y, sample_weight=None
     ):
-        """Calculates the mutual information gain over the evaluation set if each
-        candidate sample where to be labeled.
+        """Calculates the expected kullback leibler divergence over the
+        evaluation set if each candidate sample where to be labeled.
 
         Parameters
         ----------
@@ -419,7 +418,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         kl_div : numpy.ndarray of shape (n_candidate_samples)
-            The expected cross entropy given the new candidate samples.
+            The calculated expected kullback leibler divergence.
         """
 
         def new_kl_divergence(idx, x_cand, y_pot):
@@ -452,8 +451,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             new_kl_divergence,
             reg,
             random_state=self.random_state_,
-            include_idx=True,
-            include_x=True,
             **self.integration_dict_target_val
         )
 

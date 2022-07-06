@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.pool import ExpectedModelChange
+from skactiveml.pool import ExpectedModelChangeMaximization
 from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
@@ -27,37 +27,37 @@ class TestExpectedModelChange(unittest.TestCase):
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3.5, 2], [4.2, 4]])
         self.y = np.array([np.nan, np.nan, 2, -2, 3.4, 2.7])
         self.reg = SklearnRegressor(LinearRegression())
-        self.qs = ExpectedModelChange()
+        self.qs = ExpectedModelChangeMaximization()
         self.query_kwargs = dict(
             X=self.X, y=self.y, candidates=self.candidates, reg=self.reg
         )
 
     def test_init_param_random_state(self):
         provide_test_regression_query_strategy_init_random_state(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_init_param_missing_label(self):
         provide_test_regression_query_strategy_init_missing_label(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_init_param_k_bootstrap(self):
         for wrong_val, error in zip(["five", 0], [TypeError, ValueError]):
-            qs = ExpectedModelChange(k_bootstraps=wrong_val)
+            qs = ExpectedModelChangeMaximization(bootstrap_size=wrong_val)
             self.assertRaises(error, qs.query, **self.query_kwargs)
 
     def test_init_param_n_train(self):
         for wrong_val, error in zip(["five", 1.5], [TypeError, ValueError]):
-            qs = ExpectedModelChange(n_train=wrong_val)
+            qs = ExpectedModelChangeMaximization(n_train=wrong_val)
             self.assertRaises(error, qs.query, **self.query_kwargs)
 
     def test_init_param_feature_map(self):
         for wrong_val in ["wrong_val", 1]:
-            qs = ExpectedModelChange(feature_map=wrong_val)
+            qs = ExpectedModelChangeMaximization(feature_map=wrong_val)
             self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
-        qs = ExpectedModelChange(
+        qs = ExpectedModelChangeMaximization(
             feature_map=lambda x: np.zeros((len(x), 1)),
             random_state=self.random_state,
         )
@@ -67,50 +67,50 @@ class TestExpectedModelChange(unittest.TestCase):
         np.testing.assert_array_equal(np.zeros(2), utilities[0, :2])
 
     def test_init_param_ord(self):
-        qs = ExpectedModelChange(ord="wrong_norm")
+        qs = ExpectedModelChangeMaximization(ord="wrong_norm")
         self.assertRaises(ValueError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):
         provide_test_regression_query_strategy_query_X(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_y(self):
         provide_test_regression_query_strategy_query_y(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_reg(self):
         provide_test_regression_query_strategy_query_reg(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_fit_reg(self):
         provide_test_regression_query_strategy_query_fit_reg(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_sample_weight(self):
         provide_test_regression_query_strategy_query_sample_weight(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_candidates(self):
         provide_test_regression_query_strategy_query_candidates(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_batch_size(self):
         provide_test_regression_query_strategy_query_batch_size(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )
 
     def test_logic(self):
         provide_test_regression_query_strategy_change_dependence(
-            self, ExpectedModelChange
+            self, ExpectedModelChangeMaximization
         )

@@ -1,14 +1,21 @@
+from functools import partial
+
 import numpy as np
 from sklearn import clone
 from sklearn.utils import check_array
+from sklearn.metrics import mean_squared_error
 
 from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.pool.utils import _update_reg, conditional_expect
-from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
-from skactiveml.utils._validation import check_callable
+from skactiveml.utils import (
+    check_type,
+    simple_batch,
+    MISSING_LABEL,
+    check_callable,
+)
 
 
 class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
@@ -21,13 +28,16 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
     Parameters
     ----------
     integration_dict: dict, optional (default=None)
-        Dictionary for integration arguments, i.e. `integration method` etc.,
+        Dictionary for integration arguments, i.e. `integration_method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `conditional_expect`.
+        For details see method `skactiveml.pool.utils.conditional_expect`.
+        The default `integration_method` is `assume_linear`.
     loss: callable, optional (default=None)
         The loss for predicting a target value instead of the true value.
         Takes in the predicted values of an evaluation set and the true values
         of the evaluation set and returns the error, a scalar value.
+        The default loss is `sklearn.metrics.mean_squared_loss` an alternative
+        might be `sklearn.metrics.mean_absolute_loss`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
@@ -37,8 +47,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
     References
     ----------
     [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
-        Oliver and Barz, Bjoern and Denzler, Joachim and AG, Carl Zeiss. Active
-        Learning for Regression Tasks with Expected Model Output Change,
+        Oliver and Barz, Bjoern and Denzler, Joachim and Carl Zeiss AG. Active
+        Learning for Regression Tasks with Expected Model Output Change, BMVC,
         page 103 and subsequently, 2018.
 
     """
@@ -53,13 +63,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state, missing_label=missing_label
         )
-        self.loss = (
-            loss if loss is not None else lambda x, y: np.average((x - y) ** 2)
-        )
-        if integration_dict is not None:
-            self.integration_dict = integration_dict
-        else:
-            self.integration_dict = {"method": "assume_linear"}
+        self.loss = loss
+        self.integration_dict = integration_dict
 
     def query(
         self,
@@ -103,7 +108,9 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         X_eval : array-like of shape (n_eval_samples, n_features),
         optional (default=None)
             Evaluation data set that is used for estimating the probability
-            distribution of the feature space.
+            distribution of the feature space. In the referenced paper it is
+            proposed to use the unlabeled data, i.e.
+            `X_eval=X[is_unlabeled(y)]`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -135,6 +142,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         )
 
         check_type(reg, "reg", ProbabilisticRegressor)
+        if self.integration_dict is None:
+            self.integration_dict = {"method": "assume_linear"}
         check_type(self.integration_dict, "self.integration_dict", dict)
         if X_eval is None:
             X_eval = X
@@ -142,8 +151,9 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)
         check_type(fit_reg, "fit_reg", bool)
-        loss = self.loss
-        check_callable(loss, "self.loss", n_free_parameters=2)
+        if self.loss is None:
+            self.loss = mean_squared_error
+        check_callable(self.loss, "self.loss", n_free_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
@@ -152,29 +162,16 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
         y_pred = reg.predict(X_eval)
 
-        def model_output_change(idx, x_cand, y_pot):
-            reg_new = _update_reg(
-                reg,
-                X,
-                y,
-                sample_weight=sample_weight,
-                y_update=y_pot,
-                idx_update=idx,
-                X_update=x_cand,
-                mapping=mapping,
-            )
-            y_pred_new = reg_new.predict(X_eval)
-
-            return loss(y_pred, y_pred_new)
+        update_dict = dict(
+            X=X, y=y, reg=reg, sample_weight=sample_weight, mapping=mapping
+        )
 
         change = conditional_expect(
             X_cand,
-            model_output_change,
+            partial(self._model_output_change, X_eval, y_pred, update_dict),
             reg,
             random_state=self.random_state_,
-            include_idx=True,
-            include_x=True,
-            **self.integration_dict
+            **self.integration_dict,
         )
 
         if mapping is None:
@@ -189,3 +186,13 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             random_state=self.random_state_,
             return_utilities=return_utilities,
         )
+
+    def _model_output_change(
+        self, X_eval, y_pred, update_dict, idx, x_cand, y_pot
+    ):
+        reg_new = _update_reg(
+            **update_dict, y_update=y_pot, idx_update=idx, X_update=x_cand
+        )
+        y_pred_new = reg_new.predict(X_eval)
+
+        return self.loss(y_pred, y_pred_new)

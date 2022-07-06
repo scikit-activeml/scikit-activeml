@@ -1,21 +1,25 @@
+import math
+
 import numpy as np
 from sklearn import clone
 
 from skactiveml.base import (
     SkactivemlRegressor,
     SingleAnnotatorPoolQueryStrategy,
+    SkactivemlClassifier,
 )
-from skactiveml.pool.utils import bootstrap_estimators
 from skactiveml.utils import (
     check_type,
     simple_batch,
     check_scalar,
     MISSING_LABEL,
+    check_X_y,
+    check_random_state,
+    check_callable,
 )
-from skactiveml.utils._validation import check_callable
 
 
-class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
+class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
     """Expected Model Change.
 
     This class implements expected model change, an active learning
@@ -23,33 +27,35 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    k_bootstraps: int, optional (default=3)
+    bootstrap_size : int, optional (default=3)
         The number of bootstraps used to estimate the true model.
-    n_train: int or float, optional (default=0.5)
+    n_train : int or float, optional (default=0.5)
         The size of a bootstrap compared to the training data.
-    ord: int or string, optional (default=2)
+    ord : int or string, optional (default=2)
         The Norm to measure the gradient. Argument will be passed to
         `np.linalg.norm`.
-    feature_map: callable, optional (default=None)
+    feature_map : callable, optional (default=None)
         The feature map of the linear regressor. Takes in the feature data. Must
         output a np.array of dimension 2. The default value is the identity
-        function.
+        function. An example feature map is
+        `sklearn.preprocessing.PolynomialFeatures().fit_transform`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    random_state : numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
     ----------
     [1] Cai, Wenbin, Ya Zhang, and Jun Zhou. Maximizing expected model change
-    for active learning in regression, pages 51--60, 2013.
+    for active learning in regression, 2013 IEEE 13th international conference
+    on data mining pages 51--60, 2013.
 
     """
 
     def __init__(
         self,
-        k_bootstraps=3,
+        bootstrap_size=3,
         n_train=0.5,
         ord=2,
         feature_map=None,
@@ -59,12 +65,10 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             random_state=random_state, missing_label=missing_label
         )
-        self.k_bootstraps = k_bootstraps
+        self.bootstrap_size = bootstrap_size
         self.n_train = n_train
         self.ord = ord
-        self.feature_map = (
-            feature_map if feature_map is not None else lambda x: x
-        )
+        self.feature_map = feature_map
 
     def query(
         self,
@@ -87,13 +91,13 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        reg: SkactivemlRegressor
-            Regressor to predict the data. Assumes a linear regressor with respect
-            to the parameters.
+        reg : SkactivemlRegressor
+            Regressor to predict the data. Assumes a linear regressor with
+            respect to the parameters.
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -138,15 +142,8 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
 
         check_type(reg, "reg", SkactivemlRegressor)
         check_type(fit_reg, "fit_reg", bool)
-        check_scalar(
-            self.n_train,
-            "self.n_train",
-            (int, float),
-            min_val=0,
-            max_val=1,
-            min_inclusive=False,
-        )
-        check_scalar(self.k_bootstraps, "self.k_bootstraps", int, min_val=1)
+        if self.feature_map is None:
+            self.feature_map = lambda x: x
         check_callable(self.feature_map, "self.feature_map")
 
         if fit_reg:
@@ -154,11 +151,11 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        learners = bootstrap_estimators(
+        learners = _bootstrap_estimators(
             reg,
             X,
             y,
-            k_bootstrap=self.k_bootstraps,
+            bootstrap_size=self.bootstrap_size,
             n_train=self.n_train,
             sample_weight=sample_weight,
             random_state=self.random_state_,
@@ -171,7 +168,7 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
         scalars = np.average(np.abs(results_learner - pred), axis=0)
         X_cand_mapped_features = self.feature_map(X_cand)
         norms = np.linalg.norm(X_cand_mapped_features, ord=self.ord, axis=1)
-        utilities_cand = np.multiply(scalars, norms)
+        utilities_cand = scalars * norms
 
         if mapping is None:
             utilities = utilities_cand
@@ -185,3 +182,78 @@ class ExpectedModelChange(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+
+def _bootstrap_estimators(
+    est,
+    X,
+    y,
+    bootstrap_size=5,
+    n_train=0.5,
+    sample_weight=None,
+    random_state=None,
+):
+    """Train the estimator on bootstraps of `X` and `y`.
+
+    Parameters
+    ----------
+    est : SkactivemlClassifier or SkactivemlRegressor
+        The estimator to be be trained.
+    X : array-like of shape (n_samples, n_features)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples)
+        Labels of the training data set.
+    bootstrap_size : int, optional (default=5)
+        The number of trained bootstraps.
+    n_train : int or float, optional (default=0.5)
+        The size of each bootstrap training data set.
+    sample_weight: array-like of shape (n_samples), optional (default=None)
+        Weights of training samples in `X`.
+    random_state : numeric | np.random.RandomState (default=None)
+        The random state to use. If `random_state is None` random
+        `random_state` is used.
+
+    Returns
+    -------
+    bootstrap_est : list of SkactivemlClassifier or list of SkactivemlRegressor
+        The estimators trained on different bootstraps.
+    """
+
+    check_X_y(X=X, y=y, sample_weight=sample_weight)
+    check_scalar(bootstrap_size, "bootstrap_size", int, min_val=1)
+
+    check_type(n_train, "n_train", int, float)
+    if isinstance(n_train, int) and n_train < 1:
+        raise ValueError(
+            f"`n_train` has value `{type(n_train)}`, but must have a value "
+            f"greater or equal to one, if of type `int`."
+        )
+    elif isinstance(n_train, float) and n_train <= 0 or n_train >= 1:
+        raise ValueError(
+            f"`n_train` has value `{type(n_train)}`, but must have a value "
+            f"between zero and one, if of type `float`."
+        )
+    if isinstance(n_train, float):
+        n_train = math.ceil(n_train * len(X))
+
+    check_type(est, "est", SkactivemlClassifier, SkactivemlRegressor)
+    random_state = check_random_state(random_state)
+
+    bootstrap_est = [clone(est) for _ in range(bootstrap_size)]
+    sample_indices = np.arange(len(X))
+    subsets_indices = [
+        random_state.choice(sample_indices, size=int(len(X) * n_train + 1))
+        for _ in range(bootstrap_size)
+    ]
+
+    for est_b, subset_indices in zip(bootstrap_est, subsets_indices):
+        X_for_learner = X[subset_indices]
+        y_for_learner = y[subset_indices]
+        if sample_weight is None:
+            est_b.fit(X_for_learner, y_for_learner)
+        else:
+            weight_for_learner = sample_weight[subset_indices]
+            est_b.fit(X_for_learner, y_for_learner, weight_for_learner)
+
+    return bootstrap_est

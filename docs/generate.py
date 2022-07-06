@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore")
 
 def generate_api_reference_rst(gen_path):
     """Creates the api_reference.rst file in the specified gen_path.
+
     Parameters
     ----------
     gen_path : string
@@ -202,6 +203,7 @@ def generate_strategy_overview_rst(gen_path, examples_data={}):
 def table_from_array(a, title='', caption='', widths=None, header_rows=0,
                      section_level='-', indent=0):
     """Generates a rst-table and returns it as a string.
+
     Parameters
     ----------
     a : array-like, shape=(columns, rows)
@@ -219,6 +221,7 @@ def table_from_array(a, title='', caption='', widths=None, header_rows=0,
         The number of rows to use in the table header.
     indent : int, optional (default=0)
         Number of spaces as indent in each line
+
     Returns
     -------
     string : reStructuredText list-table as String.
@@ -247,6 +250,7 @@ def generate_examples(gen_path, package, json_path):
     """
     Creates all example scripts for the specified package and returns the data
     needed to create the strategy overview.
+
     Parameters
     ----------
     gen_path : string
@@ -258,6 +262,7 @@ def generate_examples(gen_path, package, json_path):
     json_path : string
         The path of the directory where to find the json example files for the
         specified package.
+
     Returns
     -------
     dict : Holds the data needed to create the strategy overview.
@@ -351,6 +356,7 @@ def generate_examples(gen_path, package, json_path):
 def generate_example_script(filename, dir_path, data, package, template_path):
     """
     Generates a python example file needed, for the 'sphinx-gallery' extension.
+
     Parameters
     ----------
     filename : string
@@ -405,12 +411,14 @@ def format_title(title, first_title):
     """
     Generates the string for a title of the example page, formatted for a
     'sphinx-gallery' example script.
+
     Parameters
     ----------
     title : string
         The title string.
     first_title : boolean
         Indicates whether the title is the first title of the example script.
+
     Returns
     -------
     string : The formatted string for the example script.
@@ -431,10 +439,12 @@ def format_subtitle(title):
     """
     Generates the string for a subtitle of the example page, formatted for a
     'sphinx-gallery' example script.
+
     Parameters
     ----------
     title : string
         The subtitle string.
+
     Returns
     -------
     string : The formatted string for the example script.
@@ -449,10 +459,12 @@ def format_text(text):
     """
     Generates the string for a paragraph of the example page, formatted for a
     'sphinx-gallery' example script.
+
     Parameters
     ----------
     text : string
         The paragraph text.
+
     Returns
     -------
     string : The formatted string for the example script.
@@ -467,10 +479,12 @@ def format_code(code):
     """
     Generates the string for a code block of the example page, formatted for a
     'sphinx-gallery' example script.
+
     Parameters
     ----------
     code : string
         The python source code to be formatted.
+
     Returns
     -------
     string : The formatted string for the example script.
@@ -485,6 +499,7 @@ def format_plot(data, template_path):
     """
     Generates the string for the plotting section of the example page,
     formatted for a 'sphinx-gallery' example script.
+
     Parameters
     ----------
     data : dict
@@ -568,10 +583,12 @@ def format_refs(refs: list):
     """
     Generates the string for a references of the example page, formatted for a
     'sphinx-gallery' example script.
+
     Parameters
     ----------
     refs : list of strings
         A list of references to bibliographic entries in the 'refs.bib' file.
+
     Returns
     -------
     string : The formatted string for the example script.
@@ -612,6 +629,7 @@ def dict_to_str(d, idx=None, allocator='=', key_as_string=False):
         shape: {key1:int1,...}
     allocator: string, optional (Default='=')
         The allocator is used to separate the key and the value.
+
     Returns
     -------
     String : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or

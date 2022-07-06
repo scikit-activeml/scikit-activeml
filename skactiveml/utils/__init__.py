@@ -27,6 +27,7 @@ from ._validation import (
     check_bound,
     check_budget_manager,
     check_indices,
+    check_callable,
 )
 
 __all__ = [
@@ -56,4 +57,5 @@ __all__ = [
     "check_budget_manager",
     "check_indices",
     "simple_batch",
+    "check_callable",
 ]

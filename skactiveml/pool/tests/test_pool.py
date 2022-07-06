@@ -30,7 +30,9 @@ from skactiveml.pool import (
     KLDivergenceMaximization,
     MutualInformationGainMaximization,
 )
-from skactiveml.pool._expected_model_change import ExpectedModelChange
+from skactiveml.pool._expected_model_change_maximization import (
+    ExpectedModelChangeMaximization,
+)
 from skactiveml.utils import (
     call_func,
     is_unlabeled,
@@ -42,7 +44,7 @@ from skactiveml.utils._label import check_equal_missing_label
 
 
 REGRESSION_STRATEGIES = [
-    ExpectedModelChange,
+    ExpectedModelChangeMaximization,
     ExpectedModelVarianceReduction,
     ExpectedModelOutputChange,
     KLDivergenceMaximization,

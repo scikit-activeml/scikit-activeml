@@ -18,7 +18,9 @@ from skactiveml.pool.utils import (
     _reshape_scipy_dist,
     _update_X_y,
     _update_reg,
-    bootstrap_estimators,
+)
+from skactiveml.pool._expected_model_change_maximization import (
+    _bootstrap_estimators,
 )
 from skactiveml.regressor import (
     NICKernelRegressor,
@@ -889,10 +891,10 @@ class TestFunctions(unittest.TestCase):
         )
 
     def test_boostrap_aggregation(self):
-        reg_s = bootstrap_estimators(self.reg, self.X, self.y, k_bootstrap=5)
+        reg_s = _bootstrap_estimators(self.reg, self.X, self.y, k_bootstrap=5)
         self.assertEqual(len(reg_s), 5)
 
-        reg_s = bootstrap_estimators(
+        reg_s = _bootstrap_estimators(
             self.reg,
             self.X,
             self.y,
