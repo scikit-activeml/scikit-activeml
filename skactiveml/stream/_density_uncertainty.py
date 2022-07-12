@@ -5,7 +5,7 @@ import warnings
 import numpy as np
 from sklearn.utils import check_array, check_consistent_length, check_scalar
 from sklearn.base import clone
-from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.metrics.pairwise import pairwise_distances
 
 from skactiveml.base import (
     BudgetManager,
@@ -26,24 +26,26 @@ from skactiveml.stream.budgetmanager import (
 )
 
 
-class DBStream(SingleAnnotatorStreamQueryStrategy):
-    """The DBStream [1] query strategy
-    samples instances based on the classifiers minimum margin between posterior
-    probabilities assessed based on the classifier's predictions.The instance
-    is queried when the probability of the most likely class exceeds a
-    threshold calculated based on the budget and the number of classes as well
-    as the instance is a new nearest neighbor of the local density sliding
-    window.
+class DBALStream(SingleAnnotatorStreamQueryStrategy):
+    """DBALStream
+
+    The DBALStream [1] query strategy is an extension to the uncertainty based
+    query strategies proposed by Žliobaitė et al. [2]. In addition to the
+    uncertainty assessment, DBALStream assesses the local density and only
+    allows querying the label for a candidate if that local density is
+    sufficiently high. The local density is measured using a sliding window.
+    The local density is represented by the number of instances, the new
+    instance is the new nearest neighbor from.
+
     Parameters
     ----------
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
+        DensityBasedBudgetManager will be used by default. The
         budget manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -52,26 +54,25 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
-    window_size : int, default=1000
-        Determines the sliding window size of the local density window
-
+    window_size : int, default=100
+        Determines the sliding window size of the local density window.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use `sklearn.metrics.pairwise`
-        euclidean_distances.
-
-    force_full_budget : bool, default=False
-            If true, tries to utilize the full budget. The paper doesn't update
-            the budget manager if the locale density factor is 0
+        density window. If None, `sklearn.metrics.pairwise.pairwise_distances`
+        will be used by default
+    dist_func_dict : dict, optional (default=None)
+        Additional parameters for `dist_func`.
 
     References
     ----------
-    [1]
-
+    [1] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        BigMine 2014 (pp. 133-148).
+    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
     """
 
     def __init__(
@@ -81,13 +82,13 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         random_state=None,
         window_size=1000,
         dist_func=None,
-        force_full_budget=False,
+        dist_func_dict=None,
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
         self.window_size = window_size
         self.dist_func = dist_func
-        self.force_full_budget = force_full_budget
+        self.dist_func_dict = dist_func_dict
 
     def query(
         self,
@@ -100,10 +101,6 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         return_utilities=False,
     ):
         """Ask the query strategy which instances in candidates to acquire.
-
-        Please note that, when the decisions from this function may differ from
-        the final sampling, so the query strategy can be updated later with
-        update(...) with the final sampling.
 
         Parameters
         ----------
@@ -130,7 +127,6 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances in candidates which should be queried,
             with 0 <= n_queried_instances <= n_samples.
-
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
@@ -169,7 +165,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
                 queried_indice = self.budget_manager_.query_by_utility(u)
                 if len(queried_indice) > 0:
                     queried_indices.append(t)
-            elif self.force_full_budget:
+            else:
                 self.budget_manager_.query_by_utility(np.array([np.nan]))
             self.window_.append(x_cand)
 
@@ -189,13 +185,12 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
-
         budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
@@ -204,7 +199,6 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         self : UncertaintyZliobaite
             The UncertaintyZliobaite returns itself, after it is updated.
         """
-        self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             check_type(
@@ -224,11 +218,17 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         if not hasattr(self, "min_dist_"):
             self.min_dist_ = deque(maxlen=self.window_size)
         if self.dist_func is None:
-            self.dist_func_ = euclidean_distances
+            self.dist_func_ = pairwise_distances
         else:
             self.dist_func_ = self.dist_func
         if not callable(self.dist_func_):
             raise TypeError("frequency_estimation needs to be a callable")
+
+        self.dist_func_dict_ = (
+            self.dist_func_dict if self.dist_func_dict is not None else {}
+        )
+        if not isinstance(self.dist_func_dict_, dict):
+            raise TypeError("'dist_func_dict' must be a Python dictionary.")
 
         budget_manager_param_dict = (
             {}
@@ -240,7 +240,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
             local_density_factor = self._calculate_ldf([x_cand])
             if local_density_factor > 0:
                 new_candidates.append(x_cand)
-            elif self.force_full_budget:
+            else:
                 new_candidates.append(np.nan)
             self.window_.append(x_cand)
         call_func(
@@ -252,7 +252,7 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _calculate_ldf(self, candidates):
-        """Calculate the number of new nearest neighbor for candiates in the
+        """Calculate the number of new nearest neighbor for candidates in the
         sliding window.
 
         Parameters
@@ -347,7 +347,6 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
             X=X, y=y, sample_weight=sample_weight
         )
         clf = self._validate_clf(clf, X, y, sample_weight, fit_clf)
-        self._validate_force_full_budget()
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -362,12 +361,19 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
                 self.budget_manager,
                 self._get_default_budget_manager(),
             )
+
         if self.dist_func is None:
-            self.dist_func_ = euclidean_distances
+            self.dist_func_ = pairwise_distances
         else:
             self.dist_func_ = self.dist_func
         if not callable(self.dist_func_):
             raise TypeError("frequency_estimation needs to be a callable")
+
+        self.dist_func_dict_ = (
+            self.dist_func_dict if self.dist_func_dict is not None else {}
+        )
+        if not isinstance(self.dist_func_dict_, dict):
+            raise TypeError("'dist_func_dict' must be a Python dictionary.")
 
         # check density_threshold
         check_scalar(self.window_size, "window_size", int, min_val=1)
@@ -407,15 +413,6 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
         return clf
-
-    def _validate_force_full_budget(self):
-        # check force_full_budget
-        check_type(self.force_full_budget, "force_full_budget", bool)
-        if not hasattr(self, "budget_manager_") and not self.force_full_budget:
-            warnings.warn(
-                "force_full_budget is set to False. "
-                "Therefore the full budget may not be utilised."
-            )
 
     def _validate_X_y_sample_weight(self, X, y, sample_weight):
         """Validate if X, y and sample_weight are numeric and of equal length.
@@ -460,24 +457,28 @@ class DBStream(SingleAnnotatorStreamQueryStrategy):
 
 
 class CogDQS(SingleAnnotatorStreamQueryStrategy):
-    """The CogDQS [1] query strategy
-    samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a threshold calculated based on the budget
-    and the number of classes as well as the instance is at least the new
-    nearest neighbor of density_threshold instances in the cognition window.
+    """CogDQS
+
+    This class is the base for the CogDQS query strategy proposed in [1].
+    To use this strategy, refer to `CogDQSRan`, `CogDQSRanVarUn`,
+    `CogDQSVarUn` , and `CogDQSFixUn`. The CogDQS strategy is an extension to
+    the uncertainty based query strategies proposed by Žliobaitė et al. [2] and
+    follows the same idea as DBALStream [3] where queries for labels is only
+    allowed if the local density around the corresponding instance is
+    sufficiently high. The authors propose the use of a cognitive window that
+    monitors the most representative samples within a data stream.
 
     Parameters
     ----------
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
-        budget manager will be initialized based on the following conditions:
+        a default budget manager will be used that is defined in the class
+        inheriting from CogDQS. The budget manager will be initialized based on
+        the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
             If only a budget manager is given use the budget manager.
@@ -485,30 +486,34 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
     density_threshold : int, default=1
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-
     cognition_window_size : int, default=10
         Determines the size of the cognition window
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use `sklearn.metrics.pairwise`
-        euclidean_distances.
-
+        density window. If None use
+        `sklearn.metrics.pairwise.pairwise_distances`
+    dist_func_dict : dict, optional (default=None)
+        Additional parameters for `dist_func`.
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
 
     References
     ----------
-    [1]
-
+    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
+        Online Active Learning for Drifting Data Streams. IEEE Transactions on
+        Neural Networks and Learning Systems, 1-15.
+    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
+    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        BigMine 2014 (pp. 133-148).
     """
 
     def __init__(
@@ -518,6 +523,7 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         density_threshold=1,
         cognition_window_size=10,
         dist_func=None,
+        dist_func_dict=None,
         random_state=None,
         force_full_budget=False,
     ):
@@ -525,6 +531,7 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         self.budget_manager = budget_manager
         self.density_threshold = density_threshold
         self.dist_func = dist_func
+        self.dist_func_dict = dist_func_dict
         self.cognition_window_size = cognition_window_size
         self.force_full_budget = force_full_budget
 
@@ -569,7 +576,6 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances in candidates which should be queried,
             with 0 <= n_queried_instances <= n_samples.
-
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
@@ -639,20 +645,19 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape (n_samples, n_features)
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
-
         budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
         Returns
         -------
-        self : UncertaintyZliobaite
-            The UncertaintyZliobaite returns itself, after it is updated.
+        self : CogDQS
+            The CogDQS returns itself, after it is updated.
         """
         self._validate_force_full_budget()
         # check if a budget_manager is set
@@ -670,11 +675,17 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             )
         # _init_members
         if self.dist_func is None:
-            self.dist_func_ = euclidean_distances
+            self.dist_func_ = pairwise_distances
         else:
             self.dist_func_ = self.dist_func
         if not callable(self.dist_func_):
             raise TypeError("frequency_estimation needs to be a callable")
+
+        self.dist_func_dict_ = (
+            self.dist_func_dict if self.dist_func_dict is not None else {}
+        )
+        if not isinstance(self.dist_func_dict_, dict):
+            raise TypeError("'dist_func_dict' must be a Python dictionary.")
         if not hasattr(self, "min_dist_"):
             self.min_dist_ = []
         if not hasattr(self, "t_"):
@@ -860,11 +871,17 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             )
 
         if self.dist_func is None:
-            self.dist_func_ = euclidean_distances
+            self.dist_func_ = pairwise_distances
         else:
             self.dist_func_ = self.dist_func
         if not callable(self.dist_func_):
             raise TypeError("frequency_estimation needs to be a callable")
+
+        self.dist_func_dict_ = (
+            self.dist_func_dict if self.dist_func_dict is not None else {}
+        )
+        if not isinstance(self.dist_func_dict_, dict):
+            raise TypeError("'dist_func_dict' must be a Python dictionary.")
 
         if not hasattr(self, "min_dist_"):
             self.min_dist_ = []
@@ -953,22 +970,25 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
 
 
 class CogDQSRan(CogDQS):
-    """The CogDQS [1] query strategy
-    samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instances is queried randomly if it is at
-    least the new nearest neighbor of density_threshold instances in the
-    cognition window. Therefore the full budget may not be utilised.
+    """CogDQSRan
+
+    This class implements the CogDQS strategy with Random Sampling. The CogDQS
+    strategy is an extension to the uncertainty based query strategies proposed
+    by Žliobaitė et al. [2] and follows the same idea as DBALStream [3] where
+    queries for labels is only allowed if the local density around the
+    corresponding instance is sufficiently high. The authors propose the use of
+    a cognitive window that monitors the most representative samples within a
+    data stream.
 
     Parameters
     ----------
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
+        RandomBudgetManager will be used by default. The
         budget manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -977,29 +997,34 @@ class CogDQSRan(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
     density_threshold : int, default=1
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-
     cognition_window_size : int, default=10
         Determines the size of the cognition window
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use `sklearn.metrics.pairwise`
-        euclidean_distances.
-
+        density window. If None use
+        `sklearn.metrics.pairwise.pairwise_distances`
+    dist_func_dict : dict, optional (default=None)
+        Additional parameters for `dist_func`.
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
 
     References
     ----------
-    [1]
+    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
+        Online Active Learning for Drifting Data Streams. IEEE Transactions on
+        Neural Networks and Learning Systems, 1-15.
+    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
+    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        BigMine 2014 (pp. 133-148).
 
     """
 
@@ -1015,23 +1040,25 @@ class CogDQSRan(CogDQS):
 
 
 class CogDQSRanVarUn(CogDQS):
-    """The CogDQS [1] query strategy
-    samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a threshold calculated based on the budget
-    and the number of classes as well as the instance is at least the new
-    nearest neighbor of density_threshold instances in the cognition window.
+    """CogDQSRanVarUn
+
+    This class implements the CogDQS strategy with RandomVariableUncertainty.
+    The CogDQS strategy is an extension to the uncertainty based query
+    strategies proposed by Žliobaitė et al. [2] and follows the same idea as
+    DBALStream [3] where queries for labels is only allowed if the local
+    density around the corresponding instance is sufficiently high. The authors
+    propose the use of a cognitive window that monitors the most representative
+    samples within a data stream.
 
     Parameters
     ----------
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
+        RandomVariableUncertaintyBudgetManager will be used by default. The
         budget manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -1040,29 +1067,34 @@ class CogDQSRanVarUn(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
     density_threshold : int, default=1
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-
     cognition_window_size : int, default=10
         Determines the size of the cognition window
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use `sklearn.metrics.pairwise`
-        euclidean_distances.
-
+        density window. If None use
+        `sklearn.metrics.pairwise.pairwise_distances`
+    dist_func_dict : dict, optional (default=None)
+        Additional parameters for `dist_func`.
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
 
     References
     ----------
-    [1]
+    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
+        Online Active Learning for Drifting Data Streams. IEEE Transactions on
+        Neural Networks and Learning Systems, 1-15.
+    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
+    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        BigMine 2014 (pp. 133-148).
 
     """
 
@@ -1078,23 +1110,25 @@ class CogDQSRanVarUn(CogDQS):
 
 
 class CogDQSVarUn(CogDQS):
-    """The CogDQS [1] query strategy
-    samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a threshold calculated based on the budget
-    and the number of classes as well as the instance is at least the new
-    nearest neighbor of density_threshold instances in the cognition window.
+    """CogDQSVarUn
+
+    This class implements the CogDQS strategy with VariableUncertainty. The
+    CogDQS strategy is an extension to the uncertainty based query strategies
+    proposed by Žliobaitė et al. [2] and follows the same idea as
+    DBALStream [3] where queries for labels is only allowed if the local
+    density around the corresponding instance is sufficiently high. The authors
+    propose the use of a cognitive window that monitors the most representative
+    samples within a data stream.
 
     Parameters
     ----------
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
+        VariableUncertaintyBudgetManager will be used by default. The
         budget manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -1103,29 +1137,34 @@ class CogDQSVarUn(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
     density_threshold : int, default=1
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-
     cognition_window_size : int, default=10
         Determines the size of the cognition window
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use `sklearn.metrics.pairwise`
-        euclidean_distances.
-
+        density window. If None use
+        `sklearn.metrics.pairwise.pairwise_distances`
+    dist_func_dict : dict, optional (default=None)
+        Additional parameters for `dist_func`.
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
 
     References
     ----------
-    [1]
+    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
+        Online Active Learning for Drifting Data Streams. IEEE Transactions on
+        Neural Networks and Learning Systems, 1-15.
+    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
+    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        BigMine 2014 (pp. 133-148).
 
     """
 
@@ -1141,21 +1180,21 @@ class CogDQSVarUn(CogDQS):
 
 
 class CogDQSFixUn(CogDQS):
-    """The CogDQS [1] query strategy
-    samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a threshold calculated based on the budget
-    and the number of classes as well as the instance is at least the new
-    nearest neighbor of density_threshold instances in the cognition window.
-    The full budget may not be utilised since the threshold is fixed by
-    the number of classes.
+    """CogDQSFixUn
+
+    This class implements the CogDQS strategy with FixedUncertainty. The CogDQS
+    strategy is an extension to the uncertainty based query strategies proposed
+    by Žliobaitė et al. [2] and follows the same idea as DBALStream [3] where
+    queries for labels is only allowed if the local density around the
+    corresponding instance is sufficiently high. The authors propose the use of
+    a cognitive window that monitors the most representative samples within a
+    data stream.
 
     Parameters
     ----------
     budget : float, default=None
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
@@ -1168,29 +1207,34 @@ class CogDQSFixUn(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
     density_threshold : int, default=1
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-
     cognition_window_size : int, default=10
         Determines the size of the cognition window
-
     random_state : int, RandomState instance, default=None
         Controls the randomness of the estimator.
-
     dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use `sklearn.metrics.pairwise`
-        euclidean_distances.
-
+        density window. If None use
+        `sklearn.metrics.pairwise.pairwise_distances`
+    dist_func_dict : dict, optional (default=None)
+        Additional parameters for `dist_func`.
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
 
     References
     ----------
-    [1]
+    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
+        Online Active Learning for Drifting Data Streams. IEEE Transactions on
+        Neural Networks and Learning Systems, 1-15.
+    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
+    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        BigMine 2014 (pp. 133-148).
 
     """
 

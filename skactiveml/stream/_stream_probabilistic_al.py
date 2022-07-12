@@ -20,7 +20,7 @@ from ..utils import (
 
 
 class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
-    """Probabilistic Active Learning in Datastreams.
+    """StreamProbabilisticAL
 
     Probabilistic Active Learning in Datastreams (StreamProbabilisticAL) is an
     extension to Multi-Class Probabilistic Active Learning (McPAL)
@@ -38,7 +38,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budget
+        BalancedIncrementalQuantileFilter will be used by default. The budget
         manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -68,10 +68,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
 
     References
     ----------
-    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active
-        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M.
-        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture
-        Notes in Computer Science, vol 9385. Springer, Cham.
+    [1] Kottke, M. (2015). Probabilistic Active Learning in Datastreams. In
+        Advances in Intelligent Data Analysis XIV (pp. 145–157). Springer.
     """
 
     def __init__(

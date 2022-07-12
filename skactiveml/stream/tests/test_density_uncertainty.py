@@ -1,11 +1,17 @@
 import unittest
 
 import numpy as np
-from sklearn.metrics import DistanceMetric
+from sklearn.metrics import pairwise_distances
 from sklearn.datasets import make_classification
 
 from skactiveml.classifier import ParzenWindowClassifier
-from skactiveml.stream import DBStream, CogDQSRan, CogDQSRanVarUn, CogDQSVarUn, CogDQSFixUn
+from skactiveml.stream import (
+    DBALStream,
+    CogDQSRan,
+    CogDQSRanVarUn,
+    CogDQSVarUn,
+    CogDQSFixUn,
+)
 
 
 class TemplateTestCogDQS:
@@ -27,7 +33,8 @@ class TemplateTestCogDQS:
         self.kwargs = dict(
             candidates=self.candidates, clf=self.clf, X=self.X, y=self.y
         )
-        self.dist_func = DistanceMetric.get_metric("manhattan").pairwise
+        self.dist_func = pairwise_distances
+        self.dist_func_dict = {"metric": "manhattan"}
 
     def test_init_param_budget(self):
         # budget must be defined as a float greater than 0
@@ -75,11 +82,46 @@ class TemplateTestCogDQS:
             dist_func="string",
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
+
         query_strategy = self.get_query_strategy()(
             dist_func=0,
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        self.assertRaises(TypeError, query_strategy.update, candidates=self.X, queried_indices=np.array([1,2]))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
+
+    def test_init_param_dist_func_dict(self):
+        query_strategy = self.get_query_strategy()(
+            dist_func=self.dist_func, dist_func_dict="string"
+        )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
+
+        query_strategy = self.get_query_strategy()(
+            dist_func=self.dist_func, dist_func_dict=0
+        )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
 
     def test_init_param_force_full_budget(self):
         query_strategy = self.get_query_strategy()(
@@ -90,7 +132,6 @@ class TemplateTestCogDQS:
             force_full_budget=0,
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-
 
     def test_query_param_candidates(self):
         # candidates must be defined as a two dimensinal array
@@ -300,7 +341,7 @@ class TemplateTestCogDQS:
             clf=self.clf,
             X=self.X,
             y=self.y,
-            fit_clf=True
+            fit_clf=True,
         )
 
 
@@ -318,13 +359,13 @@ class TestCogDQSVarUn(TemplateTestCogDQS, unittest.TestCase):
     def get_query_strategy(self):
         return CogDQSVarUn
 
-    
+
 class TestCogDQSFixUn(TemplateTestCogDQS, unittest.TestCase):
     def get_query_strategy(self):
         return CogDQSFixUn
 
 
-class TestDBStream(unittest.TestCase):
+class TestDBALStream(unittest.TestCase):
     def setUp(self):
         # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
@@ -343,9 +384,11 @@ class TestDBStream(unittest.TestCase):
         self.kwargs = dict(
             candidates=self.candidates, clf=self.clf, X=self.X, y=self.y
         )
+        self.dist_func = pairwise_distances
+        self.dist_func_dict = {"metric": "manhattan"}
 
     def get_query_strategy(self):
-        return DBStream
+        return DBALStream
 
     def test_init_param_budget(self):
         # budget must be defined as a float greater than 0
@@ -383,21 +426,46 @@ class TestDBStream(unittest.TestCase):
             dist_func="string",
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
+
         query_strategy = self.get_query_strategy()(
             dist_func=0,
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        self.assertRaises(TypeError, query_strategy.update, candidates=self.X, queried_indices=np.array([1,2]))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
 
-    def test_init_param_force_full_budget(self):
+    def test_init_param_dist_func_dict(self):
         query_strategy = self.get_query_strategy()(
-            force_full_budget="string",
+            dist_func=self.dist_func, dist_func_dict="string"
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
+
         query_strategy = self.get_query_strategy()(
-            force_full_budget=0,
+            dist_func=self.dist_func, dist_func_dict=0
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        self.assertRaises(
+            TypeError,
+            query_strategy.update,
+            candidates=self.X,
+            queried_indices=np.array([1, 2]),
+        )
 
     def test_query_param_candidates(self):
         # candidates must be defined as a two dimensinal array
@@ -598,14 +666,4 @@ class TestDBStream(unittest.TestCase):
             X=self.X,
             y=self.y[1:],
             return_utilities=1,
-        )
-    
-    def test_query_with_force(self):
-        query_strategy = self.get_query_strategy()(force_full_budget=True)
-        query_strategy.query(
-            candidates=self.candidates,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            fit_clf=True
         )

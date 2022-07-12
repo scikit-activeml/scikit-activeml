@@ -11,7 +11,13 @@ from ._uncertainty_zliobaite import (
     Split,
     RandomVariableUncertainty,
 )
-from ._density_uncertainty import DBStream, CogDQSRan, CogDQSRanVarUn, CogDQSVarUn, CogDQSFixUn
+from ._density_uncertainty import (
+    DBALStream,
+    CogDQSRan,
+    CogDQSRanVarUn,
+    CogDQSVarUn,
+    CogDQSFixUn,
+)
 
 __all__ = [
     "StreamRandomSampling",
@@ -21,7 +27,7 @@ __all__ = [
     "Split",
     "StreamProbabilisticAL",
     "RandomVariableUncertainty",
-    "DBStream",
+    "DBALStream",
     "CogDQSRan",
     "CogDQSRanVarUn",
     "CogDQSVarUn",
