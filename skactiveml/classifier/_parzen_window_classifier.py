@@ -10,7 +10,7 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted, check_scalar
 
 from ..base import ClassFrequencyEstimator
-from ..utils import MISSING_LABEL, compute_vote_vectors
+from ..utils import MISSING_LABEL, compute_vote_vectors, is_labeled
 
 
 class ParzenWindowClassifier(ClassFrequencyEstimator):
@@ -139,6 +139,17 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         self.metric_dict_ = (
             self.metric_dict if self.metric_dict is not None else {}
         )
+        if (
+            "gamma" in self.metric_dict_
+            and self.metric_dict["gamma"] == "mean"
+        ):
+            delta = np.sqrt(2) * 1e-6
+            is_lbld = is_labeled(y, missing_label=self.missing_label)
+            N = np.max([2, np.sum(is_lbld)])
+            variance = np.var(X, axis=0) ** 2
+            numerator = 2 * N * np.sum(variance)
+            denominator = (N - 1) * np.log((N - 1) / delta ** 2)
+            self.metric_dict_["gamma"] = np.sqrt(numerator / denominator)
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 

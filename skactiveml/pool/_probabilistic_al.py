@@ -172,6 +172,8 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
         if self.metric is not None:
+            if self.metric_dict is None:
+                self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
                 metric_dict=self.metric_dict,

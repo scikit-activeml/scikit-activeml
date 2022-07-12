@@ -22,6 +22,11 @@ class TestParzenWindowClassifier(unittest.TestCase):
             missing_label="nan", metric_dict=["gamma"]
         )
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
+        pwc = ParzenWindowClassifier(
+            missing_label="nan", metric_dict={"gamma": "mean"}
+        )
+        pwc.fit(X=self.X, y=self.y)
+        self.assertNotEqual(pwc.metric_dict_["gamma"], "mean")
 
     def test_init_param_metric(self):
         pwc = ParzenWindowClassifier()
