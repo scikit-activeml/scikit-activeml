@@ -879,7 +879,7 @@ method estimating the performances per sample of each annotator as
 proxies of the provided annotation’s qualities.
 
 ``predict_annotator_perf`` function
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Required Parameters:
 
