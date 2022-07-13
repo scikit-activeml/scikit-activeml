@@ -240,6 +240,7 @@ def average_kl_divergence(probas):
         raise ValueError(
             f"Expected 3D array, got {probas.ndim}D array instead."
         )
+    n_estimators = probas.shape[0]
 
     # Calculate the average KL divergence.
     probas_mean = np.mean(probas, axis=0)
@@ -247,7 +248,7 @@ def average_kl_divergence(probas):
         scores = np.nansum(
             np.nansum(probas * np.log(probas / probas_mean), axis=2), axis=0
         )
-    scores = scores / probas.shape[0]
+    scores = scores / n_estimators
 
     return scores
 
@@ -276,6 +277,7 @@ def vote_entropy(votes, classes):
     """
     # Check `votes` array.
     votes = check_array(votes)
+    n_estimators = votes.shape[1]
 
     # Count the votes.
     vote_count = compute_vote_vectors(
@@ -283,7 +285,9 @@ def vote_entropy(votes, classes):
     )
 
     # Compute vote entropy.
-    v = vote_count / len(votes)
+    v = vote_count / n_estimators
+    print(v)
+
     with np.errstate(divide="ignore", invalid="ignore"):
-        scores = -np.nansum(v * np.log(v), axis=1) / np.log(len(votes))
+        scores = np.nansum(-v * np.log(v), axis=1)
     return scores
