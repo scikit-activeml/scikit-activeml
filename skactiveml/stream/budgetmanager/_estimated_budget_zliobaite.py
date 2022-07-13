@@ -797,8 +797,7 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         # high enough
         for i, d in enumerate(samples):
             budget_left = tmp_u_t / self.w < self.budget_
-            if not budget_left:
-                d = False
+            d = d if budget_left else False
             tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + (
                 d and not np.isnan(utilities[i])
             )

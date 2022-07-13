@@ -30,6 +30,7 @@ class TemplateTestCogDQS:
         self.candidates = X[train_init_size:, :]
         self.y = y[:train_init_size]
         self.clf = ParzenWindowClassifier()
+        self.clf.fit(self.X, self.y)
         self.kwargs = dict(
             candidates=self.candidates, clf=self.clf, X=self.X, y=self.y
         )
@@ -132,6 +133,11 @@ class TemplateTestCogDQS:
             force_full_budget=0,
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = self.get_query_strategy()(
+            force_full_budget=True,
+        )
+        query_strategy.query(**self.kwargs)
+
 
     def test_query_param_candidates(self):
         # candidates must be defined as a two dimensinal array
