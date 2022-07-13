@@ -7,11 +7,13 @@ from ...utils import check_random_state, check_scalar
 
 
 class EstimatedBudgetZliobaite(BudgetManager):
-    """Budget manager which checks, whether the specified budget has been
+    """EstimatedBudgetZliobaite
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget.
 
-    This budget manager calculates the estimated budget spent in the last
+    This budget manager calculates the estimated budget [1] spent in the last
     w steps and compares that to the budget. If the ratio is smaller
     than the specified budget, i.e., budget - u_t / w > 0, the budget
     manager samples an instance when its utility is higher than the budget.
@@ -27,6 +29,12 @@ class EstimatedBudgetZliobaite(BudgetManager):
     w : int
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
+
+    References
+    ----------
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
     """
 
     def __init__(self, budget=None, w=100):
@@ -79,7 +87,9 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
 
 class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which is optimized for FixedUncertainty and checks,
+    """FixedUncertaintyBudgetManager
+    
+    Budget manager which is optimized for FixedUncertainty and checks,
     whether the specified budget has been exhausted already. If not, an
     instance is queried, when the utility is higher than the specified budget
     and the probability of the most likely class exceeds a threshold
@@ -195,7 +205,9 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 
 class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which checks, whether the specified budget has been
+    """VariableUncertaintyBudgetManager
+    
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
@@ -345,7 +357,9 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 
 class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which checks, whether the specified budget has been
+    """RandomVariableUncertaintyBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
@@ -527,7 +541,9 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 
 class SplitBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which checks, whether the specified budget has been
+    """SplitBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget. 100*v% of instances will be queried
     randomly and in 100*(1-v)% of will be queried cases according
@@ -707,6 +723,39 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
 
 class RandomBudgetManager(EstimatedBudgetZliobaite):
+    """RandomBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
+    exhausted already. If not, an instance is queried, when the utility is
+    higher than the specified budget. If budget is available, budget% instances
+    are queried randomly.
+
+    This budget manager calculates the estimated budget spent in the last
+    w steps and compares that to the budget. If the ratio is smaller
+    than the specified budget, i.e., budget - u_t / w > 0 , the budget
+    manager samples an instance when its utility is higher than the budget.
+    u is the estimate of how many true lables were queried within the last
+    w steps. The recursive funktion,
+    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    See also :class:`.EstimatedBudgetZliobaite`
+
+    Parameters
+    ----------
+    budget : float
+        Specifies the ratio of instances which are allowed to be queried, with
+        0 <= budget <= 1.
+    w : int
+        Specifies the size of the memory window. Controlles the budget in the
+        last w steps taken. Default = 100
+    theta : float
+        Specifies the starting threshold in wich instances are purchased. This
+        value of theta will recalculated after each instance. Default = 1
+    s : float
+        Specifies the value in wich theta is decresed or increased based on the
+        purchase of the given label. Default = 0.01
+    v : float
+        Specifies the percent value of instances queried randomly.
+    """
     def __init__(self, budget=None, w=100, random_state=0):
         super().__init__(budget, w)
         self.random_state = random_state
@@ -750,7 +799,9 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
             budget_left = tmp_u_t / self.w < self.budget_
             if not budget_left:
                 d = False
-            tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + (d and not np.isnan(utilities[i]))
+            tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + (
+                d and not np.isnan(utilities[i])
+            )
             # get the indices instances that should be queried
             if d and not np.isnan(utilities[i]):
                 queried_indices.append(i)

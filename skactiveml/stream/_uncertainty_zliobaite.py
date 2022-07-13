@@ -24,10 +24,10 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
     """UncertaintyZliobaite
 
     The UncertaintyZliobaite class provides the base for query strategies
-    proposed by Žliobaitė et al. in [1]. The strategies evaluate the classifier's
-    uncertainty based on its predictions and instances' labels are queried when
-    the uncertainty exceeds a specific threshold. Žliobaitė et al. propose
-    various techniques to calculate such a threshold.
+    proposed by Žliobaitė et al. in [1]. The strategies evaluate the
+    classifier's uncertainty based on its predictions and instances' labels are
+    queried when the uncertainty exceeds a specific threshold. Žliobaitė et al.
+    propose various techniques to calculate such a threshold.
 
     Parameters
     ----------
@@ -479,7 +479,9 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
 
 
 class Split(UncertaintyZliobaite):
-    """The Split [1] query strategy samples in 100*v% of instances randomly and
+    """Split
+
+    The Split [1] query strategy samples in 100*v% of instances randomly and
     in 100*(1-v)% of cases according to VariableUncertainty.
 
     Parameters

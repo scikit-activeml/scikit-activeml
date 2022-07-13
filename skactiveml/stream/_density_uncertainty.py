@@ -189,8 +189,10 @@ class DBALStream(SingleAnnotatorStreamQueryStrategy):
         (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
+
         budget_manager_param_dict : kwargs
             Optional kwargs for budget_manager.
 
@@ -499,6 +501,7 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
         `sklearn.metrics.pairwise.pairwise_distances`
     dist_func_dict : dict, optional (default=None)
         Additional parameters for `dist_func`.
+
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
@@ -1039,16 +1042,16 @@ class CogDQSRan(CogDQS):
         return RandomBudgetManager
 
 
-class CogDQSRanVarUn(CogDQS):
-    """CogDQSRanVarUn
+class CogDQSFixUn(CogDQS):
+    """CogDQSFixUn
 
-    This class implements the CogDQS strategy with RandomVariableUncertainty.
-    The CogDQS strategy is an extension to the uncertainty based query
-    strategies proposed by Žliobaitė et al. [2] and follows the same idea as
-    DBALStream [3] where queries for labels is only allowed if the local
-    density around the corresponding instance is sufficiently high. The authors
-    propose the use of a cognitive window that monitors the most representative
-    samples within a data stream.
+    This class implements the CogDQS strategy with FixedUncertainty. The CogDQS
+    strategy is an extension to the uncertainty based query strategies proposed
+    by Žliobaitė et al. [2] and follows the same idea as DBALStream [3] where
+    queries for labels is only allowed if the local density around the
+    corresponding instance is sufficiently high. The authors propose the use of
+    a cognitive window that monitors the most representative samples within a
+    data stream.
 
     Parameters
     ----------
@@ -1058,7 +1061,7 @@ class CogDQSRanVarUn(CogDQS):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        RandomVariableUncertaintyBudgetManager will be used by default. The
+        FixedUncertaintyBudgetManager will be used by default. The
         budget manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -1078,8 +1081,7 @@ class CogDQSRanVarUn(CogDQS):
         The distance function used to calculate the distances within the local
         density window. If None use
         `sklearn.metrics.pairwise.pairwise_distances`
-    dist_func_dict : dict, optional (default=None)
-        Additional parameters for `dist_func`.
+
     force_full_budget : bool, default=False
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
@@ -1106,7 +1108,7 @@ class CogDQSRanVarUn(CogDQS):
         budget_manager : BudgetManager
             The BudgetManager that should be used by default.
         """
-        return RandomVariableUncertaintyBudgetManager
+        return FixedUncertaintyBudgetManager
 
 
 class CogDQSVarUn(CogDQS):
@@ -1179,16 +1181,16 @@ class CogDQSVarUn(CogDQS):
         return VariableUncertaintyBudgetManager
 
 
-class CogDQSFixUn(CogDQS):
-    """CogDQSFixUn
+class CogDQSRanVarUn(CogDQS):
+    """CogDQSRanVarUn
 
-    This class implements the CogDQS strategy with FixedUncertainty. The CogDQS
-    strategy is an extension to the uncertainty based query strategies proposed
-    by Žliobaitė et al. [2] and follows the same idea as DBALStream [3] where
-    queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
-    a cognitive window that monitors the most representative samples within a
-    data stream.
+    This class implements the CogDQS strategy with RandomVariableUncertainty.
+    The CogDQS strategy is an extension to the uncertainty based query
+    strategies proposed by Žliobaitė et al. [2] and follows the same idea as
+    DBALStream [3] where queries for labels is only allowed if the local
+    density around the corresponding instance is sufficiently high. The authors
+    propose the use of a cognitive window that monitors the most representative
+    samples within a data stream.
 
     Parameters
     ----------
@@ -1198,7 +1200,7 @@ class CogDQSFixUn(CogDQS):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
+        RandomVariableUncertaintyBudgetManager will be used by default. The
         budget manager will be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
@@ -1246,4 +1248,4 @@ class CogDQSFixUn(CogDQS):
         budget_manager : BudgetManager
             The BudgetManager that should be used by default.
         """
-        return FixedUncertaintyBudgetManager
+        return RandomVariableUncertaintyBudgetManager
