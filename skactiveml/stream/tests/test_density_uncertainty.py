@@ -136,8 +136,8 @@ class TemplateTestCogDQS:
         query_strategy = self.get_query_strategy()(
             force_full_budget=True,
         )
-        query_strategy.query(**self.kwargs)
-
+        queried_indices = query_strategy.query(**self.kwargs)
+        query_strategy.update(self.candidates, queried_indices)
 
     def test_query_param_candidates(self):
         # candidates must be defined as a two dimensinal array
