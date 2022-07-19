@@ -12,7 +12,7 @@ from sklearn.datasets import make_blobs
 from sklearn.ensemble import RandomForestClassifier
 
 from docs.generate import generate_examples
-from skactiveml import pool, stream
+from skactiveml import pool
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.classifier import (
     ParzenWindowClassifier,
@@ -27,8 +27,8 @@ from skactiveml.utils import (
     MISSING_LABEL,
     is_labeled,
     unlabeled_indices,
+    check_equal_missing_label,
 )
-from skactiveml.utils._label import check_equal_missing_label
 
 
 class TestGeneral(unittest.TestCase):
