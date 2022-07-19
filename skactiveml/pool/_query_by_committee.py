@@ -286,7 +286,6 @@ def vote_entropy(votes, classes):
 
     # Compute vote entropy.
     v = vote_count / n_estimators
-    print(v)
 
     with np.errstate(divide="ignore", invalid="ignore"):
         scores = np.nansum(-v * np.log(v), axis=1)
