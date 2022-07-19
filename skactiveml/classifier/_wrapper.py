@@ -166,6 +166,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_is_fitted(self)
         X = check_array(X, **self.check_X_dict_)
         self._check_n_features(X, reset=False)
+        random_state_ = deepcopy(self.random_state_)
         if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
@@ -173,11 +174,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
-                    costs, random_state=self.random_state_, axis=1
+                    costs, random_state=random_state_, axis=1
                 )
         else:
             p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state_.choice(
+            y_pred = random_state_.choice(
                 np.arange(len(self.classes_)), len(X), replace=True, p=p
             )
         y_pred = self._le.inverse_transform(y_pred)

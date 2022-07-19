@@ -124,6 +124,9 @@ class TestClassifier(unittest.TestCase):
             if hasattr(clf_mdl, "predict_annotator_perf"):
                 P = clf_mdl.predict_annotator_perf(X=self.X)
                 np.testing.assert_allclose(P, np.ones((len(self.X), 1)) / 3)
+            score_old = clf_mdl.score(self.X, self.y_true)
+            score_new = clf_mdl.score(self.X, self.y_true)
+            self.assertEqual(score_old, score_new)
 
         with self.subTest(msg="Labels Shape Test", clf_name=clf):
             self.assertRaises(

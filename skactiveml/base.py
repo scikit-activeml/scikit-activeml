@@ -1092,7 +1092,9 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         """
         P = self.predict_proba(X)
         costs = np.dot(P, self.cost_matrix_)
-        y_pred = rand_argmin(costs, random_state=self.random_state_, axis=1)
+        y_pred = rand_argmin(
+            costs, random_state=deepcopy(self.random_state_), axis=1
+        )
         y_pred = self._le.inverse_transform(y_pred)
         y_pred = np.asarray(y_pred, dtype=self.classes_.dtype)
         return y_pred
