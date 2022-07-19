@@ -223,7 +223,9 @@ class TestVoteEntropy(unittest.TestCase):
     def setUp(self):
         self.classes = np.array([0, 1, 2])
         self.votes = np.array([[0, 0, 2], [1, 0, 2], [2, 1, 2]]).T
-        self.scores = np.array([1, 0.5793801643, 0])
+        self.scores = np.array(
+            [-np.log(1 / 3), -2 / 3 * np.log(2 / 3) - 1 / 3 * np.log(1 / 3), 0]
+        )
 
     def test_param_votes(self):
         self.assertRaises(
@@ -270,6 +272,5 @@ class TestVoteEntropy(unittest.TestCase):
         )
 
     def test_vote_entropy(self):
-        vote_entropy(votes=np.full((10, 10), 0), classes=self.classes)
         scores = vote_entropy(votes=self.votes, classes=self.classes)
-        np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
+        np.testing.assert_array_equal(scores.round(3), self.scores.round(3))
