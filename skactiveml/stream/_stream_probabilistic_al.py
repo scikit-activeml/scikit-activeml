@@ -57,7 +57,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         be used instead. If this is not defined, an Exception is raised.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-        If metric_dict is None, sets gamma to mean.
+        If metric_dict is None and metric is 'rbf', 'chi2', 'polynomial',
+        'poly', 'laplacian', 'sigmoid', metric_dict is set to
+        {'gamma': 'mean'}.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the query strategy.
     prior : float
@@ -160,7 +162,18 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
-            if self.metric_dict is None:
+            allowed_mean_kernel_metrics = [
+                "rbf",
+                "chi2",
+                "polynomial",
+                "poly",
+                "laplacian",
+                "sigmoid",
+            ]
+            if (
+                self.metric_dict is None
+                and self.metric in allowed_mean_kernel_metrics
+            ):
                 self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(
                 metric=self.metric,

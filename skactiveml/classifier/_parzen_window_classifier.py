@@ -45,6 +45,9 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         available samples are considered.
     metric_dict : dict,
         Any further parameters are passed directly to the kernel function.
+        For the the kernels 'rbf', 'chi2', 'polynomial', 'poly', 'laplacian',
+        and 'sigmoid', we implement the mean kernel [2] and use it when gamma
+        is set to 'mean' (i.e., {'gamma': 'mean'}).
 
     Attributes
     ----------
@@ -66,9 +69,13 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
     References
     ----------
-    .. [1] `O. Chapelle, "Active Learning for Parzen Window Classifier",
+    .. [1] O. Chapelle, "Active Learning for Parzen Window Classifier",
        Proceedings of the Tenth International Workshop Artificial Intelligence
-       and Statistics, 2005.`_
+       and Statistics, 2005.
+       [2] Chaudhuri, A., Kakde, D., Sadek, C., Gonzalez, L., & Kong, S.,
+       "The Mean and Median Criteria for Kernel Bandwidth Selection for Support
+       Vector Data Description" IEEE International Conference on Data
+       Mining Workshops (ICDMW), 2017.
     """
 
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
@@ -139,9 +146,18 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         self.metric_dict_ = (
             self.metric_dict if self.metric_dict is not None else {}
         )
+        allowed_mean_kernel_metrics = [
+            "rbf",
+            "chi2",
+            "polynomial",
+            "poly",
+            "laplacian",
+            "sigmoid",
+        ]
         if (
             "gamma" in self.metric_dict_
             and self.metric_dict["gamma"] == "mean"
+            and self.metric in allowed_mean_kernel_metrics
         ):
             delta = np.sqrt(2) * 1e-6
             is_lbld = is_labeled(y, missing_label=self.missing_label)
