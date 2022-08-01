@@ -211,7 +211,9 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         # exchange nan values to make rankdata work.
         nan_values = np.isnan(combined_ranking)
         combined_ranking[nan_values] = -np.inf
-        combined_ranking = rankdata(combined_ranking, **rank_dict).astype(float)
+        combined_ranking = rankdata(combined_ranking, **rank_dict).astype(
+            float
+        )
         combined_ranking[nan_values] = np.nan
         combined_ranking = combined_ranking.reshape(cr_shape)
 

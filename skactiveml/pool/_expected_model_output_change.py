@@ -27,12 +27,12 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    integration_dict: dict, optional (default=None)
+    integration_dict : dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration_method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `skactiveml.pool.utils.conditional_expect`.
         The default `integration_method` is `assume_linear`.
-    loss: callable, optional (default=None)
+    loss : callable, optional (default=None)
         The loss for predicting a target value instead of the true value.
         Takes in the predicted values of an evaluation set and the true values
         of the evaluation set and returns the error, a scalar value.
@@ -41,15 +41,15 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    random_state : numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
     ----------
-    [1] Kaeding, Christoph and Rodner, Erik and Freytag, Alexander and Mothes,
-        Oliver and Barz, Bjoern and Denzler, Joachim and Carl Zeiss AG. Active
+    [1] Christoph Kaeding, Erik Rodner, Alexander Freytag, Oliver Mothes,
+        Oliver, Bjoern Barz and Joachim Denzler. Active
         Learning for Regression Tasks with Expected Model Output Change, BMVC,
-        page 103 and subsequently, 2018.
+        page 1-15, 2018.
 
     """
 
@@ -88,12 +88,12 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        reg: ProbabilisticRegressor
+        reg : ProbabilisticRegressor
             Predicts the output and the target distribution.
-        fit_reg: bool, optional (default=True)
+        fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),

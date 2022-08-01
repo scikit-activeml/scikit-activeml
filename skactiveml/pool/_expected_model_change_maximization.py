@@ -30,7 +30,9 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
     bootstrap_size : int, optional (default=3)
         The number of bootstraps used to estimate the true model.
     n_train : int or float, optional (default=0.5)
-        The size of a bootstrap compared to the training data.
+        The size of a bootstrap compared to the training data if of type float.
+        Must lie in the range of (0, 1]. The total size of a bootstrap if of
+        type int. Must be greater or equal to 1.
     ord : int or string, optional (default=2)
         The Norm to measure the gradient. Argument will be passed to
         `np.linalg.norm`.
@@ -229,10 +231,10 @@ def _bootstrap_estimators(
             f"`n_train` has value `{type(n_train)}`, but must have a value "
             f"greater or equal to one, if of type `int`."
         )
-    elif isinstance(n_train, float) and n_train <= 0 or n_train >= 1:
+    elif isinstance(n_train, float) and n_train <= 0 or n_train > 1:
         raise ValueError(
             f"`n_train` has value `{type(n_train)}`, but must have a value "
-            f"between zero and one, if of type `float`."
+            f"between zero and one, excluding zero, if of type `float`."
         )
     if isinstance(n_train, float):
         n_train = math.ceil(n_train * len(X))

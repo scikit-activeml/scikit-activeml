@@ -42,7 +42,7 @@ class TestGreedySamplingX(unittest.TestCase):
 
     def test_init_param_metric(self):
         qs = GreedySamplingX(metric="illegal", random_state=self.random_state)
-        self.assertRaises(ValueError, qs.query, **self.query_kwargs)
+        self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):
         provide_test_regression_query_strategy_query_X(self, GreedySamplingX)
@@ -102,13 +102,13 @@ class TestGreedySamplingY(unittest.TestCase):
         qs = GreedySamplingY(
             x_metric="illegal", random_state=self.random_state
         )
-        self.assertRaises(ValueError, qs.query, **self.query_kwargs)
+        self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
     def test_init_param_y_metric(self):
         qs = GreedySamplingY(
             y_metric="illegal", random_state=self.random_state
         )
-        self.assertRaises(ValueError, qs.query, **self.query_kwargs)
+        self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):
         provide_test_regression_query_strategy_query_X(self, GreedySamplingY)

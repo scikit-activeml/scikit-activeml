@@ -20,7 +20,6 @@ from ._information_gain_maximization import (
     KLDivergenceMaximization,
     MutualInformationGainMaximization,
 )
-from .utils import cross_entropy
 from ._probabilistic_al import ProbabilisticAL, cost_reduction
 from ._query_by_committee import (
     QueryByCommittee,
@@ -62,6 +61,5 @@ __all__ = [
     "RepresentativenessDiversity",
     "GreedySamplingX",
     "GreedySamplingY",
-    "cross_entropy",
     "DiscriminativeAL",
 ]

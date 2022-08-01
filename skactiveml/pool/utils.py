@@ -573,7 +573,7 @@ class IndexClassifierWrapper:
             )
 
 
-def cross_entropy(
+def _cross_entropy(
     X_eval, true_reg, other_reg, integration_dict=None, random_state=None
 ):
     """Calculates the cross entropy.
@@ -873,7 +873,9 @@ def conditional_expect(
     X : array-like of shape (n_samples, n_features)
         The samples where the expectation should be evaluated.
     func : callable
-        The function that transforms the random variable.
+        The function that transforms the random variable. The signature of the
+        function must be of the form `func(y, x, idx)`, where `y` is the target
+        value, `x` is the feature value and `idx` is such that `X[idx] = x`.
     reg: ProbabilisticRegressor
         Predicts the target distribution over which the expectation is
         calculated.
@@ -916,11 +918,14 @@ def conditional_expect(
     random_state: numeric | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
     vector_func : bool or str, optional (default=False)
-        If `vector_func` is `True`, the integration values are passed as a whole
-        to the function `func`. If `vector_func` is 'both', the integration
-        values might or might not be passed as a whole. The integration values
-        if passed as a whole are of the form (n_samples, n_integration), where
-        n_integration denotes the number of integration values.
+        If `vector_func` is `True`, the integration values are passes
+        in vectorized form to `func`. If `vector_func` is 'both', the
+        integration values might or might not be passed in vectorized form,
+        depending what is more efficient. The integration values
+        are passed in vectorized form, means that in a call like
+        `func(y, x, idx)` `y` is of the form (n_samples, n_integration_samples),
+         `x` equals `X` and `idx` is an index map of `X.
+
 
 
     Returns

@@ -11,7 +11,7 @@ from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
-from skactiveml.pool import cross_entropy
+from skactiveml.pool import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
     conditional_expect,
@@ -911,7 +911,7 @@ class TestFunctions(unittest.TestCase):
         reg_1 = NICKernelRegressor().fit(X_1, y_1)
         reg_2 = NICKernelRegressor().fit(X_2, y_2)
 
-        result = cross_entropy(X_eval=X_1, true_reg=reg_1, other_reg=reg_2)
+        result = _cross_entropy(X_eval=X_1, true_reg=reg_1, other_reg=reg_2)
         self.assertEqual(y_1.shape, result.shape)
 
         for name, val in [
@@ -936,5 +936,5 @@ class TestFunctions(unittest.TestCase):
             )
             cross_entropy_dict[name] = val
             self.assertRaises(
-                (TypeError, ValueError), cross_entropy, **cross_entropy_dict
+                (TypeError, ValueError), _cross_entropy, **cross_entropy_dict
             )

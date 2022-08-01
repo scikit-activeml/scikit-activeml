@@ -10,7 +10,7 @@ from skactiveml.base import (
 from skactiveml.pool.utils import (
     _update_reg,
     conditional_expect,
-    cross_entropy,
+    _cross_entropy,
 )
 from skactiveml.utils import (
     check_type,
@@ -28,14 +28,14 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    integration_dict: dict,
+    integration_dict : dict,
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state : numeric | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
@@ -79,13 +79,13 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        reg: ProbabilisticRegressor
+        reg : ProbabilisticRegressor
             Predicts the entropy and the y-values the candidate samples
             could have.
         fit_reg : bool, optional (default=True)
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -179,7 +179,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         mapping : array-like of shape (n_samples,) or None
             The potential mapping between the candidate samples and the
             training data set.
-        reg: ProbabilisticRegressor
+        reg : ProbabilisticRegressor
             Predict output values and entropy.
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
@@ -235,11 +235,11 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    integration_dict_target_val: dict, optional (default=None)
+    integration_dict_target_val : dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `conditional_expect`.
-    integration_dict_cross_entropy: dict, optional (default=None)
+    integration_dict_cross_entropy : dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the cross entropy between the updated conditional
         estimator by the `X_cand` value and the old conditional estimator.
@@ -247,7 +247,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    random_state : numeric | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
@@ -293,13 +293,13 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        reg: ProbabilisticRegressor
+        reg : ProbabilisticRegressor
             Predicts the entropy and the cross entropy and the potential
             y-values for the candidate samples.
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -436,7 +436,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
                 reg_new.predict(X_eval, return_entropy=True)[1]
             )
             cross_ent = np.sum(
-                cross_entropy(
+                _cross_entropy(
                     X_eval,
                     reg_new,
                     reg,
