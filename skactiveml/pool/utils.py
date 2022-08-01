@@ -610,7 +610,7 @@ def _cross_entropy(
         other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
     )
 
-    cross_ent = -expect_target_val(
+    cross_ent = -expected_target_val(
         X_eval,
         dist.logpdf,
         reg=true_reg,
@@ -773,7 +773,7 @@ def _reshape_scipy_dist(dist, shape):
     return dist
 
 
-def expect_target_val(X, target_func, reg, **kwargs):
+def expected_target_val(X, target_func, reg, **kwargs):
     """Calculates the conditional expectation of a function depending only on
     the target value for each sample in `X`, i.e.
     E[target_func(Y)|X=x], where Y | X=x ~ reg.predict_target_distribution,

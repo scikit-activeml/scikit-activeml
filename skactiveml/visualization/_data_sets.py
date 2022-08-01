@@ -34,7 +34,7 @@ def gaussian_noise_generator_1d(
     """
 
     X = check_array(X, allow_nd=False, ensure_2d=True)
-    check_type(X.shape[1], "X.shape[1]", 1)
+    check_type(X.shape[1], "X.shape[1]", target_vals=[1])
     check_scalar(
         interval_std,
         "interval_std",

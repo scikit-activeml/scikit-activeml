@@ -79,7 +79,7 @@ def _get_contour_args(contour_dict):
 
 def _check_interval_and_assign(intervals, default_val):
     for idx, interval in enumerate(intervals):
-        check_type(len(interval), f"len(intervals[{idx}])", 2, 3)
+        check_type(len(interval), f"len(intervals[{idx}])", target_vals=[2, 3])
         for i, val in enumerate(interval):
             check_scalar(val, f"interval[{i}]", (int, float))
         if len(interval) != 3:
