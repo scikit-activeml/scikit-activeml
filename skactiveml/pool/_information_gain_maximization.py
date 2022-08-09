@@ -22,9 +22,9 @@ from skactiveml.utils import (
 class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Mutual Information Gain Maximization.
 
-    This class implements a mutual information based selection strategies, where
-    it is assumed that the prediction probability for different samples
-    are independent.
+    This class implements a query strategy, which selects those samples
+    that maximize the mutual information gain, where it is assumed that the
+    target probabilities for different samples are independent.
 
     Parameters
     ----------
@@ -229,9 +229,9 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
 class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Kullback Leibler Divergence Maximization.
 
-    This class implements a Kullback Leibler divergence based selection
-    strategies, where it is assumed that the prediction probability for
-    different samples are independent.
+    This class implements a query strategy, which selects those samples
+    that maximize the expected kullback leibler divergence, where it is assumed
+    that the target probabilities for different samples are independent.
 
     Parameters
     ----------
@@ -412,7 +412,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight: array-like of shape (n_samples,), optional (default=None)
             Weights of training samples in `X`.
 
         Returns

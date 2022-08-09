@@ -217,7 +217,7 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
         self.y_metric = y_metric
         self.x_metric_dict = x_metric_dict
         self.y_metric_dict = y_metric_dict
-        self.k_0 = min_samples
+        self.min_samples = min_samples
 
     def query(
         self,
@@ -293,12 +293,12 @@ class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
         if self.method is None:
             self.method = "y"
         check_type(self.method, "self.method", target_vals=["y", "i"])
-        check_scalar(self.k_0, "self.k_0", int, min_val=0)
+        check_scalar(self.min_samples, "self.k_0", int, min_val=0)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         n_labeled = np.sum(is_labeled(y, missing_label=self.missing_label_))
-        batch_size_x = max(0, min(self.k_0 - n_labeled, batch_size))
+        batch_size_x = max(0, min(self.min_samples - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
         if fit_reg:

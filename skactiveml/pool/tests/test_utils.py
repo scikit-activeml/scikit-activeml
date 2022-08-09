@@ -11,7 +11,7 @@ from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
-from skactiveml.pool import _cross_entropy
+from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
     conditional_expect,
