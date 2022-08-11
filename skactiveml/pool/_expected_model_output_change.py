@@ -9,7 +9,7 @@ from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.pool.utils import _update_reg, conditional_expect
+from skactiveml.pool.utils import _update_reg, _conditional_expect
 from skactiveml.utils import (
     check_type,
     simple_batch,
@@ -162,13 +162,24 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
         y_pred = reg.predict(X_eval)
 
-        update_dict = dict(
-            X=X, y=y, reg=reg, sample_weight=sample_weight, mapping=mapping
-        )
+        def _model_output_change(idx, x_cand, y_pot):
+            reg_new = _update_reg(
+                reg,
+                X,
+                y,
+                sample_weight=sample_weight,
+                y_update=y_pot,
+                idx_update=idx,
+                X_update=x_cand,
+                mapping=mapping,
+            )
+            y_pred_new = reg_new.predict(X_eval)
 
-        change = conditional_expect(
+            return self.loss(y_pred, y_pred_new)
+
+        change = _conditional_expect(
             X_cand,
-            partial(self._model_output_change, X_eval, y_pred, update_dict),
+            _model_output_change,
             reg,
             random_state=self.random_state_,
             **self.integration_dict,
@@ -186,13 +197,3 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             random_state=self.random_state_,
             return_utilities=return_utilities,
         )
-
-    def _model_output_change(
-        self, X_eval, y_pred, update_dict, idx, x_cand, y_pot
-    ):
-        reg_new = _update_reg(
-            **update_dict, y_update=y_pot, idx_update=idx, X_update=x_cand
-        )
-        y_pred_new = reg_new.predict(X_eval)
-
-        return self.loss(y_pred, y_pred_new)

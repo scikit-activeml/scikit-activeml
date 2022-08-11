@@ -849,10 +849,10 @@ def expected_target_val(X, target_func, reg, **kwargs):
     def arg_filtered_func(idx_y, x_y, y):
         return target_func(y)
 
-    return conditional_expect(X, arg_filtered_func, reg, **kwargs)
+    return _conditional_expect(X, arg_filtered_func, reg, **kwargs)
 
 
-def conditional_expect(
+def _conditional_expect(
     X,
     func,
     reg,

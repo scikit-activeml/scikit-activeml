@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.base import SkactivemlRegressor
-from skactiveml.pool import GreedySamplingX, GreedySamplingY
+from skactiveml.pool import GreedySamplingX, GreedySamplingI
 from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_init_random_state,
     provide_test_regression_query_strategy_init_missing_label,
@@ -89,59 +89,59 @@ class TestGreedySamplingY(unittest.TestCase):
 
     def test_init_param_random_state(self):
         provide_test_regression_query_strategy_init_random_state(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_init_param_missing_label(self):
         provide_test_regression_query_strategy_init_missing_label(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_init_param_x_metric(self):
         self.query_kwargs["y"] = np.full(len(self.y), MISSING_LABEL)
-        qs = GreedySamplingY(
+        qs = GreedySamplingI(
             x_metric="illegal", random_state=self.random_state
         )
         self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
     def test_init_param_y_metric(self):
-        qs = GreedySamplingY(
+        qs = GreedySamplingI(
             y_metric="illegal", random_state=self.random_state
         )
         self.assertRaises(TypeError, qs.query, **self.query_kwargs)
 
     def test_query_param_X(self):
-        provide_test_regression_query_strategy_query_X(self, GreedySamplingY)
+        provide_test_regression_query_strategy_query_X(self, GreedySamplingI)
 
     def test_query_param_y(self):
-        provide_test_regression_query_strategy_query_y(self, GreedySamplingY)
+        provide_test_regression_query_strategy_query_y(self, GreedySamplingI)
 
     def test_query_param_reg(self):
-        provide_test_regression_query_strategy_query_reg(self, GreedySamplingY)
+        provide_test_regression_query_strategy_query_reg(self, GreedySamplingI)
 
     def test_query_param_fit_reg(self):
         provide_test_regression_query_strategy_query_fit_reg(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_query_param_sample_weight(self):
         provide_test_regression_query_strategy_query_sample_weight(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_query_param_candidates(self):
         provide_test_regression_query_strategy_query_candidates(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_query_param_batch_size(self):
         provide_test_regression_query_strategy_query_batch_size(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_query_param_return_utilities(self):
         provide_test_regression_query_strategy_query_return_utilities(
-            self, GreedySamplingY
+            self, GreedySamplingI
         )
 
     def test_logic(self):
@@ -156,7 +156,7 @@ class TestGreedySamplingY(unittest.TestCase):
                 return np.zeros(len(X))
 
         reg = ZeroRegressor()
-        qs = GreedySamplingY()
+        qs = GreedySamplingI()
         utilities = qs.query(X, y, reg, return_utilities=True)[1][0]
         np.testing.assert_array_equal(
             utilities, np.where(is_labeled(y), np.nan, 0)

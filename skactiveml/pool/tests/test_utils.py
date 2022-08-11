@@ -14,7 +14,7 @@ from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
-    conditional_expect,
+    _conditional_expect,
     _reshape_scipy_dist,
     _update_X_y,
     _update_reg,
@@ -661,9 +661,6 @@ class TestApproximation(unittest.TestCase):
         def dummy_func_2(x, y):
             return np.zeros_like(y)
 
-        def dummy_func_3(idx, x, y):
-            return np.zeros_like(y)
-
         X = np.arange(4 * 2).reshape(4, 2)
         y = np.arange(4, dtype=float)
         reg = NICKernelRegressor().fit(X, y)
@@ -689,27 +686,7 @@ class TestApproximation(unittest.TestCase):
                 )
                 param_dict[parameter] = illegal_argument
                 self.assertRaises(
-                    (TypeError, ValueError), conditional_expect, **param_dict
-                )
-
-        param_dict = dict(X=X, func=dummy_func_1, reg=reg, method="quantile")
-        dummy_funcs = [dummy_func_1, dummy_func_2, dummy_func_3]
-        for include_idx, include_x in itertools.product(
-            [False, True], [False, True]
-        ):
-            n_free_parameters = include_x + include_idx
-            correct_func = dummy_funcs[include_x + include_idx]
-
-            param_dict["func"] = correct_func
-            param_dict["include_x"] = include_x
-            param_dict["include_idx"] = include_idx
-            y_int = conditional_expect(**param_dict)
-            np.testing.assert_array_equal(np.zeros_like(y), y_int)
-            for i in range(1, 3):
-                incorrect_func = dummy_funcs[(n_free_parameters + i) % 3]
-                param_dict["func"] = incorrect_func
-                self.assertRaises(
-                    (TypeError, ValueError), conditional_expect, **param_dict
+                    (TypeError, ValueError), _conditional_expect, **param_dict
                 )
 
     def test_conditional_expectation(self):
@@ -773,13 +750,8 @@ class TestApproximation(unittest.TestCase):
                     self.assertEqual(x.shape, (3,))
                     return 0
 
-            res = conditional_expect(
-                X=X,
-                func=dummy_func,
-                reg=reg,
-                include_x=True,
-                include_idx=True,
-                **parameter
+            res = _conditional_expect(
+                X=X, func=dummy_func, reg=reg, **parameter
             )
 
             np.testing.assert_array_equal(res, np.zeros(2))
@@ -891,7 +863,9 @@ class TestFunctions(unittest.TestCase):
         )
 
     def test_boostrap_aggregation(self):
-        reg_s = _bootstrap_estimators(self.reg, self.X, self.y, k_bootstrap=5)
+        reg_s = _bootstrap_estimators(
+            self.reg, self.X, self.y, bootstrap_size=5
+        )
         self.assertEqual(len(reg_s), 5)
 
         reg_s = _bootstrap_estimators(
@@ -899,9 +873,28 @@ class TestFunctions(unittest.TestCase):
             self.X,
             self.y,
             sample_weight=self.sample_weight,
-            k_bootstrap=5,
+            bootstrap_size=5,
         )
         self.assertEqual(len(reg_s), 5)
+
+        self.assertRaises(
+            ValueError,
+            _bootstrap_estimators,
+            self.reg,
+            self.X,
+            self.y,
+            bootstrap_size=5,
+            n_train=-1,
+        )
+        self.assertRaises(
+            ValueError,
+            _bootstrap_estimators,
+            self.reg,
+            self.X,
+            self.y,
+            bootstrap_size=5,
+            n_train=1.9,
+        )
 
     def test_cross_entropy(self):
         X_1 = np.arange(3 * 2).reshape(3, 2)

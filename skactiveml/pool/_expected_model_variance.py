@@ -7,7 +7,7 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
-from skactiveml.pool.utils import _update_reg, conditional_expect
+from skactiveml.pool.utils import _update_reg, _conditional_expect
 
 
 class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
@@ -155,7 +155,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
             return np.average(new_model_std**2)
 
-        ex_model_variance = conditional_expect(
+        ex_model_variance = _conditional_expect(
             X_cand,
             new_model_variance,
             reg,

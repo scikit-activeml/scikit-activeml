@@ -9,7 +9,7 @@ from skactiveml.base import (
 
 from skactiveml.pool.utils import (
     _update_reg,
-    conditional_expect,
+    _conditional_expect,
     _cross_entropy,
 )
 from skactiveml.utils import (
@@ -213,7 +213,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             potentials_post_entropy = np.sum(entropy_cand)
             return potentials_post_entropy
 
-        cond_entropy = conditional_expect(
+        cond_entropy = _conditional_expect(
             X_cand,
             new_entropy,
             reg,
@@ -446,7 +446,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             )
             return cross_ent - entropy_post
 
-        kl_div = conditional_expect(
+        kl_div = _conditional_expect(
             X_cand,
             new_kl_divergence,
             reg,

@@ -151,7 +151,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             return query_indices
 
 
-class GreedySamplingY(SingleAnnotatorPoolQueryStrategy):
+class GreedySamplingI(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling on the target space.
 
     This class implements greedy sampling on the target space. A query strategy
