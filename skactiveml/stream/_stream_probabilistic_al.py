@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
 
-from ..classifier import ParzenWindowClassifier
+from ..classifier import ParzenWindowClassifier, ALLOWED_MEAN_KERNEL_METRICS
 from .budgetmanager import BalancedIncrementalQuantileFilter
 from ..base import (
     SingleAnnotatorStreamQueryStrategy,
@@ -162,17 +162,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
-            allowed_mean_kernel_metrics = [
-                "rbf",
-                "chi2",
-                "polynomial",
-                "poly",
-                "laplacian",
-                "sigmoid",
-            ]
             if (
                 self.metric_dict is None
-                and self.metric in allowed_mean_kernel_metrics
+                and self.metric in ALLOWED_MEAN_KERNEL_METRICS
             ):
                 self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(

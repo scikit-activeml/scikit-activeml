@@ -7,7 +7,7 @@ from sklearn.utils.validation import check_array
 
 from ..base import SkactivemlClassifier
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..classifier import ParzenWindowClassifier
+from ..classifier import ParzenWindowClassifier, ALLOWED_MEAN_KERNEL_METRICS
 from ..utils import (
     MISSING_LABEL,
     check_scalar,
@@ -174,17 +174,9 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
         if self.metric is not None:
-            allowed_mean_kernel_metrics = [
-                "rbf",
-                "chi2",
-                "polynomial",
-                "poly",
-                "laplacian",
-                "sigmoid",
-            ]
             if (
                 self.metric_dict is None
-                and self.metric in allowed_mean_kernel_metrics
+                and self.metric in ALLOWED_MEAN_KERNEL_METRICS
             ):
                 self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(

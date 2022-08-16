@@ -28,6 +28,13 @@ class TestParzenWindowClassifier(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y)
         self.assertNotEqual(pwc.metric_dict_["gamma"], "mean")
 
+        X = [[1], [2], [3]]
+        y = [0, 1, np.nan]
+        gamma = 5.050851362881613
+        pwc = ParzenWindowClassifier(metric_dict={"gamma": "mean"})
+        pwc.fit(X=X, y=y)
+        self.assertEquals(gamma, pwc.metric_dict_["gamma"])
+
     def test_init_param_metric(self):
         pwc = ParzenWindowClassifier()
         self.assertEqual(pwc.metric, "rbf")
