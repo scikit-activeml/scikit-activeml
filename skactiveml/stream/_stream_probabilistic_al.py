@@ -2,7 +2,7 @@ import numpy as np
 from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
 
-from ..classifier import ParzenWindowClassifier, ALLOWED_MEAN_KERNEL_METRICS
+from ..classifier import ParzenWindowClassifier
 from .budgetmanager import BalancedIncrementalQuantileFilter
 from ..base import (
     SingleAnnotatorStreamQueryStrategy,
@@ -57,8 +57,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         be used instead. If this is not defined, an Exception is raised.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-        If metric_dict is None and metric is 'rbf', 'chi2', 'polynomial',
-        'poly', 'laplacian', 'sigmoid', metric_dict is set to
+        If metric_dict is None and metric is 'rbf' metric_dict is set to
         {'gamma': 'mean'}.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the query strategy.
@@ -164,7 +163,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         if self.metric is not None:
             if (
                 self.metric_dict is None
-                and self.metric in ALLOWED_MEAN_KERNEL_METRICS
+                and self.metric == "rbf"
             ):
                 self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(

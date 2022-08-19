@@ -12,16 +12,6 @@ from sklearn.utils.validation import check_is_fitted, check_scalar
 from ..base import ClassFrequencyEstimator
 from ..utils import MISSING_LABEL, compute_vote_vectors, is_labeled
 
-# Define constant for kernels that include gamma
-ALLOWED_MEAN_KERNEL_METRICS = [
-            "rbf",
-            "chi2",
-            "polynomial",
-            "poly",
-            "laplacian",
-            "sigmoid",
-        ]
-
 
 class ParzenWindowClassifier(ClassFrequencyEstimator):
     """ParzenWindowClassifier
@@ -55,10 +45,9 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         available samples are considered.
     metric_dict : dict,
         Any further parameters are passed directly to the kernel function.
-        For the the kernels 'rbf', 'chi2', 'polynomial', 'poly', 'laplacian',
-        and 'sigmoid', we allow the use of mean kernel [2] and use it when
-        gamma is set to 'mean' (i.e., {'gamma': 'mean'}). While N is defined
-        as the labeled data the variance is calculated over all X.
+        For the the kernel 'rbf' we allow the use of mean kernel [2] and use
+        it when gamma is set to 'mean' (i.e., {'gamma': 'mean'}). While N is
+        defined as the labeled data the variance is calculated over all X.
 
     Attributes
     ----------
@@ -160,13 +149,13 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         if (
             "gamma" in self.metric_dict_
             and self.metric_dict["gamma"] == "mean"
-            and self.metric in ALLOWED_MEAN_KERNEL_METRICS
+            and self.metric == "rbf"
         ):
             is_lbld = is_labeled(y, missing_label=1)
             N = np.max([2, np.sum(is_lbld)])
             variance = np.var(X, axis=0)
-            self.metric_dict_["gamma"] = _calculate_mean_gamma(
-                N, variance
+            self.metric_dict_["gamma"] = (
+                ParzenWindowClassifier._calculate_mean_gamma(N, variance)
             )
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
@@ -238,9 +227,8 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
                 F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
         return F
 
-
-def _calculate_mean_gamma(N, variance, delta=(np.sqrt(2) * 1e-6)):
-    numerator = 2 * N * np.sum(variance)
-    denominator = (N - 1) * np.log((N - 1) / delta ** 2)
-    gamma = 0.5 * denominator / numerator
-    return gamma
+    def _calculate_mean_gamma(N, variance, delta=(np.sqrt(2) * 1e-6)):
+        numerator = 2 * N * np.sum(variance)
+        denominator = (N - 1) * np.log((N - 1) / delta ** 2)
+        gamma = 0.5 * denominator / numerator
+        return gamma
