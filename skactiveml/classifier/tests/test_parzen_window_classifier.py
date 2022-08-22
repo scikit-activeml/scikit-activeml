@@ -192,3 +192,31 @@ class TestParzenWindowClassifier(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
         y = pwc.predict(self.X)
         np.testing.assert_array_equal(["paris", "paris", "paris"], y)
+
+    def test__calculate_mean_gamma(self):
+        # test without missing labels
+        N = 3
+        variance = [0.66666667]
+        gamma = 6.907755278982137
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        self.assertAlmostEqual(gamma, gamma2)
+        # test with 1 missing label
+        N = 2
+        variance = [0.66666667]
+        gamma = 5.050851362881613
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        self.assertAlmostEqual(gamma, gamma2)
+        # test mutli dimensional X
+        N = 3
+        variance = [0.5, 1.1875]
+        gamma = 2.7289897398447946
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        self.assertAlmostEqual(gamma, gamma2)
+        # test if increasing N increases gamma
+        N = np.arange(2, 100)
+        variance = 1
+        gamma = [
+            ParzenWindowClassifier._calculate_mean_gamma(n, variance)
+            for n in N
+        ]
+        self.assertTrue(np.all(np.diff(gamma) > 0))
