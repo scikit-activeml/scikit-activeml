@@ -2,6 +2,7 @@ import numpy as np
 from sklearn import clone
 from sklearn.utils import check_array, check_consistent_length
 
+from ..classifier import ParzenWindowClassifier
 from .budgetmanager import BalancedIncrementalQuantileFilter
 from ..base import (
     SingleAnnotatorStreamQueryStrategy,
@@ -46,6 +47,16 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
+    metric : str or callable, default=None
+        The metric must a be None or a valid kernel as defined by the function
+        `sklearn.metrics.pairwise.pairwise_kernels`. The kernel is used to
+        calculate the frequency of labels near the candidates and multiplied
+        with the probabilities returned by the `clf` to get a kernel frequency
+        estimate for each class.
+        If metric is set to None, the `predict_freq` function of the `clf` will
+        be used instead. If this is not defined, an Exception is raised.
+    metric_dict : dict,
+        Any further parameters are passed directly to the kernel function.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the query strategy.
     prior : float
@@ -67,6 +78,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         self,
         budget_manager=None,
         budget=None,
+        metric=None,
+        metric_dict=None,
         random_state=None,
         prior=1.0e-3,
         m_max=2,
@@ -75,6 +88,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         self.budget_manager = budget_manager
         self.prior = prior
         self.m_max = m_max
+        self.metric = metric
+        self.metric_dict = metric_dict
 
     def query(
         self,
@@ -89,11 +104,6 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     ):
         """Ask the query strategy which instances in candidates to acquire.
 
-        Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query
-        strategy can be updated later with update(...) with the final sampling.
-        This is especially helpful, when developing wrapper query strategies.
-
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape
@@ -101,7 +111,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
+            Model implementing the methods `fit` and `predict_proba`. If
+            `self.metric` is None, the `clf` must also implement
+            `predict_freq`.
         X : array-like of shape (n_samples, n_features), optional
         (default=None)
             Input samples used to fit the classifier.
@@ -110,8 +122,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
         fit_clf : bool,
-            If true, refit the classifier also requires X and y to be given.
-        utility_weight: array-like of shape (n_candidate_samples), optional
+            If True, refit the classifier also requires X and y to be given.
+        utility_weight : array-like of shape (n_candidate_samples), optional
         (default=None)
             Densities for each sample in `candidates`.
         return_utilities : bool, optional
@@ -123,7 +135,6 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         queried_indices : ndarray of shape (n_queried_instances,)
             The indices of instances in candidates which should be queried,
             with 0 <= n_queried_instances <= n_samples.
-
         utilities: ndarray of shape (n_samples,), optional
             The utilities based on the query strategy. Only provided if
             return_utilities is True.
@@ -147,8 +158,20 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             utility_weight=utility_weight,
             return_utilities=return_utilities,
         )
+        if self.metric is not None:
+            pwc = ParzenWindowClassifier(
+                metric=self.metric,
+                metric_dict=self.metric_dict,
+                missing_label=clf.missing_label,
+                classes=clf.classes,
+            )
+            pwc.fit(X=X, y=y, sample_weight=sample_weight)
+            n = pwc.predict_freq(candidates).sum(axis=1, keepdims=True)
+            pred_proba = clf.predict_proba(candidates)
+            k_vec = n * pred_proba
+        else:
+            k_vec = clf.predict_freq(candidates)
 
-        k_vec = clf.predict_freq(candidates)
         utilities = cost_reduction(k_vec, prior=self.prior, m_max=self.m_max)
 
         utilities *= utility_weight
@@ -163,7 +186,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
     def update(
         self, candidates, queried_indices, budget_manager_param_dict=None
     ):
-        """Updates the budget manager
+        """Updates the budget manager.
 
         Parameters
         ----------
@@ -227,7 +250,9 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         candidates: array-like, shape (n_candidates, n_features)
             Candidate samples.
         clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
+            Model implementing the methods `fit` and `predict_proba`. If
+            `self.metric` is None, the `clf` must also implement
+            `predict_freq`.
         X : array-like of shape (n_samples, n_features)
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
@@ -271,7 +296,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
         candidates, return_utilities = super()._validate_data(
-            candidates, return_utilities, reset=reset, **check_candidates_params
+            candidates,
+            return_utilities,
+            reset=reset,
+            **check_candidates_params
         )
         # check if a budgetmanager is set
 
@@ -295,7 +323,15 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         utility_weight = self._validate_utility_weight(
             utility_weight, candidates
         )
-        check_scalar(self.prior, "prior", float, min_val=0, min_inclusive=False)
+
+        if self.metric is None and not hasattr(clf, "predict_freq"):
+            raise TypeError(
+                "clf has no predict_freq and metric was set to None"
+            )
+
+        check_scalar(
+            self.prior, "prior", float, min_val=0, min_inclusive=False
+        )
         check_scalar(self.m_max, "m_max", int, min_val=0, min_inclusive=False)
         self._validate_random_state()
 
@@ -319,7 +355,6 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
 
@@ -354,6 +389,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,) (default=None)
             Sample weights for X, used to fit the clf.
+
         Returns
         -------
         clf : SkactivemlClassifier
@@ -367,7 +403,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         return clf
 
     def _validate_utility_weight(self, utility_weight, candidates):
-        """Validate if utility_weight is numeric and of equal length as candidates.
+        """Validate if utility_weight is numeric and of equal length as
+        candidates.
 
         Parameters
         ----------
@@ -376,6 +413,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         utility_weight: array-like of shape (n_candidate_samples), optional
         (default=None)
             Densities for each sample in `candidates`.
+
         Returns
         -------
         utility_weight : array-like of shape (n_candidate_samples), optional

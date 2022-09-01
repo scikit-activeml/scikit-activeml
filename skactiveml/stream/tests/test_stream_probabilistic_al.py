@@ -2,8 +2,9 @@ import unittest
 
 import numpy as np
 from sklearn.datasets import make_classification
+from sklearn.naive_bayes import GaussianNB
 
-from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.stream import StreamProbabilisticAL
 
 
@@ -62,10 +63,43 @@ class TestStreamProbabilisticAL(unittest.TestCase):
         query_strategy = StreamProbabilisticAL(m_max=-1)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
-    def test_init_param_random_state(self):
+    def test_init_param_metric_dict(self):
         query_strategy = StreamProbabilisticAL(
-            random_state="string",
+            metric="rbf", metric_dict=["gamma"]
         )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL(
+            metric="rbf", metric_dict={"test": 0}
+        )
+        self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
+
+    def test_init_param_metric(self):
+        query_strategy = StreamProbabilisticAL(metric="string")
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL(metric=0)
+        self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
+        query_strategy = StreamProbabilisticAL()
+        clf = SklearnClassifier(GaussianNB())
+        self.assertRaises(
+            TypeError,
+            query_strategy.query,
+            candidates=self.candidates,
+            clf=clf,
+            X=self.X,
+            y=self.y,
+        )
+        query_strategy = StreamProbabilisticAL(metric="rbf")
+        clf = SklearnClassifier(GaussianNB())
+        query_strategy.query(
+            candidates=self.candidates,
+            clf=clf,
+            X=self.X,
+            y=self.y,
+            fit_clf=True,
+        )
+
+    def test_init_param_random_state(self):
+        query_strategy = StreamProbabilisticAL(random_state="string")
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_query_param_candidates(self):

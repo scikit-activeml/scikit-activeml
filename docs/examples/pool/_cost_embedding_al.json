@@ -1,19 +1,17 @@
 [
   {
     "class" : "CostEmbeddingAL",
+    "package" : "pool",
     "method" : "Active Learning with Cost Embedding (ALCE)",
-    "categories" : {
-      "Settles2012" : ""
-    },
-    "tags" : ["pool"],
+    "category" : "",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Active Learning with Cost Embedding",
     "refs" : ["huang2016novel"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {
-      "classes" : "[0, 1]"
-    },
-    "query_params" : {}
+    "import_misc" : "from skactiveml.pool import CostEmbeddingAL",
+    "init_qs" : "CostEmbeddingAL(classes=[0, 1])",
+    "query_params" : "X=X, y=y"
   }
 ]

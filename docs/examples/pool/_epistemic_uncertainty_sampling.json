@@ -1,19 +1,17 @@
 [
   {
     "class" : "EpistemicUncertaintySampling",
+    "package" : "pool",
     "method" : "Epistemic Uncertainty Sampling",
-    "categories" : {
-      "Settles2012" : "Uncertainty Sampling"
-    },
-    "tags" : ["pool"],
+    "category" : "Uncertainty Sampling",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Epistemic Uncertainty Sampling",
     "refs" : ["nguyen2019epistemic"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "bp_add_imports" : [],
-    "init_params" : {},
-    "query_params" : {
-      "clf" : "clf"
-    }
+    "import_misc" : "from skactiveml.pool import EpistemicUncertaintySampling",
+    "init_qs" : "EpistemicUncertaintySampling()",
+    "query_params" : "X=X, y=y, clf=clf"
   }
 ]
