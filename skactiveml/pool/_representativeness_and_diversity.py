@@ -13,8 +13,8 @@ from skactiveml.utils._selection import combine_ranking
 
 
 class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
-    """RD ALR, Representativeness and Diversity in active learning for
-    regression.
+    """Representativeness and Diversity in active learning for
+    regression (RD ALR).
 
     This class implements the active learning for regression based query
     strategy RD ALR.
@@ -28,7 +28,7 @@ class RepresentativenessDiversity(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References

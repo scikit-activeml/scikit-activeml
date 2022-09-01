@@ -38,7 +38,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         the empirical variance is used.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state: numeric or np.random.RandomState, default=None
+    random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     References

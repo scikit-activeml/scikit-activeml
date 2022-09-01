@@ -30,7 +30,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         Maximum number of hypothetically acquired labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
@@ -44,7 +44,9 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     def __init__(
         self, prior=1, m_max=1, missing_label=MISSING_LABEL, random_state=None
     ):
-        super().__init__(missing_label=missing_label, random_state=random_state)
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
         self.prior = prior
         self.m_max = m_max
 
@@ -219,7 +221,9 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
 
     # all combination of k-, l-, and prediction indicator vectors
     combs = [k_vec_list, l_vec_list, np.eye(n_classes)]
-    combs = np.asarray([list(elem) for elem in list(itertools.product(*combs))])
+    combs = np.asarray(
+        [list(elem) for elem in list(itertools.product(*combs))]
+    )
 
     # three factors of the closed form solution
     factor_1 = 1 / _euler_beta(k_vec_list)

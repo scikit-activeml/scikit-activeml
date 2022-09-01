@@ -15,7 +15,7 @@ from ._expected_model_change_maximization import (
 from ._expected_model_output_change import ExpectedModelOutputChange
 from ._expected_model_variance import ExpectedModelVarianceReduction
 from ._four_ds import FourDs
-from ._greedy_sampling import GreedySamplingX, GreedySamplingI
+from ._greedy_sampling import GreedySamplingX, GreedySamplingTarget
 from ._information_gain_maximization import (
     KLDivergenceMaximization,
     MutualInformationGainMaximization,
@@ -60,6 +60,6 @@ __all__ = [
     "MutualInformationGainMaximization",
     "RepresentativenessDiversity",
     "GreedySamplingX",
-    "GreedySamplingI",
+    "GreedySamplingTarget",
     "DiscriminativeAL",
 ]

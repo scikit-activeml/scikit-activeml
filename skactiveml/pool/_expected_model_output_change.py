@@ -15,6 +15,7 @@ from skactiveml.utils import (
     simple_batch,
     MISSING_LABEL,
     check_callable,
+    is_unlabeled,
 )
 
 
@@ -30,7 +31,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
     integration_dict : dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration_method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `skactiveml.pool.utils.conditional_expect`.
+        For details see method `skactiveml.pool.utils._conditional_expect`.
         The default `integration_method` is `assume_linear`.
     loss : callable, optional (default=None)
         The loss for predicting a target value instead of the true value.
@@ -41,7 +42,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
@@ -146,14 +147,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             self.integration_dict = {"method": "assume_linear"}
         check_type(self.integration_dict, "self.integration_dict", dict)
         if X_eval is None:
-            X_eval = X
+            X_eval = X[is_unlabeled(y)]
         else:
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)
         check_type(fit_reg, "fit_reg", bool)
         if self.loss is None:
             self.loss = mean_squared_error
-        check_callable(self.loss, "self.loss", n_free_parameters=2)
+        check_callable(self.loss, "self.loss", n_positional_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 

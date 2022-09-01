@@ -44,7 +44,7 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
@@ -212,7 +212,7 @@ def _bootstrap_estimators(
         The size of each bootstrap training data set.
     sample_weight: array-like of shape (n_samples), optional (default=None)
         Weights of training samples in `X`.
-    random_state : numeric | np.random.RandomState (default=None)
+    random_state : int | np.random.RandomState (default=None)
         The random state to use. If `random_state is None` random
         `random_state` is used.
 

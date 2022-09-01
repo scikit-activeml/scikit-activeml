@@ -589,7 +589,7 @@ def _cross_entropy(
     integration_dict: dict, optional default = None
         Dictionary for integration arguments, i.e. `integration method` etc..
         For details see method `conditional_expect`.
-    random_state: numeric | np.random.RandomState, optional
+    random_state : int | np.random.RandomState, optional
         Random state for cross entropy calculation.
 
     Returns
@@ -827,7 +827,7 @@ def expected_target_val(X, target_func, reg, **kwargs):
         'gauss-hermite'.
     quad_dict: dict, optional (default=None)
         Further arguments for using `scipy's` `expect`
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
     target_func : bool
         If `True` only the target values will be passed to `func`.
@@ -844,7 +844,7 @@ def expected_target_val(X, target_func, reg, **kwargs):
         The conditional expectation for each value applied.
     """
 
-    check_callable(target_func, "target_func", n_free_parameters=1)
+    check_callable(target_func, "target_func", n_positional_parameters=1)
 
     def arg_filtered_func(idx_y, x_y, y):
         return target_func(y)
@@ -915,7 +915,7 @@ def _conditional_expect(
         'gauss-hermite'.
     quad_dict: dict, optional (default=None)
         Further arguments for using `scipy's` `expect`
-    random_state: numeric | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
     vector_func : bool or str, optional (default=False)
         If `vector_func` is `True`, the integration values are passes
@@ -964,7 +964,7 @@ def _conditional_expect(
     check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
     check_type(quad_dict, "scipy_args", dict, target_vals=[None])
     check_type(vector_func, "vector_func", bool, target_vals=["both"])
-    check_callable(func, "func", n_free_parameters=3)
+    check_callable(func, "func", n_positional_parameters=3)
 
     if method is None:
         method = "gauss_hermite"

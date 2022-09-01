@@ -665,7 +665,7 @@ def check_type(
         raise TypeError(error_str + ".")
 
 
-def check_callable(func, name, n_free_parameters=None):
+def check_callable(func, name, n_positional_parameters=None):
     """Checks if function is a callable and if the number of free parameters is
     correct.
 
@@ -675,13 +675,13 @@ def check_callable(func, name, n_free_parameters=None):
         The functions to be validated.
     name: str
         The name of the function
-    n_free_parameters: int, optional (default=None)
+    n_positional_parameters: int, optional (default=None)
         The number of free parameters. If `n_free_parameters` is `None`,
         `n_free_parameters` is set to `1`.
     """
 
-    if n_free_parameters is None:
-        n_free_parameters = 1
+    if n_positional_parameters is None:
+        n_positional_parameters = 1
 
     if not callable(func):
         raise TypeError(
@@ -689,7 +689,7 @@ def check_callable(func, name, n_free_parameters=None):
         )
 
     # count the number of arguments that have no default value
-    n_free_params = len(
+    n_actual_positional_parameters = len(
         list(
             filter(
                 lambda x: x.default == Parameter.empty,
@@ -698,11 +698,12 @@ def check_callable(func, name, n_free_parameters=None):
         )
     )
 
-    if n_free_params != n_free_parameters:
+    if n_actual_positional_parameters != n_positional_parameters:
         raise ValueError(
-            f"The number of free parameters of the callable has to "
-            f"equal {n_free_parameters}. "
-            f"The number of free parameters is {n_free_params}."
+            f"The number of positional parameters of the callable has to "
+            f"equal {n_positional_parameters}. "
+            f"The number of positional parameters is "
+            f"{n_actual_positional_parameters}."
         )
 
 

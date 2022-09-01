@@ -25,7 +25,7 @@ from skactiveml.pool import (
     ExpectedModelVarianceReduction,
     ExpectedModelOutputChange,
     GreedySamplingX,
-    GreedySamplingI,
+    GreedySamplingTarget,
     RepresentativenessDiversity,
     KLDivergenceMaximization,
     MutualInformationGainMaximization,
@@ -50,7 +50,7 @@ REGRESSION_STRATEGIES = [
     KLDivergenceMaximization,
     MutualInformationGainMaximization,
     GreedySamplingX,
-    GreedySamplingI,
+    GreedySamplingTarget,
     RepresentativenessDiversity,
 ]
 

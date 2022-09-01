@@ -91,7 +91,7 @@ def simple_batch(
     ----------
     utilities : np.ndarray
         The utilities to be used to create the batch.
-    random_state : numeric | np.random.RandomState (default=None)
+    random_state : int | np.random.RandomState (default=None)
         The random state to use. If `random_state is None` random
         `random_state` is used.
     batch_size : int, optional (default=1)

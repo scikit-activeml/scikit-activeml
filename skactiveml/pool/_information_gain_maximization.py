@@ -16,6 +16,7 @@ from skactiveml.utils import (
     check_type,
     simple_batch,
     MISSING_LABEL,
+    is_unlabeled,
 )
 
 
@@ -31,18 +32,18 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
     integration_dict : dict,
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `conditional_expect`.
+        For details see method `skactiveml.pool.utils._conditional_expect`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional
+    random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
     ----------
     [1] Elreedy, Dina and F Atiya, Amir and I Shaheen, Samir. A novel active
         learning regression framework for balancing the exploration-exploitation
-        trade-off, page 651 and subsequently, 2019.
+        trade-off, MDPI, Basel. page 651--706, 2019.
 
     """
 
@@ -100,7 +101,9 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
         X_eval : array-like of shape (n_eval_samples, n_features),
         optional (default=None)
             Evaluation data set that is used for estimating the probability
-            distribution of the feature space.
+            distribution of the feature space. In the referenced paper it is
+            proposed to use the unlabeled data, i.e.
+            `X_eval=X[is_unlabeled(y)]`.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -137,7 +140,7 @@ class MutualInformationGainMaximization(SingleAnnotatorPoolQueryStrategy):
             self.integration_dict = {"method": "assume_linear"}
         check_type(self.integration_dict, "self.integration_dict", dict)
         if X_eval is None:
-            X_eval = X
+            X_eval = X[is_unlabeled(y)]
         else:
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)
@@ -238,7 +241,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     integration_dict_target_val : dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `conditional_expect`.
+        For details see method `skactiveml.pool.utils._conditional_expect`.
     integration_dict_cross_entropy : dict, optional (default=None)
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the cross entropy between the updated conditional
@@ -247,7 +250,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
         Random state for candidate selection.
 
     References
@@ -348,7 +351,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         check_type(reg, "reg", ProbabilisticRegressor)
         check_type(fit_reg, "fit_reg", bool)
         if X_eval is None:
-            X_eval = X
+            X_eval = X[is_unlabeled(y)]
         else:
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)

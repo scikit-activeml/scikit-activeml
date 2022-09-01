@@ -13,7 +13,6 @@ from skactiveml.utils import (
     is_labeled,
     check_type,
     check_scalar,
-    is_unlabeled,
 )
 
 
@@ -36,7 +35,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric | np.random.RandomState, optional
+    random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
@@ -151,22 +150,22 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             return query_indices
 
 
-class GreedySamplingI(SingleAnnotatorPoolQueryStrategy):
+class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling on the target space.
 
     This class implements greedy sampling on the target space. A query strategy
     that at first selects samples to maximize the diversity in the
     feature space and than selects samples to maximize the diversity in the
-    target space, optionally the diversity in the feature and the target space
-    can be maximized (GSi).
+    feature and the target space (GSi), optionally only the diversity in the
+    target space can be maximized (GSy).
 
     Parameters
     ----------
-    x_metric: str, optional (default=None)
+    x_metric : str, optional (default=None)
         Metric used for calculating the distances of the samples in the feature
         space. It must be a valid argument for
         `sklearn.metrics.pairwise_distances` argument `metric`.
-    y_metric: str, optional (default=None)
+    y_metric : str, optional (default=None)
         Metric used for calculating the distances of the samples in the target
         space. It must be a valid argument for
         `sklearn.metrics.pairwise_distances` argument `metric`.
@@ -178,17 +177,17 @@ class GreedySamplingI(SingleAnnotatorPoolQueryStrategy):
         Any further parameters for computing the distances of the samples in
         the target space are passed directly to the pairwise_distances
         function.
-    min_samples: int, optional (default=1)
+    n_GSx_samples : int, optional (default=1)
         Indicates the number of selected samples required till the query
-        strategy selects samples to maximize the diversity of the target space.
-    method: string, optional (default="y")
-        Specifies whether only the diversity in the target space (GSy) or the
-        diversity in the feature and the target space (GSi) should be maximized,
-         when the minimum number of labeled samples is reached.
+        strategy switches from GSx to the strategy specified by `method`.
+    method : "GSy" or "GSi", optional (default="GSi")
+        Specifies whether only the diversity in the target space (`GSy`) or the
+        diversity in the feature and the target space (`GSi`) should be
+        maximized, when the number of selected samples exceeds `n_GSx_samples`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
@@ -205,7 +204,7 @@ class GreedySamplingI(SingleAnnotatorPoolQueryStrategy):
         x_metric_dict=None,
         y_metric_dict=None,
         method=None,
-        min_samples=1,
+        n_GSx_samples=1,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -217,7 +216,7 @@ class GreedySamplingI(SingleAnnotatorPoolQueryStrategy):
         self.y_metric = y_metric
         self.x_metric_dict = x_metric_dict
         self.y_metric_dict = y_metric_dict
-        self.min_samples = min_samples
+        self.n_GSx_samples = n_GSx_samples
 
     def query(
         self,
@@ -291,14 +290,14 @@ class GreedySamplingI(SingleAnnotatorPoolQueryStrategy):
         check_type(reg, "reg", SkactivemlRegressor)
         check_type(fit_reg, "fit_reg", bool)
         if self.method is None:
-            self.method = "y"
-        check_type(self.method, "self.method", target_vals=["y", "i"])
-        check_scalar(self.min_samples, "self.k_0", int, min_val=0)
+            self.method = "GSi"
+        check_type(self.method, "self.method", target_vals=["GSy", "GSi"])
+        check_scalar(self.n_GSx_samples, "self.k_0", int, min_val=0)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         n_labeled = np.sum(is_labeled(y, missing_label=self.missing_label_))
-        batch_size_x = max(0, min(self.min_samples - n_labeled, batch_size))
+        batch_size_x = max(0, min(self.n_GSx_samples - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
         if fit_reg:
