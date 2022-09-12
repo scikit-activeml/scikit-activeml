@@ -1,0 +1,16 @@
+[
+  {
+    "class" : "ExpectedModelOutputChange",
+    "package" : "pool",
+    "method" : "Expected Model Output Change",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Expected Model Output Change",
+    "refs" : ["reitmaier2013let"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import ExpectedModelOutputChange"],
+    "init_qs" : "ExpectedModelOutputChange()",
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

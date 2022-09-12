@@ -368,7 +368,7 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
                 metric_dict_x=self.x_metric_dict,
                 metric_y=self.y_metric,
                 metric_dict_y=self.y_metric_dict,
-                method="xy" if self.method == "i" else "y",
+                method="xy" if self.method == "GSi" else "y",
             )
 
             query_indices[batch_size_x:] = unselected_cands[query_indices_y]

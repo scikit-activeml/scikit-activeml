@@ -162,8 +162,11 @@ class TestGreedySamplingY(unittest.TestCase):
                 return np.zeros(len(X))
 
         reg = ZeroRegressor()
-        qs = GreedySamplingTarget()
-        utilities = qs.query(X, y, reg, return_utilities=True)[1][0]
-        np.testing.assert_array_equal(
-            utilities, np.where(is_labeled(y), np.nan, 0)
-        )
+        for method in ["GSy", "GSi"]:
+            qs = GreedySamplingTarget(
+                random_state=self.random_state, method=method
+            )
+            utilities = qs.query(X, y, reg, return_utilities=True)[1][0]
+            np.testing.assert_array_equal(
+                utilities, np.where(is_labeled(y), np.nan, 0)
+            )

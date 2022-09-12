@@ -11,7 +11,7 @@ from skactiveml.pool.utils import _update_reg, _conditional_expect
 
 
 class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
-    """Expected model variance reduction.
+    """Expected Model Variance Reduction.
 
     This class implements the active learning strategy expected model variance
     minimization, which tries to select the sample that minimizes the expected
