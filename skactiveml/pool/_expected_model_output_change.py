@@ -14,7 +14,7 @@ from skactiveml.utils import (
     check_type,
     simple_batch,
     MISSING_LABEL,
-    check_callable,
+    _check_callable,
     is_unlabeled,
 )
 
@@ -154,7 +154,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         check_type(fit_reg, "fit_reg", bool)
         if self.loss is None:
             self.loss = mean_squared_error
-        check_callable(self.loss, "self.loss", n_positional_parameters=2)
+        _check_callable(self.loss, "self.loss", n_positional_parameters=2)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 

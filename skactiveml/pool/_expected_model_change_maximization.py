@@ -15,7 +15,7 @@ from skactiveml.utils import (
     MISSING_LABEL,
     check_X_y,
     check_random_state,
-    check_callable,
+    _check_callable,
 )
 
 
@@ -146,7 +146,7 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         check_type(fit_reg, "fit_reg", bool)
         if self.feature_map is None:
             self.feature_map = lambda x: x
-        check_callable(self.feature_map, "self.feature_map")
+        _check_callable(self.feature_map, "self.feature_map")
 
         if fit_reg:
             reg = clone(reg).fit(X, y, sample_weight)

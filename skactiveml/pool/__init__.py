@@ -18,7 +18,6 @@ from ._four_ds import FourDs
 from ._greedy_sampling import GreedySamplingX, GreedySamplingTarget
 from ._information_gain_maximization import (
     KLDivergenceMaximization,
-    MutualInformationGainMaximization,
 )
 from ._probabilistic_al import ProbabilisticAL, cost_reduction
 from ._query_by_committee import (
@@ -28,7 +27,6 @@ from ._query_by_committee import (
 )
 from ._quire import Quire
 from ._random_sampling import RandomSampling
-from ._representativeness_and_diversity import RepresentativenessDiversity
 from ._uncertainty_sampling import (
     UncertaintySampling,
     uncertainty_scores,
@@ -57,8 +55,6 @@ __all__ = [
     "ExpectedModelOutputChange",
     "ExpectedModelVarianceReduction",
     "KLDivergenceMaximization",
-    "MutualInformationGainMaximization",
-    "RepresentativenessDiversity",
     "GreedySamplingX",
     "GreedySamplingTarget",
     "DiscriminativeAL",

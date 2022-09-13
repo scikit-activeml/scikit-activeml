@@ -31,7 +31,7 @@ from ..utils import (
 
 __all__ = ["IndexClassifierWrapper"]
 
-from ..utils._validation import check_callable
+from ..utils._validation import _check_callable
 
 
 class IndexClassifierWrapper:
@@ -844,7 +844,7 @@ def expected_target_val(X, target_func, reg, **kwargs):
         The conditional expectation for each value applied.
     """
 
-    check_callable(target_func, "target_func", n_positional_parameters=1)
+    _check_callable(target_func, "target_func", n_positional_parameters=1)
 
     def arg_filtered_func(idx_y, x_y, y):
         return target_func(y)
@@ -964,7 +964,7 @@ def _conditional_expect(
     check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
     check_type(quad_dict, "scipy_args", dict, target_vals=[None])
     check_type(vector_func, "vector_func", bool, target_vals=["both"])
-    check_callable(func, "func", n_positional_parameters=3)
+    _check_callable(func, "func", n_positional_parameters=3)
 
     if method is None:
         method = "gauss_hermite"

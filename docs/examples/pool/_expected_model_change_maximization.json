@@ -2,11 +2,12 @@
   {
     "class" : "ExpectedModelChangeMaximization",
     "package" : "pool",
+    "category" : "Model Change",
     "method" : "Expected Model Change",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],
     "title" : "Expected Model Change",
-    "refs" : ["reitmaier2013let"],
+    "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : ["from skactiveml.pool import ExpectedModelChangeMaximization"],

@@ -20,7 +20,7 @@ from skactiveml.pool.tests.provide_test_pool_regression import (
 from skactiveml.regressor import SklearnRegressor
 
 
-class TestExpectedModelChange(unittest.TestCase):
+class TestExpectedModelChangeMaximization(unittest.TestCase):
     def setUp(self):
         self.random_state = 1
         self.candidates = np.array([[8, 1], [9, 1], [5, 1]])

@@ -665,7 +665,7 @@ def check_type(
         raise TypeError(error_str + ".")
 
 
-def check_callable(func, name, n_positional_parameters=None):
+def _check_callable(func, name, n_positional_parameters=None):
     """Checks if function is a callable and if the number of free parameters is
     correct.
 

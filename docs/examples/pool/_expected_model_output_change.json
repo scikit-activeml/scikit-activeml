@@ -2,11 +2,12 @@
   {
     "class" : "ExpectedModelOutputChange",
     "package" : "pool",
+    "category" : "Expected Error Reduction",
     "method" : "Expected Model Output Change",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],
     "title" : "Expected Model Output Change",
-    "refs" : ["reitmaier2013let"],
+    "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : ["from skactiveml.pool import ExpectedModelOutputChange"],
