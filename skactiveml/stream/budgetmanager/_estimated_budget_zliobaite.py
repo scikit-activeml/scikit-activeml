@@ -128,9 +128,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         queried_indices = []
         budget_left = []
         # calculate theta with num_classes
-        theta = 1 / self.num_classes + self.budget_ * (
-            1 - 1 / self.num_classes
-        )
+        theta = 1 / self.num_classes + self.budget_ * (1 - 1 / self.num_classes)
 
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
@@ -502,9 +500,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             self.s, "s", float, min_val=0, min_inclusive=False, max_val=1
         )
         # Check delta
-        check_scalar(
-            self.delta, "delta", float, min_val=0, min_inclusive=False
-        )
+        check_scalar(self.delta, "delta", float, min_val=0, min_inclusive=False)
         self._validate_random_state()
 
         return utilities

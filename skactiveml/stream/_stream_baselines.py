@@ -180,10 +180,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         )
 
         candidates, return_utilities = super()._validate_data(
-            candidates,
-            return_utilities,
-            reset=reset,
-            **check_candidates_params
+            candidates, return_utilities, reset=reset, **check_candidates_params
         )
 
         self._validate_random_state()
@@ -341,10 +338,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
         candidates, return_utilities = super()._validate_data(
-            candidates,
-            return_utilities,
-            reset=reset,
-            **check_candidates_params
+            candidates, return_utilities, reset=reset, **check_candidates_params
         )
 
         self._validate_random_state()

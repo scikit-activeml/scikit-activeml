@@ -52,9 +52,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(
-            random_state=random_state, missing_label=missing_label
-        )
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.strategy = strategy
         self.y_aggregate = y_aggregate
 
@@ -256,9 +254,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 target_type=int,
                 min_val=1,
             )
-            pref_n_annotators = n_annotators_per_sample * np.ones(
-                batch_size_sq
-            )
+            pref_n_annotators = n_annotators_per_sample * np.ones(batch_size_sq)
         elif _is_arraylike(n_annotators_per_sample):
             pref_n_annotators = check_array(
                 n_annotators_per_sample, ensure_2d=False

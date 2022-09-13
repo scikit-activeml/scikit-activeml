@@ -18,9 +18,7 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(self, missing_label=MISSING_LABEL, random_state=None):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
-        )
+        super().__init__(missing_label=missing_label, random_state=random_state)
 
     def query(
         self, X, y, candidates=None, batch_size=1, return_utilities=False

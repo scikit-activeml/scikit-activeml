@@ -84,8 +84,6 @@ class TestStreamRandomSampling(
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
 
-class TestPeriodicSampling(
-    TemplateTestStreamRandomSampling, unittest.TestCase
-):
+class TestPeriodicSampling(TemplateTestStreamRandomSampling, unittest.TestCase):
     def get_query_strategy(self):
         return PeriodicSampling

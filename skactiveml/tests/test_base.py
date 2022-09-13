@@ -12,6 +12,8 @@ from skactiveml.base import (
     AnnotatorModelMixin,
     BudgetManager,
     SingleAnnotatorStreamQueryStrategy,
+    SkactivemlRegressor,
+    ProbabilisticRegressor,
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL
@@ -27,9 +29,7 @@ class QueryStrategyTest(unittest.TestCase):
 
 
 class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
-    @patch.multiple(
-        SingleAnnotatorPoolQueryStrategy, __abstractmethods__=set()
-    )
+    @patch.multiple(SingleAnnotatorPoolQueryStrategy, __abstractmethods__=set())
     def setUp(self):
         self.qs = SingleAnnotatorPoolQueryStrategy()
 
@@ -94,9 +94,7 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             ValueError,
             self.qs._validate_data,
             candidates=np.array([[1, 2], [0, 1]]),
-            annotators=np.array([[False, True], [True, True]]).reshape(
-                2, 2, 1
-            ),
+            annotators=np.array([[False, True], [True, True]]).reshape(2, 2, 1),
             X=np.array([[1, 2], [0, 1]]),
             y=np.array([[1, MISSING_LABEL], [2, 3]]),
             batch_size=2,
@@ -262,4 +260,38 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
             self.qs.update,
             candidates=None,
             queried_indices=None,
+        )
+
+
+class ScaktivemlRegressorTest(unittest.TestCase):
+    @patch.multiple(SkactivemlRegressor, __abstractmethods__=set())
+    def setUp(self):
+        self.reg = SkactivemlRegressor(missing_label=-1)
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.reg.fit, X=None, y=None)
+
+    def test_predict(self):
+        self.assertRaises(NotImplementedError, self.reg.predict, X=None)
+
+    def test_validate_data(self):
+        X = np.arange(5 * 2).reshape(5, 2)
+        y = 1 / 2 * np.arange(5)
+        self.assertRaises(
+            ValueError,
+            self.reg._validate_data,
+            X=X,
+            y=y,
+            sample_weight=np.arange(1, 5),
+        )
+
+
+class TargetDistributionEstimatorTest(unittest.TestCase):
+    @patch.multiple(ProbabilisticRegressor, __abstractmethods__=set())
+    def setUp(self):
+        self.reg = ProbabilisticRegressor(missing_label=-1)
+
+    def test_predict_target_distribution(self):
+        self.assertRaises(
+            NotImplementedError, self.reg.predict_target_distribution, X=None
         )

@@ -263,9 +263,7 @@ class TestUncertaintyScores(unittest.TestCase):
         self.assertRaises(
             ValueError, uncertainty_scores, self.probas, method="String"
         )
-        self.assertRaises(
-            ValueError, uncertainty_scores, self.probas, method=1
-        )
+        self.assertRaises(ValueError, uncertainty_scores, self.probas, method=1)
 
     def test_param_cost_matrix(self):
         self.assertRaises(

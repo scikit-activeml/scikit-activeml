@@ -216,9 +216,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         random_state=None,
         missing_label=MISSING_LABEL,
     ):
-        super().__init__(
-            random_state=random_state, missing_label=missing_label
-        )
+        super().__init__(random_state=random_state, missing_label=missing_label)
         self.epsilon = epsilon
         self.alpha = alpha
 
