@@ -20,6 +20,7 @@ from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_change_dependence,
 )
 from skactiveml.regressor import NICKernelRegressor
+from skactiveml.utils import MISSING_LABEL
 
 
 class TestExpectedModelOutputChange(unittest.TestCase):
@@ -27,7 +28,7 @@ class TestExpectedModelOutputChange(unittest.TestCase):
         self.random_state = 1
         self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.y = np.array([0, 1, 2, -2])
+        self.y = np.array([0, 1, 2, MISSING_LABEL])
         self.reg = NICKernelRegressor()
         self.query_kwargs = dict(
             X=self.X,
@@ -102,6 +103,17 @@ class TestExpectedModelOutputChange(unittest.TestCase):
     def test_query_param_X_eval(self):
         provide_test_regression_query_strategy_query_X_eval(
             self, ExpectedModelOutputChange
+        )
+
+        qs = ExpectedModelOutputChange()
+        y = np.full_like(self.y, 0)
+        self.assertRaises(
+            ValueError,
+            qs.query,
+            self.X,
+            y,
+            self.reg,
+            candidates=self.candidates,
         )
 
     def test_query_param_batch_size(self):

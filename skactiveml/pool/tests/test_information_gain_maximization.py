@@ -1,5 +1,7 @@
 import unittest
 
+import numpy as np
+
 from skactiveml.pool import (
     KLDivergenceMaximization,
 )
@@ -18,6 +20,7 @@ from skactiveml.pool.tests.provide_test_pool_regression import (
     provide_test_regression_query_strategy_query_X_eval,
     provide_test_regression_query_strategy_change_dependence,
 )
+from skactiveml.regressor import NICKernelRegressor
 
 
 class TestKLDivergenceMaximization(unittest.TestCase):
@@ -88,12 +91,20 @@ class TestKLDivergenceMaximization(unittest.TestCase):
             self, KLDivergenceMaximization
         )
 
-    def test_query_param_X_eval(self):
-        provide_test_regression_query_strategy_query_X_eval(
-            self, KLDivergenceMaximization
-        )
-
     def test_logic(self):
         provide_test_regression_query_strategy_change_dependence(
             self, KLDivergenceMaximization
+        )
+
+        qs = KLDivergenceMaximization()
+        X = np.arange(5).reshape(5, 1)
+        y = np.full(5, 0)
+        X_cand = np.arange(3).reshape(3, 1)
+        self.assertRaises(
+            ValueError,
+            qs.query,
+            X,
+            y,
+            NICKernelRegressor(),
+            candidates=X_cand,
         )

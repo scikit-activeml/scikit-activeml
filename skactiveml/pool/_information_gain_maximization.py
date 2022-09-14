@@ -19,6 +19,7 @@ from skactiveml.utils import (
     is_unlabeled,
 )
 
+
 class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Kullback Leibler Divergence Maximization.
 
@@ -72,7 +73,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         fit_reg=True,
         sample_weight=None,
         candidates=None,
-        X_eval=None,
         batch_size=1,
         return_utilities=False,
     ):
@@ -104,10 +104,6 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the
             candidates are directly given in candidates (not necessarily
             contained in X).
-        X_eval : array-like of shape (n_eval_samples, n_features),
-        optional (default=None)
-            Evaluation data set that is used for estimating the probability
-            distribution of the feature space.
         batch_size : int, optional (default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
@@ -140,11 +136,15 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
         check_type(reg, "reg", ProbabilisticRegressor)
         check_type(fit_reg, "fit_reg", bool)
-        if X_eval is None:
-            X_eval = X[is_unlabeled(y)]
-        else:
-            X_eval = check_array(X_eval)
-            self._check_n_features(X_eval, reset=False)
+
+        X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
+        if len(X_eval) == 0:
+            raise ValueError(
+                "The training data contains no unlabeled "
+                "data. This can be fixed by setting the "
+                "evaluation set manually, e.g. set "
+                "`X_eval=X`."
+            )
 
         if self.integration_dict_target_val is None:
             self.integration_dict_target_val = {"method": "assume_linear"}

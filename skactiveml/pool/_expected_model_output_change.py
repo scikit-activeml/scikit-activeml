@@ -37,8 +37,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         The loss for predicting a target value instead of the true value.
         Takes in the predicted values of an evaluation set and the true values
         of the evaluation set and returns the error, a scalar value.
-        The default loss is `sklearn.metrics.mean_squared_loss` an alternative
-        might be `sklearn.metrics.mean_absolute_loss`.
+        The default loss is `sklearn.metrics.mean_squared_error` an alternative
+        might be `sklearn.metrics.mean_absolute_error`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
@@ -147,7 +147,14 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
             self.integration_dict = {"method": "assume_linear"}
         check_type(self.integration_dict, "self.integration_dict", dict)
         if X_eval is None:
-            X_eval = X[is_unlabeled(y)]
+            X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
+            if len(X_eval) == 0:
+                raise ValueError(
+                    "The training data contains no unlabeled "
+                    "data. This can be fixed by setting the "
+                    "evaluation set manually, e.g. set "
+                    "`X_eval=X`."
+                )
         else:
             X_eval = check_array(X_eval)
             self._check_n_features(X_eval, reset=False)

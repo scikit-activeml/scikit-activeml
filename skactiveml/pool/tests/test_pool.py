@@ -40,7 +40,6 @@ from skactiveml.utils import (
     check_equal_missing_label,
 )
 
-
 REGRESSION_STRATEGIES = [
     ExpectedModelChangeMaximization,
     ExpectedModelVarianceReduction,
@@ -85,8 +84,12 @@ class TestGeneral(unittest.TestCase):
         self.query_strategies = {}
         for qs_name in pool.__all__:
             qs = getattr(pool, qs_name)
-            if inspect.isclass(qs) and issubclass(
-                qs, SingleAnnotatorPoolQueryStrategy
+            if qs in REGRESSION_STRATEGIES:
+                break
+            if (
+                inspect.isclass(qs)
+                and issubclass(qs, SingleAnnotatorPoolQueryStrategy)
+                and qs not in REGRESSION_STRATEGIES
             ):
                 self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())

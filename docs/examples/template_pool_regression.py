@@ -63,7 +63,7 @@ for c in range(n_cycles):
     title = ax_1.text(
         0.5,
         1.05,
-        f"Decision boundary after acquring {c} labels",
+        f"Prediction after acquring {c} labels",
         size=plt.rcParams["axes.titlesize"],
         ha="center",
         transform=ax_1.transAxes,
@@ -87,7 +87,7 @@ for c in range(n_cycles):
     ax_1.scatter(X[~is_lbld], y_true[~is_lbld], c="lightblue")
     ax_1.scatter(X[is_lbld], y[is_lbld], c="orange")
 
-    y_pred, y_std = reg.predict(X_test, return_std=True)
+    y_pred = reg.predict(X_test)
     (prediction_line,) = ax_1.plot(X_test, y_pred, c="black")
 
     coll_new = list(ax_1.collections) + list(ax_2.collections)

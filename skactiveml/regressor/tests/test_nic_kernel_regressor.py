@@ -64,9 +64,9 @@ class TestNICKernelEstimator(unittest.TestCase):
     def test_random_state(self):
         reg = NICKernelRegressor(**self.start_parameter)
 
-        X_test = norm(size=(10, 2), random_state=self.random_state)
-        X = norm(size=(8, 2), random_state=self.random_state)
-        y = norm(size=8, random_state=self.random_state)
+        X_test = norm.rvs(size=(10, 2), random_state=self.random_state)
+        X = norm.rvs(size=(8, 2), random_state=self.random_state)
+        y = norm.rvs(size=8, random_state=self.random_state)
 
         reg.fit(X, y)
         prediction_1 = reg.predict(X_test)

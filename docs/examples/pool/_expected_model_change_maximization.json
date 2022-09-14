@@ -7,7 +7,7 @@
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],
     "title" : "Expected Model Change",
-    "refs" : [],
+    "refs" : ["cai2013maximizing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : ["from skactiveml.pool import ExpectedModelChangeMaximization"],

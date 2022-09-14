@@ -500,7 +500,7 @@ def provide_test_regression_query_strategy_change_dependence(
     query_dict["return_utilities"] = True
 
     utilities = call_func(qs.query, **query_dict)[1][0]
-    np.testing.assert_array_equal(
+    np.testing.assert_almost_equal(
         np.zeros_like(y),
         np.where(is_unlabeled(utilities), 0, utilities),
     )

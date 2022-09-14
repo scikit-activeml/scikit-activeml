@@ -4,7 +4,7 @@ import numpy as np
 from sklearn import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.linear_model import LinearRegression, ARDRegression
+from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVC
 
@@ -128,6 +128,25 @@ class TestWrapper(unittest.TestCase):
         reg.fit(X, y)
 
         self.assertEqual(reg.sample_y("a", 10), "a")
+
+    def test_partial_fit(self):
+        reg_1 = SklearnRegressor(
+            SGDRegressor(random_state=self.random_state),
+            random_state=self.random_state,
+        )
+        reg_2 = SklearnRegressor(
+            SGDRegressor(random_state=self.random_state),
+            random_state=self.random_state,
+        )
+
+        X = np.array([[0], [1], [2], [3], [4]])
+        y = np.array([3, 4, 1, 2, 1])
+
+        reg_1.partial_fit(X, y)
+        reg_2.fit(X, y)
+        self.assertTrue(
+            np.any(np.not_equal(reg_1.predict(X), reg_2.predict(X)))
+        )
 
 
 class TestSklearnProbabilisticRegressor(unittest.TestCase):
