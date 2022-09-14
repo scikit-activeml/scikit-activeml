@@ -655,11 +655,8 @@ class TestApproximation(unittest.TestCase):
         self.random_state = 0
 
     def test_conditional_expectation_params(self):
-        def dummy_func_1(y):
-            return np.zeros_like(y)
-
-        def dummy_func_2(x, y):
-            return np.zeros_like(y)
+        dummy_func_1 = lambda y : np.zeros_like(y)
+        dummy_func_2 = lambda x, y : np.zeros_like(y)
 
         X = np.arange(4 * 2).reshape(4, 2)
         y = np.arange(4, dtype=float)

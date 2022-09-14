@@ -75,13 +75,3 @@ def _get_contour_args(contour_dict):
         check_type(contour_dict, "contour_dict", dict)
         contour_args.update(contour_dict)
     return contour_args
-
-
-def _check_interval_and_assign(intervals, default_val):
-    for idx, interval in enumerate(intervals):
-        check_type(len(interval), f"len(intervals[{idx}])", target_vals=[2, 3])
-        for i, val in enumerate(interval):
-            check_scalar(val, f"interval[{i}]", (int, float))
-        if len(interval) != 3:
-            intervals[idx] = (*interval, default_val)
-    return intervals

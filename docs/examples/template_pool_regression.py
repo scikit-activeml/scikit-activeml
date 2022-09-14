@@ -34,7 +34,7 @@ noise = np.concatenate(
 # Build a dataset.
 y_true = true_function(X) + noise
 y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
-X_test = np.linspace(0, 2, num=100).reshape(-1, 1)
+X_test = np.linspace(0, 2, num="$n_samples|100").reshape(-1, 1)
 
 # Initialise the classifier.
 reg = "$init_reg|NICKernelRegressor(random_state=random_state, metric_dict={'gamma': 15.0})"
