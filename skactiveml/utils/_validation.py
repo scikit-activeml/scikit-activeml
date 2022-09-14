@@ -1,6 +1,7 @@
 import copy
 import warnings
 from collections.abc import Iterable
+from inspect import Parameter, signature
 
 import numpy as np
 from sklearn.utils.validation import (
@@ -664,11 +665,53 @@ def check_type(
         raise TypeError(error_str + ".")
 
 
+def _check_callable(func, name, n_positional_parameters=None):
+    """Checks if function is a callable and if the number of free parameters is
+    correct.
+
+    Parameters
+    ----------
+    func: callable
+        The functions to be validated.
+    name: str
+        The name of the function
+    n_positional_parameters: int, optional (default=None)
+        The number of free parameters. If `n_free_parameters` is `None`,
+        `n_free_parameters` is set to `1`.
+    """
+
+    if n_positional_parameters is None:
+        n_positional_parameters = 1
+
+    if not callable(func):
+        raise TypeError(
+            f"`{name}` must be callable. " f"`{name}` is of type {type(func)}"
+        )
+
+    # count the number of arguments that have no default value
+    n_actual_positional_parameters = len(
+        list(
+            filter(
+                lambda x: x.default == Parameter.empty,
+                signature(func).parameters.values(),
+            )
+        )
+    )
+
+    if n_actual_positional_parameters != n_positional_parameters:
+        raise ValueError(
+            f"The number of positional parameters of the callable has to "
+            f"equal {n_positional_parameters}. "
+            f"The number of positional parameters is "
+            f"{n_actual_positional_parameters}."
+        )
+
+
 def check_bound(
     bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False
 ):
     """Validates bound and returns the bound of X if bound is None.
-    `bound` and `X` must not be None.
+    `bound` or `X` must not be None.
 
     Parameters
     ----------

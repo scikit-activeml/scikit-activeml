@@ -35,7 +35,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None, optional
     (default=MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState, optional (default=None)
         The random state to use.
 
     References

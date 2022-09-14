@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.utils import rand_argmin, rand_argmax, simple_batch
+from skactiveml.utils._selection import combine_ranking
 
 
 class TestSelection(unittest.TestCase):
@@ -113,3 +114,41 @@ class TestSelection(unittest.TestCase):
             return_utilities=False,
         )
         np.testing.assert_equal((0, 2), indices.shape)
+
+    def test_combine_ranking(self):
+
+        self.assertRaises(
+            ValueError,
+            combine_ranking,
+            np.array([0, 1]),
+            np.array([[0, 1], [1, 2]]),
+        )
+
+        ranking_1 = np.array([0, 1, 1])
+        ranking_2 = np.array([0.1, 0.2, 0.4])
+        new_ranking = combine_ranking(ranking_2)
+        np.testing.assert_array_equal(ranking_2, new_ranking)
+
+        com_ranking = combine_ranking(ranking_1, ranking_2)
+
+        self.assertTrue(com_ranking[1] > com_ranking[0])
+        self.assertTrue(com_ranking[2] > com_ranking[1])
+
+        ranking_1 = np.array([0.1, 0.1, 0.2])
+        ranking_2 = np.array([14, 13, 12])
+        com_ranking = combine_ranking(ranking_1, ranking_2)
+        self.assertTrue(com_ranking[2] > com_ranking[0])
+        self.assertTrue(com_ranking[0] > com_ranking[1])
+
+        ranking_1 = np.array([[2, 3, 4], [1, 0, 0]])
+        ranking_2 = np.array([[4, 3, 3], [4.5, 4, 10]])
+
+        com_ranking = combine_ranking(
+            ranking_1, ranking_2, rank_per_batch=True
+        )
+
+        self.assertTrue(com_ranking[0, 2] > com_ranking[0, 1])
+        self.assertTrue(com_ranking[0, 1] > com_ranking[0, 0])
+
+        self.assertTrue(com_ranking[1, 0] > com_ranking[1, 2])
+        self.assertTrue(com_ranking[1, 2] > com_ranking[1, 1])

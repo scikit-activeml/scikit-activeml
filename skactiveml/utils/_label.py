@@ -2,6 +2,7 @@ import numpy as np
 from iteration_utilities import deepflatten
 
 # Define constant for missing label used throughout the package.
+
 MISSING_LABEL = np.nan
 
 

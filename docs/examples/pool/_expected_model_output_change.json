@@ -1,0 +1,23 @@
+[
+  {
+    "class" : "ExpectedModelOutputChange",
+    "package" : "pool",
+    "category" : "Expected Error Reduction",
+    "method" : "Expected Model Output Change",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Expected Model Output Change",
+    "refs" : ["kading2018active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import ExpectedModelOutputChange"],
+    "init_qs" : ["ExpectedModelOutputChange(",
+                 "    random_state=random_state,",
+                 "    integration_dict={",
+                 "        \"method\": \"gauss_hermite\",",
+                 "        \"n_integration_samples\": 5,",
+                 "    },",
+                 ")"],
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

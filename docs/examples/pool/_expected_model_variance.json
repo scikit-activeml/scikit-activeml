@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "ExpectedModelVarianceReduction",
+    "package" : "pool",
+    "category" : "Expected Error Reduction",
+    "method" : "Expected Model Variance Reduction",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Expected Model Variance Reduction",
+    "refs" : ["cohn1996active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import ExpectedModelVarianceReduction"],
+    "init_qs" : "ExpectedModelVarianceReduction()",
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

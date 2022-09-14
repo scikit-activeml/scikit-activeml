@@ -30,7 +30,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         Maximum number of hypothetically acquired labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState, optional
+    random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
