@@ -1,6 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt, animation
-from scipy.stats import norm, uniform
+from scipy.stats import uniform
 
 from skactiveml.utils import MISSING_LABEL, labeled_indices, is_labeled
 
@@ -13,28 +13,19 @@ random_state = np.random.RandomState(0)
 def true_function(X_):
     return (X_**3 + 2 * X_**2 + X_ - 1).flatten()
 
+n_samples = "$n_samples|100"
+X = np.concatenate(
+        [uniform.rvs(0, 1.5, 9 * n_samples // 10, random_state=random_state),
+         uniform.rvs(1.5, 0.5, n_samples // 10, random_state=random_state)]
+    ).reshape(-1, 1)
 
-X = np.sort(
-    np.concatenate(
-        (
-            uniform.rvs(0, 1, 60, random_state=random_state),
-            uniform.rvs(1, 0.5, 30, random_state=random_state),
-            uniform.rvs(1.5, 0.5, 10, random_state=random_state),
-        )
-    )
-).reshape(-1, 1)
-
-noise = np.concatenate(
-    (
-        norm.rvs(0, 1.5, 60, random_state=random_state),
-        norm.rvs(0, 0.5, 40, random_state=random_state),
-    )
-)
+noise = np.vectorize(lambda x : random_state.rand() * 1.5 if x < 1
+                                else random_state.rand() * 0.5)
 
 # Build a dataset.
-y_true = true_function(X) + noise
+y_true = true_function(X) + noise(X).flatten()
 y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
-X_test = np.linspace(0, 2, num="$n_samples|100").reshape(-1, 1)
+X_test = np.linspace(0, 2, num="$res|100").reshape(-1, 1)
 
 # Initialise the classifier.
 reg = "$init_reg|NICKernelRegressor(random_state=random_state, metric_dict={'gamma': 15.0})"

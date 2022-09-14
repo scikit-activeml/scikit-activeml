@@ -551,7 +551,8 @@ class TestExamples(unittest.TestCase):
                     )
                     with self.subTest(msg=msg):
                         file_path = path.join(root, filename)
-                        exec(open(file_path, "r").read(), locals())
+                        with open(file_path, "r") as f:
+                            exec(f.read(), locals())
 
         # Remove the created examples from disk.
         shutil.rmtree(examples_path)
