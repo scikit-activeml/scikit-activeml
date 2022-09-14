@@ -6,9 +6,9 @@ packages_dict = {}
 for p in packages:
     print(p)
     try:
-        p_split = p.split('==')
-        version_split = p_split[1].split('.')
-        version = f'{version_split[0]}.{int(version_split[1]) + 1}'
+        p_split = p.split("==")
+        version_split = p_split[1].split(".")
+        version = f"{version_split[0]}.{int(version_split[1]) + 1}"
         packages_dict[p_split[0]] = version
     except:
         continue
@@ -20,8 +20,8 @@ print(packages_dict.keys())
 for line_idx, line in enumerate(content_list):
     print(line)
     try:
-        name = line.split('>=')[0]
-        line = line.replace('\n', '')
+        name = line.split(">=")[0]
+        line = line.replace("\n", "")
         line += f",<{packages_dict[name]}\n"
         content_list[line_idx] = line
     except:
@@ -29,6 +29,6 @@ for line_idx, line in enumerate(content_list):
 
 
 # Override requirements.
-with open('requirements.txt', 'w') as f:
+with open("requirements.txt", "w") as f:
     for item in content_list:
         f.write("%s" % item)

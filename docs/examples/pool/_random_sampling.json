@@ -5,7 +5,7 @@
     "method" : "Random Sampling",
     "category" : "Random Sampling",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "single-annotator"],
+    "tags" : ["pool",  "regression",  "classification", "single-annotator"],
     "title" : "Random Sampling",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],

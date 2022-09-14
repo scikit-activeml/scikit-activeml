@@ -32,7 +32,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         Any further parameters are passed directly to the metric function.
     missing_label : scalar or string or np.nan or None, default=MISSING_LABEL
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState, optional (default=None)
         The random state to use.
 
     References
