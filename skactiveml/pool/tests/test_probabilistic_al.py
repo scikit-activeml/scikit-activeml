@@ -122,7 +122,10 @@ class TestProbabilisticAL(unittest.TestCase):
             ValueError, pal.query, **self.kwargs, utility_weight="string"
         )
         self.assertRaises(
-            ValueError, pal.query, **self.kwargs, utility_weight=self.candidates
+            ValueError,
+            pal.query,
+            **self.kwargs,
+            utility_weight=self.candidates
         )
         self.assertRaises(
             ValueError,

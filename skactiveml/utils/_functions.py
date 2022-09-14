@@ -71,7 +71,9 @@ class _IffHasAMethod:
     def __get__(self, obj, owner=None):
 
         delegate = attrgetter(self.delegate_name)(obj)
-        if not _hasattr_array_like(delegate, attribute_names=self.method_names):
+        if not _hasattr_array_like(
+            delegate, attribute_names=self.method_names
+        ):
             raise AttributeError
 
         def out(*args, **kwargs):

@@ -18,7 +18,9 @@ class TestParzenWindowClassifier(unittest.TestCase):
         self.assertEqual(pwc.metric_dict, None)
         pwc = ParzenWindowClassifier(missing_label="nan", metric_dict="Test")
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
-        pwc = ParzenWindowClassifier(missing_label="nan", metric_dict=["gamma"])
+        pwc = ParzenWindowClassifier(
+            missing_label="nan", metric_dict=["gamma"]
+        )
         self.assertRaises(TypeError, pwc.fit, X=self.X, y=self.y)
 
     def test_init_param_metric(self):
@@ -52,9 +54,13 @@ class TestParzenWindowClassifier(unittest.TestCase):
         pwc.fit(X=self.X, y=self.y)
         self.assertIsNone(pwc.cost_matrix)
         np.testing.assert_array_equal(1 - np.eye(3), pwc.cost_matrix_)
-        np.testing.assert_array_equal([[0, 0, 1], [0, 0, 0], [0, 1, 0]], pwc.V_)
+        np.testing.assert_array_equal(
+            [[0, 0, 1], [0, 0, 0], [0, 1, 0]], pwc.V_
+        )
         pwc.fit(X=self.X, y=self.y, sample_weight=self.w)
-        np.testing.assert_array_equal([[0, 0, 2], [0, 0, 0], [0, 1, 0]], pwc.V_)
+        np.testing.assert_array_equal(
+            [[0, 0, 2], [0, 0, 0], [0, 1, 0]], pwc.V_
+        )
 
     def test_predict_freq(self):
         pwc = ParzenWindowClassifier(

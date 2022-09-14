@@ -108,7 +108,9 @@ class TestCostEmbeddingAL(unittest.TestCase):
 
     def test_query_param_batch_size(self):
         alce = CostEmbeddingAL(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(TypeError, alce.query, self.X, self.y, batch_size=1.0)
+        self.assertRaises(
+            TypeError, alce.query, self.X, self.y, batch_size=1.0
+        )
         self.assertRaises(ValueError, alce.query, self.X, self.y, batch_size=0)
 
     def test_query_param_return_utilities(self):
@@ -173,7 +175,9 @@ class TestCostEmbeddingAL(unittest.TestCase):
         np.testing.assert_array_equal(query_indices, [1])
 
     def test_MDS(self):
-        sim = np.array([[0, 5, 3, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]])
+        sim = np.array(
+            [[0, 5, 3, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]]
+        )
         mds_clf = MDSP(metric=False, n_jobs=3, dissimilarity="precomputed")
         mds_clf.fit(sim)
 
@@ -184,7 +188,9 @@ class TestCostEmbeddingAL(unittest.TestCase):
 
     def test_smacof_p_error(self):
         # Not symmetric similarity matrix:
-        sim = np.array([[0, 5, 9, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]])
+        sim = np.array(
+            [[0, 5, 9, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]]
+        )
 
         np.testing.assert_raises(ValueError, smacof_p, sim, n_uq=1)
 
@@ -194,7 +200,9 @@ class TestCostEmbeddingAL(unittest.TestCase):
         np.testing.assert_raises(ValueError, smacof_p, sim, n_uq=1)
 
         # init not None and not correct format:
-        sim = np.array([[0, 5, 3, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]])
+        sim = np.array(
+            [[0, 5, 3, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]]
+        )
 
         Z = np.array([[-0.266, -0.539], [0.016, -0.238], [-0.200, 0.524]])
         np.testing.assert_raises(
@@ -202,5 +210,7 @@ class TestCostEmbeddingAL(unittest.TestCase):
         )
 
     def test_smacof_p(self):
-        sim = np.array([[0, 5, 3, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]])
+        sim = np.array(
+            [[0, 5, 3, 4], [5, 0, 2, 2], [3, 2, 0, 1], [4, 2, 1, 0]]
+        )
         smacof_p(sim, n_uq=1, return_n_iter=False)

@@ -260,7 +260,9 @@ class TestSplit(TemplateTestUncertaintyZliobaite, unittest.TestCase):
         return Split
 
 
-class TestFixedUncertainty(TemplateTestUncertaintyZliobaite, unittest.TestCase):
+class TestFixedUncertainty(
+    TemplateTestUncertaintyZliobaite, unittest.TestCase
+):
     def get_query_strategy(self):
         return FixedUncertainty
 

@@ -57,7 +57,9 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
         selector = EpistemicUncertaintySampling()
         dt = SklearnClassifier(DecisionTreeClassifier())
         for clf in [None, "string", 1, dt]:
-            self.assertRaises(TypeError, selector.query, **self.kwargs, clf=clf)
+            self.assertRaises(
+                TypeError, selector.query, **self.kwargs, clf=clf
+            )
 
     def test_query_param_X(self):
         selector = EpistemicUncertaintySampling()

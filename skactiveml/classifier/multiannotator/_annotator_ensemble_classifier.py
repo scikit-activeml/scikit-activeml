@@ -174,7 +174,9 @@ class AnnotatorEnsembleClassifier(
         if self.n_features_in_ is None:
             return np.ones((len(X), len(self.classes_))) / len(self.classes_)
         elif self.voting == "hard":
-            y_pred = np.array([est.predict(X) for _, est in self.estimators_]).T
+            y_pred = np.array(
+                [est.predict(X) for _, est in self.estimators_]
+            ).T
             V = compute_vote_vectors(y=y_pred, classes=self.classes_)
             P = V / np.sum(V, axis=1, keepdims=True)
         elif self.voting == "soft":

@@ -29,7 +29,9 @@ class QueryStrategyTest(unittest.TestCase):
 
 
 class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
-    @patch.multiple(SingleAnnotatorPoolQueryStrategy, __abstractmethods__=set())
+    @patch.multiple(
+        SingleAnnotatorPoolQueryStrategy, __abstractmethods__=set()
+    )
     def setUp(self):
         self.qs = SingleAnnotatorPoolQueryStrategy()
 
@@ -94,7 +96,9 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             ValueError,
             self.qs._validate_data,
             candidates=np.array([[1, 2], [0, 1]]),
-            annotators=np.array([[False, True], [True, True]]).reshape(2, 2, 1),
+            annotators=np.array([[False, True], [True, True]]).reshape(
+                2, 2, 1
+            ),
             X=np.array([[1, 2], [0, 1]]),
             y=np.array([[1, MISSING_LABEL], [2, 3]]),
             batch_size=2,
