@@ -345,6 +345,57 @@ def plot_contour_for_samples(
     return ax
 
 
+def plot_stream_utilities(
+    qs,
+    feature_bound,
+    clf=None,
+    X=None,
+    y=None,
+    **kwargs,
+):
+    ax = kwargs.pop("ax", None)
+    res = kwargs.pop("res", 21)
+    fit_clf = kwargs.pop("fit_clf", False)
+    contour_dict = kwargs.pop("contour_dict", None)
+    check_type(qs, "qs", QueryStrategy)
+    X = check_array(X, allow_nd=False, ensure_2d=True)
+    if X.shape[1] != 2:
+        raise ValueError("Samples in `X` must have 2 features.")
+    contour_args = _get_contour_args(contour_dict)
+    # Check labels
+    y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    check_consistent_length(X, y)
+    if ax is None:
+        ax = plt.subplots(1, 1)[1]
+    else:
+        check_type(ax, "ax", Axes)
+    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+    Z_queried_ravel = np.zeros(len(X_mesh) * len(Y_mesh))
+    Z_ravel = np.zeros(len(X_mesh) * len(Y_mesh))
+
+    for i, cand in enumerate(mesh_instances):
+        candidates = [cand]
+        queried_indices, utility = call_func(
+            qs.query,
+            candidates=candidates,
+            clf=clf,
+            X=X,
+            y=y,
+            fit_clf=fit_clf,
+            return_utilities=True,
+        )
+        Z_queried_ravel[i] = len(queried_indices)
+        Z_ravel[i] = utility
+    Z_ravel[np.isnan(Z_ravel)] = 0
+    Z = Z_ravel.reshape(X_mesh.shape)
+    # Z_queried = Z_queried_ravel.reshape(X_mesh.shape)
+    # Z_new = Z
+    # if np.sum(Z_queried) > 0:
+    #     Z_new = Z * Z_queried
+    ax.contourf(X_mesh, Y_mesh, Z, **contour_args)
+    return ax
+
+
 def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     """Plot the utility for the given query strategy.
 

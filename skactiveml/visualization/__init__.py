@@ -7,6 +7,7 @@ from ._feature_space import (
     plot_decision_boundary,
     plot_contour_for_samples,
     plot_annotator_utilities,
+    plot_stream_utilities
 )
 from ._misc import mesh
 
@@ -15,5 +16,6 @@ __all__ = [
     "plot_decision_boundary",
     "plot_contour_for_samples",
     "plot_annotator_utilities",
+    "plot_stream_utilities",
     "mesh",
 ]

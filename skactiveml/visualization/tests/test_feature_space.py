@@ -11,6 +11,7 @@ from sklearn.svm import LinearSVC
 
 from skactiveml import visualization
 from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.stream import Split
 from skactiveml.pool import (
     UncertaintySampling,
     RandomSampling,
@@ -22,6 +23,7 @@ from skactiveml.visualization import (
     plot_utilities,
     plot_contour_for_samples,
     plot_annotator_utilities,
+    plot_stream_utilities,
 )
 from skactiveml.visualization._feature_space import _general_plot_utilities
 
@@ -342,6 +344,95 @@ class TestFeatureSpace(unittest.TestCase):
             contour_dict="string"
         )
         _general_plot_utilities(
+            qs=self.qs,
+            **self.qs_dict,
+            X=self.X,
+            y=self.y,
+            feature_bound=self.bound,
+            contour_dict={"linestyles": "."}
+        )
+
+    # Tests for plot_stream_utilities function
+    def test_plot_stream_utilities_param_qs(self):
+        self.assertRaises(
+            TypeError,
+            plot_stream_utilities,
+            qs=self.clf,
+            X=self.X,
+            y=self.y,
+            **self.qs_dict,
+            feature_bound=self.bound
+        )
+
+    def test_plot_stream_utilities_param_X(self):
+        self.assertRaises(
+            ValueError,
+            plot_stream_utilities,
+            qs=self.qs,
+            X=np.ones([len(self.X), 3]),
+            y=self.y,
+            **self.qs_dict,
+            feature_bound=self.bound
+        )
+
+    def test_plot_stream_utilities_param_y(self):
+        self.assertRaises(
+            ValueError,
+            plot_stream_utilities,
+            qs=self.qs,
+            X=self.X,
+            y=np.zeros(len(self.y) + 1),
+            **self.qs_dict,
+            feature_bound=self.bound
+        )
+
+    def test_plot_stream_utilities_param_res(self):
+        self.assertRaises(
+            ValueError,
+            plot_stream_utilities,
+            qs=self.qs,
+            X=self.X,
+            y=self.y_active,
+            **self.qs_dict,
+            feature_bound=self.bound,
+            res=-3
+        )
+
+    def test_plot_stream_utilities_param_ax(self):
+        self.assertRaises(
+            TypeError,
+            plot_stream_utilities,
+            qs=self.qs,
+            X=self.X,
+            y=self.y_active,
+            **self.qs_dict,
+            feature_bound=self.bound,
+            ax=2
+        )
+        _, axes = plt.subplots(1, 2)
+        self.assertRaises(
+            TypeError,
+            plot_stream_utilities,
+            qs=self.qs,
+            X=self.X,
+            y=self.y_active,
+            **self.qs_dict,
+            feature_bound=self.bound,
+            ax=axes
+        )
+
+    def test_plot_stream_utilities_param_contour_dict(self):
+        self.assertRaises(
+            TypeError,
+            plot_stream_utilities,
+            qs=self.qs,
+            X=self.X,
+            y=self.y_active,
+            **self.qs_dict,
+            feature_bound=self.bound,
+            contour_dict="string"
+        )
+        plot_stream_utilities(
             qs=self.qs,
             **self.qs_dict,
             X=self.X,
