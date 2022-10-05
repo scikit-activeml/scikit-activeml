@@ -103,6 +103,54 @@ class TestUncertaintySampling(unittest.TestCase):
             sample_weight=np.ones(2),
         )
 
+    def test_query_param_utility_weight(self):
+        selector = UncertaintySampling()
+        self.assertRaises(
+            ValueError, selector.query, **self.kwargs, utility_weight="string"
+        )
+        self.assertRaises(
+            ValueError,
+            selector.query,
+            **self.kwargs,
+            utility_weight=self.candidates
+        )
+        self.assertRaises(
+            ValueError,
+            selector.query,
+            **self.kwargs,
+            utility_weight=np.empty((len(self.X) - 1))
+        )
+        self.assertRaises(
+            ValueError,
+            selector.query,
+            **self.kwargs,
+            utility_weight=np.empty((len(self.X) + 1))
+        )
+        self.assertRaises(
+            ValueError,
+            selector.query,
+            **self.kwargs,
+            utility_weight=np.ones((len(self.X) + 1))
+        )
+        self.assertRaises(
+            ValueError,
+            selector.query,
+            X=self.X,
+            y=self.y,
+            candidates=None,
+            clf=self.clf,
+            utility_weight=np.ones((len(self.X) + 1)),
+        )
+        self.assertRaises(
+            ValueError,
+            selector.query,
+            X=self.X,
+            y=self.y,
+            candidates=[0],
+            clf=self.clf,
+            utility_weight=np.ones(2),
+        )
+
     def test_query_param_fit_clf(self):
         selector = UncertaintySampling()
         self.assertRaises(
@@ -136,6 +184,16 @@ class TestUncertaintySampling(unittest.TestCase):
         selector = UncertaintySampling()
         best_idx = selector.query(**self.kwargs, batch_size=bs)
         self.assertEqual(bs, len(best_idx))
+
+        # utility_weight
+        qs = UncertaintySampling()
+        utility_weight = np.arange(len(self.candidates))
+        utility_weight = utility_weight*utility_weight
+        idx, utils_w = qs.query(**self.kwargs, utility_weight=utility_weight,
+                              return_utilities=True)
+        idx, utils = qs.query(**self.kwargs, return_utilities=True)
+        np.testing.assert_array_equal(utils*utility_weight, utils_w)
+
 
         # query
         selector = UncertaintySampling(method="entropy")
