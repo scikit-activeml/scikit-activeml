@@ -67,5 +67,24 @@
     "init_qs" : "UncertaintySampling(method='expected_average_precision')",
     "query_params" : "X=X, y=y, clf=clf",
     "plot_utility_params" : "candidates=X"
+  },
+  {
+    "class" : "UncertaintySampling",
+    "package" : "pool",
+    "method" : "Density weighted Uncertainty Sampling",
+    "category" : "Uncertainty Sampling",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Density weighted Uncertainty Sampling",
+    "refs" : ["donmez2007dual", "nguyen2004active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_clf" : "from sklearn.linear_model import LogisticRegression\nfrom sklearn.mixture import GaussianMixture\nfrom skactiveml.classifier import SklearnClassifier",
+    "import_misc" : "from skactiveml.pool import UncertaintySampling",
+    "init_qs" : "UncertaintySampling(method='least_confident', random_state=random_state)",
+    "init_clf" : "SklearnClassifier(LogisticRegression(), classes=np.unique(y_true))",
+    "preproc" : "gmm = GaussianMixture(init_params='kmeans', n_components=5)\ngmm.fit(X)\ndensity = np.exp(gmm.score_samples(X))",
+    "query_params" : "X=X, y=y, clf=clf, utility_weight=density",
+    "plot_utility_params" : "candidates=unlabeled_indices(y), replace_nan=None"
   }
 ]
