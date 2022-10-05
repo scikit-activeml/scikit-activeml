@@ -118,19 +118,19 @@ class TestUncertaintySampling(unittest.TestCase):
             ValueError,
             selector.query,
             **self.kwargs,
-            utility_weight=np.empty((len(self.X) - 1))
+            utility_weight=np.empty((len(self.candidates) - 1))
         )
         self.assertRaises(
             ValueError,
             selector.query,
             **self.kwargs,
-            utility_weight=np.empty((len(self.X) + 1))
+            utility_weight=np.empty((len(self.candidates) + 1))
         )
         self.assertRaises(
             ValueError,
             selector.query,
             **self.kwargs,
-            utility_weight=np.ones((len(self.X) + 1))
+            utility_weight=np.ones((len(self.candidates) + 1))
         )
         self.assertRaises(
             ValueError,
@@ -139,7 +139,7 @@ class TestUncertaintySampling(unittest.TestCase):
             y=self.y,
             candidates=None,
             clf=self.clf,
-            utility_weight=np.ones((len(self.X) + 1)),
+            utility_weight=np.ones((len(self.candidates) + 1)),
         )
         self.assertRaises(
             ValueError,
