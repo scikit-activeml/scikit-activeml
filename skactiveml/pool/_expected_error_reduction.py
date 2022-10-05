@@ -46,7 +46,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         Used for misclassification loss and ignored for log loss.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState
+    random_state : int or np.random.RandomState
         The random state to use.
 
     References
@@ -533,7 +533,7 @@ class MonteCarloEER(ExpectedErrorReduction):
         score. This might be helpful to define a stopping criterion.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState
+    random_state : int or np.random.RandomState
         The random state to use.
 
     References
@@ -665,7 +665,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         current error.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState
+    random_state : int or np.random.RandomState
         The random state to use.
 
     References

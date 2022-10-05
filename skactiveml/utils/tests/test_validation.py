@@ -16,6 +16,7 @@ from skactiveml.utils import (
     check_indices,
 )
 from skactiveml.utils import check_random_state, check_class_prior
+from skactiveml.utils._validation import _check_callable
 
 
 class TestValidation(unittest.TestCase):
@@ -263,6 +264,26 @@ class TestValidation(unittest.TestCase):
             target_vals=["undefined"],
             indicator_funcs=[is_prime],
         )
+
+    def test_check_callable(self):
+
+        self.assertRaises(
+            ValueError,
+            _check_callable,
+            lambda x: x,
+            "name",
+            n_positional_parameters=2,
+        )
+
+        self.assertRaises(
+            ValueError,
+            _check_callable,
+            lambda x, y: x,
+            "name",
+            n_positional_parameters=1,
+        )
+
+        self.assertRaises(TypeError, _check_callable, "illegal", "name")
 
     def test_check_indices_single_dimension(self):
         A = np.array([[4, 5], [6, 1], [3, 4]])

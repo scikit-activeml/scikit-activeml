@@ -1,0 +1,44 @@
+[
+  {
+    "class" : "GreedySamplingX",
+    "package" : "pool",
+    "method" : "Greedy Sampling on the Feature Space (GSx)",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Greedy Sampling on the Feature Space (GSx)",
+    "refs" : ["wu2019active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import GreedySamplingX"],
+    "init_qs" : "GreedySamplingX()",
+    "query_params" : "X=X, y=y"
+  },
+  {
+    "class" : "GreedySamplingTarget",
+    "package" : "pool",
+    "method" : "Greedy Sampling on the Target Space (GSy)",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Greedy Sampling on the Target Space (GSy)",
+    "refs" : ["wu2019active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import GreedySamplingTarget"],
+    "init_qs" : "GreedySamplingTarget(method='GSy')",
+    "query_params" : "X=X, y=y, reg=reg"
+  },
+  {
+    "class" : "GreedySamplingTarget",
+    "package" : "pool",
+    "method" : "Improved Greedy Sampling (GSi)",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Improved Greedy Sampling (GSi)",
+    "refs" : ["wu2019active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import GreedySamplingTarget"],
+    "init_qs" : "GreedySamplingTarget(method='GSi')",
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

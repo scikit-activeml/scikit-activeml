@@ -20,7 +20,17 @@ from skactiveml.classifier import (
     SklearnClassifier,
 )
 from skactiveml.exceptions import MappingError
-from skactiveml.pool import FourDs
+from skactiveml.pool import (
+    FourDs,
+    ExpectedModelVarianceReduction,
+    ExpectedModelOutputChange,
+    GreedySamplingX,
+    GreedySamplingTarget,
+    KLDivergenceMaximization,
+)
+from skactiveml.pool._expected_model_change_maximization import (
+    ExpectedModelChangeMaximization,
+)
 from skactiveml.utils import (
     call_func,
     is_unlabeled,
@@ -29,6 +39,15 @@ from skactiveml.utils import (
     unlabeled_indices,
     check_equal_missing_label,
 )
+
+REGRESSION_STRATEGIES = [
+    ExpectedModelChangeMaximization,
+    ExpectedModelVarianceReduction,
+    ExpectedModelOutputChange,
+    KLDivergenceMaximization,
+    GreedySamplingX,
+    GreedySamplingTarget,
+]
 
 
 class TestGeneral(unittest.TestCase):
@@ -65,8 +84,12 @@ class TestGeneral(unittest.TestCase):
         self.query_strategies = {}
         for qs_name in pool.__all__:
             qs = getattr(pool, qs_name)
-            if inspect.isclass(qs) and issubclass(
-                qs, SingleAnnotatorPoolQueryStrategy
+            if qs in REGRESSION_STRATEGIES:
+                break
+            if (
+                inspect.isclass(qs)
+                and issubclass(qs, SingleAnnotatorPoolQueryStrategy)
+                and qs not in REGRESSION_STRATEGIES
             ):
                 self.query_strategies[qs_name] = qs
         print(self.query_strategies.keys())
@@ -506,7 +529,7 @@ class TestExamples(unittest.TestCase):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples")
-        self.exceptions = []
+        self.exceptions = [qs.__name__ for qs in REGRESSION_STRATEGIES]
         self.working_dir = os.path.abspath(os.curdir)
 
         # A list of all modules that should have a json file.
@@ -514,9 +537,7 @@ class TestExamples(unittest.TestCase):
 
     def test_example_files(self):
         # Temporary generate the examples from the json files.
-        examples_path = path.join(
-            self.skaml_path, "docs", "temp_examples"
-        )
+        examples_path = path.join(self.skaml_path, "docs", "temp_examples")
         os.chdir(self.docs_path)
         generate_examples(examples_path, self.json_path)
         os.chdir(self.working_dir)
@@ -525,11 +546,13 @@ class TestExamples(unittest.TestCase):
         for (root, dirs, files) in os.walk(examples_path, topdown=True):
             for filename in files:
                 if filename.endswith(".py"):
-                    msg = os.path.join(root, filename)\
-                        .replace(examples_path, '')
+                    msg = os.path.join(root, filename).replace(
+                        examples_path, ""
+                    )
                     with self.subTest(msg=msg):
                         file_path = path.join(root, filename)
-                        exec(open(file_path, "r").read(), locals())
+                        with open(file_path, "r") as f:
+                            exec(f.read(), locals())
 
         # Remove the created examples from disk.
         shutil.rmtree(examples_path)
