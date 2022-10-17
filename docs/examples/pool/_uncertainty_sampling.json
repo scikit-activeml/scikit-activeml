@@ -71,11 +71,11 @@
   {
     "class" : "UncertaintySampling",
     "package" : "pool",
-    "method" : "Density weighted Uncertainty Sampling",
+    "method" : "Density-weighted Uncertainty Sampling",
     "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
-    "title" : "Density weighted Uncertainty Sampling",
+    "title" : "Density-weighted Uncertainty Sampling",
     "refs" : ["donmez2007dual", "nguyen2004active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",

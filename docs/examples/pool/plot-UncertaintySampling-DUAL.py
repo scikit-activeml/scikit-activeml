@@ -58,8 +58,8 @@ for c in range(n_cycles):
         # DWUS
         query_idx, utils = qs.query(X=X, y=y, clf=clf, utility_weight=density, return_utilities=True)
         utilities = utils[0]
-        switching_point = utils[0, query_idx[0]] - u_max < delta
-        u_max = utils[0, query_idx[0]]
+        switching_point = utilities[query_idx[0]] - u_max < delta
+        u_max = utilities[query_idx[0]]
         strategy = "DWUS"
     else:
         # DWUS + US
