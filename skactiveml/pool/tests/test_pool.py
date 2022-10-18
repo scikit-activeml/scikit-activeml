@@ -131,7 +131,7 @@ class TestGeneral(unittest.TestCase):
                 self.assertEqual(len(u1[0]), len(self.X))
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_array_equal(u1, u2)
-
+                self.asser
             with self.subTest(msg="Batch", qs_name=qs_name):
                 y = np.full(self.y_true.shape, self.MISSING_LABEL)
                 y[0:2] = self.y_true[0:2]
