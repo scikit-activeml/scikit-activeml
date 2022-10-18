@@ -33,6 +33,9 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
      - Joshi, A. J., Porikli, F., & Papanikolopoulos, N. P. (2012). Scalable
        active learning for multiclass image classification.
        IEEE TrPAMI, 34(11), pp. 2259-2273.
+     - Kottke, Daniel, et al. "Toward optimal probabilistic active learning
+       using a Bayesian approach." Machine Learning 110.6 (2021): 1199-1231.
+
 
     Parameters
     ----------
@@ -61,6 +64,9 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
     [4] Kapoor, Ashish, Eric Horvitz, and Sumit Basu. "Selective Supervision:
         Guiding Supervised Learning with Decision-Theoretic Active Learning."
         IJCAI. Vol. 7. 2007.
+    [5] Kottke, Daniel, et al. "Toward optimal probabilistic active learning
+        using a Bayesian approach." Machine Learning 110.6 (2021): 1199-1231.
+
     """
 
     def __init__(
