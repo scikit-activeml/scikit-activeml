@@ -66,6 +66,12 @@ class TemplateQueryStrategy:
         test_cases += [(np.nan, ValueError), ("state", ValueError), (1, None)]
         self._test_param("init", "random_state", test_cases)
 
+    def test_query_param_fit_clf(self, test_cases=None):
+        init_params = inspect.signature(self.qs_class.query).parameters
+        if "clf" in init_params:
+            raise ValueError("TODO: Daniel")
+
+
     def _test_param(self, test_func, test_param, test_cases,
                     replace_init_params=None, replace_query_params=None,
                     exclude_clf=False, exclude_reg=False):
@@ -147,7 +153,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         super().setUp(qs_class, init_default_params,
                       query_default_params_clf, query_default_params_reg)
         self.y_shape = list(self.query_default_params_clf["y"].shape \
-                            if self.query_default_params_clf is None else \
+                            if self.query_default_params_clf is not None else \
                             self.query_default_params_reg["y"].shape)
 
     def test_init_param_missing_label(self, test_cases=None):  # TODO add more cases
@@ -220,9 +226,9 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 id1, u1 = qs.query(**query_params)
                 id2, u2 = qs.query(**query_params)
 
-            self.assertEqual(len(u1[0]), len(query_params["X"]))
-            np.testing.assert_array_equal(id1, id2)
-            np.testing.assert_allclose(u1, u2)
+                self.assertEqual(len(u1[0]), len(query_params["X"]))
+                np.testing.assert_array_equal(id1, id2)
+                np.testing.assert_allclose(u1, u2)
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
 
