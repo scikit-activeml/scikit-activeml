@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
@@ -10,165 +11,84 @@ from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import TemplateSingleAnnotatorPoolQueryStrategy
 
 
-class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
+                              unittest.TestCase):
     def setUp(self):
+        self.classes = [0, 1]
         query_default_params_clf = {
             'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
-            'clf': ParzenWindowClassifier(random_state=0, classes=[0, 1]),
+            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            'clf': ParzenWindowClassifier(random_state=0, classes=self.classes),
         }
         super().setUp(qs_class=UncertaintySampling, init_default_params={},
                       query_default_params_clf=query_default_params_clf)
 
-    # def test_init_param_method(self):
-    #     selector = UncertaintySampling()
-    #     self.assertTrue(hasattr(selector, "method"))
-    #     selector = UncertaintySampling(method="String")
-    #     self.assertRaises(ValueError, selector.query, **self.kwargs)
-    #     selector = UncertaintySampling(method=1)
-    #     self.assertRaises(TypeError, selector.query, **self.kwargs)
-    #
-    # def test_init_param_cost_matrix(self):
-    #     selector = UncertaintySampling(cost_matrix=np.ones((2, 3)))
-    #     self.assertRaises(ValueError, selector.query, **self.kwargs)
-    #
-    #     selector = UncertaintySampling(cost_matrix="string")
-    #     self.assertRaises(ValueError, selector.query, **self.kwargs)
-    #
-    #     selector = UncertaintySampling(cost_matrix=np.ones((3, 3)))
-    #     self.assertRaises(ValueError, selector.query, **self.kwargs)
-    #
-    #     selector = UncertaintySampling(
-    #         method="entropy", cost_matrix=np.ones([2, 2]) - np.eye(2)
-    #     )
-    #     self.assertRaises(ValueError, selector.query, **self.kwargs)
-    #
-    # def test_query_param_clf(self):
-    #     selector = UncertaintySampling()
-    #     self.assertRaises(
-    #         TypeError,
-    #         selector.query,
-    #         candidates=self.candidates,
-    #         clf=GaussianProcessClassifier(),
-    #         X=self.X,
-    #         y=self.y,
-    #     )
-    #
-    # def test_query_param_sample_weight(self):
-    #     selector = UncertaintySampling()
-    #     self.assertRaises(
-    #         ValueError, selector.query, **self.kwargs, sample_weight="string"
-    #     )
-    #     self.assertRaises(
-    #         ValueError,
-    #         selector.query,
-    #         **self.kwargs,
-    #         sample_weight=self.candidates
-    #     )
-    #     self.assertRaises(
-    #         ValueError,
-    #         selector.query,
-    #         **self.kwargs,
-    #         sample_weight=np.empty((len(self.X) - 1))
-    #     )
-    #     self.assertRaises(
-    #         ValueError,
-    #         selector.query,
-    #         **self.kwargs,
-    #         sample_weight=np.empty((len(self.X) + 1))
-    #     )
-    #     self.assertRaises(
-    #         ValueError,
-    #         selector.query,
-    #         **self.kwargs,
-    #         sample_weight=np.ones((len(self.X) + 1))
-    #     )
-    #     self.assertRaises(
-    #         ValueError,
-    #         selector.query,
-    #         X=self.X,
-    #         y=self.y,
-    #         candidates=None,
-    #         clf=self.clf,
-    #         sample_weight=np.ones((len(self.X) + 1)),
-    #     )
-    #     self.assertRaises(
-    #         ValueError,
-    #         selector.query,
-    #         X=self.X,
-    #         y=self.y,
-    #         candidates=[0],
-    #         clf=self.clf,
-    #         sample_weight=np.ones(2),
-    #     )
-    #
-    # def test_query_param_fit_clf(self):
-    #     selector = UncertaintySampling()
-    #     self.assertRaises(
-    #         TypeError, selector.query, **self.kwargs, fit_clf="string"
-    #     )
-    #     self.assertRaises(
-    #         TypeError, selector.query, **self.kwargs, fit_clf=self.candidates
-    #     )
-    #     self.assertRaises(
-    #         TypeError, selector.query, **self.kwargs, fit_clf=None
-    #     )
-    #
-    # def test_query(self):
-    #     compare_list = []
-    #     clf = SklearnClassifier(
-    #         estimator=GaussianProcessClassifier(),
-    #         random_state=self.random_state,
-    #         classes=self.classes,
-    #     )
-    #
-    #     selector = UncertaintySampling()
-    #
-    #     # return_utilities
-    #     L = list(selector.query(**self.kwargs, return_utilities=True))
-    #     self.assertTrue(len(L) == 2)
-    #     L = list(selector.query(**self.kwargs, return_utilities=False))
-    #     self.assertTrue(len(L) == 1)
-    #
-    #     # batch_size
-    #     bs = 3
-    #     selector = UncertaintySampling()
-    #     best_idx = selector.query(**self.kwargs, batch_size=bs)
-    #     self.assertEqual(bs, len(best_idx))
-    #
-    #     # query
-    #     selector = UncertaintySampling(method="entropy")
-    #     selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-    #     compare_list.append(selector.query(**self.kwargs))
-    #
-    #     selector = UncertaintySampling(method="margin_sampling")
-    #     selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-    #     compare_list.append(selector.query(**self.kwargs))
-    #
-    #     selector = UncertaintySampling(method="least_confident")
-    #     selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-    #     compare_list.append(selector.query(**self.kwargs))
-    #
-    #     selector = UncertaintySampling(
-    #         method="margin_sampling", cost_matrix=[[0, 1], [1, 0]]
-    #     )
-    #     selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-    #
-    #     selector = UncertaintySampling(
-    #         method="least_confident", cost_matrix=[[0, 1], [1, 0]]
-    #     )
-    #     selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-    #
-    #     for x in compare_list:
-    #         self.assertEqual(compare_list[0], x)
-    #
-    #     selector = UncertaintySampling(method="expected_average_precision")
-    #     selector.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-    #     best_indices, utilities = selector.query(
-    #         **self.kwargs, return_utilities=True
-    #     )
-    #     self.assertEqual(utilities.shape, (1, len(self.candidates)))
-    #     self.assertEqual(best_indices.shape, (1,))
+    def test_init_param_method(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(1, TypeError), ("string", ValueError)]
+        self._test_param("init", "method", test_cases)
+
+    def test_init_param_cost_matrix(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.ones((2, 3)), ValueError), ("string", ValueError),
+                       (np.ones((3, 3)), ValueError)]
+        self._test_param("init", "cost_matrix", test_cases)
+        self._test_param("init", "cost_matrix",
+                         [(np.ones([2, 2]) - np.eye(2), ValueError)],
+                         replace_init_params={'method': "entropy"})
+
+    def test_query_param_sample_weight(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [("string", ValueError),
+                       (self.query_default_params_clf['X'], ValueError),
+                       (np.empty((len(self.X) - 1)), ValueError)]
+        self._test_param("query", "sample_weight", test_cases)
+
+    def test_query(self):
+        compare_list = []
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            random_state=self.init_default_params['random_state'],
+            classes=self.classes
+        )
+
+        # query
+        qs = UncertaintySampling(method="entropy")
+        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        compare_list.append(qs.query(**self.query_default_params_clf))
+
+        qs = UncertaintySampling(method="margin_sampling")
+        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        compare_list.append(qs.query(**self.query_default_params_clf))
+
+        qs = UncertaintySampling(method="least_confident")
+        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+        compare_list.append(qs.query(**self.query_default_params_clf))
+
+        for x in compare_list:
+            self.assertEqual(compare_list[0], x)
+
+        qs = UncertaintySampling(
+            method="margin_sampling", cost_matrix=[[0, 1], [1, 0]]
+        )
+        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+
+        qs = UncertaintySampling(
+            method="least_confident", cost_matrix=[[0, 1], [1, 0]]
+        )
+        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+
+        qs = UncertaintySampling(method="expected_average_precision")
+        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
+
+        candidates = np.random.rand(10, 2)
+        query_params = deepcopy(self.query_default_params_clf)
+        query_params['candidates'] = candidates
+        best_indices, utilities = qs.query(
+            **query_params, return_utilities=True
+        )
+        self.assertEqual(utilities.shape, (1, len(candidates)))
+        self.assertEqual(best_indices.shape, (1,))
 
 
 class TestExpectedAveragePrecision(unittest.TestCase):
