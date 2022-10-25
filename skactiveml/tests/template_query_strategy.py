@@ -10,6 +10,7 @@ from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, is_labeled, \
     unlabeled_indices
 
+from sklearn.naive_bayes import GaussianNB
 
 class Dummy:
     def __init__(self):
@@ -67,9 +68,51 @@ class TemplateQueryStrategy:
         self._test_param("init", "random_state", test_cases)
 
     def test_query_param_fit_clf(self, test_cases=None):
-        init_params = inspect.signature(self.qs_class.query).parameters
-        if "clf" in init_params:
-            raise ValueError("TODO: Daniel")
+        query_params = inspect.signature(self.qs_class.query).parameters
+        if "fit_clf" in query_params:
+            # custom test cases are not necessary
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [(np.nan, TypeError), ("state", TypeError)]
+            self._test_param("query", "fit_clf", test_cases)
+
+            # Todo check if clf remains the same for both options
+            for fit_clf in [True, False]:
+                with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
+                    clf = deepcopy(self.query_default_params_clf["clf"])
+                    if not fit_clf:
+                        clf.fit(self.query_default_params_clf["X"],
+                                self.query_default_params_clf["y"])
+                    query_params = deepcopy(self.query_default_params_clf)
+                    query_params["clf"] = deepcopy(clf)
+                    query_params["fit_clf"] = fit_clf
+
+                    qs = self.qs_class(**self.init_default_params)
+                    qs.query(**query_params)
+                    self.assertEqual(
+                        query_params["clf"].__dict__,
+                        clf.__dict__,
+                        msg=f"Classifier changed after calling query for "
+                            f"`fit_clf={fit_clf}`."
+                    )
+
+    def test_query_param_clf(self, test_cases=None):
+        query_params = inspect.signature(self.qs_class.query).parameters
+        if "clf" in query_params:
+            # custom test cases are necessary as clf usually has specific
+            # properties for query strategies
+            if test_cases is None:
+                raise NotImplementedError(
+                    "The test function `test_query_param_clf` should be "
+                    "implemented for every query strategy as they probably "
+                    "have specific demands. If the query strategy supports "
+                    "every classifier, please call "
+                    "`super().test_query_param_clf(test_cases=[])`."
+                )
+            test_cases += [(np.nan, TypeError), ("state", TypeError),
+                           (Dummy(), TypeError), (GaussianNB(), TypeError)]
+            self._test_param("query", "clf", test_cases)
+
+            # Todo check if clf remains the same
 
 
     def _test_param(self, test_func, test_param, test_cases,
@@ -200,6 +243,34 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         test_cases += [(np.nan, ValueError), (Dummy, TypeError),
                        ([0], None)]
         self._test_param("query", "candidates", test_cases)
+
+    def test_query_param_sample_weight(self, test_cases=None):#TODO more cases
+
+        query_params = inspect.signature(self.qs_class.query).parameters
+        if "sample_weight" in query_params:
+            # custom test cases are not necessary
+            raise NotImplementedError("TODO Daniel")
+
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [(np.nan, TypeError), (Dummy, TypeError)]
+            self._test_param("query", "y", test_cases)
+
+            if self.query_default_params_clf is not None:
+                y = self.query_default_params_clf["y"]
+                test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
+                self._test_param("query", "y", test_cases, exclude_reg=True)
+            if self.query_default_params_reg is not None:
+                y = self.query_default_params_reg["y"]
+                test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
+                self._test_param("query", "y", test_cases, exclude_clf=True)
+
+    def test_query_param_utility_weight(self,
+                                       test_cases=None):  # TODO more cases
+
+        query_params = inspect.signature(self.qs_class.query).parameters
+        if "utility_weight" in query_params:
+            # custom test cases are not necessary
+            raise NotImplementedError("TODO Daniel")
 
     def test_query_param_batch_size(self, test_cases=None):  # TODO more cases
         test_cases = [] if test_cases is None else test_cases

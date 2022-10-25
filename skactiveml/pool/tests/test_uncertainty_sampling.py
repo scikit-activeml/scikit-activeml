@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, expected_average_precision
@@ -17,8 +18,10 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
         self.classes = [0, 1]
         query_default_params_clf = {
             'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            #'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
             'clf': ParzenWindowClassifier(random_state=0, classes=self.classes),
+            'y': np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
+            #'clf': SklearnClassifier(SVC(probability=True), random_state=0, classes=[0, 1]),
         }
         super().setUp(qs_class=UncertaintySampling, init_default_params={},
                       query_default_params_clf=query_default_params_clf)
@@ -36,6 +39,13 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
         self._test_param("init", "cost_matrix",
                          [(np.ones([2, 2]) - np.eye(2), ValueError)],
                          replace_init_params={'method': "entropy"})
+
+    def test_query_param_clf(self):
+        add_test_cases = [(SVC(), TypeError),
+                          (SklearnClassifier(SVC()), AttributeError),
+                          (SklearnClassifier(SVC(probability=True)), None),
+                          ]
+        super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
