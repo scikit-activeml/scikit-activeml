@@ -39,9 +39,9 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
 
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [("string", ValueError),
-                       (self.query_default_params_clf['X'], ValueError),
-                       (np.empty((len(self.X) - 1)), ValueError)]
+        X = self.query_default_params_clf['X']
+        test_cases += [("string", ValueError), (X, ValueError),
+                       (np.empty((len(X) - 1)), ValueError)]
         self._test_param("query", "sample_weight", test_cases)
 
     def test_query(self):

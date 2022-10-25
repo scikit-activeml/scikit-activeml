@@ -154,14 +154,16 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             missing_label=self.missing_label_,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
         )
+
+        # Validate 'method'
+        check_type(
+            self.method,
+            "method",
+            target_vals=["KL_divergence", "vote_entropy"],
+        )
+
         # classes is None if the ensemble is a regressor
         if classes is not None:
-            check_type(
-                self.method,
-                "method",
-                target_vals=["KL_divergence", "vote_entropy"],
-            )
-
             # Compute utilities.
             if self.method == "KL_divergence":
                 probas = np.array(
