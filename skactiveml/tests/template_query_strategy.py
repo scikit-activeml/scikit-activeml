@@ -75,7 +75,7 @@ class TemplateQueryStrategy:
             test_cases += [(np.nan, TypeError), ("state", TypeError)]
             self._test_param("query", "fit_clf", test_cases)
 
-            # Todo check if clf remains the same for both options
+            # check if clf remains the same for both options
             for fit_clf in [True, False]:
                 with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
                     clf = deepcopy(self.query_default_params_clf["clf"])
@@ -88,9 +88,11 @@ class TemplateQueryStrategy:
 
                     qs = self.qs_class(**self.init_default_params)
                     qs.query(**query_params)
-                    self.assertEqual(
-                        query_params["clf"].__dict__,
-                        clf.__dict__,
+                    self.assertTrue(
+                        _cmp_object_dict(
+                            query_params["clf"].__dict__,
+                            clf.__dict__
+                        ),
                         msg=f"Classifier changed after calling query for "
                             f"`fit_clf={fit_clf}`."
                     )
@@ -112,8 +114,21 @@ class TemplateQueryStrategy:
                            (Dummy(), TypeError), (GaussianNB(), TypeError)]
             self._test_param("query", "clf", test_cases)
 
-            # Todo check if clf remains the same
+            # check if clf remains the same
+            with self.subTest(msg="Clf consistency"):
+                clf = deepcopy(self.query_default_params_clf["clf"])
+                query_params = deepcopy(self.query_default_params_clf)
+                query_params["clf"] = deepcopy(clf)
 
+                qs = self.qs_class(**self.init_default_params)
+                qs.query(**query_params)
+                self.assertTrue(
+                    _cmp_object_dict(
+                        query_params["clf"].__dict__,
+                        clf.__dict__
+                    ),
+                    msg=f"Classifier changed after calling query."
+                )
 
     def _test_param(self, test_func, test_param, test_cases,
                     replace_init_params=None, replace_query_params=None,
@@ -167,8 +182,8 @@ class TemplateQueryStrategy:
 
         # Check init parameters.
         for param in np.setdiff1d(init_params, not_test):
-            with self.subTest(init_param=param):
-                test_func_name = "test_init_param_" + param
+            test_func_name = "test_init_param_" + param
+            with self.subTest(msg=test_func_name):
                 self.assertTrue(
                     hasattr(self, test_func_name),
                     msg=f"'{test_func_name}()' missing in {self.__class__}"
@@ -180,12 +195,19 @@ class TemplateQueryStrategy:
 
         # Check init parameters.
         for param in np.setdiff1d(query_params, not_test):
-            with self.subTest(query_param=param):
-                test_func_name = "test_query_param_" + param
+            test_func_name = "test_query_param_" + param
+            with self.subTest(msg=test_func_name):
                 self.assertTrue(
                     hasattr(self, test_func_name),
                     msg=f"'{test_func_name}()' missing in {self.__class__}"
                 )
+
+        # Check if query is being tested.
+        with self.subTest(msg="test_query"):
+            self.assertTrue(
+                hasattr(self, "test_query"),
+                msg=f"'test_query' missing in {self.__class__}"
+            )
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
@@ -244,25 +266,25 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                        ([0], None)]
         self._test_param("query", "candidates", test_cases)
 
-    def test_query_param_sample_weight(self, test_cases=None):#TODO more cases
-
+    def test_query_param_sample_weight(self, test_cases=None):
         query_params = inspect.signature(self.qs_class.query).parameters
         if "sample_weight" in query_params:
             # custom test cases are not necessary
-            raise NotImplementedError("TODO Daniel")
-
             test_cases = [] if test_cases is None else test_cases
-            test_cases += [(np.nan, TypeError), (Dummy, TypeError)]
-            self._test_param("query", "y", test_cases)
+            test_cases += [(np.nan, (ValueError,TypeError)),
+                           (Dummy, (ValueError,TypeError)),
+                           (None, None)]
+            self._test_param("query", "sample_weight", test_cases)
 
-            if self.query_default_params_clf is not None:
-                y = self.query_default_params_clf["y"]
-                test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
-                self._test_param("query", "y", test_cases, exclude_reg=True)
-            if self.query_default_params_reg is not None:
-                y = self.query_default_params_reg["y"]
-                test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
-                self._test_param("query", "y", test_cases, exclude_clf=True)
+            for exclude_clf, exclude_reg, query_params in \
+                    [(True, False, self.query_default_params_clf),
+                     (False, True, self.query_default_params_reg)]:
+                if self.query_default_params_reg is not None:
+                    y = query_params["y"]
+                    test_cases = [(np.ones(len(y)), None),
+                                  (np.ones(len(y)+1), ValueError)]
+                    self._test_param("query", "sample_weight", test_cases,
+                                     exclude_clf=exclude_clf, exclude_reg=exclude_reg)
 
     def test_query_param_utility_weight(self,
                                        test_cases=None):  # TODO more cases
@@ -302,7 +324,6 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_allclose(u1, u2)
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
-
 
     def test_query_al_cycles(self):
         budget = 1
@@ -398,4 +419,32 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 except MappingError:
                     pass
 
-
+def _cmp_object_dict(d1, d2):
+    keys = np.union1d(d1.keys(), d2.keys())[0]
+    print(keys)
+    for key in keys:
+        print(f"{key}..")
+        if key not in d1.keys() or key not in d2.keys():
+            return False
+        if hasattr(d1[key], "__dict__") ^ hasattr(d1[key], "__dict__"):
+            return False
+        if hasattr(d1[key], "__dict__") and hasattr(d1[key], "__dict__"):
+            print("  .. go into")
+            if not _cmp_object_dict(d1[key].__dict__, d2[key].__dict__):
+                return False
+            print("  .. go back")
+        try:
+            if np.issubdtype(type(d1[key]), np.number) and np.issubdtype(type(d1[key]), np.number):
+                if np.isnan(d1[key]) == np.isnan(d2[key]):
+                    pass
+                elif np.isnan(d1[key]) ^ np.isnan(d2[key]):
+                    return False
+                else:
+                    if not d1[key].__eq__(d2[key]):
+                        return False
+        except NotImplementedError:
+            pass
+        except Exception:
+            return False
+        print(f"  .. passed")
+    return True
