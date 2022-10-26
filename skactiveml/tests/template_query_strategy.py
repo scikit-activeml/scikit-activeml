@@ -182,8 +182,8 @@ class TemplateQueryStrategy:
 
         # Check init parameters.
         for param in np.setdiff1d(init_params, not_test):
-            with self.subTest(init_param=param):
-                test_func_name = "test_init_param_" + param
+            test_func_name = "test_init_param_" + param
+            with self.subTest(msg=test_func_name):
                 self.assertTrue(
                     hasattr(self, test_func_name),
                     msg=f"'{test_func_name}()' missing in {self.__class__}"
@@ -195,12 +195,19 @@ class TemplateQueryStrategy:
 
         # Check init parameters.
         for param in np.setdiff1d(query_params, not_test):
-            with self.subTest(query_param=param):
-                test_func_name = "test_query_param_" + param
+            test_func_name = "test_query_param_" + param
+            with self.subTest(msg=test_func_name):
                 self.assertTrue(
                     hasattr(self, test_func_name),
                     msg=f"'{test_func_name}()' missing in {self.__class__}"
                 )
+
+        # Check if query is being tested.
+        with self.subTest(msg="test_query"):
+            self.assertTrue(
+                hasattr(self, "test_query"),
+                msg=f"'test_query' missing in {self.__class__}"
+            )
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
