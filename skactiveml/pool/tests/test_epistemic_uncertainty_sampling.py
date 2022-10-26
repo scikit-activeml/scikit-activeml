@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -57,6 +58,17 @@ class TestEpistemicUncertaintySampling(
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(None, TypeError), ([], TypeError), (0, TypeError)]
         self._test_param("init", "precompute", test_cases)
+
+    def test_query_param_clf(self):
+        add_test_cases = [
+            (LogisticRegression(), TypeError),
+            (SklearnClassifier(DecisionTreeClassifier(),
+                               classes=self.classes), TypeError),
+            (SklearnClassifier(LogisticRegression(),
+                               classes=self.classes), None),
+            (ParzenWindowClassifier(), None),
+        ]
+        super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

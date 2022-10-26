@@ -52,28 +52,29 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
         X = self.query_default_params_clf['X']
         test_cases += [("string", ValueError), (X, ValueError),
                        (np.empty((len(X) - 1)), ValueError)]
-        self._test_param("query", "sample_weight", test_cases)
+        super().test_query_param_sample_weight(test_cases)
 
     def test_query(self):
         compare_list = []
+        random_state = np.random.RandomState(42)
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
-            random_state=self.init_default_params['random_state'],
+            random_state=random_state,
             classes=self.classes
         )
+        candidates = random_state.rand(100, 10)
+        X = random_state.rand(100, 10)
+        y = random_state.randint(0, 2, (100,))
 
         # query
         qs = UncertaintySampling(method="entropy")
-        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-        compare_list.append(qs.query(**self.query_default_params_clf))
+        compare_list.append(qs.query(X, y, clf, candidates=candidates))
 
         qs = UncertaintySampling(method="margin_sampling")
-        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-        compare_list.append(qs.query(**self.query_default_params_clf))
+        compare_list.append(qs.query(X, y, clf, candidates=candidates))
 
         qs = UncertaintySampling(method="least_confident")
-        qs.query(candidates=[[1]], clf=clf, X=[[1]], y=[MISSING_LABEL])
-        compare_list.append(qs.query(**self.query_default_params_clf))
+        compare_list.append(qs.query(X, y, clf, candidates=candidates))
 
         for x in compare_list:
             self.assertEqual(compare_list[0], x)
