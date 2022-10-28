@@ -40,7 +40,7 @@ jobs:
         flake8 . --count --exit-zero --statistics
     - name: Test with pytest
       run: |
-        pytest --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml ./skactiveml
+        pytest --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
       with:
