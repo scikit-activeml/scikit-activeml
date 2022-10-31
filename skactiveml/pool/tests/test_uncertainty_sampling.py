@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, expected_average_precision
@@ -16,9 +17,17 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy, unittest
             'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             'y': np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
             'clf': ParzenWindowClassifier(random_state=0, classes=[0, 1]),
+            #'clf': SklearnClassifier(SVC(probability=True), random_state=0, classes=[0, 1]),
         }
         super().setUp(qs_class=UncertaintySampling, init_default_params={},
                       query_default_params_clf=query_default_params_clf)
+
+    def test_query_param_clf(self):
+        add_test_cases = [(SVC(), TypeError),
+                          (SklearnClassifier(SVC()), AttributeError),
+                          (SklearnClassifier(SVC(probability=True)), None),
+                          ]
+        super().test_query_param_clf(test_cases=add_test_cases)
 
     # def test_init_param_method(self):
     #     selector = UncertaintySampling()
