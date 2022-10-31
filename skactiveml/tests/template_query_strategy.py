@@ -233,7 +233,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             self._test_param("init", "missing_label", test_cases, exclude_reg=True)
 
         if self.query_default_params_reg is not None:
-            test_cases = [(1, ValueError), ("string", TypeError), (Dummy, TypeError)]
+            test_cases = [(1, ValueError), ("string", (ValueError, TypeError)), (Dummy, TypeError)]
             self._test_param("init", "missing_label", test_cases, exclude_clf=True)
 
     def test_query_param_X(self, test_cases=None):
@@ -263,12 +263,12 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
             self._test_param("query", "y", test_cases, exclude_reg=True)
 
-            for ml, classes, err in \
-                    [(np.nan, [1.0, 2.0], None),
-                     (0, [1, 2], None),
-                     #(None, [1, 2], None),
-                     (None, ["A", "B"], None),
-                     ("", ["A", "B"], None)]:
+            for ml, classes, t, err in \
+                    [(np.nan, [1.0, 2.0], float, None),
+                     (0, [1, 2], int, None),
+                     (None, [0, 1, 2], object, None),
+                     (None, ["A", "B"], object, None),
+                     ("", ["A", "B"], str, None)]:
                 replace_init_params = {"missing_label": ml}
                 if "clf" in self.query_default_params_clf:
                     clf = clone(self.query_default_params_clf["clf"])
@@ -277,7 +277,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                     replace_query_params = {"clf": clf}
                 else:
                     replace_query_params = None
-                replace_y = np.full_like(y, ml, dtype=object)
+                replace_y = np.full_like(y, ml, dtype=t)
                 replace_y[0] = classes[0]
                 replace_y[1] = classes[1]
                 test_cases = [(replace_y, err)]
