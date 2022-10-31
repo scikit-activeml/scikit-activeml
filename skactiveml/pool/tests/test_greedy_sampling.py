@@ -4,9 +4,11 @@ import numpy as np
 
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.pool import GreedySamplingX, GreedySamplingTarget
-from skactiveml.regressor import NICKernelRegressor
+from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import TemplateSingleAnnotatorPoolQueryStrategy
 from skactiveml.utils import MISSING_LABEL, is_labeled
+
+from sklearn.gaussian_process import GaussianProcessRegressor
 
 
 class TestGreedySamplingX(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -118,8 +120,15 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
         ]
         self._test_param("init", "n_GSx_samples", test_cases)
 
+    def test_query_param_reg(self):
+        test_cases = [
+            (NICKernelRegressor(), None),
+            (GaussianProcessRegressor(), TypeError),
+            (SklearnRegressor(GaussianProcessRegressor()), None)
+        ]
+        super().test_query_param_reg(test_cases=test_cases)
 
-    def test_logic(self):
+    def test_query(self):
         X = (1 / 2 * np.arange(2 * 7) + 3.7).reshape(7, 2)
         y = [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL, 0, 0, 0, 0]
 

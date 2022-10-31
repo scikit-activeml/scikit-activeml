@@ -69,66 +69,94 @@ class TemplateQueryStrategy:
         self._test_param("init", "random_state", test_cases)
 
     def test_query_param_fit_clf(self, test_cases=None):
+        self._fit_test(test_cases=test_cases, model_type="clf")
+
+    def test_query_param_fit_reg(self, test_cases=None):
+        self._fit_test(test_cases=test_cases, model_type="reg")
+
+    def _fit_test(self, test_cases, model_type):
         query_params = inspect.signature(self.qs_class.query).parameters
-        if "fit_clf" in query_params:
+        if f"fit_{model_type}" in query_params:
             # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
             test_cases += [(np.nan, TypeError), ("state", TypeError)]
-            self._test_param("query", "fit_clf", test_cases)
+            self._test_param("query", f"fit_{model_type}", test_cases)
 
-            # check if clf remains the same for both options
-            for fit_clf in [True, False]:
-                with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
-                    clf = deepcopy(self.query_default_params_clf["clf"])
-                    if not fit_clf:
-                        clf.fit(self.query_default_params_clf["X"],
-                                self.query_default_params_clf["y"])
-                    query_params = deepcopy(self.query_default_params_clf)
-                    query_params["clf"] = deepcopy(clf)
-                    query_params["fit_clf"] = fit_clf
+            # check if model remains the same for both options
+            for fit_type in [True, False]:
+                with self.subTest(msg="Model consistency"):
+                    if model_type == "clf":
+                        query_params = self.query_default_params_clf
+                    elif model_type == "reg":
+                        query_params = self.query_default_params_reg
+                    else:
+                        raise ValueError(
+                            "Only 'reg' or 'clf' is allowed as `model_type`."
+                        )
+                    mdl = deepcopy(query_params[f"{model_type}"])
+                    if not fit_type:
+                        mdl.fit(query_params["X"],
+                                query_params["y"])
+                    query_params = deepcopy(query_params)
+                    query_params[f"{model_type}"] = deepcopy(mdl)
+                    query_params[f"fit_{model_type}"] = fit_type
 
                     qs = self.qs_class(**self.init_default_params)
                     qs.query(**query_params)
                     self.assertTrue(
                         _cmp_object_dict(
-                            query_params["clf"].__dict__,
-                            clf.__dict__
+                            query_params[f"{model_type}"].__dict__,
+                            mdl.__dict__
                         ),
-                        msg=f"Classifier changed after calling query for "
-                            f"`fit_clf={fit_clf}`."
+                        msg=f"{model_type} changed after calling query for "
+                            f"`fit_{model_type}={fit_type}`."
                     )
 
     def test_query_param_clf(self, test_cases=None):
+        self._model_comparison(test_cases=test_cases, model_type="clf")
+
+    def test_query_param_reg(self, test_cases=None):
+        self._model_comparison(test_cases=test_cases, model_type="reg")
+
+    def _model_comparison(self, test_cases, model_type):
         query_params = inspect.signature(self.qs_class.query).parameters
-        if "clf" in query_params:
-            # custom test cases are necessary as clf usually has specific
-            # properties for query strategies
+        if f"{model_type}" in query_params:
+            # custom test cases are necessary as model_type usually has
+            # specific properties for query strategies
             if test_cases is None:
                 raise NotImplementedError(
-                    "The test function `test_query_param_clf` should be "
-                    "implemented for every query strategy as they probably "
-                    "have specific demands. If the query strategy supports "
-                    "every classifier, please call "
-                    "`super().test_query_param_clf(test_cases=[])`."
+                    f"The test function `test_query_param_{model_type}`  "
+                    "should be implemented for every query strategy as they  "
+                    "probably have specific demands. If the query strategy  "
+                    f"supports every {model_type}, please call "
+                    f"`super().test_query_param_{model_type}(test_cases=[])`."
                 )
             test_cases += [(np.nan, TypeError), ("state", TypeError),
                            (Dummy(), TypeError), (GaussianNB(), TypeError)]
-            self._test_param("query", "clf", test_cases)
+            self._test_param("query", f"{model_type}", test_cases)
 
-            # check if clf remains the same
-            with self.subTest(msg="Clf consistency"):
-                clf = deepcopy(self.query_default_params_clf["clf"])
-                query_params = deepcopy(self.query_default_params_clf)
-                query_params["clf"] = deepcopy(clf)
+            # check if model remains the same
+            with self.subTest(msg=f"{model_type} consistency"):
+                if model_type == "clf":
+                    query_params = self.query_default_params_clf
+                elif model_type == "reg":
+                    query_params = self.query_default_params_reg
+                else:
+                    raise ValueError(
+                        "Only 'reg' or 'clf' is allowed as `model_type`."
+                    )
+                mdl = deepcopy(query_params[f"{model_type}"])
+                query_params = deepcopy(query_params)
+                query_params[f"{model_type}"] = deepcopy(mdl)
 
                 qs = self.qs_class(**self.init_default_params)
                 qs.query(**query_params)
                 self.assertTrue(
                     _cmp_object_dict(
-                        query_params["clf"].__dict__,
-                        clf.__dict__
+                        query_params[f"{model_type}"].__dict__,
+                        mdl.__dict__
                     ),
-                    msg=f"Classifier changed after calling query."
+                    msg=f"`{model_type}` changed after calling query."
                 )
 
     def test_init_param_assignments(self):

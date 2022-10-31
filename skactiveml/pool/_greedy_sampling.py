@@ -115,7 +115,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         sample_indices = np.arange(len(X), dtype=int)
-        selected_indices = labeled_indices(y)
+        selected_indices = labeled_indices(y, missing_label=self.missing_label)
 
         if mapping is None:
             X_all = np.append(X, X_cand, axis=0)
