@@ -222,7 +222,7 @@ class TestProbabilisticAL(unittest.TestCase):
         np.testing.assert_array_equal(best_indices, [1])
 
 
-class TestXPal(unittest.TestCase):
+class TestXProbabilisticAL(unittest.TestCase):
     def setUp(self):
         self.X = np.zeros((6, 2))
         self.candidates = np.zeros((2, 2))

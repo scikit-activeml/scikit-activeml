@@ -335,7 +335,7 @@ def _multinomial(a):
     return factorial(np.sum(a, axis=1)) / np.prod(factorial(a), axis=1)
 
 
-class XPal(ExpectedErrorReduction):
+class XProbabilisticAL(ExpectedErrorReduction):
     # TODO description, parameters
     """
 
