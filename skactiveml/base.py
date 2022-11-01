@@ -157,7 +157,7 @@ class PoolQueryStrategy(QueryStrategy):
         check_consistent_length(X, y)
 
         # Check missing_label
-        check_missing_label(self.missing_label)
+        check_missing_label(self.missing_label, target_type=y.dtype)
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
