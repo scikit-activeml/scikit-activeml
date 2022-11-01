@@ -224,17 +224,9 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
+        ml = self.init_default_params['missing_label']
+        test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param("init", "missing_label", test_cases)
-
-        # Todo replace missing value in `y` as well
-        if self.query_default_params_clf is not None:
-            ml = self.init_default_params['missing_label']
-            test_cases = [(ml, None), (Dummy, TypeError)]
-            self._test_param("init", "missing_label", test_cases, exclude_reg=True)
-
-        if self.query_default_params_reg is not None:
-            test_cases = [(1, ValueError), ("string", (ValueError, TypeError)), (Dummy, TypeError)]
-            self._test_param("init", "missing_label", test_cases, exclude_clf=True)
 
     def test_query_param_X(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
