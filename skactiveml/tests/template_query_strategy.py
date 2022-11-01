@@ -266,10 +266,12 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             for ml, classes, t, err in \
                     [(np.nan, [1.0, 2.0], float, None),
                      (0, [1, 2], int, None),
-                     (None, [0, 1, 2], object, None),
+                     (None, [1, 2], object, None),
                      (None, ["A", "B"], object, None),
                      ("", ["A", "B"], str, None)]:
                 replace_init_params = {"missing_label": ml}
+                if "classes" in self.init_default_params:
+                    replace_init_params["classes"] = classes
                 if "clf" in self.query_default_params_clf:
                     clf = clone(self.query_default_params_clf["clf"])
                     clf.missing_label = ml
@@ -460,18 +462,14 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
 
 def _cmp_object_dict(d1, d2):
     keys = np.union1d(d1.keys(), d2.keys())[0]
-    print(keys)
     for key in keys:
-        print(f"{key}..")
         if key not in d1.keys() or key not in d2.keys():
             return False
         if hasattr(d1[key], "__dict__") ^ hasattr(d1[key], "__dict__"):
             return False
         if hasattr(d1[key], "__dict__") and hasattr(d1[key], "__dict__"):
-            print("  .. go into")
             if not _cmp_object_dict(d1[key].__dict__, d2[key].__dict__):
                 return False
-            print("  .. go back")
         try:
             if np.issubdtype(type(d1[key]), np.number) and np.issubdtype(type(d1[key]), np.number):
                 if np.isnan(d1[key]) == np.isnan(d2[key]):
@@ -485,5 +483,4 @@ def _cmp_object_dict(d1, d2):
             pass
         except Exception:
             return False
-        print(f"  .. passed")
     return True

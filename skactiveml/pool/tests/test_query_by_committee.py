@@ -2,6 +2,7 @@ import unittest
 from itertools import product
 
 import numpy as np
+from sklearn import clone
 from sklearn.ensemble import (
     BaggingClassifier,
     RandomForestClassifier,
@@ -79,12 +80,39 @@ class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
         ]
         self._test_param("query", "ensemble", test_cases)
 
-    def test_query_param_sample_weight(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        X = self.query_default_params_clf['X']
-        test_cases += [("string", ValueError), (X, ValueError),
-                       (np.empty((len(X) - 1)), ValueError)]
-        self._test_param("query", "sample_weight", test_cases)
+    def test_query_param_y(self, test_cases=None):
+        y = self.query_default_params_clf["y"]
+        test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
+        self._test_param("query", "y", test_cases, exclude_reg=True)
+
+        for ml, classes, t, err in \
+                [(np.nan, [1.0, 2.0], float, None),
+                 (0, [1, 2], int, None),
+                 (None, [1, 2], object, None),
+                 (None, ["A", "B"], object, None),
+                 ("", ["A", "B"], str, None)]:
+            replace_init_params = {"missing_label": ml}
+
+            ensemble = clone(self.query_default_params_clf["ensemble"])
+            ensemble.missing_label = ml
+            ensemble.classes = classes
+            replace_query_params = {"ensemble": ensemble}
+
+            replace_y = np.full_like(y, ml, dtype=t)
+            replace_y[0] = classes[0]
+            replace_y[1] = classes[1]
+            test_cases = [(replace_y, err)]
+            self._test_param("query", "y", test_cases,
+                             replace_init_params=replace_init_params,
+                             replace_query_params=replace_query_params,
+                             exclude_reg=True)
+    #
+    # def test_query_param_sample_weight(self, test_cases=None):
+    #     test_cases = [] if test_cases is None else test_cases
+    #     X = self.query_default_params_clf['X']
+    #     test_cases += [("string", ValueError), (X, ValueError),
+    #                    (np.empty((len(X) - 1)), ValueError)]
+    #     self._test_param("query", "sample_weight", test_cases)
 
     def test_query_param_fit_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
