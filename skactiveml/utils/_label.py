@@ -57,7 +57,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
         # Todo check if solution is appropriate (see line 46)
         # y = np.hstack([[1.1, 2.1], np.full(8, np.nan)])
         # is_unlabeled(y, 'sdhu')  # Fails
-        return np.equal(y, missing_label)
+        return y.astype(target_type) == missing_label
 
 
 def is_labeled(y, missing_label=MISSING_LABEL):
