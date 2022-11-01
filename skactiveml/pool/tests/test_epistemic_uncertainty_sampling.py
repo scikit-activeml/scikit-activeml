@@ -75,7 +75,7 @@ class TestEpistemicUncertaintySampling(
         X = self.query_default_params_clf['X']
         test_cases += [("string", ValueError), (X, ValueError),
                        (np.empty((len(X) - 1)), ValueError)]
-        self._test_param("query", "sample_weight", test_cases)
+        super().test_query_param_sample_weight(test_cases)
 
     # tests for epistemic ParzenWindowClassifier
     def test_interpolate(self):
