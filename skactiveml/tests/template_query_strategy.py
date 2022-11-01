@@ -131,7 +131,7 @@ class TemplateQueryStrategy:
                     msg=f"Classifier changed after calling query."
                 )
 
-    def test_init_param_assignments(self):
+    def test_init_param_test_assignments(self):
         for param in inspect.signature(self.qs_class.__init__).parameters:
             if param != "self":
                 init_params = deepcopy(self.init_default_params)
@@ -360,6 +360,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 self.assertEqual(len(u1[0]), len(query_params["X"]))
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
+
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
 
