@@ -151,8 +151,9 @@ class PoolQueryStrategy(QueryStrategy):
         self._check_n_features(X, reset=reset)
 
         # Check labels
-        y = check_array(y, ensure_2d=False, force_all_finite="allow-nan",
-                        dtype=None)
+        y = check_array(
+            y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+        )
         check_consistent_length(X, y)
 
         # Check missing_label

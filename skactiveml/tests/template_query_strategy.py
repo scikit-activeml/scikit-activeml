@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import numpy as np
 from numpy.random import RandomState
+from sklearn import clone
 
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL, is_unlabeled, is_labeled, \
@@ -130,38 +131,7 @@ class TemplateQueryStrategy:
                     msg=f"Classifier changed after calling query."
                 )
 
-    def _test_param(self, test_func, test_param, test_cases,
-                    replace_init_params=None, replace_query_params=None,
-                    exclude_clf=False, exclude_reg=False):
-        if replace_init_params is None:
-            replace_init_params = {}
-        if replace_query_params is None:
-            replace_query_params = {}
-
-        for i, (test_val, err) in enumerate(test_cases):
-            # TODO Subtest to show which test failed
-            with self.subTest(msg="Param", id=i, val=test_val):
-                init_params = deepcopy(self.init_default_params)
-                for key, val in replace_init_params.items():
-                    init_params[key] = val
-
-                for query_params, exclude_case in \
-                        [(self.query_default_params_clf, exclude_clf),
-                         (self.query_default_params_reg, exclude_reg)]:
-                    if not (query_params is None or exclude_case):
-                        query_params = deepcopy(query_params)
-                        for key, val in replace_query_params.items():
-                            query_params[key] = val
-
-                        locals()[f"{test_func}_params"][test_param] = test_val
-
-                        qs = self.qs_class(**init_params)
-                        if err is None:
-                            qs.query(**query_params)
-                        else:
-                            self.assertRaises(err, qs.query, **query_params)
-
-    def test_init_param_assignments(self):
+    def test_init_param_test_assignments(self):
         for param in inspect.signature(self.qs_class.__init__).parameters:
             if param != "self":
                 init_params = deepcopy(self.init_default_params)
@@ -209,6 +179,37 @@ class TemplateQueryStrategy:
                 msg=f"'test_query' missing in {self.__class__}"
             )
 
+    def _test_param(self, test_func, test_param, test_cases,
+                    replace_init_params=None, replace_query_params=None,
+                    exclude_clf=False, exclude_reg=False):
+        if replace_init_params is None:
+            replace_init_params = {}
+        if replace_query_params is None:
+            replace_query_params = {}
+
+        for i, (test_val, err) in enumerate(test_cases):
+            with self.subTest(msg="Param", id=i, val=test_val):
+                init_params = deepcopy(self.init_default_params)
+                for key, val in replace_init_params.items():
+                    init_params[key] = val
+
+                for query_params, exclude_case in \
+                        [(self.query_default_params_clf, exclude_clf),
+                         (self.query_default_params_reg, exclude_reg)]:
+                    if not (query_params is None or exclude_case):
+                        query_params = deepcopy(query_params)
+                        for key, val in replace_query_params.items():
+                            query_params[key] = val
+
+                        locals()[f"{test_func}_params"][test_param] = test_val
+
+                        qs = self.qs_class(**init_params)
+                        if err is None:
+                            qs.query(**query_params)
+                        else:
+                            self.assertRaises(err, qs.query, **query_params)
+
+
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
     def setUp(self, qs_class, init_default_params,
@@ -221,30 +222,36 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                             if self.query_default_params_clf is not None else \
                             self.query_default_params_reg["y"].shape)
 
-    def test_init_param_missing_label(self, test_cases=None):  # TODO add more cases
+    def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         self._test_param("init", "missing_label", test_cases)
 
         # Todo replace missing value in `y` as well
         if self.query_default_params_clf is not None:
-            test_cases = [(np.nan, None), (Dummy, TypeError)]
+            ml = self.init_default_params['missing_label']
+            test_cases = [(ml, None), (Dummy, TypeError)]
             self._test_param("init", "missing_label", test_cases, exclude_reg=True)
+
         if self.query_default_params_reg is not None:
-            test_cases = [(1, ValueError), ("string", TypeError), (Dummy, TypeError)]
+            test_cases = [(1, ValueError), ("string", (ValueError, TypeError)), (Dummy, TypeError)]
             self._test_param("init", "missing_label", test_cases, exclude_clf=True)
 
-    def test_query_param_X(self, test_cases=None):  #TODO more cases
+    def test_query_param_X(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [("string", (ValueError, TypeError)),
                        (Dummy, (ValueError, TypeError))]
-        replace_init_params = {"missing_label": MISSING_LABEL}
-        replace_query_params = {"y": np.full(self.y_shape, MISSING_LABEL),
-                                "candidates": None}
-        test_cases += [(np.zeros([self.y_shape[0], 3]), None),
-                       (np.zeros([self.y_shape[0]+1, 3]), ValueError)]
-        self._test_param("query", "X", test_cases,
-                         replace_init_params=replace_init_params,
-                         replace_query_params=replace_query_params)
+        self._test_param("query", "X", test_cases)
+
+        for exclude_clf, exclude_reg, query_params in \
+                [(True, False, self.query_default_params_clf),
+                 (False, True, self.query_default_params_reg)]:
+            if query_params is not None:
+                X = query_params["X"]
+                test_cases += [(X, None),
+                               (np.vstack([X, X]), ValueError)]
+                self._test_param("query", "X", test_cases,
+                                 exclude_clf=exclude_clf,
+                                 exclude_reg=exclude_reg)
 
     def test_query_param_y(self, test_cases=None):  # TODO more cases
         test_cases = [] if test_cases is None else test_cases
@@ -255,6 +262,29 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             y = self.query_default_params_clf["y"]
             test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
             self._test_param("query", "y", test_cases, exclude_reg=True)
+
+            for ml, classes, t, err in \
+                    [(np.nan, [1.0, 2.0], float, None),
+                     (0, [1, 2], int, None),
+                     (None, [0, 1, 2], object, None),
+                     (None, ["A", "B"], object, None),
+                     ("", ["A", "B"], str, None)]:
+                replace_init_params = {"missing_label": ml}
+                if "clf" in self.query_default_params_clf:
+                    clf = clone(self.query_default_params_clf["clf"])
+                    clf.missing_label = ml
+                    clf.classes = classes
+                    replace_query_params = {"clf": clf}
+                else:
+                    replace_query_params = None
+                replace_y = np.full_like(y, ml, dtype=t)
+                replace_y[0] = classes[0]
+                replace_y[1] = classes[1]
+                test_cases = [(replace_y, err)]
+                self._test_param("query", "y", test_cases,
+                                 replace_init_params=replace_init_params,
+                                 replace_query_params=replace_query_params,
+                                 exclude_reg=True)
         if self.query_default_params_reg is not None:
             y = self.query_default_params_reg["y"]
             test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
@@ -262,9 +292,17 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
     def test_query_param_candidates(self, test_cases=None):  # TODO more cases
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(np.nan, ValueError), (Dummy, TypeError),
-                       ([0], None)]
-        self._test_param("query", "candidates", test_cases)
+
+        for exclude_clf, exclude_reg, query_params in \
+                [(True, False, self.query_default_params_clf),
+                 (False, True, self.query_default_params_reg)]:
+            if query_params is not None:
+                ulbd_idx = unlabeled_indices(query_params["y"])
+                cases = test_cases + [(np.nan, ValueError), (Dummy, TypeError),
+                               ([ulbd_idx[0]], None)]
+                self._test_param("query", "candidates", cases,
+                                 exclude_clf=exclude_clf,
+                                 exclude_reg=exclude_reg)
 
     def test_query_param_sample_weight(self, test_cases=None):
         query_params = inspect.signature(self.qs_class.query).parameters
@@ -279,7 +317,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             for exclude_clf, exclude_reg, query_params in \
                     [(True, False, self.query_default_params_clf),
                      (False, True, self.query_default_params_reg)]:
-                if self.query_default_params_reg is not None:
+                if query_params is not None:
                     y = query_params["y"]
                     test_cases = [(np.ones(len(y)), None),
                                   (np.ones(len(y)+1), ValueError)]
@@ -322,6 +360,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 self.assertEqual(len(u1[0]), len(query_params["X"]))
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
+
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
 
