@@ -5,7 +5,7 @@
     "method" : "Discriminative Active Learning (DAL)",
     "category" : "",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "single-annotator"],
+    "tags" : ["pool",  "classification", "regression", "single-annotator"],
     "title" : "Discriminative Active Learning",
     "refs" : ["gissin2019discriminative"],
     "sequence" : ["title", "text_0", "plot", "refs"],
