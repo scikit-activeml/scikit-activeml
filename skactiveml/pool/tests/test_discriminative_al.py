@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.datasets import load_breast_cancer
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import DiscriminativeAL
@@ -37,28 +38,14 @@ class TestDiscriminativeAL(TemplateSingleAnnotatorPoolQueryStrategy,
                       query_default_params_reg=query_default_params_reg)
 
     def test_init_param_greedy_selection(self):
-        for greedy_selection in [0, "test", None]:
-            dal = DiscriminativeAL(
-                greedy_selection=greedy_selection
-            )
-            self.assertRaises(
-                TypeError,
-                dal.query,
-                X=self.X,
-                y=self.y,
-                discriminator=self.discriminator,
-            )
+        test_cases = [(0, TypeError), ("test", TypeError), (None, TypeError),
+                      (SVC(), TypeError)]
+        self._test_param("init", "greedy_selection", test_cases)
 
     def test_query_param_discriminator(self):
-        dal = DiscriminativeAL()
-        for discriminator in [None, GaussianProcessClassifier(), "test"]:
-            self.assertRaises(
-                TypeError,
-                dal.query,
-                X=self.X,
-                y=self.y,
-                discriminator=discriminator,
-            )
+        test_cases = [(0, TypeError), ("test", TypeError), (None, TypeError),
+                      (SVC(), TypeError)]
+        self._test_param("query", "discriminator", test_cases)
 
     def test_query(self):
         for greedy_selection in [False, True]:

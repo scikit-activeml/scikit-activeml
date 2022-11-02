@@ -77,7 +77,7 @@ class TemplateQueryStrategy:
             self._test_param("query", "fit_clf", test_cases)
 
             # check if clf remains the same for both options
-            for fit_clf in [True, False]:
+            for fit_clf in [False, True]:
                 with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
                     clf = deepcopy(self.query_default_params_clf["clf"])
                     if not fit_clf:
