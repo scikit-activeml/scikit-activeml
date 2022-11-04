@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.classifier import ParzenWindowClassifier
-from skactiveml.pool import ProbabilisticAL, XPal
+from skactiveml.pool import ProbabilisticAL, XProbabilisticAL
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -237,30 +237,30 @@ class TestXProbabilisticAL(unittest.TestCase):
 
     # Test init parameters
     def test_init_param_method(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertTrue(hasattr(qs, "method"))
-        selector = XPal(method="String")
+        selector = XProbabilisticAL(method="String")
         self.assertRaises(ValueError, selector.query, **self.kwargs)
-        selector = XPal(method=1)
+        selector = XProbabilisticAL(method=1)
         self.assertRaises(TypeError, selector.query, **self.kwargs)
 
     def test_init_param_candidate_prior(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertTrue(hasattr(qs, "candidate_prior"))
         for candidate_prior in [-1, 0, "string"]:
-            qs = XPal(candidate_prior=candidate_prior)
+            qs = XProbabilisticAL(candidate_prior=candidate_prior)
             self.assertRaises((ValueError, TypeError), qs.query, **self.kwargs)
 
     def test_init_param_evaluation_prior(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertTrue(hasattr(qs, "evaluation_prior"))
         for evaluation_prior in [-1, 0, "string"]:
-            qs = XPal(evaluation_prior=evaluation_prior)
+            qs = XProbabilisticAL(evaluation_prior=evaluation_prior)
             self.assertRaises((ValueError, TypeError), qs.query, **self.kwargs)
 
     # Test query parameters
     def test_query_param_clf(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertRaises(
             TypeError,
             qs.query,
@@ -277,7 +277,7 @@ class TestXProbabilisticAL(unittest.TestCase):
         )
 
     def test_query_param_fit_clf(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertRaises(
             TypeError, qs.query, **self.kwargs, fit_clf="string"
         )
@@ -289,7 +289,7 @@ class TestXProbabilisticAL(unittest.TestCase):
         )
 
     def test_query_param_ignore_partial_fit(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertRaises(
             TypeError,
             qs.query,
@@ -298,7 +298,7 @@ class TestXProbabilisticAL(unittest.TestCase):
         )
 
     def test_query_param_sample_weight(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         sample_weight_list = [
             "string",
             self.candidates,
@@ -306,7 +306,7 @@ class TestXProbabilisticAL(unittest.TestCase):
             np.empty((len(self.X) + 1)),
         ]
         for sample_weight in sample_weight_list:
-            qs = XPal()
+            qs = XProbabilisticAL()
             self.assertRaises((ValueError, TypeError), qs.query, **self.kwargs,
                               sample_weight=sample_weight)
 
@@ -330,7 +330,7 @@ class TestXProbabilisticAL(unittest.TestCase):
         )
 
     def test_query_param_sample_weight_candidates(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         sample_weight_candidates_list = [
             "string",
             self.candidates,
@@ -338,7 +338,7 @@ class TestXProbabilisticAL(unittest.TestCase):
             np.empty((len(self.X) + 1)),
         ]
         for sample_weight_candidates in sample_weight_candidates_list:
-            qs = XPal()
+            qs = XProbabilisticAL()
             self.assertRaises(
                 (ValueError, TypeError), qs.query, **self.kwargs,
                 sample_weight_candidates=sample_weight_candidates
@@ -364,7 +364,7 @@ class TestXProbabilisticAL(unittest.TestCase):
         )
 
     def _test_query_param_X(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         for X_eval in [None, "str", [], np.ones(5)]:
             self.assertRaises(
                 (TypeError, ValueError),
@@ -374,7 +374,7 @@ class TestXProbabilisticAL(unittest.TestCase):
             )
 
     def test_query_param_sample_weight_eval(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         sample_weight_eval_list = [
             "string",
             self.candidates,
@@ -382,7 +382,7 @@ class TestXProbabilisticAL(unittest.TestCase):
             np.empty((len(self.X) + 1)),
         ]
         for sample_weight_eval in sample_weight_eval_list:
-            qs = XPal()
+            qs = XProbabilisticAL()
             self.assertRaises(
                 (ValueError, TypeError), qs.query, **self.kwargs,
                 sample_weight_eval=sample_weight_eval
@@ -408,7 +408,7 @@ class TestXProbabilisticAL(unittest.TestCase):
         )
 
     def test_query_param_return_candidate_utilities(self):
-        qs = XPal()
+        qs = XProbabilisticAL()
         self.assertRaises(
             TypeError,
             qs.query,

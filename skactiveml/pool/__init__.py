@@ -19,7 +19,7 @@ from ._greedy_sampling import GreedySamplingX, GreedySamplingTarget
 from ._information_gain_maximization import (
     KLDivergenceMaximization,
 )
-from ._probabilistic_al import ProbabilisticAL, XPal, cost_reduction
+from ._probabilistic_al import ProbabilisticAL, XProbabilisticAL, cost_reduction
 from ._query_by_committee import (
     QueryByCommittee,
     average_kl_divergence,
