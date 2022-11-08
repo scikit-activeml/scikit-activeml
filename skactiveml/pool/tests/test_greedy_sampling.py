@@ -5,32 +5,38 @@ import numpy as np
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.pool import GreedySamplingX, GreedySamplingTarget
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
-from skactiveml.tests.template_query_strategy import TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL, is_labeled
-
 from sklearn.gaussian_process import GaussianProcessRegressor
 
 
-class TestGreedySamplingX(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestGreedySamplingX(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         query_default_params_reg = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([1.5, -1.2, MISSING_LABEL, MISSING_LABEL]),
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([1.5, -1.2, MISSING_LABEL, MISSING_LABEL]),
         }
         query_default_params_clf = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
         }
-        super().setUp(qs_class=GreedySamplingX, init_default_params={},
-                      query_default_params_reg=query_default_params_reg,
-                      query_default_params_clf=query_default_params_clf)
+        super().setUp(
+            qs_class=GreedySamplingX,
+            init_default_params={},
+            query_default_params_reg=query_default_params_reg,
+            query_default_params_clf=query_default_params_clf,
+        )
 
     def test_init_param_metric(self):
         test_cases = [
             (np.nan, TypeError),
             ("illegal", TypeError),
             (1.1, TypeError),
-            ("euclidean", None)
+            ("euclidean", None),
         ]
         self._test_param("init", "metric", test_cases)
 
@@ -39,7 +45,7 @@ class TestGreedySamplingX(TemplateSingleAnnotatorPoolQueryStrategy, unittest.Tes
             (np.nan, TypeError),
             ("illegal", TypeError),
             ({"test": 2}, TypeError),
-            ({}, None)
+            ({}, None),
         ]
         self._test_param("init", "metric_dict", test_cases)
 
@@ -54,22 +60,27 @@ class TestGreedySamplingX(TemplateSingleAnnotatorPoolQueryStrategy, unittest.Tes
         )
 
 
-class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestGreedySamplingTarget(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         query_default_params_reg = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([1.5, -1.2, MISSING_LABEL, MISSING_LABEL]),
-            'reg': NICKernelRegressor()
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([1.5, -1.2, MISSING_LABEL, MISSING_LABEL]),
+            "reg": NICKernelRegressor(),
         }
-        super().setUp(qs_class=GreedySamplingTarget, init_default_params={},
-                      query_default_params_reg=query_default_params_reg)
+        super().setUp(
+            qs_class=GreedySamplingTarget,
+            init_default_params={},
+            query_default_params_reg=query_default_params_reg,
+        )
 
     def test_init_param_x_metric(self):
         test_cases = [
             (np.nan, TypeError),
             ("illegal", TypeError),
             (1.1, TypeError),
-            ("euclidean", None)
+            ("euclidean", None),
         ]
         self._test_param("init", "x_metric", test_cases)
 
@@ -78,7 +89,7 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
             (np.nan, TypeError),
             ("illegal", TypeError),
             ({"test": 2}, TypeError),
-            ({}, None)
+            ({}, None),
         ]
         self._test_param("init", "x_metric_dict", test_cases)
 
@@ -87,7 +98,7 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
             (np.nan, TypeError),
             ("illegal", TypeError),
             (1.1, TypeError),
-            ("euclidean", None)
+            ("euclidean", None),
         ]
         self._test_param("init", "y_metric", test_cases)
 
@@ -96,7 +107,7 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
             (np.nan, TypeError),
             ("illegal", TypeError),
             ({"test": 2}, TypeError),
-            ({}, None)
+            ({}, None),
         ]
         self._test_param("init", "y_metric_dict", test_cases)
 
@@ -116,7 +127,7 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
             (1.5, TypeError),
             ({"test": 2}, TypeError),
             (0, None),
-            (10, None)
+            (10, None),
         ]
         self._test_param("init", "n_GSx_samples", test_cases)
 
@@ -124,7 +135,7 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
         test_cases = [
             (NICKernelRegressor(), None),
             (GaussianProcessRegressor(), TypeError),
-            (SklearnRegressor(GaussianProcessRegressor()), None)
+            (SklearnRegressor(GaussianProcessRegressor()), None),
         ]
         super().test_query_param_reg(test_cases=test_cases)
 
@@ -141,9 +152,7 @@ class TestGreedySamplingTarget(TemplateSingleAnnotatorPoolQueryStrategy, unittes
 
         reg = ZeroRegressor()
         for method in ["GSy", "GSi"]:
-            qs = GreedySamplingTarget(
-                random_state=42, method=method
-            )
+            qs = GreedySamplingTarget(random_state=42, method=method)
             utilities = qs.query(X, y, reg, return_utilities=True)[1][0]
             np.testing.assert_array_equal(
                 utilities, np.where(is_labeled(y), np.nan, 0)
