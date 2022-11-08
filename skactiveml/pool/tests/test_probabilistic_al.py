@@ -60,8 +60,8 @@ class TestProbabilisticAL(
         super().test_query_param_sample_weight(test_cases)
 
     def test_query_param_utility_weight(self):
-        test_cases = [('string', ValueError), (self.candidates, ValueError),
-                      (np.empty(len(self.X)), ValueError)]
+        test_cases = [('string', TypeError), (self.candidates, TypeError),
+                      (np.empty(len(self.X)), TypeError)]
         super().test_query_param_utility_weight(test_cases)
 
         test_cases = [(np.ones(2), None)]
