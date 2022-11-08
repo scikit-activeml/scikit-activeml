@@ -2,111 +2,77 @@ import unittest
 
 import numpy as np
 from sklearn.datasets import load_breast_cancer
-from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.preprocessing import StandardScaler
 
-from skactiveml.classifier import MixtureModelClassifier, SklearnClassifier
+from skactiveml.classifier import MixtureModelClassifier, ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import FourDs
+from skactiveml.utils import MISSING_LABEL, is_unlabeled
+from skactiveml.tests.template_query_strategy import \
+    TemplateSingleAnnotatorPoolQueryStrategy
 
 
-class TestFourDs(unittest.TestCase):
+class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def setUp(self):
-        self.random_state = 1
-        self.X, self.y = load_breast_cancer(return_X_y=True)
-        self.y_unlblb = np.full_like(self.y, -1)
-        self.X = StandardScaler().fit_transform(self.X)
-        mixture_model = BayesianGaussianMixture(n_components=2)
-        mixture_model.fit(self.X)
-        self.clf = MixtureModelClassifier(
+        X, y = load_breast_cancer(return_X_y=True)
+        X = StandardScaler().fit_transform(X)
+        y = y.astype(float)
+        y[:50] = MISSING_LABEL
+        y[350:] = MISSING_LABEL
+        mixture_model = BayesianGaussianMixture(n_components=2, random_state=0)
+        mixture_model.fit(X)
+        clf = MixtureModelClassifier(
             mixture_model=mixture_model,
-            classes=np.unique(self.y),
-            missing_label=-1,
+            classes=[0, 1],
+            missing_label=MISSING_LABEL,
         )
+        query_default_params_clf = {
+            'X': X,
+            'y': y,
+            'clf': clf,
+            'fit_clf': True
+        }
+        super().setUp(qs_class=FourDs, init_default_params={},
+                      query_default_params_clf=query_default_params_clf)
 
     def test_init_param_lmbda(self):
-        al4ds = FourDs(lmbda=True, missing_label=-1)
-        self.assertRaises(
-            TypeError, al4ds.query, X=self.X, y=self.y_unlblb, clf=self.clf
-        )
-        al4ds = FourDs(lmbda=1.1, missing_label=-1)
-        self.assertRaises(
-            ValueError, al4ds.query, X=self.X, y=self.y_unlblb, clf=self.clf
-        )
+        test_cases = [
+            (np.nan, ValueError),
+            ("state", TypeError),
+            (1.1, ValueError),
+            (-0.1, ValueError),
+            (0.5, None)
+        ]
+        self._test_param("init", "lmbda", test_cases)
 
     def test_query_param_clf(self):
-        al4ds = FourDs(missing_label=-1)
-        for clf in [None, SklearnClassifier(GaussianProcessClassifier())]:
-            self.assertRaises(
-                TypeError, al4ds.query, X=self.X, y=self.y_unlblb, clf=clf
-            )
-        al4ds = FourDs(missing_label=0)
-        self.assertRaises(
-            ValueError, al4ds.query, X=self.X, y=self.y_unlblb, clf=self.clf
-        )
-
-    def test_query_param_fit_clf(self):
-        al4ds = FourDs(missing_label=-1)
-        for fit_clf in ["string", None]:
-            self.assertRaises(
-                TypeError,
-                al4ds.query,
-                X=self.X,
-                y=self.y_unlblb,
-                clf=self.clf,
-                fit_clf="string",
-            )
-
-    def test_query_param_sample_weight(self):
-        al4ds = FourDs(missing_label=-1)
-        for sample_weight in [np.ones(1), "test"]:
-            self.assertRaises(
-                ValueError,
-                al4ds.query,
-                X=self.X,
-                y=self.y_unlblb,
-                clf=self.clf,
-                sample_weight=sample_weight,
-            )
+        test_cases = [
+            (ParzenWindowClassifier(), TypeError),
+            (SklearnClassifier(estimator=ParzenWindowClassifier()), TypeError),
+            (MixtureModelClassifier(), None)
+        ]
+        self._test_param("query", "clf", test_cases)
 
     def test_query(self):
-        al4ds = FourDs(missing_label=-1, random_state=self.random_state)
-        clf = self.clf.fit(self.X, self.y_unlblb)
-        query_indices = al4ds.query(
-            X=self.X, y=self.y_unlblb, clf=clf, fit_clf=False
+        init_params = self.init_default_params.copy()
+        query_params = self.query_default_params_clf.copy()
+        is_unlbld = is_unlabeled(
+            query_params["y"], missing_label=MISSING_LABEL
         )
-        self.assertEqual(1, len(query_indices))
+        al4ds = FourDs(**init_params)
         query_indices, utilities = al4ds.query(
-            X=self.X,
-            y=self.y_unlblb,
-            clf=clf,
-            fit_clf=False,
+            **query_params,
             return_utilities=True,
         )
-        self.assertEqual(1, len(query_indices))
-        self.assertEqual((1, len(self.y)), utilities.shape)
+        self.assertEqual(0, np.sum(utilities[:, is_unlbld] < 0))
+        self.assertEqual(0, np.sum(utilities[:, is_unlbld] > 1))
+        init_params["lmbda"] = 0
+        query_params["y"] = np.full_like(query_params["y"], np.nan)
+        query_params["batch_size"] = 10
+        al4ds = FourDs(**init_params)
+        query_indices, utilities = al4ds.query(
+            **query_params,
+            return_utilities=True,
+        )
         self.assertEqual(0, np.sum(utilities < 0))
-        query_indices, utilities = al4ds.query(
-            X=self.X,
-            y=self.y_unlblb,
-            clf=clf,
-            batch_size=3,
-            fit_clf=False,
-            return_utilities=True,
-        )
-        self.assertEqual(3, len(query_indices))
-        self.assertEqual((3, len(self.y)), utilities.shape)
-        self.assertEqual(3, np.sum(np.isnan(utilities)))
-        query_indices, utilities = al4ds.query(
-            X=self.X,
-            y=self.y_unlblb,
-            clf=clf,
-            fit_clf=False,
-            batch_size=len(self.X) + 1,
-            return_utilities=True,
-        )
-        self.assertEqual(len(self.y), len(query_indices))
-        self.assertEqual((len(self.y), len(self.y)), utilities.shape)
-        self.assertEqual(
-            np.sum(np.arange(0, len(self.y))), np.sum(np.isnan(utilities))
-        )
+        self.assertEqual(0, np.sum(utilities > 1))

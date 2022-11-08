@@ -159,7 +159,7 @@ class TemplateQueryStrategy:
                     msg=f"`{model_type}` changed after calling query."
                 )
 
-    def test_init_param_assignments(self):
+    def test_init_param_test_assignments(self):
         for param in inspect.signature(self.qs_class.__init__).parameters:
             if param != "self":
                 init_params = deepcopy(self.init_default_params)
@@ -252,17 +252,9 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
+        ml = self.init_default_params['missing_label']
+        test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param("init", "missing_label", test_cases)
-
-        # Todo replace missing value in `y` as well
-        if self.query_default_params_clf is not None:
-            ml = self.init_default_params['missing_label']
-            test_cases = [(ml, None), (Dummy, TypeError)]
-            self._test_param("init", "missing_label", test_cases, exclude_reg=True)
-
-        if self.query_default_params_reg is not None:
-            test_cases = [(1, ValueError), ("string", (ValueError, TypeError)), (Dummy, TypeError)]
-            self._test_param("init", "missing_label", test_cases, exclude_clf=True)
 
     def test_query_param_X(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -294,10 +286,12 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             for ml, classes, t, err in \
                     [(np.nan, [1.0, 2.0], float, None),
                      (0, [1, 2], int, None),
-                     (None, [0, 1, 2], object, None),
+                     (None, [1, 2], object, None),
                      (None, ["A", "B"], object, None),
                      ("", ["A", "B"], str, None)]:
                 replace_init_params = {"missing_label": ml}
+                if "classes" in self.init_default_params:
+                    replace_init_params["classes"] = classes
                 if "clf" in self.query_default_params_clf:
                     clf = clone(self.query_default_params_clf["clf"])
                     clf.missing_label = ml
@@ -388,6 +382,7 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 self.assertEqual(len(u1[0]), len(query_params["X"]))
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
+
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
 
@@ -487,18 +482,14 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
 
 def _cmp_object_dict(d1, d2):
     keys = np.union1d(d1.keys(), d2.keys())[0]
-    print(keys)
     for key in keys:
-        print(f"{key}..")
         if key not in d1.keys() or key not in d2.keys():
             return False
         if hasattr(d1[key], "__dict__") ^ hasattr(d1[key], "__dict__"):
             return False
         if hasattr(d1[key], "__dict__") and hasattr(d1[key], "__dict__"):
-            print("  .. go into")
             if not _cmp_object_dict(d1[key].__dict__, d2[key].__dict__):
                 return False
-            print("  .. go back")
         try:
             if np.issubdtype(type(d1[key]), np.number) and np.issubdtype(type(d1[key]), np.number):
                 if np.isnan(d1[key]) == np.isnan(d2[key]):
@@ -512,5 +503,4 @@ def _cmp_object_dict(d1, d2):
             pass
         except Exception:
             return False
-        print(f"  .. passed")
     return True

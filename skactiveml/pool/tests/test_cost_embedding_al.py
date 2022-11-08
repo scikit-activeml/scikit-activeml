@@ -6,127 +6,66 @@ from sklearn.svm import SVR
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import CostEmbeddingAL
 from skactiveml.pool._cost_embedding_al import MDSP, smacof_p
+from skactiveml.tests.template_query_strategy import \
+    TemplateSingleAnnotatorPoolQueryStrategy
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestCostEmbeddingAL(unittest.TestCase):
+class TestCostEmbeddingAL(TemplateSingleAnnotatorPoolQueryStrategy,
+                          unittest.TestCase):
     def setUp(self):
-        self.X_cand = np.zeros((100, 2))
-        self.X = np.zeros((6, 2))
-        self.y = [0, 1, np.nan, np.nan, 2, 1]
-        self.classes = [0, 1, 2]
-        self.cost_matrix = np.array([[0, 2, 3], [4, 0, 6], [7, 8, 0]])
-        self.regressor = SVR()
-        self.pwc = ParzenWindowClassifier()
+        self.classes = [0, 1]
+        init_default_params = {
+            "classes": self.classes
+        }
+        query_default_params = {
+            'X': np.linspace(0, 1, 20).reshape(10, 2),
+            'y': np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
+        }
+        super().setUp(qs_class=CostEmbeddingAL,
+                      init_default_params=init_default_params,
+                      query_default_params_clf=query_default_params)
 
     # Test init parameters
+    def test_init_param_classes(self):
+        test_cases = [(True, TypeError), ("string", TypeError),
+                      (np.zeros(2), ValueError)]
+        self._test_param("init", "classes", test_cases)
+
     def test_init_param_base_regressor(self):
-        alce = CostEmbeddingAL(
-            classes=self.classes,
-            base_regressor=self.pwc,
-            cost_matrix=self.cost_matrix,
-        )
-        self.assertTrue(hasattr(alce, "base_regressor"))
-        self.assertRaises(TypeError, alce.query, self.X, self.y)
+        test_cases = [(1, TypeError), ("string", TypeError),
+                      (ParzenWindowClassifier(), TypeError), (SVR(), None)]
+        self._test_param("init", "base_regressor", test_cases)
 
     def test_init_param_cost_matrix(self):
-        alce = CostEmbeddingAL(classes=self.classes, cost_matrix="A")
-        self.assertTrue(hasattr(alce, "cost_matrix"))
-        self.assertRaises(ValueError, alce.query, self.X, self.y)
-
-        zero_cost_matrix = np.zeros((len(self.classes), len(self.classes)))
-        alce = CostEmbeddingAL(
-            classes=self.classes, cost_matrix=zero_cost_matrix
-        )
-        self.assertRaises(ValueError, alce.query, self.X, self.y)
-
-    def test_init_param_classes(self):
-        alce = CostEmbeddingAL(classes=[0, 1], cost_matrix=self.cost_matrix)
-        self.assertTrue(hasattr(alce, "classes"))
-        self.assertRaises(ValueError, alce.query, self.X, self.y)
+        test_cases = [
+            (np.ones((len(self.classes), len(self.classes)+1)), ValueError),
+            ("string", ValueError),
+            (np.ones((3, 3)), ValueError),
+            (np.zeros((len(self.classes), len(self.classes))), ValueError),
+            (np.ones((len(self.classes), len(self.classes))) -
+             np.eye(len(self.classes)), None)
+        ]
+        self._test_param("init", "cost_matrix", test_cases)
 
     def test_init_param_embed_dim(self):
-        alce = CostEmbeddingAL(
-            classes=self.classes, cost_matrix=self.cost_matrix, embed_dim=1.5
-        )
-        self.assertTrue(hasattr(alce, "embed_dim"))
-        self.assertRaises(TypeError, alce.query, self.X, self.y)
-
-        alce = CostEmbeddingAL(
-            classes=self.classes, cost_matrix=self.cost_matrix, embed_dim=0
-        )
-        self.assertRaises(ValueError, alce.query, self.X, self.y)
-
-    def test_init_param_missing_label(self):
-        alce = CostEmbeddingAL(
-            classes=self.classes,
-            cost_matrix=self.cost_matrix,
-            missing_label=[1, 2, 3],
-        )
-        self.assertTrue(hasattr(alce, "missing_label"))
-        self.assertRaises(TypeError, alce.query, self.X, self.y)
+        test_cases = [(True, TypeError), ("string", TypeError),
+                      (1.5, TypeError), (0, ValueError), (3, None)]
+        self._test_param("init", "embed_dim", test_cases)
 
     def test_init_param_mds_params(self):
-        alce = CostEmbeddingAL(
-            classes=self.classes, cost_matrix=self.cost_matrix, mds_params=0
-        )
-        self.assertTrue(hasattr(alce, "mds_params"))
-        self.assertRaises(TypeError, alce.query, self.X, self.y)
+        test_cases = [(True, TypeError), ("string", TypeError),
+                      (0, TypeError), ({}, None)]
+        self._test_param("init", "mds_params", test_cases)
 
     def test_init_param_nn_params(self):
-        alce = CostEmbeddingAL(
-            classes=self.classes, cost_matrix=self.cost_matrix, nn_params=0
-        )
-        self.assertTrue(hasattr(alce, "nn_params"))
-        self.assertRaises(TypeError, alce.query, self.X, self.y)
+        test_cases = [(True, TypeError), ("string", TypeError),
+                      (0, TypeError), ({}, None)]
+        self._test_param("init", "nn_params", test_cases)
 
-    # Test query parameters
-    def test_query_param_X(self):
-        alce = CostEmbeddingAL(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(ValueError, alce.query, X=np.ones((5, 3)), y=self.y)
-        _, result = alce.query(
-            X=self.X,
-            y=[MISSING_LABEL] * len(self.X),
-            candidates=self.X_cand,
-            return_utilities=True,
-        )
-        np.testing.assert_array_equal(result, np.ones((1, len(self.X_cand))))
-
-    def test_query_param_y(self):
-        alce = CostEmbeddingAL(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(
-            ValueError, alce.query, X=self.X, y=[0, 1, 4, 0, 2, 1]
-        )
-
-    def test_query_param_sample_weight(self):
-        alce = CostEmbeddingAL(
-            classes=self.classes, cost_matrix=self.cost_matrix
-        )
-        self.assertRaises(
-            ValueError, alce.query, X=self.X, y=self.y, sample_weight="string"
-        )
-
-    def test_query_param_batch_size(self):
-        alce = CostEmbeddingAL(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(
-            TypeError, alce.query, self.X, self.y, batch_size=1.0
-        )
-        self.assertRaises(ValueError, alce.query, self.X, self.y, batch_size=0)
-
-    def test_query_param_return_utilities(self):
-        alce = CostEmbeddingAL(self.classes, self.regressor, self.cost_matrix)
-        self.assertRaises(
-            TypeError, alce.query, X_cand=self.X_cand, return_utilities=None
-        )
-        self.assertRaises(
-            TypeError, alce.query, X_cand=self.X_cand, return_utilities=[]
-        )
-        self.assertRaises(
-            TypeError, alce.query, X_cand=self.X_cand, return_utilities=0
-        )
-
+    # Test query
     def test_query(self):
-        alce = CostEmbeddingAL(base_regressor=self.regressor, classes=[0, 1])
+        alce = CostEmbeddingAL(base_regressor=SVR(), classes=[0, 1])
         query_indices = alce.query(
             [[0], [200]], [0, 1], candidates=[[0], [100], [200]]
         )
@@ -137,19 +76,22 @@ class TestCostEmbeddingAL(unittest.TestCase):
         X = np.random.random((10, 2))
         y = np.random.randint(0, 2, 10)
         candidates = np.random.random((15, 2))
+        classes = [0, 1, 2]
+        cost_matrix = np.array([[0, 2, 3], [4, 0, 6], [7, 8, 0]])
+        regressor = SVR()
 
         alce = CostEmbeddingAL(
-            self.classes,
-            self.regressor,
-            self.cost_matrix,
+            classes,
+            regressor,
+            cost_matrix,
             random_state=14,
             mds_params={"n_jobs": 1, "verbose": 2},
         )
         cand1 = alce.query(X, y, candidates=candidates)
         alce = CostEmbeddingAL(
-            self.classes,
-            self.regressor,
-            self.cost_matrix,
+            classes,
+            regressor,
+            cost_matrix,
             random_state=14,
             mds_params={"n_jobs": 2},
         )
@@ -157,15 +99,15 @@ class TestCostEmbeddingAL(unittest.TestCase):
         np.testing.assert_array_equal(cand1, cand2)
 
         alce = CostEmbeddingAL(
-            self.classes,
-            self.regressor,
-            self.cost_matrix,
+            classes,
+            regressor,
+            cost_matrix,
             mds_params={"dissimilarity": "wrong"},
         )
         self.assertRaises(ValueError, alce.query, X, y, candidates=candidates)
 
         alce = CostEmbeddingAL(
-            base_regressor=self.regressor,
+            base_regressor=regressor,
             classes=[0, 1],
             mds_params={"dissimilarity": "precomputed"},
         )

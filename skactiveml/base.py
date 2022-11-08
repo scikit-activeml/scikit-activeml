@@ -157,7 +157,7 @@ class PoolQueryStrategy(QueryStrategy):
         check_consistent_length(X, y)
 
         # Check missing_label
-        check_missing_label(self.missing_label)
+        check_missing_label(self.missing_label, target_type=y.dtype)
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
@@ -583,9 +583,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        check_array(
-            y, ensure_2d=True, force_all_finite="allow-nan", dtype=None
-        )
+        check_array(y, ensure_2d=True, force_all_finite="allow-nan")
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
