@@ -320,11 +320,47 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
     def test_query_param_utility_weight(self,
                                        test_cases=None):  # TODO more cases
-
-        query_params = inspect.signature(self.qs_class.query).parameters
-        if "utility_weight" in query_params:
+        query_params_list = inspect.signature(self.qs_class.query).parameters
+        if "utility_weight" in query_params_list:
             # custom test cases are not necessary
-            raise NotImplementedError("TODO Daniel")
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [(0, ValueError), (1.2, TypeError), (1, None)]
+            self._test_param("query", "batch_size", test_cases)
+
+            init_params = deepcopy(self.init_default_params)
+            init_params["random_state"] = np.random.RandomState(0)
+            qs = self.qs_class(**init_params)
+
+            for query_params in [self.query_default_params_clf,
+                                 self.query_default_params_reg]:
+                if query_params is not None:
+                    query_params = deepcopy(query_params)
+                    query_params["return_utilities"] = True
+                    if "utility_weight" in query_params.keys():
+                        del query_params["utility_weight"]
+
+                    ml = self.init_default_params['missing_label']
+                    unld_idx = is_unlabeled(query_params["y"], ml)
+
+                    query_idx1, utils1 = qs.query(**query_params)
+
+                    utility_weight = np.random.rand(len(unld_idx))
+                    query_params["utility_weight"] = utility_weight
+                    query_idx2, utils2 = qs.query(**query_params)
+                    np.testing.assert_allclose(utils1 * utility_weight, utils2)
+
+                    try:
+                        query_params["candidates"] = query_params["X"][unld_idx]
+                        query_params["utility_weight"] = utility_weight[unld_idx]
+                        query_idx3, utils3 = qs.query(**query_params)
+
+                        np.testing.assert_allclose(
+                            (utils1 * utility_weight)[:, unld_idx],
+                            utils3
+                        )
+
+                    except MappingError:
+                        pass
 
     def test_query_param_batch_size(self, test_cases=None):  # TODO more cases
         test_cases = [] if test_cases is None else test_cases
@@ -367,7 +403,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                              self.query_default_params_reg]:
             if query_params is not None:
                 query_params = deepcopy(query_params)
-                
+
                 missing_label = self.init_default_params['missing_label']
                 lbld_idx = is_labeled(query_params["y"], missing_label)
                 unld_idx = is_unlabeled(query_params["y"], missing_label)
