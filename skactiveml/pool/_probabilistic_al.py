@@ -484,6 +484,11 @@ class XProbabilisticAL(ExpectedErrorReduction):
         # Check fit_clf
         check_type(fit_clf, 'fit_clf', bool)
 
+        # Check return_candidate_utilities
+        check_type(
+            return_candidate_utilities, 'return_candidate_utilities', bool
+        )
+
         # Initialize classifier that works with indices to improve readability
         id_clf = IndexClassifierWrapper(
             clf, X_full, y_full, w_full, set_base_clf=not fit_clf,
@@ -499,6 +504,7 @@ class XProbabilisticAL(ExpectedErrorReduction):
         # Fit the ground truth for candiates
         gt_clf_cand = ParzenWindowClassifier(
             classes=id_clf.classes_,
+            missing_label=self.missing_label_,
             metric=id_clf.clf.metric,
             metric_dict=id_clf.clf.metric_dict,
             class_prior=self.candidate_prior
@@ -516,6 +522,7 @@ class XProbabilisticAL(ExpectedErrorReduction):
         # Fit the ground truth for evaluation instances
         gt_clf = ParzenWindowClassifier(
             classes=id_clf.classes_,
+            missing_label=self.missing_label_,
             metric=id_clf.clf.metric,
             metric_dict=id_clf.clf.metric_dict,
             class_prior=self.evaluation_prior
@@ -586,7 +593,7 @@ class XProbabilisticAL(ExpectedErrorReduction):
             return idx, utils, cand_utilities
 
     def _validate_init_params(self):
-        methods = ['transducve', 'inductive']
+        methods = ['transductive', 'inductive']
         if not isinstance(self.method, str):
             raise TypeError('"method" has to be of type "str"')
         if self.method not in methods:

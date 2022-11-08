@@ -7,7 +7,7 @@ from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import ProbabilisticAL, XProbabilisticAL
 from skactiveml.tests.template_query_strategy import \
     TemplateSingleAnnotatorPoolQueryStrategy
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, is_unlabeled, unlabeled_indices
 
 
 class TestProbabilisticAL(
@@ -15,17 +15,7 @@ class TestProbabilisticAL(
     unittest.TestCase):
 
     def setUp(self):
-        self.X = np.zeros((6, 2))
-        self.utility_weight = np.ones(len(self.X)) / len(self.X)
-        self.candidates = np.zeros((2, 2))
-        self.y = [0, 1, 1, 0, 2, 1]
         self.classes = [0, 1, 2]
-        self.clf = ParzenWindowClassifier(
-            classes=self.classes, missing_label=MISSING_LABEL
-        )
-        self.kwargs = dict(
-            X=self.X, y=self.y, candidates=self.candidates, clf=self.clf
-        )
         query_default_params_clf = {
             'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
@@ -38,13 +28,17 @@ class TestProbabilisticAL(
 
     # Test init parameters
     def test_init_param_prior(self):
-        test_cases = [(0, ValueError), (self.clf, TypeError)]
+        clf = ParzenWindowClassifier(
+            classes=self.classes, missing_label=MISSING_LABEL
+        )
+        test_cases = [(0, ValueError), (clf, TypeError)]
         self._test_param('init', 'prior', test_cases)
 
     def test_init_param_m_max(self):
         test_cases = [(-2, ValueError), (1.5, TypeError)]
         self._test_param('init', 'm_max', test_cases)
 
+    # Test query parameters
     def test_query_param_clf(self):
         add_test_cases = [
             (GaussianProcessClassifier(), TypeError),
@@ -60,8 +54,8 @@ class TestProbabilisticAL(
         super().test_query_param_sample_weight(test_cases)
 
     def test_query_param_utility_weight(self):
-        test_cases = [('string', ValueError), (self.candidates, ValueError),
-                      (np.empty(len(self.X)), ValueError)]
+        test_cases = [('string', ValueError), (np.zeros((2, 2)), ValueError),
+                      (np.empty(6), ValueError)]
         super().test_query_param_utility_weight(test_cases)
 
         test_cases = [(np.ones(2), None)]
@@ -69,17 +63,20 @@ class TestProbabilisticAL(
                          replace_query_params={'candidates': [[0, 1], [2, 3]]})
 
     def test_query(self):
+        clf = ParzenWindowClassifier(
+            classes=self.classes, missing_label=MISSING_LABEL
+        )
         mcpal = ProbabilisticAL()
-        self.assertRaises(ValueError, mcpal.query, X=[], y=[], clf=self.clf)
+        self.assertRaises(ValueError, mcpal.query, X=[], y=[], clf=clf)
         self.assertRaises(
-            ValueError, mcpal.query, X=[], y=[], clf=self.clf, candidates=[]
+            ValueError, mcpal.query, X=[], y=[], clf=clf, candidates=[]
         )
         self.assertRaises(
             ValueError,
             mcpal.query,
-            X=self.X,
+            X=np.zeros((6, 2)),
             y=[0, 1, 4, 0, 2, 1],
-            clf=self.clf,
+            clf=clf,
             candidates=[],
         )
 
@@ -126,199 +123,108 @@ class TestProbabilisticAL(
         np.testing.assert_array_equal(best_indices, [1])
 
 
-class TestXProbabilisticAL(unittest.TestCase):
+class TestXProbabilisticAL(
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    unittest.TestCase):
     def setUp(self):
-        self.X = np.zeros((6, 2))
-        self.candidates = np.zeros((2, 2))
-        self.y = [0, 1, 1, 0, 2, 1]
+        # self.X = np.zeros((6, 2))
+        # self.candidates = np.zeros((2, 2))
+        # self.y = [0, 1, 1, 0, 2, 1]
         self.classes = [0, 1, 2]
-        self.clf = ParzenWindowClassifier(
-            classes=self.classes, missing_label=MISSING_LABEL
-        )
-        self.kwargs = dict(
-            X=self.X, y=self.y, candidates=self.candidates, clf=self.clf
-        )
+        # self.clf = ParzenWindowClassifier(
+        #     classes=self.classes, missing_label=MISSING_LABEL
+        # )
+        # self.kwargs = dict(
+        #     X=self.X, y=self.y, candidates=self.candidates, clf=self.clf
+        # )
+        self.random_state = np.random.RandomState(42)
+        query_default_params_clf = {
+            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            'clf': ParzenWindowClassifier(random_state=42,
+                                          classes=self.classes),
+        }
+        super().setUp(qs_class=XProbabilisticAL,
+                      init_default_params={},
+                      query_default_params_clf=query_default_params_clf)
 
     # Test init parameters
     def test_init_param_method(self):
-        qs = XProbabilisticAL()
-        self.assertTrue(hasattr(qs, "method"))
-        selector = XProbabilisticAL(method="String")
-        self.assertRaises(ValueError, selector.query, **self.kwargs)
-        selector = XProbabilisticAL(method=1)
-        self.assertRaises(TypeError, selector.query, **self.kwargs)
+        test_cases = [(1, TypeError), ("string", ValueError),
+                      ('inductive', None), ('transductive', None)]
+        self._test_param("init", "method", test_cases)
+
+    def test_init_param_cost_matrix(self):
+        test_cases = [(np.ones((2, 3)), ValueError), ("string", ValueError),
+                      (np.ones((2, 2)), ValueError)]
+        self._test_param("init", "cost_matrix", test_cases)
 
     def test_init_param_candidate_prior(self):
-        qs = XProbabilisticAL()
-        self.assertTrue(hasattr(qs, "candidate_prior"))
-        for candidate_prior in [-1, 0, "string"]:
-            qs = XProbabilisticAL(candidate_prior=candidate_prior)
-            self.assertRaises((ValueError, TypeError), qs.query, **self.kwargs)
+        test_cases = [(-1, ValueError), ("string", TypeError)]
+        self._test_param("init", "candidate_prior", test_cases)
 
     def test_init_param_evaluation_prior(self):
-        qs = XProbabilisticAL()
-        self.assertTrue(hasattr(qs, "evaluation_prior"))
-        for evaluation_prior in [-1, 0, "string"]:
-            qs = XProbabilisticAL(evaluation_prior=evaluation_prior)
-            self.assertRaises((ValueError, TypeError), qs.query, **self.kwargs)
+        test_cases = [(-1, ValueError), ("string", TypeError)]
+        self._test_param("init", "evaluation_prior", test_cases)
 
     # Test query parameters
     def test_query_param_clf(self):
-        qs = XProbabilisticAL()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            clf=GaussianProcessClassifier(),
-        )
-        self.assertRaises(
-            (ValueError, TypeError),
-            qs.query,
-            X=self.X,
-            y=self.y,
-            clf=ParzenWindowClassifier(missing_label="missing"),
-        )
-
-    def test_query_param_fit_clf(self):
-        qs = XProbabilisticAL()
-        self.assertRaises(
-            TypeError, qs.query, **self.kwargs, fit_clf="string"
-        )
-        self.assertRaises(
-            TypeError, qs.query, **self.kwargs, fit_clf=self.candidates
-        )
-        self.assertRaises(
-            TypeError, qs.query, **self.kwargs, fit_clf=None
-        )
+        add_test_cases = [
+            (GaussianProcessClassifier(), TypeError),
+            (ParzenWindowClassifier(missing_label="missing"), TypeError),
+        ]
+        super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query_param_ignore_partial_fit(self):
-        qs = XProbabilisticAL()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            **self.kwargs,
-            ignore_partial_fit="test"
-        )
+        test_params = [('string', TypeError), (True, None), (False, None)]
+        self._test_param('query', 'ignore_partial_fit', test_params)
 
     def test_query_param_sample_weight(self):
-        qs = XProbabilisticAL()
-        sample_weight_list = [
-            "string",
-            self.candidates,
-            np.empty((len(self.X) - 1)),
-            np.empty((len(self.X) + 1)),
-        ]
-        for sample_weight in sample_weight_list:
-            qs = XProbabilisticAL()
-            self.assertRaises((ValueError, TypeError), qs.query, **self.kwargs,
-                              sample_weight=sample_weight)
-
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            candidates=None,
-            clf=self.clf,
-            sample_weight=np.ones((len(self.X) + 1)),
-        )
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            candidates=[0],
-            clf=self.clf,
-            sample_weight=np.ones(2),
-        )
+        X = self.query_default_params_clf['X']
+        test_cases = [("string", ValueError), (X, ValueError),
+                      (np.empty((len(X) - 1)), ValueError),
+                      (np.ones(len(X)), None)]
+        super().test_query_param_sample_weight(test_cases)
 
     def test_query_param_sample_weight_candidates(self):
-        qs = XProbabilisticAL()
-        sample_weight_candidates_list = [
-            "string",
-            self.candidates,
-            np.empty((len(self.X) - 1)),
-            np.empty((len(self.X) + 1)),
-        ]
-        for sample_weight_candidates in sample_weight_candidates_list:
-            qs = XProbabilisticAL()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.kwargs,
-                sample_weight_candidates=sample_weight_candidates
-            )
+        raise NotImplementedError('TODO Daniel Kottke')
+        query_params = self.query_default_params_clf
+        y = self.query_default_params_clf['y']
+        candidates = unlabeled_indices(y)
 
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            candidates=None,
-            clf=self.clf,
-            sample_weight_candidates=np.ones((len(self.X) + 1)),
-        )
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            candidates=[0],
-            clf=self.clf,
-            sample_weight_candidates=np.ones(2),
-        )
+        # sample_wight = None
+        test_cases = [(np.ones(candidates), ValueError), (None, None)]
+        self._test_param('query', 'sample_weight_candidates', test_cases)
 
-    def _test_query_param_X(self):
-        qs = XProbabilisticAL()
-        for X_eval in [None, "str", [], np.ones(5)]:
-            self.assertRaises(
-                (TypeError, ValueError),
-                qs.query,
-                **self.kwargs,
-                X_eval=X_eval
-            )
+        # sample_wight = 1d array
+        query_params['sample_weight'] = np.ones(len(query_params['X']))
+        test_cases = [("string", ValueError), (candidates, ValueError),
+                      (np.empty((len(candidates) - 1)), ValueError),
+                      (np.ones(len(candidates)), None), None]
+        self._test_param('query', 'sample_weight_candidates', test_cases)
+
+    def test_query_param_X_eval(self):
+        X = self.query_default_params_clf['X']
+        test_cases = [("string", ValueError),
+                      (1, ValueError), (X, None)]
+        self._test_param("query", "X_eval", test_cases)
 
     def test_query_param_sample_weight_eval(self):
-        qs = XProbabilisticAL()
-        sample_weight_eval_list = [
-            "string",
-            self.candidates,
-            np.empty((len(self.X) - 1)),
-            np.empty((len(self.X) + 1)),
-        ]
-        for sample_weight_eval in sample_weight_eval_list:
-            qs = XProbabilisticAL()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.kwargs,
-                sample_weight_eval=sample_weight_eval
-            )
+        X_eval = self.random_state.rand(6, 2)
+        test_cases = [(np.ones(len(X_eval)), ValueError)]
+        self._test_param('query', 'sample_weight_eval', test_cases)
 
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            X_eval=None,
-            clf=self.clf,
-            sample_weight_eval=np.ones((len(self.X) + 1)),
-        )
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X=self.X,
-            y=self.y,
-            X_eval=[[0]],
-            clf=self.clf,
-            sample_weight_eval=np.ones(2),
-        )
+        query_params = self.query_default_params_clf
+        query_params['X_eval'] = X_eval
+        test_cases = [("string", ValueError), (X_eval, ValueError),
+                      (np.empty((len(X_eval) - 1)), ValueError),
+                      (np.ones(len(X_eval)), None)]
+        self._test_param('query', 'sample_weight_eval', test_cases,
+                         replace_query_params=query_params)
 
     def test_query_param_return_candidate_utilities(self):
-        qs = XProbabilisticAL()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            **self.kwargs,
-            return_candidate_utilities="test"
-        )
+        test_params = [('string', TypeError), (True, None), (False, None)]
+        self._test_param('query', 'return_candidate_utilities', test_params)
 
     def test_query(self):
         # TODO
