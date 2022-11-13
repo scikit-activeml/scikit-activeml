@@ -1,116 +1,97 @@
+import numpy as np
 import unittest
 
-import numpy as np
+from copy import deepcopy
+from scipy.stats import norm
+from skactiveml.base import ProbabilisticRegressor
+from skactiveml.pool import ExpectedModelChangeMaximization
+from skactiveml.regressor import (
+    NICKernelRegressor,
+    SklearnRegressor,
+    SklearnNormalRegressor,
+)
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
+from skactiveml.utils import is_unlabeled, call_func, MISSING_LABEL
+from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 
-from skactiveml.pool import ExpectedModelChangeMaximization
-from skactiveml.pool.tests.provide_test_pool_regression import (
-    provide_test_regression_query_strategy_init_random_state,
-    provide_test_regression_query_strategy_init_missing_label,
-    provide_test_regression_query_strategy_query_X,
-    provide_test_regression_query_strategy_query_y,
-    provide_test_regression_query_strategy_query_reg,
-    provide_test_regression_query_strategy_query_fit_reg,
-    provide_test_regression_query_strategy_query_sample_weight,
-    provide_test_regression_query_strategy_query_candidates,
-    provide_test_regression_query_strategy_query_batch_size,
-    provide_test_regression_query_strategy_query_return_utilities,
-    provide_test_regression_query_strategy_change_dependence,
-)
-from skactiveml.regressor import SklearnRegressor
 
-
-class TestExpectedModelChangeMaximization(unittest.TestCase):
+class TestExpectedModelChangeMaximization(
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    unittest.TestCase,
+):
     def setUp(self):
-        self.random_state = 1
-        self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
-        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3.5, 2], [4.2, 4]])
-        self.y = np.array([np.nan, np.nan, 2, -2, 3.4, 2.7])
-        self.reg = SklearnRegressor(LinearRegression())
-        self.qs = ExpectedModelChangeMaximization()
-        self.query_kwargs = dict(
-            X=self.X, y=self.y, candidates=self.candidates, reg=self.reg
+        query_default_params_reg = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([1.5, -1.2, MISSING_LABEL, MISSING_LABEL]),
+            "reg": SklearnRegressor(LinearRegression()),
+        }
+        super().setUp(
+            qs_class=ExpectedModelChangeMaximization,
+            init_default_params={},
+            query_default_params_reg=query_default_params_reg,
         )
 
-    def test_init_param_random_state(self):
-        provide_test_regression_query_strategy_init_random_state(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_init_param_missing_label(self):
-        provide_test_regression_query_strategy_init_missing_label(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_init_param_k_bootstrap(self):
-        for wrong_val, error in zip(["five", 0], [TypeError, ValueError]):
-            qs = ExpectedModelChangeMaximization(bootstrap_size=wrong_val)
-            self.assertRaises(error, qs.query, **self.query_kwargs)
+    def test_init_param_bootstrap_size(self):
+        test_cases = [
+            (1, None),
+            (-1, ValueError),
+            ("five", TypeError),
+            (0, ValueError)
+        ]
+        self._test_param("init", "bootstrap_size", test_cases)
 
     def test_init_param_n_train(self):
-        for wrong_val, error in zip(["five", 1.5], [TypeError, ValueError]):
-            qs = ExpectedModelChangeMaximization(n_train=wrong_val)
-            self.assertRaises(error, qs.query, **self.query_kwargs)
+        test_cases = [
+            (1, None),
+            (0.0, ValueError),
+            (1.5, ValueError),
+            ("illegal", TypeError),
+        ]
+        self._test_param("init", "n_train", test_cases)
 
     def test_init_param_feature_map(self):
-        for wrong_val in ["wrong_val", 1]:
-            qs = ExpectedModelChangeMaximization(feature_map=wrong_val)
-            self.assertRaises(TypeError, qs.query, **self.query_kwargs)
-
-        qs = ExpectedModelChangeMaximization(
-            feature_map=lambda x: np.zeros((len(x), 1)),
-            random_state=self.random_state,
-        )
-        utilities = qs.query(
-            self.X, self.y, reg=self.reg, return_utilities=True, fit_reg=True
-        )[1]
-        np.testing.assert_array_equal(np.zeros(2), utilities[0, :2])
+        test_cases = [
+            ("illegal", TypeError),
+            (1, TypeError),
+            (lambda x: np.zeros((len(x), 1)), None)
+        ]
+        self._test_param("init", "feature_map", test_cases)
 
     def test_init_param_ord(self):
-        qs = ExpectedModelChangeMaximization(ord="wrong_norm")
-        self.assertRaises(ValueError, qs.query, **self.query_kwargs)
-
-    def test_query_param_X(self):
-        provide_test_regression_query_strategy_query_X(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_query_param_y(self):
-        provide_test_regression_query_strategy_query_y(
-            self, ExpectedModelChangeMaximization
-        )
+        test_cases = [
+            (1, None),
+            ("illegal", ValueError),
+        ]
+        self._test_param("init", "ord", test_cases)
 
     def test_query_param_reg(self):
-        provide_test_regression_query_strategy_query_reg(
-            self, ExpectedModelChangeMaximization
+        test_cases = [
+            (NICKernelRegressor(), None),
+            (SklearnNormalRegressor(GaussianProcessRegressor()), None),
+            (GaussianProcessRegressor(), TypeError),
+            (SklearnRegressor(GaussianProcessRegressor()), None),
+        ]
+        super().test_query_param_reg(test_cases=test_cases)
+
+    def test_query(self):
+        class ZeroRegressor(ProbabilisticRegressor):
+            def predict_target_distribution(self, X):
+                return norm(loc=np.zeros(len(X)))
+
+            def fit(self, *args, **kwargs):
+                return self
+
+        qs = self.qs_class(**self.init_default_params)
+        query_dict = deepcopy(self.query_default_params_reg)
+        query_dict["reg"] = ZeroRegressor()
+        query_dict["return_utilities"] = True
+        utilities = call_func(qs.query, **query_dict)[1][0]
+        np.testing.assert_almost_equal(
+            np.zeros_like(query_dict["y"]),
+            np.where(is_unlabeled(utilities), 0, utilities),
         )
 
-    def test_query_param_fit_reg(self):
-        provide_test_regression_query_strategy_query_fit_reg(
-            self, ExpectedModelChangeMaximization
-        )
 
-    def test_query_param_sample_weight(self):
-        provide_test_regression_query_strategy_query_sample_weight(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_query_param_candidates(self):
-        provide_test_regression_query_strategy_query_candidates(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_query_param_batch_size(self):
-        provide_test_regression_query_strategy_query_batch_size(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_query_param_return_utilities(self):
-        provide_test_regression_query_strategy_query_return_utilities(
-            self, ExpectedModelChangeMaximization
-        )
-
-    def test_logic(self):
-        provide_test_regression_query_strategy_change_dependence(
-            self, ExpectedModelChangeMaximization
-        )

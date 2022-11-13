@@ -1,7 +1,5 @@
-import unittest
-
 import numpy as np
-
+import unittest
 
 from copy import deepcopy
 from scipy.stats import norm
