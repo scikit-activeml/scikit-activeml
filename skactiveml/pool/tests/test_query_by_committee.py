@@ -1,15 +1,12 @@
-import unittest
-from itertools import product
-
 import numpy as np
+import unittest
+
 from sklearn import clone
 from sklearn.ensemble import (
     BaggingClassifier,
     RandomForestClassifier,
     VotingClassifier,
-    BaggingRegressor,
-    VotingRegressor,
-    AdaBoostRegressor, RandomForestRegressor,
+    RandomForestRegressor,
 )
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -20,23 +17,16 @@ from skactiveml.pool._query_by_committee import (
     average_kl_divergence,
     vote_entropy,
 )
-from skactiveml.pool.tests.provide_test_pool_regression import (
-    provide_test_regression_query_strategy_init_random_state,
-    provide_test_regression_query_strategy_init_missing_label,
-    provide_test_regression_query_strategy_query_X,
-    provide_test_regression_query_strategy_query_y,
-    provide_test_regression_query_strategy_query_candidates,
-    provide_test_regression_query_strategy_query_batch_size,
-    provide_test_regression_query_strategy_query_return_utilities,
-)
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
-                           unittest.TestCase):
+class TestQueryByCommittee(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.classes = [0, 1]
         self.ensemble_clf = SklearnClassifier(
@@ -49,18 +39,23 @@ class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
             random_state=42,
         )
         query_default_params_clf = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
-            'ensemble': self.ensemble_clf,
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "ensemble": self.ensemble_clf,
+            "fit_ensemble": True,
         }
         query_default_params_reg = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
-            'ensemble': self.ensemble_reg,
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "ensemble": self.ensemble_reg,
+            "fit_ensemble": True,
         }
-        super().setUp(qs_class=QueryByCommittee, init_default_params={},
-                      query_default_params_clf=query_default_params_clf,
-                      query_default_params_reg=query_default_params_reg)
+        super().setUp(
+            qs_class=QueryByCommittee,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+            query_default_params_reg=query_default_params_reg,
+        )
 
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -70,13 +65,26 @@ class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
     def test_query_param_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
-            (None, TypeError), ("test", TypeError), (1, TypeError),
+            (None, TypeError),
+            ("test", TypeError),
+            (1, TypeError),
             (ParzenWindowClassifier(classes=self.classes), TypeError),
             (GaussianProcessRegressor(), TypeError),
             (RandomForestRegressor(), TypeError),
             (RandomForestClassifier(), TypeError),
+            (
+                [GaussianProcessRegressor(), GaussianProcessRegressor()],
+                TypeError,
+            ),
+            (
+                [GaussianProcessClassifier(), GaussianProcessRegressor()],
+                TypeError,
+            ),
+            ([NICKernelRegressor(), ParzenWindowClassifier()], TypeError),
             (self.ensemble_clf, None),
             (self.ensemble_reg, None),
+            ([NICKernelRegressor(), NICKernelRegressor()], None),
+            ([ParzenWindowClassifier(), ParzenWindowClassifier()], None),
         ]
         self._test_param("query", "ensemble", test_cases)
 
@@ -85,12 +93,13 @@ class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
         test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
         self._test_param("query", "y", test_cases, exclude_reg=True)
 
-        for ml, classes, t, err in \
-                [(np.nan, [1.0, 2.0], float, None),
-                 (0, [1, 2], int, None),
-                 (None, [1, 2], object, None),
-                 (None, ["A", "B"], object, None),
-                 ("", ["A", "B"], str, None)]:
+        for ml, classes, t, err in [
+            (np.nan, [1.0, 2.0], float, None),
+            (0, [1, 2], int, None),
+            (None, [1, 2], object, None),
+            (None, ["A", "B"], object, None),
+            ("", ["A", "B"], str, None),
+        ]:
             replace_init_params = {"missing_label": ml}
 
             ensemble = clone(self.query_default_params_clf["ensemble"])
@@ -102,17 +111,14 @@ class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
             replace_y[0] = classes[0]
             replace_y[1] = classes[1]
             test_cases = [(replace_y, err)]
-            self._test_param("query", "y", test_cases,
-                             replace_init_params=replace_init_params,
-                             replace_query_params=replace_query_params,
-                             exclude_reg=True)
-    #
-    # def test_query_param_sample_weight(self, test_cases=None):
-    #     test_cases = [] if test_cases is None else test_cases
-    #     X = self.query_default_params_clf['X']
-    #     test_cases += [("string", ValueError), (X, ValueError),
-    #                    (np.empty((len(X) - 1)), ValueError)]
-    #     self._test_param("query", "sample_weight", test_cases)
+            self._test_param(
+                "query",
+                "y",
+                test_cases,
+                replace_init_params=replace_init_params,
+                replace_query_params=replace_query_params,
+                exclude_reg=True,
+            )
 
     def test_query_param_fit_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -139,17 +145,24 @@ class TestQueryByCommittee(TemplateSingleAnnotatorPoolQueryStrategy,
         ensemble_voting = SklearnClassifier(
             VotingClassifier(estimators=ensemble_classifiers, voting="soft")
         )
+        ensemble_array_reg = [NICKernelRegressor(), NICKernelRegressor()]
+        ensemble_array_clf = [
+            ParzenWindowClassifier(classes=self.classes),
+            ParzenWindowClassifier(classes=self.classes),
+        ]
         ensemble_list = [
             self.ensemble_clf,
             self.ensemble_reg,
             ensemble_classifiers,
             ensemble_bagging,
             ensemble_voting,
+            ensemble_array_reg,
+            ensemble_array_clf,
         ]
         for ensemble in ensemble_list:
             query_params = self.query_default_params_clf
-            query_params['ensemble'] = ensemble
-            query_params['return_utilities'] = True
+            query_params["ensemble"] = ensemble
+            query_params["return_utilities"] = True
             for method in ["KL_divergence", "vote_entropy"]:
                 qs = QueryByCommittee(method=method)
                 idx, u = qs.query(**query_params)
@@ -235,134 +248,3 @@ class TestVoteEntropy(unittest.TestCase):
     def test_vote_entropy(self):
         scores = vote_entropy(votes=self.votes, classes=self.classes)
         np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
-
-
-class TestQueryByCommitteeForRegression(unittest.TestCase):
-    def setUp(self):
-        self.random_state = 1
-        self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
-        self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        self.y = np.array([0, 1, 2, -2])
-        self.ensemble = SklearnRegressor(
-            BaggingRegressor(
-                NICKernelRegressor(), random_state=self.random_state
-            ),
-            random_state=self.random_state,
-        )
-        self.query_dict_regression_test = dict(ensemble=self.ensemble)
-        self.query_dict = dict(
-            ensemble=self.ensemble,
-            fit_ensemble=True,
-            X=self.X,
-            y=self.y,
-            candidates=self.candidates,
-        )
-
-    def test_init_param_random_state(self):
-        provide_test_regression_query_strategy_init_random_state(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
-        )
-
-    def test_init_param_missing_label(self):
-        provide_test_regression_query_strategy_init_missing_label(
-            self,
-            QueryByCommittee,
-            init_dict={"missing_label": MISSING_LABEL},
-            query_dict=self.query_dict_regression_test,
-            missing_label_params_query_dict=["ensemble"],
-        )
-
-    def test_query_param_X(self):
-        provide_test_regression_query_strategy_query_X(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
-        )
-
-    def test_query_param_y(self):
-        provide_test_regression_query_strategy_query_y(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
-        )
-
-    def test_query_param_ensemble(self):
-        for illegal_ensemble in [ParzenWindowClassifier(), "illegal"]:
-            self.query_dict["ensemble"] = illegal_ensemble
-            qs = QueryByCommittee()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.query_dict
-            )
-
-    def test_query_param_fit_ensemble(self):
-        for illegal_fit_ensemble in ["illegal", dict]:
-            self.query_dict["fit_ensemble"] = illegal_fit_ensemble
-            qs = QueryByCommittee()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.query_dict
-            )
-
-    def test_query_param_sample_weight(self):
-        for illegal_sample_weight in ["illegal", dict]:
-            self.query_dict["sample_weight"] = illegal_sample_weight
-            qs = QueryByCommittee()
-            self.assertRaises(
-                (ValueError, TypeError), qs.query, **self.query_dict
-            )
-
-    def test_query_param_candidates(self):
-        provide_test_regression_query_strategy_query_candidates(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
-        )
-
-    def test_query_param_batch_size(self):
-        provide_test_regression_query_strategy_query_batch_size(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
-        )
-
-    def test_query_param_return_utilities(self):
-        provide_test_regression_query_strategy_query_return_utilities(
-            self, QueryByCommittee, query_dict=self.query_dict_regression_test
-        )
-
-    def test_query_ensemble_fit_ensemble(self):
-        ensemble_regressors = [
-            SklearnRegressor(estimator=GaussianProcessRegressor()),
-            SklearnRegressor(estimator=GaussianProcessRegressor()),
-            SklearnRegressor(estimator=GaussianProcessRegressor()),
-        ]
-        nic_reg = NICKernelRegressor()
-        ensemble_bagging = SklearnRegressor(
-            BaggingRegressor(base_estimator=nic_reg)
-        )
-        ensemble_voting = SklearnRegressor(
-            VotingRegressor(
-                estimators=[
-                    (f"gpr{i}", reg)
-                    for i, reg in enumerate(ensemble_regressors)
-                ]
-            )
-        )
-        ensemble_adaboost = SklearnRegressor(AdaBoostRegressor(n_estimators=3))
-        ensemble_list = [
-            self.ensemble,
-            ensemble_regressors,
-            ensemble_bagging,
-            ensemble_voting,
-            ensemble_adaboost,
-        ]
-
-        for ensemble_regressors in ensemble_list:
-            if isinstance(ensemble_regressors, list):
-                for ensemble_regressor in ensemble_regressors:
-                    ensemble_regressor.fit(self.X, self.y)
-            else:
-                ensemble_regressors.fit(self.X, self.y)
-
-        self.query_dict["return_utilities"] = True
-        for ensemble_regressors, fit_ensemble in product(
-            ensemble_list, [True, False]
-        ):
-            qs = QueryByCommittee()
-            self.query_dict["ensemble"] = ensemble_regressors
-            self.query_dict["fit_ensemble"] = fit_ensemble
-
-            indices, utilities = qs.query(**self.query_dict)
-            self.assertEqual(indices.shape, (1,))
-            self.assertEqual(utilities.shape, (1, len(self.candidates)))

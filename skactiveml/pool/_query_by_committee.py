@@ -8,7 +8,7 @@ import copy
 
 import numpy as np
 from sklearn import clone
-from sklearn.utils.validation import check_array, _is_arraylike
+from sklearn.utils.validation import check_array
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,

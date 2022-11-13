@@ -69,6 +69,15 @@ class TestExpectedModelOutputChange(
             ("illegal", ValueError),
         ]
         self._test_param("query", "X_eval", test_cases)
+        test_cases = [(None, ValueError)]
+        query_params = deepcopy(self.query_default_params_reg)
+        query_params["y"] = np.ones_like(self.query_default_params_reg["y"])
+        self._test_param(
+            "query",
+            "X_eval",
+            test_cases=test_cases,
+            replace_query_params=query_params,
+        )
 
     def test_query(self):
         class ZeroRegressor(ProbabilisticRegressor):
