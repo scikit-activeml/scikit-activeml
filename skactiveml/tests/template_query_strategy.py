@@ -68,13 +68,14 @@ class TemplateQueryStrategy:
         test_cases += [(np.nan, ValueError), ("state", ValueError), (1, None)]
         self._test_param("init", "random_state", test_cases)
 
-    def test_query_param_fit_clf(self, test_cases=None):
-        self._fit_test(test_cases=test_cases, model_type="clf")
+    def test_query_param_fit_clf(self, test_cases=None, fit_values=None):
+        self._fit_test(test_cases=test_cases, fit_values=fit_values, model_type="clf")
 
-    def test_query_param_fit_reg(self, test_cases=None):
-        self._fit_test(test_cases=test_cases, model_type="reg")
+    def test_query_param_fit_reg(self, test_cases=None, fit_values=None):
+        self._fit_test(test_cases=test_cases, fit_values=fit_values, model_type="reg")
 
-    def _fit_test(self, test_cases, model_type):
+    def _fit_test(self, test_cases, model_type, fit_values=None):
+        fit_values = [False, True] if fit_values is None else fit_values
         query_params = inspect.signature(self.qs_class.query).parameters
         if f"fit_{model_type}" in query_params:
             # custom test cases are not necessary
@@ -83,7 +84,7 @@ class TemplateQueryStrategy:
             self._test_param("query", f"fit_{model_type}", test_cases)
 
             # check if model remains the same for both options
-            for fit_type in [True, False]:
+            for fit_type in fit_values:
                 with self.subTest(msg="Model consistency"):
                     if model_type == "clf":
                         query_params = self.query_default_params_clf
@@ -352,8 +353,10 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         if "utility_weight" in query_params_list:
             # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
-            test_cases += [(0, ValueError), (1.2, TypeError), (1, None)]
-            self._test_param("query", "batch_size", test_cases)
+            test_cases += [(0, (ValueError, TypeError)),
+                           (1.2, (ValueError, TypeError)),
+                           (1, (ValueError, TypeError))]
+            self._test_param("query", "utility_weight", test_cases)
 
             init_params = deepcopy(self.init_default_params)
             init_params["random_state"] = np.random.RandomState(0)
@@ -386,6 +389,13 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                             (utils1 * utility_weight)[:, unld_idx],
                             utils3
                         )
+
+                        test_cases = [(0, (ValueError, TypeError)),
+                                      (1.2, (ValueError, TypeError)),
+                                      (utility_weight, (ValueError, TypeError))]
+                        self._test_param("query", "utility_weight", test_cases,
+                                         replace_init_params=init_params,
+                                         replace_query_params=query_params)
 
                     except MappingError:
                         pass
