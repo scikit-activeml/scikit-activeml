@@ -68,7 +68,8 @@ class TemplateQueryStrategy:
         test_cases += [(np.nan, ValueError), ("state", ValueError), (1, None)]
         self._test_param("init", "random_state", test_cases)
 
-    def test_query_param_fit_clf(self, test_cases=None):
+    def test_query_param_fit_clf(self, test_cases=None, fit_values=None):
+        fit_values = [False, True] if fit_values is None else fit_values
         query_params = inspect.signature(self.qs_class.query).parameters
         if "fit_clf" in query_params:
             # custom test cases are not necessary
@@ -77,7 +78,7 @@ class TemplateQueryStrategy:
             self._test_param("query", "fit_clf", test_cases)
 
             # check if clf remains the same for both options
-            for fit_clf in [False, True]:
+            for fit_clf in fit_values:
                 with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
                     clf = deepcopy(self.query_default_params_clf["clf"])
                     if not fit_clf:
