@@ -139,12 +139,12 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         self.assertRaises(TypeError, self.iclf, use_speed_up="string")
 
         clf = ParzenWindowClassifier().fit(self.X, self.y)
-        iclf = IndexClassifierWrapper(clf, self.X, self.y, use_speed_up=True,
-                                      ignore_partial_fit=False)
+        iclf = IndexClassifierWrapper(
+            clf, self.X, self.y, use_speed_up=True, ignore_partial_fit=False
+        )
         self.assertWarns(Warning, iclf.predict, [0])
         self.assertWarns(Warning, iclf.predict_proba, [0])
         self.assertWarns(Warning, iclf.predict_freq, [0])
-
 
     def test_init_param_missing_label(self):
         self.assertTrue(hasattr(self.iclf(), "missing_label"))

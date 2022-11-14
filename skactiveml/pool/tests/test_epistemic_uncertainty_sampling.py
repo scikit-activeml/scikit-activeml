@@ -18,14 +18,14 @@ from skactiveml.pool._epistemic_uncertainty_sampling import (
     _epistemic_uncertainty_logreg,
     _theta,
 )
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL
 
 
 class TestEpistemicUncertaintySampling(
-    TemplateSingleAnnotatorPoolQueryStrategy,
-    unittest.TestCase
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
     def setUp(self):
         self.random_state = 1
@@ -45,14 +45,17 @@ class TestEpistemicUncertaintySampling(
         )
 
         query_default_params_clf = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
-            'clf': ParzenWindowClassifier(random_state=42,
-                                          classes=self.classes),
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "clf": ParzenWindowClassifier(
+                random_state=42, classes=self.classes
+            ),
         }
-        super().setUp(qs_class=EpistemicUncertaintySampling,
-                      init_default_params={},
-                      query_default_params_clf=query_default_params_clf)
+        super().setUp(
+            qs_class=EpistemicUncertaintySampling,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+        )
 
     def test_init_param_precompute(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -62,19 +65,28 @@ class TestEpistemicUncertaintySampling(
     def test_query_param_clf(self):
         add_test_cases = [
             (LogisticRegression(), TypeError),
-            (SklearnClassifier(DecisionTreeClassifier(),
-                               classes=self.classes), TypeError),
-            (SklearnClassifier(LogisticRegression(),
-                               classes=self.classes), None),
+            (
+                SklearnClassifier(
+                    DecisionTreeClassifier(), classes=self.classes
+                ),
+                TypeError,
+            ),
+            (
+                SklearnClassifier(LogisticRegression(), classes=self.classes),
+                None,
+            ),
             (ParzenWindowClassifier(), None),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        X = self.query_default_params_clf['X']
-        test_cases += [("string", ValueError), (X, ValueError),
-                       (np.empty((len(X) - 1)), ValueError)]
+        X = self.query_default_params_clf["X"]
+        test_cases += [
+            ("string", ValueError),
+            (X, ValueError),
+            (np.empty((len(X) - 1)), ValueError),
+        ]
         super().test_query_param_sample_weight(test_cases)
 
     # tests for epistemic ParzenWindowClassifier
@@ -135,14 +147,14 @@ class TestEpistemicUncertaintySampling(
 
         qs = EpistemicUncertaintySampling(precompute=True)
         query_params = deepcopy(self.query_default_params_clf)
-        query_params['return_utilities'] = True
-        query_params['candidates'] = np.zeros_like(freq)
-        query_params['clf'] = Dummy_PWC(classes=self.classes)
+        query_params["return_utilities"] = True
+        query_params["candidates"] = np.zeros_like(freq)
+        query_params["clf"] = Dummy_PWC(classes=self.classes)
         _, utilities = qs.query(**query_params)
         np.testing.assert_array_equal(val_utilities, utilities[0])
 
         qs = EpistemicUncertaintySampling()
-        query_params['clf'] = ParzenWindowClassifier(classes=[0, 1, 2])
+        query_params["clf"] = ParzenWindowClassifier(classes=[0, 1, 2])
         self.assertRaises(ValueError, qs.query, **query_params)
 
     # tests for epistemic logistic regression
@@ -227,7 +239,7 @@ class TestEpistemicUncertaintySampling(
 
     def test_query(self):
         query_params = deepcopy(self.query_default_params_clf)
-        query_params['return_utilities'] = True
+        query_params["return_utilities"] = True
 
         # query - ParzenWindowClassifier
         clf = ParzenWindowClassifier(

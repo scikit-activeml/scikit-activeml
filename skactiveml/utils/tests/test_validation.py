@@ -69,7 +69,6 @@ class TestValidation(unittest.TestCase):
         )
         check_scalar(x=np.nan, name="x", target_type=float)
 
-
     def test_check_classifier_params(self):
         self.assertRaises(
             ValueError,

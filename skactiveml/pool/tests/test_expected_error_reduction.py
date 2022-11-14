@@ -10,13 +10,16 @@ from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy, _cmp_object_dict
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    _cmp_object_dict,
+)
 from skactiveml.utils import MISSING_LABEL, is_labeled
 
 
 class TemplateTestExpectedErrorReduction(
-    TemplateSingleAnnotatorPoolQueryStrategy):
+    TemplateSingleAnnotatorPoolQueryStrategy
+):
     def setUp(self, qs_class):
         self.Strategy = qs_class
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
@@ -52,24 +55,33 @@ class TemplateTestExpectedErrorReduction(
         self.DummyClf = DummyClf
 
         query_default_params_clf = {
-            'X': np.linspace(0, 1, 20).reshape(10, 2),
-            'y': np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
-            'clf': ParzenWindowClassifier(random_state=0, classes=self.classes),
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
+            "clf": ParzenWindowClassifier(
+                random_state=0, classes=self.classes
+            ),
         }
-        super().setUp(qs_class=qs_class, init_default_params={},
-                      query_default_params_clf=query_default_params_clf)
+        super().setUp(
+            qs_class=qs_class,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+        )
 
     def test_query_param_clf(self):
-        add_test_cases = [(SVC(), TypeError),
-                          (SklearnClassifier(SVC()), AttributeError),
-                          (SklearnClassifier(SVC(probability=True)), None),
-                          ]
+        add_test_cases = [
+            (SVC(), TypeError),
+            (SklearnClassifier(SVC()), AttributeError),
+            (SklearnClassifier(SVC(probability=True)), None),
+        ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_init_param_cost_matrix(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(np.ones((2, 3)), ValueError), ("string", ValueError),
-                       (np.ones((2, 2)), ValueError)]
+        test_cases += [
+            (np.ones((2, 3)), ValueError),
+            ("string", ValueError),
+            (np.ones((2, 2)), ValueError),
+        ]
         self._test_param("init", "cost_matrix", test_cases)
 
     def test_query_param_fit_clf(self, test_cases=None):
@@ -83,8 +95,10 @@ class TemplateTestExpectedErrorReduction(
             with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
                 clf = deepcopy(self.query_default_params_clf["clf"])
                 if not fit_clf:
-                    clf.fit(self.query_default_params_clf["X"],
-                            self.query_default_params_clf["y"])
+                    clf.fit(
+                        self.query_default_params_clf["X"],
+                        self.query_default_params_clf["y"],
+                    )
                 query_params = deepcopy(self.query_default_params_clf)
                 query_params["clf"] = deepcopy(clf)
                 query_params["fit_clf"] = fit_clf
@@ -93,12 +107,12 @@ class TemplateTestExpectedErrorReduction(
                 qs.query(**query_params)
                 self.assertTrue(
                     _cmp_object_dict(
-                        query_params["clf"].__dict__,
-                        clf.__dict__
+                        query_params["clf"].__dict__, clf.__dict__
                     ),
                     msg=f"Classifier changed after calling query for "
-                        f"`fit_clf={fit_clf}`."
+                    f"`fit_clf={fit_clf}`.",
                 )
+
     def test_init_param_subtract_current(self):
         test_cases = [(2, TypeError), ("string", TypeError)]
         self._test_param("init", "subtract_current", test_cases)
@@ -438,8 +452,12 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
         self._test_param("init", "method", test_cases)
         test_cases = [("log_loss", ValueError)]
         replace_init_params = {"cost_matrix": 1 - np.eye(2)}
-        self._test_param("init", "method", test_cases,
-                         replace_init_params=replace_init_params)
+        self._test_param(
+            "init",
+            "method",
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
 
     def test_init_param_cost_matrix(self):
         super().test_init_param_cost_matrix([("log_loss", ValueError)])
@@ -447,41 +465,71 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
     def test_query_param_sample_weight_candidates(self):
         X = self.query_default_params_clf["X"]
         X_cand = X[:4]
-        test_cases = [(np.ones((len(X_cand) - 1)), ValueError),
-                      ("string", ValueError), (np.ones(len(X_cand)), None)]
+        test_cases = [
+            (np.ones((len(X_cand) - 1)), ValueError),
+            ("string", ValueError),
+            (np.ones(len(X_cand)), None),
+        ]
         replace_query_params = {"candidates": X_cand}
-        self._test_param("query", "sample_weight_candidates", test_cases,
-                         replace_query_params=replace_query_params)
+        self._test_param(
+            "query",
+            "sample_weight_candidates",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
         replace_query_params["sample_weight"] = np.ones(len(X))
-        self._test_param("query", "sample_weight_candidates", test_cases,
-                         replace_query_params=replace_query_params)
+        self._test_param(
+            "query",
+            "sample_weight_candidates",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
         # check if error is raised if candidates are None with sw_candidates
-        self._test_param("query", "sample_weight_candidates",
-                         [(np.ones(len(X_cand)), ValueError)])
+        self._test_param(
+            "query",
+            "sample_weight_candidates",
+            [(np.ones(len(X_cand)), ValueError)],
+        )
 
     def test_query_param_X_eval(self):
-        test_cases = [(np.ones(5), TypeError), ("str", ValueError),
-                      ([], TypeError)]
+        test_cases = [
+            (np.ones(5), TypeError),
+            ("str", ValueError),
+            ([], TypeError),
+        ]
         self._test_param("init", "method", test_cases)
 
     def test_query_param_sample_weight_eval(self):
         X = self.query_default_params_clf["X"]
         X_cand = X[:3]
         X_eval = X[:4]
-        test_cases = [(np.ones((len(X_eval) - 1)), ValueError),
-                      ("string", ValueError), (np.ones(len(X_eval)), None)]
-        replace_query_params = {
-            "X_eval": X_eval
-        }
-        self._test_param("query", "sample_weight_eval", test_cases,
-                         replace_query_params=replace_query_params)
+        test_cases = [
+            (np.ones((len(X_eval) - 1)), ValueError),
+            ("string", ValueError),
+            (np.ones(len(X_eval)), None),
+        ]
+        replace_query_params = {"X_eval": X_eval}
+        self._test_param(
+            "query",
+            "sample_weight_eval",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
         replace_query_params["sample_weight"] = np.ones(len(X))
-        self._test_param("query", "sample_weight_eval", test_cases,
-                         replace_query_params=replace_query_params)
+        self._test_param(
+            "query",
+            "sample_weight_eval",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
         replace_query_params["candidates"] = X_cand
         replace_query_params["sample_weight_candidates"] = np.ones(len(X_cand))
-        self._test_param("query", "sample_weight_eval", test_cases,
-                         replace_query_params=replace_query_params)
+        self._test_param(
+            "query",
+            "sample_weight_eval",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
 
         # qs = self.Strategy()
         # for swe in [

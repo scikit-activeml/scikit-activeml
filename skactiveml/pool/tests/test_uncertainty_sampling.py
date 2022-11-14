@@ -9,22 +9,30 @@ from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.pool import UncertaintySampling, expected_average_precision
 from skactiveml.pool._uncertainty_sampling import uncertainty_scores
 from skactiveml.utils import MISSING_LABEL
-from skactiveml.tests.template_query_strategy import TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 
 
-class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
-                              unittest.TestCase):
+class TestUncertaintySampling(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.classes = [0, 1]
         query_default_params_clf = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             #'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
-            'clf': ParzenWindowClassifier(random_state=0, classes=self.classes),
-            'y': np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
+            "clf": ParzenWindowClassifier(
+                random_state=0, classes=self.classes
+            ),
+            "y": np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
             #'clf': SklearnClassifier(SVC(probability=True), random_state=0, classes=[0, 1]),
         }
-        super().setUp(qs_class=UncertaintySampling, init_default_params={},
-                      query_default_params_clf=query_default_params_clf)
+        super().setUp(
+            qs_class=UncertaintySampling,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+        )
 
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -33,25 +41,35 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
 
     def test_init_param_cost_matrix(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(np.ones((2, 3)), ValueError), ("string", ValueError),
-                       (np.ones((3, 3)), ValueError)]
+        test_cases += [
+            (np.ones((2, 3)), ValueError),
+            ("string", ValueError),
+            (np.ones((3, 3)), ValueError),
+        ]
         self._test_param("init", "cost_matrix", test_cases)
-        self._test_param("init", "cost_matrix",
-                         [(np.ones([2, 2]) - np.eye(2), ValueError)],
-                         replace_init_params={'method': "entropy"})
+        self._test_param(
+            "init",
+            "cost_matrix",
+            [(np.ones([2, 2]) - np.eye(2), ValueError)],
+            replace_init_params={"method": "entropy"},
+        )
 
     def test_query_param_clf(self):
-        add_test_cases = [(SVC(), TypeError),
-                          (SklearnClassifier(SVC()), AttributeError),
-                          (SklearnClassifier(SVC(probability=True)), None),
-                          ]
+        add_test_cases = [
+            (SVC(), TypeError),
+            (SklearnClassifier(SVC()), AttributeError),
+            (SklearnClassifier(SVC(probability=True)), None),
+        ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query_param_sample_weight(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        X = self.query_default_params_clf['X']
-        test_cases += [("string", ValueError), (X, ValueError),
-                       (np.empty((len(X) - 1)), ValueError)]
+        X = self.query_default_params_clf["X"]
+        test_cases += [
+            ("string", ValueError),
+            (X, ValueError),
+            (np.empty((len(X) - 1)), ValueError),
+        ]
         super().test_query_param_sample_weight(test_cases)
 
     def test_query(self):
@@ -60,7 +78,7 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
             random_state=random_state,
-            classes=self.classes
+            classes=self.classes,
         )
         candidates = random_state.rand(100, 10)
         X = random_state.rand(100, 10)
@@ -94,7 +112,7 @@ class TestUncertaintySampling(TemplateSingleAnnotatorPoolQueryStrategy,
 
         candidates = np.random.rand(10, 2)
         query_params = deepcopy(self.query_default_params_clf)
-        query_params['candidates'] = candidates
+        query_params["candidates"] = candidates
         best_indices, utilities = qs.query(
             **query_params, return_utilities=True
         )

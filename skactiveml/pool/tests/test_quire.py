@@ -9,13 +9,13 @@ from skactiveml.pool._quire import (
     _one_versus_rest_transform,
     Quire,
 )
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL, is_labeled, is_unlabeled
 
 
-class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy,
-                unittest.TestCase):
+class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def setUp(self):
         self.candidates = np.array([1, 3])
         self.X_cand = np.array([[8, 1], [9, 1], [5, 1]])
@@ -29,31 +29,44 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy,
             y=self.y,
         )
         query_default_params_clf = {
-            'X': np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
         }
-        super().setUp(qs_class=Quire, init_default_params={'classes': [0, 1]},
-                      query_default_params_clf=query_default_params_clf)
+        super().setUp(
+            qs_class=Quire,
+            init_default_params={"classes": [0, 1]},
+            query_default_params_clf=query_default_params_clf,
+        )
 
     def test_init_param_classes(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(None, TypeError), (Quire, TypeError)]
         self._test_param("init", "classes", test_cases)
         self._test_param("init", "classes", [([0, 1], None)])
-        self._test_param("init", "classes", [(['0', '1'], None)],
-                         {'missing_label': 'none'},
-                         {'y': ['0', '1', 'none', 'none']})
+        self._test_param(
+            "init",
+            "classes",
+            [(["0", "1"], None)],
+            {"missing_label": "none"},
+            {"y": ["0", "1", "none", "none"]},
+        )
 
     def test_init_param_lmbda(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(-1, ValueError), (0, ValueError),
-                       ("string", TypeError)]
+        test_cases += [
+            (-1, ValueError),
+            (0, ValueError),
+            ("string", TypeError),
+        ]
         self._test_param("init", "lmbda", test_cases)
 
     def test_init_param_metric_dict(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(42, TypeError), ({"string": None}, TypeError),
-                       ("string", TypeError)]
+        test_cases += [
+            (42, TypeError),
+            ({"string": None}, TypeError),
+            ("string", TypeError),
+        ]
         self._test_param("init", "metric_dict", test_cases)
 
     def test_init_param_metric(self, test_cases=None):
@@ -63,8 +76,9 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy,
 
         K = np.zeros((len(self.y), len(self.y) - 1))
         test_cases += [("precomputed", ValueError)]
-        self._test_param("init", "metric", test_cases,
-                         replace_query_params={'X': K})
+        self._test_param(
+            "init", "metric", test_cases, replace_query_params={"X": K}
+        )
 
     def test_query(self):
         # Test metric="precomputed"
