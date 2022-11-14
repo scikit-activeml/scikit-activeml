@@ -325,8 +325,10 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         if "utility_weight" in query_params_list:
             # custom test cases are not necessary
             test_cases = [] if test_cases is None else test_cases
-            test_cases += [(0, ValueError), (1.2, TypeError), (1, None)]
-            self._test_param("query", "batch_size", test_cases)
+            test_cases += [(0, (ValueError, TypeError)),
+                           (1.2, (ValueError, TypeError)),
+                           (1, (ValueError, TypeError))]
+            self._test_param("query", "utility_weight", test_cases)
 
             init_params = deepcopy(self.init_default_params)
             init_params["random_state"] = np.random.RandomState(0)
@@ -359,6 +361,13 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                             (utils1 * utility_weight)[:, unld_idx],
                             utils3
                         )
+
+                        test_cases = [(0, (ValueError, TypeError)),
+                                      (1.2, (ValueError, TypeError)),
+                                      (utility_weight, (ValueError, TypeError))]
+                        self._test_param("query", "utility_weight", test_cases,
+                                         replace_init_params=init_params,
+                                         replace_query_params=query_params)
 
                     except MappingError:
                         pass
