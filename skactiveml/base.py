@@ -151,11 +151,13 @@ class PoolQueryStrategy(QueryStrategy):
         self._check_n_features(X, reset=reset)
 
         # Check labels
-        y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+        y = check_array(
+            y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+        )
         check_consistent_length(X, y)
 
         # Check missing_label
-        check_missing_label(self.missing_label)
+        check_missing_label(self.missing_label, target_type=y.dtype)
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).

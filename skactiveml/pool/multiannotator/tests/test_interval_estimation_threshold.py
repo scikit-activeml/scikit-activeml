@@ -41,7 +41,7 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
         ie_model = IntervalEstimationAnnotModel(missing_label=["test"])
         self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)
         ie_model = IntervalEstimationAnnotModel(missing_label="o")
-        self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
+        self.assertRaises(TypeError, ie_model.fit, X=self.X, y=self.y)
 
     def test_init_param_alpha(self):
         ie_model = IntervalEstimationAnnotModel(alpha=0.0)
