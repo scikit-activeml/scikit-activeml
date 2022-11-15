@@ -88,14 +88,15 @@ Examples
 In the following, there are two simple examples illustrating the straightforwardness
 of implementing active learning cycles with our Python package ``skactiveml``.
 For more in-depth examples, we refer to our
-`tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/>`_ offering
+`tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
 a broad overview of different use-cases:
 
-- `pool-based active learning -- getting started <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/00_pool_getting_started.ipynb>`_,
-- `deep pool-based active learning -- scikit-activeml with skorch <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/01_deep_pool_al_with_skorch.ipynb>`_,
-- `multi-annotator pool-based active learning -- getting started <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/10_multiple_annotators_getting_started.ipynb>`_,
-- `stream-based active learning -- getting started <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/20_stream_getting_started.ipynb>`_,
-- and `batch stream-based active learning with pool-based query strategies <https://github.com/scikit-activeml/scikit-activeml/blob/master/tutorials/21_stream_batch_with_pool_al.ipynb>`_.
+- `Pool-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/00_pool_getting_started.html>`_,
+- `Deep Pool-based Active Learning -- scikit-activeml with Skorch <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/01_deep_pool_al_with_skorch.html>`_,
+- `Pool-based Active Learning for Regression - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/02_pool_regression_getting_started.html>`_,
+- `Multi-annotator Pool-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/10_multiple_annotators_getting_started.ipynb>`_,
+- `Stream-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/20_stream_getting_started.ipynb>`_,
+- and `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.ipynb>`_.
 
 Pool-based Active Learning
 ##########################

@@ -838,7 +838,7 @@ class BudgetManager(ABC, BaseEstimator):
 
 class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
-       scikit-activeml.
+    scikit-activeml.
 
     Parameters
     ----------
