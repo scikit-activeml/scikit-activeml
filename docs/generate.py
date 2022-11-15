@@ -390,9 +390,15 @@ def generate_examples(gen_path, json_path, recursive=True):
                             template_path=os.path.abspath(data["template"]),
                         )
             elif not filename.startswith("template"):
-                # Copy the all other files except for templates.
-                src = os.path.join(root, filename)
-                shutil.copyfile(src, os.path.join(dst, filename))
+                if filename.endswith(".py") or filename.endswith(".ipynb"):
+                    src = os.path.join(root, filename)
+                    example_string = format_plot({}, src)
+                    with open(os.path.join(dst, filename), "w") as file:
+                        file.write(example_string)
+                else:
+                    # Copy all other files except for templates.
+                    src = os.path.join(root, filename)
+                    shutil.copyfile(src, os.path.join(dst, filename))
 
         if not recursive:
             break

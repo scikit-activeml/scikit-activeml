@@ -1,11 +1,3 @@
-"""
-Dual strategy for Active Learning
-=================================
-"""
-
-# %%
-# 
-
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
@@ -22,7 +14,7 @@ from skactiveml.pool import UncertaintySampling
 random_state = np.random.RandomState(0)
 
 # Build a dataset.
-X, y_true = make_blobs(n_samples=200, n_features=2,
+X, y_true = make_blobs(n_samples="$n_samples|200", n_features=2,
                        centers=[[0, 1], [-3, .5], [-1, -1], [2, 1], [1, -.5]],
                        cluster_std=.7, random_state=random_state)
 y_true = y_true % 2
@@ -45,7 +37,7 @@ feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
 # The active learning cycle:
-n_cycles = 20
+n_cycles = "$n_cycles|20"
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
@@ -92,12 +84,3 @@ for c in range(n_cycles):
     y[query_idx] = y_true[query_idx]
 
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
-
-# %%
-# .. rubric:: References:
-# 
-# The implementation of this strategy is based on :footcite:t:`donmez2007dual` and :footcite:t:`nguyen2004active`.
-#
-# .. footbibliography::
-
-

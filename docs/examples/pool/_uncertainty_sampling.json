@@ -86,5 +86,16 @@
     "preproc" : "gmm = GaussianMixture(init_params='kmeans', n_components=5)\ngmm.fit(X)\ndensity = np.exp(gmm.score_samples(X))",
     "query_params" : "X=X, y=y, clf=clf, utility_weight=density",
     "plot_utility_params" : "candidates=unlabeled_indices(y), replace_nan=None"
+  },
+  {
+    "class" : "UncertaintySampling",
+    "package" : "pool",
+    "method" : "Dual strategy for Active Learning",
+    "category" : "Uncertainty Sampling",
+    "template" : "examples/pool/template_DUAL.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Dual strategy for Active Learning",
+    "refs" : ["donmez2007dual", "nguyen2004active"],
+    "sequence" : ["title", "plot", "refs"]
   }
 ]
