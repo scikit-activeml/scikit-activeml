@@ -1,10 +1,35 @@
 Developer Guide
 ===============
 
-**Scikit-ActiveML** is a library that implements the most important
+**scikit-activeml** is a library that implements the most important
 query strategies of active learning. It is built upon the well-known
 machine learning framework
 `scikit-learn <https://scikit-learn.org/stable/>`__.
+
+Overview
+--------
+
+Our philosophy is to extend the ``sklearn`` eco-system with the most relevant
+query strategies for active learning and to implement tools for working with partially
+unlabeled data. An overview of our repository's structure is given in the image below.
+Each node represents a class or interface. The arrows illustrate the inheritance
+hierarchy among them. The functionality of a dashed node is not yet available in our library.
+
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
+   :width: 1000
+
+In our package ``skactiveml``, there three major components, i.e., ``SkactivemlClassifier``,
+``QueryStrategy``, and the not yet supported ``SkactivemlRegressor``.
+The classifier and regressor modules are necessary to deal with partially unlabeled
+data and to implement active-learning specific estimators. This way, an active learning
+cycle can be easily implemented to start with zero initial labels. Regarding the
+active learning query strategies, we currently differ between
+the pool-based (a large pool of unlabeled samples is available) and stream-based
+(unlabeled samples arrive sequentially, i.e., as a stream) paradigm.
+On top of both paradigms, we also distinguish the single- and multi-annotator
+setting. In the latter setting, multiple error-prone annotators are queried
+to provide labels. As a result, an active learning query strategy not only decides
+which samples but also which annotators should be queried.
 
 Introduction
 ------------
@@ -12,7 +37,7 @@ Introduction
 Thank you, contributors!
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-A big thank you to all contributors who provide the **Scikit-ActiveML**
+A big thank you to all contributors who provide the **scikit-activeml**
 project with new enhancements and bug fixes.
 
 Getting Help
@@ -921,7 +946,7 @@ Documentation (User guide and Developer guide)
 Guidelines for writing documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In ``Scikit-ActiveML``, the
+In ``scikit-activeml``, the
 `guidelines <https://scikit-learn.org/stable/developers/contributing.html#guidelines-for-writing-documentation>`__
 for writing the documentation are adopted from
 `scikit-learn <https://scikit-learn.org/stable/>`__.
@@ -929,7 +954,11 @@ for writing the documentation are adopted from
 Building the documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   TODO: How to build the user guide and developer guide?
+To ensure the documentation of your work is well formatted, build the sphinx documentation by executing the following line.
+
+.. code:: bash
+
+   sphinx-build -b html docs docs/_build
 
 Issue Tracking
 --------------
@@ -937,7 +966,7 @@ Issue Tracking
 We use `Github
 Issues <https://github.com/scikit-activeml/scikit-activeml/issues>`__ as
 our issue tracker. If you think you have found a bug in
-``Scikit-ActiveML``, you can report it to the issue tracker.
+``scikit-activeml``, you can report it to the issue tracker.
 Documentation bugs can also be reported there.
 
 Checking If A Bug Already Exists

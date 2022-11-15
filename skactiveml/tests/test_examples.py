@@ -8,33 +8,13 @@ from os import path
 from docs.generate import generate_examples
 from skactiveml import pool
 
-from skactiveml.pool import (
-    ExpectedModelVarianceReduction,
-    ExpectedModelOutputChange,
-    GreedySamplingX,
-    GreedySamplingTarget,
-    KLDivergenceMaximization,
-)
-from skactiveml.pool._expected_model_change_maximization import (
-    ExpectedModelChangeMaximization,
-)
-
-REGRESSION_STRATEGIES = [
-    ExpectedModelChangeMaximization,
-    ExpectedModelVarianceReduction,
-    ExpectedModelOutputChange,
-    KLDivergenceMaximization,
-    GreedySamplingX,
-    GreedySamplingTarget,
-]
-
 
 class TestExamples(unittest.TestCase):
     def setUp(self):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples")
-        self.exceptions = [qs.__name__ for qs in REGRESSION_STRATEGIES]
+        self.exceptions = []
         self.working_dir = os.path.abspath(os.curdir)
 
         # A list of all modules that should have a json file.

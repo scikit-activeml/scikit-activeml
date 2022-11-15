@@ -39,35 +39,6 @@ at the University of Kassel and is distributed under the `3-Clause BSD licence
 
 .. intro_end
 
-.. overview_start
-
-Overview
-========
-
-Our philosophy is to extend the ``sklearn`` eco-system with the most relevant
-query strategies for active learning and to implement tools for working with partially
-unlabeled data. An overview of our repository's structure is given in the image below.
-Each node represents a class or interface. The arrows illustrate the inheritance
-hierarchy among them. The functionality of a dashed node is not yet available in our library.
-
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
-   :width: 1000
-
-In our package ``skactiveml``, there three major components, i.e., ``SkactivemlClassifier``,
-``QueryStrategy``, and the not yet supported ``SkactivemlRegressor``.
-The classifier and regressor modules are necessary to deal with partially unlabeled
-data and to implement active-learning specific estimators. This way, an active learning
-cycle can be easily implemented to start with zero initial labels. Regarding the
-active learning query strategies, we currently differ between
-the pool-based (a large pool of unlabeled samples is available) and stream-based
-(unlabeled samples arrive sequentially, i.e., as a stream) paradigm.
-On top of both paradigms, we also distinguish the single- and multi-annotator
-setting. In the latter setting, multiple error-prone annotators are queried
-to provide labels. As a result, an active learning query strategy not only decides
-which samples but also which annotators should be queried.
-
-.. overview_end
-
 .. user_installation_start
 
 User Installation
@@ -79,7 +50,7 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
     pip install -U scikit-activeml
 
-.. install_end
+.. user_installation_end
 
 .. examples_start
 
@@ -217,6 +188,8 @@ a visualization of its accuracy over the 200 samples.
 
 .. examples_end
 
+.. citing_start
+
 Citing
 ======
 If you use ``scikit-activeml`` in one of your research projects and find it helpful,
@@ -232,3 +205,5 @@ please cite the following:
         year={2021},
         url={https://github.com/scikit-activeml/scikit-activeml}
     }
+
+.. citing_end

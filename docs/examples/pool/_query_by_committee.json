@@ -5,7 +5,7 @@
     "method" : "Query-by-Committee with Kullback-Leibler Divergence",
     "category" :  "Query-by-Committee",
     "template" : "examples/template_pool.py",
-    "tags" : ["pool",  "classification", "single-annotator"],
+    "tags" : ["pool",  "classification", "regression", "single-annotator"],
     "title" : "Query-by-Committee with Kullback-Leibler Divergence",
     "refs" : ["seung1992query","mccallum1998employing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
