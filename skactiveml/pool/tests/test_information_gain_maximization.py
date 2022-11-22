@@ -1,110 +1,89 @@
+import numpy as np
 import unittest
 
-import numpy as np
-
+from copy import deepcopy
+from scipy.stats import norm
+from skactiveml.base import ProbabilisticRegressor
 from skactiveml.pool import (
     KLDivergenceMaximization,
 )
-from skactiveml.pool.tests.provide_test_pool_regression import (
-    provide_test_regression_query_strategy_init_random_state,
-    provide_test_regression_query_strategy_init_missing_label,
-    provide_test_regression_query_strategy_query_X,
-    provide_test_regression_query_strategy_query_y,
-    provide_test_regression_query_strategy_query_reg,
-    provide_test_regression_query_strategy_query_fit_reg,
-    provide_test_regression_query_strategy_query_sample_weight,
-    provide_test_regression_query_strategy_query_candidates,
-    provide_test_regression_query_strategy_query_batch_size,
-    provide_test_regression_query_strategy_query_return_utilities,
-    provide_test_regression_query_strategy_init_integration_dict,
-    provide_test_regression_query_strategy_query_X_eval,
-    provide_test_regression_query_strategy_change_dependence,
+from skactiveml.regressor import (
+    NICKernelRegressor,
+    SklearnRegressor,
+    SklearnNormalRegressor,
 )
-from skactiveml.regressor import NICKernelRegressor
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
+from skactiveml.utils import is_unlabeled, call_func, MISSING_LABEL
+from sklearn.gaussian_process import GaussianProcessRegressor
 
 
-class TestKLDivergenceMaximization(unittest.TestCase):
+class TestKLDivergenceMaximization(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
-        self.random_state = 0
-
-    def test_init_param_random_state(self):
-        provide_test_regression_query_strategy_init_random_state(
-            self, KLDivergenceMaximization
+        query_default_params_reg = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([1.5, -1.2, MISSING_LABEL, MISSING_LABEL]),
+            "reg": NICKernelRegressor(),
+        }
+        super().setUp(
+            qs_class=KLDivergenceMaximization,
+            init_default_params={},
+            query_default_params_reg=query_default_params_reg,
         )
 
-    def test_init_param_missing_label(self):
-        provide_test_regression_query_strategy_init_missing_label(
-            self, KLDivergenceMaximization
-        )
-
-    def test_init_param_integration_dict_potential_y_val(self):
-        provide_test_regression_query_strategy_init_integration_dict(
-            self,
-            KLDivergenceMaximization,
-            integration_dict_name="integration_dict_target_val",
-        )
+    def test_init_param_integration_dict_target_val(self):
+        test_cases = [
+            ({"method": "assume_linear"}, None),
+            ({"method": "monte_carlo"}, None),
+            ({}, None),
+            ({"method": "illegal"}, TypeError),
+            ("illegal", TypeError),
+        ]
+        self._test_param("init", "integration_dict_target_val", test_cases)
 
     def test_init_param_integration_dict_cross_entropy(self):
-        provide_test_regression_query_strategy_init_integration_dict(
-            self,
-            KLDivergenceMaximization,
-            integration_dict_name="integration_dict_cross_entropy",
-        )
-
-    def test_query_param_X(self):
-        provide_test_regression_query_strategy_query_X(
-            self, KLDivergenceMaximization
-        )
-
-    def test_query_param_y(self):
-        provide_test_regression_query_strategy_query_y(
-            self, KLDivergenceMaximization
-        )
+        test_cases = [
+            ({"method": "assume_linear"}, None),
+            ({"method": "monte_carlo"}, None),
+            ({}, None),
+            ({"method": "illegal"}, TypeError),
+            ("illegal", TypeError),
+        ]
+        self._test_param("init", "integration_dict_cross_entropy", test_cases)
 
     def test_query_param_reg(self):
-        provide_test_regression_query_strategy_query_reg(
-            self, KLDivergenceMaximization, is_probabilistic=True
+        test_cases = [
+            (NICKernelRegressor(), None),
+            (SklearnNormalRegressor(GaussianProcessRegressor()), None),
+            (GaussianProcessRegressor(), TypeError),
+            (SklearnRegressor(GaussianProcessRegressor()), TypeError),
+        ]
+        super().test_query_param_reg(test_cases=test_cases)
+
+    def test_query(self):
+        class ZeroRegressor(ProbabilisticRegressor):
+            def predict_target_distribution(self, X):
+                return norm(loc=np.zeros(len(X)))
+
+            def fit(self, *args, **kwargs):
+                return self
+
+        qs = self.qs_class(**self.init_default_params)
+        query_dict = deepcopy(self.query_default_params_reg)
+        query_dict["reg"] = ZeroRegressor()
+        query_dict["return_utilities"] = True
+        utilities = call_func(qs.query, **query_dict)[1][0]
+        np.testing.assert_almost_equal(
+            np.zeros_like(query_dict["y"]),
+            np.where(is_unlabeled(utilities), 0, utilities),
         )
 
-    def test_query_param_fit_reg(self):
-        provide_test_regression_query_strategy_query_fit_reg(
-            self, KLDivergenceMaximization
-        )
-
-    def test_query_param_sample_weight(self):
-        provide_test_regression_query_strategy_query_sample_weight(
-            self, KLDivergenceMaximization
-        )
-
-    def test_query_param_candidates(self):
-        provide_test_regression_query_strategy_query_candidates(
-            self, KLDivergenceMaximization
-        )
-
-    def test_query_param_batch_size(self):
-        provide_test_regression_query_strategy_query_batch_size(
-            self, KLDivergenceMaximization
-        )
-
-    def test_query_param_return_utilities(self):
-        provide_test_regression_query_strategy_query_return_utilities(
-            self, KLDivergenceMaximization
-        )
-
-    def test_logic(self):
-        provide_test_regression_query_strategy_change_dependence(
-            self, KLDivergenceMaximization
-        )
-
-        qs = KLDivergenceMaximization()
-        X = np.arange(5).reshape(5, 1)
-        y = np.full(5, 0)
-        X_cand = np.arange(3).reshape(3, 1)
-        self.assertRaises(
-            ValueError,
-            qs.query,
-            X,
-            y,
-            NICKernelRegressor(),
-            candidates=X_cand,
-        )
+        qs = self.qs_class(**self.init_default_params)
+        query_dict = deepcopy(self.query_default_params_reg)
+        query_dict["X"] = np.arange(5).reshape(5, 1)
+        query_dict["y"] = np.full(5, 0)
+        query_dict["candidates"] = np.arange(3).reshape(3, 1)
+        self.assertRaises(ValueError, qs.query, **query_dict)

@@ -49,6 +49,25 @@ class TestValidation(unittest.TestCase):
             min_val=5,
             name="x",
         )
+        self.assertRaises(
+            ValueError,
+            check_scalar,
+            x=np.nan,
+            target_type=float,
+            min_inclusive=False,
+            min_val=5,
+            name="x",
+        )
+        self.assertRaises(
+            ValueError,
+            check_scalar,
+            x=np.nan,
+            target_type=float,
+            min_inclusive=False,
+            max_val=5,
+            name="x",
+        )
+        check_scalar(x=np.nan, name="x", target_type=float)
 
     def test_check_classifier_params(self):
         self.assertRaises(
