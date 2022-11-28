@@ -6,7 +6,6 @@ Module implementing 4DS active learning strategy.
 
 import numpy as np
 from sklearn.base import clone
-from sklearn.utils.validation import check_scalar
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..classifier import MixtureModelClassifier
@@ -16,6 +15,7 @@ from ..utils import (
     check_type,
     MISSING_LABEL,
     check_equal_missing_label,
+    check_scalar,
 )
 
 
@@ -35,7 +35,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None, optional
     (default=MISSING_LABEL)
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState, optional (default=None)
         The random state to use.
 
     References
@@ -143,7 +143,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         if lmbda is None:
             lmbda = np.min(((batch_size - 1) * 0.05, 0.5))
         check_scalar(
-            lmbda, target_type=float, name="lmbda", min_val=0, max_val=1
+            lmbda, target_type=(float, int), name="lmbda", min_val=0, max_val=1
         )
 
         # Obtain candidates plus mapping.

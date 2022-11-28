@@ -4,14 +4,17 @@ Query-by-committee strategies.
 
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 #         Marek Herde <marek.herde@uni-kassel.de>
-
-from copy import deepcopy
+import copy
 
 import numpy as np
 from sklearn import clone
-from sklearn.utils.validation import check_array, _is_arraylike
+from sklearn.utils.validation import check_array
 
-from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
+from ..base import (
+    SingleAnnotatorPoolQueryStrategy,
+    SkactivemlClassifier,
+    SkactivemlRegressor,
+)
 from ..utils import (
     simple_batch,
     check_type,
@@ -25,16 +28,17 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     """Query-by-Committee.
 
     The Query-by-Committee (QueryByCommittee) strategy uses an ensemble of
-    classifiers to identify on which instances many classifiers disagree.
+    estimators to identify on which instances many estimators disagree.
 
     Parameters
     ----------
     method : string, default='KL_divergence'
-        The method to calculate the disagreement. KL_divergence or
-        vote_entropy are possible.
+        The method to calculate the disagreement in the case of classification.
+        KL_divergence or vote_entropy are possible. In the case of regression
+        the empirical variance is used.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state: numeric or np.random.RandomState, default=None
+    random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     References
@@ -45,6 +49,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     [2] N. Abe and H. Mamitsuka. Query learning strategies using boosting and
         bagging. In Proceedings of the International Conference on Machine
         Learning (ICML), pages 1-9. Morgan Kaufmann, 1998.
+    [3] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active learning
+        for regression based on query by committee. International conference on
+        intelligent data engineering and automated learning, pages 209--218,
+        2007.
     """
 
     def __init__(
@@ -78,18 +86,18 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
-        ensemble : array-like of shape (n_estimators) or SkactivemlClassifier
-            If `ensemble` is a `SkactivemlClassifier`, it must have
-            `n_estimators` and `estimators_` after fitting as attribute. Then,
-            its estimators will be used as committee. If `ensemble` is
-            array-like, each element of this list must be
-            `SkactivemlClassifier` and will be used as committee member.
+            indicated by self.MISSING_LABEL.)
+        ensemble : list or tuple of SkactivemlClassifier or list or tuple of
+        SkactivemlRegressor, SkactivemlClassifier or SkactivemlRegressor
+            If `ensemble` is a `SkactivemlClassifier` or a `SkactivemlRegressor`
+            , it must have `n_estimators` and `estimators_` after fitting as
+            attribute. Then, its estimators will be used as committee. If
+            `ensemble` is array-like, each element of this list must be
+            `SkactivemlClassifier` or a `SkactivemlRegressor` and will be used
+            as committee member.
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), default=None
-            Weights of training samples in `X`.
         sample_weight: array-like of shape (n_samples), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
@@ -137,68 +145,40 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         # Validate classifier type.
         check_type(fit_ensemble, "fit_ensemble", bool)
 
-        # Check attributed `method`.
-        if self.method not in ["KL_divergence", "vote_entropy"]:
-            raise ValueError(
-                f"The given method {self.method} is not valid. "
-                f"Supported methods are 'KL_divergence' and 'vote_entropy'"
-            )
+        ensemble, est_arr, classes = _check_ensemble(
+            ensemble=ensemble,
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            fit_ensemble=fit_ensemble,
+            missing_label=self.missing_label_,
+            estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
+        )
 
-        # Check if the parameter `ensemble` is valid.
-        if isinstance(ensemble, SkactivemlClassifier) and (
-            hasattr(ensemble, "n_estimators")
-            or hasattr(ensemble, "estimators")
-        ):
-            check_equal_missing_label(
-                ensemble.missing_label, self.missing_label_
-            )
-            # Fit the ensemble.
-            if fit_ensemble:
-                ensemble = clone(ensemble).fit(X, y, sample_weight)
-            classes = ensemble.classes_
-            if hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
-            else:
-                if hasattr(ensemble, "estimators"):
-                    n_estimators = len(ensemble.estimators)
-                else:
-                    n_estimators = ensemble.n_estimators
-                est_arr = [ensemble] * n_estimators
-        elif _is_arraylike(ensemble):
-            est_arr = deepcopy(ensemble)
-            for i in range(len(est_arr)):
-                check_type(est_arr[i], f"ensemble[{i}]", SkactivemlClassifier)
-                check_equal_missing_label(
-                    est_arr[i].missing_label, self.missing_label_
+        # Validate 'method'
+        check_type(
+            self.method,
+            "method",
+            target_vals=["KL_divergence", "vote_entropy"],
+        )
+
+        # classes is None if the ensemble is a regressor
+        if classes is not None:
+            # Compute utilities.
+            if self.method == "KL_divergence":
+                probas = np.array(
+                    [est.predict_proba(X_cand) for est in est_arr]
                 )
-                # Fit the ensemble.
-                if fit_ensemble:
-                    est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+                utilities_cand = average_kl_divergence(probas)
+            else:  # self.method == "vote_entropy":
+                votes = np.array([est.predict(X_cand) for est in est_arr]).T
+                utilities_cand = vote_entropy(votes, classes)
 
-                if i > 0:
-                    np.testing.assert_array_equal(
-                        est_arr[i - 1].classes_,
-                        est_arr[i].classes_,
-                        err_msg=f"The inferred classes of the {i - 1}-th and "
-                        f"{i}-th are not equal. Set the `classes` "
-                        f"parameter of each ensemble member to avoid "
-                        f"this error.",
-                    )
-            classes = est_arr[0].classes_
         else:
-            raise TypeError(
-                f"`ensemble` must either be a `{SkactivemlClassifier} "
-                f"with the attribute `n_ensembles` and `estimators_` after "
-                f"fitting or a list of {SkactivemlClassifier} objects."
+            results = np.array(
+                [learner.predict(X_cand) for learner in est_arr]
             )
-
-        # Compute utilities.
-        if self.method == "KL_divergence":
-            probas = np.array([est.predict_proba(X_cand) for est in est_arr])
-            utilities_cand = average_kl_divergence(probas)
-        elif self.method == "vote_entropy":
-            votes = np.array([est.predict(X_cand) for est in est_arr]).T
-            utilities_cand = vote_entropy(votes, classes)
+            utilities_cand = np.std(results, axis=0)
 
         if mapping is None:
             utilities = utilities_cand
@@ -240,6 +220,7 @@ def average_kl_divergence(probas):
         raise ValueError(
             f"Expected 3D array, got {probas.ndim}D array instead."
         )
+    n_estimators = probas.shape[0]
 
     # Calculate the average KL divergence.
     probas_mean = np.mean(probas, axis=0)
@@ -247,7 +228,7 @@ def average_kl_divergence(probas):
         scores = np.nansum(
             np.nansum(probas * np.log(probas / probas_mean), axis=2), axis=0
         )
-    scores = scores / probas.shape[0]
+    scores = scores / n_estimators
 
     return scores
 
@@ -276,6 +257,7 @@ def vote_entropy(votes, classes):
     """
     # Check `votes` array.
     votes = check_array(votes)
+    n_estimators = votes.shape[1]
 
     # Count the votes.
     vote_count = compute_vote_vectors(
@@ -283,7 +265,78 @@ def vote_entropy(votes, classes):
     )
 
     # Compute vote entropy.
-    v = vote_count / len(votes)
+    v = vote_count / n_estimators
+
     with np.errstate(divide="ignore", invalid="ignore"):
-        scores = -np.nansum(v * np.log(v), axis=1) / np.log(len(votes))
+        scores = np.nansum(-v * np.log(v), axis=1)
     return scores
+
+
+def _check_ensemble(
+    ensemble,
+    estimator_types,
+    X,
+    y,
+    sample_weight,
+    fit_ensemble=True,
+    missing_label=MISSING_LABEL,
+):
+    # Check if the parameter `ensemble` is valid.
+    for estimator_type in estimator_types:
+        if isinstance(ensemble, estimator_type) and (
+            hasattr(ensemble, "n_estimators")
+            or hasattr(ensemble, "estimators")
+        ):
+            check_equal_missing_label(ensemble.missing_label, missing_label)
+            # Fit the ensemble.
+            if fit_ensemble:
+                ensemble = clone(ensemble).fit(X, y, sample_weight)
+
+            if hasattr(ensemble, "estimators_"):
+                est_arr = ensemble.estimators_
+            else:
+                if hasattr(ensemble, "estimators"):
+                    n_estimators = len(ensemble.estimators)
+                else:
+                    n_estimators = ensemble.n_estimators
+                est_arr = [ensemble] * n_estimators
+
+            if estimator_type == SkactivemlClassifier:
+                return ensemble, est_arr, ensemble.classes_
+            else:
+                return ensemble, est_arr, None
+
+        elif isinstance(ensemble, (list, tuple)) and isinstance(
+            ensemble[0], estimator_type
+        ):
+            est_arr = copy.deepcopy(ensemble)
+            for i in range(len(est_arr)):
+                check_type(
+                    est_arr[i], f"ensemble[{i}]", estimator_type
+                )  # better error message
+                check_equal_missing_label(
+                    est_arr[i].missing_label, missing_label
+                )
+                # Fit the ensemble.
+                if fit_ensemble:
+                    est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+
+                if i > 0 and estimator_type == SkactivemlClassifier:
+                    np.testing.assert_array_equal(
+                        est_arr[i - 1].classes_,
+                        est_arr[i].classes_,
+                        err_msg=f"The inferred classes of the {i - 1}-th and "
+                        f"{i}-th are not equal. Set the `classes` "
+                        f"parameter of each ensemble member to avoid "
+                        f"this error.",
+                    )
+            if estimator_type == SkactivemlClassifier:
+                return ensemble, est_arr, est_arr[0].classes_
+            else:
+                return ensemble, est_arr, None
+
+    raise TypeError(
+        f"`ensemble` must either be a `{estimator_types} "
+        f"with the attribute `n_ensembles` and `estimators_` after "
+        f"fitting or a list of {estimator_types} objects."
+    )

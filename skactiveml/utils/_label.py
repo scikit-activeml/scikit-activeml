@@ -2,6 +2,7 @@ import numpy as np
 from iteration_utilities import deepflatten
 
 # Define constant for missing label used throughout the package.
+
 MISSING_LABEL = np.nan
 
 
@@ -53,7 +54,10 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     if missing_label is np.nan:
         return np.isnan(y)
     else:
-        return y == missing_label
+        # Todo check if solution is appropriate (see line 46)
+        # y = np.hstack([[1.1, 2.1], np.full(8, np.nan)])
+        # is_unlabeled(y, 'sdhu')  # Fails
+        return y.astype(target_type) == missing_label
 
 
 def is_labeled(y, missing_label=MISSING_LABEL):

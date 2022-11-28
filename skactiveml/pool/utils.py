@@ -2,12 +2,20 @@ import warnings
 from copy import deepcopy
 
 import numpy as np
+import scipy
+from scipy import integrate
+from scipy.special import roots_hermitenorm
 from sklearn import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.metrics import pairwise_kernels
+from sklearn.utils import column_or_1d
 from sklearn.utils.validation import check_array, check_consistent_length
 
-from ..base import SkactivemlClassifier
+from ..base import (
+    SkactivemlClassifier,
+    ProbabilisticRegressor,
+    SkactivemlRegressor,
+)
 from ..classifier import ParzenWindowClassifier
 from ..utils import (
     MISSING_LABEL,
@@ -17,9 +25,13 @@ from ..utils import (
     check_equal_missing_label,
     check_type,
     check_indices,
+    check_random_state,
+    check_scalar,
 )
 
 __all__ = ["IndexClassifierWrapper"]
+
+from ..utils._validation import _check_callable
 
 
 class IndexClassifierWrapper:
@@ -259,7 +271,12 @@ class IndexClassifierWrapper:
             if is_unlabeled(y, missing_label=self.missing_label_).all():
                 warnings.warn("All labels are of `missing_label` in `fit`.")
         else:
-            y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+            y = check_array(
+                y,
+                ensure_2d=False,
+                force_all_finite="allow-nan",
+                dtype=self.y.dtype,
+            )
             check_consistent_length(idx, y)
 
         # check sample_weight
@@ -366,7 +383,10 @@ class IndexClassifierWrapper:
                 )
         else:
             add_y = check_array(
-                y, ensure_2d=False, force_all_finite="allow-nan"
+                y,
+                ensure_2d=False,
+                force_all_finite="allow-nan",
+                dtype=self.y.dtype,
             )
             check_consistent_length(add_idx, add_y)
 
@@ -437,7 +457,11 @@ class IndexClassifierWrapper:
             Predicted class labels of the input samples.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            P = self.pwc_K_[self.idx_, :][:, idx].T
+            if hasattr(self, "idx_"):
+                P = self.pwc_K_[self.idx_, :][:, idx].T
+            else:
+                warnings.warn("Speed-up not possible when prefitted")
+                return self.clf.predict_proba(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
@@ -467,7 +491,11 @@ class IndexClassifierWrapper:
             by lexicographic order.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            P = self.pwc_K_[self.idx_, :][:, idx].T
+            if hasattr(self, "idx_"):
+                P = self.pwc_K_[self.idx_, :][:, idx].T
+            else:
+                warnings.warn("Speed-up not possible when prefitted")
+                return self.clf.predict_proba(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
@@ -497,7 +525,11 @@ class IndexClassifierWrapper:
             ordered according to `classes_`.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            P = self.pwc_K_[self.idx_, :][:, idx].T
+            if hasattr(self, "idx_"):
+                P = self.pwc_K_[self.idx_, :][:, idx].T
+            else:
+                warnings.warn("Speed-up not possible when prefitted")
+                return self.clf.predict_proba(self.X[idx])
 
             # check if results contain NAN
             if np.isnan(P).any():
@@ -533,7 +565,7 @@ class IndexClassifierWrapper:
             return False
 
     def __getattr__(self, item):
-        if "clf_" in self.__dict__:
+        if "clf_" in self.__dict__ and hasattr(self.clf_, item):
             return getattr(self.clf_, item)
         else:
             return getattr(self.clf, item)
@@ -559,3 +591,510 @@ class IndexClassifierWrapper:
             raise ValueError(
                 "All `sample_weight` must be either None or " "given."
             )
+
+
+def _cross_entropy(
+    X_eval, true_reg, other_reg, integration_dict=None, random_state=None
+):
+    """Calculates the cross entropy.
+
+    Parameters
+    ----------
+    X_eval : array-like of shape (n_samples, n_features)
+        The samples where the cross entropy should be evaluated.
+    true_reg: ProbabilisticRegressor
+        True distribution of the cross entropy.
+    other_reg: ProbabilisticRegressor
+        Evaluated distribution of the cross entropy.
+    integration_dict: dict, optional default = None
+        Dictionary for integration arguments, i.e. `integration method` etc..
+        For details see method `conditional_expect`.
+    random_state : int | np.random.RandomState, optional
+        Random state for cross entropy calculation.
+
+    Returns
+    -------
+    cross_ent : numpy.ndarray of shape (n_samples)
+        The cross entropy.
+    """
+
+    if integration_dict is None:
+        integration_dict = {}
+
+    check_type(integration_dict, "integration_dict", dict)
+    check_type(true_reg, "true_reg", ProbabilisticRegressor)
+    check_type(other_reg, "other_reg", ProbabilisticRegressor)
+    random_state = check_random_state(random_state)
+
+    dist = _reshape_scipy_dist(
+        other_reg.predict_target_distribution(X_eval), shape=(len(X_eval), 1)
+    )
+
+    cross_ent = -expected_target_val(
+        X_eval,
+        dist.logpdf,
+        reg=true_reg,
+        random_state=random_state,
+        **integration_dict,
+        vector_func="both",
+    )
+
+    return cross_ent
+
+
+def _update_reg(
+    reg,
+    X,
+    y,
+    y_update,
+    sample_weight=None,
+    idx_update=None,
+    X_update=None,
+    mapping=None,
+):
+    """Update the regressor by the updating samples, depending on
+    the mapping. Chooses `X_update` if `mapping is None` and updates
+    `X[mapping[idx_update]]` otherwise.
+
+    Parameters
+    ----------
+    reg : SkactivemlRegressor
+        The regressor to be updated.
+    X : array-like of shape (n_samples, n_features)
+        Training data set.
+    y : array-like of shape (n_samples)
+        Labels of the training data set.
+    y_update : array-like of shape (n_updates) or numeric
+        Updating labels or updating label.
+    sample_weight : array-like of shape (n_samples), optional (default = None)
+        Sample weight of the training data set. If
+    idx_update : array-like of shape (n_updates) or int
+        Index of the samples or sample to be updated.
+    X_update : array-like of shape (n_updates, n_features) or (n_features)
+        Samples to be updated or sample to be updated.
+    mapping : array-like of shape (n_candidates), optional (default = None)
+        The deciding mapping.
+
+    Returns
+    -------
+    reg_new : SkaktivemlRegressor
+        The updated regressor.
+    """
+
+    if sample_weight is not None and mapping is None:
+        raise ValueError(
+            "If `sample_weight` is not `None` a mapping "
+            "between candidates and the training dataset must "
+            "exist."
+        )
+
+    if mapping is not None:
+        if isinstance(idx_update, (int, np.integer)):
+            check_indices([idx_update], A=mapping, unique="check_unique")
+        else:
+            check_indices(idx_update, A=mapping, unique="check_unique")
+        X_new, y_new = _update_X_y(
+            X, y, y_update, idx_update=mapping[idx_update]
+        )
+    else:
+        X_new, y_new = _update_X_y(X, y, y_update, X_update=X_update)
+
+    reg_new = clone(reg).fit(X_new, y_new, sample_weight)
+    return reg_new
+
+
+def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
+    """Update the training data by the updating samples/labels.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        Training data set.
+    y : array-like of shape (n_samples)
+        Labels of the training data set.
+    idx_update : array-like of shape (n_updates) or int
+        Index of the samples or sample to be updated.
+    X_update : array-like of shape (n_updates, n_features) or (n_features)
+        Samples to be updated or sample to be updated.
+    y_update : array-like of shape (n_updates) or numeric
+        Updating labels or updating label.
+
+    Returns
+    -------
+    X_new : np.ndarray of shape (n_new_samples, n_features)
+        The new training data set.
+    y_new : np.ndarray of shape (n_new_samples)
+        The new labels.
+    """
+
+    X = check_array(X)
+    y = column_or_1d(check_array(y, force_all_finite=False, ensure_2d=False))
+    check_consistent_length(X, y)
+
+    if isinstance(y_update, (int, float)):
+        y_update = np.array([y_update])
+    else:
+        y_update = check_array(
+            y_update,
+            force_all_finite=False,
+            ensure_2d=False,
+            ensure_min_samples=0,
+        )
+        y_update = column_or_1d(y_update)
+
+    if idx_update is not None:
+        if isinstance(idx_update, (int, np.integer)):
+            idx_update = np.array([idx_update])
+        idx_update = check_indices(idx_update, A=X, unique="check_unique")
+        check_consistent_length(y_update, idx_update)
+        X_new = X.copy()
+        y_new = y.copy()
+        y_new[idx_update] = y_update
+        return X_new, y_new
+    elif X_update is not None:
+        X_update = check_array(X_update, ensure_2d=False)
+        if X_update.ndim == 1:
+            X_update = X_update.reshape(1, -1)
+        check_consistent_length(X.T, X_update.T)
+        check_consistent_length(y_update, X_update)
+        X_new = np.append(X, X_update, axis=0)
+        y_new = np.append(y, y_update, axis=0)
+        return X_new, y_new
+    else:
+        raise ValueError("`idx_update` or `X_update` must not be `None`")
+
+
+def _reshape_scipy_dist(dist, shape):
+    """Reshapes the parameters "loc", "scale", "df" of a distribution, if they
+    exist.
+
+    Parameters
+    ----------
+    dist : scipy.stats._distn_infrastructure.rv_frozen
+        The distribution.
+    shape : tuple
+        The new shape.
+
+    Returns
+    -------
+    dist : scipy.stats._distn_infrastructure.rv_frozen
+        The reshaped distribution.
+    """
+    check_type(dist, "dist", scipy.stats._distn_infrastructure.rv_frozen)
+    check_type(shape, "shape", tuple)
+    for idx, item in enumerate(shape):
+        check_type(item, f"shape[{idx}]", int)
+
+    for argument in ["loc", "scale", "df"]:
+        if argument in dist.kwds:
+            # check if shapes are compatible
+            dist.kwds[argument].shape = shape
+
+    return dist
+
+
+def expected_target_val(X, target_func, reg, **kwargs):
+    """Calculates the conditional expectation of a function depending only on
+    the target value for each sample in `X`, i.e.
+    E[target_func(Y)|X=x], where Y | X=x ~ reg.predict_target_distribution,
+    for x in `X`.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        The samples where the expectation should be evaluated.
+    target_func : callable
+        The function that transforms the random variable.
+    reg: ProbabilisticRegressor
+        Predicts the target distribution over which the expectation is
+        calculated.
+
+    Other Parameters
+    ----------------
+    method: string, optional, optional (default='gauss_hermite')
+        The method by which the expectation is computed.
+        -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
+          thereby only takes the function value at the expected y value.
+        -'monte_carlo' Basic monte carlo integration. Taking the average
+          of randomly drawn samples. `n_integration_samples` specifies the
+          number of monte carlo samples.
+        -'quantile' Uses the quantile function to transform the integration
+          space into the interval from 0 to 1 and than uses the method from
+          'quantile_method' to calculate the integral. The number of integration
+          points is specified by `n_integration_samples`.
+        -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
+          to be gaussian distributed. The number of evaluation  points is given
+          by `n_integration_samples`.
+        -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
+          random variable of `reg`, which in turn uses a dynamic gaussian
+          quadrature routine for calculating the integral. Performance is worse
+          using a vector function.
+    quantile_method: string, optional (default='quadrature')
+        Specifies the integration methods used after the quantile
+        transformation.
+        -'trapezoid' Trapezoidal method for integration using evenly spaced
+          samples.
+        -'simpson' Simpson method for integration using evenly spaced samples.
+        -'average' Taking the average value for integration using evenly spaced
+          samples.
+        -'romberg' Romberg method for integration. If `n_integration_samples` is
+          not equal to `2**k + 1` for a natural number k, the number of
+          samples used for integration is put to the smallest such number greater
+          than `n_integration_samples`.
+        -'quadrature' Gaussian quadrature method for integration.
+    n_integration_samples: int, optional (default=10)
+        The number of integration samples used in 'quantile', 'monte_carlo' and
+        'gauss-hermite'.
+    quad_dict: dict, optional (default=None)
+        Further arguments for using `scipy's` `expect`
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for fixing the number generation.
+    target_func : bool
+        If `True` only the target values will be passed to `func`.
+    vector_func : bool or str, optional (default=False)
+        If `vector_func` is `True`, the integration values are passed as a whole
+        to the function `func`. If `vector_func` is 'both', the integration
+        values might or might not be passed as a whole. The integration values
+        if passed as a whole are of the form (n_samples, n_integration), where
+        n_integration denotes the number of integration values.
+
+    Returns
+    -------
+    expectation : numpy.ndarray of shape (n_samples)
+        The conditional expectation for each value applied.
+    """
+
+    _check_callable(target_func, "target_func", n_positional_parameters=1)
+
+    def arg_filtered_func(idx_y, x_y, y):
+        return target_func(y)
+
+    return _conditional_expect(X, arg_filtered_func, reg, **kwargs)
+
+
+def _conditional_expect(
+    X,
+    func,
+    reg,
+    method=None,
+    quantile_method=None,
+    n_integration_samples=10,
+    quad_dict=None,
+    random_state=None,
+    vector_func=False,
+):
+    """Calculates the conditional expectation of a function depending on the
+    target value the corresponding feature value and an index for each sample
+    in `X`, i.e. E[func(Y, x, idx)|X=x], where
+    Y | X=x ~ reg.predict_target_distribution, for x in `X`.
+
+    Parameters
+    ----------
+    X : array-like of shape (n_samples, n_features)
+        The samples where the expectation should be evaluated.
+    func : callable
+        The function that transforms the random variable. The signature of the
+        function must be of the form `func(y, x, idx)`, where `y` is the target
+        value, `x` is the feature value and `idx` is such that `X[idx] = x`.
+    reg: ProbabilisticRegressor
+        Predicts the target distribution over which the expectation is
+        calculated.
+    method: string, optional, optional (default='gauss_hermite')
+        The method by which the expectation is computed.
+        -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
+          thereby only takes the function value at the expected y value.
+        -'monte_carlo' Basic monte carlo integration. Taking the average
+          of randomly drawn samples. `n_integration_samples` specifies the
+          number of monte carlo samples.
+        -'quantile' Uses the quantile function to transform the integration
+          space into the interval from 0 to 1 and than uses the method from
+          'quantile_method' to calculate the integral. The number of integration
+          points is specified by `n_integration_samples`.
+        -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
+          to be gaussian distributed. The number of evaluation  points is given
+          by `n_integration_samples`.
+        -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
+          random variable of `reg`, which in turn uses a dynamic gaussian
+          quadrature routine for calculating the integral. Performance is worse
+          using a vector function.
+    quantile_method: string, optional (default='quadrature')
+        Specifies the integration methods used after the quantile
+        transformation.
+        -'trapezoid' Trapezoidal method for integration using evenly spaced
+          samples.
+        -'simpson' Simpson method for integration using evenly spaced samples.
+        -'average' Taking the average value for integration using evenly spaced
+          samples.
+        -'romberg' Romberg method for integration. If `n_integration_samples` is
+          not equal to `2**k + 1` for a natural number k, the number of
+          samples used for integration is put to the smallest such number
+          greater than `n_integration_samples`.
+        -'quadrature' Gaussian quadrature method for integration.
+    n_integration_samples: int, optional (default=10)
+        The number of integration samples used in 'quantile', 'monte_carlo' and
+        'gauss-hermite'.
+    quad_dict: dict, optional (default=None)
+        Further arguments for using `scipy's` `expect`
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for fixing the number generation.
+    vector_func : bool or str, optional (default=False)
+        If `vector_func` is `True`, the integration values are passes
+        in vectorized form to `func`. If `vector_func` is 'both', the
+        integration values might or might not be passed in vectorized form,
+        depending what is more efficient. The integration values
+        are passed in vectorized form, means that in a call like
+        `func(y, x, idx)` `y` is of the form (n_samples, n_integration_samples),
+         `x` equals `X` and `idx` is an index map of `X.
+
+
+
+    Returns
+    -------
+    expectation : numpy.ndarray of shape (n_samples)
+        The conditional expectation for each value applied.
+    """
+
+    X = check_array(X, allow_nd=True)
+
+    check_type(reg, "reg", ProbabilisticRegressor)
+    check_type(
+        method,
+        "method",
+        target_vals=[
+            "monte_carlo",
+            "assume_linear",
+            "dynamic_quad",
+            "gauss_hermite",
+            "quantile",
+            None,
+        ],
+    )
+    check_type(
+        quantile_method,
+        "quantile_method",
+        target_vals=[
+            "trapezoid",
+            "simpson",
+            "average",
+            "romberg",
+            "quadrature",
+            None,
+        ],
+    )
+    check_scalar(n_integration_samples, "n_monte_carlo", int, min_val=1)
+    check_type(quad_dict, "scipy_args", dict, target_vals=[None])
+    check_type(vector_func, "vector_func", bool, target_vals=["both"])
+    _check_callable(func, "func", n_positional_parameters=3)
+
+    if method is None:
+        method = "gauss_hermite"
+    if quantile_method is None:
+        quantile_method = "quadrature"
+    if quad_dict is None:
+        quad_dict = {}
+    if method == "quantile" and quantile_method == "romberg":
+        # n_integration_samples need to be of the form 2**k + 1
+        n_integration_samples = (
+            2 ** int(np.log2(n_integration_samples) + 1) + 1
+        )
+    is_optional = vector_func == "both"
+    if is_optional:
+        vector_func = True
+
+    random_state = check_random_state(random_state)
+
+    def evaluate_func(inner_potential_y):
+        if vector_func:
+            inner_output = func(np.arange(len(X)), X, inner_potential_y)
+        else:
+            inner_output = np.zeros_like(inner_potential_y)
+            for idx_x, inner_x in enumerate(X):
+                for idx_y, y_val in enumerate(inner_potential_y[idx_x]):
+                    inner_output[idx_x, idx_y] = func(idx_x, inner_x, y_val)
+        return inner_output
+
+    expectation = np.zeros(len(X))
+
+    if method in ["assume_linear", "monte_carlo"]:
+        if method == "assume_linear":
+            potential_y = reg.predict(X).reshape(-1, 1)
+        else:  # method equals "monte_carlo"
+            potential_y = reg.sample_y(
+                X=X,
+                n_samples=n_integration_samples,
+                random_state=random_state,
+            )
+        expectation = np.average(evaluate_func(potential_y), axis=1)
+    elif method == "quantile":
+        if quantile_method in ["trapezoid", "simpson", "average", "romberg"]:
+            eval_points = np.arange(1, n_integration_samples + 1) / (
+                n_integration_samples + 1
+            )
+            cond_dist = _reshape_scipy_dist(
+                reg.predict_target_distribution(X), shape=(-1, 1)
+            )
+            potential_y = cond_dist.ppf(eval_points.reshape(1, -1))
+            output = evaluate_func(potential_y)
+
+            if quantile_method == "trapezoid":
+                expectation = integrate.trapezoid(
+                    output, dx=1 / n_integration_samples, axis=1
+                )
+            elif quantile_method == "simpson":
+                expectation = integrate.simpson(
+                    output, dx=1 / n_integration_samples, axis=1
+                )
+            elif quantile_method == "average":
+                expectation = np.average(output, axis=-1)
+            else:  # quantile_method equals "romberg"
+                expectation = integrate.romb(
+                    output, dx=1 / n_integration_samples, axis=1
+                )
+        else:  # quantile_method equals "quadrature"
+
+            def fixed_quad_function_wrapper(inner_eval_points):
+                inner_cond_dist = _reshape_scipy_dist(
+                    reg.predict_target_distribution(X), shape=(-1, 1)
+                )
+                inner_potential_y = inner_cond_dist.ppf(
+                    inner_eval_points.reshape(1, -1)
+                )
+
+                return evaluate_func(inner_potential_y)
+
+            expectation, _ = integrate.fixed_quad(
+                fixed_quad_function_wrapper, 0, 1, n=n_integration_samples
+            )
+    elif method == "gauss_hermite":
+        unscaled_potential_y, weights = roots_hermitenorm(
+            n_integration_samples
+        )
+        cond_mean, cond_std = reg.predict(X, return_std=True)
+        potential_y = (
+            cond_std[:, np.newaxis] * unscaled_potential_y[np.newaxis, :]
+            + cond_mean[:, np.newaxis]
+        )
+        output = evaluate_func(potential_y)
+        expectation = (
+            1
+            / (2 * np.pi) ** (1 / 2)
+            * np.sum(weights[np.newaxis, :] * output, axis=1)
+        )
+    else:  # method equals "dynamic_quad"
+        for idx, x in enumerate(X):
+            cond_dist = reg.predict_target_distribution([x])
+
+            def quad_function_wrapper(y):
+                if is_optional or not vector_func:
+                    return func(idx, x, y)
+                else:
+                    return func(np.arange(len(X)), X, np.full((len(X), 1), y))[
+                        idx
+                    ]
+
+            expectation[idx] = cond_dist.expect(
+                quad_function_wrapper,
+                **quad_dict,
+            )
+
+    return expectation

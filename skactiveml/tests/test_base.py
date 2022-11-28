@@ -12,6 +12,8 @@ from skactiveml.base import (
     AnnotatorModelMixin,
     BudgetManager,
     SingleAnnotatorStreamQueryStrategy,
+    SkactivemlRegressor,
+    ProbabilisticRegressor,
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL
@@ -22,7 +24,7 @@ class QueryStrategyTest(unittest.TestCase):
     def setUp(self):
         self.qs = QueryStrategy()
 
-    def test_fit(self):
+    def test_query(self):
         self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
 
 
@@ -33,7 +35,7 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
     def setUp(self):
         self.qs = SingleAnnotatorPoolQueryStrategy()
 
-    def test_fit(self):
+    def test_query(self):
         self.assertRaises(
             NotImplementedError, self.qs.query, X=None, y=None, candidates=None
         )
@@ -74,7 +76,7 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
         self.qs = MultiAnnotatorPoolQueryStrategy()
         self.qs.missing_label_ = MISSING_LABEL
 
-    def test_fit(self):
+    def test_query(self):
         self.assertRaises(
             NotImplementedError,
             self.qs.query,
@@ -232,7 +234,7 @@ class TestBudgetManager(unittest.TestCase):
     def setUp(self):
         self.bm = BudgetManager()
 
-    def test_fit(self):
+    def test_query_by_utility(self):
         self.assertRaises(
             NotImplementedError, self.bm.query_by_utility, utilities=None
         )
@@ -253,7 +255,7 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
     def setUp(self):
         self.qs = SingleAnnotatorStreamQueryStrategy(budget=None)
 
-    def test_fit(self):
+    def test_query(self):
         self.assertRaises(NotImplementedError, self.qs.query, candidates=None)
 
     def test_update(self):
@@ -262,4 +264,38 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
             self.qs.update,
             candidates=None,
             queried_indices=None,
+        )
+
+
+class ScaktivemlRegressorTest(unittest.TestCase):
+    @patch.multiple(SkactivemlRegressor, __abstractmethods__=set())
+    def setUp(self):
+        self.reg = SkactivemlRegressor(missing_label=-1)
+
+    def test_fit(self):
+        self.assertRaises(NotImplementedError, self.reg.fit, X=None, y=None)
+
+    def test_predict(self):
+        self.assertRaises(NotImplementedError, self.reg.predict, X=None)
+
+    def test_validate_data(self):
+        X = np.arange(5 * 2).reshape(5, 2)
+        y = 1 / 2 * np.arange(5)
+        self.assertRaises(
+            ValueError,
+            self.reg._validate_data,
+            X=X,
+            y=y,
+            sample_weight=np.arange(1, 5),
+        )
+
+
+class TargetDistributionEstimatorTest(unittest.TestCase):
+    @patch.multiple(ProbabilisticRegressor, __abstractmethods__=set())
+    def setUp(self):
+        self.reg = ProbabilisticRegressor(missing_label=-1)
+
+    def test_predict_target_distribution(self):
+        self.assertRaises(
+            NotImplementedError, self.reg.predict_target_distribution, X=None
         )

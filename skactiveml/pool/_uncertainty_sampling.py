@@ -38,7 +38,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         `least_confident` and `margin_sampling` variant.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : numeric or np.random.RandomState
+    random_state : int or np.random.RandomState
         The random state to use.
 
     References

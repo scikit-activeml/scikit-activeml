@@ -169,14 +169,14 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "\n"
             '   <input type="checkbox" class="input-tag" '
             'value="regression">\n'
-            "   <label>Regression</label>\n"
-            '<input type="checkbox" class="input-tag" '
+            '   <label>Regression</label>\n'
+            '   <input type="checkbox" class="input-tag" '
             'value="classification">\n '
-            "   <label>Classification</label>\n"
-            '<input type="checkbox" class="input-tag" '
+            '   <label>Classification</label>\n'
+            '   <input type="checkbox" class="input-tag" '
             'value="multi-annotator">\n '
-            "   <label>Multi-Annotator</label>\n"
-            '<input type="checkbox" class="input-tag" '
+            '   <label>Multi-Annotator</label>\n'
+            '   <input type="checkbox" class="input-tag" '
             'value="single-annotator">\n '
             "   <label>Single-Annotator</label>\n"
         )
