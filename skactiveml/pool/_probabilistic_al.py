@@ -31,7 +31,6 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         Maximum number of hypothetically acquired labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-<<<<<<< HEAD
     metric : str or callable, default=None
         The metric must a be None or a valid kernel as defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`. The kernel is used to
@@ -45,9 +44,6 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         If metric_dict is None and metric is 'rbf' metric_dict is set to
         {'gamma': 'mean'}.
     random_state: numeric | np.random.RandomState, optional
-=======
-    random_state : int | np.random.RandomState, optional
->>>>>>> 498edaf0d0735401f6f9645f9c232a6c9aa1bd6e
         Random state for candidate selection.
 
     References
