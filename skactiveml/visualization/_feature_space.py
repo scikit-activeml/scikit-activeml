@@ -48,8 +48,8 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
         Labels of the training data set (possibly including unlabeled ones
         indicated by self.MISSING_LABEL).
     candidates : None or array-like of shape (n_candidates,), dtype=int or
-        array-like of shape (n_candidates, n_features),
-        optional (default=None)
+    array-like of shape (n_candidates, n_features),
+    optional (default=None)
         If `candidates` is None, the unlabeled samples from (X,y) are
         considered as candidates.
         If `candidates` is of shape (n_candidates,) and of type int,

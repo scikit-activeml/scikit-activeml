@@ -9,7 +9,16 @@ from ._cost_embedding_al import CostEmbeddingAL
 from ._discriminative_al import DiscriminativeAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
 from ._expected_error_reduction import MonteCarloEER, ValueOfInformationEER
+from ._expected_model_change_maximization import (
+    ExpectedModelChangeMaximization,
+)
+from ._expected_model_output_change import ExpectedModelOutputChange
+from ._expected_model_variance import ExpectedModelVarianceReduction
 from ._four_ds import FourDs
+from ._greedy_sampling import GreedySamplingX, GreedySamplingTarget
+from ._information_gain_maximization import (
+    KLDivergenceMaximization,
+)
 from ._probabilistic_al import ProbabilisticAL, cost_reduction
 from ._query_by_committee import (
     QueryByCommittee,
@@ -42,5 +51,11 @@ __all__ = [
     "vote_entropy",
     "FourDs",
     "CostEmbeddingAL",
+    "ExpectedModelChangeMaximization",
+    "ExpectedModelOutputChange",
+    "ExpectedModelVarianceReduction",
+    "KLDivergenceMaximization",
+    "GreedySamplingX",
+    "GreedySamplingTarget",
     "DiscriminativeAL",
 ]

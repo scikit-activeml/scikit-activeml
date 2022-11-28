@@ -1,0 +1,23 @@
+[
+  {
+    "class" : "KLDivergenceMaximization",
+    "package" : "pool",
+    "category" : "Expected Error Reduction",
+    "method" : "Regression based Kullback Leibler Divergence Maximization",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Regression based Kullback Leibler Divergence Maximization",
+    "refs" : ["elreedy2019novel"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import KLDivergenceMaximization"],
+    "init_qs" : ["KLDivergenceMaximization(",
+                 "    random_state=random_state,",
+                 "    integration_dict_target_val={",
+                 "        \"method\": \"gauss_hermite\",",
+                 "        \"n_integration_samples\": 5,",
+                 "    },",
+                 ")"],
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

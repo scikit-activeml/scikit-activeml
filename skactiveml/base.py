@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import (
@@ -44,6 +44,8 @@ __all__ = [
     "SkactivemlClassifier",
     "ClassFrequencyEstimator",
     "AnnotatorModelMixin",
+    "SkactivemlRegressor",
+    "ProbabilisticRegressor",
 ]
 
 
@@ -149,11 +151,13 @@ class PoolQueryStrategy(QueryStrategy):
         self._check_n_features(X, reset=reset)
 
         # Check labels
-        y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+        y = check_array(
+            y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+        )
         check_consistent_length(X, y)
 
         # Check missing_label
-        check_missing_label(self.missing_label)
+        check_missing_label(self.missing_label, target_type=y.dtype)
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
@@ -205,7 +209,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
@@ -1329,6 +1333,192 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         )
 
         return X, y, sample_weight
+
+
+class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
+    """SkactivemlRegressor
+
+    Base class for scikit-activeml regressors.
+
+    Parameters
+    __________
+    missing_label : scalar, string, np.nan, or None, optional
+    (default=skactiveml.utils.MISSING_LABEL)
+        Value to represent a missing label.
+    random_state : int, RandomState or None, optional (default=None)
+        Determines random number for 'fit' and 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+    """
+
+    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
+        self.missing_label = missing_label
+        self.random_state = random_state
+
+    @abstractmethod
+    def fit(self, X, y, sample_weight=None):
+        """Fit the model using X as training data and y as numerical labels.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            The sample matrix X is the feature matrix representing the samples.
+        y : array-like, shape (n_samples) or (n_samples, n_targets)
+            It contains the labels of the training samples.
+            The number of numerical labels may be variable for the samples,
+            where missing labels are represented the attribute 'missing_label'.
+        sample_weight : array-like, shape (n_samples)
+            It contains the weights of the training samples' values.
+
+        Returns
+        -------
+        self: skactiveml.base.SkactivemlRegressor,
+            The `skactiveml.base.SkactivemlRegressor` object fitted on the
+            training data.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def predict(self, X):
+        """Return value predictions for the test samples X.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+        Returns
+        -------
+        y : numpy.ndarray, shape (n_samples)
+            Predicted values of the test samples 'X'.
+        """
+        raise NotImplementedError
+
+    def _validate_data(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        check_y_dict=None,
+        y_ensure_1d=True,
+    ):
+
+        if check_X_dict is None:
+            check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
+        if check_y_dict is None:
+            check_y_dict = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "ensure_2d": False,
+                "force_all_finite": False,
+                "dtype": None,
+            }
+
+        check_missing_label(self.missing_label)
+        self.missing_label_ = self.missing_label
+
+        # Store and check random state.
+        self.random_state_ = check_random_state(self.random_state)
+
+        X = check_array(X, **check_X_dict)
+        y = check_array(y, **check_y_dict)
+        if len(y) > 0:
+            y = column_or_1d(y) if y_ensure_1d else y
+
+        if sample_weight is not None:
+            sample_weight = check_array(sample_weight, **check_y_dict)
+            if not np.array_equal(y.shape, sample_weight.shape):
+                raise ValueError(
+                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"shape {sample_weight.shape}. Both need to have "
+                    f"identical shapes."
+                )
+
+        return X, y, sample_weight
+
+
+class ProbabilisticRegressor(SkactivemlRegressor):
+    """ProbabilisticRegressor
+
+    Base class for scikit-activeml probabilistic regressors.
+
+    """
+
+    @abstractmethod
+    def predict_target_distribution(self, X):
+        """Returns the predicted target distribution conditioned on the test
+        samples `X`.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+
+        Returns
+        -------
+        dist : scipy.stats._distn_infrastructure.rv_frozen
+            The distribution of the targets at the test samples.
+
+        """
+        raise NotImplementedError
+
+    def predict(self, X, return_std=False, return_entropy=False):
+        """Returns the mean, std (optional) and differential entropy (optional)
+        of the predicted target distribution conditioned on the test samples
+        `X`.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
+        return_std : bool, optional (default=False)
+            Whether to return the standard deviation.
+        return_entropy : bool, optional (default=False)
+            Whether to return the differential entropy.
+
+        Returns
+        -------
+        mu : numpy.ndarray, shape (n_samples)
+            Predicted mean conditioned on `X`.
+        std : numpy.ndarray, shape (n_samples), optional
+            Predicted standard deviation conditioned on `X`.
+        entropy : numpy..ndarray, optional
+            Predicted differential entropy conditioned on `X`.
+        """
+        rv = self.predict_target_distribution(X)
+        result = (rv.mean(),)
+        if return_std:
+            result += (rv.std(),)
+        if return_entropy:
+            result += (rv.entropy(),)
+        if len(result) == 1:
+            result = result[0]
+        return result
+
+    def sample_y(self, X, n_samples=1, random_state=None):
+        """Returns random samples from the predicted target distribution
+        conditioned on the test samples `X`.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples_X, n_features)
+            Input samples, where the target values are drawn from.
+        n_samples: int, optional (default=1)
+            Number of random samples to be drawn.
+        random_state : int, RandomState instance or None, optional
+        (default=None)
+            Determines random number generation to randomly draw samples. Pass
+            an int for reproducible results across multiple method calls.
+
+        Returns
+        -------
+        y_samples : numpy.ndarray, shape (n_samples_X, n_samples)
+            Drawn random target samples.
+        """
+        rv = self.predict_target_distribution(X)
+        rv_samples = rv.rvs(
+            size=(n_samples, len(X)), random_state=random_state
+        )
+        return rv_samples.T
 
 
 class AnnotatorModelMixin(ABC):

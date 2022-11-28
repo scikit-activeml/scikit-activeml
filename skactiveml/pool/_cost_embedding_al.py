@@ -47,7 +47,7 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         confident variant.
     missing_label: str or numeric, optional (default=MISSING_LABEL)
         Specifies the symbol that represents a missing label.
-    random_state: numeric or np.random.RandomState, optional
+    random_state : int or np.random.RandomState, optional
     (default=None)
         Random state for annotator selection.
     embed_dim : int, optional (default=None)
@@ -228,11 +228,11 @@ def _alce(
         Array of class labels.
     embed_dim: int
         Dimension of the embedding.
-    sample_weight: array-like, shape (n_samples)
+    sample_weight : array-like, shape (n_samples)
         Weights for uncertain annotators.
-    missing_label: scalar | string | np.nan | None
+    missing_label : scalar | string | np.nan | None
         Value to represent a missing label.
-    random_state: numeric | np.random.RandomState
+    random_state : int | np.random.RandomState
         Random state for annotator selection.
     mds_params : dict
         For further information, see

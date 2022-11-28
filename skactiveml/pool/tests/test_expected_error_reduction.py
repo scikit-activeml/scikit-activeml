@@ -1,19 +1,27 @@
 import unittest
+from copy import deepcopy
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.svm import SVC
 
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import MonteCarloEER, ValueOfInformationEER
 from skactiveml.pool._expected_error_reduction import ExpectedErrorReduction
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    _cmp_object_dict,
+)
 from skactiveml.utils import MISSING_LABEL, is_labeled
 
 
-class TemplateTestExpectedErrorReduction:
-    def setUp(self):
-        self.Strategy = self.get_query_strategy()
+class TemplateTestExpectedErrorReduction(
+    TemplateSingleAnnotatorPoolQueryStrategy
+):
+    def setUp(self, qs_class):
+        self.Strategy = qs_class
         self.X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
         self.X_cand = np.array([[8, 4], [5, 4], [1, 2]])
         self.candidates = np.array([2, 1, 0], dtype=int)
@@ -46,79 +54,72 @@ class TemplateTestExpectedErrorReduction:
 
         self.DummyClf = DummyClf
 
-    def test_init_param_cost_matrix(self):
-        for cost_matrix in [np.ones((2, 3)), "string", np.ones((2, 2))]:
-            qs = self.Strategy(cost_matrix=cost_matrix)
-            self.assertRaises(ValueError, qs.query, **self.kwargs)
-        self.assertTrue(hasattr(qs, "cost_matrix"))
-
-    def test_init_param_subtract_current(self):
-        qs = ValueOfInformationEER()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            subtract_current="string",
+        query_default_params_clf = {
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
+            "clf": ParzenWindowClassifier(
+                random_state=0, classes=self.classes
+            ),
+        }
+        super().setUp(
+            qs_class=qs_class,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
         )
 
     def test_query_param_clf(self):
-        qs = self.Strategy()
-        for clf in ["string", GaussianProcessClassifier()]:
-            self.assertRaises(
-                TypeError,
-                qs.query,
-                candidates=self.candidates,
-                X=self.X,
-                y=self.y,
-                clf=clf,
-            )
+        add_test_cases = [
+            (SVC(), TypeError),
+            (SklearnClassifier(SVC()), AttributeError),
+            (SklearnClassifier(SVC(probability=True)), None),
+        ]
+        super().test_query_param_clf(test_cases=add_test_cases)
 
-        for clf in [ParzenWindowClassifier(missing_label=-1)]:
-            with self.subTest(msg=f"clf={clf}", clf=clf):
-                self.assertRaises(
-                    ValueError,
-                    qs.query,
-                    candidates=self.candidates,
-                    X=self.X,
-                    y=self.y,
-                    clf=clf,
+    def test_init_param_cost_matrix(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (np.ones((2, 3)), ValueError),
+            ("string", ValueError),
+            (np.ones((2, 2)), ValueError),
+        ]
+        self._test_param("init", "cost_matrix", test_cases)
+
+    def test_query_param_fit_clf(self, test_cases=None):
+        # custom test cases are not necessary
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.nan, TypeError), ("state", TypeError)]
+        self._test_param("query", "fit_clf", test_cases)
+
+        # check if clf remains the same for both options
+        for fit_clf in [True]:
+            with self.subTest(msg="Clf consistency", fit_clf=fit_clf):
+                clf = deepcopy(self.query_default_params_clf["clf"])
+                if not fit_clf:
+                    clf.fit(
+                        self.query_default_params_clf["X"],
+                        self.query_default_params_clf["y"],
+                    )
+                query_params = deepcopy(self.query_default_params_clf)
+                query_params["clf"] = deepcopy(clf)
+                query_params["fit_clf"] = fit_clf
+
+                qs = self.qs_class(**self.init_default_params)
+                qs.query(**query_params)
+                self.assertTrue(
+                    _cmp_object_dict(
+                        query_params["clf"].__dict__, clf.__dict__
+                    ),
+                    msg=f"Classifier changed after calling query for "
+                    f"`fit_clf={fit_clf}`.",
                 )
 
-    def test_query_param_sample_weight(self):
-        qs = self.Strategy()
-        for sw in [self.X_cand, np.empty((len(self.X) - 1)), "string"]:
-            with self.subTest(msg=f"sample_weight={sw}"):
-                self.assertRaises(
-                    (IndexError, TypeError, ValueError),
-                    qs.query,
-                    **self.kwargs,
-                    sample_weight=sw,
-                )
-
-    def test_query_param_fit_clf(self):
-        qs = self.Strategy()
-        for fc in ["string", self.candidates, None]:
-            self.assertRaises(
-                TypeError,
-                qs.query,
-                **self.kwargs,
-                fit_clf=fc,
-                msg=f"fit_clf={fc}",
-            )
+    def test_init_param_subtract_current(self):
+        test_cases = [(2, TypeError), ("string", TypeError)]
+        self._test_param("init", "subtract_current", test_cases)
 
     def test_query_param_ignore_partial_fit(self):
-        qs = self.Strategy()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            candidates=self.candidates,
-            X=self.X,
-            y=self.y,
-            clf=self.clf,
-            ignore_partial_fit=None,
-        )
+        test_cases = [(2, TypeError), ("string", TypeError)]
+        self._test_param("query", "ignore_partial_fit", test_cases)
 
     def test_query(self):
         """
@@ -443,72 +444,110 @@ class TestExpectedErrorReduction(unittest.TestCase):
 
 
 class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
-    def get_query_strategy(self):
-        return MonteCarloEER
+    def setUp(self):
+        super().setUp(qs_class=MonteCarloEER)
 
     def test_init_param_method(self):
-        qs = self.Strategy(method="String")
-        self.assertRaises(ValueError, qs.query, **self.kwargs)
-        qs = self.Strategy(method=1)
-        self.assertRaises(TypeError, qs.query, **self.kwargs)
-        self.assertTrue(hasattr(qs, "method"))
+        test_cases = [(2, TypeError), ("string", ValueError)]
+        self._test_param("init", "method", test_cases)
+        test_cases = [("log_loss", ValueError)]
+        replace_init_params = {"cost_matrix": 1 - np.eye(2)}
+        self._test_param(
+            "init",
+            "method",
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
 
     def test_init_param_cost_matrix(self):
-        super().test_init_param_cost_matrix()
-        qs = self.Strategy(method="log_loss", cost_matrix=self.cost_matrix)
-        self.assertRaises(ValueError, qs.query, **self.kwargs)
+        super().test_init_param_cost_matrix([("log_loss", ValueError)])
 
     def test_query_param_sample_weight_candidates(self):
-        qs = self.Strategy()
-        for swc in ["string", np.empty((len(self.X_cand) - 1))]:
-            with self.subTest(msg=f"sample_weight_candidates={swc}"):
-                self.assertRaises(
-                    (ValueError, TypeError),
-                    qs.query,
-                    X=self.X,
-                    y=self.y,
-                    clf=self.clf,
-                    candidates=self.X_cand,
-                    sample_weight=np.ones(len(self.X)),
-                    sample_weight_candidates=swc,
-                )
-
-        # sample_weight missing: this is not an error.
-        # self.assertRaises(
-        #     ValueError, qs.query, X=self.X, y=self.y,
-        #     clf=self.clf, candidates=self.candidates,
-        #     sample_weight_candidates=np.ones(len(self.candidates))
-        # )
-
-    def test_query_param_sample_weight_eval(self):
-        qs = self.Strategy()
-        for swe in [
-            "string",
-            self.candidates,
-            None,
-            np.empty((len(self.X_eval) - 1)),
-        ]:
-            with self.assertRaises(
-                ValueError, msg=f"sample_weight_eval={swe}"
-            ):
-                qs.query(
-                    **self.kwargs,
-                    X_eval=self.X_eval,
-                    sample_weight=np.ones(len(self.X)),
-                    sample_weight_candidates=np.ones(len(self.candidates)),
-                    sample_weight_eval=swe,
-                )
+        X = self.query_default_params_clf["X"]
+        X_cand = X[:4]
+        test_cases = [
+            (np.ones((len(X_cand) - 1)), ValueError),
+            ("string", ValueError),
+            (np.ones(len(X_cand)), None),
+        ]
+        replace_query_params = {"candidates": X_cand}
+        self._test_param(
+            "query",
+            "sample_weight_candidates",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
+        replace_query_params["sample_weight"] = np.ones(len(X))
+        self._test_param(
+            "query",
+            "sample_weight_candidates",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
+        # check if error is raised if candidates are None with sw_candidates
+        self._test_param(
+            "query",
+            "sample_weight_candidates",
+            [(np.ones(len(X_cand)), ValueError)],
+        )
 
     def test_query_param_X_eval(self):
-        qs = self.Strategy()
-        for X_eval in ["str", [], np.ones(5)]:
-            with self.subTest(msg=f"X_eval={X_eval}", X_eval=X_eval):
-                self.assertRaises(
-                    ValueError,
-                    qs.query,
-                    **self.kwargs,
-                    X_eval=X_eval,
-                )
+        test_cases = [
+            (np.ones(5), TypeError),
+            ("str", ValueError),
+            ([], TypeError),
+        ]
+        self._test_param("init", "method", test_cases)
+
+    def test_query_param_sample_weight_eval(self):
+        X = self.query_default_params_clf["X"]
+        X_cand = X[:3]
+        X_eval = X[:4]
+        test_cases = [
+            (np.ones((len(X_eval) - 1)), ValueError),
+            ("string", ValueError),
+            (np.ones(len(X_eval)), None),
+        ]
+        replace_query_params = {"X_eval": X_eval}
+        self._test_param(
+            "query",
+            "sample_weight_eval",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
+        replace_query_params["sample_weight"] = np.ones(len(X))
+        self._test_param(
+            "query",
+            "sample_weight_eval",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
+        replace_query_params["candidates"] = X_cand
+        replace_query_params["sample_weight_candidates"] = np.ones(len(X_cand))
+        self._test_param(
+            "query",
+            "sample_weight_eval",
+            test_cases,
+            replace_query_params=replace_query_params,
+        )
+
+        # qs = self.Strategy()
+        # for swe in [
+        #     "string",
+        #     self.candidates,
+        #     None,
+        #     np.empty((len(self.X_eval) - 1)),
+        # ]:
+        #     with self.assertRaises(
+        #         ValueError, msg=f"sample_weight_eval={swe}"
+        #     ):
+        #         qs.query(
+        #             **self.kwargs,
+        #             X_eval=self.X_eval,
+        #             sample_weight=np.ones(len(self.X)),
+        #             sample_weight_candidates=np.ones(len(self.candidates)),
+        #             sample_weight_eval=swe,
+        #         )
 
     def test_query(self):
         super().test_query()
@@ -625,52 +664,24 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
 class TestValueOfInformationEER(
     TemplateTestExpectedErrorReduction, unittest.TestCase
 ):
-    def get_query_strategy(self):
-        return ValueOfInformationEER
+    def setUp(self):
+        super().setUp(qs_class=ValueOfInformationEER)
 
     def test_init_param_consider_unlabeled(self):
-        qs = ValueOfInformationEER()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            consider_unlabeled="string",
-        )
+        test_cases = [(2, TypeError), ("string", TypeError)]
+        self._test_param("query", "consider_unlabeled", test_cases)
 
     def test_init_param_consider_labeled(self):
-        qs = ValueOfInformationEER()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            consider_labeled="string",
-        )
+        test_cases = [(2, TypeError), ("string", TypeError)]
+        self._test_param("query", "consider_labeled", test_cases)
 
     def test_init_param_candidate_to_labeled(self):
-        qs = ValueOfInformationEER()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            candidate_to_labeled="string",
-        )
+        test_cases = [(2, TypeError), ("string", TypeError)]
+        self._test_param("query", "candidate_to_labeled", test_cases)
 
     def test_init_param_normalize(self):
-        qs = ValueOfInformationEER()
-        self.assertRaises(
-            TypeError,
-            qs.query,
-            clf=self.clf,
-            X=self.X,
-            y=self.y,
-            normalize="string",
-        )
+        test_cases = [(2, TypeError), ("string", TypeError)]
+        self._test_param("query", "normalize", test_cases)
 
     def test_query(self):
         super().test_query()
