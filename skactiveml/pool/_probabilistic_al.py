@@ -32,17 +32,17 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     metric : str or callable, default=None
-        The metric must a be None or a valid kernel as defined by the function
+        The metric must be None or a valid kernel as defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`. The kernel is used to
         calculate the frequency of labels near the candidates and multiplied
-        with the probabilities returned by the `clf` to get a kernel frequency
+        with the probabilities returned by `clf` to get a kernel frequency
         estimate for each class.
         If metric is set to None, the `predict_freq` function of the `clf` will
-        be used instead. If this is not defined, an Exception is raised.
+        be used instead. If this is not defined, a TypeError is raised.
     metric_dict : dict, default=None
-        Any further parameters are passed directly to the kernel function.
-        If metric_dict is None and metric is 'rbf' metric_dict is set to
-        {'gamma': 'mean'}.
+        Any further parameters that should be passed directly to the kernel
+        function. If metric_dict is None and metric is 'rbf' metric_dict is set
+        to {'gamma': 'mean'}.
     random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
 
