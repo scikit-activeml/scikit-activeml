@@ -342,13 +342,14 @@ class TemplateTestCogDQS:
 
     def test_query_with_force(self):
         query_strategy = self.get_query_strategy()(force_full_budget=True)
-        query_strategy.query(
+        queried_indices = query_strategy.query(
             candidates=self.candidates,
             clf=self.clf,
             X=self.X,
             y=self.y,
             fit_clf=True,
         )
+        query_strategy.update(self.candidates, queried_indices)
 
 
 class TestCogDQSRan(TemplateTestCogDQS, unittest.TestCase):
