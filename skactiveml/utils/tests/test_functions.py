@@ -51,6 +51,9 @@ class TestFunctions(unittest.TestCase):
         result = call_func(test_func_2, only_mandatory=True, kwarg1=1, arg2=2, arg3=3)
         self.assertEqual(result, 0)
 
+        result = call_func(test_func_2, ignore_var_keyword=True, kwarg1=1, arg2=2, arg3=3)
+        self.assertEqual(result, 1)
+
     def test__available_if(self):
 
         if hasattr(metaestimators, "available_if"):
