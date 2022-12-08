@@ -5,6 +5,7 @@ Parzen Window Classifier
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
+import warnings
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted, check_scalar
@@ -154,8 +155,11 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             is_lbld = is_labeled(y, missing_label=1)
             N = np.max([2, np.sum(is_lbld)])
             variance = np.var(X, axis=0)
-            self.metric_dict_["gamma"] = (
-                ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+            n_features = X.shape[1]
+            self.metric_dict_[
+                "gamma"
+            ] = ParzenWindowClassifier._calculate_mean_gamma(
+                N, variance, n_features
             )
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
@@ -227,8 +231,17 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
                 F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
         return F
 
-    def _calculate_mean_gamma(N, variance, delta=(np.sqrt(2) * 1e-6)):
+    def _calculate_mean_gamma(
+        N, variance, n_features, delta=(np.sqrt(2) * 1e-6)
+    ):
         denominator = 2 * N * np.sum(variance)
         numerator = (N - 1) * np.log((N - 1) / delta ** 2)
-        gamma = 0.5 * numerator / denominator
+        if denominator <= 0:
+            gamma = 1/n_features
+            warnings.warn(
+                "The variance of the provided data is 0. Bandwidth of "
+                + f"1/n_features={gamma} is used instead."
+                )
+        else:
+            gamma = 0.5 * numerator / denominator
         return gamma

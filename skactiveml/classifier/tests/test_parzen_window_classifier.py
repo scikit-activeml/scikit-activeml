@@ -195,34 +195,49 @@ class TestParzenWindowClassifier(unittest.TestCase):
 
     def test__calculate_mean_gamma(self):
         # test without missing labels
-        N = 3
+        n_features = 1
         variance = [0.66666667]
         gamma = 6.907755278982137
-        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(
+            3, variance, n_features
+        )
         self.assertAlmostEqual(gamma, gamma2)
         # test with 0 variance
-        N = 3
         variance = [0]
-        gamma = np.inf
-        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        gamma = 1 / n_features
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(
+            3, variance, n_features
+        )
+        self.assertAlmostEqual(gamma, gamma2)
+        # test with 0 variance
+        variance = [0]
+        n_features2 = 2
+        gamma = 1 / n_features2
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(
+            3, variance, n_features2
+        )
         self.assertAlmostEqual(gamma, gamma2)
         # test with 1 missing label
-        N = 2
         variance = [0.66666667]
         gamma = 5.050851362881613
-        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(
+            2, variance, n_features
+        )
         self.assertAlmostEqual(gamma, gamma2)
         # test mutli dimensional X
-        N = 3
         variance = [0.5, 1.1875]
         gamma = 2.7289897398447946
-        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(
+            3, variance, n_features
+        )
         self.assertAlmostEqual(gamma, gamma2)
         # test if increasing N increases gamma
         N = np.arange(2, 100)
         variance = 1
         gamma = [
-            ParzenWindowClassifier._calculate_mean_gamma(n, variance)
+            ParzenWindowClassifier._calculate_mean_gamma(
+                n, variance, n_features
+            )
             for n in N
         ]
         self.assertTrue(np.all(np.diff(gamma) > 0))
