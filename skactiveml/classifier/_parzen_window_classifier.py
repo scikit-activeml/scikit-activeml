@@ -228,7 +228,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         return F
 
     def _calculate_mean_gamma(N, variance, delta=(np.sqrt(2) * 1e-6)):
-        numerator = 2 * N * np.sum(variance)
-        denominator = (N - 1) * np.log((N - 1) / delta ** 2)
-        gamma = 0.5 * denominator / numerator
+        denominator = 2 * N * np.sum(variance)
+        numerator = (N - 1) * np.log((N - 1) / delta ** 2)
+        gamma = 0.5 * numerator / denominator
         return gamma

@@ -200,6 +200,12 @@ class TestParzenWindowClassifier(unittest.TestCase):
         gamma = 6.907755278982137
         gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
         self.assertAlmostEqual(gamma, gamma2)
+        # test with 0 variance
+        N = 3
+        variance = [0]
+        gamma = np.inf
+        gamma2 = ParzenWindowClassifier._calculate_mean_gamma(N, variance)
+        self.assertAlmostEqual(gamma, gamma2)
         # test with 1 missing label
         N = 2
         variance = [0.66666667]
