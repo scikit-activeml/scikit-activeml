@@ -28,6 +28,7 @@ REGRESSION_STRATEGIES = [
     GreedySamplingTarget,
 ]
 
+
 class TestExamples(unittest.TestCase):
     def setUp(self):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]

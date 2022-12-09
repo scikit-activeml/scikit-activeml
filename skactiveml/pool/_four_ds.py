@@ -15,7 +15,7 @@ from ..utils import (
     check_type,
     MISSING_LABEL,
     check_equal_missing_label,
-    check_scalar
+    check_scalar,
 )
 
 

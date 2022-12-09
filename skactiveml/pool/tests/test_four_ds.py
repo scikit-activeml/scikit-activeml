@@ -5,11 +5,16 @@ from sklearn.datasets import load_breast_cancer
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.preprocessing import StandardScaler
 
-from skactiveml.classifier import MixtureModelClassifier, ParzenWindowClassifier, SklearnClassifier
+from skactiveml.classifier import (
+    MixtureModelClassifier,
+    ParzenWindowClassifier,
+    SklearnClassifier,
+)
 from skactiveml.pool import FourDs
 from skactiveml.utils import MISSING_LABEL, is_unlabeled
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 
 
 class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -27,13 +32,16 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             missing_label=MISSING_LABEL,
         )
         query_default_params_clf = {
-            'X': X,
-            'y': y,
-            'clf': clf,
-            'fit_clf': True
+            "X": X,
+            "y": y,
+            "clf": clf,
+            "fit_clf": True,
         }
-        super().setUp(qs_class=FourDs, init_default_params={},
-                      query_default_params_clf=query_default_params_clf)
+        super().setUp(
+            qs_class=FourDs,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+        )
 
     def test_init_param_lmbda(self):
         test_cases = [
@@ -41,7 +49,7 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ("state", TypeError),
             (1.1, ValueError),
             (-0.1, ValueError),
-            (0.5, None)
+            (0.5, None),
         ]
         self._test_param("init", "lmbda", test_cases)
 
@@ -49,7 +57,7 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         test_cases = [
             (ParzenWindowClassifier(), TypeError),
             (SklearnClassifier(estimator=ParzenWindowClassifier()), TypeError),
-            (MixtureModelClassifier(), None)
+            (MixtureModelClassifier(), None),
         ]
         self._test_param("query", "clf", test_cases)
 

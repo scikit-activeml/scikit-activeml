@@ -6,61 +6,86 @@ from sklearn.svm import SVR
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import CostEmbeddingAL
 from skactiveml.pool._cost_embedding_al import MDSP, smacof_p
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestCostEmbeddingAL(TemplateSingleAnnotatorPoolQueryStrategy,
-                          unittest.TestCase):
+class TestCostEmbeddingAL(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.classes = [0, 1]
-        init_default_params = {
-            "classes": self.classes
-        }
+        init_default_params = {"classes": self.classes}
         query_default_params = {
-            'X': np.linspace(0, 1, 20).reshape(10, 2),
-            'y': np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
         }
-        super().setUp(qs_class=CostEmbeddingAL,
-                      init_default_params=init_default_params,
-                      query_default_params_clf=query_default_params)
+        super().setUp(
+            qs_class=CostEmbeddingAL,
+            init_default_params=init_default_params,
+            query_default_params_clf=query_default_params,
+        )
 
     # Test init parameters
     def test_init_param_classes(self):
-        test_cases = [(True, TypeError), ("string", TypeError),
-                      (np.zeros(2), ValueError)]
+        test_cases = [
+            (True, TypeError),
+            ("string", TypeError),
+            (np.zeros(2), ValueError),
+        ]
         self._test_param("init", "classes", test_cases)
 
     def test_init_param_base_regressor(self):
-        test_cases = [(1, TypeError), ("string", TypeError),
-                      (ParzenWindowClassifier(), TypeError), (SVR(), None)]
+        test_cases = [
+            (1, TypeError),
+            ("string", TypeError),
+            (ParzenWindowClassifier(), TypeError),
+            (SVR(), None),
+        ]
         self._test_param("init", "base_regressor", test_cases)
 
     def test_init_param_cost_matrix(self):
         test_cases = [
-            (np.ones((len(self.classes), len(self.classes)+1)), ValueError),
+            (np.ones((len(self.classes), len(self.classes) + 1)), ValueError),
             ("string", ValueError),
             (np.ones((3, 3)), ValueError),
             (np.zeros((len(self.classes), len(self.classes))), ValueError),
-            (np.ones((len(self.classes), len(self.classes))) -
-             np.eye(len(self.classes)), None)
+            (
+                np.ones((len(self.classes), len(self.classes)))
+                - np.eye(len(self.classes)),
+                None,
+            ),
         ]
         self._test_param("init", "cost_matrix", test_cases)
 
     def test_init_param_embed_dim(self):
-        test_cases = [(True, TypeError), ("string", TypeError),
-                      (1.5, TypeError), (0, ValueError), (3, None)]
+        test_cases = [
+            (True, TypeError),
+            ("string", TypeError),
+            (1.5, TypeError),
+            (0, ValueError),
+            (3, None),
+        ]
         self._test_param("init", "embed_dim", test_cases)
 
     def test_init_param_mds_params(self):
-        test_cases = [(True, TypeError), ("string", TypeError),
-                      (0, TypeError), ({}, None)]
+        test_cases = [
+            (True, TypeError),
+            ("string", TypeError),
+            (0, TypeError),
+            ({}, None),
+        ]
         self._test_param("init", "mds_params", test_cases)
 
     def test_init_param_nn_params(self):
-        test_cases = [(True, TypeError), ("string", TypeError),
-                      (0, TypeError), ({}, None)]
+        test_cases = [
+            (True, TypeError),
+            ("string", TypeError),
+            (0, TypeError),
+            ({}, None),
+        ]
         self._test_param("init", "nn_params", test_cases)
 
     # Test query

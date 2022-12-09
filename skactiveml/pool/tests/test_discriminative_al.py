@@ -8,13 +8,15 @@ from sklearn.svm import SVC
 
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import DiscriminativeAL
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestDiscriminativeAL(TemplateSingleAnnotatorPoolQueryStrategy,
-                           unittest.TestCase):
+class TestDiscriminativeAL(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.random_state = 1
         self.X = np.linspace(0, 1, 20).reshape(10, 2)
@@ -24,27 +26,38 @@ class TestDiscriminativeAL(TemplateSingleAnnotatorPoolQueryStrategy,
             random_state=self.random_state
         )
         query_default_params_clf = {
-            'X': self.X,
-            'y': self.y,
-            'discriminator': self.discriminator
+            "X": self.X,
+            "y": self.y,
+            "discriminator": self.discriminator,
         }
         query_default_params_reg = {
-            'X': self.X,
-            'y': self.y_reg,
-            'discriminator': self.discriminator
+            "X": self.X,
+            "y": self.y_reg,
+            "discriminator": self.discriminator,
         }
-        super().setUp(qs_class=DiscriminativeAL, init_default_params={},
-                      query_default_params_clf=query_default_params_clf,
-                      query_default_params_reg=query_default_params_reg)
+        super().setUp(
+            qs_class=DiscriminativeAL,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+            query_default_params_reg=query_default_params_reg,
+        )
 
     def test_init_param_greedy_selection(self):
-        test_cases = [(0, TypeError), ("test", TypeError), (None, TypeError),
-                      (SVC(), TypeError)]
+        test_cases = [
+            (0, TypeError),
+            ("test", TypeError),
+            (None, TypeError),
+            (SVC(), TypeError),
+        ]
         self._test_param("init", "greedy_selection", test_cases)
 
     def test_query_param_discriminator(self):
-        test_cases = [(0, TypeError), ("test", TypeError), (None, TypeError),
-                      (SVC(), TypeError)]
+        test_cases = [
+            (0, TypeError),
+            ("test", TypeError),
+            (None, TypeError),
+            (SVC(), TypeError),
+        ]
         self._test_param("query", "discriminator", test_cases)
 
     def test_query(self):

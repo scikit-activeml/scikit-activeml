@@ -64,7 +64,7 @@ def check_scalar(
                 "`{}`= {}, must be >= " "{}.".format(name, x, min_val)
             )
     else:
-        if min_val is not None and (x <= min_val  or np.isnan(x)):
+        if min_val is not None and (x <= min_val or np.isnan(x)):
             raise ValueError(
                 "`{}`= {}, must be > " "{}.".format(name, x, min_val)
             )

@@ -271,8 +271,12 @@ class IndexClassifierWrapper:
             if is_unlabeled(y, missing_label=self.missing_label_).all():
                 warnings.warn("All labels are of `missing_label` in `fit`.")
         else:
-            y = check_array(y, ensure_2d=False, force_all_finite="allow-nan",
-                            dtype=self.y.dtype)
+            y = check_array(
+                y,
+                ensure_2d=False,
+                force_all_finite="allow-nan",
+                dtype=self.y.dtype,
+            )
             check_consistent_length(idx, y)
 
         # check sample_weight
@@ -379,8 +383,10 @@ class IndexClassifierWrapper:
                 )
         else:
             add_y = check_array(
-                y, ensure_2d=False, force_all_finite="allow-nan",
-                dtype=self.y.dtype
+                y,
+                ensure_2d=False,
+                force_all_finite="allow-nan",
+                dtype=self.y.dtype,
             )
             check_consistent_length(add_idx, add_y)
 
@@ -451,10 +457,10 @@ class IndexClassifierWrapper:
             Predicted class labels of the input samples.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            if hasattr(self, 'idx_'):
+            if hasattr(self, "idx_"):
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
-                warnings.warn('Speed-up not possible when prefitted')
+                warnings.warn("Speed-up not possible when prefitted")
                 return self.clf.predict_proba(self.X[idx])
 
             # check if results contain NAN
@@ -485,10 +491,10 @@ class IndexClassifierWrapper:
             by lexicographic order.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            if hasattr(self, 'idx_'):
+            if hasattr(self, "idx_"):
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
-                warnings.warn('Speed-up not possible when prefitted')
+                warnings.warn("Speed-up not possible when prefitted")
                 return self.clf.predict_proba(self.X[idx])
 
             # check if results contain NAN
@@ -519,10 +525,10 @@ class IndexClassifierWrapper:
             ordered according to `classes_`.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
-            if hasattr(self, 'idx_'):
+            if hasattr(self, "idx_"):
                 P = self.pwc_K_[self.idx_, :][:, idx].T
             else:
-                warnings.warn('Speed-up not possible when prefitted')
+                warnings.warn("Speed-up not possible when prefitted")
                 return self.clf.predict_proba(self.X[idx])
 
             # check if results contain NAN

@@ -809,11 +809,13 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
         le = id_clf._le
         y_eval = id_clf.y[idx_eval]
-        idx_labeled = \
-            idx_train[is_labeled(y_eval, missing_label=self.missing_label_)]
+        idx_labeled = idx_train[
+            is_labeled(y_eval, missing_label=self.missing_label_)
+        ]
         y_labeled = id_clf.y[idx_labeled]
-        idx_unlabeled = \
-            idx_train[is_unlabeled(y_eval, missing_label=self.missing_label_)]
+        idx_unlabeled = idx_train[
+            is_unlabeled(y_eval, missing_label=self.missing_label_)
+        ]
 
         if self.candidate_to_labeled:
             idx_labeled = np.concatenate([idx_labeled, idx_cx], axis=0)

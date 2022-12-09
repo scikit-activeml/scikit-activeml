@@ -74,6 +74,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         clf,
         fit_clf=True,
         sample_weight=None,
+        utility_weight=None,
         candidates=None,
         batch_size=1,
         return_utilities=False,
@@ -95,6 +96,12 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             `sample_weight`.
         sample_weight: array-like of shape (n_samples), optional (default=None)
             Weights of training samples in `X`.
+        utility_weight: array-like, optional (default=None)
+            Weight for each candidate (multiplied with utilities). Usually,
+            this is to be the density of a candidate. The length of
+            `utility_weight` is usually n_samples, except for the case when
+            candidates contains samples (ndim >= 2). Then the length is
+            `n_candidates`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
@@ -145,6 +152,26 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         # Validate classifier type.
         check_type(fit_clf, "fit_clf", bool)
 
+        # Check `utility_weight`.
+        if utility_weight is None:
+            if mapping is None:
+                utility_weight = np.ones(len(X_cand))
+            else:
+                utility_weight = np.ones(len(X))
+        utility_weight = check_array(utility_weight, ensure_2d=False)
+
+        if mapping is None and not len(X_cand) == len(utility_weight):
+            raise ValueError(
+                f"'utility_weight' must have length 'n_candidates' but "
+                f"{len(X_cand)} != {len(utility_weight)}."
+            )
+        if mapping is not None and not len(X) == len(utility_weight):
+            raise ValueError(
+                f"'utility_weight' must have length 'n_samples' but "
+                f"{len(utility_weight)} != {len(X)}."
+            )
+
+
         # Validate method.
         if not isinstance(self.method, str):
             raise TypeError(
@@ -188,6 +215,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         else:
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
+        utilities *= utility_weight
 
         return simple_batch(
             utilities,

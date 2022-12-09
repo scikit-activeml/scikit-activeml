@@ -39,7 +39,7 @@ class TestExpectedModelChangeMaximization(
             (1, None),
             (-1, ValueError),
             ("five", TypeError),
-            (0, ValueError)
+            (0, ValueError),
         ]
         self._test_param("init", "bootstrap_size", test_cases)
 
@@ -56,7 +56,7 @@ class TestExpectedModelChangeMaximization(
         test_cases = [
             ("illegal", TypeError),
             (1, TypeError),
-            (lambda x: np.zeros((len(x), 1)), None)
+            (lambda x: np.zeros((len(x), 1)), None),
         ]
         self._test_param("init", "feature_map", test_cases)
 
@@ -93,5 +93,3 @@ class TestExpectedModelChangeMaximization(
             np.zeros_like(query_dict["y"]),
             np.where(is_unlabeled(utilities), 0, utilities),
         )
-
-
