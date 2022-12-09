@@ -12,6 +12,7 @@ from sklearn.ensemble import (
 )
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.utils.validation import NotFittedError
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool._query_by_committee import (
@@ -65,6 +66,21 @@ class TestQueryByCommittee(
         self._test_param("init", "method", test_cases)
 
     def test_query_param_ensemble(self, test_cases=None):
+        estimators = [
+            ("pwc1", ParzenWindowClassifier()),
+            ("pwc2", ParzenWindowClassifier())
+        ]
+        vote = SklearnClassifier(
+            VotingClassifier(estimators=estimators, voting="soft"),
+            classes=[0, 1])
+        test_cases = [(vote, None)]
+        self._test_param(
+            "query",
+            "ensemble",
+            test_cases,
+            replace_query_params={"fit_ensemble": True,
+                                  "y": np.full(4, np.nan)}
+        )
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (None, TypeError),
@@ -87,8 +103,21 @@ class TestQueryByCommittee(
             (self.ensemble_reg, None),
             ([NICKernelRegressor(), NICKernelRegressor()], None),
             ([ParzenWindowClassifier(), ParzenWindowClassifier()], None),
+            (vote, None),
         ]
         self._test_param("query", "ensemble", test_cases)
+        X = self.query_default_params_clf["X"]
+        y = self.query_default_params_clf["y"]
+        vote = vote.fit(X=X, y=y)
+        pwc_list = [ParzenWindowClassifier(), ParzenWindowClassifier()]
+        test_cases = [(vote, None), (pwc_list, NotFittedError)]
+        self._test_param(
+            "query",
+            "ensemble",
+            test_cases,
+            replace_query_params={"fit_ensemble": False}
+        )
+
 
     def test_query_param_y(self, test_cases=None):
         y = self.query_default_params_clf["y"]
