@@ -1,6 +1,8 @@
 import numpy as np
 import unittest
 
+from copy import deepcopy
+
 from sklearn import clone
 from sklearn.ensemble import (
     BaggingClassifier,
@@ -126,24 +128,25 @@ class TestQueryByCommittee(
         self._test_param("query", "fit_ensemble", test_cases)
 
     def test_query(self):
-        ensemble_classifiers = [
-            SklearnClassifier(
+        voting_classifiers = [
+            ("gp1", SklearnClassifier(
                 classes=self.classes, estimator=GaussianProcessClassifier()
-            ),
-            SklearnClassifier(
+            )),
+            ("gp2", SklearnClassifier(
                 classes=self.classes, estimator=GaussianProcessClassifier()
-            ),
-            SklearnClassifier(
+            )),
+            ("gp3", SklearnClassifier(
                 classes=self.classes, estimator=GaussianProcessClassifier()
-            ),
+            )),
         ]
+        ensemble_classifiers = [member[1] for member in voting_classifiers]
         gpc = ParzenWindowClassifier(classes=self.classes)
         ensemble_bagging = SklearnClassifier(
-            estimator=BaggingClassifier(base_estimator=gpc),
+            estimator=BaggingClassifier(estimator=gpc),
             classes=self.classes,
         )
         ensemble_voting = SklearnClassifier(
-            VotingClassifier(estimators=ensemble_classifiers, voting="soft")
+            VotingClassifier(estimators=voting_classifiers, voting="soft")
         )
         ensemble_array_reg = [NICKernelRegressor(), NICKernelRegressor()]
         ensemble_array_clf = [
@@ -160,7 +163,7 @@ class TestQueryByCommittee(
             ensemble_array_clf,
         ]
         for ensemble in ensemble_list:
-            query_params = self.query_default_params_clf
+            query_params = deepcopy(self.query_default_params_clf)
             query_params["ensemble"] = ensemble
             query_params["return_utilities"] = True
             for method in ["KL_divergence", "vote_entropy"]:
