@@ -15,8 +15,8 @@ def call_func(
         The function or object that is to be called
     only_mandatory : boolean
         If True only mandatory parameters are set.
-    allow_var_keyword : boolean
-        If True all kwargs are passed when f_callable uses a parameter that is
+    ignore_var_keyword : boolean
+        If False all kwargs are passed when f_callable uses a parameter that is
         of kind Parameter.VAR_KEYWORD, i.e., **kwargs. For further reference
         see inspect package.
     kwargs : kwargs
