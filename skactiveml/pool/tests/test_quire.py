@@ -107,6 +107,8 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         _, utils = qs.query(**self.kwargs, return_utilities=True)
 
     def test__del_i_inv(self):
+        self.assertWarns(Warning, _del_i_inv, np.tri(5), 2)
+
         A = np.random.random((3, 3))
         A = A + A.T
         A_inv = np.linalg.inv(A)
