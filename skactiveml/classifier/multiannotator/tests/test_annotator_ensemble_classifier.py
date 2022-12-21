@@ -22,7 +22,7 @@ class TestAnnotatorEnsembleClassifier(unittest.TestCase):
         self.assertEqual(clf.estimators, "Test")
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
         clf = AnnotatorEnsembleClassifier(estimators=None)
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
         clf = AnnotatorEnsembleClassifier(estimators=[("GNB", GaussianNB())])
         self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
         clf = AnnotatorEnsembleClassifier(

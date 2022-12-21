@@ -55,8 +55,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         estimate for each class.
         If metric is set to None, the `predict_freq` function of the `clf` will
         be used instead. If this is not defined, an Exception is raised.
-    metric_dict : dict,
+    metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
+        If metric_dict is None and metric is 'rbf' metric_dict is set to
+        {'gamma': 'mean'}.
     random_state : int, RandomState instance, default=None
         Controls the randomness of the query strategy.
     prior : float
@@ -159,6 +161,11 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
+            if (
+                self.metric_dict is None
+                and self.metric == "rbf"
+            ):
+                self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
                 metric_dict=self.metric_dict,
