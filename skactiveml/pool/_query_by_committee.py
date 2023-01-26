@@ -8,7 +8,7 @@ import copy
 
 import numpy as np
 from sklearn import clone
-from sklearn.utils.validation import check_array
+from sklearn.utils.validation import check_array, check_is_fitted
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -291,6 +291,8 @@ def _check_ensemble(
             # Fit the ensemble.
             if fit_ensemble:
                 ensemble = clone(ensemble).fit(X, y, sample_weight)
+            else:
+                check_is_fitted(ensemble)
 
             if hasattr(ensemble, "estimators_"):
                 est_arr = ensemble.estimators_
@@ -320,6 +322,8 @@ def _check_ensemble(
                 # Fit the ensemble.
                 if fit_ensemble:
                     est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+                else:
+                    check_is_fitted(est_arr[i])
 
                 if i > 0 and estimator_type == SkactivemlClassifier:
                     np.testing.assert_array_equal(
