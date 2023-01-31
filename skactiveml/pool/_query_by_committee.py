@@ -294,7 +294,8 @@ def _check_ensemble(
             else:
                 check_is_fitted(ensemble)
 
-            if hasattr(ensemble, "estimators_"):
+            if hasattr(ensemble, "estimators_") and \
+                    not len(ensemble.estimators_) == 0:
                 est_arr = ensemble.estimators_
             else:
                 if hasattr(ensemble, "estimators"):

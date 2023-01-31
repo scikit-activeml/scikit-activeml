@@ -1,0 +1,42 @@
+[
+  {
+    "class" : "BALD",
+    "package" : "pool",
+    "method" : "Bayesian Active Learning by Disagreement",
+    "category" :  "Query-by-Committee",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Bayesian Active Learning by Disagreement",
+    "refs" : ["houlsby2011bayesian"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import BALD"],
+    "import_clf" : ["from sklearn.gaussian_process import GaussianProcessClassifier",
+                    "from sklearn.ensemble import BaggingClassifier",
+                    "from skactiveml.classifier import SklearnClassifier"],
+    "init_clf" : ["SklearnClassifier(BaggingClassifier(\n    SklearnClassifier(GaussianProcessClassifier(), random_state=random_state)),\n    classes=np.unique(y_true),\n    random_state=random_state\n)"],
+    "init_qs" : "BALD(random_state=random_state)",
+    "query_params" : "X=X, y=y, ensemble=clf",
+    "plot_utility_params" : "replace_nan=None, candidates=X[unlabeled_indices(y)]"
+  },
+  {
+    "class" : "BALD",
+    "package" : "pool",
+    "method" : "Batch Bayesian Active Learning by Disagreement",
+    "category" :  "Query-by-Committee",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Batch Bayesian Active Learning by Disagreement (BatchBALD)",
+    "refs" : ["houlsby2011bayesian", "kirsch2019batchbald"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import BALD"],
+    "import_clf" : ["from sklearn.gaussian_process import GaussianProcessClassifier",
+                    "from sklearn.ensemble import BaggingClassifier",
+                    "from skactiveml.classifier import SklearnClassifier"],
+    "init_clf" : ["SklearnClassifier(BaggingClassifier(\n    SklearnClassifier(GaussianProcessClassifier(), random_state=random_state)),\n    classes=np.unique(y_true),\n    random_state=random_state\n)"],
+    "init_qs" : "BALD(random_state=random_state)",
+    "query_params" : "X=X, y=y, ensemble=clf, batch_size=3",
+    "plot_utility_params" : "replace_nan=None, candidates=X[unlabeled_indices(y)]"
+  }
+]
