@@ -168,12 +168,14 @@ cycle is given below.
 Query Strategy Overview
 ############################
 
-For better orientation, we provide an overview (incl. visualizations) of the query strategies implemented by ``skactiveml``.
+For better orientation, we provide an `overview <https://scikit-activeml.github.io/scikit-activeml-docs/generated/strategy_overview.html>`_
+(incl. `visualizations <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
+of the query strategies implemented by ``skactiveml``.
 
 .. image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/strategy-overview.gif
-   :width: 400
+   :width: 350
 .. image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/example-overview.gif
-   :width: 400
+   :width: 350
 
 .. examples_end
 
