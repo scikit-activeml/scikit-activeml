@@ -56,11 +56,8 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
 Examples
 ========
-In the following, there are two simple examples illustrating the straightforwardness
-of implementing active learning cycles with our Python package ``skactiveml``.
-For more in-depth examples, we refer to our
-`tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
-a broad overview of different use-cases:
+We provide broad overview of different use-cases in out `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
+
 
 - `Pool-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/00_pool_getting_started.html>`_,
 - `Deep Pool-based Active Learning -- scikit-activeml with Skorch <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/01_deep_pool_al_with_skorch.html>`_,
@@ -69,37 +66,39 @@ a broad overview of different use-cases:
 - `Stream-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/20_stream_getting_started.ipynb>`_,
 - and `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.ipynb>`_.
 
+Two simple examples illustrating the straightforwardness of implementing active learning cycles with our Python package ``skactiveml`` are given in the following.
+
 Pool-based Active Learning
 ##########################
 
-The following code implements an active learning cycle with 20 iterations using a Gaussian process
+The following code snippet implements an active learning cycle with 20 iterations using a Gaussian process
 classifier and uncertainty sampling. To use other classifiers, you can simply wrap classifiers from
 ``sklearn`` or use classifiers provided by ``skactiveml``. Note that the main difficulty using
 active learning with ``sklearn`` is the ability to handle unlabeled data, which we denote as a specific value
 (``MISSING_LABEL``) in the label vector ``y``. More query strategies can be found in the documentation.
 
 .. code-block:: python
-    
+
     import numpy as np
-    import matplotlib.pyplot as plt
     from sklearn.gaussian_process import GaussianProcessClassifier
     from sklearn.datasets import make_blobs
     from skactiveml.pool import UncertaintySampling
     from skactiveml.utils import unlabeled_indices, MISSING_LABEL
     from skactiveml.classifier import SklearnClassifier
-    from skactiveml.visualization import plot_decision_boundary, plot_utilities
 
     # Generate data set.
     X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
     y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
-    # GaussianProcessClassifier needs initial training data otherwise a warning will
-    # be raised by SklearnClassifier. Therefore, the first 10 instances are used as
-    # training data.
+    # Use the first 10 instances are initial training data.
     y[:10] = y_true[:10]
 
     # Create classifier and query strategy.
-    clf = SklearnClassifier(GaussianProcessClassifier(random_state=0),classes=np.unique(y_true), random_state=0)
+    clf = SklearnClassifier(
+        GaussianProcessClassifier(random_state=0),
+        classes=np.unique(y_true),
+        random_state=0
+    )
     qs = UncertaintySampling(method='entropy')
 
     # Execute active learning cycle.
@@ -111,20 +110,9 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
     # Fit final classifier.
     clf.fit(X, y)
 
-    # Visualize resulting classifier and current utilities.
-    bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
-    unlbld_idx = unlabeled_indices(y)
-    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
-    ax.set_title(f'Accuracy score: {clf.score(X,y_true)}', fontsize=15)
-    plot_utilities(qs, X=X, y=y, clf=clf, feature_bound=bound, ax=ax)
-    plot_decision_boundary(clf, feature_bound=bound, confidence=0.6)
-    plt.scatter(X[unlbld_idx,0], X[unlbld_idx,1], c='gray')
-    plt.scatter(X[:,0], X[:,1], c=y, cmap='jet')
-    plt.show()
-
-As output of this code snippet, we obtain the actively trained Gaussian process classifier
-including a visualization of its decision boundary and the sample utilities computed with
-uncertainty sampling.
+As a result, we obtain an actively trained Gaussian process classifier.
+A corresponding visualization of its decision boundary (black line) and the
+sample utilities (greenish contours) is given below.
 
 .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/pal-example-output.png
    :width: 400
@@ -140,8 +128,6 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
 .. code-block:: python
 
     import numpy as np
-    import matplotlib.pyplot as plt
-    from scipy.ndimage import gaussian_filter1d
     from sklearn.datasets import make_blobs
     from skactiveml.classifier import ParzenWindowClassifier
     from skactiveml.stream import Split
@@ -172,18 +158,21 @@ Like in the pool-based example you can wrap other classifiers from ``sklearn``,
         X_train.append(x_t)
         y_train.append(y_cand if len(sampled_indices) > 0 else MISSING_LABEL)
 
-    # Plot the classifier's learning accuracy.
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    ax.set_title(f'Learning curve', fontsize=15)
-    ax.set_xlabel('number of learning cycles')
-    ax.set_ylabel('accuracy')
-    ax.plot(gaussian_filter1d(np.array(correct_classifications, dtype=float), 4))
-    plt.show()
-
-As output of this code snippet, we obtain the actively trained pwc classifier incuding
-a visualization of its accuracy over the 200 samples.
+As a result, we obtain an actively trained Parzen window classifier.
+A corresponding visualization of its accuracy curve accross the active learning
+cycle is given below.
 
 .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/stream-example-output.png
+   :width: 400
+
+Query Strategy Overview
+############################
+
+For better orientation, we provide an overview (incl. visualizations) of the query strategies implemented by ``skactiveml``.
+
+.. image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/strategy-overview.gif
+   :width: 400
+.. image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/example-overview.gif
    :width: 400
 
 .. examples_end
@@ -192,13 +181,13 @@ a visualization of its accuracy over the 200 samples.
 
 Citing
 ======
-If you use ``scikit-activeml`` in one of your research projects and find it helpful,
+If you use ``skactiveml`` in one of your research projects and find it helpful,
 please cite the following:
 
 ::
 
     @article{skactiveml2021,
-        title={scikitactiveml: {A} {L}ibrary and {T}oolbox for {A}ctive {L}}earning {A}lgorithms},
+        title={scikit-activeml: {A} {L}ibrary and {T}oolbox for {A}ctive {L}}earning {A}lgorithms},
         author={Daniel Kottke and Marek Herde and Tuan Pham Minh and Alexander Benz and Pascal Mergard and Atal Roghman and Christoph Sandrock and Bernhard Sick},
         journal={Preprints},
         doi={10.20944/preprints202103.0194.v1},
