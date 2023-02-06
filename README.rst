@@ -172,10 +172,13 @@ For better orientation, we provide an `overview <https://scikit-activeml.github.
 (incl. `visualizations <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
 of the query strategies implemented by ``skactiveml``.
 
-.. image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/strategy-overview.gif
-   :width: 350
-.. image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/example-overview.gif
-   :width: 350
+|Overview| |Visualization|
+
+.. |Overview| image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/strategy-overview.gif
+   :width: 400
+   
+.. |Visualization| image:: https://github.com/scikit-activeml/scikit-activeml/blob/271-update-documentation/docs/logos/example-overview.gif
+   :width: 400
 
 .. examples_end
 
