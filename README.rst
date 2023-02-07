@@ -169,7 +169,7 @@ Query Strategy Overview
 ############################
 
 For better orientation, we provide an `overview <https://scikit-activeml.github.io/scikit-activeml-docs/generated/strategy_overview.html>`_
-(incl. `visualizations <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
+(incl. paper references and `visualizations <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
 of the query strategies implemented by ``skactiveml``.
 
 |Overview| |Visualization|
