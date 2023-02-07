@@ -7,7 +7,7 @@ from skactiveml.stream.budgetmanager import (
 )
 
 
-class TestDensityBasedBudgetManager(unittest.TestCase):
+class TestDensityBasedSplitBudgetManager(unittest.TestCase):
     def setUp(self):
         # initialise var for sampled var tests
         self.utilities = np.array([True, False])
