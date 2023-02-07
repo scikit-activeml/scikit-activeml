@@ -12,18 +12,18 @@ from skactiveml.utils import (
 )
 
 
-class DensityBasedBudgetManager(BudgetManager):
+class DensityBasedSplitBudgetManager(BudgetManager):
     """Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
     on the budget, the number of classes and the number of observed and
-    acquired samples.
+    acquired samples. This class`s logic is the same as compared to
+    SplitBudgetManager except for how available budget is calculated.
 
     This budget manager calculates the fixed budget spent and compares that to
     the budget. If the ratio is smaller
-    than the specified budget, i.e.,
-    budget - u / t > 0 , the budget
+    than the specified budget, i.e., budget - u / t > 0 , the budget
     manager samples an instance when its utility is higher than the budget.
     u is the number of queried instances within t observed instances.
 
@@ -31,7 +31,7 @@ class DensityBasedBudgetManager(BudgetManager):
     ----------
     budget : float
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
     w : int
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
@@ -43,7 +43,14 @@ class DensityBasedBudgetManager(BudgetManager):
         purchase of the given label. Default = 0.01
     delta : float
         Specifies the standart deviation of the distribution. Default 1.0
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
 
+    See Also
+    --------
+    EstimatedBudgetZliobaite : BudgetManager implementing the base class for
+        Zliobaite based budget managers
+    SplitBudgetManager : BudgetManager that is using EstimatedBudgetZliobaite.
     """
 
     def __init__(

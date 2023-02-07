@@ -20,17 +20,17 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
     Parameters
     ----------
-    w : int
+    w : int, (default=100)
         The number of observed utilities that are used to infer the threshold.
         w should be higher than 0.
 
-    w_tol : int
+    w_tol : int, (default=50)
         The window in which the number of acquisitions should stay within the
         budget. w_tol should be higher than 0.
 
-    budget : float
+    budget : float, (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
 
     References
     ----------

@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.stream.budgetmanager import (
-    DensityBasedBudgetManager
+    DensityBasedSplitBudgetManager
 )
 
 
@@ -13,7 +13,7 @@ class TestDensityBasedBudgetManager(unittest.TestCase):
         self.utilities = np.array([True, False])
 
     def get_budget_manager(self):
-        return DensityBasedBudgetManager
+        return DensityBasedSplitBudgetManager
 
     def test_init_param_budget(self):
         # budget must be defined as a float with a range of: 0 < budget <= 1

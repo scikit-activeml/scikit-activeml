@@ -442,10 +442,10 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         RandomVariableUncertaintyBudgetManager will be used by default. The
@@ -457,7 +457,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
 
     References
@@ -486,10 +486,10 @@ class Split(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         SplitBudgetManager will be used by default. The budget
@@ -502,7 +502,7 @@ class Split(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
 
     References

@@ -23,10 +23,10 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
 
@@ -88,7 +88,7 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
 class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     """FixedUncertaintyBudgetManager
-    
+
     Budget manager which is optimized for FixedUncertainty and checks,
     whether the specified budget has been exhausted already. If not, an
     instance is queried, when the utility is higher than the specified budget
@@ -98,13 +98,13 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    num_classes : int
+    num_classes : int, optional (default=2)
         Specifies the number of classes. Default = 2
     """
 
@@ -206,7 +206,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     """VariableUncertaintyBudgetManager
-    
+
     Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
@@ -226,16 +226,16 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1.0)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.1)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
     """
@@ -374,22 +374,25 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     u is the estimate of how many true lables were queried within the last
     w steps. The recursive funktion,
     u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
-    See also :class:`.EstimatedBudgetZliobaite`
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.01)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
+    delta : float, optional (default=1.0)
+        Specifies the standart deviation of the distribution. Default 1.0
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
     """
 
     def __init__(
@@ -560,24 +563,31 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1.0)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.01)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
-    v : float
+    v : float, optional (default=0.1)
         Specifies the percent value of instances queried randomly.
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
+
+    See Also
+    --------
+    EstimatedBudgetZliobaite : BudgetManager implementing the base class for
+        Zliobaite based budget managers
     """
 
     def __init__(
-        self, budget=None, w=100, theta=1.0, s=0.01, v=0.1, random_state=0
+        self, budget=None, w=100, theta=1.0, s=0.01, v=0.1, random_state=None
     ):
         super().__init__(budget, w)
         self.v = v
@@ -741,22 +751,17 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
-        Specifies the starting threshold in wich instances are purchased. This
-        value of theta will recalculated after each instance. Default = 1
-    s : float
-        Specifies the value in wich theta is decresed or increased based on the
-        purchase of the given label. Default = 0.01
-    v : float
-        Specifies the percent value of instances queried randomly.
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
     """
-    def __init__(self, budget=None, w=100, random_state=0):
+
+    def __init__(self, budget=None, w=100, random_state=None):
         super().__init__(budget, w)
         self.random_state = random_state
 
@@ -819,13 +824,10 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        self : FixedUncertaintyBudgetManager
-            The FixedUncertaintyBudget returns itself, after it is updated.
+        self : RandomBudgetManager
+            The RandomBudgetManager returns itself, after it is updated.
         """
         self._validate_data(np.array([]))
-        # TODO np.nan auswerten für alle random sachen
-        # for x_cand in candidates:
-        #     if not np.isnan(x_cand):
         self.random_state_.random_sample(len(candidates))
         super().update(candidates, queried_indices)
         return self

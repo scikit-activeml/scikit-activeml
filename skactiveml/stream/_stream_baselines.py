@@ -17,16 +17,16 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
 
-    allow_exceeding_budget : bool, default=True
+    allow_exceeding_budget : bool, (default=True)
         If True, the query strategy is allowed to exceed it's budget as long as
         the average number of queries will be within the budget. If False,
         queries are not allowed if the budget is exhausted.
 
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
     """
 
@@ -203,11 +203,11 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
 
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
     """
 

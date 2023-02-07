@@ -6,15 +6,16 @@ from sklearn.datasets import make_classification
 
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.stream import (
-    DBALStream,
-    CogDQSRan,
-    CogDQSRanVarUn,
-    CogDQSVarUn,
-    CogDQSFixUn,
+    StreamDensityBasedAL,
+    CognitiveDualQueryStrategy,
+    CognitiveDualQueryStrategyRan,
+    CognitiveDualQueryStrategyRanVarUn,
+    CognitiveDualQueryStrategyVarUn,
+    CognitiveDualQueryStrategyFixUn,
 )
 
 
-class TemplateTestCogDQS:
+class TemplateTestCognitiveDualQueryStrategy:
     def setUp(self):
         # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
@@ -49,23 +50,17 @@ class TemplateTestCogDQS:
     def test_init_param_budget_manager(self):
         # budgetmanager must be defined as an object of an budget manager
         # class
-        query_strategy = self.get_query_strategy()(budget_manager=[])
+        query_strategy = CognitiveDualQueryStrategy(budget_manager=[])
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_random_state(self):
-        query_strategy = self.get_query_strategy()(
-            random_state="string",
-        )
+        query_strategy = self.get_query_strategy()(random_state="string",)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_density_threshold(self):
-        query_strategy = self.get_query_strategy()(
-            density_threshold="string",
-        )
+        query_strategy = self.get_query_strategy()(density_threshold="string",)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(
-            density_threshold=-1,
-        )
+        query_strategy = self.get_query_strategy()(density_threshold=-1,)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_cognition_window_size(self):
@@ -73,15 +68,11 @@ class TemplateTestCogDQS:
             cognition_window_size="string",
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(
-            cognition_window_size=-1,
-        )
+        query_strategy = self.get_query_strategy()(cognition_window_size=-1,)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_dist_func(self):
-        query_strategy = self.get_query_strategy()(
-            dist_func="string",
-        )
+        query_strategy = self.get_query_strategy()(dist_func="string",)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
@@ -90,9 +81,7 @@ class TemplateTestCogDQS:
             queried_indices=np.array([1, 2]),
         )
 
-        query_strategy = self.get_query_strategy()(
-            dist_func=0,
-        )
+        query_strategy = self.get_query_strategy()(dist_func=0,)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
@@ -125,17 +114,11 @@ class TemplateTestCogDQS:
         )
 
     def test_init_param_force_full_budget(self):
-        query_strategy = self.get_query_strategy()(
-            force_full_budget="string",
-        )
+        query_strategy = self.get_query_strategy()(force_full_budget="string",)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(
-            force_full_budget=0,
-        )
+        query_strategy = self.get_query_strategy()(force_full_budget=0,)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(
-            force_full_budget=True,
-        )
+        query_strategy = self.get_query_strategy()(force_full_budget=True,)
         queried_indices = query_strategy.query(**self.kwargs)
         query_strategy.update(self.candidates, queried_indices)
 
@@ -352,27 +335,42 @@ class TemplateTestCogDQS:
         query_strategy.update(self.candidates, queried_indices)
 
 
-class TestCogDQSRan(TemplateTestCogDQS, unittest.TestCase):
+class TestCognitiveDualQueryStrategy(
+    TemplateTestCognitiveDualQueryStrategy, unittest.TestCase
+):
     def get_query_strategy(self):
-        return CogDQSRan
+        return CognitiveDualQueryStrategy
 
 
-class TestCogDQSRanVarUn(TemplateTestCogDQS, unittest.TestCase):
+class TestCognitiveDualQueryStrategyRan(
+    TemplateTestCognitiveDualQueryStrategy, unittest.TestCase
+):
     def get_query_strategy(self):
-        return CogDQSRanVarUn
+        return CognitiveDualQueryStrategyRan
 
 
-class TestCogDQSVarUn(TemplateTestCogDQS, unittest.TestCase):
+class TestCognitiveDualQueryStrategyRanVarUn(
+    TemplateTestCognitiveDualQueryStrategy, unittest.TestCase
+):
     def get_query_strategy(self):
-        return CogDQSVarUn
+        return CognitiveDualQueryStrategyRanVarUn
 
 
-class TestCogDQSFixUn(TemplateTestCogDQS, unittest.TestCase):
+class TestCognitiveDualQueryStrategyVarUn(
+    TemplateTestCognitiveDualQueryStrategy, unittest.TestCase
+):
     def get_query_strategy(self):
-        return CogDQSFixUn
+        return CognitiveDualQueryStrategyVarUn
 
 
-class TestDBALStream(unittest.TestCase):
+class TestCognitiveDualQueryStrategyFixUn(
+    TemplateTestCognitiveDualQueryStrategy, unittest.TestCase
+):
+    def get_query_strategy(self):
+        return CognitiveDualQueryStrategyFixUn
+
+
+class TestStreamDensityBasedAL(unittest.TestCase):
     def setUp(self):
         # initialise valid data to test uncertainty parameters
         rand = np.random.RandomState(0)
@@ -395,7 +393,7 @@ class TestDBALStream(unittest.TestCase):
         self.dist_func_dict = {"metric": "manhattan"}
 
     def get_query_strategy(self):
-        return DBALStream
+        return StreamDensityBasedAL
 
     def test_init_param_budget(self):
         # budget must be defined as a float greater than 0
@@ -413,25 +411,17 @@ class TestDBALStream(unittest.TestCase):
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_random_state(self):
-        query_strategy = self.get_query_strategy()(
-            random_state="string",
-        )
+        query_strategy = self.get_query_strategy()(random_state="string",)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_window_size(self):
-        query_strategy = self.get_query_strategy()(
-            window_size="string",
-        )
+        query_strategy = self.get_query_strategy()(window_size="string",)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(
-            window_size=-1,
-        )
+        query_strategy = self.get_query_strategy()(window_size=-1,)
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_dist_func(self):
-        query_strategy = self.get_query_strategy()(
-            dist_func="string",
-        )
+        query_strategy = self.get_query_strategy()(dist_func="string",)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
@@ -440,9 +430,7 @@ class TestDBALStream(unittest.TestCase):
             queried_indices=np.array([1, 2]),
         )
 
-        query_strategy = self.get_query_strategy()(
-            dist_func=0,
-        )
+        query_strategy = self.get_query_strategy()(dist_func=0,)
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,

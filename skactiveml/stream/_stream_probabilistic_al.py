@@ -32,10 +32,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         BalancedIncrementalQuantileFilter will be used by default. The budget
@@ -47,7 +47,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    metric : str or callable, default=None
+    metric : str or callable, (default=None)
         The metric must a be None or a valid kernel as defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`. The kernel is used to
         calculate the frequency of labels near the candidates and multiplied
@@ -55,16 +55,16 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         estimate for each class.
         If metric is set to None, the `predict_freq` function of the `clf` will
         be used instead. If this is not defined, an Exception is raised.
-    metric_dict : dict, default=None
+    metric_dict : dict, (default=None)
         Any further parameters are passed directly to the kernel function.
         If metric_dict is None and metric is 'rbf' metric_dict is set to
         {'gamma': 'mean'}.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the query strategy.
-    prior : float
+    prior : float, (default=1.0e-3)
         The prior value that is passed onto ProbabilisticAL
         (see pool.ProbabilisticAL).
-    m_max : float
+    m_max : float, (default=2)
         The m_max value that is passed onto ProbabilisticAL
         (see pool.ProbabilisticAL).
 

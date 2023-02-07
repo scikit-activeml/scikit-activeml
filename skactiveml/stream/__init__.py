@@ -12,14 +12,16 @@ from ._uncertainty_zliobaite import (
     RandomVariableUncertainty,
 )
 from ._density_uncertainty import (
-    DBALStream,
-    CogDQSRan,
-    CogDQSRanVarUn,
-    CogDQSVarUn,
-    CogDQSFixUn,
+    StreamDensityBasedAL,
+    CognitiveDualQueryStrategy,
+    CognitiveDualQueryStrategyRan,
+    CognitiveDualQueryStrategyRanVarUn,
+    CognitiveDualQueryStrategyVarUn,
+    CognitiveDualQueryStrategyFixUn,
 )
 
 __all__ = [
+    "budgetmanager",
     "StreamRandomSampling",
     "PeriodicSampling",
     "FixedUncertainty",
@@ -27,9 +29,10 @@ __all__ = [
     "Split",
     "StreamProbabilisticAL",
     "RandomVariableUncertainty",
-    "DBALStream",
-    "CogDQSRan",
-    "CogDQSRanVarUn",
-    "CogDQSVarUn",
-    "CogDQSFixUn",
+    "StreamDensityBasedAL",
+    "CognitiveDualQueryStrategy",
+    "CognitiveDualQueryStrategyRan",
+    "CognitiveDualQueryStrategyRanVarUn",
+    "CognitiveDualQueryStrategyVarUn",
+    "CognitiveDualQueryStrategyFixUn",
 ]

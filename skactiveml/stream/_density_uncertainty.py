@@ -19,30 +19,30 @@ from skactiveml.utils import (
 )
 from skactiveml.stream.budgetmanager import (
     FixedUncertaintyBudgetManager,
-    DensityBasedBudgetManager,
+    DensityBasedSplitBudgetManager,
     VariableUncertaintyBudgetManager,
     RandomBudgetManager,
     RandomVariableUncertaintyBudgetManager,
 )
 
 
-class DBALStream(SingleAnnotatorStreamQueryStrategy):
-    """DBALStream
+class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
+    """StreamDensityBasedAL
 
-    The DBALStream [1] query strategy is an extension to the uncertainty based
-    query strategies proposed by Žliobaitė et al. [2]. In addition to the
-    uncertainty assessment, DBALStream assesses the local density and only
-    allows querying the label for a candidate if that local density is
-    sufficiently high. The local density is measured using a sliding window.
-    The local density is represented by the number of instances, the new
-    instance is the new nearest neighbor from.
+    The StreamDensityBasedAL [1] query strategy is an extension to the
+    uncertainty based query strategies proposed by Žliobaitė et al. [2]. In
+    addition to the uncertainty assessment, StreamDensityBasedAL assesses the
+    local density and only allows querying the label for a candidate if that
+    local density is sufficiently high. The local density is measured using a
+    sliding window. The local density is represented by the number of
+    instances, the new instance is the new nearest neighbor from.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         DensityBasedBudgetManager will be used by default. The
@@ -54,11 +54,11 @@ class DBALStream(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    window_size : int, default=100
+    window_size : int, (default=100)
         Determines the sliding window size of the local density window.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
-    dist_func : callable, default=None
+    dist_func : callable, (default=None)
         The distance function used to calculate the distances within the local
         density window. If None, `sklearn.metrics.pairwise.pairwise_distances`
         will be used by default
@@ -198,8 +198,8 @@ class DBALStream(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        self : UncertaintyZliobaite
-            The UncertaintyZliobaite returns itself, after it is updated.
+        self : StreamDensityBasedAL
+            The StreamDensityBasedAL returns itself, after it is updated.
         """
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -369,7 +369,7 @@ class DBALStream(SingleAnnotatorStreamQueryStrategy):
         else:
             self.dist_func_ = self.dist_func
         if not callable(self.dist_func_):
-            raise TypeError("frequency_estimation needs to be a callable")
+            raise TypeError("dist_func_ needs to be a callable")
 
         self.dist_func_dict_ = (
             self.dist_func_dict if self.dist_func_dict is not None else {}
@@ -455,32 +455,34 @@ class DBALStream(SingleAnnotatorStreamQueryStrategy):
         budget_manager : BudgetManager
             The BudgetManager that should be used by default.
         """
-        return DensityBasedBudgetManager
+        return DensityBasedSplitBudgetManager
 
 
-class CogDQS(SingleAnnotatorStreamQueryStrategy):
-    """CogDQS
+class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
+    """CognitiveDualQueryStrategy
 
-    This class is the base for the CogDQS query strategy proposed in [1].
-    To use this strategy, refer to `CogDQSRan`, `CogDQSRanVarUn`,
-    `CogDQSVarUn` , and `CogDQSFixUn`. The CogDQS strategy is an extension to
-    the uncertainty based query strategies proposed by Žliobaitė et al. [2] and
-    follows the same idea as DBALStream [3] where queries for labels is only
+    This class is the base for the CognitiveDualQueryStrategy query strategy
+    proposed in [1]. To use this strategy, refer to
+    `CognitiveDualQueryStrategyRan`, `CognitiveDualQueryStrategyRanVarUn`,
+    `CognitiveDualQueryStrategyVarUn` , and `CognitiveDualQueryStrategyFixUn`.
+    The CognitiveDualQueryStrategy strategy is an extension to the uncertainty
+    based query strategies proposed by Žliobaitė et al. [2] and follows the
+    same idea as StreamDensityBasedAL [3] where queries for labels is only
     allowed if the local density around the corresponding instance is
     sufficiently high. The authors propose the use of a cognitive window that
     monitors the most representative samples within a data stream.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         a default budget manager will be used that is defined in the class
-        inheriting from CogDQS. The budget manager will be initialized based on
-        the following conditions:
+        inheriting from CognitiveDualQueryStrategy. The budget manager will be
+        initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
             with the given budget.
             If only a budget manager is given use the budget manager.
@@ -488,23 +490,37 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    density_threshold : int, default=1
+    density_threshold : int, (default=1)
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-    cognition_window_size : int, default=10
+    cognition_window_size : int, (default=10)
         Determines the size of the cognition window
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
-    dist_func : callable, default=None
+    dist_func : callable, (default=None)
         The distance function used to calculate the distances within the local
         density window. If None use
         `sklearn.metrics.pairwise.pairwise_distances`
     dist_func_dict : dict, optional (default=None)
         Additional parameters for `dist_func`.
-
-    force_full_budget : bool, default=False
+    force_full_budget : bool, (default=False)
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
+
+    See Also
+    --------
+    EstimatedBudgetZliobaite : BudgetManager implementing the base class for
+        Zliobaite based budget managers
+    CognitiveDualQueryStrategyRan : CognitiveDualQueryStrategy using the
+        RandomBudgetManager that is based on EstimatedBudgetZliobaite
+    CognitiveDualQueryStrategyFixUn : CognitiveDualQueryStrategy using the
+        FixedUncertaintyBudgetManager that is based on EstimatedBudgetZliobaite
+    CognitiveDualQueryStrategyVarUn : VariableUncertaintyBudgetManager using
+        the VariableUncertaintyBudgetManager that is based on
+        EstimatedBudgetZliobaite
+    CognitiveDualQueryStrategyRanVarUn : CognitiveDualQueryStrategy using the
+        RandomVariableUncertaintyBudgetManager that is based on
+        EstimatedBudgetZliobaite
 
     References
     ----------
@@ -659,8 +675,8 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        self : CogDQS
-            The CogDQS returns itself, after it is updated.
+        self : CognitiveDualQueryStrategy
+            The CognitiveDualQueryStrategy returns itself, after it is updated.
         """
         self._validate_force_full_budget()
         # check if a budget_manager is set
@@ -971,24 +987,34 @@ class CogDQS(SingleAnnotatorStreamQueryStrategy):
             check_consistent_length(X, y)
         return X, y, sample_weight
 
+    def _get_default_budget_manager(self):
+        """Provide the budget manager that will be used as default.
 
-class CogDQSRan(CogDQS):
-    """CogDQSRan
+        Returns
+        -------
+        budget_manager : BudgetManager
+            The BudgetManager that should be used by default.
+        """
+        return RandomVariableUncertaintyBudgetManager
 
-    This class implements the CogDQS strategy with Random Sampling. The CogDQS
-    strategy is an extension to the uncertainty based query strategies proposed
-    by Žliobaitė et al. [2] and follows the same idea as DBALStream [3] where
-    queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
-    a cognitive window that monitors the most representative samples within a
-    data stream.
+
+class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
+    """CognitiveDualQueryStrategyRan
+
+    This class implements the CognitiveDualQueryStrategy strategy with Random
+    Sampling. The CognitiveDualQueryStrategy strategy is an extension to the
+    uncertainty based query strategies proposed by Žliobaitė et al. [2] and
+    follows the same idea as StreamDensityBasedAL [3] where queries for labels
+    is only allowed if the local density around the corresponding instance is
+    sufficiently high. The authors propose the use of a cognitive window that
+    monitors the most representative samples within a data stream.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         RandomBudgetManager will be used by default. The
@@ -1000,22 +1026,28 @@ class CogDQSRan(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    density_threshold : int, default=1
+    density_threshold : int, (default=1)
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-    cognition_window_size : int, default=10
+    cognition_window_size : int, (default=10)
         Determines the size of the cognition window
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
-    dist_func : callable, default=None
+    dist_func : callable, (default=None)
         The distance function used to calculate the distances within the local
         density window. If None use
         `sklearn.metrics.pairwise.pairwise_distances`
     dist_func_dict : dict, optional (default=None)
         Additional parameters for `dist_func`.
-    force_full_budget : bool, default=False
+    force_full_budget : bool, (default=False)
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
+
+    See Also
+    --------
+    .budgetmanager.RandomBudgetManager : The default budget manager
+    .budgetmanager.EstimatedBudgetZliobaite : The base class for
+        RandomBudgetManager
 
     References
     ----------
@@ -1030,6 +1062,27 @@ class CogDQSRan(CogDQS):
         BigMine 2014 (pp. 133-148).
 
     """
+
+    def __init__(
+        self,
+        budget=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        dist_func=None,
+        dist_func_dict=None,
+        random_state=None,
+        force_full_budget=False,
+    ):
+        super().__init__(
+            budget=budget,
+            random_state=random_state,
+            budget_manager=None,
+            density_threshold=density_threshold,
+            dist_func=dist_func,
+            dist_func_dict=dist_func_dict,
+            cognition_window_size=cognition_window_size,
+            force_full_budget=force_full_budget,
+        )
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -1042,23 +1095,23 @@ class CogDQSRan(CogDQS):
         return RandomBudgetManager
 
 
-class CogDQSFixUn(CogDQS):
-    """CogDQSFixUn
+class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
+    """CognitiveDualQueryStrategyFixUn
 
-    This class implements the CogDQS strategy with FixedUncertainty. The CogDQS
-    strategy is an extension to the uncertainty based query strategies proposed
-    by Žliobaitė et al. [2] and follows the same idea as DBALStream [3] where
-    queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
-    a cognitive window that monitors the most representative samples within a
-    data stream.
+    This class implements the CognitiveDualQueryStrategy strategy with
+    FixedUncertainty. The CognitiveDualQueryStrategy strategy is an extension
+    to the uncertainty based query strategies proposed by Žliobaitė et al. [2]
+    and follows the same idea as StreamDensityBasedAL [3] where queries for
+    labels is only allowed if the local density around the corresponding
+    instance is sufficiently high. The authors propose the use of a cognitive
+    window that monitors the most representative samples within a data stream.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         FixedUncertaintyBudgetManager will be used by default. The
@@ -1070,21 +1123,27 @@ class CogDQSFixUn(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    density_threshold : int, default=1
+    density_threshold : int, (default=1)
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-    cognition_window_size : int, default=10
+    cognition_window_size : int, (default=10)
         Determines the size of the cognition window
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
-    dist_func : callable, default=None
+    dist_func : callable, (default=None)
         The distance function used to calculate the distances within the local
         density window. If None use
         `sklearn.metrics.pairwise.pairwise_distances`
 
-    force_full_budget : bool, default=False
+    force_full_budget : bool, (default=False)
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
+
+    See Also
+    --------
+    .budgetmanager.FixedUncertaintyBudgetManager : The default budget manager
+    .budgetmanager.EstimatedBudgetZliobaite : The base class for
+        FixedUncertaintyBudgetManager
 
     References
     ----------
@@ -1099,6 +1158,27 @@ class CogDQSFixUn(CogDQS):
         BigMine 2014 (pp. 133-148).
 
     """
+
+    def __init__(
+        self,
+        budget=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        dist_func=None,
+        dist_func_dict=None,
+        random_state=None,
+        force_full_budget=False,
+    ):
+        super().__init__(
+            budget=budget,
+            random_state=random_state,
+            budget_manager=None,
+            density_threshold=density_threshold,
+            dist_func=dist_func,
+            dist_func_dict=dist_func_dict,
+            cognition_window_size=cognition_window_size,
+            force_full_budget=force_full_budget,
+        )
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -1111,23 +1191,24 @@ class CogDQSFixUn(CogDQS):
         return FixedUncertaintyBudgetManager
 
 
-class CogDQSVarUn(CogDQS):
-    """CogDQSVarUn
+class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
+    """CognitiveDualQueryStrategyVarUn
 
-    This class implements the CogDQS strategy with VariableUncertainty. The
-    CogDQS strategy is an extension to the uncertainty based query strategies
-    proposed by Žliobaitė et al. [2] and follows the same idea as
-    DBALStream [3] where queries for labels is only allowed if the local
-    density around the corresponding instance is sufficiently high. The authors
-    propose the use of a cognitive window that monitors the most representative
-    samples within a data stream.
+    This class implements the CognitiveDualQueryStrategy strategy with
+    VariableUncertainty. The CognitiveDualQueryStrategy strategy is an
+    extension to the uncertainty based query strategies proposed by Žliobaitė
+    et al. [2] and follows the same idea as StreamDensityBasedAL [3] where
+    queries for labels is only allowed if the local density around the
+    corresponding instance is sufficiently high. The authors propose the use of
+    a cognitive window that monitors the most representative samples within a
+    data stream.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         VariableUncertaintyBudgetManager will be used by default. The
@@ -1139,22 +1220,29 @@ class CogDQSVarUn(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    density_threshold : int, default=1
+    density_threshold : int, (default=1)
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-    cognition_window_size : int, default=10
+    cognition_window_size : int, (default=10)
         Determines the size of the cognition window
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
-    dist_func : callable, default=None
+    dist_func : callable, (default=None)
         The distance function used to calculate the distances within the local
         density window. If None use
         `sklearn.metrics.pairwise.pairwise_distances`
     dist_func_dict : dict, optional (default=None)
         Additional parameters for `dist_func`.
-    force_full_budget : bool, default=False
+    force_full_budget : bool, (default=False)
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
+
+    See Also
+    --------
+    .budgetmanager.VariableUncertaintyBudgetManager : The default budget
+        manager
+    .budgetmanager.EstimatedBudgetZliobaite : The base class for
+        VariableUncertaintyBudgetManager
 
     References
     ----------
@@ -1169,6 +1257,27 @@ class CogDQSVarUn(CogDQS):
         BigMine 2014 (pp. 133-148).
 
     """
+
+    def __init__(
+        self,
+        budget=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        dist_func=None,
+        dist_func_dict=None,
+        random_state=None,
+        force_full_budget=False,
+    ):
+        super().__init__(
+            budget=budget,
+            random_state=random_state,
+            budget_manager=None,
+            density_threshold=density_threshold,
+            dist_func=dist_func,
+            dist_func_dict=dist_func_dict,
+            cognition_window_size=cognition_window_size,
+            force_full_budget=force_full_budget,
+        )
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -1181,23 +1290,24 @@ class CogDQSVarUn(CogDQS):
         return VariableUncertaintyBudgetManager
 
 
-class CogDQSRanVarUn(CogDQS):
-    """CogDQSRanVarUn
+class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
+    """CognitiveDualQueryStrategyRanVarUn
 
-    This class implements the CogDQS strategy with RandomVariableUncertainty.
-    The CogDQS strategy is an extension to the uncertainty based query
-    strategies proposed by Žliobaitė et al. [2] and follows the same idea as
-    DBALStream [3] where queries for labels is only allowed if the local
-    density around the corresponding instance is sufficiently high. The authors
-    propose the use of a cognitive window that monitors the most representative
-    samples within a data stream.
+    This class implements the CognitiveDualQueryStrategy strategy with
+    RandomVariableUncertainty. The CognitiveDualQueryStrategy strategy is an
+    extension to the uncertainty based query strategies proposed by Žliobaitė
+    et al. [2] and follows the same idea as StreamDensityBasedAL [3] where
+    queries for labels is only allowed if the local density around the
+    corresponding instance is sufficiently high. The authors propose the use of
+    a cognitive window that monitors the most representative samples within a
+    data stream.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         RandomVariableUncertaintyBudgetManager will be used by default. The
@@ -1209,22 +1319,29 @@ class CogDQSRanVarUn(CogDQS):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    density_threshold : int, default=1
+    density_threshold : int, (default=1)
         Determines the local density factor size that needs to be reached
         in order to sample the candidate.
-    cognition_window_size : int, default=10
+    cognition_window_size : int, (default=10)
         Determines the size of the cognition window
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, (default=None)
         Controls the randomness of the estimator.
-    dist_func : callable, default=None
+    dist_func : callable, (default=None)
         The distance function used to calculate the distances within the local
         density window. If None use
         `sklearn.metrics.pairwise.pairwise_distances`
     dist_func_dict : dict, optional (default=None)
         Additional parameters for `dist_func`.
-    force_full_budget : bool, default=False
+    force_full_budget : bool, (default=False)
             If true, tries to utilize the full budget. The paper doesn't update
             the budget manager if the locale density factor is 0
+
+    See Also
+    --------
+    .budgetmanager.RandomVariableUncertaintyBudgetManager : The default budget
+        manager
+    .budgetmanager.EstimatedBudgetZliobaite : The base class for
+        RandomVariableUncertaintyBudgetManager
 
     References
     ----------
@@ -1239,6 +1356,27 @@ class CogDQSRanVarUn(CogDQS):
         BigMine 2014 (pp. 133-148).
 
     """
+
+    def __init__(
+        self,
+        budget=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        dist_func=None,
+        dist_func_dict=None,
+        random_state=None,
+        force_full_budget=False,
+    ):
+        super().__init__(
+            budget=budget,
+            random_state=random_state,
+            budget_manager=None,
+            density_threshold=density_threshold,
+            dist_func=dist_func,
+            dist_func_dict=dist_func_dict,
+            cognition_window_size=cognition_window_size,
+            force_full_budget=force_full_budget,
+        )
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
