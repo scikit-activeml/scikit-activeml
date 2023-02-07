@@ -29,19 +29,16 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
         0 <= budget <= 1. See Also :class:`BudgetManager`.
-    w : int
-        Specifies the size of the memory window. Controlles the budget in the
-        last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1.0)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.01)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
-    delta : float
+    delta : float, optional (default=1.0)
         Specifies the standart deviation of the distribution. Default 1.0
     random_state : int | np.random.RandomState, optional (default=None)
         Random state for candidate selection.

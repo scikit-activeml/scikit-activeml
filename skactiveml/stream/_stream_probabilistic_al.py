@@ -32,10 +32,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, (default=None)
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, (default=None)
+    budget_manager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         BalancedIncrementalQuantileFilter will be used by default. The budget
@@ -47,7 +47,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    metric : str or callable, (default=None)
+    metric : str or callable, optional (default=None)
         The metric must a be None or a valid kernel as defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`. The kernel is used to
         calculate the frequency of labels near the candidates and multiplied
@@ -55,16 +55,16 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         estimate for each class.
         If metric is set to None, the `predict_freq` function of the `clf` will
         be used instead. If this is not defined, an Exception is raised.
-    metric_dict : dict, (default=None)
+    metric_dict : dict, optional (default=None)
         Any further parameters are passed directly to the kernel function.
         If metric_dict is None and metric is 'rbf' metric_dict is set to
         {'gamma': 'mean'}.
-    random_state : int, RandomState instance, (default=None)
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the query strategy.
-    prior : float, (default=1.0e-3)
+    prior : float, optional (default=1.0e-3)
         The prior value that is passed onto ProbabilisticAL
         (see pool.ProbabilisticAL).
-    m_max : float, (default=2)
+    m_max : float, optional (default=2)
         The m_max value that is passed onto ProbabilisticAL
         (see pool.ProbabilisticAL).
 
@@ -119,7 +119,8 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,), optional
+        (default=None)
             Sample weights for X, used to fit the clf.
         fit_clf : bool,
             If True, refit the classifier also requires X and y to be given.
@@ -262,16 +263,15 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
         fit_clf : bool,
             If true, refit the classifier also requires X and y to be given.
-        utility_weight: array-like of shape (n_candidate_samples), optional
-        (default=None)
+        utility_weight: array-like of shape (n_candidate_samples)
             Densities for each sample in `candidates`.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
+        reset : bool, optional (default=True)
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
@@ -292,8 +292,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Checked training sample weight
         fit_clf : bool,
             Checked boolean value of `fit_clf`
-        utility_weight: array-like of shape (n_candidate_samples), optional
-        (default=None)
+        utility_weight: array-like of shape (n_candidate_samples)
             Checked densities for each sample in `candidates`.
         candidates: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
@@ -360,7 +359,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         Returns
@@ -392,7 +391,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         Returns
@@ -415,14 +414,12 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates: np.ndarray, shape (n_candidates, n_features)
             Checked candidate samples
-        utility_weight: array-like of shape (n_candidate_samples), optional
-        (default=None)
+        utility_weight: array-like of shape (n_candidate_samples)
             Densities for each sample in `candidates`.
 
         Returns
         -------
-        utility_weight : array-like of shape (n_candidate_samples), optional
-        (default=None)
+        utility_weight : array-like of shape (n_candidate_samples)
             Checked densities for each sample in `candidates`.
         """
         if utility_weight is None:

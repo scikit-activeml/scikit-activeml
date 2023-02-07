@@ -31,10 +31,10 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         FixedUncertaintyBudgetManager will be used by default. The
@@ -46,7 +46,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
@@ -213,13 +213,13 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         fit_clf : bool,
             If true, refit the classifier also requires X and y to be given.
-        reset : bool, default=True
+        reset : bool, optional (default=True)
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
@@ -285,7 +285,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
         fit_clf : bool,
             If true, refit the classifier also requires X and y to be given.
@@ -312,7 +312,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
 
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         Returns
@@ -344,10 +344,10 @@ class FixedUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         FixedUncertaintyBudgetManager will be used by default. The budget
@@ -359,7 +359,7 @@ class FixedUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budget manager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
@@ -393,10 +393,10 @@ class VariableUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         VariableUncertaintyBudgetManager will be used by default. The budget
@@ -408,7 +408,7 @@ class VariableUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
@@ -442,10 +442,10 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, (default=None)
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budgetmanager : BudgetManager, (default=None)
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         RandomVariableUncertaintyBudgetManager will be used by default. The
@@ -457,7 +457,7 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, (default=None)
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
@@ -486,10 +486,10 @@ class Split(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, (default=None)
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-    budgetmanager : BudgetManager, (default=None)
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         SplitBudgetManager will be used by default. The budget
@@ -502,7 +502,7 @@ class Split(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-    random_state : int, RandomState instance, (default=None)
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
