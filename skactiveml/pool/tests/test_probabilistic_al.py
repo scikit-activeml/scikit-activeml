@@ -2,8 +2,9 @@ import unittest
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.naive_bayes import GaussianNB
 
-from skactiveml.classifier import ParzenWindowClassifier
+from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import ProbabilisticAL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
@@ -47,6 +48,41 @@ class TestProbabilisticAL(
     def test_init_param_m_max(self):
         test_cases = [(-2, ValueError), (1.5, TypeError)]
         self._test_param("init", "m_max", test_cases)
+
+    def test_init_param_metric_dict(self):
+        pal = ProbabilisticAL(
+            metric="rbf", metric_dict=["gamma"]
+        )
+        self.assertRaises(TypeError, pal.query, **(self.kwargs))
+        pal = ProbabilisticAL(
+            metric="rbf", metric_dict={"test": 0}
+        )
+        self.assertRaises(TypeError, pal.query, **(self.kwargs))
+
+    def test_init_param_metric(self):
+        pal = ProbabilisticAL(metric="string")
+        self.assertRaises(ValueError, pal.query, **(self.kwargs))
+        pal = ProbabilisticAL(metric=0)
+        self.assertRaises(ValueError, pal.query, **(self.kwargs))
+        pal = ProbabilisticAL()
+        clf = SklearnClassifier(GaussianNB())
+        self.assertRaises(
+            TypeError,
+            pal.query,
+            candidates=self.candidates,
+            clf=clf,
+            X=self.X,
+            y=self.y,
+        )
+        pal = ProbabilisticAL(metric="rbf")
+        clf = SklearnClassifier(GaussianNB())
+        pal.query(
+            candidates=self.candidates,
+            clf=clf,
+            X=self.X,
+            y=self.y,
+            fit_clf=True,
+        )
 
     def test_query_param_clf(self):
         add_test_cases = [

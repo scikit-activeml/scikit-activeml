@@ -72,6 +72,22 @@ class TestUncertaintySampling(
         ]
         super().test_query_param_sample_weight(test_cases)
 
+    def test_query_param_utility_weight(self):
+        X = self.query_default_params_clf["X"]
+        test_cases = [
+            ("string", ValueError),
+            (X, ValueError),
+            (np.empty((len(X) - 1)), ValueError),
+        ]
+        self._test_param("query", "utility_weight", test_cases)
+        self._test_param("query", "utility_weight", [(np.ones(2), ValueError)],
+                         replace_query_params={'candidates': [2]})
+        self._test_param("query", "utility_weight",
+                         [(np.ones(len(X)-1), ValueError)],
+                         replace_query_params={'candidates': np.ones_like(X)})
+
+
+
     def test_query(self):
         compare_list = []
         random_state = np.random.RandomState(42)
@@ -83,6 +99,19 @@ class TestUncertaintySampling(
         candidates = random_state.rand(100, 10)
         X = random_state.rand(100, 10)
         y = random_state.randint(0, 2, (100,))
+
+        # utility_weight
+        qs = UncertaintySampling()
+        utility_weight = np.arange(len(candidates))
+        idx, utils_w = qs.query(
+            X, y, clf, candidates=candidates, utility_weight=utility_weight,
+            return_utilities=True
+        )
+        idx, utils = qs.query(
+            X, y, clf, candidates=candidates, return_utilities=True
+        )
+        np.testing.assert_array_equal(utils*utility_weight, utils_w)
+
 
         # query
         qs = UncertaintySampling(method="entropy")
