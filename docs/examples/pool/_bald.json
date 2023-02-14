@@ -1,6 +1,6 @@
 [
   {
-    "class" : "BALD",
+    "class" : "BatchBALD",
     "package" : "pool",
     "method" : "Bayesian Active Learning by Disagreement",
     "category" :  "Query-by-Committee",
@@ -10,7 +10,7 @@
     "refs" : ["houlsby2011bayesian"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "import_misc" : ["from skactiveml.pool import BALD"],
+    "import_misc" : ["from skactiveml.pool import BatchBALD"],
     "import_clf" : ["from sklearn.gaussian_process import GaussianProcessClassifier",
                     "from sklearn.ensemble import BaggingClassifier",
                     "from skactiveml.classifier import SklearnClassifier"],
@@ -20,7 +20,7 @@
     "plot_utility_params" : "replace_nan=None, candidates=X[unlabeled_indices(y)]"
   },
   {
-    "class" : "BALD",
+    "class" : "BatchBALD",
     "package" : "pool",
     "method" : "Batch Bayesian Active Learning by Disagreement",
     "category" :  "Query-by-Committee",
@@ -30,7 +30,7 @@
     "refs" : ["houlsby2011bayesian", "kirsch2019batchbald"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "import_misc" : ["from skactiveml.pool import BALD"],
+    "import_misc" : ["from skactiveml.pool import BatchBALD"],
     "import_clf" : ["from sklearn.gaussian_process import GaussianProcessClassifier",
                     "from sklearn.ensemble import BaggingClassifier",
                     "from skactiveml.classifier import SklearnClassifier"],

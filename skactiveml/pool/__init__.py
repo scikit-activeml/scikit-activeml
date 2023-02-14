@@ -5,7 +5,7 @@ pool-based active learning.
 
 from . import multiannotator
 from . import utils
-from ._bald import BALD, batch_bald
+from ._bald import BatchBALD, batch_bald
 from ._cost_embedding_al import CostEmbeddingAL
 from ._discriminative_al import DiscriminativeAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
@@ -59,6 +59,6 @@ __all__ = [
     "GreedySamplingX",
     "GreedySamplingTarget",
     "DiscriminativeAL",
-    "BALD",
+    "BatchBALD",
     "batch_bald",
 ]

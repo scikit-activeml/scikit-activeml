@@ -13,10 +13,10 @@ from ..utils import (
 )
 
 
-class BALD(QueryByCommittee):
+class BatchBALD(QueryByCommittee):
     """Batch Bayesian Active Learning by Disagreement (BatchBALD)
 
-    The Bayesian-Active-Learning-by-Disagreement (BALD) [1] strategy reduces the
+    The Bayesian-Active-Learning-by-Disagreement (BatchBALD) [1] strategy reduces the
     number  of possible hypotheses maximally fast to minimize the uncertainty
     about the parameters using Shannon’s entropy. It seeks the data point that
     maximises the decrease in expected posterior entropy. For the batch case
@@ -162,7 +162,7 @@ def batch_bald(probas, batch_size=1, random_state=None):
     """BatchBALD: Efficient and Diverse Batch Acquisition
         for Deep Bayesian Active Learning
 
-    BatchBALD [1] is an extension of BALD (Bayesian Active Learning by
+    BatchBALD [1] is an extension of BatchBALD (Bayesian Active Learning by
     Disagreement) [2] whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.

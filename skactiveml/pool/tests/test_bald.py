@@ -18,7 +18,7 @@ from sklearn.gaussian_process import (
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 
-from skactiveml.pool._bald import BALD, batch_bald
+from skactiveml.pool._bald import BatchBALD, batch_bald
 from skactiveml.regressor import NICKernelRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
@@ -42,7 +42,7 @@ class TestBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             "fit_ensemble": True,
         }
         super().setUp(
-            qs_class=BALD,
+            qs_class=BatchBALD,
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
@@ -199,8 +199,8 @@ class Testbatch_bald(unittest.TestCase):
 
 
 def _bald(probas):
-    """Bayesian Active Learning by Disagreement (BALD)
-    Computes the Bayesian Active Learning by Disagreement (BALD) score for
+    """Bayesian Active Learning by Disagreement (BatchBALD)
+    Computes the Bayesian Active Learning by Disagreement (BatchBALD) score for
     each sample.
 
     Parameters
@@ -211,7 +211,7 @@ def _bald(probas):
     Returns
     -------
     scores: np.ndarray, shape (n_samples)
-        The BALD-scores.
+        The BatchBALD-scores.
 
     References
     ----------
