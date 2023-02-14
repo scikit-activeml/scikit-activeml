@@ -56,7 +56,7 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
 Examples
 ========
-We provide broad overview of different use-cases in out `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
+We provide a broad overview of different use-cases in out `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
 
 
 - `Pool-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/00_pool_getting_started.html>`_,
@@ -166,7 +166,7 @@ cycle is given below.
    :width: 400
 
 Query Strategy Overview
-############################
+#######################
 
 For better orientation, we provide an `overview <https://scikit-activeml.github.io/scikit-activeml-docs/generated/strategy_overview.html>`_
 (incl. paper references and `visualizations <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
