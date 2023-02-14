@@ -287,7 +287,7 @@ def plot_contour_for_samples(
     replace_nan=0.0,
     feature_bound=None,
     ax=None,
-    res=101,
+    res=21,
     contour_dict=None,
 ):
     """Plot the utility for the given query strategy.

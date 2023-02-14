@@ -2,8 +2,10 @@ import unittest
 from copy import deepcopy
 
 import numpy as np
+from click.core import batch
+from matplotlib.pyplot import axis
 from sklearn import clone
-from sklearn.ensemble import VotingClassifier, RandomForestClassifier, \
+from sklearn.ensemble import RandomForestClassifier, \
     RandomForestRegressor, BaggingClassifier
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor, \
@@ -11,10 +13,10 @@ from sklearn.gaussian_process import GaussianProcessRegressor, \
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 
-from skactiveml.pool._bald import BALD, _bald, _batchbald
+from skactiveml.pool._bald import BALD, batch_bald
 from skactiveml.regressor import NICKernelRegressor
 from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy
+    TemplateSingleAnnotatorPoolQueryStrategy, TemplatePoolQueryStrategy
 from skactiveml.utils import MISSING_LABEL
 
 
@@ -111,18 +113,14 @@ class TestBALD(
         self._test_param("query", "fit_ensemble", test_cases)
 
     def test_query(self):
-        # test _BALD and _BatchBald
-        probas = np.random.rand(10, 100, 5)
-        np.testing.assert_allclose(_bald(probas), _batchbald(probas)[0])
-
         gpc = ParzenWindowClassifier(classes=self.classes)
         ensemble_bagging = SklearnClassifier(
-            estimator=BaggingClassifier(estimator=gpc),
+            estimator=BaggingClassifier(estimator=gpc, random_state=42),
             classes=self.classes,
         )
         ensemble_array_clf = [
-            ParzenWindowClassifier(classes=self.classes),
-            ParzenWindowClassifier(classes=self.classes),
+            ParzenWindowClassifier(classes=self.classes, random_state=41),
+            ParzenWindowClassifier(classes=self.classes, random_state=42),
         ]
         ensemble_list = [
             self.ensemble_clf,
@@ -130,10 +128,91 @@ class TestBALD(
             ensemble_array_clf,
         ]
         for ensemble in ensemble_list:
-            query_params = deepcopy(self.query_default_params_clf)
-            query_params["ensemble"] = ensemble
-            query_params["return_utilities"] = True
-            qs = self.qs_class()
-            idx, u = qs.query(**query_params)
-            self.assertEqual(len(idx), 1)
-            self.assertEqual(len(u), 1)
+            with self.subTest(init_labels=ensemble):
+                query_params = deepcopy(self.query_default_params_clf)
+                batch_size = 2
+                query_params["batch_size"] = batch_size
+                query_params["ensemble"] = ensemble
+                query_params["return_utilities"] = True
+                qs = self.qs_class(random_state=42)
+                np.testing.assert_equal(qs.query(**query_params)[1],
+                                        qs.query(**query_params)[1])
+                idx, u = qs.query(**query_params)
+                self.assertEqual(len(idx), batch_size)
+                self.assertEqual(len(u), batch_size)
+
+
+class Testbatch_bald(unittest.TestCase):
+    def setUp(self):
+        p = np.random.rand(10, 100, 1)
+        self.default_params = {
+            "probas" : np.append(p, 1-p, axis=2),
+            "batch_size" : 1,
+            "random_state" : 0,
+        }
+
+    def test_param_probas(self):
+        test_cases = [(None, AttributeError),
+                      (np.random.rand(10, 100), ValueError),
+                      (np.random.rand(10, 100, 3), None),
+                      (np.random.rand(10, 100, 3, 2), ValueError)]
+        self._test_param(batch_bald, "probas", test_cases)
+
+    def test_param_batch_size(self):
+        test_cases = [(0, ValueError), (1.2, TypeError), (1, None)]
+        self._test_param(batch_bald, "batch_size", test_cases)
+
+    def test_param_random_state(self):
+        test_cases = [(np.nan, ValueError), ("state", ValueError), (1, None)]
+        self._test_param(batch_bald, "random_state", test_cases)
+
+    def test_batch_bald(self):
+        # test _BALD and _BatchBald
+        probas = np.random.rand(10, 100, 5)
+        np.testing.assert_equal(_bald(probas), _bald(probas))
+        np.testing.assert_allclose(_bald(probas), batch_bald(probas)[0])
+        np.testing.assert_equal(batch_bald(probas), batch_bald(probas))
+
+    def _test_param(
+        self,
+        test_func,
+        test_param,
+        test_cases,
+    ):
+        for i, (test_val, err) in enumerate(test_cases):
+            with self.subTest(msg="Param", id=i, val=test_val):
+                params = deepcopy(self.default_params)
+                params[test_param] = test_val
+
+                if err is None:
+                    test_func(**params)
+                else:
+                    self.assertRaises(err, test_func, **params)
+
+
+
+
+def _bald(probas):
+    """Bayesian Active Learning by Disagreement (BALD)
+    Computes the Bayesian Active Learning by Disagreement (BALD) score for
+    each sample.
+
+    Parameters
+    ----------
+    probas : array-like, shape (n_estimators, n_samples, n_classes)
+        The probability estimates of all estimators, samples, and classes.
+
+    Returns
+    -------
+    scores: np.ndarray, shape (n_samples)
+        The BALD-scores.
+
+    References
+    ----------
+    [1] Houlsby, Neil, et al. "Bayesian active learning for classification and
+        preference learning." arXiv preprint arXiv:1112.5745 (2011).
+    """
+    p_mean = np.mean(probas, axis=0)
+    uncertainty = np.nansum(-p_mean * np.log(p_mean), axis=1)
+    confident = np.nanmean(np.nansum(-probas * np.log(probas), axis=2), axis=0)
+    return uncertainty - confident

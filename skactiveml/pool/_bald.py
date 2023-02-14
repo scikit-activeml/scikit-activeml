@@ -1,12 +1,15 @@
 import numpy as np
+from setuptools._distutils.command.check import check
+from sklearn.utils import check_array
 
 from ..base import SkactivemlClassifier, SkactivemlRegressor
 from ..pool._query_by_committee import _check_ensemble, QueryByCommittee
-from ..utils import rand_argmax, MISSING_LABEL, check_type
+from ..utils import rand_argmax, MISSING_LABEL, check_type, check_scalar, \
+    check_random_state
 
 
 class BALD(QueryByCommittee):
-    """Bayesian Active Learning by Disagreement
+    """Batch Bayesian Active Learning by Disagreement (BatchBALD)
 
     The Bayesian-Active-Learning-by-Disagreement (BALD) [1] strategy reduces the
     number  of possible hypotheses maximally fast to minimize the uncertainty
@@ -23,9 +26,9 @@ class BALD(QueryByCommittee):
 
     References
     ----------
-    [1] HOULSBY, Neil, et al. Bayesian active learning for classification and
+    [1] Houlsby, Neil, et al. Bayesian active learning for classification and
         preference learning. arXiv preprint arXiv:1112.5745, 2011.
-    [2] KIRSCH, Andreas; VAN AMERSFOORT, Joost; GAL, Yarin.
+    [2] Kirsch, Andreas; Van Amersfoort, Joost; GAL, Yarin.
         Batchbald: Efficient and diverse batch acquisition for deep bayesian
         active learning. Advances in neural information processing systems,
         2019, 32. Jg.
@@ -132,7 +135,8 @@ class BALD(QueryByCommittee):
         probas = np.array(
                 [est.predict_proba(X_cand) for est in est_arr]
             )
-        batch_utilities_cand = _batchbald(probas, batch_size)
+        batch_utilities_cand = batch_bald(probas, batch_size,
+                                          self.random_state_)
 
         if mapping is None:
             batch_utilities = batch_utilities_cand
@@ -150,33 +154,7 @@ class BALD(QueryByCommittee):
             return best_indices
 
 
-def _bald(probas):
-    """Bayesian Active Learning by Disagreement (BALD)
-    Computes the Bayesian Active Learning by Disagreement (BALD) score for
-    each sample.
-
-    Parameters
-    ----------
-    probas : array-like, shape (n_estimators, n_samples, n_classes)
-        The probability estimates of all estimators, samples, and classes.
-
-    Returns
-    -------
-    scores: np.ndarray, shape (n_samples)
-        The BALD-scores.
-
-    References
-    ----------
-    [1] Houlsby, Neil, et al. "Bayesian active learning for classification and
-        preference learning." arXiv preprint arXiv:1112.5745 (2011).
-    """
-    p_mean = np.mean(probas, axis=0)
-    uncertainty = np.nansum(-p_mean * np.log(p_mean), axis=1)
-    confident = np.nanmean(np.nansum(-probas * np.log(probas), axis=2), axis=0)
-    return uncertainty - confident
-
-
-def _batchbald(probas, batch_size=1):
+def batch_bald(probas, batch_size=1, random_state=None):
     """BatchBALD: Efficient and Diverse Batch Acquisition
         for Deep Bayesian Active Learning
 
@@ -191,6 +169,8 @@ def _batchbald(probas, batch_size=1):
         The probability estimates of all estimators, samples, and classes.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
+    random_state : int or np.random.RandomState, default=None
+        The random state to use.
 
     Returns
     -------
@@ -205,19 +185,33 @@ def _batchbald(probas, batch_size=1):
     [2] Houlsby, Neil, et al. "Bayesian active learning for classification and
         preference learning." arXiv preprint arXiv:1112.5745 (2011).
     """
+    # Validate input parameters.
+    if probas.ndim != 3:
+        raise ValueError(f"'probas' should be of shape 3, but {probas.ndim}"
+                         f" were given.")
+    probas = check_array(probas, ensure_2d=False, allow_nd=True,
+                         force_all_finite="allow-nan")
+    check_scalar(batch_size, "batch_size", int, min_val=1)
+    check_random_state(random_state)
+
     n_estimators, n_samples, n_classes = probas.shape
     utils = np.full((batch_size, probas.shape[1]), fill_value=np.nan)
     batch = np.empty(0, dtype=np.int64)
-    confidents = -np.nanmean(np.nansum(-probas * np.log(probas), axis=2), axis=0)
+    # Eq. 12 in paper:
+    confidents = np.nanmean(np.nansum(-probas * np.log(probas), axis=2),
+                            axis=0)
     confident = 0
-    P = np.full((1, n_estimators), fill_value=1/n_estimators)
+    P = np.ones((1, n_estimators))
     for n in range(batch_size):
-        P_ = P @ np.swapaxes(probas, 0, 1)
-        unconditional = -np.sum(P_*np.log(P_), axis=(1, 2))
+        # Eq. 13 in paper:
+        P_ = (1 / n_estimators) * P @ np.swapaxes(probas, 0, 1)
+        # Eq. 12 in paper:
+        scores = -np.sum(P_ * np.log(P_), axis=(1, 2))
+        # Eq. 9 in paper:
+        scores -= confident + confidents
 
-        scores = unconditional + (confident+confidents)
         scores[batch] = np.nan
-        idx = rand_argmax(scores)
+        idx = rand_argmax(scores, random_state=random_state)
         if n == 0:
             P = probas[:, idx[0]].T
         else:
