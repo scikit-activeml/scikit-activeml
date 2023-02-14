@@ -5,24 +5,29 @@ import numpy as np
 from click.core import batch
 from matplotlib.pyplot import axis
 from sklearn import clone
-from sklearn.ensemble import RandomForestClassifier, \
-    RandomForestRegressor, BaggingClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    RandomForestRegressor,
+    BaggingClassifier,
+)
 from sklearn.exceptions import NotFittedError
-from sklearn.gaussian_process import GaussianProcessRegressor, \
-    GaussianProcessClassifier
+from sklearn.gaussian_process import (
+    GaussianProcessRegressor,
+    GaussianProcessClassifier,
+)
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 
 from skactiveml.pool._bald import BALD, batch_bald
 from skactiveml.regressor import NICKernelRegressor
-from skactiveml.tests.template_query_strategy import \
-    TemplateSingleAnnotatorPoolQueryStrategy, TemplatePoolQueryStrategy
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    TemplatePoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestBALD(
-    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
-):
+class TestBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def setUp(self):
         self.classes = [0, 1]
         self.ensemble_clf = SklearnClassifier(
@@ -72,7 +77,7 @@ class TestBALD(
             "query",
             "ensemble",
             test_cases,
-            replace_query_params={"fit_ensemble": False}
+            replace_query_params={"fit_ensemble": False},
         )
 
     def test_query_param_y(self, test_cases=None):
@@ -135,8 +140,9 @@ class TestBALD(
                 query_params["ensemble"] = ensemble
                 query_params["return_utilities"] = True
                 qs = self.qs_class(random_state=42)
-                np.testing.assert_equal(qs.query(**query_params)[1],
-                                        qs.query(**query_params)[1])
+                np.testing.assert_equal(
+                    qs.query(**query_params)[1], qs.query(**query_params)[1]
+                )
                 idx, u = qs.query(**query_params)
                 self.assertEqual(len(idx), batch_size)
                 self.assertEqual(len(u), batch_size)
@@ -146,16 +152,18 @@ class Testbatch_bald(unittest.TestCase):
     def setUp(self):
         p = np.random.rand(10, 100, 1)
         self.default_params = {
-            "probas" : np.append(p, 1-p, axis=2),
-            "batch_size" : 1,
-            "random_state" : 0,
+            "probas": np.append(p, 1 - p, axis=2),
+            "batch_size": 1,
+            "random_state": 0,
         }
 
     def test_param_probas(self):
-        test_cases = [(None, AttributeError),
-                      (np.random.rand(10, 100), ValueError),
-                      (np.random.rand(10, 100, 3), None),
-                      (np.random.rand(10, 100, 3, 2), ValueError)]
+        test_cases = [
+            (None, AttributeError),
+            (np.random.rand(10, 100), ValueError),
+            (np.random.rand(10, 100, 3), None),
+            (np.random.rand(10, 100, 3, 2), ValueError),
+        ]
         self._test_param(batch_bald, "probas", test_cases)
 
     def test_param_batch_size(self):
@@ -188,8 +196,6 @@ class Testbatch_bald(unittest.TestCase):
                     test_func(**params)
                 else:
                     self.assertRaises(err, test_func, **params)
-
-
 
 
 def _bald(probas):

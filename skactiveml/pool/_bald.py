@@ -4,8 +4,13 @@ from sklearn.utils import check_array
 
 from ..base import SkactivemlClassifier, SkactivemlRegressor
 from ..pool._query_by_committee import _check_ensemble, QueryByCommittee
-from ..utils import rand_argmax, MISSING_LABEL, check_type, check_scalar, \
-    check_random_state
+from ..utils import (
+    rand_argmax,
+    MISSING_LABEL,
+    check_type,
+    check_scalar,
+    check_random_state,
+)
 
 
 class BALD(QueryByCommittee):
@@ -132,11 +137,10 @@ class BALD(QueryByCommittee):
             estimator_types=[SkactivemlClassifier],
         )
 
-        probas = np.array(
-                [est.predict_proba(X_cand) for est in est_arr]
-            )
-        batch_utilities_cand = batch_bald(probas, batch_size,
-                                          self.random_state_)
+        probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        batch_utilities_cand = batch_bald(
+            probas, batch_size, self.random_state_
+        )
 
         if mapping is None:
             batch_utilities = batch_utilities_cand
@@ -144,9 +148,9 @@ class BALD(QueryByCommittee):
             batch_utilities = np.full((batch_size, len(X)), np.nan)
             batch_utilities[:, mapping] = batch_utilities_cand
 
-        best_indices = rand_argmax(batch_utilities,
-                                   axis=1,
-                                   random_state=self.random_state_)
+        best_indices = rand_argmax(
+            batch_utilities, axis=1, random_state=self.random_state_
+        )
 
         if return_utilities:
             return best_indices, batch_utilities
@@ -187,10 +191,12 @@ def batch_bald(probas, batch_size=1, random_state=None):
     """
     # Validate input parameters.
     if probas.ndim != 3:
-        raise ValueError(f"'probas' should be of shape 3, but {probas.ndim}"
-                         f" were given.")
-    probas = check_array(probas, ensure_2d=False, allow_nd=True,
-                         force_all_finite="allow-nan")
+        raise ValueError(
+            f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
+        )
+    probas = check_array(
+        probas, ensure_2d=False, allow_nd=True, force_all_finite="allow-nan"
+    )
     check_scalar(batch_size, "batch_size", int, min_val=1)
     check_random_state(random_state)
 
@@ -198,8 +204,9 @@ def batch_bald(probas, batch_size=1, random_state=None):
     utils = np.full((batch_size, probas.shape[1]), fill_value=np.nan)
     batch = np.empty(0, dtype=np.int64)
     # Eq. 12 in paper:
-    confidents = np.nanmean(np.nansum(-probas * np.log(probas), axis=2),
-                            axis=0)
+    confidents = np.nanmean(
+        np.nansum(-probas * np.log(probas), axis=2), axis=0
+    )
     confident = 0
     P = np.ones((1, n_estimators))
     for n in range(batch_size):
