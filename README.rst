@@ -1,6 +1,6 @@
 .. intro_start
 
-|Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_
+|Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_ |Black|_
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
 .. _Doc: https://scikit-activeml.github.io/scikit-activeml-docs/
@@ -16,6 +16,9 @@
 
 .. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue
 .. _Paper: https://www.preprints.org/manuscript/202103.0194/v1
+
+.. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
+.. _Black: https://github.com/psf/black
 
 |
 
