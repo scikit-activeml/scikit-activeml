@@ -25,7 +25,7 @@ authors:
   orcid: "https://orcid.org/0000-0001-9467-656X"
 title: "scikit-activeml"
 version: 0.4.0
-date-released: 2021-03-05
+date-released: 2022-12-21
 url: "https://github.com/scikit-activeml/scikit-activeml"
 preferred-citation:
   type: article
