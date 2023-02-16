@@ -118,6 +118,11 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 

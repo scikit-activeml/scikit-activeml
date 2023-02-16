@@ -87,14 +87,16 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
         X : array-like of shape (n_samples, n_features), optional
+        (default=None)
             Input samples used to fit the classifier.
-        y : array-like of shape (n_samples), optional
+        y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,), optional
+        (default=None)
             Sample weights for X, used to fit the clf.
-        fit_clf : bool,
+        fit_clf : bool, optional (default=False)
             If true, refit the classifier also requires X and y to be given.
-        return_utilities : bool, optional
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -152,7 +154,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
-        budget_manager_param_dict : kwargs
+        budget_manager_param_dict : kwargs, optional (default=None)
             Optional kwargs for budget manager.
 
         Returns

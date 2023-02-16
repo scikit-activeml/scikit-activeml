@@ -51,7 +51,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        return_utilities : bool, optional
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -118,9 +118,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
-
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budgetmanager.
 
         Returns
         -------
@@ -232,7 +229,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        return_utilities : bool, optional
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -291,9 +288,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
-
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budgetmanager.
 
         Returns
         -------

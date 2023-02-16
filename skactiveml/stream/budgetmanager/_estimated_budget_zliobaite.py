@@ -46,6 +46,11 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -165,6 +170,11 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -298,6 +308,11 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -470,6 +485,11 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -657,6 +677,11 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -775,6 +800,7 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
             is worth it given the budgeting constraint.
+
         return_utilities : bool, optional
             If true, also return whether there was budget left for each
             assessed utility. The default is False.
@@ -819,6 +845,11 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 

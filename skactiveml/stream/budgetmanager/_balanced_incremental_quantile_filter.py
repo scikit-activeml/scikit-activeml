@@ -97,10 +97,15 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like
             Indicates which instances from candidates have been queried.
 
-        utilities : ndarray of shape (n_samples,), optional
+        utilities : ndarray of shape (n_samples,)
             The utilities based on the query strategy.
 
         Returns

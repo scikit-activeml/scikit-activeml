@@ -110,24 +110,31 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
+
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`. If
             `self.metric` is None, the `clf` must also implement
             `predict_freq`.
+
         X : array-like of shape (n_samples, n_features), optional
         (default=None)
             Input samples used to fit the classifier.
+
         y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
+
         sample_weight : array-like of shape (n_samples,), optional
         (default=None)
             Sample weights for X, used to fit the clf.
-        fit_clf : bool,
+
+        fit_clf : bool,optional (default=False)
             If True, refit the classifier also requires X and y to be given.
+
         utility_weight : array-like of shape (n_candidate_samples), optional
         (default=None)
             Densities for each sample in `candidates`.
-        return_utilities : bool, optional
+
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -200,9 +207,11 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         (n_samples, n_features)
             The instances which could be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
-        budget_manager_param_dict : kwargs, optional
+
+        budget_manager_param_dict : kwargs, optional (default=None)
             Optional kwargs for budgetmanager.
 
         Returns
