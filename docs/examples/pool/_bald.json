@@ -15,7 +15,7 @@
                     "from sklearn.ensemble import BaggingClassifier",
                     "from skactiveml.classifier import SklearnClassifier"],
     "init_clf" : ["SklearnClassifier(BaggingClassifier(\n    SklearnClassifier(GaussianProcessClassifier(), random_state=random_state), \n    random_state=random_state),\n    classes=np.unique(y_true),\n    random_state=random_state\n)"],
-    "init_qs" : "BALD(random_state=random_state)",
+    "init_qs" : "BatchBALD(random_state=random_state)",
     "query_params" : "X=X, y=y, ensemble=clf",
     "plot_utility_params" : "replace_nan=None, candidates=X[unlabeled_indices(y)]"
   },
@@ -35,7 +35,7 @@
                     "from sklearn.ensemble import BaggingClassifier",
                     "from skactiveml.classifier import SklearnClassifier"],
     "init_clf" : ["SklearnClassifier(BaggingClassifier(\n    SklearnClassifier(GaussianProcessClassifier(), random_state=random_state), \n    random_state=random_state),\n    classes=np.unique(y_true),\n    random_state=random_state\n)"],
-    "init_qs" : "BALD(random_state=random_state)",
+    "init_qs" : "BatchBALD(random_state=random_state)",
     "query_params" : "X=X, y=y, ensemble=clf"
   }
 ]

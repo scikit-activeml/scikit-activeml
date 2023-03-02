@@ -27,7 +27,7 @@ qs = "$init_qs"
 # Preparation for plotting.
 fig, axs = plt.subplots(2, 2, constrained_layout=True)
 feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
-artists = [[] for j in range(5)]
+artists = [[] for j in range("$n_cycles|5")]
 
 # The active learning cycle:
 n_cycles = "$n_cycles|5"

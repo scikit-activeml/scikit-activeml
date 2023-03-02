@@ -2,8 +2,8 @@ import unittest
 from copy import deepcopy
 
 import numpy as np
-from click.core import batch
-from matplotlib.pyplot import axis
+import torch
+from batchbald_redux.batchbald import get_batchbald_batch
 from sklearn import clone
 from sklearn.ensemble import (
     RandomForestClassifier,
@@ -24,7 +24,7 @@ from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
     TemplatePoolQueryStrategy,
 )
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, check_random_state
 
 
 class TestBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -46,6 +46,15 @@ class TestBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_init_param_n_MC_samples(self):
+        test_cases = [
+            (0, ValueError),
+            (1.2, TypeError),
+            (1, None),
+            (None, None),
+        ]
+        self._test_param("init", "n_MC_samples", test_cases)
 
     def test_query_param_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -170,6 +179,15 @@ class Testbatch_bald(unittest.TestCase):
         test_cases = [(0, ValueError), (1.2, TypeError), (1, None)]
         self._test_param(batch_bald, "batch_size", test_cases)
 
+    def test_init_param_n_MC_samples(self):
+        test_cases = [
+            (0, ValueError),
+            (1.2, TypeError),
+            (1, None),
+            (None, None),
+        ]
+        self._test_param(batch_bald, "n_MC_samples", test_cases)
+
     def test_param_random_state(self):
         test_cases = [(np.nan, ValueError), ("state", ValueError), (1, None)]
         self._test_param(batch_bald, "random_state", test_cases)
@@ -178,8 +196,63 @@ class Testbatch_bald(unittest.TestCase):
         # test _BALD and _BatchBald
         probas = np.random.rand(10, 100, 5)
         np.testing.assert_equal(_bald(probas), _bald(probas))
-        np.testing.assert_allclose(_bald(probas), batch_bald(probas)[0])
-        np.testing.assert_equal(batch_bald(probas), batch_bald(probas))
+        np.testing.assert_allclose(
+            _bald(probas), batch_bald(probas, batch_size=1)[0]
+        )
+        np.testing.assert_equal(
+            batch_bald(probas, batch_size=1), batch_bald(probas, batch_size=1)
+        )
+
+        batch_size = 20
+        n_estimators = 10
+        n_classes = 2
+        n_samples = 200
+        random_state = np.random.RandomState(0)
+        probas = random_state.random(
+            n_classes * n_samples * n_estimators
+        ).reshape((n_estimators, n_samples, n_classes))
+        probas /= np.sum(probas, keepdims=True, axis=-1)
+
+        # utils3 = get_batchbald_batch(
+        #     log_probs_N_K_C=torch.Tensor(np.log(probas.swapaxes(0, 1))),
+        #     batch_size=batch_size, num_samples=n_estimators,
+        #     random_state=np.random.RandomState(0))
+        # expected_max_utilities = np.array(utils3.scores)
+        expected_max_utilities = np.array(
+            [
+                0.26082319,
+                0.51374567,
+                0.73904878,
+                0.93539158,
+                1.07305285,
+                1.27963334,
+                1.32600832,
+                1.32793891,
+                1.77275521,
+                1.74883515,
+                1.81012598,
+                1.91902003,
+                1.90019259,
+                2.14320686,
+                1.91724786,
+                2.59798092,
+                2.29420766,
+                2.14945838,
+                3.22228023,
+                1.69877866,
+            ]
+        )
+
+        utils = batch_bald(
+            probas,
+            batch_size=batch_size,
+            n_MC_samples=n_estimators,
+            random_state=np.random.RandomState(0),
+        )
+
+        np.testing.assert_allclose(
+            expected_max_utilities, np.nanmax(utils, axis=1), rtol=1e-6
+        )
 
     def _test_param(
         self,

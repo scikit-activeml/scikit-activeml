@@ -1,8 +1,7 @@
 import numpy as np
-from setuptools._distutils.command.check import check
 from sklearn.utils import check_array
 
-from ..base import SkactivemlClassifier, SkactivemlRegressor
+from ..base import SkactivemlClassifier
 from ..pool._query_by_committee import _check_ensemble, QueryByCommittee
 from ..utils import (
     rand_argmax,
@@ -24,6 +23,8 @@ class BatchBALD(QueryByCommittee):
 
     Parameters
     ----------
+    n_MC_samples : int > 0, default=n_estimators
+        The number of monte carlo samples used for label estimation.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
@@ -41,12 +42,14 @@ class BatchBALD(QueryByCommittee):
 
     def __init__(
         self,
+        n_MC_samples=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
+        self.n_MC_samples = n_MC_samples
 
     def query(
         self,
@@ -138,10 +141,18 @@ class BatchBALD(QueryByCommittee):
         )
 
         probas = np.array([est.predict_proba(X_cand) for est in est_arr])
-        batch_utilities_cand = batch_bald(
-            probas, batch_size, self.random_state_
-        )
+        # batch_utilities_cand = batch_bald(
+        #     probas, batch_size, self.random_state_
+        # )
+        if self.n_MC_samples is None:
+            n_MC_samples_ = len(est_arr)
+        else:
+            n_MC_samples_ = self.n_MC_samples
+        check_scalar(n_MC_samples_, "n_MC_samples", int, min_val=1)
 
+        batch_utilities_cand = batch_bald(
+            probas, batch_size, n_MC_samples_, self.random_state_
+        )
         if mapping is None:
             batch_utilities = batch_utilities_cand
         else:
@@ -158,11 +169,11 @@ class BatchBALD(QueryByCommittee):
             return best_indices
 
 
-def batch_bald(probas, batch_size=1, random_state=None):
+def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
     """BatchBALD: Efficient and Diverse Batch Acquisition
         for Deep Bayesian Active Learning
 
-    BatchBALD [1] is an extension of BatchBALD (Bayesian Active Learning by
+    BatchBALD [1] is an extension of BALD (Bayesian Active Learning by
     Disagreement) [2] whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.
@@ -173,6 +184,8 @@ def batch_bald(probas, batch_size=1, random_state=None):
         The probability estimates of all estimators, samples, and classes.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
+    n_MC_samples : int > 0, default=n_estimators
+        The number of monte carlo samples used for label estimation.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
 
@@ -194,36 +207,341 @@ def batch_bald(probas, batch_size=1, random_state=None):
         raise ValueError(
             f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
         )
-    probas = check_array(
+    probs_K_N_C = check_array(
         probas, ensure_2d=False, allow_nd=True, force_all_finite="allow-nan"
     )
     check_scalar(batch_size, "batch_size", int, min_val=1)
-    check_random_state(random_state)
+    if n_MC_samples is None:
+        n_MC_samples = len(probas)
+    check_scalar(n_MC_samples, "n_MC_samples", int, min_val=1)
+    random_state = check_random_state(random_state)
 
-    n_estimators, n_samples, n_classes = probas.shape
-    utils = np.full((batch_size, probas.shape[1]), fill_value=np.nan)
-    batch = np.empty(0, dtype=np.int64)
-    # Eq. 12 in paper:
-    confidents = np.nanmean(
-        np.nansum(-probas * np.log(probas), axis=2), axis=0
+    probs_N_K_C = probs_K_N_C.swapaxes(0, 1)
+    log_probs_N_K_C = np.log(probs_N_K_C)
+    N, K, C = log_probs_N_K_C.shape
+
+    batch_size = min(batch_size, N)
+
+    conditional_entropies_N = _compute_conditional_entropy(log_probs_N_K_C)
+
+    batch_joint_entropy = _DynamicJointEntropy(
+        n_MC_samples, batch_size - 1, K, C, random_state
     )
-    confident = 0
-    P = np.ones((1, n_estimators))
-    for n in range(batch_size):
-        # Eq. 13 in paper:
-        P_ = (1 / n_estimators) * P @ np.swapaxes(probas, 0, 1)
-        # Eq. 12 in paper:
-        scores = -np.sum(P_ * np.log(P_), axis=(1, 2))
-        # Eq. 9 in paper:
-        scores -= confident + confidents
 
-        scores[batch] = np.nan
-        idx = rand_argmax(scores, random_state=random_state)
-        if n == 0:
-            P = probas[:, idx[0]].T
+    # We always keep these on the CPU.
+    utilities = np.zeros((batch_size, N))
+    query_indices = []
+
+    for i in range(batch_size):
+        if i > 0:
+            latest_index = query_indices[-1]
+            batch_joint_entropy.add_variables(
+                log_probs_N_K_C[latest_index : latest_index + 1]
+            )
+
+        shared_conditinal_entropies = conditional_entropies_N[
+            query_indices
+        ].sum()
+
+        utilities[i] = batch_joint_entropy.compute_batch(
+            log_probs_N_K_C, output_entropies_B=utilities[i]
+        )
+
+        utilities[i] -= conditional_entropies_N + shared_conditinal_entropies
+        utilities[i, query_indices] = np.nan
+
+        query_idx = rand_argmax(utilities[i], random_state=0)[0]
+
+        query_indices.append(query_idx)
+
+    return utilities
+
+
+class _ExactJointEntropy:
+    def __init__(self, joint_probs_M_K):
+        self.joint_probs_M_K = joint_probs_M_K
+
+    @staticmethod
+    def empty(K):
+        return _ExactJointEntropy(np.ones((1, K)))
+
+    # def compute(self):
+    #     probs_M = np.mean(self.joint_probs_M_K, axis=1, keepdim=False)
+    #     nats_M = -np.log(probs_M) * probs_M
+    #     entropy = np.sum(nats_M)
+    #     return entropy
+
+    def add_variables(self, log_probs_N_K_C):
+        N, K, C = log_probs_N_K_C.shape
+        joint_probs_K_M_1 = self.joint_probs_M_K.T[:, :, None]
+
+        probs_N_K_C = np.exp(log_probs_N_K_C)
+
+        # Using lots of memory.
+        for i in range(N):
+            probs_i__K_1_C = probs_N_K_C[i][:, None, :]
+            joint_probs_K_M_C = joint_probs_K_M_1 * probs_i__K_1_C
+            joint_probs_K_M_1 = joint_probs_K_M_C.reshape((K, -1, 1))
+
+        self.joint_probs_M_K = joint_probs_K_M_1.squeeze(2).T
+        return self
+
+    def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
+        B, K, C = log_probs_B_K_C.shape
+        M = self.joint_probs_M_K.shape[0]
+
+        probs_b_K_C = np.exp(log_probs_B_K_C)
+        b = probs_b_K_C.shape[0]
+        probs_b_M_C = np.empty((b, M, C))
+        for i in range(b):
+            np.matmul(
+                self.joint_probs_M_K,
+                probs_b_K_C[i],
+                out=probs_b_M_C[i],
+            )
+        probs_b_M_C /= K
+
+        output_entropies_B = np.sum(
+            -np.log(probs_b_M_C) * probs_b_M_C, axis=(1, 2)
+        )
+
+        return output_entropies_B
+
+
+def _batch_multi_choices(probs_b_C, M, random_state):
+    """
+    probs_b_C: Ni... x C
+
+    Returns:
+        choices: Ni... x M
+    """
+    probs_B_C = probs_b_C.reshape((-1, probs_b_C.shape[-1]))
+    B = probs_B_C.shape[0]
+    C = probs_B_C.shape[1]
+
+    # samples: Ni... x draw_per_xx
+    choices = [
+        random_state.choice(C, size=M, p=probs_B_C[b], replace=True)
+        for b in range(B)
+    ]
+    choices = np.array(choices, dtype=int)
+
+    choices_b_M = choices.reshape(list(probs_b_C.shape[:-1]) + [M])
+    return choices_b_M
+
+
+def _gather_expand(data, axis, index):
+    max_shape = [max(dr, ir) for dr, ir in zip(data.shape, index.shape)]
+    new_data_shape = list(max_shape)
+    new_data_shape[axis] = data.shape[axis]
+
+    new_index_shape = list(max_shape)
+    new_index_shape[axis] = index.shape[axis]
+
+    data = np.broadcast_to(data, new_data_shape)
+    index = np.broadcast_to(index, new_index_shape)
+
+    return np.take_along_axis(data, index, axis=axis)
+
+
+class _SampledJointEntropy:
+    """Random variables (all with the same # of categories $C$) can be added via `_SampledJointEntropy.add_variables`.
+
+    `_SampledJointEntropy.compute` computes the joint entropy.
+
+    `_SampledJointEntropy.compute_batch` computes the joint entropy of the added variables with each of the variables in the provided batch probabilities in turn.
+    """
+
+    def __init__(self, sampled_joint_probs_M_K, random_state):
+        self.sampled_joint_probs_M_K = sampled_joint_probs_M_K
+
+    @staticmethod
+    def sample(probs_N_K_C, M, random_state):
+        K = probs_N_K_C.shape[1]
+
+        # S: num of samples per w
+        S = M // K
+
+        choices_N_K_S = _batch_multi_choices(probs_N_K_C, S, random_state)
+
+        expanded_choices_N_1_K_S = choices_N_K_S[:, None, :, :]
+        expanded_probs_N_K_1_C = probs_N_K_C[:, :, None, :]
+
+        probs_N_K_K_S = _gather_expand(
+            expanded_probs_N_K_1_C, axis=-1, index=expanded_choices_N_1_K_S
+        )
+        # exp sum log seems necessary to avoid 0s?
+        probs_K_K_S = np.exp(
+            np.sum(np.log(probs_N_K_K_S), axis=0, keepdims=False)
+        )
+        samples_K_M = probs_K_K_S.reshape((K, -1))
+
+        samples_M_K = samples_K_M.T
+        return _SampledJointEntropy(samples_M_K, random_state)
+
+    # def compute(self):
+    #     sampled_joint_probs_M = np.mean(self.sampled_joint_probs_M_K, axis=1, keepdim=False)
+    #     nats_M = -np.log(sampled_joint_probs_M)
+    #     entropy = np.mean(nats_M)
+    #     return entropy
+
+    # def add_variables(self, log_probs_N_K_C, M2):
+    #     K = self.sampled_joint_probs_M_K.shape[1]
+    #
+    #     sample_K_M1_1 = self.sampled_joint_probs_M_K.T[:, :, None]
+    #
+    #     new_sample_M2_K = self.sample(log_probs_N_K_C.exp(), M2, self.random_state).sampled_joint_probs_M_K
+    #     new_sample_K_1_M2 = new_sample_M2_K.T[:, None, :]
+    #
+    #     merged_sample_K_M1_M2 = sample_K_M1_1 * new_sample_K_1_M2
+    #     merged_sample_K_M = merged_sample_K_M1_M2.reshape((K, -1))
+    #
+    #     self.sampled_joint_probs_M_K = merged_sample_K_M.T
+    #
+    #     return self
+
+    def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
+        B, K, C = log_probs_B_K_C.shape
+        M = self.sampled_joint_probs_M_K.shape[0]
+
+        b = log_probs_B_K_C.shape[0]
+
+        probs_b_M_C = np.empty(
+            (b, M, C),
+        )
+        for i in range(b):
+            np.matmul(
+                self.sampled_joint_probs_M_K,
+                np.exp(log_probs_B_K_C[i]),
+                out=probs_b_M_C[i],
+            )
+        probs_b_M_C /= K
+
+        q_1_M_1 = self.sampled_joint_probs_M_K.mean(axis=1, keepdims=True)[
+            None
+        ]
+
+        output_entropies_B = (
+            np.sum(-np.log(probs_b_M_C) * probs_b_M_C / q_1_M_1, axis=(1, 2))
+            / M
+        )
+
+        return output_entropies_B
+
+
+class _DynamicJointEntropy:
+    def __init__(self, M, max_N, K, C, random_state):
+        self.M = M
+        self.N = 0
+        self.max_N = max_N
+
+        self.inner = _ExactJointEntropy.empty(K)
+        self.log_probs_max_N_K_C = np.empty((max_N, K, C))
+
+        self.random_state = random_state
+
+    def add_variables(self, log_probs_N_K_C):
+        C = self.log_probs_max_N_K_C.shape[2]
+        add_N = log_probs_N_K_C.shape[0]
+
+        self.log_probs_max_N_K_C[self.N : self.N + add_N] = log_probs_N_K_C
+        self.N += add_N
+
+        num_exact_samples = C**self.N
+        if num_exact_samples > self.M:
+            self.inner = _SampledJointEntropy.sample(
+                np.exp(self.log_probs_max_N_K_C[: self.N]),
+                self.M,
+                self.random_state,
+            )
         else:
-            P = np.append(P, probas[:, idx[0]].T, axis=0)
-        confident += confidents[idx]
-        batch = np.append(batch, idx)
-        utils[n] = scores
-    return utils
+            self.inner.add_variables(log_probs_N_K_C)
+
+        return self
+
+    # def compute(self):
+    #     return self.inner.compute()
+
+    def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
+        """Computes the joint entropy of the added variables together with the batch (one by one)."""
+        return self.inner.compute_batch(log_probs_B_K_C, output_entropies_B)
+
+
+def _compute_conditional_entropy(log_probs_N_K_C):
+    N, K, C = log_probs_N_K_C.shape
+
+    nats_N_K_C = log_probs_N_K_C * np.exp(log_probs_N_K_C)
+    nats_N_K_C[np.isnan(nats_N_K_C)] = 0
+    entropies_N = -np.sum(nats_N_K_C, axis=(1, 2)) / K
+    return entropies_N
+
+
+# def batch_bald(probas, batch_size=1, random_state=None):
+#     """BatchBALD: Efficient and Diverse Batch Acquisition
+#         for Deep Bayesian Active Learning
+#
+#     BatchBALD [1] is an extension of BALD (Bayesian Active Learning by
+#     Disagreement) [2] whereby points are jointly scored by estimating the
+#     mutual information between a joint of multiple data points and the model
+#     parameters.
+#
+#     Parameters
+#     ----------
+#     probas : array-like, shape (n_estimators, n_samples, n_classes)
+#         The probability estimates of all estimators, samples, and classes.
+#     batch_size : int, default=1
+#         The number of samples to be selected in one AL cycle.
+#     random_state : int or np.random.RandomState, default=None
+#         The random state to use.
+#
+#     Returns
+#     -------
+#     scores: np.ndarray, shape (n_samples)
+#         The BatchBALD-scores.
+#
+#     References
+#     ----------
+#     [1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "Batchbald:
+#         Efficient and diverse batch acquisition for deep bayesian active
+#         learning." Advances in neural information processing systems 32 (2019).
+#     [2] Houlsby, Neil, et al. "Bayesian active learning for classification and
+#         preference learning." arXiv preprint arXiv:1112.5745 (2011).
+#     """
+#     # Validate input parameters.
+#     if probas.ndim != 3:
+#         raise ValueError(
+#             f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
+#         )
+#     probas = check_array(
+#         probas, ensure_2d=False, allow_nd=True, force_all_finite="allow-nan"
+#     )
+#     check_scalar(batch_size, "batch_size", int, min_val=1)
+#     random_state = check_random_state(random_state)
+#
+#     n_estimators, n_samples, n_classes = probas.shape
+#     utils = np.full((batch_size, probas.shape[1]), fill_value=np.nan)
+#     batch = np.empty(0, dtype=np.int64)
+#     # Eq. 12 in paper:
+#     confidents = np.nanmean(
+#         np.nansum(-probas * np.log(probas), axis=2), axis=0
+#     )
+#     confident = 0
+#     P = np.ones((1, n_estimators))
+#     for n in range(batch_size):
+#         # Eq. 13 in paper:
+#         P_ = (1 / n_estimators) * P @ np.swapaxes(probas, 0, 1)
+#         # Eq. 12 in paper:
+#         scores = -np.sum(P_ * np.log(P_), axis=(1, 2))
+#         # Eq. 9 in paper:
+#         scores -= confident + confidents
+#
+#         scores[batch] = np.nan
+#         idx = rand_argmax(scores, random_state=random_state)
+#         if n == 0:
+#             P = probas[:, idx[0]].T
+#         else:
+#             P = np.append(P, probas[:, idx[0]].T, axis=0)
+#         confident += confidents[idx]
+#         batch = np.append(batch, idx)
+#         utils[n] = scores
+#     return utils
