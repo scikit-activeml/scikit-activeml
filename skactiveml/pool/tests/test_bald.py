@@ -2,8 +2,6 @@ import unittest
 from copy import deepcopy
 
 import numpy as np
-import torch
-from batchbald_redux.batchbald import get_batchbald_batch
 from sklearn import clone
 from sklearn.ensemble import (
     RandomForestClassifier,
