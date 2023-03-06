@@ -1,7 +1,9 @@
 import unittest
+from copy import deepcopy
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -16,10 +18,15 @@ from skactiveml.pool._epistemic_uncertainty_sampling import (
     _epistemic_uncertainty_logreg,
     _theta,
 )
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestEpistemicUncertaintySampling(unittest.TestCase):
+class TestEpistemicUncertaintySampling(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.random_state = 1
         self.candidates = np.array([[8, 1], [9, 1], [5, 1]])
@@ -28,7 +35,7 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
         self.y_MISSING_LABEL = np.array(
             [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL]
         )
-        self.classes = np.array([0, 1])
+        self.classes = [0, 1]
         self.clf = ParzenWindowClassifier(
             classes=self.classes, random_state=self.random_state
         )
@@ -37,94 +44,50 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
             candidates=self.candidates, X=self.X, y=self.y_MISSING_LABEL
         )
 
-    def test_init_param_precompute(self):
-        selector = EpistemicUncertaintySampling(precompute=None)
-        self.assertRaises(
-            TypeError, selector.query, **self.kwargs, clf=self.clf
+        query_default_params_clf = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "clf": ParzenWindowClassifier(
+                random_state=42, classes=self.classes
+            ),
+        }
+        super().setUp(
+            qs_class=EpistemicUncertaintySampling,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
         )
 
-        selector = EpistemicUncertaintySampling(precompute=[])
-        self.assertRaises(
-            TypeError, selector.query, **self.kwargs, clf=self.clf
-        )
-
-        selector = EpistemicUncertaintySampling(precompute=0)
-        self.assertRaises(
-            TypeError, selector.query, **self.kwargs, clf=self.clf
-        )
+    def test_init_param_precompute(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(None, TypeError), ([], TypeError), (0, TypeError)]
+        self._test_param("init", "precompute", test_cases)
 
     def test_query_param_clf(self):
-        selector = EpistemicUncertaintySampling()
-        dt = SklearnClassifier(DecisionTreeClassifier())
-        for clf in [None, "string", 1, dt]:
-            self.assertRaises(
-                TypeError, selector.query, **self.kwargs, clf=clf
-            )
-
-    def test_query_param_X(self):
-        selector = EpistemicUncertaintySampling()
-        X_list = [None, "string", [], self.y[0:-1]]
-        for X in X_list:
-            self.assertRaises(
-                ValueError,
-                selector.query,
-                candidates=self.candidates,
-                clf=self.clf,
-                X=X,
-                y=self.y,
-            )
-
-    def test_query_param_y(self):
-        selector = EpistemicUncertaintySampling()
-        for y in ["string", [], self.y[0:-1]]:
-            self.assertRaises(
-                ValueError,
-                selector.query,
-                candidates=self.candidates,
-                clf=self.clf,
-                X=self.X,
-                y=y,
-            )
-        for y in [None]:
-            self.assertRaises(
+        add_test_cases = [
+            (LogisticRegression(), TypeError),
+            (
+                SklearnClassifier(
+                    DecisionTreeClassifier(), classes=self.classes
+                ),
                 TypeError,
-                selector.query,
-                candidates=self.candidates,
-                clf=self.clf,
-                X=self.X,
-                y=y,
-            )
-
-    def test_query_param_sample_weight(self):
-        selector = EpistemicUncertaintySampling()
-        sample_weight_list = [
-            "string",
-            self.candidates,
-            self.candidates[:-2],
-            np.empty((len(self.X) - 1)),
-            np.empty((len(self.X) + 1)),
-            np.ones((len(self.X) + 1)),
+            ),
+            (
+                SklearnClassifier(LogisticRegression(), classes=self.classes),
+                None,
+            ),
+            (ParzenWindowClassifier(), None),
         ]
-        for sample_weight in sample_weight_list:
-            self.assertRaises(
-                ValueError,
-                selector.query,
-                **self.kwargs,
-                clf=self.clf,
-                sample_weight=sample_weight
-            )
+        super().test_query_param_clf(test_cases=add_test_cases)
 
-    def test_query_param_fit_clf(self):
-        selector = EpistemicUncertaintySampling()
-        self.assertRaises(
-            TypeError, selector.query, **self.kwargs, fit_clf="string"
-        )
-        self.assertRaises(
-            TypeError, selector.query, **self.kwargs, fit_clf=self.candidates
-        )
-        self.assertRaises(
-            TypeError, selector.query, **self.kwargs, fit_clf=None
-        )
+    def test_query_param_sample_weight(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        X = self.query_default_params_clf["X"]
+        test_cases += [
+            ("string", ValueError),
+            (X, ValueError),
+            (np.empty((len(X) - 1)), ValueError),
+        ]
+        super().test_query_param_sample_weight(test_cases)
 
     # tests for epistemic ParzenWindowClassifier
     def test_interpolate(self):
@@ -182,21 +145,17 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
             def predict_freq(self, X):
                 return freq
 
-        selector = EpistemicUncertaintySampling(precompute=True)
-        _, utilities = selector.query(
-            **self.kwargs,
-            clf=Dummy_PWC(classes=self.classes),
-            return_utilities=True
-        )
+        qs = EpistemicUncertaintySampling(precompute=True)
+        query_params = deepcopy(self.query_default_params_clf)
+        query_params["return_utilities"] = True
+        query_params["candidates"] = np.zeros_like(freq)
+        query_params["clf"] = Dummy_PWC(classes=self.classes)
+        _, utilities = qs.query(**query_params)
         np.testing.assert_array_equal(val_utilities, utilities[0])
 
-        selector = EpistemicUncertaintySampling()
-        self.assertRaises(
-            ValueError,
-            selector.query,
-            clf=ParzenWindowClassifier(classes=[0, 1, 2]),
-            **self.kwargs
-        )
+        qs = EpistemicUncertaintySampling()
+        query_params["clf"] = ParzenWindowClassifier(classes=[0, 1, 2])
+        self.assertRaises(ValueError, qs.query, **query_params)
 
     # tests for epistemic logistic regression
     def test_loglike_logreg(self):
@@ -233,7 +192,7 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
         clf = SklearnClassifier(
             LogisticRegression(),
             classes=[0, 1, 2],
-            random_state=self.random_state,
+            random_state=42,
         )
         self.assertRaises(
             ValueError,
@@ -247,7 +206,7 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
         clf = SklearnClassifier(
             DecisionTreeClassifier(),
             classes=[0, 1],
-            random_state=self.random_state,
+            random_state=42,
         )
         self.assertRaises(
             TypeError,
@@ -275,37 +234,21 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
         clf = SklearnClassifier(LogisticRegression(), classes=[0, 1])
         clf.fit(X, y)
         utils = _epistemic_uncertainty_logreg(X_cand, X, y, clf, probas)
-        # np.testing.assert_array_equal(utils_expected, utils)
         # TODO
+        # np.testing.assert_array_equal(utils_expected, utils)
 
     def test_query(self):
-        selector = EpistemicUncertaintySampling()
-
-        # return_utilities
-        L = list(
-            selector.query(**self.kwargs, clf=self.clf, return_utilities=True)
-        )
-        self.assertTrue(len(L) == 2)
-        L = list(
-            selector.query(**self.kwargs, clf=self.clf, return_utilities=False)
-        )
-        self.assertTrue(len(L) == 1)
-
-        # batch_size
-        bs = 3
-        selector = EpistemicUncertaintySampling()
-        best_idx = selector.query(**self.kwargs, clf=self.clf, batch_size=bs)
-        self.assertEqual(bs, len(best_idx))
+        query_params = deepcopy(self.query_default_params_clf)
+        query_params["return_utilities"] = True
 
         # query - ParzenWindowClassifier
         clf = ParzenWindowClassifier(
             classes=self.classes, random_state=self.random_state
         )
-        selector = EpistemicUncertaintySampling()
-        selector.query(**self.kwargs, clf=clf)
-        selector.query(**self.kwargs_MISSING_LABEL, clf=clf)
+        qs = EpistemicUncertaintySampling()
+        qs.query(**self.kwargs_MISSING_LABEL, clf=clf)
 
-        best_indices, utilities = selector.query(
+        best_indices, utilities = qs.query(
             **self.kwargs, clf=clf, return_utilities=True
         )
         self.assertEqual(utilities.shape, (1, len(self.candidates)))
@@ -315,20 +258,19 @@ class TestEpistemicUncertaintySampling(unittest.TestCase):
         clf = SklearnClassifier(
             LogisticRegression(),
             classes=self.classes,
-            random_state=self.random_state,
+            random_state=42,
         )
 
-        selector = EpistemicUncertaintySampling()
-        selector.query(**self.kwargs, clf=clf)
-        selector.query(**self.kwargs_MISSING_LABEL, clf=clf)
+        qs = EpistemicUncertaintySampling()
+        qs.query(**self.kwargs_MISSING_LABEL, clf=clf)
 
-        best_indices, utilities = selector.query(
+        best_indices, utilities = qs.query(
             **self.kwargs, clf=clf, return_utilities=True
         )
         self.assertEqual(utilities.shape, (1, len(self.candidates)))
         self.assertEqual(best_indices.shape, (1,))
 
-        best_indices_s, utilities_s = selector.query(
+        best_indices_s, utilities_s = qs.query(
             **self.kwargs,
             clf=clf,
             return_utilities=True,

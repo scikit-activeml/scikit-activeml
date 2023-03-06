@@ -5,8 +5,9 @@ from scipy.special import factorial, gammaln
 from sklearn import clone
 from sklearn.utils.validation import check_array
 
-from ..base import ClassFrequencyEstimator
+from ..base import SkactivemlClassifier
 from ..base import SingleAnnotatorPoolQueryStrategy
+from ..classifier import ParzenWindowClassifier
 from ..utils import (
     MISSING_LABEL,
     check_scalar,
@@ -30,7 +31,19 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         Maximum number of hypothetically acquired labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int | np.random.RandomState, optional
+    metric : str or callable, default=None
+        The metric must be None or a valid kernel as defined by the function
+        `sklearn.metrics.pairwise.pairwise_kernels`. The kernel is used to
+        calculate the frequency of labels near the candidates and multiplied
+        with the probabilities returned by `clf` to get a kernel frequency
+        estimate for each class.
+        If metric is set to None, the `predict_freq` function of the `clf` will
+        be used instead. If this is not defined, a TypeError is raised.
+    metric_dict : dict, default=None
+        Any further parameters that should be passed directly to the kernel
+        function. If metric_dict is None and metric is 'rbf' metric_dict is set
+        to {'gamma': 'mean'}.
+    random_state: numeric | np.random.RandomState, optional
         Random state for candidate selection.
 
     References
@@ -42,11 +55,19 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-        self, prior=1, m_max=1, missing_label=MISSING_LABEL, random_state=None
+        self,
+        prior=1,
+        m_max=1,
+        missing_label=MISSING_LABEL,
+        metric=None,
+        metric_dict=None,
+        random_state=None,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
+        self.metric = metric
+        self.metric_dict = metric_dict
         self.prior = prior
         self.m_max = m_max
 
@@ -120,7 +141,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Check the classifier's type.
-        check_type(clf, "clf", ClassFrequencyEstimator)
+        check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
         check_type(fit_clf, "fit_clf", bool)
 
@@ -132,21 +153,43 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
                 utility_weight = np.ones(len(X))
         utility_weight = check_array(utility_weight, ensure_2d=False)
 
-        if mapping is None and not len(X_cand) == len(utility_weight):
+        if mapping is None and len(X_cand) != len(utility_weight):
             raise ValueError(
                 f"'utility_weight' must have length 'n_candidates' but "
                 f"{len(X_cand)} != {len(utility_weight)}."
             )
-        if mapping is not None and not len(X) == len(utility_weight):
+        if mapping is not None and len(X) != len(utility_weight):
             raise ValueError(
                 f"'utility_weight' must have length 'n_samples' but "
                 f"{len(X)} != {len(utility_weight)}."
             )
 
+        if self.metric is None and not hasattr(clf, "predict_freq"):
+            raise TypeError(
+                "clf has no predict_freq and metric was set to None"
+            )
+
         # Fit the classifier and predict frequencies.
         if fit_clf:
             clf = clone(clf).fit(X, y, sample_weight)
-        k_vec = clf.predict_freq(X_cand)
+        if self.metric is not None:
+            if (
+                self.metric_dict is None
+                and self.metric == "rbf"
+            ):
+                self.metric_dict = {"gamma": "mean"}
+            pwc = ParzenWindowClassifier(
+                metric=self.metric,
+                metric_dict=self.metric_dict,
+                missing_label=clf.missing_label,
+                classes=clf.classes,
+            )
+            pwc.fit(X=X, y=y, sample_weight=sample_weight)
+            n = pwc.predict_freq(X_cand).sum(axis=1, keepdims=True)
+            pred_proba = clf.predict_proba(X_cand)
+            k_vec = n * pred_proba
+        else:
+            k_vec = clf.predict_freq(X_cand)
 
         # Calculate utilities and return the output.
         utilities_cand = cost_reduction(

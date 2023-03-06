@@ -8,7 +8,7 @@ import copy
 
 import numpy as np
 from sklearn import clone
-from sklearn.utils.validation import check_array, _is_arraylike
+from sklearn.utils.validation import check_array, check_is_fitted
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -154,14 +154,16 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             missing_label=self.missing_label_,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
         )
+
+        # Validate 'method'
+        check_type(
+            self.method,
+            "method",
+            target_vals=["KL_divergence", "vote_entropy"],
+        )
+
         # classes is None if the ensemble is a regressor
         if classes is not None:
-            check_type(
-                self.method,
-                "method",
-                target_vals=["KL_divergence", "vote_entropy"],
-            )
-
             # Compute utilities.
             if self.method == "KL_divergence":
                 probas = np.array(
@@ -289,6 +291,8 @@ def _check_ensemble(
             # Fit the ensemble.
             if fit_ensemble:
                 ensemble = clone(ensemble).fit(X, y, sample_weight)
+            else:
+                check_is_fitted(ensemble)
 
             if hasattr(ensemble, "estimators_"):
                 est_arr = ensemble.estimators_
@@ -318,6 +322,8 @@ def _check_ensemble(
                 # Fit the ensemble.
                 if fit_ensemble:
                     est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+                else:
+                    check_is_fitted(est_arr[i])
 
                 if i > 0 and estimator_type == SkactivemlClassifier:
                     np.testing.assert_array_equal(

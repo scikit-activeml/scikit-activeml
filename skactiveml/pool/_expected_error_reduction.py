@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 
 from .utils import IndexClassifierWrapper
@@ -214,7 +216,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
 
         # Initialize classifier that works with indices to improve readability
         id_clf = IndexClassifierWrapper(
-            clf,
+            deepcopy(clf),
             X_full,
             y_full,
             w_full,
@@ -410,7 +412,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             sample_weight_candidates
         ):
             raise ValueError(
-                "If `sample_weight` is set, it must have same "
+                "If `sample_weight_candidates` is set, it must have same "
                 "length as `X`."
             )
 
@@ -807,9 +809,13 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
         le = id_clf._le
         y_eval = id_clf.y[idx_eval]
-        idx_labeled = idx_train[is_labeled(y_eval)]
+        idx_labeled = idx_train[
+            is_labeled(y_eval, missing_label=self.missing_label_)
+        ]
         y_labeled = id_clf.y[idx_labeled]
-        idx_unlabeled = idx_train[is_unlabeled(y_eval)]
+        idx_unlabeled = idx_train[
+            is_unlabeled(y_eval, missing_label=self.missing_label_)
+        ]
 
         if self.candidate_to_labeled:
             idx_labeled = np.concatenate([idx_labeled, idx_cx], axis=0)

@@ -1,14 +1,14 @@
 import numpy as np
-from sklearn.base import TransformerMixin, BaseEstimator
+from sklearn.base import BaseEstimator
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
-from ._label import MISSING_LABEL, is_labeled
+from ._label import MISSING_LABEL, is_labeled, check_missing_label
 from ._validation import check_classifier_params
 
 
-class ExtLabelEncoder(TransformerMixin, BaseEstimator):
+class ExtLabelEncoder(BaseEstimator):
     """Encode class labels with value between 0 and classes-1 and uses -1 for
     unlabeled samples.
     This transformer should be used to encode class labels, *i.e.* `y`, and
@@ -47,9 +47,12 @@ class ExtLabelEncoder(TransformerMixin, BaseEstimator):
             classes=self.classes, missing_label=self.missing_label
         )
         y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
+        check_missing_label(
+            missing_label=self.missing_label, target_type=y.dtype
+        )
+
         self._le = LabelEncoder()
         if self.classes is None:
-            y = np.asarray(y)
             is_lbld = is_labeled(y, missing_label=self.missing_label)
             self._dtype = np.append(y, self.missing_label).dtype
             self._le.fit(y[is_lbld])

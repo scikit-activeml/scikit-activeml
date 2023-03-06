@@ -24,6 +24,9 @@ class TestLabelEncoder(unittest.TestCase):
         self.assertRaises(
             NotFittedError, ExtLabelEncoder().transform, y=["1", "2"]
         )
+        self.assertRaises(
+            TypeError, ExtLabelEncoder(missing_label=-1).fit_transform, self.y7
+        )
 
         # missing_label=np.nan
         ext_le = ExtLabelEncoder().fit(self.y1)
@@ -64,3 +67,4 @@ class TestLabelEncoder(unittest.TestCase):
             [-1, 1, 2, 3, -1],
             ExtLabelEncoder(classes=cls).fit_transform(self.y1),
         )
+

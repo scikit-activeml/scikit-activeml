@@ -4,67 +4,83 @@ import numpy as np
 from sklearn.datasets import load_breast_cancer
 from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.pool import DiscriminativeAL
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
+from skactiveml.utils import MISSING_LABEL
 
 
-class TestDiscriminativeAL(unittest.TestCase):
+class TestDiscriminativeAL(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.random_state = 1
-        self.X, self.y = load_breast_cancer(return_X_y=True)
-        self.y_unlblb = np.full_like(self.y, -1)
-        self.X = StandardScaler().fit_transform(self.X)
+        self.X = np.linspace(0, 1, 20).reshape(10, 2)
+        self.y = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
+        self.y_reg = np.hstack([[0.5, 1.6], np.full(8, MISSING_LABEL)])
         self.discriminator = ParzenWindowClassifier(
             random_state=self.random_state
         )
+        query_default_params_clf = {
+            "X": self.X,
+            "y": self.y,
+            "discriminator": self.discriminator,
+        }
+        query_default_params_reg = {
+            "X": self.X,
+            "y": self.y_reg,
+            "discriminator": self.discriminator,
+        }
+        super().setUp(
+            qs_class=DiscriminativeAL,
+            init_default_params={},
+            query_default_params_clf=query_default_params_clf,
+            query_default_params_reg=query_default_params_reg,
+        )
 
     def test_init_param_greedy_selection(self):
-        for greedy_selection in [0, "test", None]:
-            dal = DiscriminativeAL(
-                greedy_selection=greedy_selection, missing_label=-1
-            )
-            self.assertRaises(
-                TypeError,
-                dal.query,
-                X=self.X,
-                y=self.y_unlblb,
-                discriminator=self.discriminator,
-            )
+        test_cases = [
+            (0, TypeError),
+            ("test", TypeError),
+            (None, TypeError),
+            (SVC(), TypeError),
+        ]
+        self._test_param("init", "greedy_selection", test_cases)
 
     def test_query_param_discriminator(self):
-        dal = DiscriminativeAL(missing_label=-1)
-        for discriminator in [None, GaussianProcessClassifier(), "test"]:
-            self.assertRaises(
-                TypeError,
-                dal.query,
-                X=self.X,
-                y=self.y_unlblb,
-                discriminator=discriminator,
-            )
+        test_cases = [
+            (0, TypeError),
+            ("test", TypeError),
+            (None, TypeError),
+            (SVC(), TypeError),
+        ]
+        self._test_param("query", "discriminator", test_cases)
 
     def test_query(self):
         for greedy_selection in [False, True]:
             dal = DiscriminativeAL(
-                missing_label=-1,
                 random_state=self.random_state,
                 greedy_selection=greedy_selection,
             )
             for candidates in [None, np.arange(len(self.X))]:
                 if candidates is None:
-                    n_candidates = len(self.y_unlblb)
+                    n_candidates = len(self.y)
                 else:
                     n_candidates = len(candidates)
                 query_indices = dal.query(
                     X=self.X,
-                    y=self.y_unlblb,
+                    y=self.y,
                     discriminator=self.discriminator,
                     candidates=candidates,
                 )
                 self.assertEqual(1, len(query_indices))
                 query_indices, utilities = dal.query(
                     X=self.X,
-                    y=self.y_unlblb,
+                    y=np.full_like(self.y, MISSING_LABEL),
                     discriminator=self.discriminator,
                     return_utilities=True,
                     candidates=candidates,
@@ -77,7 +93,7 @@ class TestDiscriminativeAL(unittest.TestCase):
                 )
                 query_indices, utilities = dal.query(
                     X=self.X,
-                    y=self.y_unlblb,
+                    y=np.full_like(self.y, MISSING_LABEL),
                     discriminator=self.discriminator,
                     candidates=candidates,
                     return_utilities=True,
