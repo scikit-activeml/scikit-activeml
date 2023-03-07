@@ -2,7 +2,7 @@
   {
     "class" : "BatchBALD",
     "package" : "pool",
-    "method" : "Bayesian Active Learning by Disagreement",
+    "method" : "Bayesian Active Learning by Disagreement (BALD",
     "category" :  "Query-by-Committee",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],

@@ -5,7 +5,7 @@ pool-based active learning.
 
 from . import multiannotator
 from . import utils
-from ._bald import BatchBALD, batch_bald
+from ._batch_bald import BatchBALD, batch_bald
 from ._cost_embedding_al import CostEmbeddingAL
 from ._discriminative_al import DiscriminativeAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling

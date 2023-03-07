@@ -20,7 +20,7 @@
   {
     "class" : "FourDs",
     "package" : "pool",
-    "method" : "Batch Density-Diversity-Distribution-Distance Sampling (4DS)",
+    "method" : "Batch Density-Diversity-Distribution-Distance Sampling (Batch4DS)",
     "category" : "Uncertainty Sampling",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool",  "classification", "single-annotator"],

@@ -16,16 +16,15 @@ from sklearn.gaussian_process import (
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 
-from skactiveml.pool._bald import BatchBALD, batch_bald
+from skactiveml.pool._batch_bald import BatchBALD, batch_bald
 from skactiveml.regressor import NICKernelRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
-    TemplatePoolQueryStrategy,
 )
-from skactiveml.utils import MISSING_LABEL, check_random_state
+from skactiveml.utils import MISSING_LABEL
 
 
-class TestBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestBatchBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def setUp(self):
         self.classes = [0, 1]
         self.ensemble_clf = SklearnClassifier(

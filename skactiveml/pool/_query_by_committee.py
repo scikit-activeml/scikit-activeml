@@ -290,12 +290,11 @@ def _check_ensemble(
             check_equal_missing_label(ensemble.missing_label, missing_label)
             # Fit the ensemble.
             if fit_ensemble:
-                ensemble = copy.deepcopy(ensemble).fit(X, y, sample_weight)
+                ensemble = clone(ensemble).fit(X, y, sample_weight)
             else:
                 check_is_fitted(ensemble)
 
-            if hasattr(ensemble, "estimators_") and \
-                    len(ensemble.estimators_) > 0:
+            if hasattr(ensemble, "estimators_"):
                 est_arr = ensemble.estimators_
             else:
                 if hasattr(ensemble, "estimators"):

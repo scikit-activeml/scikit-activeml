@@ -1,3 +1,7 @@
+"""
+Code is based on https://blackhc.github.io/batchbald_redux/
+distributed under the Apache-2.0 license.
+"""
 import numpy as np
 from sklearn.utils import check_array
 
@@ -15,11 +19,11 @@ from ..utils import (
 class BatchBALD(QueryByCommittee):
     """Batch Bayesian Active Learning by Disagreement (BatchBALD)
 
-    The Bayesian-Active-Learning-by-Disagreement (BatchBALD) [1] strategy reduces the
-    number  of possible hypotheses maximally fast to minimize the uncertainty
-    about the parameters using Shannon’s entropy. It seeks the data point that
-    maximises the decrease in expected posterior entropy. For the batch case
-    the advanced strategy BatchBALD [2] is applied.
+    The Bayesian-Active-Learning-by-Disagreement (BatchBALD) [1] strategy
+    reduces the number of possible hypotheses maximally fast to minimize the
+    uncertainty about the parameters using Shannon’s entropy. It seeks the data
+    point that maximises the decrease in expected posterior entropy. For the
+    batch case, the advanced strategy BatchBALD [2] is applied.
 
     Parameters
     ----------
@@ -141,9 +145,7 @@ class BatchBALD(QueryByCommittee):
         )
 
         probas = np.array([est.predict_proba(X_cand) for est in est_arr])
-        # batch_utilities_cand = batch_bald(
-        #     probas, batch_size, self.random_state_
-        # )
+
         if self.n_MC_samples is None:
             n_MC_samples_ = len(est_arr)
         else:
@@ -180,7 +182,7 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
 
     Parameters
     ----------
-    probas : array-like, shape (n_estimators, n_samples, n_classes)
+    probas : array-like of shape (n_estimators, n_samples, n_classes)
         The probability estimates of all estimators, samples, and classes.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
@@ -191,7 +193,7 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
 
     Returns
     -------
-    scores: np.ndarray, shape (n_samples)
+    scores: np.ndarray of shape (n_samples)
         The BatchBALD-scores.
 
     References
@@ -208,7 +210,7 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
             f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
         )
     probs_K_N_C = check_array(
-        probas, ensure_2d=False, allow_nd=True, force_all_finite="allow-nan"
+        probas, ensure_2d=False, allow_nd=True
     )
     check_scalar(batch_size, "batch_size", int, min_val=1)
     if n_MC_samples is None:
@@ -228,7 +230,6 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
         n_MC_samples, batch_size - 1, K, C, random_state
     )
 
-    # We always keep these on the CPU.
     utilities = np.zeros((batch_size, N))
     query_indices = []
 
@@ -264,12 +265,6 @@ class _ExactJointEntropy:
     @staticmethod
     def empty(K):
         return _ExactJointEntropy(np.ones((1, K)))
-
-    # def compute(self):
-    #     probs_M = np.mean(self.joint_probs_M_K, axis=1, keepdim=False)
-    #     nats_M = -np.log(probs_M) * probs_M
-    #     entropy = np.sum(nats_M)
-    #     return entropy
 
     def add_variables(self, log_probs_N_K_C):
         N, K, C = log_probs_N_K_C.shape
@@ -379,27 +374,6 @@ class _SampledJointEntropy:
         samples_M_K = samples_K_M.T
         return _SampledJointEntropy(samples_M_K, random_state)
 
-    # def compute(self):
-    #     sampled_joint_probs_M = np.mean(self.sampled_joint_probs_M_K, axis=1, keepdim=False)
-    #     nats_M = -np.log(sampled_joint_probs_M)
-    #     entropy = np.mean(nats_M)
-    #     return entropy
-
-    # def add_variables(self, log_probs_N_K_C, M2):
-    #     K = self.sampled_joint_probs_M_K.shape[1]
-    #
-    #     sample_K_M1_1 = self.sampled_joint_probs_M_K.T[:, :, None]
-    #
-    #     new_sample_M2_K = self.sample(log_probs_N_K_C.exp(), M2, self.random_state).sampled_joint_probs_M_K
-    #     new_sample_K_1_M2 = new_sample_M2_K.T[:, None, :]
-    #
-    #     merged_sample_K_M1_M2 = sample_K_M1_1 * new_sample_K_1_M2
-    #     merged_sample_K_M = merged_sample_K_M1_M2.reshape((K, -1))
-    #
-    #     self.sampled_joint_probs_M_K = merged_sample_K_M.T
-    #
-    #     return self
-
     def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
         B, K, C = log_probs_B_K_C.shape
         M = self.sampled_joint_probs_M_K.shape[0]
@@ -459,9 +433,6 @@ class _DynamicJointEntropy:
 
         return self
 
-    # def compute(self):
-    #     return self.inner.compute()
-
     def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
         """Computes the joint entropy of the added variables together with the batch (one by one)."""
         return self.inner.compute_batch(log_probs_B_K_C, output_entropies_B)
@@ -474,74 +445,3 @@ def _compute_conditional_entropy(log_probs_N_K_C):
     nats_N_K_C[np.isnan(nats_N_K_C)] = 0
     entropies_N = -np.sum(nats_N_K_C, axis=(1, 2)) / K
     return entropies_N
-
-
-# def batch_bald(probas, batch_size=1, random_state=None):
-#     """BatchBALD: Efficient and Diverse Batch Acquisition
-#         for Deep Bayesian Active Learning
-#
-#     BatchBALD [1] is an extension of BALD (Bayesian Active Learning by
-#     Disagreement) [2] whereby points are jointly scored by estimating the
-#     mutual information between a joint of multiple data points and the model
-#     parameters.
-#
-#     Parameters
-#     ----------
-#     probas : array-like, shape (n_estimators, n_samples, n_classes)
-#         The probability estimates of all estimators, samples, and classes.
-#     batch_size : int, default=1
-#         The number of samples to be selected in one AL cycle.
-#     random_state : int or np.random.RandomState, default=None
-#         The random state to use.
-#
-#     Returns
-#     -------
-#     scores: np.ndarray, shape (n_samples)
-#         The BatchBALD-scores.
-#
-#     References
-#     ----------
-#     [1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "Batchbald:
-#         Efficient and diverse batch acquisition for deep bayesian active
-#         learning." Advances in neural information processing systems 32 (2019).
-#     [2] Houlsby, Neil, et al. "Bayesian active learning for classification and
-#         preference learning." arXiv preprint arXiv:1112.5745 (2011).
-#     """
-#     # Validate input parameters.
-#     if probas.ndim != 3:
-#         raise ValueError(
-#             f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
-#         )
-#     probas = check_array(
-#         probas, ensure_2d=False, allow_nd=True, force_all_finite="allow-nan"
-#     )
-#     check_scalar(batch_size, "batch_size", int, min_val=1)
-#     random_state = check_random_state(random_state)
-#
-#     n_estimators, n_samples, n_classes = probas.shape
-#     utils = np.full((batch_size, probas.shape[1]), fill_value=np.nan)
-#     batch = np.empty(0, dtype=np.int64)
-#     # Eq. 12 in paper:
-#     confidents = np.nanmean(
-#         np.nansum(-probas * np.log(probas), axis=2), axis=0
-#     )
-#     confident = 0
-#     P = np.ones((1, n_estimators))
-#     for n in range(batch_size):
-#         # Eq. 13 in paper:
-#         P_ = (1 / n_estimators) * P @ np.swapaxes(probas, 0, 1)
-#         # Eq. 12 in paper:
-#         scores = -np.sum(P_ * np.log(P_), axis=(1, 2))
-#         # Eq. 9 in paper:
-#         scores -= confident + confidents
-#
-#         scores[batch] = np.nan
-#         idx = rand_argmax(scores, random_state=random_state)
-#         if n == 0:
-#             P = probas[:, idx[0]].T
-#         else:
-#             P = np.append(P, probas[:, idx[0]].T, axis=0)
-#         confident += confidents[idx]
-#         batch = np.append(batch, idx)
-#         utils[n] = scores
-#     return utils

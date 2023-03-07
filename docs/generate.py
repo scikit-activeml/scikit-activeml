@@ -351,6 +351,7 @@ def generate_examples(gen_path, json_path, recursive=True):
     json_data = dict()
     # iterate over json example files
     for (root, dirs, files) in os.walk(json_path, topdown=True):
+        if root.endswith('__pycache__'): continue
         if "README.rst" not in files and "README.txt" not in files:
             raise FileNotFoundError(
                 f"No README.rst or README.txt found in \n" f'"{root}"'
