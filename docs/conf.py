@@ -225,6 +225,7 @@ autodoc_default_options = {
 }
 
 autoclass_content = "class"
+# os.environ["FULLEXAMPLES"] = "True"
 
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
