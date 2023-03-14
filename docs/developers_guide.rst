@@ -10,26 +10,27 @@ Overview
 --------
 
 Our philosophy is to extend the ``sklearn`` eco-system with the most relevant
-query strategies for active learning and to implement tools for working with partially
-unlabeled data. An overview of our repository's structure is given in the image below.
-Each node represents a class or interface. The arrows illustrate the inheritance
-hierarchy among them. The functionality of a dashed node is not yet available in our library.
+query strategies for active learning and to implement tools for working with
+partially unlabeled data. An overview of our repository's structure is given in
+the image below. Each node represents a class or interface. The arrows
+illustrate the inheritance hierarchy among them. The functionality of a dashed
+node is not yet available in our library.
 
 .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-structure.png
    :width: 1000
 
-In our package ``skactiveml``, there three major components, i.e., ``SkactivemlClassifier``,
-``QueryStrategy``, and the not yet supported ``SkactivemlRegressor``.
-The classifier and regressor modules are necessary to deal with partially unlabeled
-data and to implement active-learning specific estimators. This way, an active learning
-cycle can be easily implemented to start with zero initial labels. Regarding the
-active learning query strategies, we currently differ between
-the pool-based (a large pool of unlabeled samples is available) and stream-based
-(unlabeled samples arrive sequentially, i.e., as a stream) paradigm.
-On top of both paradigms, we also distinguish the single- and multi-annotator
-setting. In the latter setting, multiple error-prone annotators are queried
-to provide labels. As a result, an active learning query strategy not only decides
-which samples but also which annotators should be queried.
+In our package ``skactiveml``, there three major components, i.e.,
+``SkactivemlClassifier``, ``SkactivemlRegressor``, and the ``QueryStrategy``.
+The classifier and regressor modules are necessary to deal with partially
+unlabeled data and to implement active-learning specific estimators. This way,
+an active learning cycle can be easily implemented to start with zero initial
+labels. Regarding the active learning query strategies, we currently differ
+between the pool-based (a large pool of unlabeled samples is available) and
+stream-based (unlabeled samples arrive sequentially, i.e., as a stream)
+paradigm. On top of both paradigms, we also distinguish the single- and
+multi-annotator setting. In the latter setting, multiple error-prone annotators
+are queried to provide labels. As a result, an active learning query strategy
+not only decides which samples but also which annotators should be queried.
 
 Introduction
 ------------
@@ -81,7 +82,7 @@ Create a new Python environment named **scikit-activeml**:
 
    conda create -n scikit-activeml
 
-To be sure that the correct env is active:
+To be sure that the correct environment is active:
 
 .. code:: bash
 
@@ -97,11 +98,11 @@ Install Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 
 Now we can install some required project dependencies, which are defined
-in the ``requirements.txt`` file.
+in the ``requirements.txt`` and ``requirements.txt`` (for development) files.
 
 .. code:: bash
 
-   # Make sure your scikit-activeml python env is active!
+   # Make sure your scikit-activeml python environment is active!
    cd <project-root>
    pip install -r requirements.txt
    pip install -r requirements_extra.txt
@@ -167,40 +168,48 @@ Make sure, you covered all lines by tests.
    $ git commit -m "<commit-message>"
    $ git push
 
+6. Create a pull request.
+
 Query Strategies
 ----------------
 
-Pool-based Query Strategies
+All query strategies inherit from ``skactiveml.base.QueryStrategy`` as abstract
+superclass implemented in ``skactiveml/base.py``. This class is
+``sklearn.base.Estimator``. The ``__init__`` method requires by default a
+``random_state`` parameter and the abstract method ``query`` is to enforce the
+implementation of the sample selection logic.
+
+Single-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 General
 ^^^^^^^
 
-All query strategies are stored in a file
-``skactiveml/pool/_query_strategy.py``. Every class inherits from
-``SingleAnnotatorPoolQueryStrategy``. The class must implement the
-``__init__`` function for initialization and a ``query`` function.
+Single-annotator pool-based query strategies are stored in a file
+``skactiveml/pool/_query_strategy.py`` and inherit from
+``skactiveml.base.SingleAnnotatorPoolQueryStrategy``. The class must implement
+the ``__init__`` function for initialization and a ``query`` function.
 
 ``__init__`` function
 ^^^^^^^^^^^^^^^^^^^^^
 
-For typical class parameters we use standard names:
+For typical class parameters, we use standard names:
 
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
 | ``prior``                         | Prior probabilities for the       |
 |                                   | distribution of probabilistic     |
-|                                   | strategies                        |
+|                                   | strategies.                       |
 +-----------------------------------+-----------------------------------+
 | ``random_state``                  | Number or np.random.RandomState   |
-|                                   | like sklearn                      |
+|                                   | like sklearn.                     |
 +-----------------------------------+-----------------------------------+
 | ``method``                        | String for classes that implement |
-|                                   | multiple methods                  |
+|                                   | multiple methods.                 |
 +-----------------------------------+-----------------------------------+
 | ``cost_matrix``                   | Cost matrix defining the cost of  |
-|                                   | predicting instances wrong        |
+|                                   | interchanging classes.            |
 +-----------------------------------+-----------------------------------+
 
 ``query`` function
@@ -211,32 +220,34 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``X_cand``                        | Set of candidate instances,       |
-|                                   | inherited from                    |
-|                                   | ``Single                          |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
+| ``X``                             | Training data set, usually        |
+|                                   | complete, i.e. including the      |
+|                                   | labeled and unlabeled samples.    |
 +-----------------------------------+-----------------------------------+
-| ``clf``                           | The classifier used by the        |
-|                                   | strategy                          |
+| ``y``                             | Labels of the training data set   |
+|                                   | (possibly including unlabeled     |
+|                                   | ones indicated by MISSING_LABEL.) |
 +-----------------------------------+-----------------------------------+
-| ``X``                             | Set of labeled and unlabeled      |
-|                                   | instances                         |
+| ``candidates``                    | If candidates is None, the        |
+|                                   | unlabeled samples from (X, y) are |
+|                                   | considered as candidates. If      |
+|                                   | candidates is of shape            |
+|                                   | (n_candidates) and of type int,   |
+|                                   | candidates is considered as the   |
+|                                   | indices of the samples in (X,y).  |
+|                                   | If candidates is of shape         |
+|                                   | (n_candidates, n_features), the   |
+|                                   | candidates are directly given in  |
+|                                   | candidates (not necessarily       |
+|                                   | contained in X). This is not      |
+|                                   | supported by all query            |
+|                                   | strategies.                       |
 +-----------------------------------+-----------------------------------+
-| ``y``                             | (unknown) labels of ``X``         |
+| ``batch_size``                    | Number of samples to be selected  |
+|                                   | in one AL cycle.                  |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Weights of training samples in    |
-|                                   | ``X``                             |
-+-----------------------------------+-----------------------------------+
-| ``sample_weight_cand``            | Weights of samples in ``X_cand``  |
-+-----------------------------------+-----------------------------------+
-| ``batch_size``                    | Number of instances for batch     |
-|                                   | querying, inherited from          |
-|                                   | ``Single                          |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
-+-----------------------------------+-----------------------------------+
-| ``return_utilities``              | Inherited from                    |
-|                                   | ``Single                          |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
+| ``return_utilities``              | If true, additionally return the  |
+|                                   | utilities of the query strategy.` |
 +-----------------------------------+-----------------------------------+
 
 Returns:
@@ -244,42 +255,89 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``query_indices``                 | Indices of the best instances     |
+| ``query_indices``                 | The ``query_indices`` indicate    |
+|                                   | for which candidate sample a      |
+|                                   | label is to be queried, e.g.,     |
+|                                   | ``query_indices[0]`` indicates    |
+|                                   | the first selected sample. If     |
+|                                   | candidates is None or of shape    |
+|                                   | (n_candidates), the indexing      |
+|                                   | refers to samples in ``X``. If    |
+|                                   | candidates is of shape            |
+|                                   | (n_candidates, n_features), the   |
+|                                   | indexing refers to samples in     |
+|                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
-| ``utilities``                     | Utilities of all candidate        |
-|                                   | instances, only if                |
-|                                   | ``return_utilities`` is ``True``  |
+| ``utilities``                     | The utilities of samples after    |
+|                                   | each selected sample of the       |
+|                                   | batch, e.g., ``utilities[0]``     |
+|                                   | indicates the utilities used for  |
+|                                   | selecting the first sample (with  |
+|                                   | index ``query_indices[0]``) of    |
+|                                   | the batch. Utilities for labeled  |
+|                                   | samples will be set to np.nan. If |
+|                                   | candidates is None or of shape    |
+|                                   | (n_candidates), the indexing      |
+|                                   | refers to samples in ``X``. If    |
+|                                   | candidates is of shape            |
+|                                   | (n_candidates, n_features), the   |
+|                                   | indexing refers to samples in     |
+|                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
 
 General advice
 ''''''''''''''
 
-Use ``self._validate_data`` function (Is implemented in the superclass).
-Check the input ``X`` and ``y`` only once. Fit classifier if it is not
-yet fitted (May use ``fit_if_not_fitted`` form utils). Calculate
-utilities (In an extra function. Use ``simple_batch`` function from
-utils for return value.
+Use ``self._validate_data`` function (implemented in the superclass).
+Check the input ``X`` and ``y`` only once. Fit the classifier or regressors if
+it is not yet fitted (may use ``fit_if_not_fitted`` form utils). Calculate
+utilities via an extra function that should be public. Use ``simple_batch``
+function from utils for determining `query_indices` and setting ``utilities``
+in naive batch query strategies.
 
 Testing
 ^^^^^^^
 
-All query strategies are tested by a general unittest
-(``test_pool.py``). Querying of every method is tested with standard
-configurations with 0, 1, and 5 initial labels. For every class
-``ExampleQueryStrategy`` that inherits from
-``SingleAnnotatorPoolQueryStrategy`` (stored in ``_example.py``), it is
-automatically tested if there exists a file ``test/test_example.py``. It
-is necessary that both filenames are the same. Moreover, the test class
-must be called ``TestExampleQueryStrategy(unittest.TestCase)``. Every
-parameter in ``__init__()`` will be tested if it is written the same as
-a class variable. Every parameter arg in ``__init__()`` will be
-evaluated if there exists a method in the testclass
-``TestExampleQueryStrategy`` that is called ``test_init_param_arg()``.
-Every parameter arg in ``query()`` will be evaluated if there exists a
-method in the testclass ``TestExampleQueryStrategy`` that is called
-``test_query_param_arg()``. Standard parameters ``random_state``,
-``X_cand``, ``batch_size`` and ``return_utilities`` are tested and do
-not have to be tested in the specific tests.
+The test classes ``skactiveml.pool.test.TestQueryStrategy`` of single-annotator
+pool-based query strategies need to inherit from the test template
+``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorPoolQueryStrategy``.
+As a result, many required functionalities will be automatically tested.
+As a requirement, one needs to specify the parameters of ``qs_class``,
+``init_default_params`` of the ``__init__`` accordingly. Depending on whether
+the query strategy can handle regression/classification or both settings, one
+needs to additionally define the parameters
+``query_default_params_reg/query_default_params_clf``.
+Once, the parameters are set, the developer needs to adjust the test until
+all errors are resolved. In particular, the method ``test_query`` must
+be implemented. We refer to the test template for more detailed information.
+
+Examples
+^^^^^^^^
+Two of our main goals are to make active learning more understandable and
+improve our framework's usability.
+Therefore, we require the implementation of an example for each query strategy.
+To do so, one needs to create a file name
+``scikit-activeml/docs/examples/query_strategy.json`` and fill out the
+following fields:
+
++-----------------------------------+-----------------------------------+
+| Field                             | Description                       |
++===================================+===================================+
+| ``class``                         | Query strategy's class name.      |
++-----------------------------------+-----------------------------------+
+| ``package``                       | Name of the sub-package, i.e.,    |
+|                                   | pool in this case.                |
++-----------------------------------+-----------------------------------+
+| ``method``                        | Query strategy's official name.   |
++-----------------------------------+-----------------------------------+
+| ``category``                        | Query strategy's official name. |
++-----------------------------------+-----------------------------------+
+| ``batch_size``                    | Number of samples to be selected  |
+|                                   | in one AL cycle.                  |
++-----------------------------------+-----------------------------------+
+| ``return_utilities``              | If true, additionally return the  |
+|                                   | utilities of the query strategy.` |
++-----------------------------------+-----------------------------------+
 
 Stream-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
