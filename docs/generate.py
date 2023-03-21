@@ -696,3 +696,29 @@ def generate_tutorials(src_path, dst_path):
         find them.
     """
     distutils.dir_util.copy_tree(src=src_path, dst=dst_path)
+
+
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+
+colors = ["Decision Boundary", "Labeled Instance", "Instance Of Class 0", "Instance Of Class 1" "Utility Score"]
+f = lambda m,c: plt.plot([],[],marker=m, color=c, ls="none")[0]
+handles = [f("s", colors[i]) for i in range(3)]
+labels = colors
+legend = plt.legend(handles, labels, loc=3, framealpha=1, frameon=True)
+
+
+def export_legend(legend, path="legend.pdf", expand=[-5,-5,5,5]):
+    fig = legend.figure
+    fig.canvas.draw()
+    bbox = legend.get_window_extent()
+    bbox = bbox.from_extents(*(bbox.extents + np.array(expand)))
+    bbox = bbox.transformed(fig.dpi_scale_trans.inverted())
+    fig.savefig(path, dpi="figure", bbox_inches=bbox)
+
+
+export_legend(
+    legend,
+    path="docs/generated/examples/pool/classification_legend.pdf"
+)
