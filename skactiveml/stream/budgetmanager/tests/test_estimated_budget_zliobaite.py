@@ -7,6 +7,7 @@ from skactiveml.stream.budgetmanager import (
     VariableUncertaintyBudgetManager,
     SplitBudgetManager,
     RandomVariableUncertaintyBudgetManager,
+    RandomBudgetManager,
 )
 
 
@@ -209,6 +210,20 @@ class TestSplitBudgetManager(TestVariableUncertaintyBudgetManager):
             ValueError, budget_manager.query_by_utility, self.utilities
         )
         budget_manager = self.get_budget_manager()(v=-1.0)
+        self.assertRaises(
+            ValueError, budget_manager.query_by_utility, self.utilities
+        )
+
+
+class TestRandomBudgetManager(
+    TemplateTestEstimatedBudgetZliobaite, unittest.TestCase
+):
+    def get_budget_manager(self):
+        return RandomBudgetManager
+
+    def test_init_param_random_state(self):
+        # v must be defined as an float with a range of: 0 < v < 1
+        budget_manager = self.get_budget_manager()(random_state="string")
         self.assertRaises(
             ValueError, budget_manager.query_by_utility, self.utilities
         )

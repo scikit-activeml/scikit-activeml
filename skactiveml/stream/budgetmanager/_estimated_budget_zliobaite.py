@@ -7,11 +7,13 @@ from ...utils import check_random_state, check_scalar
 
 
 class EstimatedBudgetZliobaite(BudgetManager):
-    """Budget manager which checks, whether the specified budget has been
+    """EstimatedBudgetZliobaite
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget.
 
-    This budget manager calculates the estimated budget spent in the last
+    This budget manager calculates the estimated budget [1] spent in the last
     w steps and compares that to the budget. If the ratio is smaller
     than the specified budget, i.e., budget - u_t / w > 0, the budget
     manager samples an instance when its utility is higher than the budget.
@@ -21,12 +23,18 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
+
+    References
+    ----------
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
     """
 
     def __init__(self, budget=None, w=100):
@@ -38,6 +46,11 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -79,7 +92,9 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
 
 class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which is optimized for FixedUncertainty and checks,
+    """FixedUncertaintyBudgetManager
+
+    Budget manager which is optimized for FixedUncertainty and checks,
     whether the specified budget has been exhausted already. If not, an
     instance is queried, when the utility is higher than the specified budget
     and the probability of the most likely class exceeds a threshold
@@ -88,13 +103,13 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    num_classes : int
+    num_classes : int, optional (default=2)
         Specifies the number of classes. Default = 2
     """
 
@@ -148,13 +163,18 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             if d:
                 queried_indices.append(i)
 
-            return queried_indices
+        return queried_indices
 
     def update(self, candidates, queried_indices):
         """Updates the budget manager.
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -195,7 +215,9 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 
 class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which checks, whether the specified budget has been
+    """VariableUncertaintyBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
@@ -214,16 +236,16 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1.0)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.1)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
     """
@@ -286,6 +308,11 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -345,7 +372,9 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 
 class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which checks, whether the specified budget has been
+    """RandomVariableUncertaintyBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget and when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
@@ -360,22 +389,25 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     u is the estimate of how many true lables were queried within the last
     w steps. The recursive funktion,
     u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
-    See also :class:`.EstimatedBudgetZliobaite`
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.01)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
+    delta : float, optional (default=1.0)
+        Specifies the standart deviation of the distribution. Default 1.0
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
     """
 
     def __init__(
@@ -453,6 +485,11 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -527,7 +564,9 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
 
 class SplitBudgetManager(EstimatedBudgetZliobaite):
-    """Budget manager which checks, whether the specified budget has been
+    """SplitBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
     exhausted already. If not, an instance is queried, when the utility is
     higher than the specified budget. 100*v% of instances will be queried
     randomly and in 100*(1-v)% of will be queried cases according
@@ -544,24 +583,31 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    budget : float
+    budget : float, optional (default=None)
         Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1.
-    w : int
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
         Specifies the size of the memory window. Controlles the budget in the
         last w steps taken. Default = 100
-    theta : float
+    theta : float, optional (default=1.0)
         Specifies the starting threshold in wich instances are purchased. This
         value of theta will recalculated after each instance. Default = 1
-    s : float
+    s : float, optional (default=0.01)
         Specifies the value in wich theta is decresed or increased based on the
         purchase of the given label. Default = 0.01
-    v : float
+    v : float, optional (default=0.1)
         Specifies the percent value of instances queried randomly.
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
+
+    See Also
+    --------
+    EstimatedBudgetZliobaite : BudgetManager implementing the base class for
+        Zliobaite based budget managers
     """
 
     def __init__(
-        self, budget=None, w=100, theta=1.0, s=0.01, v=0.1, random_state=0
+        self, budget=None, w=100, theta=1.0, s=0.01, v=0.1, random_state=None
     ):
         super().__init__(budget, w)
         self.v = v
@@ -631,6 +677,11 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
         Parameters
         ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
@@ -695,6 +746,143 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         # check if theta exists
         if not hasattr(self, "theta_"):
             self.theta_ = self.theta
+
+    def _validate_random_state(self):
+        """Creates a copy 'random_state_' if random_state is an instance of
+        np.random_state. If not create a new random state. See also
+        :func:`~sklearn.utils.check_random_state`
+        """
+        if not hasattr(self, "random_state_"):
+            self.random_state_ = deepcopy(self.random_state)
+        self.random_state_ = check_random_state(self.random_state_)
+
+
+class RandomBudgetManager(EstimatedBudgetZliobaite):
+    """RandomBudgetManager
+
+    Budget manager which checks, whether the specified budget has been
+    exhausted already. If not, an instance is queried, when the utility is
+    higher than the specified budget. If budget is available, budget% instances
+    are queried randomly.
+
+    This budget manager calculates the estimated budget spent in the last
+    w steps and compares that to the budget. If the ratio is smaller
+    than the specified budget, i.e., budget - u_t / w > 0 , the budget
+    manager samples an instance when its utility is higher than the budget.
+    u is the estimate of how many true lables were queried within the last
+    w steps. The recursive funktion,
+    u_t = u_t-1 * (w-1) / w + labeling_t , is used to calculate u at time t.
+    See also :class:`.EstimatedBudgetZliobaite`
+
+    Parameters
+    ----------
+    budget : float, optional (default=None)
+        Specifies the ratio of instances which are allowed to be queried, with
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    w : int, optional (default=100)
+        Specifies the size of the memory window. Controlles the budget in the
+        last w steps taken. Default = 100
+    random_state : int | np.random.RandomState, optional (default=None)
+        Random state for candidate selection.
+    """
+
+    def __init__(self, budget=None, w=100, random_state=None):
+        super().__init__(budget, w)
+        self.random_state = random_state
+
+    def query_by_utility(self, utilities):
+        """Ask the budget manager which utilities are sufficient to query the
+        corresponding instance.
+
+        Parameters
+        ----------
+        utilities : ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy, which are used to determine whether sampling an instance
+            is worth it given the budgeting constraint.
+
+        return_utilities : bool, optional
+            If true, also return whether there was budget left for each
+            assessed utility. The default is False.
+
+        Returns
+        -------
+        queried_indices : ndarray of shape (n_queried_instances,)
+            The indices of instances represented by utilities which should be
+            queried, with 0 <= n_queried_instances <= n_samples.
+        """
+        utilities = self._validate_data(utilities)
+
+        # intialize return parameters
+        queried_indices = []
+
+        # keep the internal state to reset it later if simulate is true
+        tmp_u_t = self.u_t_
+
+        prior_random_state = self.random_state_.get_state()
+
+        samples = (
+            self.random_state_.random_sample(len(utilities)) <= self.budget_
+        )
+        # check for each sample separately if budget is left and the utility is
+        # high enough
+        for i, d in enumerate(samples):
+            budget_left = tmp_u_t / self.w < self.budget_
+            d = d if budget_left else False
+            tmp_u_t = tmp_u_t * ((self.w - 1) / self.w) + (
+                d and not np.isnan(utilities[i])
+            )
+            # get the indices instances that should be queried
+            if d and not np.isnan(utilities[i]):
+                queried_indices.append(i)
+
+        self.random_state_.set_state(prior_random_state)
+
+        return queried_indices
+
+    def update(self, candidates, queried_indices):
+        """Updates the budget manager.
+
+        Parameters
+        ----------
+        candidates : {array-like, sparse matrix} of shape
+        (n_samples, n_features)
+            The instances which could be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
+
+        queried_indices : array-like of shape (n_samples,)
+            Indicates which instances from candidates have been queried.
+
+        Returns
+        -------
+        self : RandomBudgetManager
+            The RandomBudgetManager returns itself, after it is updated.
+        """
+        self._validate_data(np.array([]))
+        self.random_state_.random_sample(len(candidates))
+        super().update(candidates, queried_indices)
+        return self
+
+    def _validate_data(self, utilities):
+        """Validate input data.
+
+        Parameters
+        ----------
+        utilities: ndarray of shape (n_samples,)
+            The utilities provided by the stream-based active learning
+            strategy.
+
+        Returns
+        -------
+        utilities : ndarray of shape (n_samples,)
+            Checked utilities.
+        """
+
+        utilities = super()._validate_data(utilities)
+        check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
+        self._validate_random_state()
+
+        return utilities
 
     def _validate_random_state(self):
         """Creates a copy 'random_state_' if random_state is an instance of
