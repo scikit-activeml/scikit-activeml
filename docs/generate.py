@@ -701,24 +701,74 @@ def generate_tutorials(src_path, dst_path):
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import os
 
-colors = ["Decision Boundary", "Labeled Instance", "Instance Of Class 0", "Instance Of Class 1" "Utility Score"]
-f = lambda m,c: plt.plot([],[],marker=m, color=c, ls="none")[0]
-handles = [f("s", colors[i]) for i in range(3)]
-labels = colors
-legend = plt.legend(handles, labels, loc=3, framealpha=1, frameon=True)
+def export_legend(legend, path="legend.pdf", expand=None):
+    if expand is None:
+        expand = [-5, -5, 5, 5]
 
-
-def export_legend(legend, path="legend.pdf", expand=[-5,-5,5,5]):
     fig = legend.figure
     fig.canvas.draw()
     bbox = legend.get_window_extent()
     bbox = bbox.from_extents(*(bbox.extents + np.array(expand)))
     bbox = bbox.transformed(fig.dpi_scale_trans.inverted())
-    fig.savefig(path, dpi="figure", bbox_inches=bbox)
+    fig.savefig(os.path.abspath(path), dpi="figure", bbox_inches=bbox)
 
 
-export_legend(
-    legend,
-    path="docs/generated/examples/pool/classification_legend.pdf"
-)
+def generate_classification_legend():
+    handles = []
+    fig, ax = plt.subplots(1, 1)
+    labels = []
+
+    labels.append("Decision Boundary")
+    handles.append(ax.plot([], [], color="black")[0])
+    labels.append("75% Confidence Class 0")
+    handles.append(ax.plot([], [], color="blue", ls="--")[0])
+    labels.append("Sample Of Class 0")
+    handles.append(ax.scatter([], [], marker=".", color="blue"))
+    labels.append("High Utility Score")
+    handles.append(mpatches.Patch(color='green', alpha=1.0))
+    labels.append("Labeled Sample")
+    handles.append(ax.scatter([], [], marker=".", color="gray", s=100,
+                              alpha=0.8))
+    labels.append("75% Confidence Class 1")
+    handles.append(ax.plot([], [], color="red", ls="--")[0])
+    labels.append("Sample Of Class 1")
+    handles.append(ax.scatter([], [], marker=".", color="red"))
+    labels.append("Low Utility Score")
+    handles.append(mpatches.Patch(color='green', alpha=0.2))
+
+    ax.axis("off")
+    legend = ax.legend(handles, labels, loc=3, framealpha=1, frameon=True,
+                       ncol=4)
+    export_legend(
+        legend,
+        path="G:\\pasme\\Documents\\Studium\\HIWI_Jobs\\IES\\scikit-activeml\\"
+             "docs\\generated\\examples\\pool\\classification_legend.png"
+    )
+
+
+def generate_regression_legend():
+    handles = []
+    fig, ax = plt.subplots(1, 1)
+    labels = ["Regression Curve", "Utilitiy Score",
+              "Unlabeled Sample", "Labeled Sample"]
+    handles.append(ax.plot([], [], color="black")[0])
+    handles.append(ax.plot([], [], color="green")[0])
+    handles.append(ax.scatter([], [], marker=".", color="lightblue", s=100))
+    handles.append(ax.scatter([], [], marker=".", color="orange", s=100))
+
+    ax.axis("off")
+    legend = ax.legend(handles, labels, loc=3, framealpha=1, frameon=True,
+                       ncol=4)
+
+    export_legend(
+        legend,
+        path="G:\\pasme\\Documents\\Studium\\HIWI_Jobs\\IES\\scikit-activeml\\"
+             "docs\\generated\\examples\\pool\\regression_legend.png"
+    )
+
+
+generate_classification_legend()
+generate_regression_legend()
