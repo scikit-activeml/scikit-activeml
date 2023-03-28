@@ -5,7 +5,6 @@ Pool Based AL Strategies
 
 .. image:: ../examples/pool/classification_legend.png
 
-
 **Legend for regression plots**
 
 .. image:: ../examples/pool/regression_legend.png
