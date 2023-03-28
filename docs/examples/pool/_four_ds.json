@@ -16,5 +16,23 @@
     "init_clf" : "MixtureModelClassifier(classes=[0, 1], mixture_model=GaussianMixture(n_components=5))",
     "init_qs" : "FourDs()",
     "query_params" : "X=X, y=y, clf=clf"
+  },
+  {
+    "class" : "FourDs",
+    "package" : "pool",
+    "method" : "Batch Density-Diversity-Distribution-Distance Sampling (Batch4DS)",
+    "category" : "Uncertainty Sampling",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Batch Density-Diversity-Distribution-Distance Sampling",
+    "refs" : ["reitmaier2013let"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : ["from skactiveml.pool import FourDs",
+                     "from sklearn.mixture import GaussianMixture"],
+    "import_clf" : "from skactiveml.classifier import MixtureModelClassifier",
+    "init_clf" : "MixtureModelClassifier(classes=[0, 1], mixture_model=GaussianMixture(n_components=5))",
+    "init_qs" : "FourDs()",
+    "query_params" : "X=X, y=y, clf=clf"
   }
 ]

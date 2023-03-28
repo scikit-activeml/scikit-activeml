@@ -287,7 +287,7 @@ def plot_contour_for_samples(
     replace_nan=0.0,
     feature_bound=None,
     ax=None,
-    res=101,
+    res=21,
     contour_dict=None,
 ):
     """Plot the utility for the given query strategy.
@@ -412,8 +412,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     candidates : None or array-like of shape (n_candidates,), dtype=int or
         array-like of shape (n_candidates, n_features),
         optional (default=None)
-        If `candidates` is None, the unlabeled samples from (X,y) are
-        considered as candidates.
+        If `candidates` is None, a mesh with the specified resolution is
+        generated and considered as candidates.
         If `candidates` is of shape (n_candidates,) and of type int,
         candidates is considered as the indices of the samples in (X,y).
         If `candidates` is of shape (n_candidates, n_features), the
