@@ -32,9 +32,6 @@ multi-annotator setting. In the latter setting, multiple error-prone annotators
 are queried to provide labels. As a result, an active learning query strategy
 not only decides which samples but also which annotators should be queried.
 
-Introduction
-------------
-
 Thank you, contributors!
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -53,7 +50,7 @@ following channels:
 Roadmap
 ~~~~~~~
 
-Our Roadmap is summarized in the issue `Upcoming
+Our roadmap is summarized in the issue `Upcoming
 Features <https://github.com/scikit-activeml/scikit-activeml/issues/145>`__.
 
 Get Started
@@ -70,8 +67,7 @@ There are several ways to create a local Python environment, such as
 `pipenv <https://pipenv.pypa.io/enz/latest/>`__,
 `miniconda <https://docs.conda.io/en/latest/miniconda.html>`__, etc. One
 possible workflow is to install ``miniconda`` and use it to create a
-Python environment. And use ``pip`` to install packages in this
-environment.
+Python environment.
 
 Example With miniconda
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -128,12 +124,21 @@ As this library conforms to the convention of
 the code should conform to `PEP
 8 <https://www.python.org/dev/peps/pep-0008/>`__ Style Guide for Python
 Code. For linting, the use of
-`flake8 <https://flake8.pycqa.org/en/latest/>`__ is recommended.
+`flake8 <https://flake8.pycqa.org/en/latest/>`__ is recommended. The Python
+package `black <https://black.readthedocs.io/en/stable/>`__ provides a simple
+solution for this formatting. Concretely, you can install it and format
+the code via the following commands:
+
+.. code:: bash
+
+   pip install black
+   black --line-length example_file.py
 
 Example for C3 (Code Contribution Cycle) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Fork the repository using the Github ``Fork`` button.
+1. Fork the repository using the Github `Fork <https://github.com/scikit-activeml/scikit-activeml/fork>`__
+button.
 
 2. Then, clone your fork to your local machine:
 
@@ -141,7 +146,7 @@ Example for C3 (Code Contribution Cycle) and Pull Requests
 
    git clone https://github.com/<your-username>/scikit-activeml.git
 
-3. Create a new branch for your changes from the ``master`` branch:
+3. Create a new branch for your changes from the ``development`` branch:
 
 .. code:: bash
 
@@ -174,7 +179,7 @@ Query Strategies
 ----------------
 
 All query strategies inherit from ``skactiveml.base.QueryStrategy`` as abstract
-superclass implemented in ``skactiveml/base.py``. This class is
+superclass implemented in ``skactiveml/base.py``. This class is a
 ``sklearn.base.Estimator``. The ``__init__`` method requires by default a
 ``random_state`` parameter and the abstract method ``query`` is to enforce the
 implementation of the sample selection logic.
@@ -186,12 +191,22 @@ General
 ^^^^^^^
 
 Single-annotator pool-based query strategies are stored in a file
-``skactiveml/pool/_query_strategy.py`` and inherit from
-``skactiveml.base.SingleAnnotatorPoolQueryStrategy``. The class must implement
-the ``__init__`` function for initialization and a ``query`` function.
+``skactiveml/pool/*.py`` and inherit from
+``skactiveml.base.SingleAnnotatorPoolQueryStrategy``.
 
-``__init__`` function
-^^^^^^^^^^^^^^^^^^^^^
+The class must implement the following methods:
+
++------------+----------------------------------------------------------------+
+| Method     | Description                                                    |
++============+================================================================+
+| ``init``   | Method for initialization.                                     |
++------------+----------------------------------------------------------------+
+| ``query``  | Select the samples whose labels are to be queried.             |
++------------+----------------------------------------------------------------+
+
+
+``__init__`` method
+^^^^^^^^^^^^^^^^^^^
 
 For typical class parameters, we use standard names:
 
@@ -212,8 +227,8 @@ For typical class parameters, we use standard names:
 |                                   | interchanging classes.            |
 +-----------------------------------+-----------------------------------+
 
-``query`` function
-^^^^^^^^^^^^^^^^^^
+``query`` method
+^^^^^^^^^^^^^^^^
 
 Required Parameters:
 
@@ -311,36 +326,8 @@ Once, the parameters are set, the developer needs to adjust the test until
 all errors are resolved. In particular, the method ``test_query`` must
 be implemented. We refer to the test template for more detailed information.
 
-Examples
-^^^^^^^^
-Two of our main goals are to make active learning more understandable and
-improve our framework's usability.
-Therefore, we require the implementation of an example for each query strategy.
-To do so, one needs to create a file name
-``scikit-activeml/docs/examples/query_strategy.json`` and fill out the
-following fields:
-
-+-----------------------------------+-----------------------------------+
-| Field                             | Description                       |
-+===================================+===================================+
-| ``class``                         | Query strategy's class name.      |
-+-----------------------------------+-----------------------------------+
-| ``package``                       | Name of the sub-package, i.e.,    |
-|                                   | pool in this case.                |
-+-----------------------------------+-----------------------------------+
-| ``method``                        | Query strategy's official name.   |
-+-----------------------------------+-----------------------------------+
-| ``category``                        | Query strategy's official name. |
-+-----------------------------------+-----------------------------------+
-| ``batch_size``                    | Number of samples to be selected  |
-|                                   | in one AL cycle.                  |
-+-----------------------------------+-----------------------------------+
-| ``return_utilities``              | If true, additionally return the  |
-|                                   | utilities of the query strategy.` |
-+-----------------------------------+-----------------------------------+
-
-Stream-based Query Strategies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Single-annotator Stream-based Query Strategies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. _general-1:
 
@@ -579,75 +566,92 @@ Multi-Annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 All query strategies are stored in a file
-``skactiveml/pool/multi/_query_strategy.py``. Every class inherits from
-``MultiAnnotatorPoolQueryStrategy``. The class must implement the
-following functions:
+``skactiveml/pool/multi/*.py`` and inherit
+``skactiveml.base.MultiAnnotatorPoolQueryStrategy``.
 
-+--------------+--------------------------------------------------------------+
-| Parameter    | Description                                                  |
-+==============+==============================================================+
-| ``__init__`` | Function for initialization of hyperparameters               |
-+--------------+--------------------------------------------------------------+
-| ``query``    | Identify the instance annotator pairs whose labels to select |
-+--------------+--------------------------------------------------------------+
+The class must implement the following methods:
 
-For typical class parameters we use standard names:
-
-================ ================================================
-Parameter        Description
-================ ================================================
-``random_state`` Number or ``np.random.RandomState`` like sklearn
-================ ================================================
++------------+----------------------------------------------------------------+
+| Method     | Description                                                    |
++============+================================================================+
+| ``init``   | Method for initialization.                                     |
++------------+----------------------------------------------------------------+
+| ``query``  | Select the annotator-sample pairs to decide which sample's     |
+|            | class label is to be queried from which annotator.             |
++------------+----------------------------------------------------------------+
 
 .. _query-function-2:
 
-``query`` function
-^^^^^^^^^^^^^^^^^^
+``query`` method
+^^^^^^^^^^^^^^^^
 
 Required Parameters:
 
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``X_cand``                        | Sequence of candidate instances   |
-|                                   | to be queried, inherited from     |
-|                                   | ``Multi                           |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
+| ``X``                             | Training data set, usually        |
+|                                   | complete, i.e. including the      |
+|                                   | labeled and unlabeled samples.    |
 +-----------------------------------+-----------------------------------+
-| ``A_cand``                        | Boolean mask further specifying   |
-|                                   | which annotator can be queried    |
-|                                   | for which candidate instance,     |
-|                                   | inherited from                    |
-|                                   | ``Multi                           |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
+| ``y``                             | Labels of the training data set   |
+|                                   | for each annotator (possibly      |
+|                                   | including unlabeled ones          |
+|                                   | indicated by self.MISSING_LABEL), |
+|                                   | meaning that ``y[i, j]`` contains |
+|                                   | the label annotated by annotator  |
+|                                   | ``i`` for sample ``j``.           |
 +-----------------------------------+-----------------------------------+
-| ``clf``                           | The classifier used by the        |
-|                                   | strategy                          |
+| ``candidates``                    | If ``candidates`` is None, the    |
+|                                   | samples from ``(X, y)``, for      |
+|                                   | which an annotator exists such    |
+|                                   | that the annotator sample pair is |
+|                                   | unlabeled are considered as       |
+|                                   | sample candidates. If             |
+|                                   | ``candidates`` is of shape        |
+|                                   | (n_candidates,) and of type int,  |
+|                                   | ``candidates`` is considered as   |
+|                                   | the indices of the sample         |
+|                                   | candidates in ``(X, y)``. If      |
+|                                   | ``candidates`` is of shape        |
+|                                   | (n_candidates, n_features), the   |
+|                                   | sample candidates are directly    |
+|                                   | given in `candidates` (not        |
+|                                   | necessarily contained in ``X``).  |
+|                                   | This is not supported by all      |
+|                                   | query strategies.                 |
 +-----------------------------------+-----------------------------------+
-| ``X``                             | Sequence of labeled and unlabeled |
-|                                   | instances                         |
+| ``annotators``                    | If ``annotators`` is None, all    |
+|                                   | annotators are considered as      |
+|                                   | available annotators. If          |
+|                                   | ``annotators`` is of shape        |
+|                                   | (n_avl_annotators), and of type   |
+|                                   | int, ``annotators`` is considered |
+|                                   | as the indices of the available   |
+|                                   | annotators. If candidate samples  |
+|                                   | and available annotators are      |
+|                                   | specified: The annotator-sample   |
+|                                   | pairs, for which the sample is a  |
+|                                   | candidate sample and the          |
+|                                   | annotator is an available         |
+|                                   | annotator are considered as       |
+|                                   | candidate annotator-sample-pairs. |
+|                                   | If ``annotators`` is a boolean    |
+|                                   | array of shape (n_candidates,     |
+|                                   | n_avl_annotators) the             |
+|                                   | annotator-sample pairs, for which |
+|                                   | the sample is a candidate sample  |
+|                                   | and the boolean matrix has entry  |
+|                                   | ``True`` are considered as        |
+|                                   | candidate annotator-sample pairs. |
 +-----------------------------------+-----------------------------------+
-| ``y``                             | (unknown) Labels of ``X`` for     |
-|                                   | each annotator                    |
+| ``batch_size``                    | The number of annotator-sample    |
+|                                   | pairs to be selected in one AL    |
+|                                   | cycle.                            |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Weights of the prediction of a    |
-|                                   | sample from an annotator (used    |
-|                                   | for predictions of labels)        |
-+-----------------------------------+-----------------------------------+
-| ``A_perf``                        | Performance of an annotators for  |
-|                                   | a given sample, usually the       |
-|                                   | accuracy (used for estimating the |
-|                                   | best annotator to query for a     |
-|                                   | given candidate sample)           |
-+-----------------------------------+-----------------------------------+
-| ``ybatch_size``                   | Number of instances for batch     |
-|                                   | querying, inherited from          |
-|                                   | ``Multi                           |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
-+-----------------------------------+-----------------------------------+
-| ``return_utilities``              | Inherited from                    |
-|                                   | ``Multi                           |
-|                                   | AnnotatorPoolBasedQueryStrategy`` |
+| ``return_utilities``              | If ``True``, also return the      |
+|                                   | utilities based on the query      |
+|                                   | strategy.                         |
 +-----------------------------------+-----------------------------------+
 
 Returns:
@@ -655,13 +659,34 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``query_indices``                 | Indices of the best candidate     |
-|                                   | instance annotator pair           |
+| ``query_indices``                 | The ``query_indices`` indicate    |
+|                                   | for which candidate sample a      |
+|                                   | label is to be queried, e.g.,     |
+|                                   | ``query_indices[0]`` indicates    |
+|                                   | the first selected sample. If     |
+|                                   | candidates is None or of shape    |
+|                                   | (n_candidates), the indexing      |
+|                                   | refers to samples in ``X``. If    |
+|                                   | candidates is of shape            |
+|                                   | (n_candidates, n_features), the   |
+|                                   | indexing refers to samples in     |
+|                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
-| ``utilities``                     | Utilities of all candidate        |
-|                                   | instances annotator pairs, only   |
-|                                   | if ``return_utilities`` is        |
-|                                   | ``True``                          |
+| ``utilities``                     | The utilities of samples after    |
+|                                   | each selected sample of the       |
+|                                   | batch, e.g., ``utilities[0]``     |
+|                                   | indicates the utilities used for  |
+|                                   | selecting the first sample (with  |
+|                                   | index ``query_indices[0]``) of    |
+|                                   | the batch. Utilities for labeled  |
+|                                   | samples will be set to np.nan. If |
+|                                   | candidates is None or of shape    |
+|                                   | (n_candidates), the indexing      |
+|                                   | refers to samples in ``X``. If    |
+|                                   | candidates is of shape            |
+|                                   | (n_candidates, n_features), the   |
+|                                   | indexing refers to samples in     |
+|                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
 
 .. _general-advice-3:
@@ -675,14 +700,26 @@ yet fitted (may use ``fit_if_not_fitted`` form ``utils``). If the
 strategy combines a single annotator query strategy with a performance
 estimate:
 
--  Define an aggregation function
--  Evaluate the performance for each annotator sample pair
--  Use the ``SingleAnnotatorWrapper``
+-  define an aggregation function
+-  evaluate the performance for each sample-annotator pair,
+-  use the ``SingleAnnotatorWrapper``.
 
 If the strategy is a ``greedy`` method regarding the utilities:
 
--  Calculate utilities (in an extra function)
--  Use ``simple_batch`` function from utils for return value
+-  calculate utilities (in an extra function),
+-  use ``skactiveml.utils.simple_batch`` function for returning values.
+
+
+Testing
+^^^^^^^
+
+The test classes ``skactiveml.pool.multiannotator.test.TestQueryStrategy`` of
+multi-annotator pool-based query strategies need inherit form
+``unittest.TestCase``. In this class, each parameter ``a`` of the
+``__init__`` method needs to be tested via a method ``test_init_param_a``.
+This applies also for a parameter ``a`` of the ``query`` method, which is
+tested via a method ``test_query_param_a``. The main logic of the query
+strategy is test via the method ``test_query``.
 
 Classifiers
 -----------
@@ -691,22 +728,29 @@ Standard classifier implementations are part of the subpackage
 ``skactiveml.classifier`` and classifiers learning from multiple
 annotators are implemented in its subpackage
 ``skactiveml.classifier.multi``. Every class of a classifier inherits
-from ``skactiveml.base.SkactivemlClassifier`` The class of a classifier
-must implement the ``__init__`` method for initialization, a ``fit``
-method for training, and a ``predict_proba`` method predicting class
-membership probabilities for samples. A ``predict`` method is already
-implemented in the superclass by using the outputs of the
-``predict_proba`` method. Additionally, a ``score`` method is
-implemented by the superclass to evaluate the accuracy of a fitted
-classifier. A commonly used subclass of
-``skactiveml.base.SkactivemlClassifier`` is the
-sk\ ``activeml.base.ClassFrequencyEstimator``, which requires an
-implementation of the method ``predict_freq``, which can be interpreted
-as prior parameters of a Dirichlet distribution over the class
-membership probabilities of a sample.
+from ``skactiveml.base.SkactivemlClassifier``.
 
-``init`` function
-~~~~~~~~~~~~~~~~~
+
+The class must implement the following methods:
+
++-------------------+---------------------------------------------------------+
+| Method            | Description                                             |
++===================+=========================================================+
+| ``init``          | Method for initialization.                              |
++-------------------+---------------------------------------------------------+
+| ``fit``           | Method to the classifier for given training data.       |
++-------------------+---------------------------------------------------------+
+| ``predict_proba`` | Method predicting class-membership probabilities for    |
+|                   | samples.                                                |
++-------------------+---------------------------------------------------------+
+| ``predict``       | Method predicting class labels for samples. The super   |
+|                   | already provides an implementation using                |
+|                   | ``predict_proba``.                                      |
++-------------------+---------------------------------------------------------+
+
+
+``init`` method
+~~~~~~~~~~~~~~~
 
 Required Parameters:
 
@@ -715,31 +759,25 @@ Required Parameters:
 +===================================+===================================+
 | ``classes``                       | Holds the label for each class.   |
 |                                   | If ``None``, the classes are      |
-|                                   | determined during the fit         |
+|                                   | determined during the fit.        |
 +-----------------------------------+-----------------------------------+
 | ``missing_label``                 | Value to represent a missing      |
-|                                   | label                             |
+|                                   | label.                            |
 +-----------------------------------+-----------------------------------+
 | ``cost_matrix``                   | Cost matrix with                  |
 |                                   | ``cost_matrix[i,j]`` indicating   |
 |                                   | cost of predicting class          |
 |                                   | ``classes[j]`` for a sample of    |
 |                                   | class ``classes[i]``. Can be only |
-|                                   | set, if classes is not ``None``   |
+|                                   | set, if classes is not ``None``.  |
 +-----------------------------------+-----------------------------------+
 | ``random_state``                  | Ensures reproducibility           |
-|                                   | (cf. scikit-learn)                |
-+-----------------------------------+-----------------------------------+
-| ``class_prior``                   | HA                                |
-|                                   | ``skactive                        |
-|                                   | ml.base.ClassFrequencyEstimator`` |
-|                                   | requires additionally this        |
-|                                   | parameter as prior observations   |
-|                                   | of the class frequency estimates  |
+|                                   | (cf. scikit-learn).               |
 +-----------------------------------+-----------------------------------+
 
-``fit`` function
-~~~~~~~~~~~~~~~~
+
+``fit`` method
+~~~~~~~~~~~~~~
 
 Required Parameters:
 
@@ -747,7 +785,7 @@ Required Parameters:
 | Parameter                         | Description                       |
 +===================================+===================================+
 | ``X``                             | Is a matrix of feature values     |
-|                                   | representing the samples          |
+|                                   | representing the samples.         |
 +-----------------------------------+-----------------------------------+
 | ``y``                             | Contains the class labels of the  |
 |                                   | training samples. Missing labels  |
@@ -758,21 +796,21 @@ Required Parameters:
 |                                   | classifiers which expect a matrix |
 |                                   | with columns containing the class |
 |                                   | labels provided by a specific     |
-|                                   | annotator                         |
+|                                   | annotator.                        |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | ontains the weights of the        |
+| ``sample_weight``                 | Contains the weights of the       |
 |                                   | training samples’ class labels.   |
 |                                   | It must have the same shape as    |
-|                                   | ``y``                             |
+|                                   | ``y``.                            |
 +-----------------------------------+-----------------------------------+
 
 Returns:
 
-========= ============================
-Parameter Description
-========= ============================
-``self``  The fitted classifier object
-========= ============================
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+|``self``                            | The fitted classifier object.    |
++-----------------------------------+-----------------------------------+
 
 .. _general-advice-4:
 
@@ -782,13 +820,13 @@ General advice
 Use ``self._validate_data`` method (is implemented in superclass) to
 check standard parameters of ``__init__`` and ``fit`` method. If
 ``self.n_features_`` is None, no samples were provided as training data.
-In this case, the classifier should still be fitted but only for the
-purpose to make random predictions, i.e., outputting uniform class
-membership probabilities when calling ``predict_proba``. Ensure that the
-classifier can handle missing labels.
+In this case, the classifier should still be fitted but only if the ``classes``
+parameter is not `None` and for the purpose to make random predictions, i.e.,
+outputting uniform class-membership probabilities when calling
+``predict_proba``. Ensure that the classifier can handle missing labels.
 
-``predict_proba`` function
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+``predict_proba`` method
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Required Parameters:
 
@@ -798,16 +836,17 @@ Required Parameters:
 | ``X``                             | Is a matrix of feature values     |
 |                                   | representing the samples, for     |
 |                                   | which the classifier will make    |
-|                                   | predictions                       |
+|                                   | predictions.                      |
 +-----------------------------------+-----------------------------------+
 
 Returns:
 
-========= =======================================================
-Parameter Description
-========= =======================================================
-``P``     The estimated class membership probabilities per sample
-========= =======================================================
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``P``                             | The estimated class-membership    |
+|                                   | probabilities per sample.         |
++-----------------------------------+-----------------------------------+
 
 .. _general-advice-5:
 
@@ -822,8 +861,8 @@ implemented in the superclass. If no samples or class labels were
 provided during the previous call of the ``fit`` method, uniform class
 membership probabilities are to be outputted.
 
-``predict_freq`` function
-~~~~~~~~~~~~~~~~~~~~~~~~~
+``predict`` method
+~~~~~~~~~~~~~~~~~~
 
 Required Parameters:
 
@@ -833,7 +872,7 @@ Required Parameters:
 | ``X``                             | Is a matrix of feature values     |
 |                                   | representing the samples, for     |
 |                                   | which the classifier will make    |
-|                                   | predictions                       |
+|                                   | predictions.                      |
 +-----------------------------------+-----------------------------------+
 
 Returns:
@@ -841,43 +880,9 @@ Returns:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``F``                             | The estimated class frequency     |
-|                                   | estimates (excluding the prior    |
-|                                   | observations)                     |
+| ``y_pred``                        | The estimated class label         |
+|                                   | of each per sample.               |
 +-----------------------------------+-----------------------------------+
-
-.. _general-advice-6:
-
-General advice
-^^^^^^^^^^^^^^
-
-Check parameter X regarding its shape, i.e., use superclass method
-``self._check_n_features`` to ensure a correct number of features. Check
-that the classifier has been fitted. If no samples or class labels were
-provided during the previous call of the ``fit`` method, a matrix of
-zeros is to be outputted.
-
-``predict`` function
-~~~~~~~~~~~~~~~~~~~~
-
-Required Parameters:
-
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``X``                             | Is a matrix of feature values     |
-|                                   | representing the samples, for     |
-|                                   | which the classifier will make    |
-|                                   | predictions                       |
-+-----------------------------------+-----------------------------------+
-
-Returns:
-
-========== ========================================
-Parameter  Description
-========== ========================================
-``y_pred`` The estimated class label of each sample
-========== ========================================
 
 .. _general-advice-7:
 
@@ -891,8 +896,8 @@ labels. If no samples or class labels were provided during the previous
 call of the ``fit`` method, random class label predictions are to be
 outputted.
 
-``score`` function
-~~~~~~~~~~~~~~~~~~
+``score`` method
+~~~~~~~~~~~~~~~~
 
 Required Parameters:
 
@@ -902,23 +907,25 @@ Required Parameters:
 | ``X``                             | Is a matrix of feature values     |
 |                                   | representing the samples, for     |
 |                                   | which the classifier will make    |
-|                                   | predictions                       |
+|                                   | predictions.                      |
 +-----------------------------------+-----------------------------------+
 | ``y``                             | Contains the true label of each   |
-|                                   | sample                            |
+|                                   | sample.                           |
 +-----------------------------------+-----------------------------------+
 | ``sample_weight``                 | Defines the importance of each    |
 |                                   | sample when computing the         |
-|                                   | accuracy of the classifier        |
+|                                   | accuracy of the classifier.       |
 +-----------------------------------+-----------------------------------+
 
 Returns:
 
-========= ====================================================
-Parameter Description
-========= ====================================================
-``score`` Mean accuracy of ``self.predict(X)`` regarding ``y``
-========= ====================================================
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``score``                         | Mean accuracy of                  |
+|                                   | ``self.predict(X)`` regarding     |
+|                                   | ``y``.                            |
++-----------------------------------+-----------------------------------+
 
 .. _general-advice-8:
 
@@ -954,31 +961,31 @@ Annotators Models
 -----------------
 
 Annotator models are marked by implementing the interface
-``skactiveml.base.AnnotMixing``. These models can estimate the
+``skactiveml.base.AnnotMixin``. These models can estimate the
 performances of annotators for given samples. Every class of a
 classifier inherits from ``skactiveml.base.SkactivemlClassifier``. The
 class of an annotator model must implement the ``predict_annotator_perf``
 method estimating the performances per sample of each annotator as
 proxies of the provided annotation’s qualities.
 
-``predict_annotator_perf`` function
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``predict_annotator_perf`` method
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Required Parameters:
 
-========= ======================================================
-Parameter Description
-========= ======================================================
-``X``     Is a matrix of feature values representing the samples
-========= ======================================================
++-------------+---------------------------------------------------------+
+| Parameter   | Description                                             |
++=============+=========================================================+
+| ``X``       | Is a matrix of feature values representing the samples. |
++-------------+---------------------------------------------------------+
 
 Returns:
 
-=========== ====================================================
-Parameter   Description
-=========== ====================================================
-``P_annot`` The estimated performances per sample-annotator pair
-=========== ====================================================
++-------------+---------------------------------------------------------+
+| Parameter   | Description                                             |
++=============+=========================================================+
+| ``P_annot`` | The estimated performances per sample-annotator pair.   |
++-------------+---------------------------------------------------------+
 
 .. _general-advice-9:
 
@@ -991,6 +998,76 @@ during the previous call of the ``fit`` method, the maximum value of
 annotator performance should be outputted for each sample-annotator
 pair.
 
+Examples
+--------
+Two of our main goals are to make active learning more understandable and
+improve our framework's usability.
+Therefore, we require the implementation of an example for each query strategy.
+To do so, one needs to create a file name
+``scikit-activeml/docs/examples/query_strategy.json``. Currently, we support
+examples for single-annotator pool-based query strategies and single-annotator
+stream-based query strategies.
+
+The ``.json`` file supports the following entries:
+
++------------------+----------------------------------------------------------+
+| Entry            | Description                                              |
++==================+==========================================================+
+| ``class``        | Query strategy's class name.                             |
++------------------+----------------------------------------------------------+
+| ``package``      | Name of the sub-package, e.g., pool.                     |
++------------------+----------------------------------------------------------+
+| ``method``       | Query strategy's official name.                          |
++------------------+----------------------------------------------------------+
+| ``category``     | The methodological category of this query strategy,      |
+|                  | i.e., Expected Error Reduction, Model Change,            |
+|                  | Query-by-Committee,  Random Sampling,                    |
+|                  | Uncertainty Sampling, or Others.                         |
++------------------+----------------------------------------------------------+
+| ``template``     | Defines the general setup/setting of the example.        |
+|                  | Supported templates are ``examples/template_pool.py``    |
+|                  | and ``examples/template_pool_regression.py``.            |
++------------------+----------------------------------------------------------+
+| ``tags``         | Defines search categories. Supported tags are ``pool``,  |
+|                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
+|                  | ``classification``, and ``regression``.                  |
++------------------+----------------------------------------------------------+
+| ``title``        | Title of the example, usually named after the query      |
+|                  | strategy.                                                |
++------------------+----------------------------------------------------------+
+| ``text_0``       | Placeholder for additional explanations.                 |
++------------------+----------------------------------------------------------+
+| ``refs``         | References (BibTeX key) to the paper(s) of the query     |
+|                  | strategy.                                                |
++------------------+----------------------------------------------------------+
+| ``sequence``     | Order in which content is displayed, usually ["title",   |
+|                  | "text_0", "plot", "refs"].                               |
++------------------+----------------------------------------------------------+
+| ``import_misc``  | Python code for imports, e.g.,                           |
+|                  | "from skactiveml.pool import RandomSampling".            |
++------------------+----------------------------------------------------------+
+| ``n_samples``    | Number of samples of the example data set.               |
++------------------+----------------------------------------------------------+
+| ``init_qs``      | Python code to initialize the query strategy object,     |
+|                  | e.g., "RandomSampling()".                                |
++------------------+----------------------------------------------------------+
+| ``query_params`` | Python code of parameters passed to the query method of  |
+|                  | the query strategy, e.g., "X=X, y=y".                    |
++------------------+----------------------------------------------------------+
+| ``preproc``      | Python code for preprocessing before executing the AL    |
+|                  | cycle, e.g., "X = (X-X.min())/(X.max()-X.min())".        |
++------------------+----------------------------------------------------------+
+| ``n_cycles``     | Number of AL cycles.                                     |
++------------------+----------------------------------------------------------+
+| ``init_clf``     | Python code to initialize the classifier object, e.g.,   |
+|                  | "ParzenWindowClassifier(classes=[0, 1])". Only supported |
+|                  | for ``examples/template_pool.py``                        |
++------------------+----------------------------------------------------------+
+| ``init_reg``     | Python code to initialize the regressor object, e.g.,    |
+|                  | "NICKernelRegressor()". Only supported for               |
+|                  | ``examples/template_pool_regression.py``.                |
++------------------+----------------------------------------------------------+
+
 Testing and code coverage
 -------------------------
 
@@ -998,8 +1075,8 @@ Please ensure test coverage is close to 100%. The current code coverage
 can be viewed
 `here <https://app.codecov.io/gh/scikit-activeml/scikit-activeml>`__.
 
-Documentation (User guide and Developer guide)
-----------------------------------------------
+Documentation
+-------------
 
 Guidelines for writing documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
