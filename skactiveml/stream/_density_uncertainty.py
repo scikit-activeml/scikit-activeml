@@ -157,13 +157,14 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             predict_proba[:, utilities_index[:, 1]]
             - predict_proba[:, utilities_index[:, 0]]
         )
+        utilities = 1 - utilities[0]
         tmp_min_dist = copy(self.min_dist_)
         tmp_window = copy(self.window_)
         queried_indices = []
         for t, (u, x_cand) in enumerate(zip(utilities, candidates)):
             local_density_factor = self._calculate_ldf([x_cand])
             if local_density_factor > 0:
-                queried_indice = self.budget_manager_.query_by_utility(u)
+                queried_indice = self.budget_manager_.query_by_utility(np.array([u]))
                 if len(queried_indice) > 0:
                     queried_indices.append(t)
             else:
@@ -622,6 +623,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         # its the margin but used as utillities
         predict_proba = clf.predict_proba(candidates)
         utilities = np.max(predict_proba, axis=1)
+        utilities = 1 - utilities
 
         # copy variables
         tmp_cognition_window = copy(self.cognition_window_)

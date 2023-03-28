@@ -23,6 +23,7 @@ from docs.generate import (
     generate_api_reference_rst,
     generate_examples,
     generate_tutorials,
+    generate_stream_classification_legend,
 )
 
 # -- Project information -----------------------------------------------------
@@ -241,4 +242,8 @@ generate_strategy_overview_rst(
 generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
     dst_path=os.path.abspath("generated/tutorials/"),
+)
+
+generate_stream_classification_legend(
+    os.path.abspath("generated\\examples\\stream\\classification_legend.png")
 )

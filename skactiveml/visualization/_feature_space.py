@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import lines, pyplot as plt
 from matplotlib.axes import Axes
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
@@ -345,55 +345,75 @@ def plot_contour_for_samples(
     return ax
 
 
-def plot_stream_utilities(
-    qs,
+def plot_stream_training_data(
+    ax,
+    t_ax,
+    X_train,
+    acq,
+    y_train,
+    classes,
     feature_bound,
-    clf=None,
-    X=None,
-    y=None,
-    **kwargs,
+    unlabeled_color="grey",
+    cmap="coolwarm",
+    alpha=0.2,
+    linewidth=3,
+    highlight_linewidth_multiplier=1,
+    plot_cand_highlight=True,
 ):
-    ax = kwargs.pop("ax", None)
-    res = kwargs.pop("res", 21)
-    fit_clf = kwargs.pop("fit_clf", False)
-    contour_dict = kwargs.pop("contour_dict", None)
-    check_type(qs, "qs", QueryStrategy)
-    X = check_array(X, allow_nd=False, ensure_2d=True)
-    if X.shape[1] != 2:
-        raise ValueError("Samples in `X` must have 2 features.")
-    contour_args = _get_contour_args(contour_dict)
-    # Check labels
-    y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
-    check_consistent_length(X, y)
-    if ax is None:
-        ax = plt.subplots(1, 1)[1]
-    else:
-        check_type(ax, "ax", Axes)
-    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
-    Z_queried_ravel = np.zeros(len(X_mesh) * len(Y_mesh))
-    Z_ravel = np.zeros(len(X_mesh) * len(Y_mesh))
+    data_lines = []
+    highlight_linewidth = linewidth * highlight_linewidth_multiplier
+    cmap = _get_cmap(cmap)
+    norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
 
-    for i, cand in enumerate(mesh_instances):
-        candidates = [cand]
-        queried_indices, utility = call_func(
-            qs.query,
-            candidates=candidates,
-            clf=clf,
-            X=X,
-            y=y,
-            fit_clf=fit_clf,
-            return_utilities=True,
+    highlight_color = cmap(norm(y_train[-1])) if acq[-1] else unlabeled_color
+
+    if plot_cand_highlight:
+        data_lines.append(
+            lines.Line2D(
+                [0, feature_bound[0][1]],
+                [X_train[-1], X_train[-1]],
+                c=highlight_color,
+                alpha=alpha,
+                linewidth=highlight_linewidth,
+            )
         )
-        Z_queried_ravel[i] = len(queried_indices)
-        Z_ravel[i] = utility
-    Z_ravel[np.isnan(Z_ravel)] = 0
-    Z = Z_ravel.reshape(X_mesh.shape)
-    # Z_queried = Z_queried_ravel.reshape(X_mesh.shape)
-    # Z_new = Z
-    # if np.sum(Z_queried) > 0:
-    #     Z_new = Z * Z_queried
-    ax.contourf(X_mesh, Y_mesh, Z, **contour_args)
-    return ax
+
+    for t, x, a, y in zip(t_ax, X_train, acq, y_train):
+        line_color = cmap(norm(y)) if a else unlabeled_color
+        zorder = 3 if a else 2
+        alpha_tmp = alpha * 2 if a else alpha
+        data_lines.append(
+            lines.Line2D(
+                [t, t_ax[-1]],
+                [x, x],
+                zorder=zorder,
+                color=line_color,
+                alpha=alpha_tmp,
+                linewidth=linewidth,
+            )
+        )
+    ax.lines.extend(data_lines)
+    return data_lines
+
+
+def plot_stream_decision_boundary(
+    ax, t_x, plot_step, clf, X, pred_list, color="k"
+):
+    x_vec = np.linspace(min(X)[0], max(X)[0], 25)
+    t_vec = np.arange(1, t_x // plot_step + 1) * plot_step
+    t_mesh, x_mesh = np.meshgrid(t_vec, x_vec)
+    predictions = np.array([clf.predict(x_vec.reshape([-1, 1]))])
+    pred_list.extend(predictions)
+
+    if len(pred_list) > 2 and np.sum(pred_list) > 0:
+        ax.contour(
+            t_mesh,
+            x_mesh,
+            np.array(pred_list[1:]).T,
+            levels=[0.5],
+            colors=color,
+        )
+    return ax, pred_list
 
 
 def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
