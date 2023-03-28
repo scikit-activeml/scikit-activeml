@@ -351,7 +351,7 @@ For typical class parameters we use standard names:
 | ``budget``                        | % of labels that the strategy is  |
 |                                   | allowed to query                  |
 +-----------------------------------+-----------------------------------+
-| ``budget_manager``                | Enforces the budget constraint    |
+| ``budget_manager``, optional      | Enforces the budget constraint    |
 +-----------------------------------+-----------------------------------+
 
 The class must implement the following functions:
@@ -376,24 +376,28 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``X_cand``                        | Set of candidate instances,       |
+| ``candidates``                    | Set of candidate instances,       |
 |                                   | inherited from                    |
 |                                   | ``SingleAn                        |
 |                                   | notatorStreamBasedQueryStrategy`` |
 +-----------------------------------+-----------------------------------+
-| ``clf``                           | The classifier used by the        |
+| ``clf``, optional                 | The classifier used by the        |
 |                                   | strategy                          |
 +-----------------------------------+-----------------------------------+
-| ``X``                             | Set of labeled and unlabeled      |
+| ``X``, optional                   | Set of labeled and unlabeled      |
 |                                   | instances                         |
 +-----------------------------------+-----------------------------------+
-| ``y``                             | Labels of ``X`` (it may be set to |
+| ``y``, optional                   | Labels of ``X`` (it may be set to |
 |                                   | ``MISSING_LABEL`` if ``y`` is     |
 |                                   | unknown)                          |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Weights for each instance in      |
+| ``sample_weight``, optional       | Weights for each instance in      |
 |                                   | ``X`` or ``None`` if all are      |
 |                                   | equally weighted                  |
++-----------------------------------+-----------------------------------+
+| ``fit_clf``, optional             | uses ``X``, ``y`` and             |
+|                                   | ``sample_weight`` to fit the given|
+|                                   |  classifier                       |
 +-----------------------------------+-----------------------------------+
 | ``return_utilities``              | Inherited from                    |
 |                                   | Single                            |
@@ -420,11 +424,12 @@ General advice
 
 The ``query`` function must not change the internal state of the
 ``query`` strategy (``budget`` and ``random_state`` included) to allow
-for assessing multiple instances with the same state. Update the the
-internal state in the ``update()`` function. Use ``self._validate_data``
-function (is implemented in superclass). Check the input ``X`` and ``y``
-only once. Fit classifier if it is not yet fitted (may use
-``fit_if_not_fitted`` from ``utils``).
+for assessing multiple instances with the same state. Update the internal 
+state in the ``update()`` function. If the class implements a classifier 
+(``clf``) the optional attributes need to be implement. Use 
+``self._validate_data`` function (is implemented in superclass). Check the 
+input ``X`` and ``y`` only once. Fit classifier if ``fit_clf`` is set to
+``True``.
 
 ``update`` function
 ^^^^^^^^^^^^^^^^^^^
@@ -434,7 +439,7 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``X_cand``                        | Set of candidate instances,       |
+| ``candidates``                    | Set of candidate instances,       |
 |                                   | inherited from                    |
 |                                   | ``SingleAn                        |
 |                                   | notatorStreamBasedQueryStrategy`` |
@@ -462,7 +467,6 @@ update). If a ``budget_manager`` is used forward the update call to the
 
 Testing
 ^^^^^^^
-
 All stream query strategies are tested by a general unittest
 (``stream/tests/test_stream.py``) -For every class
 ``ExampleQueryStrategy`` that inherits from
@@ -476,7 +480,8 @@ it is written the same as a class variable. Every parameter arg in
 ``TestExampleQueryStrategy`` that is called ``test_init_param_arg()``.
 Every parameter arg in ``query()`` will be evaluated if there exists a
 method in the testclass ``TestExampleQueryStrategy`` that is called
-``test_query_param_arg()``.
+``test_query_param_arg()``. It is tested if the internal state of ``query()``
+is unchanged after multiple calls without using ``update()``.
 
 General advice for the ``budget_manager``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -518,6 +523,8 @@ Required Parameters:
 |                                   | sklearn                           |
 +-----------------------------------+-----------------------------------+
 
+.. _query_by_utilities-function-1:
+
 ``query_by_utilities`` function
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -552,6 +559,10 @@ class ``ExampleBudgetManager`` that inherits from ``BudgetManager``
 a file ``test/test_example.py``. It is necessary that both filenames are
 the same.
 
+.. _testing-1:
+
+Testing
+^^^^^^^
 Moreover, the test class must be called ``TestExampleBudgetManager`` and
 inheriting from ``unittest.TestCase``. Every parameter in ``__init__()``
 will be tested if it is written the same as a class variable. Every
@@ -560,7 +571,8 @@ method in the testclass ``TestExampleQueryStrategy`` that is called
 ``test_init_param_arg()``. Every parameter ``arg`` in
 ``query_by_utility()`` will be evaluated if there exists a method in the
 testclass ``TestExampleQueryStrategy`` that is called
-``test_query_by_utility`` ``_param_arg()``.
+``test_query_by_utility`` ``_param_arg()``. It is tested if the internal state
+of ``query()`` is unchanged after multiple calls without using ``update()``.
 
 Multi-Annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
