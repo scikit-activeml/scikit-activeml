@@ -341,30 +341,31 @@ either an internal budget handling or an outsourced ``budget_manager``.
 
 For typical class parameters we use standard names:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``random_state``                  | Integer that acts as random seed  |
-|                                   | or ``np.random.RandomState`` like |
-|                                   | sklearn                           |
-+-----------------------------------+-----------------------------------+
-| ``budget``                        | % of labels that the strategy is  |
-|                                   | allowed to query                  |
-+-----------------------------------+-----------------------------------+
-| ``budget_manager``, optional      | Enforces the budget constraint    |
-+-----------------------------------+-----------------------------------+
++------------------------------+------------------------------------------+
+| Parameter                    | Description                              |
++==============================+==========================================+
+| ``random_state``             | Integer that acts as random seed         |
+|                              | or ``np.random.RandomState`` like        |
+|                              | sklearn                                  |
++------------------------------+------------------------------------------+
+| ``budget``                   | The share of labels that thestrategy is  |
+|                              | allowed to query                         |
++------------------------------+------------------------------------------+
+| ``budget_manager``, optional | Enforces the budget constraint           |
++------------------------------+------------------------------------------+
 
 The class must implement the following functions:
 
-+------------+----------------------------------------------------------------+
-| Function   | Description                                                    |
-+============+================================================================+
-| ``init``   | Function for initialization                                    |
-+------------+----------------------------------------------------------------+
-| ``query``  | Identify the instances whose labels to select                  |
-+------------+----------------------------------------------------------------+
-| ``update`` | Adapting the budget monitoring according to the queried labels |
-+------------+----------------------------------------------------------------+
++------------+-----------------------------------------------------------------+
+| Function   | Description                                                     |
++============+=================================================================+
+| ``init``   | Function for initialization                                     |
++------------+-----------------------------------------------------------------+
+| ``query``  | Identify the instances whose labels to select without adapting  |
+|            | the internal state                                              |
++------------+-----------------------------------------------------------------+
+| ``update`` | Adapting the budget monitoring according to the queried labels  |
++------------+-----------------------------------------------------------------+
 
 .. _query-function-1:
 
@@ -373,36 +374,32 @@ The class must implement the following functions:
 
 Required Parameters:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``candidates``                    | Set of candidate instances,       |
-|                                   | inherited from                    |
-|                                   | ``SingleAn                        |
-|                                   | notatorStreamBasedQueryStrategy`` |
-+-----------------------------------+-----------------------------------+
-| ``clf``, optional                 | The classifier used by the        |
-|                                   | strategy                          |
-+-----------------------------------+-----------------------------------+
-| ``X``, optional                   | Set of labeled and unlabeled      |
-|                                   | instances                         |
-+-----------------------------------+-----------------------------------+
-| ``y``, optional                   | Labels of ``X`` (it may be set to |
-|                                   | ``MISSING_LABEL`` if ``y`` is     |
-|                                   | unknown)                          |
-+-----------------------------------+-----------------------------------+
-| ``sample_weight``, optional       | Weights for each instance in      |
-|                                   | ``X`` or ``None`` if all are      |
-|                                   | equally weighted                  |
-+-----------------------------------+-----------------------------------+
-| ``fit_clf``, optional             | uses ``X``, ``y`` and             |
-|                                   | ``sample_weight`` to fit the given|
-|                                   |  classifier                       |
-+-----------------------------------+-----------------------------------+
-| ``return_utilities``              | Inherited from                    |
-|                                   | Single                            |
-|                                   | AnnotatorStreamBasedQueryStrategy |
-+-----------------------------------+-----------------------------------+
++------------------------------+-------------------------------------------------------------+
+| Parameter                    | Description                                                 |
++==============================+=============================================================+
+| ``candidates``               | Set of candidate instances,                                 |
+|                              | inherited from                                              |
+|                              | ``SingleAnnotatorStreamBasedQueryStrategy``                 |
++------------------------------+-------------------------------------------------------------+
+| ``clf``, optional            | The classifier used by the                                  |
+|                              | strategy                                                    |
++------------------------------+-------------------------------------------------------------+
+| ``X``, optional              | Set of labeled and unlabeled                                |
+|                              | instances                                                   |
++------------------------------+-------------------------------------------------------------+
+| ``y``, optional              | Labels of ``X`` (it may be set to                           |
+|                              | ``MISSING_LABEL`` if ``y`` is                               |
+|                              | unknown)                                                    |
++------------------------------+-------------------------------------------------------------+
+| ``sample_weight``, optional  | Weights for each instance in                                |
+|                              | ``X`` or ``None`` if all are                                |
+|                              | equally weighted                                            |
++------------------------------+-------------------------------------------------------------+
+| ``fit_clf``, optional        | uses ``X`` and ``y`` to fit the classifier                  |
++------------------------------+-------------------------------------------------------------+
+| ``return_utilities``         | Whether to return the candidates' utilities,                |
+|                              | inherited from ``SingleAnnotatorStreamBasedQueryStrategy``  |
++------------------------------+-------------------------------------------------------------+
 
 Returns:
 
@@ -422,36 +419,34 @@ Returns:
 General advice
 ''''''''''''''
 
-The ``query`` function must not change the internal state of the
-``query`` strategy (``budget`` and ``random_state`` included) to allow
-for assessing multiple instances with the same state. Update the internal 
-state in the ``update()`` function. If the class implements a classifier 
-(``clf``) the optional attributes need to be implement. Use 
-``self._validate_data`` function (is implemented in superclass). Check the 
-input ``X`` and ``y`` only once. Fit classifier if ``fit_clf`` is set to
-``True``.
+The ``query`` function must not change the internal state of the ``query``
+strategy (``budget``, ``budget_manager`` and ``random_state`` included) to allow
+for assessing multiple instances with the same state. Update the internal state
+in the ``update()`` function. If the class implements a classifier (``clf``) the
+optional attributes need to be implement. Use ``self._validate_data`` function
+(is implemented in superclass). Check the input ``X`` and ``y`` only once. Fit
+classifier if ``fit_clf`` is set to ``True``.
 
 ``update`` function
 ^^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``candidates``                    | Set of candidate instances,       |
-|                                   | inherited from                    |
-|                                   | ``SingleAn                        |
-|                                   | notatorStreamBasedQueryStrategy`` |
-+-----------------------------------+-----------------------------------+
-| ``queried_indices``               | Typically the return value of     |
-|                                   | ``query``                         |
-+-----------------------------------+-----------------------------------+
-| ``budget_manager_param_dict``     | Provides additional parameters to |
-|                                   | the ``update`` function of the    |
-|                                   | ``budget_manager`` (only include  |
-|                                   | if a ``budget_manager`` is used)  |
-+-----------------------------------+-----------------------------------+
++-------------------------------+----------------------------------------------+
+| Parameter                     | Description                                  |
++===============================+==============================================+
+| ``candidates``                | Set of candidate instances,                  |
+|                               | inherited from                               |
+|                               | ``SingleAnnotatorStreamBasedQueryStrategy``  |
++-------------------------------+----------------------------------------------+
+| ``queried_indices``           | Typically the return value of                |
+|                               | ``query``                                    |
++-------------------------------+----------------------------------------------+
+| ``budget_manager_param_dict`` | Provides additional parameters to            |
+|                               | the ``update`` function of the               |
+|                               | ``budget_manager`` (only include             |
+|                               | if a ``budget_manager`` is used)             |
++-------------------------------+----------------------------------------------+
 
 .. _general-advice-2:
 
