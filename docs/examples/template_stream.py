@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
 
-from skactiveml.utils import MISSING_LABEL, labeled_indices
+from skactiveml.utils import MISSING_LABEL
 from skactiveml.visualization import (
     plot_stream_training_data,
     plot_stream_decision_boundary,
@@ -41,7 +41,6 @@ y_train = []
 y_train.extend(y_init)
 classes = np.unique(y_true)
 queried_count = 0
-budget_list = []
 
 
 # Preparation for plotting.
@@ -57,12 +56,8 @@ X_train.extend(X_init)
 y_train = []
 y_train.extend(y_init)
 queried_count = 0
-budget_list = []
 
-t_ax = [0] * len(y_init)
-acq = [True] * len(y_init)
-# colors = []
-# mesh_instances = np.array([X_mesh.reshape(-1), Y_mesh.reshape(-1)]).T
+queried_indices = [True] * len(y_init)
 
 predictions_list = []
 
@@ -71,10 +66,7 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
     X_cand = x_t.reshape([1, -1])
     y_cand = y_t
     clf.fit(X_train, y_train)
-    # Get labeled instances.
-    X_labeled = np.array(X_train)[labeled_indices(y_train)]
     # check whether to sample the instance or not
-    X_train_array = np.array(X_train).reshape([-1, 1])
     sampled_indices, utilities = qs.query(
         "$query_params", return_utilities=True
     )
@@ -88,11 +80,8 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
     else:
         y_train.append(MISSING_LABEL)
 
-    t_ax.append(t_x)
-    acq.append(len(sampled_indices) > 0)
-    # colors.append("r" if y_cand == classes[0] else "b")
+    queried_indices.append(len(sampled_indices) > 0)
     queried_count += len(sampled_indices)
-    budget_list.append(queried_count / (t_x + 1))
 
     # Plot the labeled data.
     if t_x % plot_step == 0:
@@ -102,13 +91,13 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             ax, t_x, plot_step, clf, X, predictions_list
         )
         data_lines = plot_stream_training_data(
-            ax, t_ax, X_train, acq, y_train, classes, feature_bound
+            ax, X_train, y_train, queried_indices, classes, feature_bound
         )
 
         title_string = (
             f"Decision boundary after {t_x} new instances \n"
             + f"with utility: {utilities[0]: .4f} "
-            + f"budget is {budget_list[-1]:.4f}"
+            + f"budget is {queried_count / (t_x + 1):.4f}"
         )
         title = ax.text(
             x=0.5,

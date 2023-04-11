@@ -129,8 +129,8 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         )
 
         predict_proba = clf.predict_proba(candidates)
-        utilities = np.max(predict_proba, axis=1)
-        utilities = 1 - utilities
+        confidence = np.max(predict_proba, axis=1)
+        utilities = 1 - confidence
 
         queried_indices = self.budget_manager_.query_by_utility(utilities)
 

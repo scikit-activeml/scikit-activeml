@@ -153,11 +153,11 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         # calculate the margin used as utillities
         predict_proba = clf.predict_proba(candidates)
         utilities_index = np.argpartition(predict_proba, -2)[:, -2:]
-        utilities = (
+        confidence = (
             predict_proba[:, utilities_index[:, 1]]
             - predict_proba[:, utilities_index[:, 0]]
         )
-        utilities = 1 - utilities[0]
+        utilities = 1 - confidence[0]
         tmp_min_dist = copy(self.min_dist_)
         tmp_window = copy(self.window_)
         queried_indices = []
@@ -622,8 +622,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         # its the margin but used as utillities
         predict_proba = clf.predict_proba(candidates)
-        utilities = np.max(predict_proba, axis=1)
-        utilities = 1 - utilities
+        confidence = np.max(predict_proba, axis=1)
+        utilities = 1 - confidence
 
         # copy variables
         tmp_cognition_window = copy(self.cognition_window_)

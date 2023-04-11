@@ -6,12 +6,11 @@ from matplotlib import pyplot as plt
 from matplotlib import testing
 from matplotlib.testing.compare import compare_images
 from sklearn.base import ClassifierMixin, clone
-from sklearn.datasets import make_classification
+from sklearn.datasets import make_classification, make_blobs
 from sklearn.svm import LinearSVC
 
 from skactiveml import visualization
 from skactiveml.classifier import ParzenWindowClassifier
-from skactiveml.stream import Split
 from skactiveml.pool import (
     UncertaintySampling,
     RandomSampling,
@@ -23,7 +22,8 @@ from skactiveml.visualization import (
     plot_utilities,
     plot_contour_for_samples,
     plot_annotator_utilities,
-    plot_stream_utilities,
+    plot_stream_training_data,
+    plot_stream_decision_boundary,
 )
 from skactiveml.visualization._feature_space import _general_plot_utilities
 
@@ -36,6 +36,12 @@ class TestFeatureSpace(unittest.TestCase):
         self.X, self.y = make_classification(
             n_features=2, n_redundant=0, random_state=0
         )
+        self.X_stream, self.y_stream = make_blobs(
+            n_features=2,
+            centers=[[0], [-3], [1], [2], [-0.5]],
+            cluster_std=0.7,
+            random_state=0,
+        )
         train_indices = np.random.RandomState(0).randint(
             0, len(self.X), size=20
         )
@@ -45,10 +51,14 @@ class TestFeatureSpace(unittest.TestCase):
         self.y_active_multi = np.tile(self.y_active, [5, 1]).T
         self.X_train = self.X[train_indices]
         self.y_train = self.y[train_indices]
+        self.X_train_stream = self.X_stream[train_indices]
+        self.y_train_stream = self.y_stream[train_indices]
         self.y_train_multi = np.tile(self.y_train, [5, 1]).T
         self.X_cand = self.X[cand_indices]
         self.clf = ParzenWindowClassifier(random_state=0)
         self.clf.fit(self.X_train, self.y_train)
+        self.clf_stream = ParzenWindowClassifier(random_state=0)
+        self.clf_stream.fit(self.X_train_stream, self.y_train_stream)
         self.qs = UncertaintySampling(random_state=0)
         self.qs_dict = {"clf": self.clf}
         self.utilities = clone(self.qs).query(
@@ -64,6 +74,11 @@ class TestFeatureSpace(unittest.TestCase):
         x2_min = min(self.X[:, 1])
         x2_max = max(self.X[:, 1])
         self.bound = [[x1_min, x2_min], [x1_max, x2_max]]
+        self.stream_bound = [
+            [0, len(self.X_stream)],
+            [min(self.X_stream), max(self.X_stream)],
+        ]
+        self.queried_indices = [True] * len(self.y)
 
         self.cmap = "jet"
 
@@ -352,93 +367,262 @@ class TestFeatureSpace(unittest.TestCase):
             contour_dict={"linestyles": "."}
         )
 
-    # Tests for plot_stream_utilities function
-    def test_plot_stream_utilities_param_qs(self):
+    # Tests for plot_stream_decision_boundary function
+    def test_plot_stream_decision_boundary_param_ax(self):
         self.assertRaises(
             TypeError,
-            plot_stream_utilities,
-            qs=self.clf,
+            plot_stream_decision_boundary,
+            t_x=0,
+            plot_step=1,
+            clf=self.clf,
             X=self.X,
-            y=self.y,
-            **self.qs_dict,
-            feature_bound=self.bound
-        )
-
-    def test_plot_stream_utilities_param_X(self):
-        self.assertRaises(
-            ValueError,
-            plot_stream_utilities,
-            qs=self.qs,
-            X=np.ones([len(self.X), 3]),
-            y=self.y,
-            **self.qs_dict,
-            feature_bound=self.bound
-        )
-
-    def test_plot_stream_utilities_param_y(self):
-        self.assertRaises(
-            ValueError,
-            plot_stream_utilities,
-            qs=self.qs,
-            X=self.X,
-            y=np.zeros(len(self.y) + 1),
-            **self.qs_dict,
-            feature_bound=self.bound
-        )
-
-    def test_plot_stream_utilities_param_res(self):
-        self.assertRaises(
-            ValueError,
-            plot_stream_utilities,
-            qs=self.qs,
-            X=self.X,
-            y=self.y_active,
-            **self.qs_dict,
-            feature_bound=self.bound,
-            res=-3
-        )
-
-    def test_plot_stream_utilities_param_ax(self):
-        self.assertRaises(
-            TypeError,
-            plot_stream_utilities,
-            qs=self.qs,
-            X=self.X,
-            y=self.y_active,
-            **self.qs_dict,
-            feature_bound=self.bound,
-            ax=2
+            pred_list=[],
+            ax=2,
         )
         _, axes = plt.subplots(1, 2)
         self.assertRaises(
             TypeError,
-            plot_stream_utilities,
-            qs=self.qs,
+            plot_stream_decision_boundary,
+            t_x=0,
+            plot_step=1,
+            clf=self.clf,
             X=self.X,
-            y=self.y_active,
-            **self.qs_dict,
-            feature_bound=self.bound,
-            ax=axes
+            pred_list=[],
+            ax=axes,
         )
 
-    def test_plot_stream_utilities_param_contour_dict(self):
+    def test_plot_stream_decision_boundary_param_t_x(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_decision_boundary,
+            ax=ax,
+            t_x=-1,
+            plot_step=1,
+            clf=self.clf,
+            X=self.X,
+            pred_list=[],
+        )
+
+    def test_plot_stream_decision_boundary_param_plot_step(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_decision_boundary,
+            ax=ax,
+            t_x=0,
+            plot_step=0,
+            clf=self.clf,
+            X=self.X,
+            pred_list=[],
+        )
+
+    def test_plot_stream_decision_boundary_param_clf(self):
+        _, ax = plt.subplots()
         self.assertRaises(
             TypeError,
-            plot_stream_utilities,
-            qs=self.qs,
+            plot_stream_decision_boundary,
+            clf=self.qs,
+            ax=ax,
+            t_x=0,
+            plot_step=1,
             X=self.X,
-            y=self.y_active,
-            **self.qs_dict,
-            feature_bound=self.bound,
-            contour_dict="string"
+            pred_list=[],
         )
-        plot_stream_utilities(
-            qs=self.qs,
-            **self.qs_dict,
+        clf = TestClassifier()
+        self.assertRaises(
+            AttributeError,
+            plot_stream_decision_boundary,
+            clf=clf,
+            ax=ax,
+            t_x=0,
+            plot_step=1,
+            X=self.X,
+            pred_list=[],
+        )
+
+    def test_plot_stream_decision_boundary_param_X(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_decision_boundary,
+            ax=ax,
+            t_x=0,
+            plot_step=1,
+            pred_list=[],
+            clf=self.clf,
+            X=np.ones([len(self.X), 3]),
+        )
+
+    def test_plot_stream_decision_boundary_param_pred_list(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_decision_boundary,
+            ax=ax,
+            t_x=0,
+            plot_step=1,
+            pred_list=True,
+            clf=self.clf,
+            X=self.X,
+        )
+
+    def test_plot_stream_decision_boundary_param_color(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_decision_boundary,
+            ax=ax,
+            t_x=0,
+            plot_step=1,
+            pred_list=[],
+            clf=self.clf,
+            X=self.X,
+            color=0,
+        )
+
+    # Tests for plot_stream_training_data function
+    def test_plot_stream_training_data_param_X(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            queried_indices=self.queried_indices,
+            X=np.ones([len(self.X), 3]),
+            y=self.y,
+        )
+
+    def test_plot_stream_training_data_param_y(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            queried_indices=self.queried_indices,
+            X=self.X,
+            y=np.zeros(len(self.y) + 1),
+        )
+
+    def test_plot_stream_training_data_param_queried_indices(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=True,
+            y=self.y,
+        )
+
+    def test_plot_stream_training_data_param_classes(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=1,
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=self.queried_indices,
+            y=self.y,
+        )
+
+    def test_plot_stream_training_data_unlabeled_color(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=self.queried_indices,
+            y=self.y,
+            unlabeled_color=1,
+        )
+
+    def test_plot_stream_training_data_cmap(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=self.queried_indices,
+            y=self.y,
+            cmap=True,
+        )
+
+    def test_plot_stream_training_data_alpha(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=self.queried_indices,
+            y=self.y,
+            alpha=0,
+        )
+
+    def test_plot_stream_training_data_linewidth(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=self.queried_indices,
+            y=self.y,
+            linewidth=0,
+        )
+
+    def test_plot_stream_training_data_plot_cand_highlight(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            ax=ax,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            queried_indices=self.queried_indices,
+            y=self.y,
+            plot_cand_highlight="True",
+        )
+
+    def test_plot_stream_training_data_param_ax(self):
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
             X=self.X,
             y=self.y,
-            feature_bound=self.bound,
-            contour_dict={"linestyles": "."}
+            ax=2,
+        )
+        _, axes = plt.subplots(1, 2)
+        self.assertRaises(
+            TypeError,
+            plot_stream_training_data,
+            classes=np.unique(self.y),
+            feature_bound=self.stream_bound,
+            X=self.X,
+            y=self.y,
+            ax=axes,
         )
 
     def test_plot_contour_for_samples_param_X(self):
@@ -727,6 +911,40 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "multi_without_axes_cand_expected.pdf",
             self.path_prefix + "multi_without_axes_cand.pdf",
+            tol=0,
+        )
+        self.assertIsNone(comparison)
+
+    def test_stream(self):
+        fig, ax = plt.subplots()
+        ax.set_xlim(0, len(self.X_stream))
+        ax.set_ylim(bottom=min(self.X_stream), top=max(self.X_stream))
+        ax, _ = plot_stream_decision_boundary(
+            ax,
+            t_x=len(self.y_stream),
+            plot_step=len(self.y_stream),
+            clf=self.clf_stream,
+            X=self.X_stream,
+            pred_list=[],
+        )
+        p = 0.2
+        np.random.seed(0)
+        queried_indices = np.random.choice(
+            a=[True, False], size=100, p=[p, 1 - p]
+        )
+        _ = plot_stream_training_data(
+            ax,
+            self.X_stream,
+            self.y_stream,
+            queried_indices=queried_indices,
+            classes=np.unique(self.y_train),
+            feature_bound=self.stream_bound,
+        )
+
+        fig.savefig(self.path_prefix + "dec_bound_w_cand_stream.pdf")
+        comparison = compare_images(
+            self.path_prefix + "dec_bound_w_cand_stream_expected.pdf",
+            self.path_prefix + "dec_bound_w_cand_stream.pdf",
             tol=0,
         )
         self.assertIsNone(comparison)
