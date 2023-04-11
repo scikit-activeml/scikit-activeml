@@ -362,19 +362,18 @@ def plot_stream_training_data(
 
     Parameters
     ----------
-    ax : matplotlib.axes.Axes, optional (default=None)
+    ax : matplotlib.axes.Axes
         The axis on which the utility is plotted. Only if y.ndim = 1 (single
         annotator).
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples, ) or (n_samples, n_annotators)
+    y : array-like of shape (n_samples, )
         Labels of the training data set (possibly including unlabeled ones
         indicated by self.MISSING_LABEL).
     queried_indices : array-like of shape (n_samples,)
         Indicates which instances from candidates have been queried.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]], optional
-    (default=None)
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
@@ -436,7 +435,8 @@ def plot_stream_training_data(
                 linewidth=linewidth,
             )
         )
-    ax.lines.extend(data_lines)
+    for d_line in data_lines:
+        ax.add_line(d_line)
     return data_lines
 
 
@@ -447,26 +447,22 @@ def plot_stream_decision_boundary(
 
     Parameters
     ----------
-    ax: matplotlib.axes.Axes or List, optional (default=None)
+    ax: matplotlib.axes.Axes or List
         The axis on which the decision boundary is plotted. If ax is a List,
         each entry has to be an `matplotlib.axes.Axes`.
+    t_x: int
+        The position of the newest instance for the x axies.
+    plot_step: int
+        The interval in which the clf should predict new samples.
     clf: Sklearn classifier
-        The fitted classifier whose decision boundary is plotted. If confidence
-        is not None, the classifier must implement the predict_proba function.
-    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
-        Determines the area in which the boundary is plotted.
-    res: int, optional (default=21)
-        The resolution of the plot.
-    boundary_dict: dict, optional (default=None)
-        Additional parameters for the boundary contour.
-    confidence: scalar | None, optional (default=0.5)
-        The confidence interval plotted with dashed lines. It is not plotted if
-        confidence is None. Must be in the open interval (0.5, 1). The value
-        stands for the ratio best class / second best class.
-    color: str | matplotlib.colors.Colormap, optional (default='k')
-        The color for the decision boundary.
+        The fitted classifier whose decision boundary is plotted.
+    X : array-like of shape (n_samples, n_features)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
     pred_list: array-like of shape (n_samples, )
         The list containing classifier prediction for the last steps.
+    color: str | matplotlib.colors.Colormap, optional (default='k')
+        The color for the decision boundary.
     Returns
     -------
     ax: matplotlib.axes.Axes or List
