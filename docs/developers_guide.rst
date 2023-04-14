@@ -482,7 +482,7 @@ General advice for the ``budget_manager``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 All budget managers are stored in
-``skactivml/stream/budget_manager/\*.py``. The class must implement the
+``skactivml/stream/budget_manager/*.py``. The class must implement the
 following functions:
 
 +-----------------------------------+-----------------------------------+
@@ -490,11 +490,11 @@ following functions:
 +===================================+===================================+
 | ``__init__``                      | Function for initialization       |
 +-----------------------------------+-----------------------------------+
-| ``update``                        | Adapting the budget monitoring    |
-|                                   | according to the queried labels   |
-+-----------------------------------+-----------------------------------+
 | ``query_by_utilities``            | Identify which instances to query |
 |                                   | based on the assessed utility     |
++-----------------------------------+-----------------------------------+
+| ``update``                        | Adapting the budget monitoring    |
+|                                   | according to the queried labels   |
 +-----------------------------------+-----------------------------------+
 
 .. _update-function-1:
@@ -525,13 +525,13 @@ Required Parameters:
 
 Required Parameters:
 
-+-----------------------------------+-----------------------------------+
-| Parameter                         | Description                       |
-+===================================+===================================+
-| ``utilities``                     | The ``utilities`` of ``X_cand``   |
-|                                   | calculated by the query strategy, |
-|                                   | inherited from ``BudgetManager``  |
-+-----------------------------------+-----------------------------------+
++-----------------------------------+------------------------------------+
+| Parameter                         | Description                        |
++===================================+====================================+
+| ``utilities``                     | The ``utilities`` of ``candidates``|
+|                                   | calculated by the query strategy,  |
+|                                   | inherited from ``BudgetManager``   |
++-----------------------------------+------------------------------------+
 
 General advice for working with a ``budget_manager``:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
