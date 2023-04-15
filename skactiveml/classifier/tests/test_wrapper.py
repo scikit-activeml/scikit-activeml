@@ -2,12 +2,15 @@ import unittest
 import warnings
 
 import numpy as np
+from sklearn.datasets import make_blobs
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import BaggingClassifier
 from sklearn.gaussian_process import (
     GaussianProcessClassifier,
     GaussianProcessRegressor,
 )
 from sklearn.linear_model import Perceptron
+from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 
@@ -171,6 +174,27 @@ class TestSklearnClassifier(unittest.TestCase):
             self.assertEqual(len(w), 1)
         y_exp = ["tokyo"] * len(self.X)
         np.testing.assert_array_equal(y_exp, y)
+
+    def test_pipeline(self):
+        X, y_true = make_blobs(100, centers=2, random_state=0)
+        pipline = Pipeline((
+            ("scaler", StandardScaler()),
+            ("gpc", GaussianProcessClassifier(random_state=0))
+        ))
+        clf = SklearnClassifier(
+            pipline, classes=[0, 1], missing_label=-1, random_state=0
+        )
+        clf = clf.fit(X, y_true)
+        self.assertTrue(clf.is_fitted_)
+        check_is_fitted(clf)
+        self.assertRaises(NotFittedError, check_is_fitted, pipline)
+        self.assertGreaterEqual(clf.score(X, y_true), 0.9)
+        y_missing = np.full_like(y_true, -1)
+        clf.fit(X, y_missing)
+        self.assertFalse(clf.is_fitted_)
+        check_is_fitted(clf)
+        p = clf.predict_proba(X)
+        np.testing.assert_array_equal(np.full_like(p, 0.5), p)
 
 
 class TestSlidingWindowClassifier(unittest.TestCase):
