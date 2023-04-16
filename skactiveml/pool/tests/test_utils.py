@@ -9,6 +9,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import pairwise_kernels
 from sklearn.naive_bayes import GaussianNB
+from sklearn.datasets import make_blobs
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool.utils import _cross_entropy
@@ -39,7 +40,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
     def setUp(self):
         self.X = np.linspace(0, 1, 4).reshape(-1, 1)
         self.y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
-        self.y2 = np.array([0, 1, 0, 1])
+        self.y2 = np.array([0.0, 1.0, 0.0, 1.0])
         self.y3 = np.array([0, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
         self.clf = ParzenWindowClassifier(classes=[0, 1])
         self.kwargs = dict(X=self.X, y=self.y, clf=self.clf)
@@ -55,6 +56,26 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         clf = self.clf.fit(self.X, self.y)
         iclf = IndexClassifierWrapper(clf=clf, X=self.X, y=self.y)
         np.testing.assert_array_equal(clf.X_, iclf.clf_.X_)
+
+    def test_dtype_error(self):
+        X, y = make_blobs(
+            n_samples=2000, centers=[(-2, 2), (2, -2)], n_features=2
+        )
+        clf = ParzenWindowClassifier(
+            classes=np.unique(y), missing_label=MISSING_LABEL
+        )
+        y_known = np.full(len(y), MISSING_LABEL)
+        self.assertRaises(
+            TypeError,
+            IndexClassifierWrapper,
+            clf=clf,
+            X=X,
+            y=y,
+            missing_label=MISSING_LABEL,
+        )
+        y = y.astype(float)
+        id_clf = IndexClassifierWrapper(clf, X, y, missing_label=MISSING_LABEL)
+        id_clf.fit(np.arange(len(X)), y_known, set_base_clf=True)
 
     def test_init_param_X(self):
         self.assertTrue(hasattr(self.iclf(), "X"))
