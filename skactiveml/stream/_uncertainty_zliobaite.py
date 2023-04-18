@@ -21,20 +21,20 @@ from ..utils import (
 
 
 class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
-    """The UncertaintyZliobaite (Utility calculation in [1]) query strategy
-    samples instances based on the classifiers uncertainty assessed based on
-    the classifier's predictions. The instance is queried when the probability
-    of the most likely class exceeds a threshold calculated based on the budget
-    and the number of classes. It is used as the base class for uncertainty
-    strategies provided by Zliobaite in [1].
+    """UncertaintyZliobaite
+
+    The UncertaintyZliobaite class provides the base for query strategies
+    proposed by Žliobaitė et al. in [1]. The strategies evaluate the
+    classifier's uncertainty based on its predictions and instances' labels are
+    queried when the uncertainty exceeds a specific threshold. Žliobaitė et al.
+    propose various techniques to calculate such a threshold.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
-    budget_manager : BudgetManager, default=None
+    budget_manager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         FixedUncertaintyBudgetManager will be used by default. The
@@ -46,15 +46,14 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
     ----------
-    [1] Zliobaite, Indre & Bifet, Albert & Pfahringer, Bernhard & Holmes,
-        Geoffrey. (2014). Active Learning With Drifting Streaming Data. Neural
-        Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
 
     """
 
@@ -79,11 +78,6 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
     ):
         """Ask the query strategy which instances in candidates to acquire.
 
-        Please note that, when the decisions from this function may differ from
-        the final sampling, simulate=True can be set, so that the query
-        strategy can be updated later with update(...) with the final sampling.
-        This is especially helpful when developing wrapper query strategies.
-
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape
@@ -93,14 +87,16 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         clf : SkactivemlClassifier
             Model implementing the methods `fit` and `predict_freq`.
         X : array-like of shape (n_samples, n_features), optional
+        (default=None)
             Input samples used to fit the classifier.
-        y : array-like of shape (n_samples), optional
+        y : array-like of shape (n_samples), optional (default=None)
             Labels of the input samples 'X'. There may be missing labels.
         sample_weight : array-like of shape (n_samples,), optional
+        (default=None)
             Sample weights for X, used to fit the clf.
-        fit_clf : bool,
+        fit_clf : bool, optional (default=False)
             If true, refit the classifier also requires X and y to be given.
-        return_utilities : bool, optional
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -158,7 +154,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
-        budget_manager_param_dict : kwargs
+        budget_manager_param_dict : kwargs, optional (default=None)
             Optional kwargs for budget manager.
 
         Returns
@@ -219,13 +215,13 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
         fit_clf : bool,
             If true, refit the classifier also requires X and y to be given.
-        reset : bool, default=True
+        reset : bool, optional (default=True)
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
@@ -291,7 +287,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
             Input samples used to fit the classifier.
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
         fit_clf : bool,
             If true, refit the classifier also requires X and y to be given.
@@ -318,7 +314,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the input samples 'X'. There may be missing labels.
 
-        sample_weight : array-like of shape (n_samples,) (default=None)
+        sample_weight : array-like of shape (n_samples,)
             Sample weights for X, used to fit the clf.
 
         Returns
@@ -340,7 +336,9 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
 
 
 class FixedUncertainty(UncertaintyZliobaite):
-    """The FixedUncertainty (Fixed-Uncertainty in [1]) query strategy samples
+    """FixedUncertainty
+
+    The FixedUncertainty (Fixed-Uncertainty in [1]) query strategy samples
     instances based on the classifiers uncertainty assessed based on the
     classifier's predictions. The instance is queried when the probability of
     the most likely class exceeds a threshold calculated based on the budget
@@ -348,11 +346,10 @@ class FixedUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
         FixedUncertaintyBudgetManager will be used by default. The budget
@@ -364,15 +361,14 @@ class FixedUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budget manager.budget
             a warning is thrown.
-
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
     ----------
-    [1] Zliobaite, Indre & Bifet, Albert & Pfahringer, Bernhard & Holmes,
-        Geoffrey. (2014). Active Learning With Drifting Streaming Data. Neural
-        Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
 
     """
 
@@ -388,7 +384,9 @@ class FixedUncertainty(UncertaintyZliobaite):
 
 
 class VariableUncertainty(UncertaintyZliobaite):
-    """The VariableUncertainty (Var-Uncertainty in [1]) query strategy samples
+    """VariableUncertainty
+
+    The VariableUncertainty (Var-Uncertainty in [1]) query strategy samples
     instances based on the classifiers uncertainty assessed based on the
     classifier's predictions. The instance is queried when the probability of
     the most likely class exceeds a time-dependent threshold calculated based
@@ -397,14 +395,13 @@ class VariableUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budget
+        VariableUncertaintyBudgetManager will be used by default. The budget
         manager will be initialized based on the following conditions:
             If only a budget is given the default budgetmanager is initialized
             with the given budget.
@@ -413,16 +410,14 @@ class VariableUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
     ----------
-    [1] Zliobaite, Indre & Bifet, Albert & Pfahringer, Bernhard & Holmes,
-        Geoffrey. (2014). Active Learning With Drifting Streaming Data. Neural
-        Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
-
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
     """
 
     def _get_default_budget_manager(self):
@@ -437,7 +432,9 @@ class VariableUncertainty(UncertaintyZliobaite):
 
 
 class RandomVariableUncertainty(UncertaintyZliobaite):
-    """The RandomVariableUncertainty (Ran-Var-Uncertainty in [1]) query
+    """RandomVariableUncertainty
+
+    The RandomVariableUncertainty (Ran-Var-Uncertainty in [1]) query
     strategy samples instances based on the classifier's uncertainty assessed
     based on the classifier's predictions. The instance is queried when the
     probability of the most likely class exceeds a time-dependent threshold
@@ -447,15 +444,14 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budget
-        manager will be initialized based on the following conditions:
+        RandomVariableUncertaintyBudgetManager will be used by default. The
+        budget manager will be initialized based on the following conditions:
             If only a budget is given the default budgetmanager is initialized
             with the given budget.
             If only a budgetmanager is given use the budgetmanager.
@@ -463,16 +459,14 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
     ----------
-    [1] Zliobaite, Indre & Bifet, Albert & Pfahringer, Bernhard & Holmes,
-        Geoffrey. (2014). Active Learning With Drifting Streaming Data. Neural
-        Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
-
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
     """
 
     def _get_default_budget_manager(self):
@@ -487,19 +481,20 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
 
 
 class Split(UncertaintyZliobaite):
-    """The Split [1] query strategy samples in 100*v% of instances randomly and
+    """Split
+
+    The Split [1] query strategy samples in 100*v% of instances randomly and
     in 100*(1-v)% of cases according to VariableUncertainty.
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
-
-    budgetmanager : BudgetManager, default=None
+    budgetmanager : BudgetManager, optional (default=None)
         The BudgetManager which models the budgeting constraint used in
         the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The budget
+        SplitBudgetManager will be used by default. The budget
         manager will
         be initialized based on the following conditions:
             If only a budget is given the default budget manager is initialized
@@ -509,16 +504,14 @@ class Split(UncertaintyZliobaite):
             default budget.
             If both are given and the budget differs from budgetmanager.budget
             a warning is thrown.
-
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
 
     References
     ----------
-    [1] Zliobaite, Indre & Bifet, Albert & Pfahringer, Bernhard & Holmes,
-        Geoffrey. (2014). Active Learning With Drifting Streaming Data. Neural
-        Networks and Learning Systems, IEEE Transactions on. 25. 27-39.
-
+    [1] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
+        Learning With Drifting Streaming Data. IEEE Transactions on Neural
+        Networks and Learning Systems, 25(1), 27-39.
     """
 
     def _get_default_budget_manager(self):
