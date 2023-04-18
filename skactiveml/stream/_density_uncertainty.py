@@ -154,17 +154,19 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         predict_proba = clf.predict_proba(candidates)
         utilities_index = np.argpartition(predict_proba, -2)[:, -2:]
         confidence = (
-            predict_proba[:, utilities_index[:, 1]]
-            - predict_proba[:, utilities_index[:, 0]]
-        )
-        utilities = 1 - confidence[0]
+            np.take_along_axis(predict_proba, utilities_index[:, [1]], 1)
+            - np.take_along_axis(predict_proba, utilities_index[:, [0]], 1)
+        ).reshape([-1])
+        utilities = 1 - confidence
         tmp_min_dist = copy(self.min_dist_)
         tmp_window = copy(self.window_)
         queried_indices = []
         for t, (u, x_cand) in enumerate(zip(utilities, candidates)):
             local_density_factor = self._calculate_ldf([x_cand])
             if local_density_factor > 0:
-                queried_indice = self.budget_manager_.query_by_utility(np.array([u]))
+                queried_indice = self.budget_manager_.query_by_utility(
+                    np.array([u])
+                )
                 if len(queried_indice) > 0:
                     queried_indices.append(t)
             else:

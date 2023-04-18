@@ -375,7 +375,7 @@ class TestFeatureSpace(unittest.TestCase):
             t_x=0,
             plot_step=1,
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
             pred_list=[],
             ax=2,
         )
@@ -386,7 +386,7 @@ class TestFeatureSpace(unittest.TestCase):
             t_x=0,
             plot_step=1,
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
             pred_list=[],
             ax=axes,
         )
@@ -400,7 +400,7 @@ class TestFeatureSpace(unittest.TestCase):
             t_x=-1,
             plot_step=1,
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
             pred_list=[],
         )
 
@@ -413,7 +413,7 @@ class TestFeatureSpace(unittest.TestCase):
             t_x=0,
             plot_step=0,
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
             pred_list=[],
         )
 
@@ -426,7 +426,7 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             t_x=0,
             plot_step=1,
-            X=self.X,
+            X=self.X_stream,
             pred_list=[],
         )
         clf = TestClassifier()
@@ -437,7 +437,7 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             t_x=0,
             plot_step=1,
-            X=self.X,
+            X=self.X_stream,
             pred_list=[],
         )
 
@@ -464,7 +464,7 @@ class TestFeatureSpace(unittest.TestCase):
             plot_step=1,
             pred_list=True,
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
         )
 
     def test_plot_stream_decision_boundary_param_color(self):
@@ -477,7 +477,7 @@ class TestFeatureSpace(unittest.TestCase):
             plot_step=1,
             pred_list=[],
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
             color=0,
         )
 
@@ -491,7 +491,7 @@ class TestFeatureSpace(unittest.TestCase):
             plot_step=1,
             pred_list=[],
             clf=self.clf,
-            X=self.X,
+            X=self.X_stream,
             res=3,
         )
 
@@ -506,7 +506,7 @@ class TestFeatureSpace(unittest.TestCase):
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
             X=np.ones([len(self.X), 3]),
-            y=self.y,
+            y=self.y_stream,
         )
 
     def test_plot_stream_training_data_param_y(self):
@@ -518,8 +518,8 @@ class TestFeatureSpace(unittest.TestCase):
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
             queried_indices=self.queried_indices,
-            X=self.X,
-            y=np.zeros(len(self.y) + 1),
+            X=self.X_stream,
+            y=np.zeros(len(self.y_stream) + 1),
         )
 
     def test_plot_stream_training_data_param_queried_indices(self):
@@ -530,9 +530,9 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=True,
-            y=self.y,
+            y=self.y_stream,
         )
 
     def test_plot_stream_training_data_param_classes(self):
@@ -543,9 +543,9 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=1,
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=self.queried_indices,
-            y=self.y,
+            y=self.y_stream,
         )
 
     def test_plot_stream_training_data_unlabeled_color(self):
@@ -556,9 +556,9 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=self.queried_indices,
-            y=self.y,
+            y=self.y_stream,
             unlabeled_color=1,
         )
 
@@ -570,9 +570,9 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=self.queried_indices,
-            y=self.y,
+            y=self.y_stream,
             cmap=True,
         )
 
@@ -584,10 +584,10 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=self.queried_indices,
-            y=self.y,
-            alpha=0,
+            y=self.y_stream,
+            alpha=-1,
         )
 
     def test_plot_stream_training_data_linewidth(self):
@@ -598,10 +598,10 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=self.queried_indices,
-            y=self.y,
-            linewidth=0,
+            y=self.y_stream,
+            linewidth="string",
         )
 
     def test_plot_stream_training_data_plot_cand_highlight(self):
@@ -612,9 +612,9 @@ class TestFeatureSpace(unittest.TestCase):
             ax=ax,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
+            X=self.X_stream,
             queried_indices=self.queried_indices,
-            y=self.y,
+            y=self.y_stream,
             plot_cand_highlight="True",
         )
 
@@ -624,8 +624,8 @@ class TestFeatureSpace(unittest.TestCase):
             plot_stream_training_data,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
-            y=self.y,
+            X=self.X_stream,
+            y=self.y_stream,
             ax=2,
         )
         _, axes = plt.subplots(1, 2)
@@ -634,8 +634,8 @@ class TestFeatureSpace(unittest.TestCase):
             plot_stream_training_data,
             classes=np.unique(self.y),
             feature_bound=self.stream_bound,
-            X=self.X,
-            y=self.y,
+            X=self.X_stream,
+            y=self.y_stream,
             ax=axes,
         )
 

@@ -16,15 +16,15 @@ init_size = "$init_size|0"
 # Build a dataset.
 X, y_true = make_blobs(
     n_samples="$n_samples|200" + init_size,
-    n_features=2,
+    n_features=1,
     centers=[[0], [-3], [1], [2], [-0.5]],
     cluster_std=0.7,
     random_state=random_state,
 )
 y_true = y_true % 2
-X_init = X[:init_size, :]
+X_init = X[:init_size]
 y_init = y_true[:init_size]
-X_stream = X[init_size:, :]
+X_stream = X[init_size:]
 y_stream = y_true[init_size:]
 
 
@@ -81,7 +81,6 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
         y_train.append(MISSING_LABEL)
 
     queried_indices.append(len(sampled_indices) > 0)
-    queried_count += len(sampled_indices)
 
     # Plot the labeled data.
     if t_x % plot_step == 0:
@@ -97,7 +96,7 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
         title_string = (
             f"Decision boundary after {t_x} new instances \n"
             + f"with utility: {utilities[0]: .4f} "
-            + f"budget is {queried_count / (t_x + 1):.4f}"
+            + f"budget is {sum(queried_indices) / (t_x + 1):.4f}"
         )
         title = ax.text(
             x=0.5,

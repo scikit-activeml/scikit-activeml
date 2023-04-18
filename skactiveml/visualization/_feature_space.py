@@ -365,7 +365,7 @@ def plot_stream_training_data(
     ax : matplotlib.axes.Axes
         The axis on which the utility is plotted. Only if y.ndim = 1 (single
         annotator).
-    X : array-like of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
     y : array-like of shape (n_samples, )
@@ -373,6 +373,8 @@ def plot_stream_training_data(
         indicated by self.MISSING_LABEL).
     queried_indices : array-like of shape (n_samples,)
         Indicates which instances from candidates have been queried.
+    classes : array-like of shape (n_classes)
+        Holds the label for each class.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
@@ -394,8 +396,9 @@ def plot_stream_training_data(
      axes : array-like of shape (n_annotators_to_plot,)
          The axes on which the utilities were plotted.
     """
-    check_array(X, ensure_2d=False)
+    column_or_1d(X)
     check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    check_consistent_length(X, y)
     check_array(queried_indices, ensure_2d=False)
     check_array(classes, ensure_2d=False)
     check_type(unlabeled_color, "unlabeled_color", str)
@@ -417,7 +420,7 @@ def plot_stream_training_data(
                 [X[-1], X[-1]],
                 c=highlight_color,
                 alpha=alpha,
-                linewidth=linewidth*2,
+                linewidth=linewidth * 2,
             )
         )
 
@@ -456,7 +459,7 @@ def plot_stream_decision_boundary(
         The interval in which the clf should predict new samples.
     clf: Sklearn classifier
         The fitted classifier whose decision boundary is plotted.
-    X : array-like of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
     pred_list: array-like of shape (n_samples, )
@@ -465,6 +468,7 @@ def plot_stream_decision_boundary(
         The color for the decision boundary.
     res : int, optional (default=25)
         The resolution of the plot.
+
     Returns
     -------
     ax: matplotlib.axes.Axes or List
@@ -473,7 +477,7 @@ def plot_stream_decision_boundary(
     pred_list: array-like of shape (n_samples, )
         The list containing classifier prediction for the last steps.
     """
-    X = check_array(X, ensure_2d=False)
+    X = column_or_1d(X)
     check_array(pred_list, ensure_2d=False, ensure_min_samples=0)
     check_scalar(t_x, "t_x", int, min_val=0)
     check_scalar(plot_step, "plot_step", int, min_val=1)
