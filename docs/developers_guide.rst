@@ -187,6 +187,8 @@ implementation of the sample selection logic.
 Single-annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. _general-1:
+
 General
 ^^^^^^^
 
@@ -204,6 +206,7 @@ The class must implement the following methods:
 | ``query``  | Select the samples whose labels are to be queried.             |
 +------------+----------------------------------------------------------------+
 
+.. _init-1:
 
 ``__init__`` method
 ^^^^^^^^^^^^^^^^^^^
@@ -226,6 +229,8 @@ For typical class parameters, we use standard names:
 | ``cost_matrix``                   | Cost matrix defining the cost of  |
 |                                   | interchanging classes.            |
 +-----------------------------------+-----------------------------------+
+
+.. _query-1:
 
 ``query`` method
 ^^^^^^^^^^^^^^^^
@@ -300,6 +305,8 @@ Returns:
 |                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
 
+.. _general-advice-1:
+
 General advice
 ''''''''''''''
 
@@ -309,6 +316,8 @@ it is not yet fitted (may use ``fit_if_not_fitted`` form utils). Calculate
 utilities via an extra function that should be public. Use ``simple_batch``
 function from utils for determining `query_indices` and setting ``utilities``
 in naive batch query strategies.
+
+.. _testing-1:
 
 Testing
 ^^^^^^^
@@ -329,7 +338,7 @@ be implemented. We refer to the test template for more detailed information.
 Single-annotator Stream-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. _general-1:
+.. _general-2:
 
 General
 ^^^^^^^
@@ -366,7 +375,7 @@ The class must implement the following functions:
 | ``update`` | Adapting the budget monitoring according to the queried labels |
 +------------+----------------------------------------------------------------+
 
-.. _query-function-1:
+.. _query-function-2:
 
 ``query`` function
 ^^^^^^^^^^^^^^^^^^
@@ -413,7 +422,7 @@ Returns:
 |                                   | ``return_utilities`` is ``True``  |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-1:
+.. _general-advice-2:
 
 General advice
 ''''''''''''''
@@ -425,6 +434,8 @@ internal state in the ``update()`` function. Use ``self._validate_data``
 function (is implemented in superclass). Check the input ``X`` and ``y``
 only once. Fit classifier if it is not yet fitted (may use
 ``fit_if_not_fitted`` from ``utils``).
+
+.. _update-1:
 
 ``update`` function
 ^^^^^^^^^^^^^^^^^^^
@@ -448,7 +459,7 @@ Required Parameters:
 |                                   | if a ``budget_manager`` is used)  |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-2:
+.. _general-advice-3:
 
 General advice
 ''''''''''''''
@@ -458,7 +469,7 @@ the ``query`` method (if parameters need to be initialized before the
 update). If a ``budget_manager`` is used forward the update call to the
 ``budget_manager.update`` method.
 
-.. _testing-1:
+.. _testing-2:
 
 Testing
 ^^^^^^^
@@ -477,6 +488,9 @@ it is written the same as a class variable. Every parameter arg in
 Every parameter arg in ``query()`` will be evaluated if there exists a
 method in the testclass ``TestExampleQueryStrategy`` that is called
 ``test_query_param_arg()``.
+
+
+.. _general-advice-4:
 
 General advice for the ``budget_manager``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -497,7 +511,7 @@ following functions:
 |                                   | based on the assessed utility     |
 +-----------------------------------+-----------------------------------+
 
-.. _update-function-1:
+.. _update-2:
 
 ``update`` function
 ^^^^^^^^^^^^^^^^^^^
@@ -518,6 +532,8 @@ Required Parameters:
 |                                   | sklearn                           |
 +-----------------------------------+-----------------------------------+
 
+.. _query-by-utilities-1:
+
 ``query_by_utilities`` function
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -530,6 +546,8 @@ Required Parameters:
 |                                   | calculated by the query strategy, |
 |                                   | inherited from ``BudgetManager``  |
 +-----------------------------------+-----------------------------------+
+
+.. _general-advice-5:
 
 General advice for working with a ``budget_manager``:
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -580,7 +598,7 @@ The class must implement the following methods:
 |            | class label is to be queried from which annotator.             |
 +------------+----------------------------------------------------------------+
 
-.. _query-function-2:
+.. _query-function-3:
 
 ``query`` method
 ^^^^^^^^^^^^^^^^
@@ -689,7 +707,7 @@ Returns:
 |                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-3:
+.. _general-advice-6:
 
 General advice
 ''''''''''''''
@@ -709,6 +727,7 @@ If the strategy is a ``greedy`` method regarding the utilities:
 -  calculate utilities (in an extra function),
 -  use ``skactiveml.utils.simple_batch`` function for returning values.
 
+.. _testing-3:
 
 Testing
 ^^^^^^^
@@ -748,6 +767,7 @@ The class must implement the following methods:
 |                   | ``predict_proba``.                                      |
 +-------------------+---------------------------------------------------------+
 
+.. _init-2:
 
 ``init`` method
 ~~~~~~~~~~~~~~~
@@ -775,6 +795,7 @@ Required Parameters:
 |                                   | (cf. scikit-learn).               |
 +-----------------------------------+-----------------------------------+
 
+.. _fit-1:
 
 ``fit`` method
 ~~~~~~~~~~~~~~
@@ -812,7 +833,7 @@ Returns:
 |``self``                           | The fitted classifier object.     |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-4:
+.. _general-advice-7:
 
 General advice
 ^^^^^^^^^^^^^^
@@ -825,6 +846,8 @@ In this case, the classifier should  make random predictions, i.e.,
 outputting uniform class-membership probabilities when calling
 ``predict_proba``. Ensure that the classifier can handle ``missing labels``
 also in other cases.
+
+.. _predict-proba-1:
 
 ``predict_proba`` method
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -849,7 +872,7 @@ Returns:
 |                                   | probabilities per sample.         |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-5:
+.. _general-advice-8:
 
 General advice
 ^^^^^^^^^^^^^^
@@ -858,9 +881,9 @@ Check parameter ``X`` regarding its shape, i.e., use superclass method
 ``self._check_n_features`` to ensure a correct number of features. Check
 that the classifier has been fitted. If the classifier is a
 ``skactiveml.base.ClassFrequencyEstimator``, this method is already
-implemented in the superclass. If no samples or class labels were
-provided during the previous call of the ``fit`` method, uniform class
-membership probabilities are to be outputted.
+implemented in the superclass.
+
+.. _predict-1:
 
 ``predict`` method
 ~~~~~~~~~~~~~~~~~~
@@ -885,7 +908,7 @@ Returns:
 |                                   | of each per sample.               |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-7:
+.. _general-advice-9:
 
 General advice
 ^^^^^^^^^^^^^^
@@ -893,9 +916,9 @@ General advice
 Usually, this method is already implemented by the superclass through
 calling the ``predict_proba`` method. If the superclass method is
 overwritten, ensure that it can handle imbalanced costs and missing
-labels. If no samples or class labels were provided during the previous
-call of the ``fit`` method, random class label predictions are to be
-outputted.
+labels.
+
+.. _score-1:
 
 ``score`` method
 ~~~~~~~~~~~~~~~~
@@ -928,7 +951,7 @@ Returns:
 |                                   | ``y``.                            |
 +-----------------------------------+-----------------------------------+
 
-.. _general-advice-8:
+.. _general-advice-10:
 
 General advice
 ^^^^^^^^^^^^^^
@@ -937,7 +960,7 @@ Usually, this method is already implemented by the superclass. If the
 superclass method is overwritten, ensure that it checks the parameters
 and that the classifier has been fitted.
 
-.. _testing-2:
+.. _testing-4:
 
 Testing
 ~~~~~~~
@@ -958,6 +981,187 @@ method called ``test_methodname`` in the Python file
 ``tests/test_example_classifier.py``. It is to check whether the method works
 as intended.
 
+Regressors
+----------
+
+Standard regressors implementations are part of the subpackage
+``skactiveml.regressor``. Every class of a regressor inherits
+from ``skactiveml.base.SkactivemlRegressor``.
+
+
+The class must implement the following methods:
+
++-------------------+---------------------------------------------------------+
+| Method            | Description                                             |
++===================+=========================================================+
+| ``init``          | Method for initialization.                              |
++-------------------+---------------------------------------------------------+
+| ``fit``           | Method to fit the regressor for given training data.    |
++-------------------+---------------------------------------------------------+
+| ``predict``       | Method predicting the target values (labels) for        |
+|                   | samples.                                                |
++-------------------+---------------------------------------------------------+
+
+.. _init-3:
+
+``init`` method
+~~~~~~~~~~~~~~~
+
+Required Parameters:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``missing_label``                 | Value to represent a missing      |
+|                                   | label.                            |
++-----------------------------------+-----------------------------------+
+| ``random_state``                  | Ensures reproducibility           |
+|                                   | (cf. scikit-learn).               |
++-----------------------------------+-----------------------------------+
+
+.. _fit-2:
+
+``fit`` method
+~~~~~~~~~~~~~~
+
+Required Parameters:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``X``                             | Is a matrix of feature values     |
+|                                   | representing the samples.         |
++-----------------------------------+-----------------------------------+
+| ``y``                             | Contains the target values of the |
+|                                   | training samples. Missing labels  |
+|                                   | are represented through the       |
+|                                   | attribute ``missing_label``.      |
+|                                   | Usually, ``y`` is a column array  |
+|                                   | except for multi-target           |
+|                                   | regressors which expect a matrix  |
+|                                   | with columns containing the       |
+|                                   | different target types.           |
++-----------------------------------+-----------------------------------+
+| ``sample_weight``                 | Contains the weights of the       |
+|                                   | training samples' targets.        |
+|                                   | It must have the same shape as    |
+|                                   | ``y``.                            |
++-----------------------------------+-----------------------------------+
+
+Returns:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+|``self``                           | The fitted regressor object.      |
++-----------------------------------+-----------------------------------+
+
+.. _general-advice-11:
+
+General advice
+^^^^^^^^^^^^^^
+
+Use ``self._validate_data`` method (is implemented in superclass) to
+check standard parameters of ``__init__`` and ``fit`` method. If the regressor
+was fitted on training sample of which each was assigned a ``missing_label``,
+the regressor should predict a default value of zero when calling ``predict``.
+Ensure that the regressor can handle ``missing labels`` also in other cases.
+
+.. _predict-2:
+
+``predict`` method
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Required Parameters:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``X``                             | Is a matrix of feature values     |
+|                                   | representing the samples, for     |
+|                                   | which the regressor will make     |
+|                                   | predictions.                      |
++-----------------------------------+-----------------------------------+
+
+Returns:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``y_pred``                        | The estimated targets per sample. |
++-----------------------------------+-----------------------------------+
+
+.. _general-advice-12:
+
+General advice
+^^^^^^^^^^^^^^
+
+Check parameter ``X`` regarding its shape, i.e., use superclass method
+``self._check_n_features`` to ensure a correct number of features. Check
+that the regressor has been fitted. If the classifier is a
+``skactiveml.base.ProbabilisticRegressor``, this method is already
+implemented in the superclass.
+
+.. _score-2:
+
+``score`` method
+~~~~~~~~~~~~~~~~
+
+Required Parameters:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``X``                             | Is a matrix of feature values     |
+|                                   | representing the samples, for     |
+|                                   | which the regressor will make     |
+|                                   | predictions.                      |
++-----------------------------------+-----------------------------------+
+| ``y``                             | Contains the true target of each  |
+|                                   | sample.                           |
++-----------------------------------+-----------------------------------+
+| ``sample_weight``                 | Defines the importance of each    |
+|                                   | sample when computing the         |
+|                                   | R2 score of the regressor.        |
++-----------------------------------+-----------------------------------+
+
+Returns:
+
++-----------------------------------+-----------------------------------+
+| Parameter                         | Description                       |
++===================================+===================================+
+| ``score``                         | R2 score of ``self.predict(X)``   |
+|                                   |  regarding ``y``.                 |
++-----------------------------------+-----------------------------------+
+
+.. _general-advice-13:
+
+General advice
+^^^^^^^^^^^^^^
+
+Usually, this method is already implemented by the superclass. If the
+superclass method is overwritten, ensure that it checks the parameters
+and that the regressor has been fitted.
+
+.. _testing-5:
+
+Testing
+~~~~~~~
+
+For every class ``ExampleRegressor`` that inherits from
+``skactiveml.base.SkactivemlRegressor`` (stored in
+``_example_regressor.py``), there need to be a file
+``tests/test_example_classifier.py``. It is necessary that both
+filenames are the same. Moreover, the test class must be called
+``TestExampleRegressor`` and inherit from ``unittest.TestCase``. For
+each parameter of an implemented method, there must be a test method
+called ``test_methodname_parametername`` in the Python file
+``tests/test_example_regressor.py``. It is to check whether invalid parameters
+are handled correctly. For each implemented method, there must be a test
+method called ``test_methodname`` in the Python file
+``tests/test_example_regressor.py``. It is to check whether the method works
+as intended.
+
 Annotators Models
 -----------------
 
@@ -967,6 +1171,8 @@ performances of annotators for given samples. The class of an annotator model
 must implement the ``predict_annotator_perf`` method estimating the
 performances per sample of each annotator as proxies of the provided
 annotation's qualities.
+
+.. _predict-annotator-perf-1:
 
 ``predict_annotator_perf`` method
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -987,7 +1193,7 @@ Returns:
 | ``P_annot`` | The estimated performances per sample-annotator pair.   |
 +-------------+---------------------------------------------------------+
 
-.. _general-advice-9:
+.. _general-advice-14:
 
 General advice
 ^^^^^^^^^^^^^^
