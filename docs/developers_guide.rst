@@ -727,7 +727,7 @@ Classifiers
 Standard classifier implementations are part of the subpackage
 ``skactiveml.classifier`` and classifiers learning from multiple
 annotators are implemented in its subpackage
-``skactiveml.classifier.multi``. Every class of a classifier inherits
+``skactiveml.classifier.multiannotator``. Every class of a classifier inherits
 from ``skactiveml.base.SkactivemlClassifier``.
 
 
@@ -738,7 +738,7 @@ The class must implement the following methods:
 +===================+=========================================================+
 | ``init``          | Method for initialization.                              |
 +-------------------+---------------------------------------------------------+
-| ``fit``           | Method to the classifier for given training data.       |
+| ``fit``           | Method to fit the classifier for given training data.   |
 +-------------------+---------------------------------------------------------+
 | ``predict_proba`` | Method predicting class-membership probabilities for    |
 |                   | samples.                                                |
@@ -790,7 +790,7 @@ Required Parameters:
 | ``y``                             | Contains the class labels of the  |
 |                                   | training samples. Missing labels  |
 |                                   | are represented through the       |
-|                                   | attribute ‘missing_label’.        |
+|                                   | attribute ``missing_label``.      |
 |                                   | Usually, ``y`` is a column array  |
 |                                   | except for multi-annotator        |
 |                                   | classifiers which expect a matrix |
@@ -799,7 +799,7 @@ Required Parameters:
 |                                   | annotator.                        |
 +-----------------------------------+-----------------------------------+
 | ``sample_weight``                 | Contains the weights of the       |
-|                                   | training samples’ class labels.   |
+|                                   | training samples' class labels.   |
 |                                   | It must have the same shape as    |
 |                                   | ``y``.                            |
 +-----------------------------------+-----------------------------------+
@@ -818,12 +818,13 @@ General advice
 ^^^^^^^^^^^^^^
 
 Use ``self._validate_data`` method (is implemented in superclass) to
-check standard parameters of ``__init__`` and ``fit`` method. If
-``self.n_features_`` is None, no samples were provided as training data.
-In this case, the classifier should still be fitted but only if the ``classes``
-parameter is not `None` and for the purpose to make random predictions, i.e.,
+check standard parameters of ``__init__`` and ``fit`` method. If the
+``classes`` parameter was provided, the classifier should be fitted with
+training sample of which each was assigned a ``missing_label``.
+In this case, the classifier should  make random predictions, i.e.,
 outputting uniform class-membership probabilities when calling
-``predict_proba``. Ensure that the classifier can handle missing labels.
+``predict_proba``. Ensure that the classifier can handle ``missing labels``
+also in other cases.
 
 ``predict_proba`` method
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -951,22 +952,21 @@ filenames are the same. Moreover, the test class must be called
 ``TestExampleClassifier`` and inherit from ``unittest.TestCase``. For
 each parameter of an implemented method, there must be a test method
 called ``test_methodname_parametername`` in the Python file
-``_example_classifier.py``. It is to check whether invalid parameters
+``tests/test_example_classifier.py``. It is to check whether invalid parameters
 are handled correctly. For each implemented method, there must be a test
 method called ``test_methodname`` in the Python file
-``_example_classifier.py``. It is to check whether the method works as
-intended.
+``tests/test_example_classifier.py``. It is to check whether the method works
+as intended.
 
 Annotators Models
 -----------------
 
 Annotator models are marked by implementing the interface
-``skactiveml.base.AnnotMixin``. These models can estimate the
-performances of annotators for given samples. Every class of a
-classifier inherits from ``skactiveml.base.SkactivemlClassifier``. The
-class of an annotator model must implement the ``predict_annotator_perf``
-method estimating the performances per sample of each annotator as
-proxies of the provided annotation’s qualities.
+``skactiveml.base.AnnotatorModelMixin``. These models can estimate the
+performances of annotators for given samples. The class of an annotator model
+must implement the ``predict_annotator_perf`` method estimating the
+performances per sample of each annotator as proxies of the provided
+annotation's qualities.
 
 ``predict_annotator_perf`` method
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1000,6 +1000,7 @@ pair.
 
 Examples
 --------
+
 Two of our main goals are to make active learning more understandable and
 improve our framework's usability.
 Therefore, we require the implementation of an example for each query strategy.
@@ -1089,7 +1090,8 @@ for writing the documentation are adopted from
 Building the documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To ensure the documentation of your work is well formatted, build the sphinx documentation by executing the following line.
+To ensure the documentation of your work is well formatted, build the sphinx
+documentation by executing the following line.
 
 .. code:: bash
 
@@ -1100,9 +1102,9 @@ Issue Tracking
 
 We use `Github
 Issues <https://github.com/scikit-activeml/scikit-activeml/issues>`__ as
-our issue tracker. If you think you have found a bug in
-``scikit-activeml``, you can report it to the issue tracker.
-Documentation bugs can also be reported there.
+our issue tracker. If you think you have found a bug in ``scikit-activeml``,
+you can report it to the issue tracker. Documentation bugs can also be reported
+there.
 
 Checking If A Bug Already Exists
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
