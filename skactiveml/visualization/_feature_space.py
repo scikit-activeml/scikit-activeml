@@ -441,7 +441,7 @@ def plot_stream_training_data(
 
 
 def plot_stream_decision_boundary(
-    ax, t_x, plot_step, clf, X, pred_list, color="k"
+    ax, t_x, plot_step, clf, X, pred_list, color="k", res=25,
 ):
     """Plot the decision boundary of the given classifier.
 
@@ -463,6 +463,8 @@ def plot_stream_decision_boundary(
         The list containing classifier prediction for the last steps.
     color: str | matplotlib.colors.Colormap, optional (default='k')
         The color for the decision boundary.
+    res : int, optional (default=25)
+        The resolution of the plot.
     Returns
     -------
     ax: matplotlib.axes.Axes or List
@@ -477,7 +479,7 @@ def plot_stream_decision_boundary(
     check_scalar(plot_step, "plot_step", int, min_val=1)
     check_type(ax, "ax", Axes)
     check_type(clf, "clf", ClassifierMixin)
-    x_vec = np.linspace(np.min(X), np.max(X), 25)
+    x_vec = np.linspace(np.min(X), np.max(X), res)
     t_vec = np.arange(1, t_x // plot_step + 1) * plot_step
     t_mesh, x_mesh = np.meshgrid(t_vec, x_vec)
     predictions = np.array([clf.predict(x_vec.reshape([-1, 1]))])

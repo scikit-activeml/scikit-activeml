@@ -481,6 +481,20 @@ class TestFeatureSpace(unittest.TestCase):
             color=0,
         )
 
+    def test_plot_stream_decision_boundary_param_res(self):
+        _, ax = plt.subplots()
+        self.assertRaises(
+            ValueError,
+            plot_stream_decision_boundary,
+            ax=ax,
+            t_x=0,
+            plot_step=1,
+            pred_list=[],
+            clf=self.clf,
+            X=self.X,
+            res=3,
+        )
+
     # Tests for plot_stream_training_data function
     def test_plot_stream_training_data_param_X(self):
         _, ax = plt.subplots()
@@ -919,19 +933,32 @@ class TestFeatureSpace(unittest.TestCase):
         fig, ax = plt.subplots()
         ax.set_xlim(0, len(self.X_stream))
         ax.set_ylim(bottom=min(self.X_stream), top=max(self.X_stream))
-        ax, _ = plot_stream_decision_boundary(
+        t_x = len(self.y_stream)
+        res = 25
+        pred_list = [np.full(res, fill_value=0)]
+
+        # add predictions as z needs at least a (2, 2) array
+        np.random.seed(0)
+        predictions = np.random.choice(
+            a=[0, 1], size=res, p=[0.5, 0.5]
+        )
+        pred_list.append(predictions)
+
+        ax, pred_list = plot_stream_decision_boundary(
             ax,
             t_x=len(self.y_stream),
-            plot_step=len(self.y_stream),
+            plot_step=t_x//2,
             clf=self.clf_stream,
             X=self.X_stream,
-            pred_list=[],
+            pred_list=pred_list,
+            res=res,
         )
         p = 0.2
         np.random.seed(0)
         queried_indices = np.random.choice(
-            a=[True, False], size=100, p=[p, 1 - p]
+            a=[True, False], size=len(self.y_stream), p=[p, 1 - p]
         )
+
         _ = plot_stream_training_data(
             ax,
             self.X_stream,

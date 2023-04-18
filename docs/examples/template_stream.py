@@ -66,12 +66,12 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
     X_cand = x_t.reshape([1, -1])
     y_cand = y_t
     clf.fit(X_train, y_train)
-    # check whether to sample the instance or not
+    # Check whether to sample the instance or not
     sampled_indices, utilities = qs.query(
         "$query_params", return_utilities=True
     )
     budget_manager_param_dict = {"utilities": utilities}
-    # update the query strategy and budget_manager to calculate the right budget
+    # Update the query strategy and budget_manager to calculate the right budget
     qs.update("$update_params")
     # Label the queried instances.
     X_train.append(x_t)
@@ -88,7 +88,7 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
 
         coll_old = list(ax.collections)
         ax, predictions_list = plot_stream_decision_boundary(
-            ax, t_x, plot_step, clf, X, predictions_list
+            ax, t_x, plot_step, clf, X, predictions_list, res="$res|25"
         )
         data_lines = plot_stream_training_data(
             ax, X_train, y_train, queried_indices, classes, feature_bound
