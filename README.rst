@@ -195,7 +195,7 @@ please cite the following:
 ::
 
     @article{skactiveml2021,
-        title={scikit-activeml: {A} {L}ibrary and {T}oolbox for {A}ctive {L}}earning {A}lgorithms},
+        title={scikit-activeml: {A} {L}ibrary and {T}oolbox for {A}ctive {L}earning {A}lgorithms},
         author={Daniel Kottke and Marek Herde and Tuan Pham Minh and Alexander Benz and Pascal Mergard and Atal Roghman and Christoph Sandrock and Bernhard Sick},
         journal={Preprints},
         doi={10.20944/preprints202103.0194.v1},
