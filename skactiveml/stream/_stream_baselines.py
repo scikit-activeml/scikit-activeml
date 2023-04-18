@@ -17,16 +17,16 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
 
-    allow_exceeding_budget : bool, default=True
+    allow_exceeding_budget : bool, optional (default=True)
         If True, the query strategy is allowed to exceed it's budget as long as
         the average number of queries will be within the budget. If False,
         queries are not allowed if the budget is exhausted.
 
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
     """
 
@@ -51,7 +51,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        return_utilities : bool, optional
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -119,9 +119,6 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budgetmanager.
-
         Returns
         -------
         self : StreamRandomSampling
@@ -155,7 +152,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
+        reset : bool, optional (default=True)
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
@@ -203,11 +200,11 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
     Parameters
     ----------
-    budget : float, default=None
+    budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
 
-    random_state : int, RandomState instance, default=None
+    random_state : int, RandomState instance, optional (default=None)
         Controls the randomness of the estimator.
     """
 
@@ -232,7 +229,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
-        return_utilities : bool, optional
+        return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
             The default is False.
 
@@ -292,9 +289,6 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         queried_indices : array-like of shape (n_samples,)
             Indicates which instances from candidates have been queried.
 
-        budget_manager_param_dict : kwargs
-            Optional kwargs for budgetmanager.
-
         Returns
         -------
         self : PeriodicSampling
@@ -324,7 +318,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If true, also return the utilities based on the query strategy.
-        reset : bool, default=True
+        reset : bool, optional (default=True)
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.

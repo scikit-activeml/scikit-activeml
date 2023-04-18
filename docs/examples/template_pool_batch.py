@@ -3,7 +3,8 @@ from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
 
 from skactiveml.utils import MISSING_LABEL, labeled_indices, unlabeled_indices
-from skactiveml.visualization import plot_utilities, plot_decision_boundary
+from skactiveml.visualization import plot_utilities, plot_decision_boundary, \
+    plot_contour_for_samples
 
 "$import_clf|from skactiveml.classifier import ParzenWindowClassifier"
 "$import_misc"
@@ -24,12 +25,12 @@ qs = "$init_qs"
 "$preproc"
 
 # Preparation for plotting.
-fig, ax = plt.subplots()
+fig, axs = plt.subplots(2, 2, constrained_layout=True)
 feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
-artists = []
+artists = [[] for j in range("$n_cycles|5")]
 
 # The active learning cycle:
-n_cycles = "$n_cycles|20"
+n_cycles = "$n_cycles|5"
 for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
@@ -38,27 +39,23 @@ for c in range(n_cycles):
     X_labeled = X[labeled_indices(y)]
 
     # Query the next instance/s.
-    query_idx = qs.query("$query_params")
+    query_idx, utilities = qs.query("$query_params", batch_size=4, return_utilities=True)
 
     # Plot the labeled data.
-    coll_old = list(ax.collections)
-    title = ax.text(
-        0.5, 1.05, f"Decision boundary after acquring {c} labels",
-        size=plt.rcParams["axes.titlesize"], ha="center",
-        transform=ax.transAxes
-    )
-    ax = plot_utilities(qs, "$query_params",
-                        "$plot_utility_params|candidates=None", res="$res|25",
-                        feature_bound=feature_bound, ax=ax)
-    ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".",
-               zorder=2)
-    ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8,
-               marker=".", s=300)
-    ax = plot_decision_boundary(clf, feature_bound, ax=ax)
+    for i, ax in enumerate(axs.flatten()):
+        coll_old = list(ax.collections)
+        plot_contour_for_samples(X, utilities[i], res="$res|25",
+                                 feature_bound=feature_bound, replace_nan=None, ax=ax)
+        ax.scatter(X[:, 0], X[:, 1], c=y_true, cmap="coolwarm", marker=".",
+                   zorder=2)
+        ax.scatter(X_labeled[:, 0], X_labeled[:, 1], c="grey", alpha=.8,
+                   marker=".", s=300)
+        ax = plot_decision_boundary(clf, feature_bound, ax=ax)
+        ax.set_title(f"Batch {c+1}, Utilities[{i}]")
 
-    coll_new = list(ax.collections)
-    coll_new.append(title)
-    artists.append([x for x in coll_new if (x not in coll_old)])
+        for x in ax.collections:
+            if x not in coll_old:
+                artists[c].append(x)
 
     # Label the queried instances.
     y[query_idx] = y_true[query_idx]
