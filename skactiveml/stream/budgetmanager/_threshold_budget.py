@@ -82,6 +82,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
+        confidence = 1 - utilities
 
         # intialize return parameters
         queried_indices = []
@@ -91,8 +92,8 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         prior_random_state = self.random_state_.get_state()
 
-        # get utilities
-        for i, u in enumerate(utilities):
+        # get confidence
+        for i, u in enumerate(confidence):
             tmp_t += 1
             budget_left = self.budget_ > tmp_u / tmp_t
             if not budget_left:
