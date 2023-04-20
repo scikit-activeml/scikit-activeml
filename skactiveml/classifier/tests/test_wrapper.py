@@ -177,10 +177,12 @@ class TestSklearnClassifier(unittest.TestCase):
 
     def test_pipeline(self):
         X, y_true = make_blobs(100, centers=2, random_state=0)
-        pipline = Pipeline((
-            ("scaler", StandardScaler()),
-            ("gpc", GaussianProcessClassifier(random_state=0))
-        ))
+        pipline = Pipeline(
+            (
+                ("scaler", StandardScaler()),
+                ("gpc", GaussianProcessClassifier(random_state=0)),
+            )
+        )
         clf = SklearnClassifier(
             pipline, classes=[0, 1], missing_label=-1, random_state=0
         )

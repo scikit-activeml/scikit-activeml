@@ -155,13 +155,13 @@ class TestWrapper(unittest.TestCase):
         X = np.linspace(-3, 3, 100)
         y_true = X**2
         X = X.reshape(-1, 1)
-        pipline = Pipeline((
-            ("scaler", PolynomialFeatures(degree=2)),
-            ("lr", LinearRegression())
-        ))
-        reg = SklearnRegressor(
-            pipline, missing_label=np.nan, random_state=0
+        pipline = Pipeline(
+            (
+                ("scaler", PolynomialFeatures(degree=2)),
+                ("lr", LinearRegression()),
+            )
         )
+        reg = SklearnRegressor(pipline, missing_label=np.nan, random_state=0)
         reg = reg.fit(X, y_true)
         check_is_fitted(reg)
         self.assertRaises(NotFittedError, check_is_fitted, pipline)

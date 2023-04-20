@@ -6,7 +6,13 @@ import unittest
 from os import path
 
 from docs.generate import generate_examples
-from skactiveml import pool
+from skactiveml import pool, stream
+
+from skactiveml.stream import CognitiveDualQueryStrategy
+
+QUERY_STRATEGY_EXCEPTIONS_LIST = [
+    CognitiveDualQueryStrategy,
+]
 
 
 class TestExamples(unittest.TestCase):
@@ -14,11 +20,13 @@ class TestExamples(unittest.TestCase):
         self.skaml_path = path.abspath(os.curdir).split("skactiveml")[0]
         self.docs_path = path.join(self.skaml_path, "docs")
         self.json_path = path.join(self.skaml_path, "docs", "examples")
-        self.exceptions = []
+        self.exceptions = [
+            qs.__name__ for qs in QUERY_STRATEGY_EXCEPTIONS_LIST
+        ]
         self.working_dir = os.path.abspath(os.curdir)
 
         # A list of all modules that should have a json file.
-        self.modules = [pool]
+        self.modules = [pool, stream]
 
     def test_example_files(self):
         # Temporary generate the examples from the json files.

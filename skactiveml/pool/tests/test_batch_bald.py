@@ -24,7 +24,9 @@ from skactiveml.tests.template_query_strategy import (
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestBatchBALD(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestBatchBALD(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         self.classes = [0, 1]
         self.ensemble_clf = SklearnClassifier(

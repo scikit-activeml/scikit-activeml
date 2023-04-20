@@ -209,9 +209,7 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
         raise ValueError(
             f"'probas' should be of shape 3, but {probas.ndim}" f" were given."
         )
-    probs_K_N_C = check_array(
-        probas, ensure_2d=False, allow_nd=True
-    )
+    probs_K_N_C = check_array(probas, ensure_2d=False, allow_nd=True)
     check_scalar(batch_size, "batch_size", int, min_val=1)
     if n_MC_samples is None:
         n_MC_samples = len(probas)

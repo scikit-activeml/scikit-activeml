@@ -23,7 +23,7 @@ class TemplateTestCognitiveDualQueryStrategy:
         train_init_size = 10
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
-            random_state=rand.randint(2 ** 31 - 1),
+            random_state=rand.randint(2**31 - 1),
             shuffle=True,
         )
 
@@ -54,13 +54,19 @@ class TemplateTestCognitiveDualQueryStrategy:
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_random_state(self):
-        query_strategy = self.get_query_strategy()(random_state="string",)
+        query_strategy = self.get_query_strategy()(
+            random_state="string",
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_density_threshold(self):
-        query_strategy = self.get_query_strategy()(density_threshold="string",)
+        query_strategy = self.get_query_strategy()(
+            density_threshold="string",
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(density_threshold=-1,)
+        query_strategy = self.get_query_strategy()(
+            density_threshold=-1,
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_cognition_window_size(self):
@@ -68,11 +74,15 @@ class TemplateTestCognitiveDualQueryStrategy:
             cognition_window_size="string",
         )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(cognition_window_size=-1,)
+        query_strategy = self.get_query_strategy()(
+            cognition_window_size=-1,
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_dist_func(self):
-        query_strategy = self.get_query_strategy()(dist_func="string",)
+        query_strategy = self.get_query_strategy()(
+            dist_func="string",
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
@@ -81,7 +91,9 @@ class TemplateTestCognitiveDualQueryStrategy:
             queried_indices=np.array([1, 2]),
         )
 
-        query_strategy = self.get_query_strategy()(dist_func=0,)
+        query_strategy = self.get_query_strategy()(
+            dist_func=0,
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
@@ -114,11 +126,17 @@ class TemplateTestCognitiveDualQueryStrategy:
         )
 
     def test_init_param_force_full_budget(self):
-        query_strategy = self.get_query_strategy()(force_full_budget="string",)
+        query_strategy = self.get_query_strategy()(
+            force_full_budget="string",
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(force_full_budget=0,)
+        query_strategy = self.get_query_strategy()(
+            force_full_budget=0,
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(force_full_budget=True,)
+        query_strategy = self.get_query_strategy()(
+            force_full_budget=True,
+        )
         queried_indices = query_strategy.query(**self.kwargs)
         query_strategy.update(self.candidates, queried_indices)
 
@@ -378,7 +396,7 @@ class TestStreamDensityBasedAL(unittest.TestCase):
         train_init_size = 10
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
-            random_state=rand.randint(2 ** 31 - 1),
+            random_state=rand.randint(2**31 - 1),
             shuffle=True,
         )
 
@@ -411,17 +429,25 @@ class TestStreamDensityBasedAL(unittest.TestCase):
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_random_state(self):
-        query_strategy = self.get_query_strategy()(random_state="string",)
+        query_strategy = self.get_query_strategy()(
+            random_state="string",
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_window_size(self):
-        query_strategy = self.get_query_strategy()(window_size="string",)
+        query_strategy = self.get_query_strategy()(
+            window_size="string",
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
-        query_strategy = self.get_query_strategy()(window_size=-1,)
+        query_strategy = self.get_query_strategy()(
+            window_size=-1,
+        )
         self.assertRaises(ValueError, query_strategy.query, **(self.kwargs))
 
     def test_init_param_dist_func(self):
-        query_strategy = self.get_query_strategy()(dist_func="string",)
+        query_strategy = self.get_query_strategy()(
+            dist_func="string",
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
@@ -430,7 +456,9 @@ class TestStreamDensityBasedAL(unittest.TestCase):
             queried_indices=np.array([1, 2]),
         )
 
-        query_strategy = self.get_query_strategy()(dist_func=0,)
+        query_strategy = self.get_query_strategy()(
+            dist_func=0,
+        )
         self.assertRaises(TypeError, query_strategy.query, **(self.kwargs))
         self.assertRaises(
             TypeError,
