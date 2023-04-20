@@ -40,7 +40,6 @@ X_train.extend(X_init)
 y_train = []
 y_train.extend(y_init)
 classes = np.unique(y_true)
-queried_count = 0
 
 
 # Preparation for plotting.
@@ -55,7 +54,6 @@ X_train = []
 X_train.extend(X_init)
 y_train = []
 y_train.extend(y_init)
-queried_count = 0
 
 queried_indices = [True] * len(y_init)
 
