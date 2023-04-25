@@ -8,7 +8,7 @@ from ._feature_space import (
     plot_contour_for_samples,
     plot_annotator_utilities,
     plot_stream_training_data,
-    plot_stream_decision_boundary
+    plot_stream_decision_boundary,
 )
 from ._misc import mesh
 

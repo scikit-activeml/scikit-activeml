@@ -52,7 +52,7 @@ class IndexClassifierWrapper:
         unlabeled samples.
     y : array-like of shape (n_samples)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by self.missing_label.
+        indicated by self.missing_label).
     sample_weight : array-like of shape (n_samples), optional (default=None)
         Weights of training samples in `X`.
     set_base_clf : bool, default=False
@@ -97,6 +97,13 @@ class IndexClassifierWrapper:
         check_type(self.clf, "clf", SkactivemlClassifier)
 
         # Check X, y, sample_weight: will be done by base clf
+        self.X = check_array(self.X, allow_nd="True")
+        self.y = check_array(
+            self.y,
+            ensure_2d=False,
+            force_all_finite=False,
+            dtype=None,
+        )
         check_consistent_length(self.X, self.y)
 
         if self.sample_weight is not None:
@@ -142,6 +149,12 @@ class IndexClassifierWrapper:
         # Check missing label
         check_missing_label(self.missing_label)
         self.missing_label_ = self.missing_label
+        if not np.issubdtype(type(self.missing_label), self.y.dtype):
+            raise TypeError(
+                f"`missing_label` has type {type(missing_label)}, "
+                f"which is not compatible with {self.y.dtype} as the "
+                f"type of `y`."
+            )
         check_equal_missing_label(self.clf.missing_label, self.missing_label_)
 
         # prepare ParzenWindowClassifier
@@ -180,10 +193,14 @@ class IndexClassifierWrapper:
             will be used later. Can be of value 'all', 'labeled', or
             'unlabeled'.
         """
-        idx_fit = check_array(idx_fit, ensure_2d=False, dtype=int)
+        idx_fit = check_array(
+            idx_fit, ensure_2d=False, dtype=int, input_name="`idx_fit`"
+        )
         idx_fit = check_indices(idx_fit, self.X, dim=0)
 
-        idx_pred = check_array(idx_pred, ensure_2d=False, dtype=int)
+        idx_pred = check_array(
+            idx_pred, ensure_2d=False, dtype=int, input_name="`idx_pred`"
+        )
         idx_pred = check_indices(idx_pred, self.X, dim=0)
 
         # precompute ParzenWindowClassifier
@@ -257,7 +274,7 @@ class IndexClassifierWrapper:
 
         """
         # check idx
-        idx = check_array(idx, ensure_2d=False, dtype=int)
+        idx = check_array(idx, ensure_2d=False, dtype=int, input_name="`idx`")
         idx = check_indices(
             idx, self.X, dim=0, unique=self.enforce_unique_samples
         )
@@ -274,8 +291,9 @@ class IndexClassifierWrapper:
             y = check_array(
                 y,
                 ensure_2d=False,
-                force_all_finite="allow-nan",
+                force_all_finite=False,
                 dtype=self.y.dtype,
+                input_name="`y`",
             )
             check_consistent_length(idx, y)
 
@@ -286,7 +304,9 @@ class IndexClassifierWrapper:
             )
             # TODO deepcopy
         else:
-            sample_weight = check_array(sample_weight, ensure_2d=False)
+            sample_weight = check_array(
+                sample_weight, ensure_2d=False, input_name="`sample_weight`"
+            )
             check_consistent_length(sample_weight, y)
 
         # check if a clf_ exists
@@ -349,7 +369,9 @@ class IndexClassifierWrapper:
         """
 
         # check idx
-        add_idx = check_array(idx, ensure_2d=False, dtype=int)
+        add_idx = check_array(
+            idx, ensure_2d=False, dtype=int, input_name="`add_idx`"
+        )
         add_idx = check_indices(
             add_idx, self.X, dim=0, unique=self.enforce_unique_samples
         )
@@ -385,8 +407,9 @@ class IndexClassifierWrapper:
             add_y = check_array(
                 y,
                 ensure_2d=False,
-                force_all_finite="allow-nan",
+                force_all_finite=False,
                 dtype=self.y.dtype,
+                input_name="`y`",
             )
             check_consistent_length(add_idx, add_y)
 
@@ -396,7 +419,9 @@ class IndexClassifierWrapper:
                 self._get_sw(self.sample_weight, idx=add_idx)
             )
         else:
-            add_sample_weight = check_array(sample_weight, ensure_2d=False)
+            add_sample_weight = check_array(
+                sample_weight, ensure_2d=False, input_name="`sample_weight`"
+            )
             check_consistent_length(add_idx, add_sample_weight)
 
         # handle case when partial fit of clf is used
@@ -727,8 +752,12 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
         The new labels.
     """
 
-    X = check_array(X)
-    y = column_or_1d(check_array(y, force_all_finite=False, ensure_2d=False))
+    X = check_array(X, input_name="`X`")
+    y = column_or_1d(
+        check_array(
+            y, force_all_finite=False, ensure_2d=False, input_name="`y`"
+        )
+    )
     check_consistent_length(X, y)
 
     if isinstance(y_update, (int, float)):
@@ -739,6 +768,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
             force_all_finite=False,
             ensure_2d=False,
             ensure_min_samples=0,
+            input_name="`y`",
         )
         y_update = column_or_1d(y_update)
 
@@ -752,7 +782,9 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
         y_new[idx_update] = y_update
         return X_new, y_new
     elif X_update is not None:
-        X_update = check_array(X_update, ensure_2d=False)
+        X_update = check_array(
+            X_update, ensure_2d=False, input_name="`X_update`"
+        )
         if X_update.ndim == 1:
             X_update = X_update.reshape(1, -1)
         check_consistent_length(X.T, X_update.T)
@@ -954,7 +986,7 @@ def _conditional_expect(
         The conditional expectation for each value applied.
     """
 
-    X = check_array(X, allow_nd=True)
+    X = check_array(X, allow_nd=True, input_name="`X`")
 
     check_type(reg, "reg", ProbabilisticRegressor)
     check_type(

@@ -939,15 +939,13 @@ class TestFeatureSpace(unittest.TestCase):
 
         # add predictions as z needs at least a (2, 2) array
         np.random.seed(0)
-        predictions = np.random.choice(
-            a=[0, 1], size=res, p=[0.5, 0.5]
-        )
+        predictions = np.random.choice(a=[0, 1], size=res, p=[0.5, 0.5])
         pred_list.append(predictions)
 
         ax, pred_list = plot_stream_decision_boundary(
             ax,
             t_x=len(self.y_stream),
-            plot_step=t_x//2,
+            plot_step=t_x // 2,
             clf=self.clf_stream,
             X=self.X_stream,
             pred_list=pred_list,

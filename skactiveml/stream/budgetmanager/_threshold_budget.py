@@ -1,4 +1,3 @@
-
 import numpy as np
 from copy import deepcopy
 
@@ -6,10 +5,7 @@ from skactiveml.base import (
     BudgetManager,
 )
 
-from skactiveml.utils import (
-    check_scalar,
-    check_random_state
-)
+from skactiveml.utils import check_scalar, check_random_state
 
 
 class DensityBasedSplitBudgetManager(BudgetManager):
@@ -186,8 +182,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         return utilities
 
     def _validate_theta(self):
-        """Validate if theta is set as a float.
-        """
+        """Validate if theta is set as a float."""
         check_scalar(self.theta, "theta", float)
         # check if theta exists
         if not hasattr(self, "theta_"):

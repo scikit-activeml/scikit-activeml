@@ -2,9 +2,7 @@ import unittest
 
 import numpy as np
 
-from skactiveml.stream.budgetmanager import (
-    DensityBasedSplitBudgetManager
-)
+from skactiveml.stream.budgetmanager import DensityBasedSplitBudgetManager
 
 
 class TestDensityBasedSplitBudgetManager(unittest.TestCase):

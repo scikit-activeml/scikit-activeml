@@ -67,4 +67,3 @@ class TestLabelEncoder(unittest.TestCase):
             [-1, 1, 2, 3, -1],
             ExtLabelEncoder(classes=cls).fit_transform(self.y1),
         )
-

@@ -50,13 +50,9 @@ class TestProbabilisticAL(
         self._test_param("init", "m_max", test_cases)
 
     def test_init_param_metric_dict(self):
-        pal = ProbabilisticAL(
-            metric="rbf", metric_dict=["gamma"]
-        )
+        pal = ProbabilisticAL(metric="rbf", metric_dict=["gamma"])
         self.assertRaises(TypeError, pal.query, **(self.kwargs))
-        pal = ProbabilisticAL(
-            metric="rbf", metric_dict={"test": 0}
-        )
+        pal = ProbabilisticAL(metric="rbf", metric_dict={"test": 0})
         self.assertRaises(TypeError, pal.query, **(self.kwargs))
 
     def test_init_param_metric(self):
