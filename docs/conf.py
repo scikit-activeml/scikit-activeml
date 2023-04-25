@@ -232,11 +232,11 @@ autoclass_content = "class"
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
 generate_classification_legend(
-    os.path.abspath("generated\\examples\\pool\\classification_legend.png")
+    os.path.abspath("generated/examples/pool/classification_legend.png")
 )
 
 generate_regression_legend(
-    os.path.abspath("generated\\examples\\pool\\regression_legend.png")
+    os.path.abspath("generated/examples/pool/regression_legend.png")
 )
 
 json_data = generate_examples(
@@ -254,5 +254,5 @@ generate_tutorials(
 )
 
 generate_stream_classification_legend(
-    os.path.abspath("generated\\examples\\stream\\classification_legend.png")
+    os.path.abspath("generated/examples/stream/classification_legend.png")
 )
