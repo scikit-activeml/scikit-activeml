@@ -22,7 +22,8 @@ from docs.generate import (
     generate_strategy_overview_rst,
     generate_api_reference_rst,
     generate_examples,
-    generate_tutorials, generate_classification_legend,
+    generate_tutorials,
+    generate_classification_legend,
     generate_regression_legend,
     generate_stream_classification_legend,
 )
@@ -31,7 +32,15 @@ from docs.generate import (
 
 project = "scikit-activeml"
 copyright = "2020"
-author = "Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergard, Christoph Sandrock"
+author = "Daniel Kottke, " \
+         "Marek Herde, " \
+         "Pham Minh Tuan, " \
+         "Pascal Mergard, " \
+         "Christoph Sandrock, " \
+         "Alexander Benz, " \
+         "Lukas Lührs, " \
+         "Mehmet Mjüde, " \
+         "Atal Roghman"
 
 # The short X.Y version
 version = skactiveml.__version__
@@ -231,14 +240,6 @@ autoclass_content = "class"
 
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
-generate_classification_legend(
-    os.path.abspath("generated/examples/pool/classification_legend.png")
-)
-
-generate_regression_legend(
-    os.path.abspath("generated/examples/pool/regression_legend.png")
-)
-
 json_data = generate_examples(
     gen_path=os.path.abspath("generated/examples"),
     json_path=os.path.abspath("examples"),
@@ -251,6 +252,14 @@ generate_strategy_overview_rst(
 generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
     dst_path=os.path.abspath("generated/tutorials/"),
+)
+
+generate_classification_legend(
+    os.path.abspath("generated/examples/pool/classification_legend.png")
+)
+
+generate_regression_legend(
+    os.path.abspath("generated/examples/pool/regression_legend.png")
 )
 
 generate_stream_classification_legend(
