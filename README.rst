@@ -59,7 +59,7 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
 Examples
 ========
-We provide a broad overview of different use-cases in out `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
+We provide a broad overview of different use-cases in our `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
 
 
 - `Pool-based Active Learning -- Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/00_pool_getting_started.html>`_,
@@ -93,7 +93,7 @@ active learning with ``sklearn`` is the ability to handle unlabeled data, which 
     X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
     y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
-    # Use the first 10 instances are initial training data.
+    # Use the first 10 instances as initial training data.
     y[:10] = y_true[:10]
 
     # Create classifier and query strategy.
@@ -123,7 +123,7 @@ sample utilities (greenish contours) is given below.
 Stream-based Active Learning
 ############################
 
-The following code implements an active learning cycle with 200 data points and
+The following code snippet implements an active learning cycle with 200 data points and
 the default budget of 10% using a pwc classifier and split uncertainty sampling. 
 Like in the pool-based example you can wrap other classifiers from ``sklearn``,
 ``sklearn`` compatible classifiers or like the example classifiers provided by ``skactiveml``.

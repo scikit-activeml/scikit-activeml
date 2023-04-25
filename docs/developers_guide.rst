@@ -94,7 +94,8 @@ Install Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 
 Now we can install some required project dependencies, which are defined
-in the ``requirements.txt`` and ``requirements.txt`` (for development) files.
+in the ``requirements.txt`` and ``requirements_extra.txt`` (for development)
+files.
 
 .. code:: bash
 
@@ -132,7 +133,7 @@ the code via the following commands:
 .. code:: bash
 
    pip install black
-   black --line-length example_file.py
+   black --line-length 79 example_file.py
 
 Example for C3 (Code Contribution Cycle) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -179,7 +180,7 @@ Query Strategies
 ----------------
 
 All query strategies inherit from ``skactiveml.base.QueryStrategy`` as abstract
-superclass implemented in ``skactiveml/base.py``. This class is a
+superclass implemented in ``skactiveml/base.py``. This superclass inherits from
 ``sklearn.base.Estimator``. The ``__init__`` method requires by default a
 ``random_state`` parameter and the abstract method ``query`` is to enforce the
 implementation of the sample selection logic.
@@ -216,17 +217,17 @@ For typical class parameters, we use standard names:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``prior``                         | Prior probabilities for the       |
+| ``random_state``                  | Number or np.random.RandomState   |
+|                                   | like sklearn.                     |
++-----------------------------------------------------------------------+
+| ``prior``, optional               | Prior probabilities for the       |
 |                                   | distribution of probabilistic     |
 |                                   | strategies.                       |
 +-----------------------------------+-----------------------------------+
-| ``random_state``                  | Number or np.random.RandomState   |
-|                                   | like sklearn.                     |
-+-----------------------------------+-----------------------------------+
-| ``method``                        | String for classes that implement |
+| ``method``, optional              | String for classes that implement |
 |                                   | multiple methods.                 |
 +-----------------------------------+-----------------------------------+
-| ``cost_matrix``                   | Cost matrix defining the cost of  |
+| ``cost_matrix``, optional         | Cost matrix defining the cost of  |
 |                                   | interchanging classes.            |
 +-----------------------------------+-----------------------------------+
 
@@ -248,7 +249,7 @@ Required Parameters:
 |                                   | (possibly including unlabeled     |
 |                                   | ones indicated by MISSING_LABEL.) |
 +-----------------------------------+-----------------------------------+
-| ``candidates``                    | If candidates is None, the        |
+| ``candidates``, optional          | If candidates is None, the        |
 |                                   | unlabeled samples from (X, y) are |
 |                                   | considered as candidates. If      |
 |                                   | candidates is of shape            |
@@ -263,10 +264,10 @@ Required Parameters:
 |                                   | supported by all query            |
 |                                   | strategies.                       |
 +-----------------------------------+-----------------------------------+
-| ``batch_size``                    | Number of samples to be selected  |
+| ``batch_size``, optional          | Number of samples to be selected  |
 |                                   | in one AL cycle.                  |
 +-----------------------------------+-----------------------------------+
-| ``return_utilities``              | If true, additionally return the  |
+| ``return_utilities``, optional    | If true, additionally return the  |
 |                                   | utilities of the query strategy.` |
 +-----------------------------------+-----------------------------------+
 
@@ -288,7 +289,7 @@ Returns:
 |                                   | indexing refers to samples in     |
 |                                   | candidates.                       |
 +-----------------------------------+-----------------------------------+
-| ``utilities``                     | The utilities of samples after    |
+| ``utilities``, optional           | The utilities of samples after    |
 |                                   | each selected sample of the       |
 |                                   | batch, e.g., ``utilities[0]``     |
 |                                   | indicates the utilities used for  |
@@ -310,11 +311,11 @@ Returns:
 General advice
 ''''''''''''''
 
-Use ``self._validate_data`` function (implemented in the superclass).
+Use ``self._validate_data`` method (implemented in the superclass).
 Check the input ``X`` and ``y`` only once. Fit the classifier or regressors if
-it is not yet fitted (may use ``fit_if_not_fitted`` form utils). Calculate
+it is not yet fitted (may use ``fit_if_not_fitted`` from ``utils``). Calculate
 utilities via an extra function that should be public. Use ``simple_batch``
-function from utils for determining `query_indices` and setting ``utilities``
+function from ``utils`` for determining `query_indices` and setting ``utilities``
 in naive batch query strategies.
 
 .. _testing-1:
@@ -363,7 +364,7 @@ For typical class parameters we use standard names:
 | ``budget_manager``, optional | Enforces the budget constraint           |
 +------------------------------+------------------------------------------+
 
-The class must implement the following functions:
+The class must implement the following methods:
 
 +------------+-----------------------------------------------------------------+
 | Function   | Description                                                     |
@@ -376,9 +377,9 @@ The class must implement the following functions:
 | ``update`` | Adapting the budget monitoring according to the queried labels  |
 +------------+-----------------------------------------------------------------+
 
-.. _query-function-2:
+.. _query-method-2:
 
-``query`` function
+``query`` method
 ^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
@@ -428,17 +429,17 @@ Returns:
 General advice
 ''''''''''''''
 
-The ``query`` function must not change the internal state of the ``query``
+The ``query`` method must not change the internal state of the ``query``
 strategy (``budget``, ``budget_manager`` and ``random_state`` included) to allow
 for assessing multiple instances with the same state. Update the internal state
-in the ``update()`` function. If the class implements a classifier (``clf``) the
-optional attributes need to be implement. Use ``self._validate_data`` function
+in the ``update()`` method. If the class implements a classifier (``clf``) the
+optional attributes need to be implement. Use ``self._validate_data`` method
 (is implemented in superclass). Check the input ``X`` and ``y`` only once. Fit
 classifier if ``fit_clf`` is set to ``True``.
 
 .. _update-1:
 
-``update`` function
+``update`` method
 ^^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
@@ -454,7 +455,7 @@ Required Parameters:
 |                               | ``query``                                    |
 +-------------------------------+----------------------------------------------+
 | ``budget_manager_param_dict`` | Provides additional parameters to            |
-|                               | the ``update`` function of the               |
+|                               | the ``update`` method of the                 |
 |                               | ``budget_manager`` (only include             |
 |                               | if a ``budget_manager`` is used)             |
 +-------------------------------+----------------------------------------------+
@@ -497,7 +498,7 @@ General advice for the ``budget_manager``
 
 All budget managers are stored in
 ``skactivml/stream/budget_manager/*.py``. The class must implement the
-following functions:
+following methods:
 
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
@@ -513,10 +514,10 @@ following functions:
 
 .. _update-2:
 
-``update`` function
+``update`` method
 ^^^^^^^^^^^^^^^^^^^
 
-The update function of the budget manager has the same functionality as
+The update method of the budget manager has the same functionality as
 the query strategy update.
 
 Required Parameters:
@@ -534,7 +535,7 @@ Required Parameters:
 
 .. _query-by-utilities-1:
 
-``query_by_utilities`` function
+``query_by_utilities`` method
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Required Parameters:
@@ -603,7 +604,7 @@ The class must implement the following methods:
 |            | class label is to be queried from which annotator.             |
 +------------+----------------------------------------------------------------+
 
-.. _query-function-3:
+.. _query-method-3:
 
 ``query`` method
 ^^^^^^^^^^^^^^^^
@@ -625,27 +626,27 @@ Required Parameters:
 |                                   | the label annotated by annotator  |
 |                                   | ``i`` for sample ``j``.           |
 +-----------------------------------+-----------------------------------+
-| ``candidates``                    | If ``candidates`` is None, the    |
-|                                   | samples from ``(X, y)``, for      |
+| ``candidates``, optional          | If ``candidates`` is ``None``,    |
+|                                   | the samples from ``(X, y)``, for  |
 |                                   | which an annotator exists such    |
 |                                   | that the annotator sample pair is |
 |                                   | unlabeled are considered as       |
-|                                   | sample candidates. If             |
-|                                   | ``candidates`` is of shape        |
-|                                   | (n_candidates,) and of type int,  |
-|                                   | ``candidates`` is considered as   |
-|                                   | the indices of the sample         |
+|                                   | sample candidates.                |
+|                                   | If ``candidates`` is of shape     |
+|                                   | ``(n_candidates,)`` and of type   |
+|                                   | int, ``candidates`` is considered |
+|                                   | as the indices of the sample      |
 |                                   | candidates in ``(X, y)``. If      |
 |                                   | ``candidates`` is of shape        |
-|                                   | (n_candidates, n_features), the   |
-|                                   | sample candidates are directly    |
-|                                   | given in `candidates` (not        |
-|                                   | necessarily contained in ``X``).  |
-|                                   | This is not supported by all      |
-|                                   | query strategies.                 |
+|                                   | ``(n_candidates, n_features)``,   |
+|                                   | the sample candidates are         |
+|                                   | directly given in ``candidates``  |
+|                                   | (not necessarily contained in     |
+|                                   | ``X``). This is not supported by  |
+|                                   | all query strategies.             |
 +-----------------------------------+-----------------------------------+
-| ``annotators``                    | If ``annotators`` is None, all    |
-|                                   | annotators are considered as      |
+| ``annotators``, optional          | If ``annotators`` is ``None``,    |
+|                                   | all annotators are considered as  |
 |                                   | available annotators. If          |
 |                                   | ``annotators`` is of shape        |
 |                                   | (n_avl_annotators), and of type   |
@@ -668,11 +669,11 @@ Required Parameters:
 |                                   | ``True`` are considered as        |
 |                                   | candidate annotator-sample pairs. |
 +-----------------------------------+-----------------------------------+
-| ``batch_size``                    | The number of annotator-sample    |
+| ``batch_size``, optional          | The number of annotator-sample    |
 |                                   | pairs to be selected in one AL    |
 |                                   | cycle.                            |
 +-----------------------------------+-----------------------------------+
-| ``return_utilities``              | If ``True``, also return the      |
+| ``return_utilities``, optional    | If ``True``, also return the      |
 |                                   | utilities based on the query      |
 |                                   | strategy.                         |
 +-----------------------------------+-----------------------------------+
@@ -717,13 +718,13 @@ Returns:
 General advice
 ''''''''''''''
 
-Use ``self._validate_data function`` (is implemented in superclass).
+Use ``self._validate_data method`` (is implemented in superclass).
 Check the input ``X`` and ``y`` only once. Fit classifier if it is not
 yet fitted (may use ``fit_if_not_fitted`` form ``utils``). If the
 strategy combines a single annotator query strategy with a performance
 estimate:
 
--  define an aggregation function
+-  define an aggregation function,
 -  evaluate the performance for each sample-annotator pair,
 -  use the ``SingleAnnotatorWrapper``.
 
@@ -782,21 +783,21 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``classes``                       | Holds the label for each class.   |
+| ``classes``, optional             | Holds the label for each class.   |
 |                                   | If ``None``, the classes are      |
 |                                   | determined during the fit.        |
 +-----------------------------------+-----------------------------------+
-| ``missing_label``                 | Value to represent a missing      |
+| ``missing_label``, optional       | Value to represent a missing      |
 |                                   | label.                            |
 +-----------------------------------+-----------------------------------+
-| ``cost_matrix``                   | Cost matrix with                  |
+| ``cost_matrix``, optional         | Cost matrix with                  |
 |                                   | ``cost_matrix[i,j]`` indicating   |
 |                                   | cost of predicting class          |
 |                                   | ``classes[j]`` for a sample of    |
 |                                   | class ``classes[i]``. Can be only |
 |                                   | set, if classes is not ``None``.  |
 +-----------------------------------+-----------------------------------+
-| ``random_state``                  | Ensures reproducibility           |
+| ``random_state``, optional        | Ensures reproducibility           |
 |                                   | (cf. scikit-learn).               |
 +-----------------------------------+-----------------------------------+
 
@@ -824,7 +825,7 @@ Required Parameters:
 |                                   | labels provided by a specific     |
 |                                   | annotator.                        |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Contains the weights of the       |
+| ``sample_weight``, optional       | Contains the weights of the       |
 |                                   | training samples' class labels.   |
 |                                   | It must have the same shape as    |
 |                                   | ``y``.                            |
@@ -845,7 +846,7 @@ General advice
 
 Use ``self._validate_data`` method (is implemented in superclass) to
 check standard parameters of ``__init__`` and ``fit`` method. If the
-``classes`` parameter was provided, the classifier should be fitted with
+``classes`` parameter was provided, the classifier can be fitted with
 training sample of which each was assigned a ``missing_label``.
 In this case, the classifier should  make random predictions, i.e.,
 outputting uniform class-membership probabilities when calling
@@ -941,7 +942,7 @@ Required Parameters:
 | ``y``                             | Contains the true label of each   |
 |                                   | sample.                           |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Defines the importance of each    |
+| ``sample_weight``, optional       | Defines the importance of each    |
 |                                   | sample when computing the         |
 |                                   | accuracy of the classifier.       |
 +-----------------------------------+-----------------------------------+
@@ -1017,11 +1018,11 @@ Required Parameters:
 +-----------------------------------+-----------------------------------+
 | Parameter                         | Description                       |
 +===================================+===================================+
-| ``missing_label``                 | Value to represent a missing      |
-|                                   | label.                            |
-+-----------------------------------+-----------------------------------+
-| ``random_state``                  | Ensures reproducibility           |
+| ``random_state``, optional        | Ensures reproducibility           |
 |                                   | (cf. scikit-learn).               |
++-----------------------------------+-----------------------------------+
+| ``missing_label``, optional       | Value to represent a missing      |
+|                                   | label.                            |
 +-----------------------------------+-----------------------------------+
 
 .. _fit-2:
@@ -1047,7 +1048,7 @@ Required Parameters:
 |                                   | with columns containing the       |
 |                                   | different target types.           |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Contains the weights of the       |
+| ``sample_weight``, optional       | Contains the weights of the       |
 |                                   | training samples' targets.        |
 |                                   | It must have the same shape as    |
 |                                   | ``y``.                            |
@@ -1125,7 +1126,7 @@ Required Parameters:
 | ``y``                             | Contains the true target of each  |
 |                                   | sample.                           |
 +-----------------------------------+-----------------------------------+
-| ``sample_weight``                 | Defines the importance of each    |
+| ``sample_weight``, optional       | Defines the importance of each    |
 |                                   | sample when computing the         |
 |                                   | R2 score of the regressor.        |
 +-----------------------------------+-----------------------------------+
@@ -1175,7 +1176,7 @@ Annotator models are marked by implementing the interface
 performances of annotators for given samples. The class of an annotator model
 must implement the ``predict_annotator_perf`` method estimating the
 performances per sample of each annotator as proxies of the provided
-annotation's qualities.
+annotations' qualities.
 
 .. _predict-annotator-perf-1:
 
@@ -1237,8 +1238,10 @@ The ``.json`` file supports the following entries:
 |                  | Uncertainty Sampling, or Others.                         |
 +------------------+----------------------------------------------------------+
 | ``template``     | Defines the general setup/setting of the example.        |
-|                  | Supported templates are ``examples/template_pool.py``    |
-|                  | and ``examples/template_pool_regression.py``.            |
+|                  | Supported templates are ``examples/template_pool.py``,   |
+|                  |  ``examples/template_pool_regression.py``,               |
+|                  | ``examples/template_stream.py``, and                     |
+|                  | ``examples/template_pool_batch.py``                      |
 +------------------+----------------------------------------------------------+
 | ``tags``         | Defines search categories. Supported tags are ``pool``,  |
 |                  | ``stream``, ``single-annotator``, ``multi-annotator``,   |
@@ -1273,7 +1276,9 @@ The ``.json`` file supports the following entries:
 +------------------+----------------------------------------------------------+
 | ``init_clf``     | Python code to initialize the classifier object, e.g.,   |
 |                  | "ParzenWindowClassifier(classes=[0, 1])". Only supported |
-|                  | for ``examples/template_pool.py``                        |
+|                  | for ``examples/template_pool.py``,                       |
+|                  | ``examples/template_pool_batch.py``, and                 |
+|                  | ``examples/template_stream.py``.                         |
 +------------------+----------------------------------------------------------+
 | ``init_reg``     | Python code to initialize the regressor object, e.g.,    |
 |                  | "NICKernelRegressor()". Only supported for               |
