@@ -171,7 +171,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 f"{len(utility_weight)} != {len(X)}."
             )
 
-
         # Validate method.
         if not isinstance(self.method, str):
             raise TypeError(

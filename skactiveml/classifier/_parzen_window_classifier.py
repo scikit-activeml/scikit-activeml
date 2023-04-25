@@ -235,13 +235,13 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         N, variance, n_features, delta=(np.sqrt(2) * 1e-6)
     ):
         denominator = 2 * N * np.sum(variance)
-        numerator = (N - 1) * np.log((N - 1) / delta ** 2)
+        numerator = (N - 1) * np.log((N - 1) / delta**2)
         if denominator <= 0:
-            gamma = 1/n_features
+            gamma = 1 / n_features
             warnings.warn(
                 "The variance of the provided data is 0. Bandwidth of "
                 + f"1/n_features={gamma} is used instead."
-                )
+            )
         else:
             gamma = 0.5 * numerator / denominator
         return gamma

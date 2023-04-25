@@ -17,8 +17,8 @@ Welcome to scikit-activeml's documentation!
    :end-before: intro_end
 
 .. include:: ../README.rst
-   :start-after: install_start
-   :end-before: install_end
+   :start-after: user_installation_start
+   :end-before: user_installation_end
 
 .. include:: ../README.rst
    :start-after: examples_start
@@ -29,6 +29,10 @@ You can find more examples under :doc:`Examples </generated/sphinx_gallery_examp
 .. include:: ../README.rst
    :start-after: dev_start
    :end-before: dev_end
+
+.. include:: ../README.rst
+   :start-after: citing_start
+   :end-before: citing_end
 
 
 Indices and tables

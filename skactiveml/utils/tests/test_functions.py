@@ -45,13 +45,19 @@ class TestFunctions(unittest.TestCase):
         result = call_func(test_func_2, kwarg1=1, arg2=2, arg3=3)
         self.assertEqual(result, 6)
 
-        result = call_func(test_func_1, only_mandatory=True, arg1=1, arg2=2, arg3=3)
+        result = call_func(
+            test_func_1, only_mandatory=True, arg1=1, arg2=2, arg3=3
+        )
         self.assertEqual(result, 1)
 
-        result = call_func(test_func_2, only_mandatory=True, kwarg1=1, arg2=2, arg3=3)
+        result = call_func(
+            test_func_2, only_mandatory=True, kwarg1=1, arg2=2, arg3=3
+        )
         self.assertEqual(result, 0)
 
-        result = call_func(test_func_2, ignore_var_keyword=True, kwarg1=1, arg2=2, arg3=3)
+        result = call_func(
+            test_func_2, ignore_var_keyword=True, kwarg1=1, arg2=2, arg3=3
+        )
         self.assertEqual(result, 1)
 
     def test__available_if(self):

@@ -5,7 +5,7 @@ from operator import attrgetter
 
 def call_func(
     f_callable, only_mandatory=False, ignore_var_keyword=False, **kwargs
-    ):
+):
     """Calls a function with the given parameters given in kwargs if they
     exist as parameters in f_callable.
 

@@ -1,0 +1,36 @@
+[
+  {
+    "class" : "StreamRandomSampling",
+    "package" : "stream",
+    "method" : "StreamRandomSampling Sampling",
+    "category" : "Random Sampling",
+    "template" : "examples/template_stream.py",
+    "tags" : ["stream",  "classification", "single-annotator"],
+    "title" : "Sampling with StreamRandomSampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.stream import StreamRandomSampling",
+    "init_qs" : "StreamRandomSampling(budget=0.2)",
+    "query_params" : "candidates=X_cand",
+    "update_params" : "candidates=X_cand, queried_indices=sampled_indices",
+    "plot_possible_queries": "X=X_train, y=y_train"
+  },
+  {
+    "class" : "PeriodicSampling",
+    "package" : "stream",
+    "method" : "PeriodicSampling Sampling",
+    "category" : "Random Sampling",
+    "template" : "examples/template_stream.py",
+    "tags" : ["stream",  "classification", "single-annotator"],
+    "title" : "Sampling with PeriodicSampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.stream import PeriodicSampling",
+    "init_qs" : "PeriodicSampling(budget=0.2)",
+    "query_params" : "candidates=X_cand",
+    "update_params" : "candidates=X_cand, queried_indices=sampled_indices",
+    "plot_possible_queries": "X=X_train, y=y_train"
+  }
+]

@@ -232,6 +232,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         else:
             return self.estimator_.sample(X, n_samples)
 
+    def __sklearn_is_fitted__(self):
+        return hasattr(self, "_label_mean")
+
     def __getattr__(self, item):
         if "estimator_" in self.__dict__:
             return getattr(self.estimator_, item)

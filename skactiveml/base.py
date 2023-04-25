@@ -838,7 +838,7 @@ class BudgetManager(ABC, BaseEstimator):
 
 class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     """Base class for all stream-based active learning query strategies in
-       scikit-activeml.
+    scikit-activeml.
 
     Parameters
     ----------
@@ -860,11 +860,9 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         The query startegy determines the most useful instances in candidates,
         which can be acquired within the budgeting constraint specified by the
         budgetmanager.
-        Please note that, when the decisions from this function
-        may differ from the final sampling, simulate=True can set, so that the
-        query strategy can be updated later with update(...) with the final
-        sampling. This is especially helpful, when developing wrapper query
-        strategies.
+        Please note that, this method does not alter the internal state of the
+        query strategy. To adapt the query strategy to the selected candidates,
+        use update(...) with the selected candidates.
 
         Parameters
         ----------

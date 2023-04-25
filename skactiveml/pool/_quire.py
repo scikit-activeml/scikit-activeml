@@ -195,7 +195,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         for i, s in enumerate(mapping):
             mask_u = mask_a.copy()
             mask_u[s] = False
-            L_uu_inv = _del_i_inv(L_aa_inv, i, 'L_aa_inv')
+            L_uu_inv = _del_i_inv(L_aa_inv, i, "L_aa_inv")
 
             utilities_cand[s] = L[s, s] + np.max(
                 [
@@ -233,13 +233,15 @@ def _one_versus_rest_transform(y, classes, l_one=1, l_rest=-1):
     return y_ovr.T
 
 
-def _del_i_inv(A_inv, s, name='A'):
+def _del_i_inv(A_inv, s, name="A"):
     if not np.allclose(A_inv, A_inv.T):
-        err = (np.abs(A_inv - A_inv.T))
-        warnings.warn(f'The approximation of the inverse of matrix `{name}` '
-                      f'may be inaccurate because the matrix is not symmetric '
-                      f'with an absolut error of \n{err}.\n To avoid this '
-                      f'warning you can increase `lmbda`.')
+        err = np.abs(A_inv - A_inv.T)
+        warnings.warn(
+            f"The approximation of the inverse of matrix `{name}` "
+            f"may be inaccurate because the matrix is not symmetric "
+            f"with an absolut error of \n{err}.\n To avoid this "
+            f"warning you can increase `lmbda`."
+        )
 
     a = A_inv[s, s]
     b = np.delete(A_inv[:, [s]], s, axis=0)
