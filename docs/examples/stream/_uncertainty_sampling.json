@@ -11,7 +11,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : "from skactiveml.stream import FixedUncertainty",
-    "init_qs" : "FixedUncertainty()",
+    "init_qs" : "FixedUncertainty(budget=0.2)",
     "query_params" : "candidates=X_cand, clf=clf",
     "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   },
@@ -27,7 +27,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : "from skactiveml.stream import VariableUncertainty",
-    "init_qs" : "VariableUncertainty()",
+    "init_qs" : "VariableUncertainty(budget=0.2)",
     "query_params" : "candidates=X_cand, clf=clf",
     "update_params" : "candidates=X_cand, queried_indices=sampled_indices"
   },
