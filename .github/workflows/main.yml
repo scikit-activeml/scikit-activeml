@@ -48,7 +48,13 @@ jobs:
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
-
+    - name: 'Upload Artifact'
+      uses: actions/upload-artifact@v3
+      with:
+        name: docs
+        path: docs
+        retention-days: 5
+      
   trigger_scikit-activeml-docs:
     runs-on: ubuntu-latest
     steps:
