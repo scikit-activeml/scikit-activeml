@@ -94,4 +94,4 @@ for c in range(n_cycles):
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)
 
 # %%
-# .. image:: ../../examples/pool/regression_legend.png
+# .. image:: ../../examples/pool_regression_legend.png

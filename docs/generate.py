@@ -722,6 +722,7 @@ def export_legend(handles, labels, ax, path="legend.pdf", expand=None):
     bbox = bbox.from_extents(*(bbox.extents + np.array(expand)))
     bbox = bbox.transformed(fig.dpi_scale_trans.inverted())
     fig.savefig(os.path.abspath(path), dpi="figure", bbox_inches=bbox)
+    plt.close(fig)
 
 
 def generate_stream_classification_legend(path):
