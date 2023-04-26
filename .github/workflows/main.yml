@@ -48,6 +48,10 @@ jobs:
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
+      with:
+        name: docs_artifacts
+        path: docs
+        retention-days: 5
 
   trigger_scikit-activeml-docs:
     runs-on: ubuntu-latest
