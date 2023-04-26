@@ -176,10 +176,10 @@ of the query strategies implemented by ``skactiveml``.
 
 |Overview| |Visualization|
 
-.. |Overview| image:: https://github.com/scikit-activeml/scikit-activeml/blob/master/docs/logos/strategy-overview.gif
+.. |Overview| image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/strategy-overview.gif
    :width: 400
    
-.. |Visualization| image:: https://github.com/scikit-activeml/scikit-activeml/blob/master/docs/logos/example-overview.gif
+.. |Visualization| image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/example-overview.gif
    :width: 400
 
 .. examples_end
