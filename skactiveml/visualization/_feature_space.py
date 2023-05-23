@@ -185,7 +185,7 @@ def plot_decision_boundary(
         The resolution of the plot.
     boundary_dict: dict, optional (default=None)
         Additional parameters for the boundary contour.
-    confidence: scalar | None, optional (default=0.5)
+    confidence: scalar | None, optional (default=0.75)
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
         stands for the ratio best class / second best class.
