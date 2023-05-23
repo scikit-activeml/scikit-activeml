@@ -2,11 +2,11 @@
   {
     "class" : "StreamProbabilisticAL",
     "package" : "stream",
-    "method" : "StreamProbabilisticAL Sampling",
+    "method" : "Probabilistic Active Learning in Datastreams",
     "category" : "Probalistic Sampling",
     "template" : "examples/template_stream.py",
     "tags" : ["stream",  "classification", "single-annotator"],
-    "title" : "Sampling with StreamProbabilisticAL",
+    "title" : "Probabilistic Active Learning in Datastreams",
     "refs" : ["kottke2015probalistic"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
