@@ -22,15 +22,22 @@ from docs.generate import (
     generate_strategy_overview_rst,
     generate_api_reference_rst,
     generate_examples,
-    generate_tutorials, generate_classification_legend,
-    generate_regression_legend,
+    generate_tutorials,
 )
 
 # -- Project information -----------------------------------------------------
 
 project = "scikit-activeml"
 copyright = "2020"
-author = "Daniel Kottke, Marek Herde, Pham Minh Tuan, Pascal Mergard, Christoph Sandrock"
+author = "Daniel Kottke, " \
+         "Marek Herde, " \
+         "Pham Minh Tuan, " \
+         "Pascal Mergard, " \
+         "Christoph Sandrock, " \
+         "Alexander Benz, " \
+         "Lukas Lührs, " \
+         "Mehmet Mjüde, " \
+         "Atal Roghman"
 
 # The short X.Y version
 version = skactiveml.__version__
@@ -229,14 +236,6 @@ autoclass_content = "class"
 # os.environ["FULLEXAMPLES"] = "True"
 
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
-
-generate_classification_legend(
-    os.path.abspath("generated\\examples\\pool\\classification_legend.png")
-)
-
-generate_regression_legend(
-    os.path.abspath("generated\\examples\\pool\\regression_legend.png")
-)
 
 json_data = generate_examples(
     gen_path=os.path.abspath("generated/examples"),

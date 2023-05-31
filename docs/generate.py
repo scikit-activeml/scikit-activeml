@@ -722,6 +722,26 @@ def export_legend(handles, labels, ax, path="legend.pdf", expand=None):
     bbox = bbox.from_extents(*(bbox.extents + np.array(expand)))
     bbox = bbox.transformed(fig.dpi_scale_trans.inverted())
     fig.savefig(os.path.abspath(path), dpi="figure", bbox_inches=bbox)
+    plt.close(fig)
+
+
+def generate_stream_classification_legend(path):
+    handles = []
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4), tight_layout=True)
+    labels = []
+
+    labels.append("Sample Of Class 0")
+    handles.append(ax.plot([], [], color="blue")[0])
+    labels.append("Sample Of Class 1")
+    handles.append(ax.plot([], [], color="red")[0])
+    labels.append("Unlabled Sample")
+    handles.append(ax.plot([], [], color="grey")[0])
+    labels.append("Current Sample")
+    handles.append(ax.plot([], [], color="grey", linewidth=3)[0])
+    labels.append("Decision Boundary")
+    handles.append(ax.plot([], [], color="black")[0])
+
+    export_legend(handles, labels, ax, path=path)
 
 
 def generate_classification_legend(path):

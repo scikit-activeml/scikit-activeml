@@ -138,6 +138,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
+        confidence = 1 - utilities
 
         # intialize return parameters
         queried_indices = []
@@ -150,7 +151,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         # keep the internal state to reset it later if simulate is true
         tmp_u_t = self.u_t_
 
-        samples = np.array(utilities) <= theta
+        samples = np.array(confidence) <= theta
         # check for each sample separately if budget is left and the utility is
         # high enough
         for i, d in enumerate(samples):
@@ -276,6 +277,7 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
+        confidence = 1 - utilities
 
         # intialize return parameters
         queried_indices = []
@@ -284,8 +286,8 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
         tmp_u_t = self.u_t_
         tmp_theta = self.theta_
 
-        # get utilities
-        for i, u in enumerate(utilities):
+        # get confidence
+        for i, u in enumerate(confidence):
             budget_left.append(self.budget_ > tmp_u_t / self.w)
 
             if not budget_left[-1]:
@@ -446,6 +448,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
+        confidence = 1 - utilities
 
         # intialize return parameters
         queried_indices = []
@@ -456,8 +459,8 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         prior_random_state = self.random_state_.get_state()
 
-        # get utilities
-        for i, u in enumerate(utilities):
+        # get confidence
+        for i, u in enumerate(confidence):
             budget_left.append(self.budget_ > tmp_u_t / self.w)
 
             if not budget_left[-1]:
@@ -633,6 +636,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
+        confidence = 1 - utilities
 
         # intialise return parameters
         queried_indices = []
@@ -644,7 +648,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
         # check for each queried separately if budget is left and the utility
         # is high enough
-        for i, u in enumerate(utilities):
+        for i, u in enumerate(confidence):
             budget_left.append(tmp_u_t / self.w < self.budget_)
             if not budget_left[-1]:
                 sample = False
@@ -812,6 +816,7 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
             queried, with 0 <= n_queried_instances <= n_samples.
         """
         utilities = self._validate_data(utilities)
+        confidence = 1 - utilities
 
         # intialize return parameters
         queried_indices = []
@@ -822,7 +827,7 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
         prior_random_state = self.random_state_.get_state()
 
         samples = (
-            self.random_state_.random_sample(len(utilities)) <= self.budget_
+            self.random_state_.random_sample(len(confidence)) <= self.budget_
         )
         # check for each sample separately if budget is left and the utility is
         # high enough

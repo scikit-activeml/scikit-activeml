@@ -7,6 +7,9 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVC
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import Pipeline
+from sklearn.utils.validation import check_is_fitted
 
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.regressor._wrapper import (
@@ -147,6 +150,27 @@ class TestWrapper(unittest.TestCase):
         self.assertTrue(
             np.any(np.not_equal(reg_1.predict(X), reg_2.predict(X)))
         )
+
+    def test_pipeline(self):
+        X = np.linspace(-3, 3, 100)
+        y_true = X**2
+        X = X.reshape(-1, 1)
+        pipline = Pipeline(
+            (
+                ("scaler", PolynomialFeatures(degree=2)),
+                ("lr", LinearRegression()),
+            )
+        )
+        reg = SklearnRegressor(pipline, missing_label=np.nan, random_state=0)
+        reg = reg.fit(X, y_true)
+        check_is_fitted(reg)
+        self.assertRaises(NotFittedError, check_is_fitted, pipline)
+        self.assertGreaterEqual(reg.score(X, y_true), 0.9)
+        y_missing = np.full_like(y_true, np.nan)
+        reg.fit(X, y_missing)
+        check_is_fitted(reg)
+        y_pred = reg.predict(X)
+        np.testing.assert_array_equal(np.zeros_like(y_pred), y_pred)
 
 
 class TestSklearnProbabilisticRegressor(unittest.TestCase):

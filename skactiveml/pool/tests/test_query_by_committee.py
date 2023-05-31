@@ -68,18 +68,21 @@ class TestQueryByCommittee(
     def test_query_param_ensemble(self, test_cases=None):
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
-            ("pwc2", ParzenWindowClassifier())
+            ("pwc2", ParzenWindowClassifier()),
         ]
         vote = SklearnClassifier(
             VotingClassifier(estimators=estimators, voting="soft"),
-            classes=[0, 1])
+            classes=[0, 1],
+        )
         test_cases = [(vote, None)]
         self._test_param(
             "query",
             "ensemble",
             test_cases,
-            replace_query_params={"fit_ensemble": True,
-                                  "y": np.full(4, np.nan)}
+            replace_query_params={
+                "fit_ensemble": True,
+                "y": np.full(4, np.nan),
+            },
         )
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -115,9 +118,8 @@ class TestQueryByCommittee(
             "query",
             "ensemble",
             test_cases,
-            replace_query_params={"fit_ensemble": False}
+            replace_query_params={"fit_ensemble": False},
         )
-
 
     def test_query_param_y(self, test_cases=None):
         y = self.query_default_params_clf["y"]
@@ -158,15 +160,24 @@ class TestQueryByCommittee(
 
     def test_query(self):
         voting_classifiers = [
-            ("gp1", SklearnClassifier(
-                classes=self.classes, estimator=GaussianProcessClassifier()
-            )),
-            ("gp2", SklearnClassifier(
-                classes=self.classes, estimator=GaussianProcessClassifier()
-            )),
-            ("gp3", SklearnClassifier(
-                classes=self.classes, estimator=GaussianProcessClassifier()
-            )),
+            (
+                "gp1",
+                SklearnClassifier(
+                    classes=self.classes, estimator=GaussianProcessClassifier()
+                ),
+            ),
+            (
+                "gp2",
+                SklearnClassifier(
+                    classes=self.classes, estimator=GaussianProcessClassifier()
+                ),
+            ),
+            (
+                "gp3",
+                SklearnClassifier(
+                    classes=self.classes, estimator=GaussianProcessClassifier()
+                ),
+            ),
         ]
         ensemble_classifiers = [member[1] for member in voting_classifiers]
         gpc = ParzenWindowClassifier(classes=self.classes)

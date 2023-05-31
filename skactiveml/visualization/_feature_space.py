@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import lines, pyplot as plt
 from matplotlib.axes import Axes
 from sklearn.base import ClassifierMixin
 from sklearn.neighbors import KNeighborsRegressor
@@ -185,7 +185,7 @@ def plot_decision_boundary(
         The resolution of the plot.
     boundary_dict: dict, optional (default=None)
         Additional parameters for the boundary contour.
-    confidence: scalar | None, optional (default=0.5)
+    confidence: scalar | None, optional (default=0.75)
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
         stands for the ratio best class / second best class.
@@ -308,7 +308,8 @@ def plot_contour_for_samples(
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
     ax : matplotlib.axes.Axes, optional (default=None)
-        The axis on which the utility is plotted.
+        The axis on which the utility is plotted.  If no axis is given, the
+        current axis (`plt.gca()`) will be used instead.
     res : int, optional (default=21)
         The resolution of the plot.
     contour_dict : dict, optional (default=None)
@@ -343,6 +344,168 @@ def plot_contour_for_samples(
     scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
     ax.contourf(X_mesh, Y_mesh, scores, **contour_args)
     return ax
+
+
+def plot_stream_training_data(
+    ax,
+    X,
+    y,
+    queried_indices,
+    classes,
+    feature_bound,
+    unlabeled_color="grey",
+    cmap="coolwarm",
+    alpha=0.2,
+    linewidth=3,
+    plot_cand_highlight=True,
+):
+    """Plot the utility for the given query strategy.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axis on which the utility is plotted. Only if y.ndim = 1 (single
+        annotator).
+    X : array-like of shape (n_samples, 1)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples, )
+        Labels of the training data set (possibly including unlabeled ones
+        indicated by self.MISSING_LABEL).
+    queried_indices : array-like of shape (n_samples,)
+        Indicates which instances from candidates have been queried.
+    classes : array-like of shape (n_classes)
+        Holds the label for each class.
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
+        Determines the area in which the boundary is plotted. If candidates is
+        not given, bound must not be None. Otherwise, the bound is determined
+        based on the data.
+    unlabeled_color: str | matplotlib.colors.Colormap, optional
+    (default='grey')
+        The color for the unlabled samples.
+    cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
+        The colormap for the confidence levels.
+    alpha: scalar
+        Set the alpha value used for blending - not supported on all backends.
+    linewidth: float
+        Set the line width in points.
+    plot_cand_highlight: bool
+        The indicator to higlight the current candidate.
+
+    Returns
+    -------
+     axes : array-like of shape (n_annotators_to_plot,)
+         The axes on which the utilities were plotted.
+    """
+    column_or_1d(X)
+    check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    check_consistent_length(X, y)
+    check_array(queried_indices, ensure_2d=False)
+    check_array(classes, ensure_2d=False)
+    check_type(unlabeled_color, "unlabeled_color", str)
+    check_type(plot_cand_highlight, "plot_cand_highlight", bool)
+    check_type(ax, "ax", Axes)
+
+    data_lines = []
+    cmap = _get_cmap(cmap)
+    norm = plt.Normalize(vmin=min(classes), vmax=max(classes))
+
+    highlight_color = (
+        cmap(norm(y[-1])) if queried_indices[-1] else unlabeled_color
+    )
+
+    if plot_cand_highlight:
+        data_lines.append(
+            lines.Line2D(
+                [0, feature_bound[0][1]],
+                [X[-1], X[-1]],
+                c=highlight_color,
+                alpha=alpha,
+                linewidth=linewidth * 2,
+            )
+        )
+
+    for t, (x_t, a, y_t) in enumerate(zip(X, queried_indices, y)):
+        line_color = cmap(norm(y_t)) if a else unlabeled_color
+        zorder = 3 if a else 2
+        alpha_tmp = alpha * 2 if a else alpha
+        data_lines.append(
+            lines.Line2D(
+                [t, len(X) - 1],
+                [x_t, x_t],
+                zorder=zorder,
+                color=line_color,
+                alpha=alpha_tmp,
+                linewidth=linewidth,
+            )
+        )
+    for d_line in data_lines:
+        ax.add_line(d_line)
+    return data_lines
+
+
+def plot_stream_decision_boundary(
+    ax,
+    t_x,
+    plot_step,
+    clf,
+    X,
+    pred_list,
+    color="k",
+    res=25,
+):
+    """Plot the decision boundary of the given classifier.
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes or List
+        The axis on which the decision boundary is plotted. If ax is a List,
+        each entry has to be an `matplotlib.axes.Axes`.
+    t_x: int
+        The position of the newest instance for the x axies.
+    plot_step: int
+        The interval in which the clf should predict new samples.
+    clf: Sklearn classifier
+        The fitted classifier whose decision boundary is plotted.
+    X : array-like of shape (n_samples, 1)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples.
+    pred_list: array-like of shape (n_samples, )
+        The list containing classifier prediction for the last steps.
+    color: str | matplotlib.colors.Colormap, optional (default='k')
+        The color for the decision boundary.
+    res : int, optional (default=25)
+        The resolution of the plot.
+
+    Returns
+    -------
+    ax: matplotlib.axes.Axes or List
+        The axis on which the boundary was plotted or the list of axis if ax
+        was a list.
+    pred_list: array-like of shape (n_samples, )
+        The list containing classifier prediction for the last steps.
+    """
+    X = column_or_1d(X)
+    check_array(pred_list, ensure_2d=False, ensure_min_samples=0)
+    check_scalar(t_x, "t_x", int, min_val=0)
+    check_scalar(plot_step, "plot_step", int, min_val=1)
+    check_type(ax, "ax", Axes)
+    check_type(clf, "clf", ClassifierMixin)
+    x_vec = np.linspace(np.min(X), np.max(X), res)
+    t_vec = np.arange(1, t_x // plot_step + 1) * plot_step
+    t_mesh, x_mesh = np.meshgrid(t_vec, x_vec)
+    predictions = np.array([clf.predict(x_vec.reshape([-1, 1]))])
+    pred_list.extend(predictions)
+
+    if len(pred_list) > 2 and np.sum(pred_list) > 0:
+        ax.contour(
+            t_mesh,
+            x_mesh,
+            np.array(pred_list[1:]).T,
+            levels=[0.5],
+            colors=color,
+        )
+    return ax, pred_list
 
 
 def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):

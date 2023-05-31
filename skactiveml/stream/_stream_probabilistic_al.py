@@ -167,10 +167,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
             return_utilities=return_utilities,
         )
         if self.metric is not None:
-            if (
-                self.metric_dict is None
-                and self.metric == "rbf"
-            ):
+            if self.metric_dict is None and self.metric == "rbf":
                 self.metric_dict = {"gamma": "mean"}
             pwc = ParzenWindowClassifier(
                 metric=self.metric,
