@@ -185,7 +185,7 @@ def plot_decision_boundary(
         The resolution of the plot.
     boundary_dict: dict, optional (default=None)
         Additional parameters for the boundary contour.
-    confidence: scalar | None, optional (default=0.5)
+    confidence: scalar | None, optional (default=0.75)
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
         stands for the ratio best class / second best class.
@@ -308,7 +308,8 @@ def plot_contour_for_samples(
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
     ax : matplotlib.axes.Axes, optional (default=None)
-        The axis on which the utility is plotted.
+        The axis on which the utility is plotted.  If no axis is given, the
+        current axis (`plt.gca()`) will be used instead.
     res : int, optional (default=21)
         The resolution of the plot.
     contour_dict : dict, optional (default=None)
