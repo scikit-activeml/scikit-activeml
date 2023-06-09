@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.base import clone
 from sklearn.utils import check_array, check_consistent_length
+from copy import deepcopy
 
 from .budgetmanager import (
     FixedUncertaintyBudgetManager,
@@ -165,6 +166,8 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         """
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
+            self._validate_random_state()
+            random_seed = deepcopy(self.random_state_).randint(2**31-1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -175,6 +178,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
+                {"random_state": random_seed},
             )
 
         budget_manager_param_dict = (
@@ -262,6 +266,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
 
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
+            random_seed = deepcopy(self.random_state_).randint(2**31-1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -272,6 +277,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
+                {"random_state": random_seed},
             )
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
