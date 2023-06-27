@@ -222,6 +222,9 @@ def average_kl_divergence(probas):
         )
     n_estimators = probas.shape[0]
 
+    probas = probas + 1e-3
+    probas /= probas.sum(axis=2, keepdims=True)
+
     # Calculate the average KL divergence.
     probas_mean = np.mean(probas, axis=0)
     with np.errstate(divide="ignore", invalid="ignore"):

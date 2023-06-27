@@ -314,7 +314,7 @@ def _batch_multi_choices(probs_b_C, M, random_state):
 
     # samples: Ni... x draw_per_xx
     choices = [
-        random_state.choice(C, size=M, p=probs_B_C[b], replace=True)
+        random_state.choice(C, size=M, p=probs_B_C[b]/np.sum(probs_B_C[b]), replace=True)
         for b in range(B)
     ]
     choices = np.array(choices, dtype=int)
