@@ -114,4 +114,4 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
 ani = animation.ArtistAnimation(fig, artists, interval=500, blit=True)
 
 # %%
-# .. image:: ../../examples/stream/classification_legend.png
+# .. image:: ../../examples/stream_classification_legend.png

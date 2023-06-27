@@ -501,7 +501,7 @@ def check_random_state(random_state, seed_multiplier=None):
     random_state = copy.deepcopy(random_state)
     random_state = check_random_state_sklearn(random_state)
 
-    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
+    seed = (random_state.randint(1, 2 ** 31) * seed_multiplier) % (2 ** 31)
     return np.random.RandomState(seed)
 
 
@@ -776,11 +776,16 @@ def check_budget_manager(
     """Validate if budget manager is a budgetmanager class and create a
     copy 'budget_manager_'.
     """
+    uses_rand = (
+        "random_state" in signature(default_budget_manager_class).parameters
+    )
     if default_budget_manager_dict is None:
         default_budget_manager_dict = {}
+    elif not uses_rand:
+        default_budget_manager_dict.pop("random_state", None)
     if budget_manager is None:
         budget_manager_ = default_budget_manager_class(
-            budget=budget, **default_budget_manager_dict
+            budget=budget, **default_budget_manager_dict,
         )
     else:
         if budget is not None and budget != budget_manager.budget:
