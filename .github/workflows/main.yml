@@ -32,7 +32,7 @@ jobs:
     - name: Install latest dependencies
       run: |
         pip install --upgrade -r requirements.txt
-    - name: black
+    - name: Black
       steps:
         - uses: actions/checkout@v3
         - uses: psf/black@stable
