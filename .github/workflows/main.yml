@@ -33,12 +33,11 @@ jobs:
       run: |
         pip install --upgrade -r requirements.txt
     - name: Black
-      steps:
-        - uses: actions/checkout@v3
-        - uses: psf/black@stable
-            with:
-              options: "--check --verbose --line-length 79"
-              src: "./skactiveml"
+    - uses: actions/checkout@v3
+    - uses: psf/black@stable
+      with:
+        options: "--check --verbose --line-length 79"
+        src: "./skactiveml"
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
