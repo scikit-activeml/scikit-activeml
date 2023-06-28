@@ -33,8 +33,7 @@ jobs:
       run: |
         pip install --upgrade -r requirements.txt
     - name: Black
-    - uses: actions/checkout@v3
-    - uses: psf/black@stable
+      uses: psf/black@stable
       with:
         options: "--check --verbose --line-length 79"
         src: "./skactiveml"
