@@ -26,7 +26,7 @@ class TestBudgetManager(unittest.TestCase):
     def test_budget_managers(self):
         # Create data set for testing.
         rand = np.random.RandomState(0)
-        random_state = rand.randint(2**31 - 1)
+        random_state = rand.randint(2 ** 31 - 1)
         utilities = rand.rand(100)
 
         for bm_name, bm_class in self.budget_managers.items():
@@ -39,14 +39,12 @@ class TestBudgetManager(unittest.TestCase):
             bm2 = bm_class(**bm_kwargs)
             for t, u in enumerate(utilities):
                 queried_indices = call_func(
-                    bm.query_by_utility,
-                    utilities=u.reshape([1, -1]),
+                    bm.query_by_utility, utilities=u.reshape([1, -1]),
                 )
 
                 for i in range(3):
                     queried_indices2 = call_func(
-                        bm2.query_by_utility,
-                        utilities=u.reshape([1, -1]),
+                        bm2.query_by_utility, utilities=u.reshape([1, -1]),
                     )
                 self.assertEqual(len(queried_indices), len(queried_indices2))
                 call_func(

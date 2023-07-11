@@ -99,10 +99,7 @@ class IndexClassifierWrapper:
         # Check X, y, sample_weight: will be done by base clf
         self.X = check_array(self.X, allow_nd="True")
         self.y = check_array(
-            self.y,
-            ensure_2d=False,
-            force_all_finite=False,
-            dtype=None,
+            self.y, ensure_2d=False, force_all_finite=False, dtype=None,
         )
         check_consistent_length(self.X, self.y)
 
@@ -1125,8 +1122,7 @@ def _conditional_expect(
                     ]
 
             expectation[idx] = cond_dist.expect(
-                quad_function_wrapper,
-                **quad_dict,
+                quad_function_wrapper, **quad_dict,
             )
 
     return expectation

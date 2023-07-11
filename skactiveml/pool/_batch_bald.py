@@ -288,9 +288,7 @@ class _ExactJointEntropy:
         probs_b_M_C = np.empty((b, M, C))
         for i in range(b):
             np.matmul(
-                self.joint_probs_M_K,
-                probs_b_K_C[i],
-                out=probs_b_M_C[i],
+                self.joint_probs_M_K, probs_b_K_C[i], out=probs_b_M_C[i],
             )
         probs_b_M_C /= K
 
@@ -378,9 +376,7 @@ class _SampledJointEntropy:
 
         b = log_probs_B_K_C.shape[0]
 
-        probs_b_M_C = np.empty(
-            (b, M, C),
-        )
+        probs_b_M_C = np.empty((b, M, C),)
         for i in range(b):
             np.matmul(
                 self.sampled_joint_probs_M_K,
@@ -419,7 +415,7 @@ class _DynamicJointEntropy:
         self.log_probs_max_N_K_C[self.N : self.N + add_N] = log_probs_N_K_C
         self.N += add_N
 
-        num_exact_samples = C**self.N
+        num_exact_samples = C ** self.N
         if num_exact_samples > self.M:
             self.inner = _SampledJointEntropy.sample(
                 np.exp(self.log_probs_max_N_K_C[: self.N]),

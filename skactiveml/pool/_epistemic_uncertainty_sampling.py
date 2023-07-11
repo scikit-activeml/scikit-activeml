@@ -340,7 +340,7 @@ def _pwc_ml_1(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta**p) * ((1 - theta) ** n)) / (
+    piH = ((theta ** p) * ((1 - theta) ** n)) / (
         ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
     )
     return -np.minimum(piH, 2 * theta - 1)
@@ -366,7 +366,7 @@ def _pwc_ml_0(theta, n, p):
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
-    piH = ((theta**p) * ((1 - theta) ** n)) / (
+    piH = ((theta ** p) * ((1 - theta) ** n)) / (
         ((p / (n + p)) ** p) * ((n / (n + p)) ** n)
     )
     return -np.minimum(piH, 1 - 2 * theta)

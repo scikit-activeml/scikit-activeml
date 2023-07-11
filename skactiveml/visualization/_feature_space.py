@@ -445,14 +445,7 @@ def plot_stream_training_data(
 
 
 def plot_stream_decision_boundary(
-    ax,
-    t_x,
-    plot_step,
-    clf,
-    X,
-    pred_list,
-    color="k",
-    res=25,
+    ax, t_x, plot_step, clf, X, pred_list, color="k", res=25,
 ):
     """Plot the decision boundary of the given classifier.
 

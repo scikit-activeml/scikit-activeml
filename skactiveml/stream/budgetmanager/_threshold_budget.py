@@ -1,9 +1,7 @@
 import numpy as np
 from copy import deepcopy
 
-from skactiveml.base import (
-    BudgetManager,
-)
+from skactiveml.base import BudgetManager
 
 from skactiveml.utils import check_scalar, check_random_state
 
@@ -47,12 +45,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
     """
 
     def __init__(
-        self,
-        budget=None,
-        theta=1.0,
-        s=0.01,
-        delta=1.0,
-        random_state=None,
+        self, budget=None, theta=1.0, s=0.01, delta=1.0, random_state=None,
     ):
         super().__init__(budget)
         self.theta = theta

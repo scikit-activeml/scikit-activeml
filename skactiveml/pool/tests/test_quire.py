@@ -23,11 +23,7 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.y_true = np.array([0, 0, 1, 1])
         self.y = np.array([0, MISSING_LABEL, 1, MISSING_LABEL])
         self.classes = np.array([0, 1])
-        self.kwargs = dict(
-            candidates=self.candidates,
-            X=self.X,
-            y=self.y,
-        )
+        self.kwargs = dict(candidates=self.candidates, X=self.X, y=self.y,)
         query_default_params_clf = {
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),

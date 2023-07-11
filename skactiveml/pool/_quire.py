@@ -64,12 +64,7 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         self.metric_dict = metric_dict
 
     def query(
-        self,
-        X,
-        y,
-        candidates=None,
-        batch_size=1,
-        return_utilities=False,
+        self, X, y, candidates=None, batch_size=1, return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 

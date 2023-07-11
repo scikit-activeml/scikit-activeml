@@ -190,9 +190,7 @@ class TestEpistemicUncertaintySampling(
 
     def test_epistemic_uncertainty_logreg(self):
         clf = SklearnClassifier(
-            LogisticRegression(),
-            classes=[0, 1, 2],
-            random_state=42,
+            LogisticRegression(), classes=[0, 1, 2], random_state=42,
         )
         self.assertRaises(
             ValueError,
@@ -204,9 +202,7 @@ class TestEpistemicUncertaintySampling(
         )
 
         clf = SklearnClassifier(
-            DecisionTreeClassifier(),
-            classes=[0, 1],
-            random_state=42,
+            DecisionTreeClassifier(), classes=[0, 1], random_state=42,
         )
         self.assertRaises(
             TypeError,
@@ -256,9 +252,7 @@ class TestEpistemicUncertaintySampling(
 
         # query - logistic regression
         clf = SklearnClassifier(
-            LogisticRegression(),
-            classes=self.classes,
-            random_state=42,
+            LogisticRegression(), classes=self.classes, random_state=42,
         )
 
         qs = EpistemicUncertaintySampling()

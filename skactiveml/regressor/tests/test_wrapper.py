@@ -89,8 +89,7 @@ class TestWrapper(unittest.TestCase):
 
     def test_predict(self):
         reg = SklearnRegressor(
-            estimator=ARDRegression(),
-            random_state=self.random_state,
+            estimator=ARDRegression(), random_state=self.random_state,
         )
 
         X = np.arange(3 * 2).reshape(3, 2)
@@ -104,8 +103,7 @@ class TestWrapper(unittest.TestCase):
 
     def test_getattr(self):
         reg = SklearnRegressor(
-            estimator=LinearRegression(),
-            random_state=self.random_state,
+            estimator=LinearRegression(), random_state=self.random_state,
         )
         self.assertTrue(hasattr(reg, "positive"))
         reg.fit(self.X, self.y)
@@ -153,7 +151,7 @@ class TestWrapper(unittest.TestCase):
 
     def test_pipeline(self):
         X = np.linspace(-3, 3, 100)
-        y_true = X**2
+        y_true = X ** 2
         X = X.reshape(-1, 1)
         pipline = Pipeline(
             (

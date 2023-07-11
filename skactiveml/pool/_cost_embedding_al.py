@@ -452,7 +452,7 @@ def _smacof_single_p(
             disparities[sim_flat != 0] = disparities_flat
             disparities = disparities.reshape((n_samples, n_samples))
             disparities *= np.sqrt(
-                (n_samples * (n_samples - 1) / 2) / (disparities**2).sum()
+                (n_samples * (n_samples - 1) / 2) / (disparities ** 2).sum()
             )
             disparities[similarities == 0] = 0
 
@@ -470,7 +470,7 @@ def _smacof_single_p(
 
         X = np.dot(Vp, np.dot(_B, X))
 
-        dis = np.sqrt((X**2).sum(axis=1)).sum()
+        dis = np.sqrt((X ** 2).sum(axis=1)).sum()
 
         if verbose >= 2:
             print("it: %d, stress %s" % (it, _stress))

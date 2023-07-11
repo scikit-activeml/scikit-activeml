@@ -153,7 +153,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             )
             _, new_model_std = reg_new.predict(X_eval, return_std=True)
 
-            return np.average(new_model_std**2)
+            return np.average(new_model_std ** 2)
 
         ex_model_variance = _conditional_expect(
             X_cand,

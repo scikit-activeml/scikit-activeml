@@ -657,8 +657,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         _ = is_labeled(y, missing_label=self.missing_label)
 
         check_equal_missing_label(
-            self.missing_label,
-            self.estimator.missing_label,
+            self.missing_label, self.estimator.missing_label,
         )
         # if self.classes=None or self.estimator.classes=None then no checks
         # are done if general test is removed it should be checked again

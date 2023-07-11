@@ -208,7 +208,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31-1)
+            random_seed = deepcopy(self.random_state_).randint(2 ** 31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -221,7 +221,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self._get_default_budget_manager(),
                 {"random_state": random_seed},
             )
-
 
         if not hasattr(self, "window_"):
             self.window_ = deque(maxlen=self.window_size)
@@ -360,7 +359,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31-1)
+            random_seed = deepcopy(self.random_state_).randint(2 ** 31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -696,7 +695,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31-1)
+            random_seed = deepcopy(self.random_state_).randint(2 ** 31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -894,7 +893,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31-1)
+            random_seed = deepcopy(self.random_state_).randint(2 ** 31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",

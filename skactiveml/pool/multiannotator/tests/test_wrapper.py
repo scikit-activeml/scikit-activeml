@@ -272,13 +272,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             self.y,
             candidates=self.X_cand,
             annotators=self.A_cand,
-            A_perf=np.array(
-                [
-                    [
-                        0,
-                    ],
-                ]
-            ),
+            A_perf=np.array([[0,],]),
         )
 
     def test_query_one_annotator_per_sample_batch_size_one(self):

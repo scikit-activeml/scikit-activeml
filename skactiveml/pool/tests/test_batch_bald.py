@@ -254,10 +254,7 @@ class Testbatch_bald(unittest.TestCase):
         )
 
     def _test_param(
-        self,
-        test_func,
-        test_param,
-        test_cases,
+        self, test_func, test_param, test_cases,
     ):
         for i, (test_val, err) in enumerate(test_cases):
             with self.subTest(msg="Param", id=i, val=test_val):
