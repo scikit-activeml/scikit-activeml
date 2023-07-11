@@ -578,7 +578,10 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
                 True,
                 candidates,
                 None,
-                np.full(shape=(1, len(candidates)), fill_value=0,),
+                np.full(
+                    shape=(1, len(candidates)),
+                    fill_value=0,
+                ),
             ],
             [
                 "misclassification_loss",

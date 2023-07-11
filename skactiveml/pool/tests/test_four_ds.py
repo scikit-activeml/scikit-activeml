@@ -69,7 +69,8 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         )
         al4ds = FourDs(**init_params)
         query_indices, utilities = al4ds.query(
-            **query_params, return_utilities=True,
+            **query_params,
+            return_utilities=True,
         )
         self.assertEqual(0, np.sum(utilities[:, is_unlbld] < 0))
         self.assertEqual(0, np.sum(utilities[:, is_unlbld] > 1))
@@ -78,7 +79,8 @@ class TestFourDs(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         query_params["batch_size"] = 10
         al4ds = FourDs(**init_params)
         query_indices, utilities = al4ds.query(
-            **query_params, return_utilities=True,
+            **query_params,
+            return_utilities=True,
         )
         self.assertEqual(0, np.sum(utilities < 0))
         self.assertEqual(0, np.sum(utilities > 1))

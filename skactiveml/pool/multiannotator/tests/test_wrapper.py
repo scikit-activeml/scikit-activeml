@@ -123,7 +123,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_query_params_dict(self):
-
         uncertainty = UncertaintySampling(method="entropy")
         wrapper = SingleAnnotatorWrapper(
             uncertainty, random_state=self.random_state
@@ -272,7 +271,13 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             self.y,
             candidates=self.X_cand,
             annotators=self.A_cand,
-            A_perf=np.array([[0,],]),
+            A_perf=np.array(
+                [
+                    [
+                        0,
+                    ],
+                ]
+            ),
         )
 
     def test_query_one_annotator_per_sample_batch_size_one(self):
@@ -580,7 +585,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_indexed_annotator_sample_candidates(self):
-
         random = RandomSampling(self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state

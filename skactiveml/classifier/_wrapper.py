@@ -529,7 +529,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             )
 
     def _add_samples(self, fit_func, X, y, sample_weight=None):
-
         if not hasattr(self, "X_train_"):
             self.X_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "y_train_"):
@@ -558,7 +557,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.sample_weight_train_ = None
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
-
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(
             self.estimator, "predict_proba"
@@ -657,7 +655,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         _ = is_labeled(y, missing_label=self.missing_label)
 
         check_equal_missing_label(
-            self.missing_label, self.estimator.missing_label,
+            self.missing_label,
+            self.estimator.missing_label,
         )
         # if self.classes=None or self.estimator.classes=None then no checks
         # are done if general test is removed it should be checked again

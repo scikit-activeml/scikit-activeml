@@ -18,7 +18,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 
 
 class TestExpectedModelOutputChange(
-    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase,
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    unittest.TestCase,
 ):
     def setUp(self):
         query_default_params_reg = {

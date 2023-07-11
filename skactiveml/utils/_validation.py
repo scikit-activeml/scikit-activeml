@@ -501,7 +501,7 @@ def check_random_state(random_state, seed_multiplier=None):
     random_state = copy.deepcopy(random_state)
     random_state = check_random_state_sklearn(random_state)
 
-    seed = (random_state.randint(1, 2 ** 31) * seed_multiplier) % (2 ** 31)
+    seed = (random_state.randint(1, 2**31) * seed_multiplier) % (2**31)
     return np.random.RandomState(seed)
 
 
@@ -567,7 +567,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
                 f"{indices.shape[0]}, but must be {len(dim)}"
             )
         indices = tuple(indices.T)
-        for (i, n) in enumerate(indices):
+        for i, n in enumerate(indices):
             if np.any(indices[i] >= A.shape[dim[i]]):
                 raise ValueError(
                     f"`indices[{i}]` contains index of value "
@@ -622,7 +622,6 @@ def check_type(
     wrong_index = all(not i_func(obj) for i_func in indicator_funcs)
 
     if wrong_type and wrong_value and wrong_index:
-
         error_str = f"`{name}` "
         if len(target_types) == 0 and len(target_vals) == 0:
             error_str += f" must"
@@ -785,7 +784,8 @@ def check_budget_manager(
         default_budget_manager_dict.pop("random_state", None)
     if budget_manager is None:
         budget_manager_ = default_budget_manager_class(
-            budget=budget, **default_budget_manager_dict,
+            budget=budget,
+            **default_budget_manager_dict,
         )
     else:
         if budget is not None and budget != budget_manager.budget:

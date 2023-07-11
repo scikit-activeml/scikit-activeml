@@ -298,7 +298,6 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         reset=True,
         check_X_dict=None,
     ):
-
         # Validate input parameters.
         (
             X,
@@ -372,7 +371,6 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _validate_cost_matrix(self, n_classes):
-
         cost_matrix = (
             1 - np.eye(n_classes)
             if self.cost_matrix is None
@@ -390,7 +388,6 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         X_eval,
         sample_weight_eval,
     ):
-
         # Check if candidates are samples if sample_weight_candidates is set
         if (
             candidates is None or candidates.ndim == 1
@@ -895,7 +892,6 @@ class ValueOfInformationEER(ExpectedErrorReduction):
     def _precompute_and_fit_clf(
         self, id_clf, X_full, y_full, idx_train, idx_cand, idx_eval, fit_clf
     ):
-
         # TODO: replace the following line by more efficient code
         id_clf.precompute(
             idx_train, idx_train, fit_params="all", pred_params="all"

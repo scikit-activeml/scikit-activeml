@@ -33,12 +33,12 @@ class TestStream(unittest.TestCase):
         training_size = 50
         X, y = make_classification(
             n_samples=stream_length + train_init_size,
-            random_state=rand.randint(2 ** 31 - 1),
+            random_state=rand.randint(2**31 - 1),
             shuffle=True,
         )
 
         clf = ParzenWindowClassifier(
-            classes=[0, 1], random_state=rand.randint(2 ** 31 - 1)
+            classes=[0, 1], random_state=rand.randint(2**31 - 1)
         )
 
         X_init = X[:train_init_size, :]
@@ -55,7 +55,7 @@ class TestStream(unittest.TestCase):
         # Test predictions of classifiers.
         for qs_name, qs_class in self.query_strategies.items():
             self._test_query_strategy(
-                rand.randint(2 ** 31 - 1),
+                rand.randint(2**31 - 1),
                 qs_class,
                 clf,
                 X_init,
@@ -66,7 +66,7 @@ class TestStream(unittest.TestCase):
                 qs_name,
             )
             self._test_update_before_query(
-                rand.randint(2 ** 31 - 1),
+                rand.randint(2**31 - 1),
                 qs_class,
                 clf,
                 X_init,
@@ -89,9 +89,8 @@ class TestStream(unittest.TestCase):
         training_size,
         qs_name,
     ):
-
         rand = check_random_state(rand_seed)
-        random_state = rand.randint(2 ** 31 - 1)
+        random_state = rand.randint(2**31 - 1)
         query_strategy = query_strategy_class(random_state=random_state)
 
         query_strategy2 = query_strategy_class(random_state=random_state)
@@ -162,7 +161,7 @@ class TestStream(unittest.TestCase):
         qs_name,
     ):
         rand = check_random_state(rand_seed)
-        random_state = rand.randint(2 ** 31 - 1)
+        random_state = rand.randint(2**31 - 1)
         query_strategy = query_strategy_class(random_state=random_state)
 
         query_strategy2 = query_strategy_class(random_state=random_state)

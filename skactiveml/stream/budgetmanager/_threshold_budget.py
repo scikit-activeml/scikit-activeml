@@ -45,7 +45,12 @@ class DensityBasedSplitBudgetManager(BudgetManager):
     """
 
     def __init__(
-        self, budget=None, theta=1.0, s=0.01, delta=1.0, random_state=None,
+        self,
+        budget=None,
+        theta=1.0,
+        s=0.01,
+        delta=1.0,
+        random_state=None,
     ):
         super().__init__(budget)
         self.theta = theta

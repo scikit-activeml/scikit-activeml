@@ -19,7 +19,8 @@ from sklearn.linear_model import LinearRegression
 
 
 class TestExpectedModelChangeMaximization(
-    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase,
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    unittest.TestCase,
 ):
     def setUp(self):
         query_default_params_reg = {

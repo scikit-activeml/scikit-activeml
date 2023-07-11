@@ -63,7 +63,9 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
 
         X = np.array([[2], [3]])
         X_cand, mapping = self.qs._transform_candidates(
-            candidates=np.array([0]), X=X, y=np.array([0, 1]),
+            candidates=np.array([0]),
+            X=X,
+            y=np.array([0, 1]),
         )
         np.testing.assert_array_equal(X_cand, X[mapping])
 
@@ -79,7 +81,13 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             NotImplementedError,
             self.qs.query,
             X=np.array([[1, 2]]),
-            y=np.array([[1,]]),
+            y=np.array(
+                [
+                    [
+                        1,
+                    ]
+                ]
+            ),
         )
 
     def test__transform_cand_annot(self):
@@ -103,7 +111,13 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             candidates=np.array([[0, 2]]),
             annotators=None,
             X=np.array([[1, 2]]),
-            y=np.array([[1,]]),
+            y=np.array(
+                [
+                    [
+                        1,
+                    ]
+                ]
+            ),
             enforce_mapping=True,
         )
         re_val = self.qs._transform_cand_annot(

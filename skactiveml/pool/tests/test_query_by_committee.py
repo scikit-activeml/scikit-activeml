@@ -38,7 +38,8 @@ class TestQueryByCommittee(
             random_state=42,
         )
         self.ensemble_reg = SklearnRegressor(
-            estimator=RandomForestRegressor(random_state=42), random_state=42,
+            estimator=RandomForestRegressor(random_state=42),
+            random_state=42,
         )
         query_default_params_clf = {
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
@@ -181,7 +182,8 @@ class TestQueryByCommittee(
         ensemble_classifiers = [member[1] for member in voting_classifiers]
         gpc = ParzenWindowClassifier(classes=self.classes)
         ensemble_bagging = SklearnClassifier(
-            estimator=BaggingClassifier(estimator=gpc), classes=self.classes,
+            estimator=BaggingClassifier(estimator=gpc),
+            classes=self.classes,
         )
         ensemble_voting = SklearnClassifier(
             VotingClassifier(estimators=voting_classifiers, voting="soft")

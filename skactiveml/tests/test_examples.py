@@ -36,7 +36,7 @@ class TestExamples(unittest.TestCase):
         os.chdir(self.working_dir)
 
         # Execute the examples.
-        for (root, dirs, files) in os.walk(examples_path, topdown=True):
+        for root, dirs, files in os.walk(examples_path, topdown=True):
             for filename in files:
                 if filename.endswith(".py"):
                     msg = os.path.join(root, filename).replace(
@@ -53,7 +53,7 @@ class TestExamples(unittest.TestCase):
     def test_json(self):
         # Collect all strategies for which an example exists
         strats_with_json = []
-        for (root, dirs, files) in os.walk(self.json_path, topdown=True):
+        for root, dirs, files in os.walk(self.json_path, topdown=True):
             for filename in files:
                 if not filename.endswith(".json"):
                     continue
