@@ -1399,7 +1399,6 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         check_y_dict=None,
         y_ensure_1d=True,
     ):
-
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
         if check_y_dict is None:

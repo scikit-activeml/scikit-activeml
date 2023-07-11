@@ -61,7 +61,6 @@ class TestFunctions(unittest.TestCase):
         self.assertEqual(result, 1)
 
     def test__available_if(self):
-
         if hasattr(metaestimators, "available_if"):
             wrapper_func = _available_if("a", True)
             self.assertTrue(callable(wrapper_func))
