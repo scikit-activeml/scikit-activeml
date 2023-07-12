@@ -8,7 +8,7 @@ updates:
       time: "13:30"
       timezone: "Europe/Berlin"
     target-branch: "master"
-    versioning-strategy: auto
+    versioning-strategy: increase-if-necessary
     
     open-pull-requests-limit: 10
     
