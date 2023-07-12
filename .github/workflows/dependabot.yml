@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "pip" # See documentation for possible values
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "13:30"
+      timezone: "Europe/Berlin"
+    versioning-strategy: "increase-if-necessary"
+    
+    target-branch: "development"
+
+    open-pull-requests-limit: 10
