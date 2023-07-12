@@ -7,7 +7,7 @@ updates:
       day: "wednesday"
       time: "13:30"
       timezone: "Europe/Berlin"
-    target-branch: "development"
+    target-branch: "master"
     versioning-strategy: auto
     
     open-pull-requests-limit: 10
@@ -21,6 +21,6 @@ updates:
       time: "13:30"
       timezone: "Europe/Berlin"
     
-    target-branch: "development"
+    target-branch: "master"
 
     open-pull-requests-limit: 10
