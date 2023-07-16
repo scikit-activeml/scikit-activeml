@@ -7,7 +7,7 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.exceptions import NotFittedError
-from sklearn.utils import metaestimators
+from sklearn.utils.metaestimators import available_if
 from sklearn.utils.validation import (
     has_fit_parameter,
     check_array,
@@ -15,7 +15,6 @@ from sklearn.utils.validation import (
 )
 
 from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
-from skactiveml.utils._functions import _available_if
 from skactiveml.utils._label import is_labeled, MISSING_LABEL
 
 
@@ -76,7 +75,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @_available_if("partial_fit", hasattr(metaestimators, "available_if"))
+    @available_if(lambda self: hasattr(self.estimator, "partial_fit"))
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -202,8 +201,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             else:
                 return np.full(len(X), self._label_mean)
 
-    @_available_if(
-        ("sample_y", "sample"), hasattr(metaestimators, "available_if")
+    @available_if(
+        lambda self: hasattr(self.estimator, ("sample_y"))
+        or hasattr(self.estimator, ("sample"))
     )
     def sample_y(self, X, n_samples=1, random_state=None):
         """Assumes a probabilistic regressor. Samples are drawn from
