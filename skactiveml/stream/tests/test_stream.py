@@ -89,7 +89,6 @@ class TestStream(unittest.TestCase):
         training_size,
         qs_name,
     ):
-
         rand = check_random_state(rand_seed)
         random_state = rand.randint(2**31 - 1)
         query_strategy = query_strategy_class(random_state=random_state)

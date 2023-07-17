@@ -16,7 +16,7 @@ from sklearn.utils.validation import (
     check_array,
     has_fit_parameter,
 )
-from sklearn.utils import metaestimators, check_consistent_length
+from sklearn.utils import check_consistent_length
 
 from ..base import SkactivemlClassifier
 from ..utils import (
@@ -29,7 +29,7 @@ from ..utils import (
     check_type,
     check_scalar,
 )
-from ..utils._functions import _available_if
+from sklearn.utils.metaestimators import available_if
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -114,7 +114,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @_available_if("partial_fit", hasattr(metaestimators, "available_if"))
+    @available_if(lambda self: hasattr(self.estimator, "partial_fit"))
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -184,7 +184,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
-    @_available_if("predict_proba", hasattr(metaestimators, "available_if"))
+    @available_if(lambda self: hasattr(self.estimator, "predict_proba"))
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
@@ -529,7 +529,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             )
 
     def _add_samples(self, fit_func, X, y, sample_weight=None):
-
         if not hasattr(self, "X_train_"):
             self.X_train_ = deque(maxlen=self.window_size)
         if not hasattr(self, "y_train_"):
@@ -558,7 +557,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self.sample_weight_train_ = None
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
-
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(
             self.estimator, "predict_proba"
@@ -723,7 +721,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         proba = self.estimator_.predict_proba(X)
         return proba
 
-    @_available_if("predict_freq", hasattr(metaestimators, "available_if"))
+    @available_if(lambda self: hasattr(self.estimator, "predict_freq"))
     def predict_freq(self, X):
         """Return class frequency estimates for the test samples `X`.
 

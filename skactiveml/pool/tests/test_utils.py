@@ -478,7 +478,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         )
 
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
-
             with self.subTest(
                 msg="ParzenWindowClassifier use base data",
                 BaseClf=str(BaseClf()),
@@ -521,7 +520,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     )
 
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
-
             with self.subTest(
                 msg="ParzenWindowClassifier use fit data",
                 BaseClf=str(BaseClf()),
@@ -571,7 +569,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                     )
 
         for BaseClf, speed_up, sample_weight, pred, enforce_unique in params:
-
             with self.subTest(
                 msg="ParzenWindowClassifier use fit data with base clf",
                 BaseClf=str(BaseClf()),
@@ -629,7 +626,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         )
 
         for BaseClf, speed_up, sample_weight, pred in params:
-
             with self.subTest(
                 msg="NB use fit data",
                 BaseClf=str(BaseClf()),
@@ -716,7 +712,6 @@ class TestApproximation(unittest.TestCase):
                 )
 
     def test_conditional_expectation(self):
-
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())
         X_train = np.array([[0, 2, 3], [1, 3, 4], [2, 4, 5], [3, 6, 7]])
         y_train = np.array([-1, 2, 1, 4])
@@ -801,7 +796,6 @@ class TestFunctions(unittest.TestCase):
         self.y_pot = 5
 
     def test_update_X_y(self):
-
         X_new, y_new = _update_X_y(
             self.X, self.y, self.y_pot, X_update=self.x_pot
         )

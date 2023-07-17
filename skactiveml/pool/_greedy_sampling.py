@@ -399,7 +399,6 @@ def _greedy_sampling(
     method=None,
     **kwargs,
 ):
-
     dist_dict = dict(
         X_cand=X_cand, y_cand=y_cand, X=X, y=y, method=method, **kwargs
     )

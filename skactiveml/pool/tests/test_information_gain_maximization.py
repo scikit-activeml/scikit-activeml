@@ -4,9 +4,7 @@ import unittest
 from copy import deepcopy
 from scipy.stats import norm
 from skactiveml.base import ProbabilisticRegressor
-from skactiveml.pool import (
-    KLDivergenceMaximization,
-)
+from skactiveml.pool import KLDivergenceMaximization
 from skactiveml.regressor import (
     NICKernelRegressor,
     SklearnRegressor,
