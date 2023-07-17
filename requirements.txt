@@ -1,6 +1,6 @@
 joblib>=1.2
-numpy>=1.22
-scipy>=1.8
-scikit-learn>=1.2, <1.2.1
-matplotlib>=3.5
+numpy>=1.22, <1.26
+scipy>=1.8, <1.12
+scikit-learn>=1.2, <1.4
+matplotlib>=3.5, <3.8
 iteration-utilities>=0.11

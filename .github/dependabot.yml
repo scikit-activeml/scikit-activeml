@@ -4,10 +4,10 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-      day: "wednesday"
-      time: "13:30"
+      day: "monday"
+      time: "20:00"
       timezone: "Europe/Berlin"
-    target-branch: "master"
+    target-branch: "development"
     versioning-strategy: increase-if-necessary
     
     open-pull-requests-limit: 10
@@ -21,6 +21,6 @@ updates:
       time: "13:30"
       timezone: "Europe/Berlin"
     
-    target-branch: "master"
+    target-branch: "development"
 
     open-pull-requests-limit: 10
