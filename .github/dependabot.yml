@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "pip" # See documentation for possible values
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "20:00"
+      timezone: "Europe/Berlin"
+    target-branch: "development"
+    versioning-strategy: increase-if-necessary
+    
+    open-pull-requests-limit: 10
+    
+
+  - package-ecosystem: "github-actions"
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "20:00"
+      timezone: "Europe/Berlin"
+    
+    target-branch: "development"
+
+    open-pull-requests-limit: 10
