@@ -42,7 +42,7 @@ jobs:
         python setup.py sdist bdist_wheel
         twine check dist/*
     - name: Publish package
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      uses: pypa/gh-action-pypi-publish@f8c70e705ffc13c3b4d1221169b84f12a75d6ca8
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
