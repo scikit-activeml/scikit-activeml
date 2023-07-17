@@ -6,7 +6,7 @@ sphinx==4.2.0
 sphinxcontrib-bibtex~=2.3
 numpydoc~=1.1
 nbsphinx~=0.8
-nbformat~=5.4.0
+nbformat~=5.9.1
 sphinx-gallery~=0.8
 pybtex~=0.23
 pydata_sphinx_theme==0.9
