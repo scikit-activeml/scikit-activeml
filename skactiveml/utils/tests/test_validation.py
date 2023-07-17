@@ -285,7 +285,6 @@ class TestValidation(unittest.TestCase):
         )
 
     def test_check_callable(self):
-
         self.assertRaises(
             ValueError,
             _check_callable,

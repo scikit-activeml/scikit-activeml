@@ -123,7 +123,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_query_params_dict(self):
-
         uncertainty = UncertaintySampling(method="entropy")
         wrapper = SingleAnnotatorWrapper(
             uncertainty, random_state=self.random_state
@@ -586,7 +585,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_indexed_annotator_sample_candidates(self):
-
         random = RandomSampling(self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state

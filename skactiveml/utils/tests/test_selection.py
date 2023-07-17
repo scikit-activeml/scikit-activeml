@@ -116,7 +116,6 @@ class TestSelection(unittest.TestCase):
         np.testing.assert_equal((0, 2), indices.shape)
 
     def test_combine_ranking(self):
-
         self.assertRaises(
             ValueError,
             combine_ranking,

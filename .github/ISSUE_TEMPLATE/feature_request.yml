@@ -1,0 +1,24 @@
+#### This Template was inspired by [scikit-learn](https://github.com/scikit-learn/scikit-learn/blob/main/.github/ISSUE_TEMPLATE/feature_request.yml)
+
+name: Feature request
+description: Suggest a new algorithm, enhancement to an existing algorithm, etc.
+title: "FR: <Please write a comprehensive title after the 'FR: ' prefix>"
+
+body:
+
+- type: textarea
+  attributes:
+    label: Describe the workflow you want to enable
+  validations:
+    required: true
+- type: textarea
+  attributes:
+    label: Describe your proposed solution
+  validations:
+    required: true
+- type: textarea
+  attributes:
+    label: Describe alternatives you've considered, if relevant
+- type: textarea
+  attributes:
+    label: Additional context
