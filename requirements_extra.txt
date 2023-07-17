@@ -9,4 +9,4 @@ nbsphinx~=0.8
 nbformat~=5.4.0
 sphinx-gallery~=0.8
 pybtex~=0.23
-pydata_sphinx_theme==0.9
+pydata_sphinx_theme==0.13.3
