@@ -17,8 +17,8 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-      day: "wednesday"
-      time: "13:30"
+      day: "monday"
+      time: "20:00"
       timezone: "Europe/Berlin"
     
     target-branch: "development"
