@@ -2,7 +2,7 @@ flake8
 pytest
 pytest-cov
 jupyter
-sphinx==4.2.0
+sphinx==7.1.2
 sphinxcontrib-bibtex~=2.3
 numpydoc~=1.1
 nbsphinx~=0.8
