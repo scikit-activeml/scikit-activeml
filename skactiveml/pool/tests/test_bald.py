@@ -16,7 +16,12 @@ from sklearn.gaussian_process import (
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 
-from skactiveml.pool._batch_bald import BatchBALD, batch_bald
+from skactiveml.pool._bald import (
+    _GeneralBALD,
+    batch_bald,
+    BatchBALD,
+    GreedyBALD,
+)
 from skactiveml.regressor import NICKernelRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
@@ -24,7 +29,7 @@ from skactiveml.tests.template_query_strategy import (
 from skactiveml.utils import MISSING_LABEL
 
 
-class TestBatchBALD(
+class TestGeneralBALD(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
     def setUp(self):
@@ -41,7 +46,7 @@ class TestBatchBALD(
             "fit_ensemble": True,
         }
         super().setUp(
-            qs_class=BatchBALD,
+            qs_class=_GeneralBALD,
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
         )
@@ -54,6 +59,19 @@ class TestBatchBALD(
             (None, None),
         ]
         self._test_param("init", "n_MC_samples", test_cases)
+
+    def test_init_param_greedy_selection(self):
+        test_cases = [
+            (0, TypeError),
+            (1.2, TypeError),
+            (1, TypeError),
+            ("1", TypeError),
+            (False, None),
+            (True, None),
+        ]
+        self._test_param("init", "greedy_selection", test_cases)
+        self.assertTrue(GreedyBALD().greedy_selection)
+        self.assertFalse(BatchBALD().greedy_selection)
 
     def test_query_param_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -147,13 +165,21 @@ class TestBatchBALD(
                 query_params["batch_size"] = batch_size
                 query_params["ensemble"] = ensemble
                 query_params["return_utilities"] = True
-                qs = self.qs_class(random_state=42)
-                np.testing.assert_equal(
-                    qs.query(**query_params)[1], qs.query(**query_params)[1]
-                )
-                idx, u = qs.query(**query_params)
-                self.assertEqual(len(idx), batch_size)
-                self.assertEqual(len(u), batch_size)
+                for greedy_selection in [False, True]:
+                    qs = self.qs_class(
+                        greedy_selection=greedy_selection, random_state=42
+                    )
+                    np.testing.assert_equal(
+                        qs.query(**query_params)[1],
+                        qs.query(**query_params)[1],
+                    )
+                    idx, u = qs.query(**query_params)
+                    self.assertEqual(len(idx), batch_size)
+                    self.assertEqual(len(u), batch_size)
+                    if greedy_selection:
+                        self.assertEqual(np.sum(u[0] != u[1]), 1)
+                    else:
+                        self.assertEqual(np.sum(u[0] != u[1]), 4)
 
 
 class Testbatch_bald(unittest.TestCase):
@@ -178,7 +204,7 @@ class Testbatch_bald(unittest.TestCase):
         test_cases = [(0, ValueError), (1.2, TypeError), (1, None)]
         self._test_param(batch_bald, "batch_size", test_cases)
 
-    def test_init_param_n_MC_samples(self):
+    def test_param_n_MC_samples(self):
         test_cases = [
             (0, ValueError),
             (1.2, TypeError),
@@ -187,12 +213,24 @@ class Testbatch_bald(unittest.TestCase):
         ]
         self._test_param(batch_bald, "n_MC_samples", test_cases)
 
+    def test_param_eps(self):
+        test_cases = [
+            ("0", TypeError),
+            (1, ValueError),
+            (-1, ValueError),
+            (-0.1, ValueError),
+            (0.001, None),
+            (0, None),
+            (0.1, None),
+        ]
+        self._test_param(batch_bald, "eps", test_cases)
+
     def test_param_random_state(self):
         test_cases = [(np.nan, ValueError), ("state", ValueError), (1, None)]
         self._test_param(batch_bald, "random_state", test_cases)
 
     def test_batch_bald(self):
-        # test _BALD and _BatchBald
+        # test BALD and BatchBALD
         probas = np.random.rand(10, 100, 5)
         np.testing.assert_equal(_bald(probas), _bald(probas))
         np.testing.assert_allclose(
@@ -271,8 +309,8 @@ class Testbatch_bald(unittest.TestCase):
 
 
 def _bald(probas):
-    """Bayesian Active Learning by Disagreement (BatchBALD)
-    Computes the Bayesian Active Learning by Disagreement (BatchBALD) score for
+    """
+    Computes the Bayesian Active Learning by Disagreement (BALD) score for
     each sample.
 
     Parameters
@@ -283,7 +321,7 @@ def _bald(probas):
     Returns
     -------
     scores: np.ndarray, shape (n_samples)
-        The BatchBALD-scores.
+        The BALD-scores.
 
     References
     ----------
