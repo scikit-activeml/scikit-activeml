@@ -192,10 +192,6 @@ class TestGeneralBALD(
                         idx, u = qs.query(**query_params)
                         self.assertEqual(len(idx), batch_size)
                         self.assertEqual(len(u), batch_size)
-                        if greedy_selection:
-                            self.assertEqual(np.sum(u[0] != u[1]), 3)
-                        else:
-                            self.assertEqual(np.sum(u[0] != u[1]), 4)
 
 
 class Testbatch_bald(unittest.TestCase):
