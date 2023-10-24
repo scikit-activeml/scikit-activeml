@@ -109,7 +109,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
-
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
                 "'{}' must be a scikit-learn "

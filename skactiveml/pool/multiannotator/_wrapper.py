@@ -376,7 +376,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         return_utilities,
         pref_n_annotators,
     ):
-
         random_state = check_random_state(self.random_state)
 
         n_annotators = A_cand.shape[1]
@@ -424,7 +423,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
     def _get_order_preserving_s_query(
         A, candidate_utilities, annotator_utilities
     ):
-
         nan_indices = np.argwhere(np.isnan(candidate_utilities))
 
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = -np.inf
@@ -448,7 +446,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
     @staticmethod
     def _n_to_assign_annotators(batch_size, A, s_indices, pref_n_annotators):
-
         n_max_annotators = np.sum(A, axis=1)
         n_max_chosen_annotators = n_max_annotators[s_indices]
         annot_per_sample = np.minimum(
