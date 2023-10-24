@@ -1,9 +1,7 @@
 import numpy as np
 from copy import deepcopy
 
-from skactiveml.base import (
-    BudgetManager,
-)
+from skactiveml.base import BudgetManager
 
 from skactiveml.utils import check_scalar, check_random_state
 

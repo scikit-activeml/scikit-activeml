@@ -87,7 +87,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
-        for (value, name) in [
+        for value, name in [
             (self.kappa_0, "self.kappa_0"),
             (self.nu_0, "self.nu_0"),
             (self.sigma_sq_0, "self.sigma_sq_0"),
@@ -141,7 +141,6 @@ class NICKernelRegressor(ProbabilisticRegressor):
         return N, mu_ml, var_ml
 
     def _estimate_update_params(self, X):
-
         if len(self.X_) != 0:
             N, mu_ml, var_ml = self._estimate_ml_params(X)
             update_params = (N, N, mu_ml, var_ml)

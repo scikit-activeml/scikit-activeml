@@ -17,9 +17,7 @@ from ._expected_model_output_change import ExpectedModelOutputChange
 from ._expected_model_variance import ExpectedModelVarianceReduction
 from ._four_ds import FourDs
 from ._greedy_sampling import GreedySamplingX, GreedySamplingTarget
-from ._information_gain_maximization import (
-    KLDivergenceMaximization,
-)
+from ._information_gain_maximization import KLDivergenceMaximization
 from ._probabilistic_al import ProbabilisticAL, cost_reduction
 from ._query_by_committee import (
     QueryByCommittee,
