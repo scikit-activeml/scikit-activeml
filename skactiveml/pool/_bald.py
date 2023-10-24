@@ -18,7 +18,7 @@ from ..utils import (
 
 
 class _GeneralBALD(QueryByCommittee):
-    """General Bayesian Active Learning by Disagreement (BALD)
+    """General Bayesian Active Learning by Disagreement (_GeneralBALD)
 
     The Bayesian Active Learning by Disagreement (BatchBALD) [1] strategy
     reduces the number of possible hypotheses maximally fast to minimize the
@@ -35,6 +35,8 @@ class _GeneralBALD(QueryByCommittee):
     greedy_selection : bool, optional (default=False)
         Flag to either use BatchBALD (`greedy_selection=False`) or a greedy
         (top-k) selection (`greedy_selection=True`) if `batch_size>1`.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
     missing_label : scalar or string or np.nan or None, optional
         (default=np.nan)
         Value to represent a missing label.
@@ -56,6 +58,7 @@ class _GeneralBALD(QueryByCommittee):
         self,
         n_MC_samples=None,
         greedy_selection=False,
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -64,6 +67,7 @@ class _GeneralBALD(QueryByCommittee):
         )
         self.n_MC_samples = n_MC_samples
         self.greedy_selection = greedy_selection
+        self.eps = eps
 
     def query(
         self,
@@ -141,7 +145,6 @@ class _GeneralBALD(QueryByCommittee):
         check_scalar(
             self.greedy_selection, "greedy_selection", target_type=bool
         )
-
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate classifier type.
@@ -165,31 +168,29 @@ class _GeneralBALD(QueryByCommittee):
             n_MC_samples_ = self.n_MC_samples
         check_scalar(n_MC_samples_, "n_MC_samples", int, min_val=1)
 
+        utils_batch_size = 1 if self.greedy_selection else batch_size
+        batch_utilities_cand = batch_bald(
+            probas=probas,
+            batch_size=utils_batch_size,
+            n_MC_samples=n_MC_samples_,
+            eps=self.eps,
+            random_state=self.random_state_,
+        )
+
+        if mapping is None:
+            batch_utilities = batch_utilities_cand
+        else:
+            batch_utilities = np.full((utils_batch_size, len(X)), np.nan)
+            batch_utilities[:, mapping] = batch_utilities_cand
+
         if self.greedy_selection:
-            batch_utilities_cand = batch_bald(
-                probas=probas,
-                batch_size=batch_size,
-                n_MC_samples=n_MC_samples_,
-                random_state=self.random_state_,
-            )
             return simple_batch(
-                batch_utilities_cand[0],
+                batch_utilities[0],
                 self.random_state_,
                 batch_size=batch_size,
                 return_utilities=return_utilities,
             )
         else:
-            batch_utilities_cand = batch_bald(
-                probas=probas,
-                batch_size=batch_size,
-                n_MC_samples=n_MC_samples_,
-                random_state=self.random_state_,
-            )
-            if mapping is None:
-                batch_utilities = batch_utilities_cand
-            else:
-                batch_utilities = np.full((batch_size, len(X)), np.nan)
-                batch_utilities[:, mapping] = batch_utilities_cand
             best_indices = rand_argmax(
                 batch_utilities, axis=1, random_state=self.random_state_
             )
@@ -212,6 +213,8 @@ class BatchBALD(_GeneralBALD):
     ----------
     n_MC_samples : int > 0, optional (default=n_estimators)
         The number of monte carlo samples used for label estimation.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
     missing_label : scalar or string or np.nan or None, optional
         (default=np.nan)
         Value to represent a missing label.
@@ -232,20 +235,23 @@ class BatchBALD(_GeneralBALD):
     def __init__(
         self,
         n_MC_samples=None,
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            n_MC_samples=n_MC_samples,
+            greedy_selection=False,
+            eps=eps,
+            missing_label=missing_label,
+            random_state=random_state,
         )
-        self.n_MC_samples = n_MC_samples
-        self.greedy_selection = False
 
 
 class GreedyBALD(_GeneralBALD):
     """Greedy Bayesian Active Learning by Disagreement (GreedyBALD)
 
-    The Bayesian Active Learning by Disagreement (GreedyBALD) [1] strategy
+    The Bayesian Active Learning by Disagreement (BALD) [1] strategy
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
@@ -255,6 +261,8 @@ class GreedyBALD(_GeneralBALD):
     ----------
     n_MC_samples : int > 0, optional (default=n_estimators)
         The number of monte carlo samples used for label estimation.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
     missing_label : scalar or string or np.nan or None, optional
         (default=np.nan)
         Value to represent a missing label.
@@ -272,14 +280,17 @@ class GreedyBALD(_GeneralBALD):
     def __init__(
         self,
         n_MC_samples=None,
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            n_MC_samples=n_MC_samples,
+            greedy_selection=True,
+            eps=eps,
+            missing_label=missing_label,
+            random_state=random_state,
         )
-        self.n_MC_samples = n_MC_samples
-        self.greedy_selection = True
 
 
 def batch_bald(
@@ -292,8 +303,8 @@ def batch_bald(
     """BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian
     Active Learning
 
-    BatchBALD [1] is an extension of BALD (Bayesian Active Learning by
-    Disagreement) [2] whereby points are jointly scored by estimating the
+    BatchBALD [2] is an extension of BALD  [1] (Bayesian Active Learning by
+    Disagreement) whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.
 
@@ -305,7 +316,7 @@ def batch_bald(
         The number of samples to be selected in one AL cycle.
     n_MC_samples : int > 0, optional (default=n_estimators)
         The number of monte carlo samples used for label estimation.
-    eps : float, optional (default=1e-7)
+    eps : float  > 0, optional (default=1e-7)
         Minimum probability threshold to compute log-probabilities.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
@@ -331,7 +342,14 @@ def batch_bald(
         )
     probs_K_N_C = check_array(probas, ensure_2d=False, allow_nd=True)
     check_scalar(batch_size, "batch_size", int, min_val=1)
-    check_scalar(eps, "eps", min_val=0, max_val=0.1, target_type=(float, int))
+    check_scalar(
+        eps,
+        "eps",
+        min_val=0,
+        max_val=0.1,
+        target_type=(float, int),
+        min_inclusive=False,
+    )
     if n_MC_samples is None:
         n_MC_samples = len(probas)
     check_scalar(n_MC_samples, "n_MC_samples", int, min_val=1)

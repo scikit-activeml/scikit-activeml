@@ -73,6 +73,20 @@ class TestGeneralBALD(
         self.assertTrue(GreedyBALD().greedy_selection)
         self.assertFalse(BatchBALD().greedy_selection)
 
+    def test_init_param_eps(self):
+        test_cases = [
+            (0, ValueError),
+            (1e-3, None),
+            (0.1, None),
+            ("1", TypeError),
+            (1, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "eps",
+            test_cases,
+        )
+
     def test_query_param_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -166,20 +180,22 @@ class TestGeneralBALD(
                 query_params["ensemble"] = ensemble
                 query_params["return_utilities"] = True
                 for greedy_selection in [False, True]:
-                    qs = self.qs_class(
-                        greedy_selection=greedy_selection, random_state=42
-                    )
-                    np.testing.assert_equal(
-                        qs.query(**query_params)[1],
-                        qs.query(**query_params)[1],
-                    )
-                    idx, u = qs.query(**query_params)
-                    self.assertEqual(len(idx), batch_size)
-                    self.assertEqual(len(u), batch_size)
-                    if greedy_selection:
-                        self.assertEqual(np.sum(u[0] != u[1]), 1)
-                    else:
-                        self.assertEqual(np.sum(u[0] != u[1]), 4)
+                    for candidates in [None, [2, 3]]:
+                        # query_params["candidates"] = candidates
+                        qs = self.qs_class(
+                            greedy_selection=greedy_selection, random_state=42
+                        )
+                        np.testing.assert_equal(
+                            qs.query(**query_params)[1],
+                            qs.query(**query_params)[1],
+                        )
+                        idx, u = qs.query(**query_params)
+                        self.assertEqual(len(idx), batch_size)
+                        self.assertEqual(len(u), batch_size)
+                        if greedy_selection:
+                            self.assertEqual(np.sum(u[0] != u[1]), 3)
+                        else:
+                            self.assertEqual(np.sum(u[0] != u[1]), 4)
 
 
 class Testbatch_bald(unittest.TestCase):
@@ -220,7 +236,7 @@ class Testbatch_bald(unittest.TestCase):
             (-1, ValueError),
             (-0.1, ValueError),
             (0.001, None),
-            (0, None),
+            (0, ValueError),
             (0.1, None),
         ]
         self._test_param(batch_bald, "eps", test_cases)
