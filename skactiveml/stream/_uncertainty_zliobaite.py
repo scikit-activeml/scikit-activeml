@@ -167,7 +167,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
             self._validate_random_state()
-            random_seed = deepcopy(self.random_state_).randint(2**31-1)
+            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -266,7 +266,7 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
 
         # check if a budgetmanager is set
         if not hasattr(self, "budget_manager_"):
-            random_seed = deepcopy(self.random_state_).randint(2**31-1)
+            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
