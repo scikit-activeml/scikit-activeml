@@ -21,6 +21,7 @@ from ..utils import (
     compute_vote_vectors,
     MISSING_LABEL,
     check_equal_missing_label,
+    check_scalar,
 )
 
 
@@ -36,6 +37,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         The method to calculate the disagreement in the case of classification.
         KL_divergence or vote_entropy are possible. In the case of regression
         the empirical variance is used.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities (only
+        relevant for `method='KL_divergence'`).
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
@@ -58,6 +62,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     def __init__(
         self,
         method="KL_divergence",
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -65,6 +70,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             missing_label=missing_label, random_state=random_state
         )
         self.method = method
+        self.eps = eps
 
     def query(
         self,
@@ -169,7 +175,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 probas = np.array(
                     [est.predict_proba(X_cand) for est in est_arr]
                 )
-                utilities_cand = average_kl_divergence(probas)
+                utilities_cand = average_kl_divergence(probas, self.eps)
             else:  # self.method == "vote_entropy":
                 votes = np.array([est.predict(X_cand) for est in est_arr]).T
                 utilities_cand = vote_entropy(votes, classes)
@@ -194,7 +200,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def average_kl_divergence(probas):
+def average_kl_divergence(probas, eps=1e-7):
     """Calculates the average Kullback-Leibler (KL) divergence for measuring
     the level of disagreement in QueryByCommittee.
 
@@ -202,6 +208,8 @@ def average_kl_divergence(probas):
     ----------
     probas : array-like, shape (n_estimators, n_samples, n_classes)
         The probability estimates of all estimators, samples, and classes.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
 
     Returns
     -------
@@ -214,7 +222,15 @@ def average_kl_divergence(probas):
         for text classification. In Proceedings of the International Conference
         on Machine Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
     """
-    # Check probabilities.
+    # Check parameters.
+    check_scalar(
+        eps,
+        "eps",
+        min_val=0,
+        max_val=0.1,
+        target_type=(float, int),
+        min_inclusive=False,
+    )
     probas = check_array(probas, allow_nd=True)
     if probas.ndim != 3:
         raise ValueError(
@@ -222,7 +238,7 @@ def average_kl_divergence(probas):
         )
     n_estimators = probas.shape[0]
 
-    probas = probas + 1e-3
+    np.clip(probas, a_min=eps, a_max=1, out=probas)
     probas /= probas.sum(axis=2, keepdims=True)
 
     # Calculate the average KL divergence.
