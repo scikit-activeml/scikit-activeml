@@ -53,6 +53,22 @@ class TemplateCognitiveDualQueryStrategy(
             (None, None),
         ]
         self._test_param("init", "dist_func", test_cases)
+        replace_init_params = {"dist_func": []}
+        test_cases = [(np.array([[1, 2]]), TypeError)]
+        self._test_param(
+            "update",
+            "candidates",
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
+        replace_init_params = {"dist_func": pairwise_distances}
+        test_cases = [(np.array([[1, 2]]), None)]
+        self._test_param(
+            "update",
+            "candidates",
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
 
     def test_init_param_dist_func_dict(self):
         test_cases = []
@@ -62,6 +78,14 @@ class TemplateCognitiveDualQueryStrategy(
             ({"metric": "manhattan"}, None),
         ]
         self._test_param("init", "dist_func_dict", test_cases)
+        replace_init_params = {"dist_func_dict": []}
+        test_cases = [(np.array([[1, 2]]), TypeError)]
+        self._test_param(
+            "update",
+            "candidates",
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
 
     def test_init_param_force_full_budget(self):
         test_cases = []
