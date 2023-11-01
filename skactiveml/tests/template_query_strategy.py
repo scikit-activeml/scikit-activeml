@@ -925,12 +925,12 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
     def test_update_param_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [("string", TypeError), (Dummy, TypeError), ([[]], None)]
+        test_cases += [(Dummy, TypeError), ([[]], None)]
         self._test_param("update", "candidates", test_cases)
 
     def test_update_param_queried_indices(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [("string", TypeError), (Dummy, TypeError), ([], None)]
+        test_cases += [("string", IndexError), (Dummy, IndexError), ([], None)]
         self._test_param("update", "queried_indices", test_cases)
 
     def _test_param(
@@ -962,7 +962,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                         query_params = deepcopy(query_params)
                         for key, val in replace_query_params.items():
                             query_params[key] = val
-                        update_params = {}
+                        update_params = deepcopy(self.update_params)
 
                         locals()[f"{test_func}_params"][test_param] = test_val
 

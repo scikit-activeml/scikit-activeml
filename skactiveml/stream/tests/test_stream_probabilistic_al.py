@@ -36,7 +36,7 @@ class TestStreamProbabilisticAL(
         self.update_params = {
             "candidates": [[]],
             "queried_indices": [],
-            "budget_manager_dict": {"utilities": 0.0},
+            "budget_manager_param_dict": {"utilities": 0.0},
         }
 
     def test_query_param_clf(self):
