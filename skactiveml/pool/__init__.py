@@ -31,7 +31,7 @@ from ._uncertainty_sampling import (
     uncertainty_scores,
     expected_average_precision,
 )
-from ._wrapper import SubSamplingWrapper
+from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 
 __all__ = [
     "multiannotator",
@@ -62,4 +62,5 @@ __all__ = [
     "batch_bald",
     "GreedyBALD",
     "SubSamplingWrapper",
+    "ParallelUtilityEstimationWrapper"
 ]
