@@ -52,6 +52,37 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             batch_size=1,
             return_utilities=False,
         ):
+         
+         """ Query the next instances to be labeled
+
+         Parameters
+         ----------
+         X: array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+         y: array-like of shape (n_samples, )
+            Labels of the training data set (possibly including unlabeles ones
+            indicated by self.missing_label)
+         candidates: None or array-like of shape (n_candidates), dtype = int or
+            array-like of shape (n_candidates, n_features),
+            optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are considered
+            as candidates
+         batch_size: int, optional(default=1)
+            The number of samples to be selectes in one AL cycle.
+         return_utilities: bool, optional(default=False)
+            If True, also return the utilites based on the query strategy
+
+         Returns
+         ----------
+         query_indices: numpy.ndarry of shape (batch_size, )
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+         utilities: numpy.ndarray of shape (n_samples, )
+            The distance between each data point and its nearest center after
+            each selected sample of the batch
+         """
         
          X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
@@ -69,10 +100,35 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
              return query_indices
     
     def k_greedy_center(self, X, selected_samples, batch_size):
+        """
+         An active learning method that greedily forms a batch to minimize 
+         the maximum distance to a cluster center among all unlabeled
+         datapoints.
+
+         Parameters:
+         ----------
+         X: array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+         selected_samples: np.ndarray of shape (n_seleted_samples, )
+            index of datapoints already selectes
+         batch_size: int, optional(default=1)
+            The number of samples to be selectes in one AL cycle.
+        
+         Return:
+         ----------
+         new_samples: numpy.ndarry of shape (batch_size, )
+            The query_indices indicate for which candidate sample a label is
+            to queried from the candidates
+         utilities: numpy.ndarray of shape (n_samples, )
+            The distance between each data point and its nearest center after
+            each selected sample of the batch
+        """
+
         if len(selected_samples) > 0:
             min_distances = self.update_distances(X, selected_samples)
 
-        new_samples = []
+        query_indices = np.array([])
 
         for _ in range(batch_size):
             if len(selected_samples) == 0:
@@ -81,24 +137,35 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 idx = np.argmax(min_distances)
             assert idx not in selected_samples
 
+            query_indices = np.append(query_indices, [idx])
             selected_samples = np.append(selected_samples, [idx])
-
             min_distances = self.update_distances(X, selected_samples)
-
-            new_samples.append(idx)
                 
-        return new_samples, min_distances
+        return query_indices, min_distances
     
     def update_distances(self, X, cluster_centers):
-        """
+        """ 
+         Update min distances by given cluster centers.
 
+         Parameters:
+         ----------
+         X: array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+         cluster_centers: indices of cluster centers
+
+         Return:
+         ---------
+         dist: numpy.ndarray of shape (n_samples, )
+            The distance between each data point and its nearest center after
+            each selected sample of the batch
         """
         if len(cluster_centers) == 0:
             return np.full(shape=len(X), fill_value=np.nan)
 
         cluster_center_feature = X[cluster_centers]
         dist_matrix = pairwise_distances(X, cluster_center_feature)
-        dist = np.min(dist_matrix, axis=1).reshape(-1,1)
+        dist = np.min(dist_matrix, axis=1)
 
         return dist
     
