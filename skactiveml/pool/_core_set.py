@@ -128,7 +128,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         if len(selected_samples) > 0:
             min_distances = self.update_distances(X, selected_samples)
 
-        query_indices = np.array([])
+        query_indices = np.array([], dtype=int)
 
         for _ in range(batch_size):
             if len(selected_samples) == 0:
