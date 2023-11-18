@@ -12,6 +12,7 @@ from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices
 from sklearn.metrics import pairwise_distances
 
+
 class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """ Core Set Selection
 
@@ -36,24 +37,24 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-        self, method='greedy', missing_label=MISSING_LABEL, random_state=None
+            self, method='greedy', missing_label=MISSING_LABEL, random_state=None
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
 
         self.method = method
-    
+
     def query(
-            self, 
-            X, 
+            self,
+            X,
             y,
             candidates=None,
             batch_size=1,
             return_utilities=False,
-        ):
-         
-         """ Query the next instances to be labeled
+    ):
+
+        """ Query the next instances to be labeled
 
          Parameters
          ----------
@@ -83,22 +84,22 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             The distance between each data point and its nearest center after
             each selected sample of the batch
          """
-        
-         X, y, candidates, batch_size, return_utilities = self._validate_data(
+
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
-         
-         X_cand, mapping = self._transform_candidates(candidates, X, y)
-         selected_samples = labeled_indices(y, missing_label=self.missing_label)
-         
-         if self.method == 'greedy':
-             query_indices, utilities = self.k_greedy_center(X, selected_samples, batch_size)
 
-         if return_utilities:
-             return query_indices, utilities
-         else:
-             return query_indices
-    
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        selected_samples = labeled_indices(y, missing_label=self.missing_label)
+
+        if self.method == 'greedy':
+            query_indices, utilities = self.k_greedy_center(X, selected_samples, batch_size)
+
+        if return_utilities:
+            return query_indices, utilities
+        else:
+            return query_indices
+
     def k_greedy_center(self, X, selected_samples, batch_size):
         """
          An active learning method that greedily forms a batch to minimize 
@@ -140,11 +141,13 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             query_indices = np.append(query_indices, [idx])
             selected_samples = np.append(selected_samples, [idx])
             min_distances = self.update_distances(X, selected_samples)
-                
+
+        min_distances = np.where(min_distances == 0, np.nan, min_distances)
+
         return query_indices, min_distances
-    
+
     def update_distances(self, X, cluster_centers):
-        """ 
+        """
          Update min distances by given cluster centers.
 
          Parameters:
@@ -168,5 +171,3 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         dist = np.min(dist_matrix, axis=1).reshape(1, -1)
 
         return dist
-    
-    
