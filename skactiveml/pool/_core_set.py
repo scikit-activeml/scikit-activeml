@@ -165,7 +165,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
         cluster_center_feature = X[cluster_centers]
         dist_matrix = pairwise_distances(X, cluster_center_feature)
-        dist = np.min(dist_matrix, axis=1)
+        dist = np.min(dist_matrix, axis=1).reshape(1, -1)
 
         return dist
     
