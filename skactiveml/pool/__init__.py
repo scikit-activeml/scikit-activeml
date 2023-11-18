@@ -31,6 +31,7 @@ from ._uncertainty_sampling import (
     uncertainty_scores,
     expected_average_precision,
 )
+from ._core_set import CoreSet
 
 __all__ = [
     "multiannotator",
@@ -59,4 +60,5 @@ __all__ = [
     "DiscriminativeAL",
     "BatchBALD",
     "batch_bald",
+    "CoreSet",
 ]
