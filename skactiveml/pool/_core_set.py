@@ -111,17 +111,17 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
          X: array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples
-         selected_samples: np.ndarray of shape (n_seleted_samples, )
+         selected_samples: np.ndarray of shape (n_selected_samples, )
             index of datapoints already selectes
          batch_size: int, optional(default=1)
-            The number of samples to be selectes in one AL cycle.
+            The number of samples to be selected in one AL cycle.
         
          Return:
          ----------
          new_samples: numpy.ndarry of shape (batch_size, )
             The query_indices indicate for which candidate sample a label is
             to queried from the candidates
-         utilities: numpy.ndarray of shape (n_samples, )
+         utilities: numpy.ndarray of shape (1, n_samples)
             The distance between each data point and its nearest center after
             each selected sample of the batch
         """
@@ -159,7 +159,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
          Return:
          ---------
-         dist: numpy.ndarray of shape (n_samples, )
+         dist: numpy.ndarray of shape (1, n_samples)
             The distance between each data point and its nearest center after
             each selected sample of the batch
         """
