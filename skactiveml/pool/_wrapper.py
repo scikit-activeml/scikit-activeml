@@ -108,8 +108,16 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
-
-        seed_multiplier = int(is_labeled(y).sum())
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+        seed_multiplier = (
+            int(is_labeled(y, missing_label=self.missing_label_).sum()) + 1
+        )
         max_candidates = self.max_candidates
         if isinstance(self.max_candidates, int):
             check_scalar(
@@ -138,7 +146,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
         if candidates is None:
             candidate_indices = unlabeled_indices(
-                y=y, missing_label=self.missing_label
+                y=y, missing_label=self.missing_label_
             )
             if isinstance(max_candidates, float):
                 max_candidates = ceil(

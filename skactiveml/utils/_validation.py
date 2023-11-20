@@ -530,7 +530,9 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         The validated indices.
     """
     indices = check_array(indices, dtype=int, ensure_2d=False)
-    A = check_array(A, allow_nd=True, force_all_finite=False, ensure_2d=False)
+    A = check_array(
+        A, allow_nd=True, force_all_finite=False, ensure_2d=False, dtype=None
+    )
     if unique == "check_unique":
         if indices.ndim == 1:
             n_unique_indices = len(np.unique(indices))

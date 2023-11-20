@@ -65,12 +65,16 @@ class TemplateQueryStrategy:
                 f"Use emtpy dictionary to use default values."
             )
         query_params = inspect.signature(self.qs_class.query).parameters
+        has_var_keyword = any(
+            filter(lambda p: p.kind == p.VAR_KEYWORD, query_params.values())
+        )
         for key, val in query_params.items():
             if (
                 key != "self"
                 and val.default == inspect._empty
                 and self.query_default_params_clf is not None
                 and key not in self.query_default_params_clf
+                and not has_var_keyword
             ):
                 raise ValueError(
                     f"Missing positional argument `{key}` of `query` in "
@@ -82,6 +86,7 @@ class TemplateQueryStrategy:
                 and val.default == inspect._empty
                 and self.query_default_params_reg is not None
                 and key not in self.query_default_params_reg
+                and not has_var_keyword
             ):
                 raise ValueError(
                     f"Missing positional argument `{key}` of `query` in "
@@ -350,13 +355,23 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 replace_init_params = {"missing_label": ml}
                 if "classes" in self.init_default_params:
                     replace_init_params["classes"] = classes
+                if "query_strategy" in self.init_default_params:
+                    query_strategy = clone(
+                        self.init_default_params["query_strategy"]
+                    )
+                    query_strategy.missing_label = ml
+                    replace_init_params["query_strategy"] = query_strategy
+                replace_query_params = {}
                 if "clf" in self.query_default_params_clf:
                     clf = clone(self.query_default_params_clf["clf"])
                     clf.missing_label = ml
                     clf.classes = classes
-                    replace_query_params = {"clf": clf}
-                else:
-                    replace_query_params = None
+                    replace_query_params["clf"] = clf
+                if "ensemble" in self.query_default_params_clf:
+                    ensemble = clone(self.query_default_params_clf["ensemble"])
+                    ensemble.missing_label = ml
+                    ensemble.classes = classes
+                    replace_query_params["ensemble"] = ensemble
                 replace_y = np.full_like(y, ml, dtype=t)
                 replace_y[0] = classes[0]
                 replace_y[1] = classes[1]
