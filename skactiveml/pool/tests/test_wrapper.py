@@ -110,6 +110,7 @@ class TestSubSamplingWrapper(
             query_params = deepcopy(query_params)
             query_params["return_utilities"] = True
             query_params["batch_size"] = 1
+            query_params["candidates"] = query_params["X"]
             (
                 q,
                 u,
