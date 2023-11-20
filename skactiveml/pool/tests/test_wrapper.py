@@ -120,6 +120,9 @@ class TestSubSamplingWrapper(
             u_sub = u_sub.ravel()
             mask = ~np.isnan(u_sub)
             np.testing.assert_array_equal(u[mask], u_sub[mask])
+            query_params["return_utilities"] = False
+            q_sub = qs_sub.query(**query_params)
+            self.assertEqual(len(q_sub), 1)
 
     def test_query_batch_variation(self):
         init_params = deepcopy(self.init_default_params)
