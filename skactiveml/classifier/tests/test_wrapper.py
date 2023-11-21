@@ -7,7 +7,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import BaggingClassifier
 from sklearn.gaussian_process import (
     GaussianProcessClassifier,
-    GaussianProcessRegressor,
 )
 from sklearn.linear_model import Perceptron
 from sklearn.pipeline import Pipeline
@@ -19,24 +18,34 @@ from skactiveml.classifier import (
     SlidingWindowClassifier,
     ParzenWindowClassifier,
 )
+from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
 
 
-class TestSklearnClassifier(unittest.TestCase):
+class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
     def setUp(self):
+        estimator_class = SklearnClassifier
+        init_default_params = {
+                            "estimator": GaussianNB(),
+                            "missing_label": "nan",
+                               }
+        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+        predict_default_params = {"X": [[1]]}
+        super().setUp(
+            estimator_class=estimator_class,
+            init_default_params=init_default_params,
+            fit_default_params=fit_default_params,
+            predict_default_params=predict_default_params,
+        )
+
         self.X = np.zeros((4, 1))
         self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
-
+    
     def test_init_param_estimator(self):
-        clf = SklearnClassifier(estimator="Test")
-        self.assertEqual(clf.estimator, "Test")
-        clf = SklearnClassifier(estimator="Test")
-        self.assertEqual(clf.estimator, "Test")
-        clf = SklearnClassifier(
-            missing_label="nan", estimator=GaussianProcessRegressor()
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+        test_cases = []
+        test_cases += [(Perceptron(), None), ("Test", TypeError), (GaussianNB(), None)]
+        self._test_param("init", "estimator", test_cases)
 
     def test_fit(self):
         clf = SklearnClassifier(
@@ -199,50 +208,50 @@ class TestSklearnClassifier(unittest.TestCase):
         np.testing.assert_array_equal(np.full_like(p, 0.5), p)
 
 
-class TestSlidingWindowClassifier(unittest.TestCase):
+class TestSlidingWindowClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
     def setUp(self):
+        estimator_class = SlidingWindowClassifier
+        init_default_params = {
+                            "estimator": SklearnClassifier(GaussianProcessClassifier(), classes=["tokyo", "paris"],  missing_label="nan"),
+                            "missing_label": "nan",
+                               }
+        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+        predict_default_params = {"X": [[1]]}
+        super().setUp(
+            estimator_class=estimator_class,
+            init_default_params=init_default_params,
+            fit_default_params=fit_default_params,
+            predict_default_params=predict_default_params,
+        )
+
         self.X = np.zeros((4, 1))
         self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
-        self.y3 = [0, 1, 0, 0]
         self.y_nan = ["nan", "nan", "nan", "nan"]
-
+    
     def test_init_param_estimator(self):
-        est = GaussianNB()
-        clf = SlidingWindowClassifier(estimator=est, missing_label="nan")
-        self.assertEqual(clf.estimator, est)
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+        test_cases = []
+        test_cases += [(ParzenWindowClassifier(missing_label="nan"), None), ("Test", TypeError), (GaussianNB(), TypeError)]
+        self._test_param("init", "estimator", test_cases)
+
+    def test_init_param_missing_label(self, test_cases=None):
+        replace_init_params = {"estimator": SklearnClassifier(GaussianProcessClassifier(), missing_label=-1)}
+        return super().test_init_param_missing_label(test_cases, replace_init_params=replace_init_params)
+    
+    def test_init_param_ignore_estimator_partial_fit(self):
+        test_cases = []
+        test_cases += [(True, None), ("Test", TypeError), (0, TypeError)]
+        self._test_param("init", "ignore_estimator_partial_fit", test_cases)
 
     def test_init_param_window_size(self):
-        clf = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(), window_size="Test"
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(), window_size=-1
-        )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        test_cases = []
+        test_cases += [(100, None), (-1, ValueError), ("Test", TypeError)]
+        self._test_param("init", "window_size", test_cases)
 
     def test_init_param_only_labeled(self):
-        clf = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(), only_labeled="Test"
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(), only_labeled=0
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-
-    def test_init_param_ignore_estimator_partial_fit(self):
-        clf = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(),
-            ignore_estimator_partial_fit="Test",
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
-        clf = SlidingWindowClassifier(
-            estimator=ParzenWindowClassifier(), ignore_estimator_partial_fit=0
-        )
-        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y1)
+        test_cases = []
+        test_cases += [(True, None), ("Test", TypeError), (0, TypeError)]
+        self._test_param("init", "only_labeled", test_cases)
 
     def test_fit(self):
         # check if clf is correctly initialized

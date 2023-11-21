@@ -6,26 +6,36 @@ from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 
 from skactiveml.classifier import MixtureModelClassifier
+from skactiveml.tests.template_estimator import TemplateClassFrequencyEstimator
 
-
-class TestMixtureModelClassifier(unittest.TestCase):
+class TestMixtureModelClassifier(TemplateClassFrequencyEstimator, unittest.TestCase):
     def setUp(self):
+        estimator_class = MixtureModelClassifier
+        init_default_params = {"missing_label": "nan",
+                            #    "classes": ["tokyo", "paris"]
+                               }
+        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+        predict_default_params = {"X": [[1]]}
+        super().setUp(
+            estimator_class=estimator_class,
+            init_default_params=init_default_params,
+            fit_default_params=fit_default_params,
+            predict_default_params=predict_default_params,
+        )
         self.X = np.zeros((3, 1))
-        self.y = ["tokyo", "nan", "paris"]
         self.y_nan = ["nan", "nan", "nan"]
+        self.y = ["tokyo", "nan", "paris"]
         self.w = [2, np.nan, 1]
-
+    
     def test_init_param_mixture_model(self):
-        cmm = MixtureModelClassifier(missing_label=-1)
-        self.assertEqual(cmm.mixture_model, None)
-        cmm = MixtureModelClassifier(missing_label="nan", mixture_model="Test")
-        self.assertRaises(TypeError, cmm.fit, X=self.X, y=self.y)
-
+        test_cases = []
+        test_cases += [(None, None), ("Test", TypeError), (BayesianGaussianMixture(), None)]
+        self._test_param("init", "mixture_model", test_cases)
+    
     def test_init_param_weight_mode(self):
-        cmm = MixtureModelClassifier(missing_label=-1)
-        self.assertEqual(cmm.weight_mode, "responsibilities")
-        cmm = MixtureModelClassifier(missing_label="nan", weight_mode="Test")
-        self.assertRaises(ValueError, cmm.fit, X=self.X, y=self.y)
+        test_cases = []
+        test_cases += [("responsibilities", None), ("Test", ValueError)]
+        self._test_param("init", "weight_mode", test_cases)
 
     def test_fit(self):
         mixture = GaussianMixture(random_state=0, n_components=4)
