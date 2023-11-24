@@ -637,12 +637,14 @@ class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):
         test_cases = []
         X = np.array([[0, 1], [1, 0], [2, 3]])
         test_cases += [(X, None), ("Test", ValueError)]
+        replace_fit_params = {"X": X}
         extras_params = deepcopy(self.predict_default_params)
         self._test_param(
             "predict_target_distribution",
             "X",
             test_cases,
             extras_params=extras_params,
+            replace_fit_params=replace_fit_params,
         )
 
     def test_predict_param_return_std(self):
