@@ -17,17 +17,17 @@ from skactiveml.regressor._wrapper import (
     SklearnNormalRegressor,
 )
 from skactiveml.utils import MISSING_LABEL
-from skactiveml.tests.template_estimator import TemplateSkactivemlRegressor, TemplateProbabilisticRegressor
+from skactiveml.tests.template_estimator import (
+    TemplateSkactivemlRegressor,
+    TemplateProbabilisticRegressor,
+)
 
 
 class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
     def setUp(self):
         estimator_class = SklearnRegressor
         estimator = SGDRegressor()
-        init_default_params = {
-            "estimator": estimator,
-            "missing_label": np.nan
-        }
+        init_default_params = {"estimator": estimator, "missing_label": np.nan}
         fit_default_params = {"X": np.zeros((3, 1)), "y": [0.5, 0.6, np.nan]}
         predict_default_params = {"X": [[1]]}
         super().setUp(
@@ -44,7 +44,11 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
 
     def test_init_param_estimator(self):
         test_cases = []
-        test_cases += [(GaussianProcessRegressor(), None), (SVC(), TypeError), ("Test", TypeError)]
+        test_cases += [
+            (GaussianProcessRegressor(), None),
+            (SVC(), TypeError),
+            ("Test", TypeError),
+        ]
         self._test_param("init", "estimator", test_cases)
 
     def test_fit_predict(self):
@@ -185,14 +189,14 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
         y_pred = reg.predict(X)
         np.testing.assert_array_equal(np.zeros_like(y_pred), y_pred)
 
-class TestSklearnProbabilisticRegressor(TemplateProbabilisticRegressor, unittest.TestCase):
+
+class TestSklearnProbabilisticRegressor(
+    TemplateProbabilisticRegressor, unittest.TestCase
+):
     def setUp(self):
         estimator_class = SklearnNormalRegressor
         estimator = GaussianProcessRegressor()
-        init_default_params = {
-            "estimator": estimator,
-            "missing_label": np.nan
-        }
+        init_default_params = {"estimator": estimator, "missing_label": np.nan}
         fit_default_params = {"X": np.zeros((3, 1)), "y": [0.5, 0.6, np.nan]}
         predict_default_params = {"X": [[1]]}
         super().setUp(
@@ -208,20 +212,36 @@ class TestSklearnProbabilisticRegressor(TemplateProbabilisticRegressor, unittest
 
     def test_init_param_estimator(self):
         test_cases = []
-        test_cases += [(GaussianProcessRegressor(), None), (SVC(), TypeError), ("Test", TypeError)]
+        test_cases += [
+            (GaussianProcessRegressor(), None),
+            (SVC(), TypeError),
+            ("Test", TypeError),
+        ]
         self._test_param("init", "estimator", test_cases)
 
     def test_partial_fit_param_X(self, test_cases=None, extras_params=None):
         replace_init_params = {"estimator": SGDRegressor()}
-        return super().test_partial_fit_param_X(test_cases, extras_params=extras_params, replace_init_params=replace_init_params,)
-    
+        super().test_partial_fit_param_X(
+            test_cases,
+            extras_params=extras_params,
+            replace_init_params=replace_init_params,
+        )
+
     def test_partial_fit_param_y(self, test_cases=None):
         replace_init_params = {"estimator": SGDRegressor()}
-        return super().test_partial_fit_param_y(test_cases, replace_init_params=replace_init_params)
-    
-    def test_partial_fit_param_sample_weight(self, test_cases=None, extras_params=None):
+        super().test_partial_fit_param_y(
+            test_cases, replace_init_params=replace_init_params
+        )
+
+    def test_partial_fit_param_sample_weight(
+        self, test_cases=None, extras_params=None
+    ):
         replace_init_params = {"estimator": SGDRegressor()}
-        return super().test_partial_fit_param_sample_weight(test_cases, extras_params=extras_params, replace_init_params=replace_init_params)
+        super().test_partial_fit_param_sample_weight(
+            test_cases,
+            extras_params=extras_params,
+            replace_init_params=replace_init_params,
+        )
 
     def test_predict_target_distribution(self):
         reg = SklearnNormalRegressor(estimator=GaussianProcessRegressor())

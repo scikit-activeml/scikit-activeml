@@ -25,10 +25,13 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
     def setUp(self):
         estimator_class = SklearnClassifier
         init_default_params = {
-                            "estimator": GaussianNB(),
-                            "missing_label": "nan",
-                               }
-        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+            "estimator": GaussianNB(),
+            "missing_label": "nan",
+        }
+        fit_default_params = {
+            "X": np.zeros((3, 1)),
+            "y": ["tokyo", "nan", "paris"],
+        }
         predict_default_params = {"X": [[1]]}
         super().setUp(
             estimator_class=estimator_class,
@@ -41,10 +44,14 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
-    
+
     def test_init_param_estimator(self):
         test_cases = []
-        test_cases += [(Perceptron(), None), ("Test", TypeError), (GaussianNB(), None)]
+        test_cases += [
+            (Perceptron(), None),
+            ("Test", TypeError),
+            (GaussianNB(), None),
+        ]
         self._test_param("init", "estimator", test_cases)
 
     def test_fit(self):
@@ -208,14 +215,23 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         np.testing.assert_array_equal(np.full_like(p, 0.5), p)
 
 
-class TestSlidingWindowClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
+class TestSlidingWindowClassifier(
+    TemplateSkactivemlClassifier, unittest.TestCase
+):
     def setUp(self):
         estimator_class = SlidingWindowClassifier
         init_default_params = {
-                            "estimator": SklearnClassifier(GaussianProcessClassifier(), classes=["tokyo", "paris"],  missing_label="nan"),
-                            "missing_label": "nan",
-                               }
-        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(),
+                classes=["tokyo", "paris"],
+                missing_label="nan",
+            ),
+            "missing_label": "nan",
+        }
+        fit_default_params = {
+            "X": np.zeros((3, 1)),
+            "y": ["tokyo", "nan", "paris"],
+        }
         predict_default_params = {"X": [[1]]}
         super().setUp(
             estimator_class=estimator_class,
@@ -228,16 +244,26 @@ class TestSlidingWindowClassifier(TemplateSkactivemlClassifier, unittest.TestCas
         self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
-    
+
     def test_init_param_estimator(self):
         test_cases = []
-        test_cases += [(ParzenWindowClassifier(missing_label="nan"), None), ("Test", TypeError), (GaussianNB(), TypeError)]
+        test_cases += [
+            (ParzenWindowClassifier(missing_label="nan"), None),
+            ("Test", TypeError),
+            (GaussianNB(), TypeError),
+        ]
         self._test_param("init", "estimator", test_cases)
 
     def test_init_param_missing_label(self, test_cases=None):
-        replace_init_params = {"estimator": SklearnClassifier(GaussianProcessClassifier(), missing_label=-1)}
-        return super().test_init_param_missing_label(test_cases, replace_init_params=replace_init_params)
-    
+        replace_init_params = {
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label=-1
+            )
+        }
+        super().test_init_param_missing_label(
+            test_cases, replace_init_params=replace_init_params
+        )
+
     def test_init_param_ignore_estimator_partial_fit(self):
         test_cases = []
         test_cases += [(True, None), ("Test", TypeError), (0, TypeError)]

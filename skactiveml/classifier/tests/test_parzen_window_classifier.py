@@ -6,13 +6,20 @@ from skactiveml.tests.template_estimator import TemplateClassFrequencyEstimator
 
 from skactiveml.classifier import ParzenWindowClassifier
 
-class TestParzenWindowClassifier2(TemplateClassFrequencyEstimator, unittest.TestCase):
+
+class TestParzenWindowClassifier2(
+    TemplateClassFrequencyEstimator, unittest.TestCase
+):
     def setUp(self):
         estimator_class = ParzenWindowClassifier
-        init_default_params = {"missing_label": "nan",
-                            #    "classes": ["tokyo", "paris"]
-                               }
-        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+        init_default_params = {
+            "missing_label": "nan",
+            #    "classes": ["tokyo", "paris"]
+        }
+        fit_default_params = {
+            "X": np.zeros((3, 1)),
+            "y": ["tokyo", "nan", "paris"],
+        }
         predict_default_params = {"X": [[1]]}
         super().setUp(
             estimator_class=estimator_class,
@@ -32,12 +39,21 @@ class TestParzenWindowClassifier2(TemplateClassFrequencyEstimator, unittest.Test
 
     def test_init_param_metric_dict(self):
         test_cases = []
-        test_cases += [({"gamma": "mean"}, None), ("gamma", TypeError), ([], TypeError)]
+        test_cases += [
+            ({"gamma": "mean"}, None),
+            ("gamma", TypeError),
+            ([], TypeError),
+        ]
         self._test_param("init", "metric_dict", test_cases)
 
     def test_init_param_n_neighbors(self):
         test_cases = []
-        test_cases += [(1, None), (0, ValueError), (-1, ValueError), (1.5, TypeError)]
+        test_cases += [
+            (1, None),
+            (0, ValueError),
+            (-1, ValueError),
+            (1.5, TypeError),
+        ]
         self._test_param("init", "n_neighbors", test_cases)
 
     def test_fit(self):

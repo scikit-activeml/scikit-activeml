@@ -8,13 +8,20 @@ from sklearn.utils.validation import NotFittedError, check_is_fitted
 from skactiveml.classifier import MixtureModelClassifier
 from skactiveml.tests.template_estimator import TemplateClassFrequencyEstimator
 
-class TestMixtureModelClassifier(TemplateClassFrequencyEstimator, unittest.TestCase):
+
+class TestMixtureModelClassifier(
+    TemplateClassFrequencyEstimator, unittest.TestCase
+):
     def setUp(self):
         estimator_class = MixtureModelClassifier
-        init_default_params = {"missing_label": "nan",
-                            #    "classes": ["tokyo", "paris"]
-                               }
-        fit_default_params = {"X": np.zeros((3, 1)), "y": ["tokyo", "nan", "paris"]}
+        init_default_params = {
+            "missing_label": "nan",
+            #    "classes": ["tokyo", "paris"]
+        }
+        fit_default_params = {
+            "X": np.zeros((3, 1)),
+            "y": ["tokyo", "nan", "paris"],
+        }
         predict_default_params = {"X": [[1]]}
         super().setUp(
             estimator_class=estimator_class,
@@ -26,12 +33,16 @@ class TestMixtureModelClassifier(TemplateClassFrequencyEstimator, unittest.TestC
         self.y_nan = ["nan", "nan", "nan"]
         self.y = ["tokyo", "nan", "paris"]
         self.w = [2, np.nan, 1]
-    
+
     def test_init_param_mixture_model(self):
         test_cases = []
-        test_cases += [(None, None), ("Test", TypeError), (BayesianGaussianMixture(), None)]
+        test_cases += [
+            (None, None),
+            ("Test", TypeError),
+            (BayesianGaussianMixture(), None),
+        ]
         self._test_param("init", "mixture_model", test_cases)
-    
+
     def test_init_param_weight_mode(self):
         test_cases = []
         test_cases += [("responsibilities", None), ("Test", ValueError)]
