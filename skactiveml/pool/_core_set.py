@@ -2,7 +2,7 @@
 Module implementing various Core-set Selection strategies.
 
 Core-set selection problem aims to find a small subset given a large labeled
-dataset such that a model learned over the small subset is competitve over the
+dataset such that a model learned over the small subset is competitive over the
 whole dataset.
 """
 
@@ -64,7 +64,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples
          y: array-like of shape (n_samples, )
-            Labels of the training data set (possibly including unlabeles ones
+            Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label)
          candidates: None or array-like of shape (n_candidates), dtype = int or
             array-like of shape (n_candidates, n_features),
@@ -72,9 +72,9 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             If candidates is None, the unlabeled samples from (X,y) are considered
             as candidates
          batch_size: int, optional(default=1)
-            The number of samples to be selectes in one AL cycle.
+            The number of samples to be selects in one AL cycle.
          return_utilities: bool, optional(default=False)
-            If True, also return the utilites based on the query strategy
+            If True, also return the utilities based on the query strategy
 
          Returns
          ----------
@@ -106,7 +106,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 y_cand = np.full(shape=n_new_cand, fill_value=MISSING_LABEL)
                 y_with_cand = np.append(y, y_cand)
                 mapping = np.arange(X.shape[0], X.shape[0] + n_new_cand)
-                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, self.random_state, self.missing_label, mapping, n_new_cand)
+                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, batch_size, self.random_state, self.missing_label, mapping, n_new_cand)
 
         if return_utilities:
             return query_indices, utilities
@@ -125,7 +125,7 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples
      selected_samples: np.ndarray of shape (n_selected_samples, )
-        index of datapoints already selectes
+        index of datapoints already selects
      batch_size: int, optional(default=1)
         The number of samples to be selected in one AL cycle.
         
