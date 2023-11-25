@@ -96,15 +96,17 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         """
 
         if self.method == 'greedy':
-            if candidates is None:
-                query_indices, utilities = k_greedy_center(X, y, batch_size, self.missing_label, self.random_state_)
+            if mapping is not None:
+                query_indices, utilities = k_greedy_center(X, y, batch_size, self.missing_label, self.random_state_, mapping)
+            else:
+                pass
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
 
-def k_greedy_center(X, y, batch_size, missing_label, random_state, mapping=None):
+def k_greedy_center(X, y, batch_size, missing_label, random_state, mapping):
     """
      An active learning method that greedily forms a batch to minimize
      the maximum distance to a cluster center among all unlabeled
@@ -137,21 +139,22 @@ def k_greedy_center(X, y, batch_size, missing_label, random_state, mapping=None)
     query_indices = np.array([], dtype=int)
 
     for i in range(batch_size):
-        utilities[i] = update_distances(X, selected_samples)
+        if mapping is not None:
+            utilities[i] = update_distances(X, selected_samples, mapping)
 
-        # select index
-        idx = np.nanargmax(utilities[i, mapping])
+            # select index
+            idx = np.nanargmax(utilities[i])
 
-        if len(selected_samples) == 0:
-            idx = random_state.choice(np.arange(X.shape[0]))
-            # because np.nanargmax always return the first occurrence is returned
+            if len(selected_samples) == 0:
+                idx = random_state.choice(np.arange(X.shape[0]))
+                # because np.nanargmax always return the first occurrence is returned
 
         query_indices = np.append(query_indices, [idx])
         selected_samples = np.append(selected_samples, [idx])
 
     return query_indices, utilities
 
-def update_distances(X, cluster_centers):
+def update_distances(X, cluster_centers, mapping):
     """
     Update min distances by given cluster centers.
 
@@ -171,12 +174,15 @@ def update_distances(X, cluster_centers):
             distance between each data point and its nearest center after
             each selected sample of the batch
         """
-    if len(cluster_centers) == 0:
-        return np.empty(shape=(1, X.shape[0]))
+    dist = np.empty(shape=(1, X.shape[0]))
 
-    cluster_center_feature = X[cluster_centers]
-    dist_matrix = pairwise_distances(X, cluster_center_feature)
-    dist = np.min(dist_matrix, axis=1).reshape(1, -1)
+    if len(cluster_centers) > 0:
+        cluster_center_feature = X[cluster_centers]
+        dist_matrix = pairwise_distances(X, cluster_center_feature)
+        dist = np.min(dist_matrix, axis=1).reshape(1, -1)
 
-    dist[cluster_centers] = np.nan
-    return dist
+    result_dist = np.full((1, X.shape[0]), np.nan)
+    result_dist[0, mapping] = dist[0, mapping]
+    result_dist[0, cluster_centers] = np.nan
+
+    return result_dist
