@@ -91,22 +91,29 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True)
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
         """
         X_cand unlabeled samples
         mapping: indices of the original array
         """
 
         if self.method == 'greedy':
-            query_indices, utilities = k_greedy_center(X, y, batch_size, self.random_state_, self.missing_label, mapping)
-
+            if mapping is not None:
+                query_indices, utilities = k_greedy_center(X, y, batch_size, self.random_state_, self.missing_label, mapping)
+            else:
+                X_with_cand = np.append(X, X_cand)
+                n_new_cand = X_cand.shape[0]
+                y_cand = np.full(shape=n_new_cand, fill_value=MISSING_LABEL)
+                y_with_cand = np.append(y, y_cand)
+                mapping = np.arange(X.shape[0], X.shape[0] + n_new_cand)
+                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, self.random_state, self.missing_label, mapping, n_new_cand)
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
 
-def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mapping=None):
+def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mapping=None, n_new_cand=None):
     """
      An active learning method that greedily forms a batch to minimize
      the maximum distance to a cluster center among all unlabeled
@@ -147,15 +154,18 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
         idx = np.nanargmax(utilities[i])
 
         if len(selected_samples) == 0:
-            idx = random_state.choice(np.arange(X.shape[0]))
+            idx = random_state.choice(mapping)
             # because np.nanargmax always return the first occurrence is returned
 
         query_indices = np.append(query_indices, [idx])
         selected_samples = np.append(selected_samples, [idx])
 
+    if n_new_cand is not None:
+        utilities = utilities[:, mapping]
+
     return query_indices, utilities
 
-def update_distances(X, cluster_centers, mapping=None):
+def update_distances(X, cluster_centers, mapping):
     """
     Update min distances by given cluster centers.
 
