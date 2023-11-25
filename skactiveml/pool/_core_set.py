@@ -9,7 +9,7 @@ whole dataset.
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, labeled_indices
+from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices
 from sklearn.metrics import pairwise_distances
 
 
@@ -52,12 +52,14 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             candidates=None,
             batch_size=1,
             return_utilities=False,
+            **kwargs
     ):
 
         """ Query the next instances to be labeled
 
          Parameters
          ----------
+         **kwargs
          X: array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples
@@ -89,24 +91,22 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True)
         """
         X_cand unlabeled samples
         mapping: indices of the original array
         """
 
         if self.method == 'greedy':
-            if mapping is not None:
-                query_indices, utilities = k_greedy_center(X, y, batch_size, self.missing_label, self.random_state_, mapping)
-            else:
-                pass
+            query_indices, utilities = k_greedy_center(X, y, batch_size, self.random_state_, self.missing_label, mapping)
+
 
         if return_utilities:
             return query_indices, utilities
         else:
             return query_indices
 
-def k_greedy_center(X, y, batch_size, missing_label, random_state, mapping):
+def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mapping=None):
     """
      An active learning method that greedily forms a batch to minimize
      the maximum distance to a cluster center among all unlabeled
@@ -133,28 +133,29 @@ def k_greedy_center(X, y, batch_size, missing_label, random_state, mapping):
         """
     # read the labeled aka selected samples from the y vector
     selected_samples = labeled_indices(y, missing_label=missing_label)
+    if mapping is None:
+        mapping = unlabeled_indices(y, missing_label=missing_label)
     # initialize the utilities matrix with
     utilities = np.empty(shape=(batch_size, X.shape[0]))
 
     query_indices = np.array([], dtype=int)
 
     for i in range(batch_size):
-        if mapping is not None:
-            utilities[i] = update_distances(X, selected_samples, mapping)
+        utilities[i] = update_distances(X, selected_samples, mapping)
 
-            # select index
-            idx = np.nanargmax(utilities[i])
+        # select index
+        idx = np.nanargmax(utilities[i])
 
-            if len(selected_samples) == 0:
-                idx = random_state.choice(np.arange(X.shape[0]))
-                # because np.nanargmax always return the first occurrence is returned
+        if len(selected_samples) == 0:
+            idx = random_state.choice(np.arange(X.shape[0]))
+            # because np.nanargmax always return the first occurrence is returned
 
         query_indices = np.append(query_indices, [idx])
         selected_samples = np.append(selected_samples, [idx])
 
     return query_indices, utilities
 
-def update_distances(X, cluster_centers, mapping):
+def update_distances(X, cluster_centers, mapping=None):
     """
     Update min distances by given cluster centers.
 
