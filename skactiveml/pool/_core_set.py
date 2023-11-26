@@ -110,7 +110,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             if mapping is not None:
                 query_indices, utilities = k_greedy_center(X, y, batch_size, self.random_state_, self.missing_label, mapping)
             else:
-                X_with_cand = np.append(X_cand, X)
+                X_with_cand = np.concatenate((X_cand, X), axis=0)
                 n_new_cand = X_cand.shape[0]
                 y_cand = np.full(shape=n_new_cand, fill_value=MISSING_LABEL)
                 y_with_cand = np.concatenate((y_cand, y), axis=None)
@@ -185,7 +185,7 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
             utilities[i] = update_distances(X, selected_samples, mapping)
         else:
             update_dist = update_distances(X, selected_samples, mapping)
-            utilities[i] = update_dist[:, mapping]
+            utilities[i] = update_dist[mapping]
 
         # select index
         idx = np.nanargmax(utilities[i])
@@ -226,15 +226,15 @@ def update_distances(X, cluster_centers, mapping):
         - For the indices isn't in mapping, the corresponding value in
         result-dist will be also np.nan
         """
-    dist = np.empty(shape=(1, X.shape[0]))
+    dist = np.zeros(shape=X.shape[0])
 
     if len(cluster_centers) > 0:
         cluster_center_feature = X[cluster_centers]
         dist_matrix = pairwise_distances(X, cluster_center_feature)
-        dist = np.min(dist_matrix, axis=1).reshape(1, -1)
+        dist = np.min(dist_matrix, axis=1)
 
-    result_dist = np.full((1, X.shape[0]), np.nan)
-    result_dist[0, mapping] = dist[0, mapping]
-    result_dist[0, cluster_centers] = np.nan
+    result_dist = np.full(X.shape[0], np.nan)
+    result_dist[mapping] = dist[mapping]
+    result_dist[cluster_centers] = np.nan
 
     return result_dist
