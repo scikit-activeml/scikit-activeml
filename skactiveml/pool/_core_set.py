@@ -105,10 +105,6 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-        """
-        X_cand unlabeled samples
-        mapping: indices of the original array
-        """
 
         if self.method == 'greedy':
             if mapping is not None:
@@ -131,6 +127,7 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
      An active learning method that greedily forms a batch to minimize
      the maximum distance to a cluster center among all unlabeled
      datapoints.
+     This method is a static method.
 
      Parameters:
      ----------
@@ -141,15 +138,35 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
         index of datapoints already selects
      batch_size: int, optional(default=1)
         The number of samples to be selected in one AL cycle.
+     random_state: np.random.RandomState
+        The random state to use
+     missing_label: scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label
+     mapping: np.ndarray of shape (n_candidates, ) default None
+        Index array that maps `candidates` to `X`.
+        (`candidates = X[mapping]`)
+     n_new_cand: int or None, default None
+        The number of new candidates that are additionally added to X.
+        Only used for the case, that in the query function with the
+        shape of candidates is (n_candidates, n_feature)
         
      Return:
      ----------
-     new_samples: numpy.ndarry of shape (batch_size, )
+     query_indices: numpy.ndarry of shape (batch_size, )
          The query_indices indicate for which candidate sample a label is
-         to queried from the candidates
-     utilities: numpy.ndarray of shape (batch_size, n_samples)
+         to queried from the candidates.
+         If candidates in None or of shape (n_candidates), the indexing
+         refers to samples in X.
+         If candidates is of shape (n_candidates, n_features), the indexing
+         refers to samples in candidates.
+     utilities: numpy.ndarray of shape (batch_size, n_samples) or
+         numpy.ndarry of shape (batch_size, n_new_cand)
          The distance between each data point and its nearest center that used
          for selecting the next sample.
+         If candidates is None or of shape (n_candidates), the indexing
+         refers to samples in X.
+         If candidates is of shape (n_candidates, n_features), the indexing
+         refers to samples in candidates.
         """
     # read the labeled aka selected samples from the y vector
     selected_samples = labeled_indices(y, missing_label=missing_label)
@@ -187,16 +204,23 @@ def update_distances(X, cluster_centers, mapping):
     X: array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples
-    cluster_centers: indices of cluster centers
+    cluster_centers: array-like of shape (n_cluster_centers)
+        indices of cluster centers
+    mapping: np.ndarray of shape (n_candidates, ) default None
+        Index array that maps `candidates` to `X`.
+        (`candidates = X[mapping]`)
 
     Return:
     ---------
-    dist: numpy.ndarray of shape (1, n_samples)
+    result-dist: numpy.ndarray of shape (1, n_samples)
         - if there aren't any cluster centers existed, the default distance
-            will be 0
+        will be 0
         - if there are some cluster center existed, the return will be the
-            distance between each data point and its nearest center after
-            each selected sample of the batch
+        distance between each data point and its nearest center after
+        each selected sample of the batch. By the case of cluster center the
+        value will be np.nan
+        - For the indices isn't in mapping, the corresponding value in
+        result-dist will be also np.nan
         """
     dist = np.empty(shape=(1, X.shape[0]))
 
