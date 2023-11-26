@@ -71,6 +71,10 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             optional (default=None)
             If candidates is None, the unlabeled samples from (X,y) are considered
             as candidates
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as a list of the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the candidates are
+            directly given in the input candidates (not necessarily contained in X)
          batch_size: int, optional(default=1)
             The number of samples to be selects in one AL cycle.
          return_utilities: bool, optional(default=False)
@@ -78,13 +82,22 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
          Returns
          ----------
-         query_indices: numpy.ndarry of shape (batch_size, )
+         query_indices: numpy.ndarry of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-         utilities: numpy.ndarray of shape (n_samples, )
-            The distance between each data point and its nearest center after
-            each selected sample of the batch
+            If candidates in None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+         utilities: numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples for selecting each sample of the batch.
+            Here, utilities means the distance between each data point and its nearest center.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
          """
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
