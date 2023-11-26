@@ -113,9 +113,9 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 X_with_cand = np.append(X_cand, X)
                 n_new_cand = X_cand.shape[0]
                 y_cand = np.full(shape=n_new_cand, fill_value=MISSING_LABEL)
-                y_with_cand = np.append(y_cand, y)
+                y_with_cand = np.concatenate((y_cand, y), axis=None)
                 mapping = np.arange(n_new_cand)
-                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, batch_size, self.random_state, self.missing_label, mapping, n_new_cand)
+                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, batch_size, self.random_state_, self.missing_label, mapping, n_new_cand)
 
         if return_utilities:
             return query_indices, utilities
@@ -173,12 +173,19 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
     if mapping is None:
         mapping = unlabeled_indices(y, missing_label=missing_label)
     # initialize the utilities matrix with
-    utilities = np.empty(shape=(batch_size, X.shape[0]))
+    if n_new_cand is None:
+        utilities = np.empty(shape=(batch_size, X.shape[0]))
+    else:
+        utilities = np.empty(shape=(batch_size, n_new_cand))
 
     query_indices = np.array([], dtype=int)
 
     for i in range(batch_size):
-        utilities[i] = update_distances(X, selected_samples, mapping)
+        if n_new_cand is None:
+            utilities[i] = update_distances(X, selected_samples, mapping)
+        else:
+            update_dist = update_distances(X, selected_samples, mapping)
+            utilities[i] = update_dist[:, mapping]
 
         # select index
         idx = np.nanargmax(utilities[i])
@@ -189,9 +196,6 @@ def k_greedy_center(X, y, batch_size, random_state, missing_label=np.nan, mappin
 
         query_indices = np.append(query_indices, [idx])
         selected_samples = np.append(selected_samples, [idx])
-
-    if n_new_cand is not None:
-        utilities = utilities[:, mapping]
 
     return query_indices, utilities
 
