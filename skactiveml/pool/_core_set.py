@@ -110,12 +110,14 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             if mapping is not None:
                 query_indices, utilities = k_greedy_center(X, y, batch_size, self.random_state_, self.missing_label, mapping)
             else:
-                X_with_cand = np.concatenate((X_cand, X), axis=0)
+                selected_samples = labeled_indices(y=y, missing_label=self.missing_label)
+                X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
                 n_new_cand = X_cand.shape[0]
-                y_cand = np.full(shape=n_new_cand, fill_value=MISSING_LABEL)
-                y_with_cand = np.concatenate((y_cand, y), axis=None)
+                y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
+                y_with_cand = np.concatenate((y_cand, y[selected_samples]), axis=None)
                 mapping = np.arange(n_new_cand)
-                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, batch_size, self.random_state_, self.missing_label, mapping, n_new_cand)
+                query_indices, utilities = k_greedy_center(X_with_cand, y_with_cand, batch_size, self.random_state_,
+                                                           self.missing_label, mapping, n_new_cand)
 
         if return_utilities:
             return query_indices, utilities
