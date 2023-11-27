@@ -374,6 +374,9 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             y = self.query_default_params_reg["y"]
             test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
             self._test_param("query", "y", test_cases, exclude_clf=True)
+            y_string = np.full(len(y), "test")
+            test_cases = [(y_string, TypeError)]
+            self._test_param("query", "y", test_cases, exclude_clf=True)
 
     def test_query_param_candidates(self, test_cases=None):  # TODO more cases
         test_cases = [] if test_cases is None else test_cases
@@ -637,12 +640,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         qs_class,
         init_default_params,
         query_default_params_clf=None,
+        query_default_params_reg=None,
     ):
         super().setUp(
             qs_class,
             init_default_params,
             query_default_params_clf,
-            None,
+            query_default_params_reg,
         )
         self.update_params = {
             "candidates": [[]],
@@ -653,6 +657,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         # _model_comparison checks for the availability of the classifier
         self.query_default_params_clf["fit_clf"] = True
         self._model_comparison(test_cases=test_cases, model_type="clf")
+
+    def test_query_param_reg(self, test_cases=None):
+        # _model_comparison checks for the availability of the regressor
+        query_params = inspect.signature(self.qs_class.query).parameters
+        if "fit_reg" in query_params:
+            self.query_default_params_reg["fit_reg"] = True
+        self._model_comparison(test_cases=test_cases, model_type="reg")
 
     def test_init_param_budget(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -686,9 +697,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
             for exclude_clf, exclude_reg, query_params in [
                 (False, True, self.query_default_params_clf),
+                (True, False, self.query_default_params_reg),
             ]:
                 if query_params is not None:
-                    replace_query_params = {"fit_clf": True}
+                    if not exclude_clf:
+                        replace_query_params = {"fit_clf": True}
+                    else:
+                        replace_query_params = {"fit_reg": True}
                     X = query_params["X"]
                     test_cases += [(X, None), (np.vstack([X, X]), ValueError)]
                     self._test_param(
@@ -743,11 +758,33 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                         exclude_reg=True,
                     )
 
+            if self.query_default_params_reg is not None:
+                y = self.query_default_params_reg["y"]
+                replace_query_params = {"fit_reg": True}
+                test_cases = [(y, None), (np.vstack([y, y]), ValueError)]
+                self._test_param(
+                    "query",
+                    "y",
+                    test_cases,
+                    exclude_clf=True,
+                    replace_query_params=replace_query_params,
+                )
+                y_string = np.full(len(y), "test")
+                test_cases = [(y_string, TypeError)]
+                self._test_param(
+                    "query",
+                    "y",
+                    test_cases,
+                    exclude_clf=True,
+                    replace_query_params=replace_query_params,
+                )
+
     def test_query_param_candidates(self, test_cases=None):  # TODO more cases
         test_cases = [] if test_cases is None else test_cases
 
         for exclude_clf, exclude_reg, query_params in [
             (False, True, self.query_default_params_clf),
+            (True, False, self.query_default_params_reg),
         ]:
             if query_params is not None:
                 ulbd_idx = query_params["candidates"]
@@ -778,10 +815,13 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
             for exclude_clf, exclude_reg, query_params in [
                 (False, True, self.query_default_params_clf),
-                # (True, False, self.query_default_params_reg),
+                (True, False, self.query_default_params_reg),
             ]:
                 if query_params is not None:
-                    replace_query_params = {"fit_clf": True}
+                    if not exclude_clf:
+                        replace_query_params = {"fit_clf": True}
+                    else:
+                        replace_query_params = {"fit_reg": True}
                     y = query_params["y"]
                     test_cases = [
                         (np.ones(len(y)), None),
@@ -798,55 +838,64 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
 
     def test_query(
         self,
-        expected_output=None,
-        expected_utilities=None,
+        expected_output,
+        expected_utilities,
         budget_manager_param_dict=None,
     ):
         if expected_output is None or expected_utilities is None:
             raise ValueError(
                 "Test need to override expected_output and expected_utilities"
             )
-        init_params = deepcopy(self.init_default_params)
-        init_params["random_state"] = np.random.RandomState(0)
-        qs = self.qs_class(**init_params)
-        qs2 = self.qs_class(**init_params)
-        X = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75]])
-        y = np.array([0, 0, 1, 1, 1])
-        candidat = np.array([[0.5, 0.5]])
-        query_default_params = deepcopy(self.query_default_params_clf)
-        query_params = inspect.signature(self.qs_class.query).parameters
-        if "clf" in query_params:
-            query_default_params["X"] = X
-            query_default_params["y"] = y
-            query_default_params["fit_clf"] = True
-        query_default_params["candidates"] = candidat
-        query_default_params["return_utilities"] = True
-        call_func(
-            qs.update,
-            candidates=X,
-            queried_indices=[0, 1, 2, 3, 4],
-            budget_manager_param_dict=budget_manager_param_dict,
-        )
-        call_func(
-            qs2.update,
-            candidates=X,
-            queried_indices=[0, 1, 2, 3, 4],
-            budget_manager_param_dict=budget_manager_param_dict,
-        )
-        qs_output, utilities = qs.query(**query_default_params)
-        qs_output2 = []
-        utilities2 = []
-        for i in range(3):
-            qs_output2, utilities2 = qs2.query(**query_default_params)
-        np.testing.assert_almost_equal(expected_utilities, utilities)
-        self.assertFalse(isinstance(list, type(qs_output)))
-        if len(expected_output) == 0:
-            self.assertEqual(len(expected_output), len(qs_output))
-            self.assertEqual(len(qs_output2), len(qs_output))
-        else:
-            self.assertEqual(expected_output, qs_output)
-            self.assertEqual(qs_output2, qs_output)
-        np.testing.assert_almost_equal(utilities, utilities2)
+        for exclude_clf, exclude_reg, query_params in [
+            (False, True, self.query_default_params_clf),
+            (True, False, self.query_default_params_reg),
+        ]:
+            if query_params is None:
+                continue
+            init_params = deepcopy(self.init_default_params)
+            init_params["random_state"] = np.random.RandomState(0)
+            qs = self.qs_class(**init_params)
+            qs2 = self.qs_class(**init_params)
+            X = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75]])
+            y = np.array([0, 0, 1, 1, 1])
+            candidate = np.array([[0.5, 0.5]])
+            query_default_params = deepcopy(self.query_default_params_clf)
+            query_params = inspect.signature(self.qs_class.query).parameters
+            if "clf" in query_params:
+                query_default_params["X"] = X
+                query_default_params["y"] = y
+                if not exclude_clf:
+                    query_default_params["fit_clf"] = True
+                else:
+                    query_default_params["fit_reg"] = True
+            query_default_params["candidates"] = candidate
+            query_default_params["return_utilities"] = True
+            call_func(
+                qs.update,
+                candidates=X,
+                queried_indices=[0, 1, 2, 3, 4],
+                budget_manager_param_dict=budget_manager_param_dict,
+            )
+            call_func(
+                qs2.update,
+                candidates=X,
+                queried_indices=[0, 1, 2, 3, 4],
+                budget_manager_param_dict=budget_manager_param_dict,
+            )
+            qs_output, utilities = qs.query(**query_default_params)
+            qs_output2 = []
+            utilities2 = []
+            for i in range(3):
+                qs_output2, utilities2 = qs2.query(**query_default_params)
+            np.testing.assert_almost_equal(expected_utilities, utilities)
+            self.assertFalse(isinstance(list, type(qs_output)))
+            if len(expected_output) == 0:
+                self.assertEqual(len(expected_output), len(qs_output))
+                self.assertEqual(len(qs_output2), len(qs_output))
+            else:
+                self.assertEqual(expected_output, qs_output)
+                self.assertEqual(qs_output2, qs_output)
+            np.testing.assert_almost_equal(utilities, utilities2)
 
     def test_update_before_query(
         self,
@@ -923,14 +972,20 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
 
+    # TODO Issues candidates als leere listen nicht zulassen
     def test_update_param_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [(Dummy, TypeError), ([[]], None)]
+        test_cases += [(Dummy, TypeError), ([[]], None), ([[0]], None)]
         self._test_param("update", "candidates", test_cases)
 
     def test_update_param_queried_indices(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases += [("string", IndexError), (Dummy, IndexError), ([], None)]
+        test_cases += [
+            ("string", IndexError),
+            (Dummy, IndexError),
+            ([], None),
+            ([0], None),
+        ]
         self._test_param("update", "queried_indices", test_cases)
 
     def _test_param(

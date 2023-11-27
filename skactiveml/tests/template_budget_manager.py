@@ -134,6 +134,7 @@ class TemplateBudgetManager:
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (np.array([0.1]), None),
+            (np.array([np.nan]), None),
             (Dummy, TypeError),
             ("state", TypeError),
             (0.0, TypeError),
@@ -196,6 +197,8 @@ class TemplateBudgetManager:
         if utilities is None:
             random = RandomState(0)
             utilities = random.rand(50)
+            utilities_nan = np.full(50, np.nan)
+            utilities = np.append(utilities, utilities_nan)
         bm = self.bm_class(**init_params)
         bm2 = self.bm_class(**init_params)
         utilities_update = []
@@ -225,6 +228,8 @@ class TemplateBudgetManager:
             self.assertEqual(len(expected_output), len(bm2_outputs))
         else:
             self.assertEqual(expected_output, bm2_outputs)
+        output = bm.query_by_utility(utilities_nan)
+        self.assertEqual(0, len(output))
 
     def test_update_before_query_by_utility(
         self,
