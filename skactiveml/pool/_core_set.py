@@ -138,6 +138,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                     mapping,
                     n_new_cand,
                 )
+        else:
+            raise ValueError("Only `method='greedy'` is supported.")
 
         if return_utilities:
             return query_indices, utilities
@@ -216,9 +218,9 @@ def k_greedy_center(
 
     for i in range(batch_size):
         if n_new_cand is None:
-            utilities[i] = update_distances(X, selected_samples, mapping)
+            utilities[i] = _update_distances(X, selected_samples, mapping)
         else:
-            update_dist = update_distances(X, selected_samples, mapping)
+            update_dist = _update_distances(X, selected_samples, mapping)
             utilities[i] = update_dist[mapping]
 
         # select index
