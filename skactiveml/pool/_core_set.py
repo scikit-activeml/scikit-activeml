@@ -275,6 +275,10 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
     mapping: np.ndarray of shape (n_candidates, ) default None
         Index array that maps `candidates` to `X`.
         (`candidates = X[mapping]`)
+    latest_distance: array-like of shape (n_samples) default None
+        The distance between each data point and its nearest center
+        Using to facilitate the computation the later distances for the
+        coming selected sample
 
     Return:
     ---------
