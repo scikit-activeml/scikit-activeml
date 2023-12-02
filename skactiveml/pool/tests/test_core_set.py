@@ -145,5 +145,7 @@ class TestKGreedyCenter(unittest.TestCase):
     def test_k_greedy_center(self):
         random_state = np.random.RandomState(42)
         query_idx_1, _ = k_greedy_center(self.X, self.y, random_state=42)
-        query_idx_2, _ = k_greedy_center(self.X, self.y, random_state=random_state)
+        query_idx_2, _ = k_greedy_center(
+            self.X, self.y, random_state=random_state
+        )
         self.assertEqual(query_idx_1, query_idx_2)
