@@ -10,6 +10,7 @@ import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices
+from sklearn.utils.validation import check_array, check_consistent_length
 from sklearn.metrics import pairwise_distances
 
 
@@ -51,13 +52,11 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         candidates=None,
         batch_size=1,
         return_utilities=False,
-        **kwargs
     ):
         """Query the next samples to be labeled
 
         Parameters
         ----------
-        **kwargs
         X: array-like of shape (n_samples, n_features)
            Training data set, usually complete, i.e. including the labeled and
            unlabeled samples
@@ -167,18 +166,18 @@ def k_greedy_center(
     X: array-like of shape (n_samples, n_features)
        Training data set, usually complete, i.e. including the labeled and
        unlabeled samples
-    selected_samples: np.ndarray of shape (n_selected_samples, )
+    y: np.ndarray of shape (n_selected_samples, )
        index of datapoints already selects
     batch_size: int, optional(default=1)
        The number of samples to be selected in one AL cycle.
-    random_state: np.random.RandomState
-       The random state to use
-    missing_label: scalar or string or np.nan or None, default=np.nan
+    random_state: int | np.random.RandomState, optional (default=None)
+       Random state for candidate selection.
+    missing_label: scalar or string or np.nan or None (default=np.nan)
        Value to represent a missing label
-    mapping: np.ndarray of shape (n_candidates, ) default None
+    mapping: np.ndarray of shape (n_candidates, ) (default=None)
        Index array that maps `candidates` to `X`.
        (`candidates = X[mapping]`)
-    n_new_cand: int or None, default None
+    n_new_cand: int or None (default=None)
        The number of new candidates that are additionally added to X.
        Only used for the case, that in the query function with the
        shape of candidates is (n_candidates, n_feature)
@@ -201,18 +200,35 @@ def k_greedy_center(
         If candidates is of shape (n_candidates, n_features), the indexing
         refers to samples in candidates.
     """
-    # read the labeled aka selected samples from the y vector
-    """
-        valid the input shape whether is valid or not.
-    """
+
+    #valid the input shape whether is valid or not.
+    X = check_array(X, allow_nd=True)
+    y = check_array(y, ensure_2d=False, force_all_finite="allow-nan", dtype=None)
+    check_consistent_length(X, y)
+
     selected_samples = labeled_indices(y, missing_label=missing_label)
+
+    if random_state is None:
+        random_state_ = np.random.RandomState(None)
+    elif isinstance(random_state, int):
+        random_state_ = np.random.RandomState(random_state)
+    elif isinstance(random_state, np.random.RandomState):
+        random_state_ = random_state
+    else:
+        raise ValueError("Only random_state with int, np.random.RandomState or None is supported.")
+
     if mapping is None:
         mapping = unlabeled_indices(y, missing_label=missing_label)
+    else:
+        check_array(mapping, ensure_2d=False, dtype=None)
+
     # initialize the utilities matrix with
     if n_new_cand is None:
         utilities = np.empty(shape=(batch_size, X.shape[0]))
-    else:
+    elif isinstance(n_new_cand, int):
         utilities = np.empty(shape=(batch_size, n_new_cand))
+    else:
+        raise ValueError("Only n_new_cand with type int is supported.")
 
     query_indices = np.array([], dtype=int)
 
@@ -227,7 +243,7 @@ def k_greedy_center(
         idx = np.nanargmax(utilities[i])
 
         if len(selected_samples) == 0:
-            idx = random_state.choice(mapping)
+            idx = random_state_.choice(mapping)
             # because np.nanargmax always return the first occurrence is returned
 
         query_indices = np.append(query_indices, [idx])
