@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from skactiveml.pool._core_set import CoreSet
+from skactiveml.pool._core_set import CoreSet, k_greedy_center
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
@@ -88,6 +88,37 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             X, y_1, batch_size=2, candidates=X_cand, return_utilities=True
         )
         self.assertEqual(5, utilities_5.shape[1])
+
+class TestKGreedyCenter(unittest.TestCase):
+    def setUp(self):
+        self.X = np.random.RandomState(42).choice(5, size=(10, 2))
+        self.y = np.hstack([[0], np.full(9, MISSING_LABEL)])
+        self.batch_size = 1,
+        self.random_state = None
+        self.missing_label = np.nan,
+        self.mapping = None
+        self.n_new_cand = None
+
+    def test_param_X(self):
+        self.assertRaises(ValueError, k_greedy_center, X=[1], y=[np.nan])
+        self.assertRaises(ValueError, k_greedy_center, X="string", y=[np.nan])
+
+    def test_param_y(self):
+        self.assertRaises(ValueError, k_greedy_center, X=[[1, 1]], y=[[np.nan]])
+        self.assertRaises(TypeError, k_greedy_center, X=[[1, 1]], y=1)
+
+    def test_param_random_state(self):
+        self.assertRaises(TypeError, k_greedy_center, X=self.X, y=self.y, batch_size="string")
+
+    def test_param_random_state(self):
+        self.assertRaises(TypeError, k_greedy_center, X=self.X, y=self.y, random_state="string")
+
+    def test_param_mapping(self):
+        self.assertRaises(TypeError, k_greedy_center, X=self.X, y=self.y, mapping="string")
+
+    def test_param_n_new_cand(self):
+        self.assertRaises(TypeError, k_greedy_center, X=self.X, y=self.y, n_new_cand="string")
+        self.assertRaises(ValueError, k_greedy_center, X=self.X, y=self.y, mapping=np.arange(4), n_new_cand=5)
 
 
 
