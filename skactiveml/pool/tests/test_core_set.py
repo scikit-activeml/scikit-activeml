@@ -107,7 +107,7 @@ class TestKGreedyCenter(unittest.TestCase):
         self.assertRaises(ValueError, k_greedy_center, X=[[1, 1]], y=[[np.nan]])
         self.assertRaises(TypeError, k_greedy_center, X=[[1, 1]], y=1)
 
-    def test_param_random_state(self):
+    def test_param_batch_size(self):
         self.assertRaises(TypeError, k_greedy_center, X=self.X, y=self.y, batch_size="string")
 
     def test_param_random_state(self):
