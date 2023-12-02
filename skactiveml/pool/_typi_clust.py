@@ -16,6 +16,13 @@ from sklearn.base import ClusterMixin
 
 
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
+    """ Typi Clust Selection
+
+    This class implements
+
+    [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
+    Opposite Strategies Suit High and Low Budgets“. arXiv, 2022.
+    """
     def __init__(
         self,
         missing_label=MISSING_LABEL,
