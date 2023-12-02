@@ -217,7 +217,7 @@ def k_greedy_center(
     elif isinstance(random_state, np.random.RandomState):
         random_state_ = random_state
     else:
-        raise ValueError(
+        raise TypeError(
             "Only random_state with int, np.random.RandomState or None is supported."
         )
 
@@ -226,13 +226,19 @@ def k_greedy_center(
     else:
         check_array(mapping, ensure_2d=False, dtype=None)
 
+    if not isinstance(batch_size, int):
+        raise TypeError("batch_size must be a integer")
+
     # initialize the utilities matrix with
     if n_new_cand is None:
         utilities = np.empty(shape=(batch_size, X.shape[0]))
     elif isinstance(n_new_cand, int):
-        utilities = np.empty(shape=(batch_size, n_new_cand))
+        if n_new_cand == len(mapping):
+            utilities = np.empty(shape=(batch_size, n_new_cand))
+        else:
+            raise ValueError("n_new_cand must equal to the length of mapping array")
     else:
-        raise ValueError("Only n_new_cand with type int is supported.")
+        raise TypeError("Only n_new_cand with type int is supported.")
 
     query_indices = np.array([], dtype=int)
 
