@@ -87,7 +87,7 @@ def _typicality(X, uncovered_samples_mapping, k):
     dist_matrix_sort_inc = np.sort(dist_matrix)
     knn = np.sum(dist_matrix_sort_inc[:, :k+1], axis=1)
     typi = 1 / (1 / k * knn)
-    for idx, value in uncovered_samples_mapping:
+    for idx, value in enumerate(uncovered_samples_mapping):
         typicality[value] = typi[idx]
     return typicality
 
