@@ -1,0 +1,19 @@
+[
+{
+    "class" : "TypiClust",
+    "package" : "pool",
+    "method" : "Typi Clust",
+    "category" : "Others",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "regression", "classification", "single-annotator"],
+    "title" : "Typi Clust",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import TypiClust",
+    "init_qs" : "TypiClust()",
+    "query_params" : "X=X, y=y"
+}
+]
+  
+  

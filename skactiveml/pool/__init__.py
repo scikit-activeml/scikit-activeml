@@ -32,6 +32,7 @@ from ._uncertainty_sampling import (
     expected_average_precision,
 )
 from ._core_set import CoreSet, k_greedy_center
+from ._typi_clust import TypiClust
 
 __all__ = [
     "multiannotator",
@@ -62,4 +63,5 @@ __all__ = [
     "batch_bald",
     "CoreSet",
     "k_greedy_center",
+    "TypiClust",
 ]
