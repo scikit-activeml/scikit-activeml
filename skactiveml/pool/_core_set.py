@@ -201,9 +201,11 @@ def k_greedy_center(
         refers to samples in candidates.
     """
 
-    #valid the input shape whether is valid or not.
+    # valid the input shape whether is valid or not.
     X = check_array(X, allow_nd=True)
-    y = check_array(y, ensure_2d=False, force_all_finite="allow-nan", dtype=None)
+    y = check_array(
+        y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+    )
     check_consistent_length(X, y)
 
     selected_samples = labeled_indices(y, missing_label=missing_label)
@@ -215,7 +217,9 @@ def k_greedy_center(
     elif isinstance(random_state, np.random.RandomState):
         random_state_ = random_state
     else:
-        raise ValueError("Only random_state with int, np.random.RandomState or None is supported.")
+        raise ValueError(
+            "Only random_state with int, np.random.RandomState or None is supported."
+        )
 
     if mapping is None:
         mapping = unlabeled_indices(y, missing_label=missing_label)
