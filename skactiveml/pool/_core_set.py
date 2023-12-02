@@ -237,10 +237,15 @@ def k_greedy_center(
     query_indices = np.array([], dtype=int)
 
     for i in range(batch_size):
-        if n_new_cand is None:
-            utilities[i] = _update_distances(X, selected_samples, mapping)
-        else:
+        if i == 0:
             update_dist = _update_distances(X, selected_samples, mapping)
+        else:
+            latest_dist = utilities[i - 1]
+            update_dist = _update_distances(X, [idx], mapping, latest_dist)
+
+        if n_new_cand is None:
+            utilities[i] = update_dist
+        else:
             utilities[i] = update_dist[mapping]
 
         # select index
@@ -256,7 +261,7 @@ def k_greedy_center(
     return query_indices, utilities
 
 
-def _update_distances(X, cluster_centers, mapping):
+def _update_distances(X, cluster_centers, mapping, latest_distance=None):
     """
     Update min distances by given cluster centers.
 
@@ -289,6 +294,11 @@ def _update_distances(X, cluster_centers, mapping):
         cluster_center_feature = X[cluster_centers]
         dist_matrix = pairwise_distances(X, cluster_center_feature)
         dist = np.min(dist_matrix, axis=1)
+
+    if latest_distance is not None:
+        l_distance = np.zeros(shape=X.shape[0])
+        l_distance[mapping] = latest_distance[mapping]
+        dist = np.minimum(l_distance, dist)
 
     result_dist = np.full(X.shape[0], np.nan)
     result_dist[mapping] = dist[mapping]
