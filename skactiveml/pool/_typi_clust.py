@@ -18,10 +18,18 @@ from sklearn.base import ClusterMixin
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
     """ Typi Clust Selection
 
-    This class implements
+    This class implements various Typi Cluster query strategies [1], which considers
+    both density and typicality of the samples.
+
+    Parameters
+    ----------
+    missing_label: scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label
+    random_state: int or np.random.RandomState
+        The random state to use
 
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
-    Opposite Strategies Suit High and Low Budgets“. arXiv, 2022.
+    Opposite Strategies Suit High and Low Budgets“, arXiv, 2022.
     """
     def __init__(
         self,
@@ -42,6 +50,51 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
+        """Query the next samples to be labeled
+
+        Parameters
+        ----------
+        X: array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+        y: array-like of shape (n_samples, )
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.missing_label)
+        clust_algo: class in sklearn.cluster (default=Kmeans)
+            The cluster algorithm that to be used in the TypiClust
+        k: int, optional (default=5)
+            the number for knn by computation of typicality
+        candidates: None or array-like of shape (n_candidates), dtype = int or
+            array-like of shape (n_candidates, n_features), optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are considered
+            as candidates
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as a list of the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the candidates are
+            directly given in the input candidates (not necessarily contained in X)
+        batch_size: int, optional(default=1)
+            The number of samples to be selects in one AL cycle.
+        return_utilities: bool, optional(default=False)
+            If True, also return the utilities based on the query strategy
+
+        Returns
+        ----------
+        query_indices: numpy.ndarry of shape (batch_size)
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected sample.
+            If candidates in None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        utilities: numpy.ndarray of shape (batch_size, n_samples) or
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples for selecting each sample of the batch.
+            Here, utilities means the typicality in the considering cluster.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
+        """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
