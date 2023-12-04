@@ -34,7 +34,7 @@ class TestStreamProbabilisticAL(
             query_default_params_clf=query_default_params_clf,
         )
         self.update_params = {
-            "candidates": [[]],
+            "candidates": np.array([[1, 2]]),
             "queried_indices": [],
             "budget_manager_param_dict": {"utilities": 0.0},
         }
@@ -49,7 +49,28 @@ class TestStreamProbabilisticAL(
 
     def test_query(self):
         expected_output = []
-        expected_utilities = [0.0170216]
+        expected_utilities = [
+            0.0170216,
+            0.0468436,
+            0.0194907,
+            0.0083636,
+            0.110665,
+            0.0170216,
+            0.0468436,
+            0.0194907,
+            0.0083636,
+            0.110665,
+            0.0170216,
+            0.0468436,
+            0.0194907,
+            0.0083636,
+            0.110665,
+            0.0170216,
+            0.0468436,
+            0.0194907,
+            0.0083636,
+            0.110665,
+        ]
         budget_manager_param_dict = {"utilities": [0.5, 0.5, 0.5, 0.5, 0.5]}
         return super().test_query(
             expected_output, expected_utilities, budget_manager_param_dict
@@ -57,11 +78,15 @@ class TestStreamProbabilisticAL(
 
     def test_query_param_utility_weight(self):
         test_cases = []
+        utility_weight = np.random.rand(
+            len(self.query_default_params_clf["candidates"])
+        )
         test_cases += [
             ([1, 1], ValueError),
             ("string", ValueError),
             (["string", "string"], ValueError),
             (0.5, TypeError),
+            (utility_weight, None),
         ]
         self._test_param("query", "utility_weight", test_cases)
 
@@ -94,6 +119,7 @@ class TestStreamProbabilisticAL(
         test_cases = []
         test_cases += [
             ({"gamma": "mean"}, None),
+            ({"gamma": 0.1}, None),
             (["gamma"], TypeError),
             ({"test": 0}, TypeError),
         ]

@@ -54,6 +54,7 @@ class TemplateEstimatedBudgetManager(TemplateBudgetManager):
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
                 (1.0, None),
+                (0.01, None),
                 (1.1, ValueError),
                 (0.0, ValueError),
                 (-1.0, ValueError),
@@ -156,6 +157,7 @@ class TestSplitBudgetManager(
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (0.2, None),
+            (1.0, ValueError),
             (1.1, ValueError),
             (0.0, ValueError),
             (-1.0, ValueError),

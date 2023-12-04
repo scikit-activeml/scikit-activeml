@@ -48,8 +48,29 @@ class TestFixedUncertainty(
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = []
-        expected_utilities = [0.3841551]
+        expected_output = [4, 9, 14, 19]
+        expected_utilities = [
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+        ]
         return super().test_query(expected_output, expected_utilities)
 
 
@@ -82,8 +103,29 @@ class TestSplit(TemplateSingleAnnotatorStreamQueryStrategy, unittest.TestCase):
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = [0]
-        expected_utilities = [0.3841551]
+        expected_output = [0, 1, 2, 3, 4, 5, 11]
+        expected_utilities = [
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+        ]
         return super().test_query(expected_output, expected_utilities)
 
 
@@ -118,8 +160,29 @@ class TestVariableUncertainty(
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = [0]
-        expected_utilities = [0.3841551]
+        expected_output = [0, 1, 2, 3, 4, 5, 11]
+        expected_utilities = [
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+        ]
         return super().test_query(expected_output, expected_utilities)
 
 
@@ -154,6 +217,27 @@ class TestRandomVariableUncertainty(
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = [0]
-        expected_utilities = [0.3841551]
+        expected_output = [0, 1, 2, 3, 5, 9, 12]
+        expected_utilities = [
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+            0.3841551,
+            0.4388273,
+            0.3902932,
+            0.1933426,
+            0.4901074,
+        ]
         return super().test_query(expected_output, expected_utilities)

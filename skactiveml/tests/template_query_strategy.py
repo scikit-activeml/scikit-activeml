@@ -858,15 +858,38 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             qs2 = self.qs_class(**init_params)
             X = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75]])
             y = np.array([0, 0, 1, 1, 1])
-            candidate = np.array([[0.5, 0.5]])
+            candidate = np.array(
+                [
+                    [0.5, 0.5],
+                    [0.25, 0.5],
+                    [0.5, 0.25],
+                    [1.5, 1.5],
+                    [0, 0],
+                    [0.5, 0.5],
+                    [0.25, 0.5],
+                    [0.5, 0.25],
+                    [1.5, 1.5],
+                    [0, 0],
+                    [0.5, 0.5],
+                    [0.25, 0.5],
+                    [0.5, 0.25],
+                    [1.5, 1.5],
+                    [0, 0],
+                    [0.5, 0.5],
+                    [0.25, 0.5],
+                    [0.5, 0.25],
+                    [1.5, 1.5],
+                    [0, 0],
+                ]
+            )
             query_default_params = deepcopy(self.query_default_params_clf)
             query_params = inspect.signature(self.qs_class.query).parameters
-            if "clf" in query_params:
+            if "clf" in query_params or "reg" in query_params:
                 query_default_params["X"] = X
                 query_default_params["y"] = y
                 if not exclude_clf:
                     query_default_params["fit_clf"] = True
-                else:
+                if not exclude_reg:
                     query_default_params["fit_reg"] = True
             query_default_params["candidates"] = candidate
             query_default_params["return_utilities"] = True
@@ -893,58 +916,73 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 self.assertEqual(len(expected_output), len(qs_output))
                 self.assertEqual(len(qs_output2), len(qs_output))
             else:
-                self.assertEqual(expected_output, qs_output)
-                self.assertEqual(qs_output2, qs_output)
+                np.testing.assert_array_equal(
+                    np.array(expected_output), np.array(qs_output)
+                )
+                np.testing.assert_array_equal(
+                    np.array(qs_output2), np.array(qs_output)
+                )
+                # self.assertEqual(expected_output, qs_output)
+                # self.assertEqual(qs_output2, qs_output)
             np.testing.assert_almost_equal(utilities, utilities2)
 
     def test_update_before_query(
         self,
     ):
-        init_params = deepcopy(self.init_default_params)
-        init_params["random_state"] = np.random.RandomState(0)
-        qs = self.qs_class(**init_params)
-        qs2 = self.qs_class(**init_params)
-        X = [[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75], [0.5, 0.5]]
-        y_true = [0, 0, 1, 1, 1, 0]
-        query_default_params1 = deepcopy(self.query_default_params_clf)
-        query_params = inspect.signature(self.qs_class.query).parameters
-        utilities = []
-        X_queue = []
-        y_queue = []
-        qs_outputs = []
-        for i, x in enumerate(X):
-            if "clf" in query_params and i > 0:
-                X_queue.append(X[i - 1])
-                y_queue.append(y_true[i - 1])
-                query_default_params1["X"] = X_queue
-                query_default_params1["y"] = y_queue
-                query_default_params1["fit_clf"] = True
-            query_default_params1["candidates"] = np.array(
-                np.array(x).reshape([1, -1])
-            )
-            query_default_params1["return_utilities"] = True
-            qs_output, u = qs.query(**query_default_params1)
-            budget_manager_param_dict1 = {"utilities": u}
-            qs_outputs.extend(qs_output)
+        for exclude_clf, exclude_reg, query_params in [
+            (False, True, self.query_default_params_clf),
+            (True, False, self.query_default_params_reg),
+        ]:
+            if query_params is None:
+                continue
+            init_params = deepcopy(self.init_default_params)
+            init_params["random_state"] = np.random.RandomState(0)
+            qs = self.qs_class(**init_params)
+            qs2 = self.qs_class(**init_params)
+            X = [[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75], [0.5, 0.5]]
+            y_true = [0, 0, 1, 1, 1, 0]
+            query_default_params1 = deepcopy(self.query_default_params_clf)
+            query_params = inspect.signature(self.qs_class.query).parameters
+            utilities = []
+            X_queue = []
+            y_queue = []
+            qs_outputs = []
+            for i, x in enumerate(X):
+                if ("clf" in query_params or "reg" in query_params) and i > 0:
+                    X_queue.append(X[i - 1])
+                    y_queue.append(y_true[i - 1])
+                    query_default_params1["X"] = X_queue
+                    query_default_params1["y"] = y_queue
+                    if not exclude_clf:
+                        query_default_params1["fit_clf"] = True
+                    if not exclude_reg:
+                        query_default_params1["fit_reg"] = True
+                query_default_params1["candidates"] = np.array(
+                    np.array(x).reshape([1, -1])
+                )
+                query_default_params1["return_utilities"] = True
+                qs_output, u = qs.query(**query_default_params1)
+                budget_manager_param_dict1 = {"utilities": u}
+                qs_outputs.extend(qs_output)
+                call_func(
+                    qs.update,
+                    candidates=np.array(x).reshape([1, -1]),
+                    queried_indices=qs_output,
+                    budget_manager_param_dict=budget_manager_param_dict1,
+                )
+                utilities.extend(u)
+
+            budget_manager_param_dict1 = {"utilities": np.array(utilities)}
             call_func(
-                qs.update,
-                candidates=np.array(x).reshape([1, -1]),
-                queried_indices=qs_output,
+                qs2.update,
+                candidates=np.array(X),
+                queried_indices=qs_outputs,
                 budget_manager_param_dict=budget_manager_param_dict1,
             )
-            utilities.extend(u)
-
-        budget_manager_param_dict1 = {"utilities": np.array(utilities)}
-        call_func(
-            qs2.update,
-            candidates=np.array(X),
-            queried_indices=qs_outputs,
-            budget_manager_param_dict=budget_manager_param_dict1,
-        )
-        query_default_params1["candidates"] = X
-        _, expected_utilities = qs.query(**query_default_params1)
-        _, utilities = qs2.query(**query_default_params1)
-        np.testing.assert_almost_equal(expected_utilities, utilities)
+            query_default_params1["candidates"] = X
+            _, expected_utilities = qs.query(**query_default_params1)
+            _, utilities = qs2.query(**query_default_params1)
+            np.testing.assert_almost_equal(expected_utilities, utilities)
 
     def test_query_param_return_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -972,7 +1010,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
 
-    # TODO Issues candidates als leere listen nicht zulassen
     def test_update_param_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(Dummy, TypeError), ([[]], None), ([[0]], None)]

@@ -23,12 +23,38 @@ class TestStreamRandomSampling(
 
     def test_init_param_allow_exceeding_budget(self):
         test_cases = []
-        test_cases += [(0, TypeError), ("", TypeError), (True, None)]
+        test_cases += [
+            (0, TypeError),
+            ("", TypeError),
+            (True, None),
+            (False, None),
+        ]
         self._test_param("init", "allow_exceeding_budget", test_cases)
 
     def test_query(self):
-        expected_output = np.array([])
-        expected_utilities = np.array([0.6458941])
+        expected_output = np.array([3, 8, 15])
+        expected_utilities = [
+            0.6458941,
+            0.4375872,
+            0.891773,
+            0.9636628,
+            0.3834415,
+            0.791725,
+            0.5288949,
+            0.5680446,
+            0.9255966,
+            0.0710361,
+            0.0871293,
+            0.0202184,
+            0.8326198,
+            0.7781568,
+            0.8700121,
+            0.9786183,
+            0.7991586,
+            0.4614794,
+            0.7805292,
+            0.1182744,
+        ]
         return super().test_query(expected_output, expected_utilities)
 
 
@@ -48,5 +74,28 @@ class TestPeriodicSampling(
 
     def test_query(self):
         expected_output = np.array([])
-        expected_utilities = np.array([0.0])
+        expected_utilities = np.array(
+            [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+            ]
+        )
         return super().test_query(expected_output, expected_utilities)
