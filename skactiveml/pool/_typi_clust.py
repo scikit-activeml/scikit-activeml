@@ -27,25 +27,37 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label
     random_state: int or np.random.RandomState
         The random state to use
+    cluster_algo: class in sklearn.cluster (default=Kmeans)
+            The cluster algorithm that to be used in the TypiClust
+    k: int, optional (default=5)
+            the number for knn by computation of typicality
 
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
-    Opposite Strategies Suit High and Low Budgets“, arXiv, 2022.
+    Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
     """
     def __init__(
         self,
         missing_label=MISSING_LABEL,
         random_state=None,
+        cluster_algo=KMeans,
+        cluster_algo_param=None,
+        n_cluster_param_name="n_clusters",
+        k=5
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
 
+        self.cluster_algo = cluster_algo
+        self.cluster_algo_param = cluster_algo_param
+        self.n_cluster_param_name = n_cluster_param_name
+        self.k = k
+
+
     def query(
         self,
         X,
         y,
-        clust_algo=KMeans,
-        k=5,
         candidates=None,
         batch_size=1,
         return_utilities=False,
@@ -60,10 +72,6 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         y: array-like of shape (n_samples, )
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label)
-        clust_algo: class in sklearn.cluster (default=Kmeans)
-            The cluster algorithm that to be used in the TypiClust
-        k: int, optional (default=5)
-            the number for knn by computation of typicality
         candidates: None or array-like of shape (n_candidates), dtype = int or
             array-like of shape (n_candidates, n_features), optional (default=None)
             If candidates is None, the unlabeled samples from (X,y) are considered
@@ -101,32 +109,45 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        # Validate Clustering Algorithm?
-        if not issubclass(clust_algo, ClusterMixin):
+        # Validate init parameter
+        if not issubclass(self.cluster_algo, ClusterMixin):
             raise TypeError("Only clustering algorithm from super class sklearn.ClusterMixin is supported.")
 
-        if not isinstance(k, int):
+        if not isinstance(self.k, int):
             raise TypeError("Only k as integer is supported.")
+
+        if not isinstance(self.cluster_algo_param, dict):
+            raise TypeError("Please pass a dictionary with corresponding parameter name and value in the init function.")
+
+        if not isinstance(self.n_cluster_param_name, str):
+            raise TypeError("n_cluster_param_name supports only string.")
 
         selected_samples = labeled_indices(y, missing_label=self.missing_label)
         n_clusters = len(selected_samples) + batch_size
 
-        clustering_algo = clust_algo(n_clusters=n_clusters, random_state=self.random_state)
+        cluster_algo_param = self.cluster_algo_param.copy()
+        cluster_algo_param[self.n_cluster_param_name] = n_clusters
 
-        cluster_labels = clustering_algo.fit_predict(X)
+        cluster_obj = self.cluster_algo(**cluster_algo_param)
+
+        cluster_labels = cluster_obj.fit_predict(X)
         cluster_ids, cluster_sizes = np.unique(cluster_labels, return_counts=True)
 
         covered_cluster = np.unique([cluster_labels[i] for i in selected_samples])
 
         cluster_sizes[covered_cluster] = 0
 
-        utilities = np.zeros(shape=(batch_size, X.shape[0]))
+        if mapping is not None:
+            utilities = np.zeros(shape=(batch_size, X.shape[0]))
+        else:
+            utilities = np.zeros(shape=(batch_size, X_cand.shape[0]))
+
         query_indices = []
 
         for i in range(batch_size):
             cluster_id = np.argmax(cluster_sizes)
             uncovered_samples_mapping = [idx for idx, value in enumerate(cluster_labels) if value == cluster_id]
-            typicality = _typicality(X, uncovered_samples_mapping, k)
+            typicality = _typicality(X, uncovered_samples_mapping, self.k)
             idx = np.argmax(typicality)
             typicality[selected_samples] = np.nan
             utilities[i] = typicality
