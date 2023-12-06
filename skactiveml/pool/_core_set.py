@@ -10,7 +10,7 @@ import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices
-from sklearn.utils.validation import check_array, check_consistent_length
+from sklearn.utils.validation import check_array, check_consistent_length, check_random_state, column_or_1d
 from sklearn.metrics import pairwise_distances
 
 
@@ -206,25 +206,17 @@ def k_greedy_center(
     y = check_array(
         y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
     )
+    y = column_or_1d(y, warn=True)
     check_consistent_length(X, y)
 
     selected_samples = labeled_indices(y, missing_label=missing_label)
 
-    if random_state is None:
-        random_state_ = np.random.RandomState(None)
-    elif isinstance(random_state, int):
-        random_state_ = np.random.RandomState(random_state)
-    elif isinstance(random_state, np.random.RandomState):
-        random_state_ = random_state
-    else:
-        raise TypeError(
-            "Only random_state with int, np.random.RandomState or None is supported."
-        )
+    random_state_ = check_random_state(random_state)
 
     if mapping is None:
         mapping = unlabeled_indices(y, missing_label=missing_label)
     else:
-        check_array(mapping, ensure_2d=False, dtype=None)
+        mapping = column_or_1d(mapping, dtype=int, warn=True)
 
     if not isinstance(batch_size, int):
         raise TypeError("batch_size must be a integer")
