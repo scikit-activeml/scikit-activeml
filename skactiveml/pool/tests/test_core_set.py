@@ -66,7 +66,7 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         for u in utilities_3:
             for i in u:
                 if not np.isnan(i):
-                    self.assertGreaterEqual(i, 0)
+                    self.assertEqual(i, 0)
                 else:
                     self.assertTrue(np.isnan(i))
 
@@ -81,6 +81,7 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                     self.assertGreaterEqual(value, 0)
                 else:
                     self.assertTrue(np.isnan(value))
+        self.assertEqual(len(X), utilities_4.shape[1])
 
         # test case 5: for candidates with new samples
         X_cand = random_state.choice(5, size=(5, 2))
