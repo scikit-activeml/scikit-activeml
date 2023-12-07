@@ -16,7 +16,7 @@ from sklearn.base import ClusterMixin
 
 
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
-    """ Typi Clust Selection
+    """Typi Clust Selection
 
     This class implements various Typi Cluster query strategies [1], which considers
     both density and typicality of the samples.
@@ -35,14 +35,15 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
     """
+
     def __init__(
-            self,
-            missing_label=MISSING_LABEL,
-            random_state=None,
-            cluster_algo=KMeans,
-            cluster_algo_param={},
-            n_cluster_param_name="n_clusters",
-            k=5
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        cluster_algo=KMeans,
+        cluster_algo_param={},
+        n_cluster_param_name="n_clusters",
+        k=5,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -53,14 +54,13 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         self.n_cluster_param_name = n_cluster_param_name
         self.k = k
 
-
     def query(
-            self,
-            X,
-            y,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Query the next samples to be labeled
 
@@ -111,14 +111,17 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         # Validate init parameter
         if not issubclass(self.cluster_algo, ClusterMixin):
-            raise TypeError("Only clustering algorithm from super class sklearn.ClusterMixin is supported.")
+            raise TypeError(
+                "Only clustering algorithm from super class sklearn.ClusterMixin is supported."
+            )
 
         if not isinstance(self.k, int):
             raise TypeError("Only k as integer is supported.")
 
         if not isinstance(self.cluster_algo_param, dict):
             raise TypeError(
-                "Please pass a dictionary with corresponding parameter name and value in the init function.")
+                "Please pass a dictionary with corresponding parameter name and value in the init function."
+            )
 
         if not isinstance(self.n_cluster_param_name, str):
             raise TypeError("n_cluster_param_name supports only string.")
@@ -134,29 +137,44 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             X_for_cluster = X
             selected_samples_X_c = selected_samples
         else:
-            X_for_cluster = np.concatenate((X_cand, X[selected_samples]), axis=0)
-            selected_samples_X_c = np.arange(len(X_cand), len(X_cand) + len(selected_samples))
+            X_for_cluster = np.concatenate(
+                (X_cand, X[selected_samples]), axis=0
+            )
+            selected_samples_X_c = np.arange(
+                len(X_cand), len(X_cand) + len(selected_samples)
+            )
         cluster_labels = cluster_obj.fit_predict(X_for_cluster)
-        print(cluster_labels)
 
-        cluster_ids, cluster_sizes = np.unique(cluster_labels, return_counts=True)
+        cluster_ids, cluster_sizes = np.unique(
+            cluster_labels, return_counts=True
+        )
 
-        covered_cluster = np.unique([cluster_labels[i] for i in selected_samples_X_c])
+        covered_cluster = np.unique(
+            [cluster_labels[i] for i in selected_samples_X_c]
+        )
 
         if len(covered_cluster) > 0:
             cluster_sizes[covered_cluster] = 0
 
         if mapping is not None:
-            utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
+            utilities = np.full(
+                shape=(batch_size, X.shape[0]), fill_value=np.nan
+            )
         else:
-            utilities = np.full(shape=(batch_size, X_cand.shape[0]), fill_value=np.nan)
+            utilities = np.full(
+                shape=(batch_size, X_cand.shape[0]), fill_value=np.nan
+            )
             mapping = np.arange(len(X_cand))
 
         query_indices = []
 
         for i in range(batch_size):
             cluster_id = np.argmax(cluster_sizes)
-            uncovered_samples_mapping = [idx for idx, value in enumerate(cluster_labels) if value == cluster_id]
+            uncovered_samples_mapping = [
+                idx
+                for idx, value in enumerate(cluster_labels)
+                if value == cluster_id
+            ]
             typicality = _typicality(X, uncovered_samples_mapping, self.k)
             idx = np.argmax(typicality)
             idx = mapping[idx]
@@ -179,7 +197,7 @@ def _typicality(X, uncovered_samples_mapping, k):
     typicality = np.zeros(shape=X.shape[0])
     dist_matrix = pairwise_distances(X[uncovered_samples_mapping])
     dist_matrix_sort_inc = np.sort(dist_matrix)
-    knn = np.sum(dist_matrix_sort_inc[:, :k + 1], axis=1)
+    knn = np.sum(dist_matrix_sort_inc[:, : k + 1], axis=1)
     typi = ((1 / k) * knn) ** (-1)
     for idx, value in enumerate(uncovered_samples_mapping):
         typicality[value] = typi[idx]
