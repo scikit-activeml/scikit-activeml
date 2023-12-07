@@ -176,13 +176,10 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
                 if value == cluster_id
             ]
             typicality = _typicality(X, uncovered_samples_mapping, self.k)
+            utilities[i, mapping] = typicality[np.arange(len(mapping))]
+            utilities[i, query_indices] = np.nan
             idx = np.argmax(typicality)
             idx = mapping[idx]
-            for index, value in enumerate(mapping):
-                if value in query_indices:
-                    utilities[i, value] = np.nan
-                else:
-                    utilities[i, value] = typicality[index]
 
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
@@ -199,6 +196,7 @@ def _typicality(X, uncovered_samples_mapping, k):
     dist_matrix_sort_inc = np.sort(dist_matrix)
     knn = np.sum(dist_matrix_sort_inc[:, : k + 1], axis=1)
     typi = ((1 / k) * knn) ** (-1)
-    for idx, value in enumerate(uncovered_samples_mapping):
-        typicality[value] = typi[idx]
+    typicality[uncovered_samples_mapping] = typi[
+        np.arange(len(uncovered_samples_mapping))
+    ]
     return typicality
