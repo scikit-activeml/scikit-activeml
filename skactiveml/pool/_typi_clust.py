@@ -40,7 +40,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         cluster_algo=KMeans,
-        cluster_algo_param=None,
+        cluster_algo_param={},
         n_cluster_param_name="n_clusters",
         k=5
     ):
@@ -171,15 +171,3 @@ def _typicality(X, uncovered_samples_mapping, k):
     for idx, value in enumerate(uncovered_samples_mapping):
         typicality[value] = typi[idx]
     return typicality
-
-
-
-
-
-
-
-
-
-
-
-
