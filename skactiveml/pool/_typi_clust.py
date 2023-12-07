@@ -36,13 +36,13 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
     """
     def __init__(
-        self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
-        cluster_algo=KMeans,
-        cluster_algo_param={},
-        n_cluster_param_name="n_clusters",
-        k=5
+            self,
+            missing_label=MISSING_LABEL,
+            random_state=None,
+            cluster_algo=KMeans,
+            cluster_algo_param={},
+            n_cluster_param_name="n_clusters",
+            k=5
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -55,12 +55,12 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
 
     def query(
-        self,
-        X,
-        y,
-        candidates=None,
-        batch_size=1,
-        return_utilities=False,
+            self,
+            X,
+            y,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
     ):
         """Query the next samples to be labeled
 
@@ -117,30 +117,40 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             raise TypeError("Only k as integer is supported.")
 
         if not isinstance(self.cluster_algo_param, dict):
-            raise TypeError("Please pass a dictionary with corresponding parameter name and value in the init function.")
+            raise TypeError(
+                "Please pass a dictionary with corresponding parameter name and value in the init function.")
 
         if not isinstance(self.n_cluster_param_name, str):
             raise TypeError("n_cluster_param_name supports only string.")
 
         selected_samples = labeled_indices(y, missing_label=self.missing_label)
-        n_clusters = len(selected_samples) + batch_size
 
+        n_clusters = len(selected_samples) + batch_size
         cluster_algo_param = self.cluster_algo_param.copy()
         cluster_algo_param[self.n_cluster_param_name] = n_clusters
-
         cluster_obj = self.cluster_algo(**cluster_algo_param)
 
-        cluster_labels = cluster_obj.fit_predict(X)
+        if candidates is None:
+            X_for_cluster = X
+            selected_samples_X_c = selected_samples
+        else:
+            X_for_cluster = np.concatenate((X_cand, X[selected_samples]), axis=0)
+            selected_samples_X_c = np.arange(len(X_cand), len(X_cand) + len(selected_samples))
+        cluster_labels = cluster_obj.fit_predict(X_for_cluster)
+        print(cluster_labels)
+
         cluster_ids, cluster_sizes = np.unique(cluster_labels, return_counts=True)
 
-        covered_cluster = np.unique([cluster_labels[i] for i in selected_samples])
+        covered_cluster = np.unique([cluster_labels[i] for i in selected_samples_X_c])
 
-        cluster_sizes[covered_cluster] = 0
+        if len(covered_cluster) > 0:
+            cluster_sizes[covered_cluster] = 0
 
         if mapping is not None:
-            utilities = np.zeros(shape=(batch_size, X.shape[0]))
+            utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
         else:
-            utilities = np.zeros(shape=(batch_size, X_cand.shape[0]))
+            utilities = np.full(shape=(batch_size, X_cand.shape[0]), fill_value=np.nan)
+            mapping = np.arange(len(X_cand))
 
         query_indices = []
 
@@ -149,12 +159,15 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             uncovered_samples_mapping = [idx for idx, value in enumerate(cluster_labels) if value == cluster_id]
             typicality = _typicality(X, uncovered_samples_mapping, self.k)
             idx = np.argmax(typicality)
-            typicality[selected_samples] = np.nan
-            utilities[i] = typicality
+            idx = mapping[idx]
+            for index, value in enumerate(mapping):
+                if value in query_indices:
+                    utilities[i, value] = np.nan
+                else:
+                    utilities[i, value] = typicality[index]
 
             query_indices = np.append(query_indices, [idx])
-            selected_samples = np.append(selected_samples, [idx])
-            cluster_sizes[cluster_ids] = 0
+            cluster_sizes[cluster_id] = 0
 
         if return_utilities:
             return query_indices, utilities
@@ -166,8 +179,8 @@ def _typicality(X, uncovered_samples_mapping, k):
     typicality = np.zeros(shape=X.shape[0])
     dist_matrix = pairwise_distances(X[uncovered_samples_mapping])
     dist_matrix_sort_inc = np.sort(dist_matrix)
-    knn = np.sum(dist_matrix_sort_inc[:, :k+1], axis=1)
-    typi = 1 / (1 / k * knn)
+    knn = np.sum(dist_matrix_sort_inc[:, :k + 1], axis=1)
+    typi = ((1 / k) * knn) ** (-1)
     for idx, value in enumerate(uncovered_samples_mapping):
         typicality[value] = typi[idx]
     return typicality
