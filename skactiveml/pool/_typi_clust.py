@@ -28,9 +28,11 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     random_state: int or np.random.RandomState
         The random state to use
     cluster_algo: class in sklearn.cluster (default=Kmeans)
-            The cluster algorithm that to be used in the TypiClust
+        The cluster algorithm that to be used in the TypiClust
+    cluster_algo_param:
+    n_cluster_param_name:
     k: int, optional (default=5)
-            the number for knn by computation of typicality
+        The number for knn by computation of typicality
 
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
@@ -179,7 +181,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             utilities[i, mapping] = typicality[np.arange(len(mapping))]
             utilities[i, query_indices] = np.nan
             idx = np.argmax(typicality)
-            idx = mapping[idx]
+            if candidates is not None:
+                idx = mapping[idx]
 
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
