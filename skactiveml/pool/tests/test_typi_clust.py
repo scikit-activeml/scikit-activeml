@@ -8,22 +8,24 @@ from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
 
-class TestTypiClust(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+
+class TestTypiClust(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         query_default_params_clf = {
             "X": np.linspace(0, 1, 20).reshape(10, 2),
-            "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
-
+            "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
         }
         query_default_params_reg = {
             "X": np.linspace(0, 1, 20).reshape(10, 2),
-            "y": np.hstack([[0.1, 1.1], np.full(8, MISSING_LABEL)])
+            "y": np.hstack([[0.1, 1.1], np.full(8, MISSING_LABEL)]),
         }
         super().setUp(
             qs_class=TypiClust,
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
-            query_default_params_reg=query_default_params_reg
+            query_default_params_reg=query_default_params_reg,
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):
@@ -45,7 +47,7 @@ class TestTypiClust(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase)
             ("string", TypeError),
             (None, TypeError),
             ({}, None),
-            ({"n_init": 'auto'}, None)
+            ({"n_init": "auto"}, None),
         ]
         self._test_param("init", "cluster_algo_param", test_cases)
 
@@ -75,7 +77,7 @@ class TestTypiClust(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase)
 
         random_state = np.random.RandomState(42)
 
-        typi_clust_1 = TypiClust(random_state=42)
+        typi_clust_1 = TypiClust(random_state=42, k=3)
 
         X = random_state.choice(5, size=(10, 2))
         y = np.full(10, MISSING_LABEL)
@@ -93,3 +95,40 @@ class TestTypiClust(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase)
                     self.assertGreaterEqual(i, 0)
                 else:
                     self.assertTrue(np.isnan(i))
+
+        # test case 3: for an uncovered cluster with 2 samples, the utilities with k=1 is for
+        # all samples are the same
+        X_3 = np.array([[1, 2], [3, 4]])
+        y_3 = np.full(2, MISSING_LABEL)
+        typi_clust_3 = TypiClust(random_state=42, k=1)
+        _, utilities_3 = typi_clust_3.query(
+            X_3, y_3, batch_size=1, return_utilities=True
+        )
+        for u in utilities_3:
+            for i in u:
+                if not np.isnan(i):
+                    self.assertEqual(i, u[0])
+                else:
+                    self.assertTrue(np.isnan(i))
+
+        # test case 4: for candidates.ndim = 1
+        candidates = np.arange(1, 5)
+        _, utilities_4 = typi_clust_1.query(
+            X, y_1, batch_size=1, candidates=candidates, return_utilities=True
+        )
+        for u in utilities_4:
+            for idx, value in enumerate(u):
+                if idx in candidates:
+                    self.assertGreaterEqual(value, 0)
+                else:
+                    self.assertTrue(np.isnan(value))
+        self.assertEqual(10, utilities_4.shape[1])
+        self.assertEqual(1, utilities_4.shape[0])
+
+        # test case 5: for candidates with new samples
+        X_cand = random_state.choice(5, size=(5, 2))
+        _, utilities_5 = typi_clust_1.query(
+            X, y_1, batch_size=2, candidates=X_cand, return_utilities=True
+        )
+        self.assertEqual(5, utilities_5.shape[1])
+        self.assertEqual(2, utilities_5.shape[0])
