@@ -119,6 +119,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         if not isinstance(self.k, int):
             raise TypeError("Only k as integer is supported.")
+        elif (self.k > len(X)-1) or (candidates is not None and self.k > len(candidates)-1):
+            raise ValueError("k muss be less than n_samples or n_candidates.")
 
         if not isinstance(self.cluster_algo_param, dict):
             raise TypeError(
