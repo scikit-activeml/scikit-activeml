@@ -45,7 +45,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo=KMeans,
         cluster_algo_param={},
         n_cluster_param_name="n_clusters",
-        k=2,
+        k=5,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -136,16 +136,13 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo_param["random_state"] = self.random_state
         cluster_obj = self.cluster_algo(**cluster_algo_param)
 
-        if candidates is None:
-            X_for_cluster = X
-            selected_samples_X_c = selected_samples
-        else:
-            X_for_cluster = np.concatenate(
-                (X_cand, X[selected_samples]), axis=0
-            )
-            selected_samples_X_c = np.arange(
-                len(X_cand), len(X_cand) + len(selected_samples)
-            )
+
+        X_for_cluster = np.concatenate(
+            (X_cand, X[selected_samples]), axis=0
+        )
+        selected_samples_X_c = np.arange(
+            len(X_cand), len(X_cand) + len(selected_samples)
+        )
         cluster_labels = cluster_obj.fit_predict(X_for_cluster)
 
         cluster_ids, cluster_sizes = np.unique(
@@ -182,8 +179,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             utilities[i, mapping] = typicality[np.arange(len(mapping))]
             utilities[i, query_indices] = np.nan
             idx = np.argmax(typicality)
-            if candidates is not None:
-                idx = mapping[idx]
+            idx = mapping[idx]
 
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
@@ -198,7 +194,10 @@ def _typicality(X, uncovered_samples_mapping, k):
     typicality = np.zeros(shape=X.shape[0])
     dist_matrix = pairwise_distances(X[uncovered_samples_mapping])
     dist_matrix_sort_inc = np.sort(dist_matrix)
-    knn = np.sum(dist_matrix_sort_inc[:, : k + 1], axis=1)
+    if k > len(uncovered_samples_mapping) - 1:
+        knn = np.sum(dist_matrix_sort_inc, axis=1)
+    else:
+        knn = np.sum(dist_matrix_sort_inc[:, : k + 1], axis=1)
     typi = ((1 / k) * knn) ** (-1)
     typicality[uncovered_samples_mapping] = typi[
         np.arange(len(uncovered_samples_mapping))
