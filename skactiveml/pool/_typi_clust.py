@@ -45,7 +45,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo=KMeans,
         cluster_algo_param={},
         n_cluster_param_name="n_clusters",
-        k=5,
+        k=2,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -119,8 +119,6 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         if not isinstance(self.k, int):
             raise TypeError("Only k as integer is supported.")
-        elif (self.k > len(X)-1) or (candidates is not None and self.k > len(candidates)-1):
-            raise ValueError("k muss be less than n_samples or n_candidates.")
 
         if not isinstance(self.cluster_algo_param, dict):
             raise TypeError(
@@ -135,6 +133,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         n_clusters = len(selected_samples) + batch_size
         cluster_algo_param = self.cluster_algo_param.copy()
         cluster_algo_param[self.n_cluster_param_name] = n_clusters
+        cluster_algo_param["random_state"] = self.random_state
         cluster_obj = self.cluster_algo(**cluster_algo_param)
 
         if candidates is None:
