@@ -17,7 +17,7 @@ from sklearn.metrics import pairwise_distances
 class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """Core Set Selection
 
-    This class implement various core-set based query strategies, i.e., the
+    This class implements various core-set based query strategies, i.e., the
     standard greedy algorithm for k-center problem [1], the robust k-center
     algorithm [1].
 
