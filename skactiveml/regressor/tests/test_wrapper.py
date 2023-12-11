@@ -286,3 +286,7 @@ class TestSklearnProbabilisticRegressor(
         np.testing.assert_array_equal(np.zeros(3), y_pred)
         _, std_pred = reg.predict(X, return_std=True)
         np.testing.assert_array_equal(np.ones(3), std_pred)
+
+    def test_partial_fit(self):
+        # TODO: add Test
+        pass

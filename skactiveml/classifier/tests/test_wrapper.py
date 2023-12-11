@@ -1,6 +1,7 @@
 import unittest
 import warnings
 
+from copy import deepcopy
 import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
@@ -257,11 +258,192 @@ class TestSlidingWindowClassifier(
     def test_init_param_missing_label(self, test_cases=None):
         replace_init_params = {
             "estimator": SklearnClassifier(
-                GaussianProcessClassifier(), missing_label=-1
+                GaussianProcessClassifier(), missing_label="nan"
             )
         }
-        super().test_init_param_missing_label(
-            test_cases, replace_init_params=replace_init_params
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.nan, TypeError), ("nan", None), (1, TypeError)]
+        replace_init_params["classes"] = ["tokyo", "paris"]
+        replace_fit_params = {
+            "y": ["tokyo", "nan", "paris"],
+            "X": np.zeros((3, 1)),
+        }
+        self._test_param(
+            "init",
+            "missing_label",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+        test_cases = [("state", TypeError), (-1, None)]
+        replace_init_params["classes"] = [0, 1]
+        replace_init_params["estimator"] = SklearnClassifier(
+            GaussianProcessClassifier(), missing_label=-1
+        )
+        replace_fit_params = {"y": [0, -1, 1], "X": np.zeros((3, 1))}
+        self._test_param(
+            "init",
+            "missing_label",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+        test_cases = [("state", TypeError), (None, None)]
+        replace_init_params["classes"] = [0, 1]
+        replace_init_params["estimator"] = SklearnClassifier(
+            GaussianProcessClassifier(), missing_label=None
+        )
+        replace_fit_params = {"y": [0, None, 1], "X": np.zeros((3, 1))}
+        self._test_param(
+            "init",
+            "missing_label",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+        test_cases = [("state", TypeError), (0.0, None)]
+        replace_init_params["classes"] = [0.5, 1.4]
+        replace_init_params["estimator"] = SklearnClassifier(
+            GaussianProcessClassifier(), missing_label=0.0
+        )
+        replace_fit_params = {"y": [0.5, 0, 1.4], "X": np.zeros((3, 1))}
+        self._test_param(
+            "init",
+            "missing_label",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+    def test_init_param_classes(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (np.nan, TypeError),
+            ([1, 2], TypeError),
+            (["tokyo", "paris"], None),
+        ]
+        replace_init_params = {
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            )
+        }
+        replace_init_params = {"missing_label": "nan"}
+        replace_fit_params = {
+            "y": ["tokyo", "nan", "paris"],
+            "X": np.zeros((3, 1)),
+        }
+        self._test_param(
+            "init",
+            "classes",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+        test_cases = [([1, 2], None), (["tokyo", "paris"], TypeError)]
+        replace_init_params = {"missing_label": -1}
+        replace_init_params["estimator"] = SklearnClassifier(
+            GaussianProcessClassifier(), missing_label=-1
+        )
+        replace_fit_params = {"y": [2, -1, 1], "X": np.zeros((3, 1))}
+        self._test_param(
+            "init",
+            "classes",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+    def test_fit_param_y(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            ([0, 1, 2], TypeError),
+            (["tokyo", "nan", "paris"], None),
+        ]
+        replace_init_params = {
+            "classes": ["tokyo", "paris"],
+            "missing_label": "nan",
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+        }
+        replace_fit_params = {"X": np.zeros((3, 1))}
+        self._test_param(
+            "fit",
+            "y",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+        test_cases = [
+            ([0, 1, 2], None),
+            (["tokyo", "nan", "paris"], TypeError),
+            ([0.4, 1.5, 2.0], None),
+        ]
+        replace_init_params = {
+            "classes": [0, 1, 2],
+            "missing_label": -1,
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label=-1
+            ),
+        }
+        replace_fit_params = {"X": np.zeros((3, 1))}
+        self._test_param(
+            "fit",
+            "y",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
+    def test_partial_fit_param_y(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            ([0, 1, 2], TypeError),
+            (["tokyo"], ValueError),
+            (["nan", "tokyo", "nan"], None),
+        ]
+        replace_init_params = {
+            "classes": ["tokyo", "paris"],
+            "missing_label": "nan",
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label="nan"
+            ),
+        }
+        replace_fit_params = {"X": np.zeros((3, 1))}
+        extras_params = deepcopy(self.fit_default_params)
+        self._test_param(
+            "partial_fit",
+            "y",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+            extras_params=extras_params,
+            exclude_fit=True,
+        )
+        test_cases = [
+            ([0, 1, 2], None),
+            (["nan", "nan", "nan"], TypeError),
+            ([0.4, 1.5, 2.0], None),
+        ]
+        replace_init_params = {
+            "classes": [0, 1, 2],
+            "missing_label": -1,
+            "estimator": SklearnClassifier(
+                GaussianProcessClassifier(), missing_label=-1
+            ),
+        }
+        replace_fit_params = {"X": np.zeros((3, 1))}
+        self._test_param(
+            "partial_fit",
+            "y",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+            extras_params=extras_params,
+            exclude_fit=True,
         )
 
     def test_init_param_ignore_estimator_partial_fit(self):
