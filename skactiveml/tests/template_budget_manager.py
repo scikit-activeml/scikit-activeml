@@ -194,10 +194,10 @@ class TemplateBudgetManager:
         init_params_list = inspect.signature(self.bm_class.__init__).parameters
         if "random_state" in init_params_list:
             init_params["random_state"] = random_state
+        utilities_nan = np.full(50, np.nan)
         if utilities is None:
             random = RandomState(0)
             utilities = random.rand(50)
-            utilities_nan = np.full(50, np.nan)
             utilities = np.append(utilities, utilities_nan)
         bm = self.bm_class(**init_params)
         bm2 = self.bm_class(**init_params)

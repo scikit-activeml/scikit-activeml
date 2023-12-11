@@ -48,37 +48,41 @@ class TestStreamProbabilisticAL(
         super().test_query_param_clf(test_cases=add_test_cases)
 
     def test_query(self):
-        expected_output = []
+        expected_output = [0, 6]
         expected_utilities = [
-            0.0170216,
-            0.0468436,
-            0.0194907,
-            0.0083636,
-            0.110665,
-            0.0170216,
-            0.0468436,
-            0.0194907,
-            0.0083636,
-            0.110665,
-            0.0170216,
-            0.0468436,
-            0.0194907,
-            0.0083636,
-            0.110665,
-            0.0170216,
-            0.0468436,
-            0.0194907,
-            0.0083636,
-            0.110665,
+            4.3857739e-02,
+            9.2920475e-04,
+            2.6554099e-02,
+            2.5520705e-02,
+            1.8695656e-04,
+            2.1625776e-03,
+            1.0521981e-01,
+            1.2177500e-02,
+            5.8971376e-02,
+            2.3056263e-03,
+            7.9819082e-04,
+            9.1568692e-05,
+            1.7785138e-03,
+            1.1380995e-04,
+            2.1395855e-03,
+            2.9674745e-04,
         ]
-        budget_manager_param_dict = {"utilities": [0.5, 0.5, 0.5, 0.5, 0.5]}
+        budget_manager_param_dict = {
+            "utilities": [
+                7.00998185e-05,
+                8.88936175e-05,
+                4.31959419e-03,
+                5.26122086e-03,
+            ]
+        }
         return super().test_query(
             expected_output, expected_utilities, budget_manager_param_dict
         )
 
     def test_query_param_utility_weight(self):
         test_cases = []
-        utility_weight = np.random.rand(
+        random_state = np.random.RandomState(0)
+        utility_weight = random_state.rand(
             len(self.query_default_params_clf["candidates"])
         )
         test_cases += [

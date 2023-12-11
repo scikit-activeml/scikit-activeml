@@ -6,6 +6,7 @@ from copy import deepcopy
 import numpy as np
 from numpy.random import RandomState
 from sklearn import clone
+import sklearn.datasets
 
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import (
@@ -841,6 +842,10 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         expected_output,
         expected_utilities,
         budget_manager_param_dict=None,
+        X=None,
+        y=None,
+        candidates=None,
+        queried_indices=None,
     ):
         if expected_output is None or expected_utilities is None:
             raise ValueError(
@@ -852,36 +857,32 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         ]:
             if query_params is None:
                 continue
+            # initialise query stategies to compare expectes_output
             init_params = deepcopy(self.init_default_params)
             init_params["random_state"] = np.random.RandomState(0)
             qs = self.qs_class(**init_params)
             qs2 = self.qs_class(**init_params)
-            X = np.array([[0, 0], [0, 1], [1, 0], [1, 1], [0.75, 0.75]])
-            y = np.array([0, 0, 1, 1, 1])
-            candidate = np.array(
-                [
-                    [0.5, 0.5],
-                    [0.25, 0.5],
-                    [0.5, 0.25],
-                    [1.5, 1.5],
-                    [0, 0],
-                    [0.5, 0.5],
-                    [0.25, 0.5],
-                    [0.5, 0.25],
-                    [1.5, 1.5],
-                    [0, 0],
-                    [0.5, 0.5],
-                    [0.25, 0.5],
-                    [0.5, 0.25],
-                    [1.5, 1.5],
-                    [0, 0],
-                    [0.5, 0.5],
-                    [0.25, 0.5],
-                    [0.5, 0.25],
-                    [1.5, 1.5],
-                    [0, 0],
-                ]
-            )
+            # if no candidates are given generate a dataset with a fixed seed
+            if candidates is None:
+                if X is not None or y is not None:
+                    raise ValueError(
+                        "override candidates or X and y need to be None"
+                    )
+                init_train_length = 4
+                random_state = RandomState(0)
+                X_all, y_centers = sklearn.datasets.make_blobs(
+                    n_samples=20,
+                    centers=3,
+                    random_state=random_state,
+                    shuffle=True,
+                )
+                y_all = y_centers % 2
+                X = X_all[:init_train_length]
+                y = y_all[:init_train_length]
+                candidates = X_all[4:]
+                if queried_indices is None:
+                    queried_indices = np.arange(0, init_train_length)
+            # add candidates as well as X and y to the default query_params
             query_default_params = deepcopy(self.query_default_params_clf)
             query_params = inspect.signature(self.qs_class.query).parameters
             if "clf" in query_params or "reg" in query_params:
@@ -891,25 +892,43 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                     query_default_params["fit_clf"] = True
                 if not exclude_reg:
                     query_default_params["fit_reg"] = True
-            query_default_params["candidates"] = candidate
+            query_default_params["candidates"] = candidates
             query_default_params["return_utilities"] = True
-            call_func(
-                qs.update,
-                candidates=X,
-                queried_indices=[0, 1, 2, 3, 4],
-                budget_manager_param_dict=budget_manager_param_dict,
-            )
-            call_func(
-                qs2.update,
-                candidates=X,
-                queried_indices=[0, 1, 2, 3, 4],
-                budget_manager_param_dict=budget_manager_param_dict,
-            )
+
+            # update query as to already have queried the initial instances
+            # as well as test if update can be called before query
+            if X is not None:
+                call_func(
+                    qs.update,
+                    candidates=X,
+                    queried_indices=queried_indices,
+                    budget_manager_param_dict=budget_manager_param_dict,
+                )
+                call_func(
+                    qs2.update,
+                    candidates=X,
+                    queried_indices=queried_indices,
+                    budget_manager_param_dict=budget_manager_param_dict,
+                )
+            else:
+                call_func(
+                    qs.update,
+                    candidates=candidates,
+                    queried_indices=queried_indices,
+                    budget_manager_param_dict=budget_manager_param_dict,
+                )
+                call_func(
+                    qs2.update,
+                    candidates=candidates,
+                    queried_indices=queried_indices,
+                    budget_manager_param_dict=budget_manager_param_dict,
+                )
+            # use qs and qs2 to compare if query is not changed without update
             qs_output, utilities = qs.query(**query_default_params)
-            qs_output2 = []
-            utilities2 = []
             for i in range(3):
                 qs_output2, utilities2 = qs2.query(**query_default_params)
+
+            # Test if all query strategie outputs and utilities are the same
             np.testing.assert_almost_equal(expected_utilities, utilities)
             self.assertFalse(isinstance(list, type(qs_output)))
             if len(expected_output) == 0:
@@ -922,8 +941,6 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_array_equal(
                     np.array(qs_output2), np.array(qs_output)
                 )
-                # self.assertEqual(expected_output, qs_output)
-                # self.assertEqual(qs_output2, qs_output)
             np.testing.assert_almost_equal(utilities, utilities2)
 
     def test_update_before_query(

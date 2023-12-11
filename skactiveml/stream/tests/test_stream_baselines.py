@@ -32,8 +32,9 @@ class TestStreamRandomSampling(
         self._test_param("init", "allow_exceeding_budget", test_cases)
 
     def test_query(self):
-        expected_output = np.array([3, 8, 15])
+        expected_output = np.array([4, 9])
         expected_utilities = [
+            0.4236548,
             0.6458941,
             0.4375872,
             0.891773,
@@ -49,11 +50,6 @@ class TestStreamRandomSampling(
             0.8326198,
             0.7781568,
             0.8700121,
-            0.9786183,
-            0.7991586,
-            0.4614794,
-            0.7805292,
-            0.1182744,
         ]
         return super().test_query(expected_output, expected_utilities)
 
@@ -73,29 +69,16 @@ class TestPeriodicSampling(
         )
 
     def test_query(self):
-        expected_output = np.array([])
-        expected_utilities = np.array(
-            [
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-            ]
+        expected_output = np.array([9, 19, 29, 39])
+        stream_length = 40
+        expected_utilities = np.full(stream_length, fill_value=0.0)
+        expected_utilities[expected_output] = 1
+        candidates = np.zeros((stream_length, 1))
+        queried_indices = np.arange(0, 4)
+
+        super().test_query(
+            expected_output,
+            expected_utilities,
+            candidates=candidates,
+            queried_indices=queried_indices,
         )
-        return super().test_query(expected_output, expected_utilities)
