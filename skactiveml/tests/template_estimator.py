@@ -369,7 +369,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
 
     def test_init_param_cost_matrix(self):
         test_cases = []
-        replace_init_params = {"classes": ["tokyo", "paris"]}
+        replace_init_params = {"classes": ["tokyo", "paris"], "missing_label": "nan"}
         replace_fit_params = {
             "y": ["tokyo", "tokyo", "paris"],
             "X": np.zeros((3, 1)),
@@ -378,7 +378,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             (None, None),
             (-1, ValueError),
             ([], ValueError),
-            (1 - np.eye(len(np.unique(self.fit_default_params["y"]))), None),
+            (1 - np.eye(len(np.unique(replace_fit_params["y"]))), None),
         ]
         self._test_param(
             "init",
