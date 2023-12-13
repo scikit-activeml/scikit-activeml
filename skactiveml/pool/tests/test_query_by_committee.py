@@ -65,6 +65,16 @@ class TestQueryByCommittee(
         test_cases += [(1, TypeError), ("string", TypeError)]
         self._test_param("init", "method", test_cases)
 
+    def test_init_param_eps(self):
+        test_cases = [
+            (0, ValueError),
+            (1e-3, None),
+            (0.1, None),
+            ("1", TypeError),
+            (1, ValueError),
+        ]
+        self._test_param("init", "eps", test_cases, exclude_reg=True)
+
     def test_query_param_ensemble(self, test_cases=None):
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
