@@ -19,7 +19,9 @@ class TestTypiClust(
         }
         super().setUp(
             qs_class=TypiClust,
-            init_default_params={"cluster_algo_param": {"n_init": "auto", "random_state": 0}},
+            init_default_params={
+                "cluster_algo_param": {"n_init": "auto", "random_state": 0}
+            },
             query_default_params_clf=query_default_params_clf,
         )
 
@@ -63,7 +65,7 @@ class TestTypiClust(
             (None, TypeError),
             (10, None),
             (1, None),
-            (1.5, TypeError)
+            (1.5, TypeError),
         ]
         self._test_param("init", "k", test_cases)
 

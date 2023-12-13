@@ -38,6 +38,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
     """
+
     def __init__(
         self,
         missing_label=MISSING_LABEL,
@@ -135,10 +136,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo_param[self.n_cluster_param_name] = n_clusters
         cluster_obj = self.cluster_algo(**cluster_algo_param)
 
-
-        X_for_cluster = np.concatenate(
-            (X_cand, X[selected_samples]), axis=0
-        )
+        X_for_cluster = np.concatenate((X_cand, X[selected_samples]), axis=0)
         selected_samples_X_c = np.arange(
             len(X_cand), len(X_cand) + len(selected_samples)
         )
@@ -193,9 +191,14 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
 def _typicality(X, uncovered_samples_mapping, k):
     typicality = np.zeros(shape=X.shape[0])
-    k = np.min((len(uncovered_samples_mapping)-1, k))
-    nn = NearestNeighbors(n_neighbors=k+1).fit(X[uncovered_samples_mapping])
-    dist_matrix_sort_inc, _ = nn.kneighbors(X[uncovered_samples_mapping], n_neighbors=k+1, return_distance=True)
+    if len(uncovered_samples_mapping) == 1:
+        typicality[uncovered_samples_mapping] = 1
+        return typicality
+    k = np.min((len(uncovered_samples_mapping) - 1, k))
+    nn = NearestNeighbors(n_neighbors=k + 1).fit(X[uncovered_samples_mapping])
+    dist_matrix_sort_inc, _ = nn.kneighbors(
+        X[uncovered_samples_mapping], n_neighbors=k + 1, return_distance=True
+    )
     knn = np.sum(dist_matrix_sort_inc, axis=1)
     typi = ((1 / k) * knn) ** (-1)
     typicality[uncovered_samples_mapping] = typi[

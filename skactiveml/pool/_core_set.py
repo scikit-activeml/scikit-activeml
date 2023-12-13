@@ -236,7 +236,9 @@ def k_greedy_center(
         if n_new_cand == len(mapping):
             utilities = np.empty(shape=(batch_size, n_new_cand))
         else:
-            raise ValueError("n_new_cand must equal to the length of mapping array")
+            raise ValueError(
+                "n_new_cand must equal to the length of mapping array"
+            )
     else:
         raise TypeError("Only n_new_cand with type int is supported.")
 
