@@ -31,10 +31,13 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     cluster_algo: class in sklearn.cluster (default=Kmeans)
         The cluster algorithm that to be used in the TypiClust
     cluster_algo_param: dictionary (default={})
+        The parameter passing in the clustering algorithm 'cluster_algo',
+        without the parameter for the number of clusters
     n_cluster_param_name: string (default="n_clusters")
-        The name of parameter for the number clusters to computation
+        The name of parameter for the number of clusters to computation
     k: int, optional (default=5)
         The number for knn by computation of typicality
+
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
     """
@@ -140,7 +143,6 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         selected_samples_X_c = np.arange(
             len(X_cand), len(X_cand) + len(selected_samples)
         )
-        # selected samples in der X_cand?
 
         cluster_labels = cluster_obj.fit_predict(X_for_cluster)
 
@@ -190,6 +192,23 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
 
 def _typicality(X, uncovered_samples_mapping, k):
+    """
+    Calculation the typicality of uncovers samples in X.
+
+    Parameters
+    ----------
+    X: array-like of shape (n_samples, n_features)
+        Training data set, usually complete, i.e. including the labeled and
+        unlabeled samples
+    uncovered_samples_mapping: np.ndarray of shape (n_candidates, ) (default=None)
+       Index array that maps `candidates` to `X_for_cluster`.
+    k: int
+        k for computation of k nearst neighbors
+    Returns
+    -------
+    typicality: numpy.ndarray of shape (n_X)
+        The typicality of all uncovered samples in X
+    """
     typicality = np.zeros(shape=X.shape[0])
     if len(uncovered_samples_mapping) == 1:
         typicality[uncovered_samples_mapping] = 1
