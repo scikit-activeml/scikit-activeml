@@ -13,6 +13,7 @@ from ..utils import MISSING_LABEL, labeled_indices
 from sklearn.metrics import pairwise_distances
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
+from sklearn.neighbors import NearestNeighbors
 
 
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
@@ -29,15 +30,14 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         The random state to use
     cluster_algo: class in sklearn.cluster (default=Kmeans)
         The cluster algorithm that to be used in the TypiClust
-    cluster_algo_param:
-    n_cluster_param_name:
+    cluster_algo_param: dictionary (default={})
+    n_cluster_param_name: string (default="n_clusters")
+        The name of parameter for the number clusters to computation
     k: int, optional (default=5)
         The number for knn by computation of typicality
-
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
     """
-
     def __init__(
         self,
         missing_label=MISSING_LABEL,
@@ -133,7 +133,6 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         n_clusters = len(selected_samples) + batch_size
         cluster_algo_param = self.cluster_algo_param.copy()
         cluster_algo_param[self.n_cluster_param_name] = n_clusters
-        cluster_algo_param["random_state"] = self.random_state
         cluster_obj = self.cluster_algo(**cluster_algo_param)
 
 
@@ -143,6 +142,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         selected_samples_X_c = np.arange(
             len(X_cand), len(X_cand) + len(selected_samples)
         )
+        # selected samples in der X_cand?
+
         cluster_labels = cluster_obj.fit_predict(X_for_cluster)
 
         cluster_ids, cluster_sizes = np.unique(
@@ -192,12 +193,10 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
 def _typicality(X, uncovered_samples_mapping, k):
     typicality = np.zeros(shape=X.shape[0])
-    dist_matrix = pairwise_distances(X[uncovered_samples_mapping])
-    dist_matrix_sort_inc = np.sort(dist_matrix)
-    if k > len(uncovered_samples_mapping) - 1:
-        knn = np.sum(dist_matrix_sort_inc, axis=1)
-    else:
-        knn = np.sum(dist_matrix_sort_inc[:, : k + 1], axis=1)
+    k = np.min((len(uncovered_samples_mapping)-1, k))
+    nn = NearestNeighbors(n_neighbors=k+1).fit(X[uncovered_samples_mapping])
+    dist_matrix_sort_inc, _ = nn.kneighbors(X[uncovered_samples_mapping], n_neighbors=k+1, return_distance=True)
+    knn = np.sum(dist_matrix_sort_inc, axis=1)
     typi = ((1 / k) * knn) ** (-1)
     typicality[uncovered_samples_mapping] = typi[
         np.arange(len(uncovered_samples_mapping))
