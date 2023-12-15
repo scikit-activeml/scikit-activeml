@@ -13,6 +13,14 @@ from ..utils import (
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
+    """
+    Badge query strategy
+
+    Parameters
+    ----------
+    missing_label
+    random_state
+    """
     def __init__(
             self,
             missing_label=MISSING_LABEL,
@@ -32,6 +40,23 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             return_utilities=False,
             return_embeddings=False,
     ):
+        """
+        Query strategy for BADGE
+
+        Parameters
+        ----------
+        X
+        y
+        clf
+        candidates
+        batch_size
+        return_utilities
+        return_embeddings
+
+        Returns
+        -------
+
+        """
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
@@ -60,8 +85,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             X_unlbld = X_cand
             unlbld_mapping = np.arange(len(X_cand))
 
-        # Gradient embedding, aka predict class membership probabilities
-
+        # gradient embedding, aka predict class membership probabilities
         probas = clf.predict_proba(X_unlbld)
         print(probas)
         p_max = np.max(probas, axis=1).reshape(-1, 1)  # gaile
@@ -73,7 +97,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         else:
             utilities = np.full(shape=(batch_size, X_cand.shape[0]), fill_value=np.nan)
 
-        # 2. sampling with kmeans++
+        # sampling with kmeans++
         query_indicies = np.array([], dtype=int)
         D_p = []
         for i in range(batch_size):
@@ -103,6 +127,19 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
 
 def _d_probability(g_x, query_indicies, d_latest=None):
+    """
+
+    Parameters
+    ----------
+    g_x
+    query_indicies
+    d_latest
+
+    Returns
+    -------
+    probability:
+    is_randomized:
+    """
     if len(query_indicies) == 0:
         return np.ones(shape=len(g_x)), True
     g_query_indicies = g_x[query_indicies]
@@ -113,6 +150,7 @@ def _d_probability(g_x, query_indicies, d_latest=None):
     D2 = np.square(D)
     print("D2 ", D2)
     D2_sum = np.sum(D2)
+    # for the case that clf only know a label aka class
     if D2_sum == 0:
         return np.ones(shape=len(g_x)), True
     D_probas = D2 / D2_sum
