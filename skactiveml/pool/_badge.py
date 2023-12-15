@@ -37,5 +37,12 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         # Validate classifier type
         check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
+        
+        probas = clf.predict_proba(X_cand)
+        p_max = np.max(probas)
+        g_x = (p_max - 1) * X_cand
+
+        
+        
 
 
