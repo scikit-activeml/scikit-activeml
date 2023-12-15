@@ -87,7 +87,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
         # gradient embedding, aka predict class membership probabilities
         probas = clf.predict_proba(X_unlbld)
-        print(probas)
         p_max = np.max(probas, axis=1).reshape(-1, 1)  # gaile
         g_x = (p_max - 1) * X_unlbld
 
@@ -145,10 +144,8 @@ def _d_probability(g_x, query_indicies, d_latest=None):
     g_query_indicies = g_x[query_indicies]
     _, D = pairwise_distances_argmin_min(X=g_x, Y=g_query_indicies)
     if d_latest is not None:
-        print("d_latest:", d_latest)
         D = np.minimum(d_latest, D)
     D2 = np.square(D)
-    print("D2 ", D2)
     D2_sum = np.sum(D2)
     # for the case that clf only know a label aka class
     if D2_sum == 0:
