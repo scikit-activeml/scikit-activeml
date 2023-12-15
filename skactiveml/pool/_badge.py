@@ -86,9 +86,13 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = np.arange(len(X_cand))
 
         # gradient embedding, aka predict class membership probabilities
-        probas = clf.predict_proba(X_unlbld)
-        p_max = np.max(probas, axis=1).reshape(-1, 1)  # gaile
-        g_x = (p_max - 1) * X_unlbld
+        if return_embeddings:
+            probas, X_emb = clf.predict_proba(X_unlbld, return_embeddings=True)
+        else:
+            probas = clf.predict_proba(X_unlbld)
+            X_emb = X_unlbld
+        p_max = np.max(probas, axis=1).reshape(-1, 1)
+        g_x = (p_max - 1) * X_emb
 
         # init the utilities
         if mapping is not None:
@@ -112,7 +116,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             if is_randomized:
                 idx_in_unlbld = self.random_state_.choice(len(g_x))
             else:
-                customDist = stats.rv_discrete(name="customDist", values=(np.arange(len(d_probas)), d_probas))  # gaile
+                customDist = stats.rv_discrete(name="customDist", values=(np.arange(len(d_probas)), d_probas))
                 idx_in_unlbld_array = customDist.rvs(size=1, random_state=self.random_state_)
                 idx_in_unlbld = idx_in_unlbld_array[0]
 
