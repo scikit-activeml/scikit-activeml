@@ -10,7 +10,6 @@ import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices
-from sklearn.metrics import pairwise_distances
 from sklearn.cluster import KMeans
 from sklearn.base import ClusterMixin
 from sklearn.neighbors import NearestNeighbors
@@ -184,6 +183,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
+
+        if utilities.shape[1] == X.shape[0]:
+            utilities[:, selected_samples] = np.nan
 
         if return_utilities:
             return query_indices, utilities
