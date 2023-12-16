@@ -8,7 +8,7 @@ from ..utils import (
     MISSING_LABEL,
     check_type,
     check_equal_missing_label,
-    unlabeled_indices
+    unlabeled_indices,
 )
 
 
@@ -35,24 +35,21 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     arXiv, Feb. 23, 2020. Accessed: Dec. 05, 2023. [Online].
     Available: http://arxiv.org/abs/1906.03671
     """
-    def __init__(
-            self,
-            missing_label=MISSING_LABEL,
-            random_state=None
-    ):
+
+    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
 
     def query(
-            self,
-            X,
-            y,
-            clf,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
-            return_embeddings=False,
+        self,
+        X,
+        y,
+        clf,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
+        return_embeddings=False,
     ):
         """
         Query strategy for BADGE
@@ -131,7 +128,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             X_unlbld = X_cand
             unlbld_mapping = mapping
         elif mapping is not None:
-            unlbld_mapping = unlabeled_indices(y[mapping], missing_label=self.missing_label)
+            unlbld_mapping = unlabeled_indices(
+                y[mapping], missing_label=self.missing_label
+            )
             X_unlbld = X_cand[unlbld_mapping]
             unlbld_mapping = mapping[unlbld_mapping]
         else:
@@ -149,9 +148,13 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
         # init the utilities
         if mapping is not None:
-            utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
+            utilities = np.full(
+                shape=(batch_size, X.shape[0]), fill_value=np.nan
+            )
         else:
-            utilities = np.full(shape=(batch_size, X_cand.shape[0]), fill_value=np.nan)
+            utilities = np.full(
+                shape=(batch_size, X_cand.shape[0]), fill_value=np.nan
+            )
 
         # sampling with kmeans++
         query_indicies = np.array([], dtype=int)
@@ -160,7 +163,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             if i == 0:
                 d_probas, is_randomized = _d_probability(g_x, [])
             else:
-                d_probas, is_randomized = _d_probability(g_x, [idx_in_unlbld], D_p[i - 1])
+                d_probas, is_randomized = _d_probability(
+                    g_x, [idx_in_unlbld], D_p[i - 1]
+                )
             D_p.append(d_probas)
 
             utilities[i, unlbld_mapping] = d_probas
@@ -169,8 +174,13 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             if is_randomized:
                 idx_in_unlbld = self.random_state_.choice(len(g_x))
             else:
-                customDist = stats.rv_discrete(name="customDist", values=(np.arange(len(d_probas)), d_probas))
-                idx_in_unlbld_array = customDist.rvs(size=1, random_state=self.random_state_)
+                customDist = stats.rv_discrete(
+                    name="customDist",
+                    values=(np.arange(len(d_probas)), d_probas),
+                )
+                idx_in_unlbld_array = customDist.rvs(
+                    size=1, random_state=self.random_state_
+                )
                 idx_in_unlbld = idx_in_unlbld_array[0]
 
             idx = unlbld_mapping[idx_in_unlbld]

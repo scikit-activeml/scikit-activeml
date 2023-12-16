@@ -10,7 +10,12 @@ import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices
-from sklearn.utils.validation import check_array, check_consistent_length, check_random_state, column_or_1d
+from sklearn.utils.validation import (
+    check_array,
+    check_consistent_length,
+    check_random_state,
+    column_or_1d,
+)
 from sklearn.metrics import pairwise_distances
 
 
