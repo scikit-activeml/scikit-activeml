@@ -158,30 +158,30 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
         # sampling with kmeans++
         query_indicies = np.array([], dtype=int)
-        D_p = []
+        query_indicies_in_unlbld = np.array([], dtype=int)
+        d_2_s = []
         for i in range(batch_size):
             if i == 0:
-                d_probas, is_randomized = _d_probability(g_x, [])
+                d_2 = _d_2(g_x, [])
             else:
-                d_probas, is_randomized = _d_probability(
-                    g_x, [idx_in_unlbld], D_p[i - 1]
-                )
-            D_p.append(d_probas)
+                d_2 = _d_2(g_x, [idx_in_unlbld], d_2_s[i - 1])
+            d_2_s.append(d_2)
+
+            d_2_sum = np.sum(d_2)
+            if i == 0 or d_2_sum == 0:
+                d_2 = np.ones(shape=len(g_x))
+                d_2[query_indicies_in_unlbld] = 0
+                d_2_sum = np.sum(d_2)
+
+            d_probas = d_2 / d_2_sum
 
             utilities[i, unlbld_mapping] = d_probas
             utilities[i, query_indicies] = np.nan
 
-            if is_randomized:
-                idx_in_unlbld = self.random_state_.choice(len(g_x))
-            else:
-                customDist = stats.rv_discrete(
-                    name="customDist",
-                    values=(np.arange(len(d_probas)), d_probas),
-                )
-                idx_in_unlbld_array = customDist.rvs(
-                    size=1, random_state=self.random_state_
-                )
-                idx_in_unlbld = idx_in_unlbld_array[0]
+            customDist = stats.rv_discrete(name="customDist", values=(np.arange(len(d_probas)), d_probas))  # gaile
+            idx_in_unlbld_array = customDist.rvs(size=1, random_state=self.random_state_)
+            idx_in_unlbld = idx_in_unlbld_array[0]
+            query_indicies_in_unlbld = np.append(query_indicies_in_unlbld, idx_in_unlbld_array)
 
             idx = unlbld_mapping[idx_in_unlbld]
             query_indicies = np.append(query_indicies, [idx])
@@ -192,7 +192,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             return query_indicies
 
 
-def _d_probability(g_x, query_indicies, d_latest=None):
+def _d_2(g_x, query_indicies, d_latest=None):
     """
 
     Parameters
@@ -218,15 +218,13 @@ def _d_probability(g_x, query_indicies, d_latest=None):
         the discrete distribution which defined after 'probability'.
     """
     if len(query_indicies) == 0:
-        return np.ones(shape=len(g_x)), True
+        return np.full(shape=len(g_x), fill_value=np.inf)
     g_query_indicies = g_x[query_indicies]
     _, D = pairwise_distances_argmin_min(X=g_x, Y=g_query_indicies)
     if d_latest is not None:
         D = np.minimum(d_latest, D)
     D2 = np.square(D)
     D2_sum = np.sum(D2)
-    # for the case that clf only know a label aka class
     if D2_sum == 0:
-        return np.ones(shape=len(g_x)), True
-    D_probas = D2 / D2_sum
-    return D_probas, False
+        return np.full(shape=len(g_x), fill_value=np.inf)
+    return D2
