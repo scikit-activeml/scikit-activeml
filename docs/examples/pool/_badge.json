@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "Badge",
+    "package" : "pool",
+    "method" : "Badge",
+    "category" : "Others",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Badge",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import Badge",
+    "init_qs" : "Badge()",
+    "query_params" : "X=X, y=y, clf=clf"
+  }
+]
