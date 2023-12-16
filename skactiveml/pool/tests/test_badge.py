@@ -93,3 +93,16 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         )
         self.assertEqual(5, utilities_5.shape[1])
         self.assertEqual(2, utilities_5.shape[0])
+
+        # test case 6: for clf know only a class
+        X_6 = np.random.RandomState(42).choice(5, size=(10, 2))
+        y_6 = np.hstack([[0], np.full(9, MISSING_LABEL)])
+        _, utilities_6 = badge_1.query(X_6, y_6, clf_1, batch_size=2, return_utilities=True)
+
+        probas = [i for i in utilities_6[0] if not np.isnan(i)]
+        probas_sum = np.sum(probas)
+        self.assertAlmostEqual(probas_sum, 1)
+
+        probas = [i for i in utilities_6[1] if not np.isnan(i)]
+        probas_sum = np.sum(probas)
+        self.assertAlmostEqual(probas_sum, 1)
