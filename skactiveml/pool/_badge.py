@@ -138,13 +138,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = np.arange(len(X_cand))
 
         # gradient embedding, aka predict class membership probabilities
-        if return_embeddings:
-            probas, X_emb = clf.predict_proba(X_unlbld, return_embeddings=True)
-        else:
-            probas = clf.predict_proba(X_unlbld)
-            X_emb = X_unlbld
+
+        probas = clf.predict_proba(X_unlbld)
         p_max = np.max(probas, axis=1).reshape(-1, 1)
-        g_x = (p_max - 1) * X_emb
+        g_x = (p_max - 1) * X_unlbld
 
         # init the utilities
         if mapping is not None:
@@ -169,6 +166,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
             d_2_sum = np.sum(d_2)
             if i == 0 or d_2_sum == 0:
+                if d_2_sum == 0:
+                    d_2_s[-1] = np.full(shape=len(g_x), fill_value=np.inf)
                 d_2 = np.ones(shape=len(g_x))
                 d_2[query_indicies_in_unlbld] = 0
                 d_2_sum = np.sum(d_2)
@@ -224,7 +223,4 @@ def _d_2(g_x, query_indicies, d_latest=None):
     if d_latest is not None:
         D = np.minimum(d_latest, D)
     D2 = np.square(D)
-    D2_sum = np.sum(D2)
-    if D2_sum == 0:
-        return np.full(shape=len(g_x), fill_value=np.inf)
     return D2
