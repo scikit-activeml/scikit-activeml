@@ -193,6 +193,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
 def _d_2(g_x, query_indicies, d_latest=None):
     """
+    Calculates the D^2 value of the embedding features of unlabeled
+    data.
 
     Parameters
     ----------
@@ -207,14 +209,8 @@ def _d_2(g_x, query_indicies, d_latest=None):
 
     Returns
     -------
-    probability: numpy.ndarray of shape (n_unlabeled_samples)
-        For the case where sample choose uniform random from the set, the
-        utility of all samples will be 1.
-        The utilities represent here the probabilities of samples being
-        chosen.
-    is_randomized: bool
-        A indicator for whether choose uniform randomly or choose based on
-        the discrete distribution which defined after 'probability'.
+    D2: numpy.ndarray of shape (n_unlabeled_samples)
+        The D^2 value, for the first sample is the value inf.
     """
     if len(query_indicies) == 0:
         return np.full(shape=len(g_x), fill_value=np.inf)
