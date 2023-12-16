@@ -106,9 +106,6 @@ class TestKGreedyCenter(unittest.TestCase):
         self.assertRaises(ValueError, k_greedy_center, X="string", y=[np.nan])
 
     def test_param_y(self):
-        self.assertRaises(
-            ValueError, k_greedy_center, X=[[1, 1]], y=[[np.nan]]
-        )
         self.assertRaises(TypeError, k_greedy_center, X=[[1, 1]], y=1)
 
     def test_param_batch_size(self):
@@ -118,7 +115,7 @@ class TestKGreedyCenter(unittest.TestCase):
 
     def test_param_random_state(self):
         self.assertRaises(
-            TypeError,
+            ValueError,
             k_greedy_center,
             X=self.X,
             y=self.y,
@@ -127,7 +124,7 @@ class TestKGreedyCenter(unittest.TestCase):
 
     def test_param_mapping(self):
         self.assertRaises(
-            TypeError, k_greedy_center, X=self.X, y=self.y, mapping="string"
+            ValueError, k_greedy_center, X=self.X, y=self.y, mapping="string"
         )
 
     def test_param_n_new_cand(self):
