@@ -9,6 +9,16 @@ updates:
       timezone: "Europe/Berlin"
     target-branch: "development"
     versioning-strategy: increase-if-necessary
+    ignore:
+      # ignore all requirements_extra
+      - dependency-name: "sphinx"
+      - dependency-name: "sphinxcontrib-bibtex"
+      - dependency-name: "numpydoc"
+      - dependency-name: "nbsphinx"
+      - dependency-name: "nbformat"
+      - dependency-name: "sphinx-gallery"
+      - dependency-name: "pybtex"
+      - dependency-name: "pydata_sphinx_theme"
     
     open-pull-requests-limit: 10
     
@@ -20,6 +30,8 @@ updates:
       day: "monday"
       time: "20:00"
       timezone: "Europe/Berlin"
+    ignore:
+      - dependency-name: "pypa/gh-action-pypi-publish"
     
     target-branch: "development"
 
