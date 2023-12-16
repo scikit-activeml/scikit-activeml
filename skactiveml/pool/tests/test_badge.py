@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import Badge
@@ -15,3 +16,80 @@ from skactiveml.tests.template_query_strategy import (
 class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def setUp(self):
         self.classes = [0, 1]
+        query_default_params_clf = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
+            "clf": SklearnClassifier(LogisticRegression(), classes=self.classes),
+        }
+        super().setUp(
+            qs_class=Badge,
+            init_default_params={"random_state": 42},
+            query_default_params_clf=query_default_params_clf
+        )
+
+    def test_query_param_clf(self):
+        add_test_cases = [
+            (SVC(), TypeError),
+            (SklearnClassifier(SVC()), AttributeError),
+            (SklearnClassifier(SVC(probability=True)), None),
+            (SklearnClassifier(LogisticRegression(), classes=self.classes), None),
+        ]
+        super().test_query_param_clf(test_cases=add_test_cases)
+
+    def test_query_param_return_embeddings(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (1, TypeError),
+            ("string", TypeError),
+            (None, TypeError),
+            (False, None),
+        ]
+        self._test_param("query", "return_embeddings", test_cases=test_cases)
+
+    def test_query(self):
+        # test case 1: with the same random stat the init pick up is the same
+        badge_1 = Badge(random_state=42)
+        X_1 = np.random.RandomState(42).choice(5, size=(10,2))
+        y_1 = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
+        clf_1 = SklearnClassifier(LogisticRegression(), classes=self.classes)
+
+        self.assertEqual(badge_1.query(X_1, y_1, clf_1), badge_1.query(X_1, y_1, clf_1))
+
+        # test case 2: all utilities are not negative or np.nan
+        _, utilities_2 = badge_1.query(X_1, y_1, clf_1, batch_size=2, return_utilities=True)
+        for u in utilities_2:
+            for i in u:
+                if not np.isnan(i):
+                    self.assertGreaterEqual(i, 0)
+                else:
+                    self.assertTrue(np.isnan(i))
+
+        # test case 3: for the case, the sum of utilities equals to one.
+
+        probas = [i for i in utilities_2[0] if not np.isnan(i)]
+        probas_sum = np.sum(probas)
+        self.assertAlmostEqual(probas_sum, 1)
+
+        probas = [i for i in utilities_2[1] if not np.isnan(i)]
+        probas_sum = np.sum(probas)
+        self.assertAlmostEqual(probas_sum, 1)
+
+        # test case 4: for candidates.ndim = 1
+        candidates_4 = np.arange(4, 10)
+        _, utilities_4 = badge_1.query(X_1, y_1, clf_1, batch_size=2, candidates=candidates_4, return_utilities=True)
+        for u in utilities_4:
+            for i in u:
+                if not np.isnan(i):
+                    self.assertGreaterEqual(i, 0)
+                else:
+                    self.assertTrue(np.isnan(i))
+        self.assertEqual(2, utilities_4.shape[0])
+        self.assertEqual(10, utilities_4.shape[1])
+
+        # test case 5: for candidates with new samples
+        X_cand = np.random.choice(5, size=(5, 2))
+        _, utilities_5 = badge_1.query(
+            X_1, y_1, clf_1, batch_size=2, candidates=X_cand, return_utilities=True
+        )
+        self.assertEqual(5, utilities_5.shape[1])
+        self.assertEqual(2, utilities_5.shape[0])
