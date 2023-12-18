@@ -18,6 +18,7 @@ from skactiveml.classifier import (
     SklearnClassifier,
     SlidingWindowClassifier,
     ParzenWindowClassifier,
+    MixtureModelClassifier,
 )
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
 
@@ -276,7 +277,7 @@ class TestSlidingWindowClassifier(
             replace_fit_params=replace_fit_params,
         )
 
-        test_cases = [("state", TypeError), (-1, None)]
+        test_cases = [("state", TypeError), (-1, None), (-2, ValueError)]
         replace_init_params["classes"] = [0, 1]
         replace_init_params["estimator"] = SklearnClassifier(
             GaussianProcessClassifier(), missing_label=-1
@@ -324,10 +325,11 @@ class TestSlidingWindowClassifier(
             (np.nan, TypeError),
             ([1, 2], TypeError),
             (["tokyo", "paris"], None),
+            (["tokyo", "berlin"], ValueError),
         ]
         replace_init_params = {
             "estimator": SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan"
+                GaussianProcessClassifier(), missing_label="nan", classes=["tokyo", "paris"]
             )
         }
         replace_init_params = {"missing_label": "nan"}
@@ -355,6 +357,15 @@ class TestSlidingWindowClassifier(
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+
+    def test_fit_param_X(self, test_cases=None, replace_init_params=None):
+        replace_init_params = {"classes": [0,1],
+            "missing_label": -1,
+            "estimator": SklearnClassifier(
+                MixtureModelClassifier(), missing_label=-1, classes=[0,1]
+            ),
+        }
+        super().test_fit_param_X(test_cases, replace_init_params)
 
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
