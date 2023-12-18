@@ -262,6 +262,6 @@ class TemplateBudgetManager:
             queried_indices=bm2_outputs,
             **budget_manager_param_dict1,
         )
-        output1 = bm.query_by_utility(candidat)
-        output2 = bm2.query_by_utility(candidat)
+        output1 = bm.query_by_utility(candidate)
+        output2 = bm2.query_by_utility(candidate)
         self.assertEqual(len(output1), len(output2))
