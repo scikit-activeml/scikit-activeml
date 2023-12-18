@@ -184,7 +184,7 @@ class TemplateBudgetManager:
 
     def test_query_by_utility(
         self,
-        expected_output=None,
+        expected_output,
         utilities=None,
     ):
         if expected_output is None:
@@ -243,7 +243,7 @@ class TemplateBudgetManager:
         bm2_outputs = []
         utilities_update = []
         utilities = np.array([0.2, 0.6, 0.8, 0.9, 0.1])
-        candidat = np.array([0.3])
+        candidate = np.array([0.3])
         for u in utilities:
             output = bm2.query_by_utility(np.array([u]))
             bm2_outputs.extend(output)
