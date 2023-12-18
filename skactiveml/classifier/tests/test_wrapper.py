@@ -329,7 +329,9 @@ class TestSlidingWindowClassifier(
         ]
         replace_init_params = {
             "estimator": SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan", classes=["tokyo", "paris"]
+                GaussianProcessClassifier(),
+                missing_label="nan",
+                classes=["tokyo", "paris"],
             )
         }
         replace_init_params = {"missing_label": "nan"}
@@ -359,10 +361,11 @@ class TestSlidingWindowClassifier(
         )
 
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
-        replace_init_params = {"classes": [0,1],
+        replace_init_params = {
+            "classes": [0, 1],
             "missing_label": -1,
             "estimator": SklearnClassifier(
-                MixtureModelClassifier(), missing_label=-1, classes=[0,1]
+                MixtureModelClassifier(), missing_label=-1, classes=[0, 1]
             ),
         }
         super().test_fit_param_X(test_cases, replace_init_params)

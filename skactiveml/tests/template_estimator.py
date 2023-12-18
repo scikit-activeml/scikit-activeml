@@ -390,8 +390,10 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
-        test_cases = [(self.predict_default_params["X"],None)]
-        replace_init_params["cost_matrix"] = 1 - np.eye(len(np.unique(replace_fit_params["y"])))
+        test_cases = [(self.predict_default_params["X"], None)]
+        replace_init_params["cost_matrix"] = 1 - np.eye(
+            len(np.unique(replace_fit_params["y"]))
+        )
         self._test_param(
             "predict",
             "X",
@@ -399,14 +401,20 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
-    
+
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
         super().test_fit_param_X(test_cases)
         test_cases = [([], None)]
         replace_fit_params = {"y": []}
         if replace_init_params is None:
-            replace_init_params = {"classes": [0,1], "missing_label": -1}
-        self._test_param("fit", "X", test_cases, replace_init_params=replace_init_params, replace_fit_params=replace_fit_params)
+            replace_init_params = {"classes": [0, 1], "missing_label": -1}
+        self._test_param(
+            "fit",
+            "X",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
 
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
