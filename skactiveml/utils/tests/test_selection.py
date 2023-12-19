@@ -115,6 +115,19 @@ class TestSelection(unittest.TestCase):
         )
         np.testing.assert_equal((0, 2), indices.shape)
 
+        batch_size = 10
+        idx, utils = simple_batch(np.arange(100), batch_size=batch_size,
+                                  return_utilities=True, method='proportional')
+        self.assertEqual(batch_size, len(idx))
+        self.assertEqual(
+            np.sum(np.isnan(utils)),
+            np.sum(np.arange(batch_size)))
+        for i in range(batch_size):
+            np.testing.assert_array_equal(
+                np.argwhere(np.isnan(utils[i])).flatten(),
+                np.sort(idx[:i])
+            )
+
     def test_combine_ranking(self):
         self.assertRaises(
             ValueError,
