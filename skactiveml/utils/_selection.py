@@ -144,10 +144,12 @@ def simple_batch(
             utilities[tuple(best_indices[i])] = np.nan
     elif method == 'proportional':
         random_state = check_random_state(random_state)
+        p = utilities/np.nansum(utilities)
+        p[np.isnan(p)] = 0
         best_indices = random_state.choice(
             len(utilities),
             size=batch_size,
-            p=utilities/np.sum(utilities),
+            p=p,
             replace=False,
         )
 
