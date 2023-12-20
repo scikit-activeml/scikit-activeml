@@ -11,6 +11,7 @@ from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
+from sklearn.exceptions import NotFittedError
 
 
 class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -20,7 +21,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
             "clf": SklearnClassifier(
-                LogisticRegression(), classes=self.classes
+                LogisticRegression(random_state=0), classes=self.classes, random_state=0
             ),
         }
         super().setUp(
@@ -48,8 +49,20 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ("string", TypeError),
             (None, TypeError),
             (False, None),
+            (True, TypeError),
         ]
         self._test_param("query", "return_embeddings", test_cases=test_cases)
+
+    def test_query_param_fit_clf(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (1, TypeError),
+            ("string", TypeError),
+            (None, TypeError),
+            (False, NotFittedError),
+            (True, None),
+        ]
+        self._test_param("query", "fit_clf", test_cases=test_cases)
 
     def test_query(self):
         # test case 1: with the same random stat the init pick up is the same

@@ -9,6 +9,7 @@ from ..utils import (
     check_type,
     check_equal_missing_label,
     unlabeled_indices,
+    check_scalar,
 )
 
 
@@ -46,6 +47,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         X,
         y,
         clf,
+        fit_clf=True,
         candidates=None,
         batch_size=1,
         return_utilities=False,
@@ -117,11 +119,12 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         # Validate classifier type
         check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
-        if not isinstance(return_embeddings, bool):
-            raise TypeError("'return_embeddings' must be a boolean.")
+        check_scalar(fit_clf, "fit_clf", bool)
+        check_scalar(return_embeddings, "return_embeddings", bool)
 
         # Fit the classifier
-        clf = clone(clf).fit(X, y)
+        if fit_clf:
+            clf = clone(clf).fit(X, y)
 
         # find the unlabeled dataset
         if candidates is None:
@@ -138,8 +141,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = np.arange(len(X_cand))
 
         # gradient embedding, aka predict class membership probabilities
-
-        probas = clf.predict_proba(X_unlbld)
+        if return_embeddings:
+            probas, X_unlbld = clf.predict_proba(X_unlbld, return_embeddings=True)
+        else:
+            probas = clf.predict_proba(X_unlbld)
         p_max = np.max(probas, axis=1).reshape(-1, 1)
         g_x = (p_max - 1) * X_unlbld
 
@@ -179,10 +184,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
             customDist = stats.rv_discrete(
                 name="customDist", values=(np.arange(len(d_probas)), d_probas)
-            )  # gaile
+            )
             idx_in_unlbld_array = customDist.rvs(
                 size=1, random_state=self.random_state_
             )
+            # TODO: with self.random_state_.choice(p=d_probas)
             idx_in_unlbld = idx_in_unlbld_array[0]
             query_indicies_in_unlbld = np.append(
                 query_indicies_in_unlbld, idx_in_unlbld_array
