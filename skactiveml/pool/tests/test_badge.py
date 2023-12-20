@@ -19,12 +19,14 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         query_default_params_clf = {
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
-            "clf": SklearnClassifier(LogisticRegression(), classes=self.classes),
+            "clf": SklearnClassifier(
+                LogisticRegression(), classes=self.classes
+            ),
         }
         super().setUp(
             qs_class=Badge,
             init_default_params={"random_state": 42},
-            query_default_params_clf=query_default_params_clf
+            query_default_params_clf=query_default_params_clf,
         )
 
     def test_query_param_clf(self):
@@ -32,7 +34,10 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             (SVC(), TypeError),
             (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(SVC(probability=True)), None),
-            (SklearnClassifier(LogisticRegression(), classes=self.classes), None),
+            (
+                SklearnClassifier(LogisticRegression(), classes=self.classes),
+                None,
+            ),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
 
@@ -49,14 +54,18 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def test_query(self):
         # test case 1: with the same random stat the init pick up is the same
         badge_1 = Badge(random_state=42)
-        X_1 = np.random.RandomState(42).choice(5, size=(10,2))
+        X_1 = np.random.RandomState(42).choice(5, size=(10, 2))
         y_1 = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
         clf_1 = SklearnClassifier(LogisticRegression(), classes=self.classes)
 
-        self.assertEqual(badge_1.query(X_1, y_1, clf_1), badge_1.query(X_1, y_1, clf_1))
+        self.assertEqual(
+            badge_1.query(X_1, y_1, clf_1), badge_1.query(X_1, y_1, clf_1)
+        )
 
         # test case 2: all utilities are not negative or np.nan
-        _, utilities_2 = badge_1.query(X_1, y_1, clf_1, batch_size=2, return_utilities=True)
+        _, utilities_2 = badge_1.query(
+            X_1, y_1, clf_1, batch_size=2, return_utilities=True
+        )
         for u in utilities_2:
             for i in u:
                 if not np.isnan(i):
@@ -76,7 +85,14 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
 
         # test case 4: for candidates.ndim = 1
         candidates_4 = np.arange(4, 10)
-        _, utilities_4 = badge_1.query(X_1, y_1, clf_1, batch_size=2, candidates=candidates_4, return_utilities=True)
+        _, utilities_4 = badge_1.query(
+            X_1,
+            y_1,
+            clf_1,
+            batch_size=2,
+            candidates=candidates_4,
+            return_utilities=True,
+        )
         for u in utilities_4:
             for i in u:
                 if not np.isnan(i):
@@ -89,7 +105,12 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         # test case 5: for candidates with new samples
         X_cand = np.random.choice(5, size=(5, 2))
         _, utilities_5 = badge_1.query(
-            X_1, y_1, clf_1, batch_size=2, candidates=X_cand, return_utilities=True
+            X_1,
+            y_1,
+            clf_1,
+            batch_size=2,
+            candidates=X_cand,
+            return_utilities=True,
         )
         self.assertEqual(5, utilities_5.shape[1])
         self.assertEqual(2, utilities_5.shape[0])
@@ -97,7 +118,9 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         # test case 6: for clf know only a class
         X_6 = np.random.RandomState(42).choice(5, size=(10, 2))
         y_6 = np.hstack([[0], np.full(9, MISSING_LABEL)])
-        _, utilities_6 = badge_1.query(X_6, y_6, clf_1, batch_size=2, return_utilities=True)
+        _, utilities_6 = badge_1.query(
+            X_6, y_6, clf_1, batch_size=2, return_utilities=True
+        )
 
         probas = [i for i in utilities_6[0] if not np.isnan(i)]
         probas_sum = np.sum(probas)

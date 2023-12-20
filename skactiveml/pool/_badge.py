@@ -177,10 +177,16 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             utilities[i, unlbld_mapping] = d_probas
             utilities[i, query_indicies] = np.nan
 
-            customDist = stats.rv_discrete(name="customDist", values=(np.arange(len(d_probas)), d_probas))  # gaile
-            idx_in_unlbld_array = customDist.rvs(size=1, random_state=self.random_state_)
+            customDist = stats.rv_discrete(
+                name="customDist", values=(np.arange(len(d_probas)), d_probas)
+            )  # gaile
+            idx_in_unlbld_array = customDist.rvs(
+                size=1, random_state=self.random_state_
+            )
             idx_in_unlbld = idx_in_unlbld_array[0]
-            query_indicies_in_unlbld = np.append(query_indicies_in_unlbld, idx_in_unlbld_array)
+            query_indicies_in_unlbld = np.append(
+                query_indicies_in_unlbld, idx_in_unlbld_array
+            )
 
             idx = unlbld_mapping[idx_in_unlbld]
             query_indicies = np.append(query_indicies, [idx])
