@@ -153,7 +153,11 @@ html_theme_options = {
         }
     ],
     "icon_links_label": "Quick Links",
+    # "switcher": {
+    #     "json_url": "switcher.json",
+    # }
 }
+# TODO: automaticly generate switcher and generate new docs on release.
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
