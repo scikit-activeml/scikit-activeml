@@ -136,7 +136,7 @@ Stream-based Active Learning
 ############################
 
 The following code snippet implements an active learning cycle with 200 data points and
-the default budget of 10% using a pwc classifier and split uncertainty sampling. 
+the default budget of 10% using a pwc classifier and split uncertainty sampling.
 Like in the pool-based example you can wrap other classifiers from ``sklearn``,
 ``sklearn`` compatible classifiers or like the example classifiers provided by ``skactiveml``.
 
@@ -191,7 +191,7 @@ of the query strategies implemented by ``skactiveml``.
 
 .. |Overview| image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/strategy-overview.gif
    :width: 400
-   
+
 .. |Visualization| image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/example-overview.gif
    :width: 400
 
