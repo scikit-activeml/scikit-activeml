@@ -68,16 +68,3 @@ jobs:
       if: github.ref == 'refs/heads/versioning-of-docs'
       run: |
         curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/AlexanderBenz/scikit-activeml-project-docs/dispatches -d "{\"event_type\":\"build_docs\"}"
-
-on:
-  release:
-    types: [published]
-  
-jobs:
-  build:
-
-    runs-on: ubuntu-latest
-    steps:
-    - name: Trigger realease documentation for scikit-activeml-docs
-      run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/AlexanderBenz/scikit-activeml-project-docs/dispatches -d "{\"event_type\":\"release\"}"
