@@ -154,9 +154,9 @@ html_theme_options = {
         }
     ],
     "icon_links_label": "Quick Links",
-    # "switcher": {
-    #     "json_url": "switcher.json",
-    # }
+    "switcher": {
+        "json_url": "switcher.json",
+    }
 }
 # TODO: automaticly generate switcher and generate new docs on release.
 

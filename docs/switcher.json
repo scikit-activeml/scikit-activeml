@@ -1,19 +1,11 @@
 [
     {
-        "name": "v2.1 (stable)",
+        "name": "latest",
         "version": "2.1",
-        "url": "https://mysite.org/en/2.1/"
+        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/"
     },
     {
-        "version": "2.1rc1",
-        "url": "https://mysite.org/en/2.1rc1/"
-    },
-    {
-        "version": "2.0",
-        "url": "https://mysite.org/en/2.0/"
-    },
-    {
-        "version": "1.0",
-        "url": "https://mysite.org/en/1.0/"
+        "version": "test",
+        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/v0.1"
     }
 ]
