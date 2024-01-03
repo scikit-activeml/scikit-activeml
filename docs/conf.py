@@ -154,17 +154,17 @@ html_theme_options = {
         }
     ],
     "icon_links_label": "Quick Links",
-    # "switcher": {
-    #     "json_url": "switcher.json",
-    # },
-    # "navbar_start": ["version-switcher"]
+    "switcher": {
+        "json_url": "switcher.json",
+    },
+    "navbar_start": ["version-switcher"]
 }
 # TODO: automaticly generate switcher and generate new docs on release.
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["./_static"]
+html_static_path = ["_static"]
 
 html_js_files = [
     "https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js",
