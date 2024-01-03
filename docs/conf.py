@@ -154,10 +154,10 @@ html_theme_options = {
         }
     ],
     "icon_links_label": "Quick Links",
-    "switcher": {
-        "json_url": "switcher.json",
-    },
-    "navbar_start": ["version-switcher"]
+    # "switcher": {
+    #     "json_url": "switcher.json",
+    # },
+    # "navbar_start": ["version-switcher"]
 }
 # TODO: automaticly generate switcher and generate new docs on release.
 
