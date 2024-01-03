@@ -1,5 +1,5 @@
-# import os
-# os.environ["OMP_NUM_THREADS"] = "1"
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
 import distutils.dir_util
 import importlib
 import inspect
@@ -368,8 +368,8 @@ def generate_examples(gen_path, json_path, recursive=True):
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
         if "num_cpus" not in os.environ:
-            os.environ["num_cpus"] = "1"
-        if int(os.environ["num_cpus"]) > 1:
+            os.environ["num_cpus"] = "-1"
+        if int(os.environ["num_cpus"]) != 1:
             Parallel(n_jobs=int(os.environ['num_cpus']),backend='loky')
             (delayed(_generate_single_example)(f,root, json_data, sub_dir_str, dst) for f in files)
         else:

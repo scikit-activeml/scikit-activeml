@@ -2,10 +2,10 @@
     {
         "name": "latest",
         "version": "2.1",
-        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/"
+        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/docs/"
     },
     {
         "version": "test",
-        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/v0.1"
+        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/v0.1/"
     }
 ]
