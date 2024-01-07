@@ -188,7 +188,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             idx_in_unlbld_array = customDist.rvs(
                 size=1, random_state=self.random_state_
             )
-            # TODO: with self.random_state_.choice(p=d_probas)
             idx_in_unlbld = idx_in_unlbld_array[0]
             query_indicies_in_unlbld = np.append(
                 query_indicies_in_unlbld, idx_in_unlbld_array
