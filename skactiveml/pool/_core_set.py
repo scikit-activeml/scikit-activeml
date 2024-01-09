@@ -9,7 +9,7 @@ whole dataset.
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices
+from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices, rand_argmax
 from sklearn.utils.validation import check_array, check_consistent_length, check_random_state, column_or_1d
 from sklearn.metrics import pairwise_distances
 
@@ -18,14 +18,10 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """Core Set Selection
 
     This class implement various core-set based query strategies, i.e., the
-    standard greedy algorithm for k-center problem [1], the robust k-center
-    algorithm [1].
+    standard greedy algorithm for k-center problem [1].
 
     Parameters
     ----------
-    method: {'greedy', 'robust'}, default='greedy'
-        The method to solve the k-center problem, k-center-greedy and robust
-        k-center are possible. So far only `method=greedy` is supported
     missing_label: scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label
     random_state: int or np.random.RandomState
@@ -38,20 +34,19 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-        self, method="greedy", missing_label=MISSING_LABEL, random_state=None
+            self, missing_label=MISSING_LABEL, random_state=None
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
-        self.method = method
 
     def query(
-        self,
-        X,
-        y,
-        candidates=None,
-        batch_size=1,
-        return_utilities=False,
+            self,
+            X,
+            y,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
     ):
         """Query the next samples to be labeled
 
@@ -103,42 +98,39 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
-        if self.method == "greedy":
-            if mapping is not None:
-                query_indices, utilities = k_greedy_center(
-                    X,
-                    y,
-                    batch_size,
-                    self.random_state_,
-                    self.missing_label_,
-                    mapping,
-                )
-            else:
-                selected_samples = labeled_indices(
-                    y=y, missing_label=self.missing_label_
-                )
-                X_with_cand = np.concatenate(
-                    (X_cand, X[selected_samples]), axis=0
-                )
-                n_new_cand = X_cand.shape[0]
-                y_cand = np.full(
-                    shape=n_new_cand, fill_value=self.missing_label
-                )
-                y_with_cand = np.concatenate(
-                    (y_cand, y[selected_samples]), axis=None
-                )
-                mapping = np.arange(n_new_cand)
-                query_indices, utilities = k_greedy_center(
-                    X_with_cand,
-                    y_with_cand,
-                    batch_size,
-                    self.random_state_,
-                    self.missing_label_,
-                    mapping,
-                    n_new_cand,
-                )
+        if mapping is not None:
+            query_indices, utilities = k_greedy_center(
+                X,
+                y,
+                batch_size,
+                self.random_state_,
+                self.missing_label_,
+                mapping,
+            )
         else:
-            raise ValueError("Only `method='greedy'` is supported.")
+            selected_samples = labeled_indices(
+                y=y, missing_label=self.missing_label_
+            )
+            X_with_cand = np.concatenate(
+                (X_cand, X[selected_samples]), axis=0
+            )
+            n_new_cand = X_cand.shape[0]
+            y_cand = np.full(
+                shape=n_new_cand, fill_value=self.missing_label
+            )
+            y_with_cand = np.concatenate(
+                (y_cand, y[selected_samples]), axis=None
+            )
+            mapping = np.arange(n_new_cand)
+            query_indices, utilities = k_greedy_center(
+                X_with_cand,
+                y_with_cand,
+                batch_size,
+                self.random_state_,
+                self.missing_label_,
+                mapping,
+                n_new_cand,
+            )
 
         if return_utilities:
             return query_indices, utilities
@@ -147,19 +139,18 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
 
 def k_greedy_center(
-    X,
-    y,
-    batch_size=1,
-    random_state=None,
-    missing_label=np.nan,
-    mapping=None,
-    n_new_cand=None,
+        X,
+        y,
+        batch_size=1,
+        random_state=None,
+        missing_label=MISSING_LABEL,
+        mapping=None,
+        n_new_cand=None,
 ):
     """
     An active learning method that greedily forms a batch to minimize
     the maximum distance to a cluster center among all unlabeled
     datapoints.
-    This method is a static method.
 
     Parameters:
     ----------
@@ -168,16 +159,16 @@ def k_greedy_center(
        unlabeled samples
     y: np.ndarray of shape (n_selected_samples, )
        index of datapoints already selects
-    batch_size: int, optional(default=1)
+    batch_size: int, optional (default=1)
        The number of samples to be selected in one AL cycle.
     random_state: int | np.random.RandomState, optional (default=None)
        Random state for candidate selection.
-    missing_label: scalar or string or np.nan or None (default=np.nan)
+    missing_label: scalar or string or np.nan or None, optional (default=np.nan)
        Value to represent a missing label
-    mapping: np.ndarray of shape (n_candidates, ) (default=None)
+    mapping: np.ndarray of shape (n_candidates, ), optional (default=None)
        Index array that maps `candidates` to `X`.
        (`candidates = X[mapping]`)
-    n_new_cand: int or None (default=None)
+    n_new_cand: int or None, optional (default=None)
        The number of new candidates that are additionally added to X.
        Only used for the case, that in the query function with the
        shape of candidates is (n_candidates, n_feature)
@@ -232,7 +223,7 @@ def k_greedy_center(
     else:
         raise TypeError("Only n_new_cand with type int is supported.")
 
-    query_indices = np.array([], dtype=int)
+    query_indices = np.zeros(batch_size, dtype=int)
 
     for i in range(batch_size):
         if i == 0:
@@ -247,14 +238,9 @@ def k_greedy_center(
             utilities[i] = update_dist[mapping]
 
         # select index
-        idx = np.nanargmax(utilities[i])
+        idx = rand_argmax(utilities[i], random_state=random_state_)
 
-        if len(selected_samples) == 0:
-            idx = random_state_.choice(mapping)
-            # because np.nanargmax always return the first occurrence is returned
-
-        query_indices = np.append(query_indices, [idx])
-        selected_samples = np.append(selected_samples, [idx])
+        query_indices[i] = idx
 
     return query_indices, utilities
 
@@ -281,14 +267,14 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
     Return:
     ---------
     result-dist: numpy.ndarray of shape (1, n_samples)
-        - if there aren't any cluster centers existed, the default distance
-        will be 0
-        - if there are some cluster center existed, the return will be the
+        If there aren't any cluster centers existing, the default distance
+        will be 0.
+        If there are some cluster center exist, the return will be the
         distance between each data point and its nearest center after
-        each selected sample of the batch. By the case of cluster center the
-        value will be np.nan
-        - For the indices isn't in mapping, the corresponding value in
-        result-dist will be also np.nan
+        each selected sample of the batch. In the case of cluster center the
+        value will be 'np.nan'.
+        For the case, that indices aren't in 'mapping', the corresponding value in
+        'result-dist' will be also 'np.nan'.
     """
     dist = np.zeros(shape=X.shape[0])
 
