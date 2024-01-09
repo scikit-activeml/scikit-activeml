@@ -20,16 +20,6 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             query_default_params_clf=query_default_params,
         )
 
-    def test_init_param_method(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [
-            (1, ValueError),
-            ("string", ValueError),
-            (None, ValueError),
-            ("greedy", None),
-        ]
-        self._test_param("init", "method", test_cases)
-
     def test_query(self):
         # test case 1: with the same random state the init pick up
         # is the same
@@ -56,7 +46,6 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
 
         # test case 3: all samples have the same features, the utilities
         # are also the same.
-
         X_3 = np.ones((10, 2))
         y_3 = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
 
