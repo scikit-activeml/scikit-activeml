@@ -9,8 +9,18 @@ whole dataset.
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, labeled_indices, unlabeled_indices, rand_argmax
-from sklearn.utils.validation import check_array, check_consistent_length, check_random_state, column_or_1d
+from ..utils import (
+    MISSING_LABEL,
+    labeled_indices,
+    unlabeled_indices,
+    rand_argmax,
+)
+from sklearn.utils.validation import (
+    check_array,
+    check_consistent_length,
+    check_random_state,
+    column_or_1d,
+)
 from sklearn.metrics import pairwise_distances
 
 
@@ -33,20 +43,18 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     Networks: A Core-Set Approach“, ICLR, 2018.
     """
 
-    def __init__(
-            self, missing_label=MISSING_LABEL, random_state=None
-    ):
+    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
 
     def query(
-            self,
-            X,
-            y,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Query the next samples to be labeled
 
@@ -111,13 +119,9 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             selected_samples = labeled_indices(
                 y=y, missing_label=self.missing_label_
             )
-            X_with_cand = np.concatenate(
-                (X_cand, X[selected_samples]), axis=0
-            )
+            X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
-            y_cand = np.full(
-                shape=n_new_cand, fill_value=self.missing_label
-            )
+            y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
             y_with_cand = np.concatenate(
                 (y_cand, y[selected_samples]), axis=None
             )
@@ -139,13 +143,13 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
 
 def k_greedy_center(
-        X,
-        y,
-        batch_size=1,
-        random_state=None,
-        missing_label=MISSING_LABEL,
-        mapping=None,
-        n_new_cand=None,
+    X,
+    y,
+    batch_size=1,
+    random_state=None,
+    missing_label=MISSING_LABEL,
+    mapping=None,
+    n_new_cand=None,
 ):
     """
     An active learning method that greedily forms a batch to minimize
@@ -219,7 +223,9 @@ def k_greedy_center(
         if n_new_cand == len(mapping):
             utilities = np.empty(shape=(batch_size, n_new_cand))
         else:
-            raise ValueError("n_new_cand must equal to the length of mapping array")
+            raise ValueError(
+                "n_new_cand must equal to the length of mapping array"
+            )
     else:
         raise TypeError("Only n_new_cand with type int is supported.")
 
