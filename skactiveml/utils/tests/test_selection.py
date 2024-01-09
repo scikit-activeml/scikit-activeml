@@ -1,6 +1,9 @@
 import unittest
 
+import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import norm
+from sklearn.neighbors import KernelDensity
 
 from skactiveml.utils import rand_argmin, rand_argmax, simple_batch
 from skactiveml.utils._selection import combine_ranking
@@ -127,6 +130,30 @@ class TestSelection(unittest.TestCase):
                 np.argwhere(np.isnan(utils[i])).flatten(),
                 np.sort(idx[:i])
             )
+
+        # test proportional method
+        N = 1000
+        X = np.linspace(-5, 10, N)
+        true_dens = 0.3 * norm(0, 1).pdf(X.reshape(-1, 1)) + \
+                    0.7 * norm(5, 1).pdf(X.reshape(-1, 1))
+        true_dens += np.mean(true_dens)
+        true_dens = true_dens / np.sum(true_dens)
+        sel = np.empty(100000)
+        for i in range(100000):
+            sel[i] = X[simple_batch(true_dens[:, 0], method='proportional')[0]]
+        density = KernelDensity(kernel='gaussian', bandwidth=0.2).fit(
+            sel.reshape(-1, 1))
+        est_dens = np.exp(density.score_samples(X.reshape(-1, 1))).flatten()
+        est_dens /= np.sum(est_dens)
+        # plt.plot(X, est_dens)
+        # plt.plot(X, true_dens)
+        # plt.plot(X, np.abs(est_dens / true_dens.flatten() - 1))
+        # plt.show()
+        np.testing.assert_allclose(
+            true_dens.flatten()[20:-20],
+            est_dens[20:-20],
+            rtol=0.1
+        )
 
     def test_combine_ranking(self):
         self.assertRaises(
