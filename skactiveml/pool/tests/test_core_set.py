@@ -23,7 +23,6 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
     def test_query(self):
         # test case 1: with the same random state the init pick up
         # is the same
-
         core_set_1 = CoreSet(random_state=42)
         random_state = np.random.RandomState(42)
 
@@ -78,6 +77,29 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             X, y_1, batch_size=2, candidates=X_cand, return_utilities=True
         )
         self.assertEqual(5, utilities_5.shape[1])
+
+        # test case 6: remove already unlabeled samples `X[unlbld_indices]` from `X`
+        # and add them as `candidates=X[unlbld_indices]` and check whether the utilities
+        # are the same.
+        core_set_6 = CoreSet(random_state=42)
+
+        X = random_state.choice(5, size=(10, 2))
+        y = np.full(10, MISSING_LABEL)
+        y[:5] = 0
+
+        query_indicies_6_1, utilities_6_1 = core_set_6.query(
+            X, y, candidates=None, return_utilities=True
+        )
+        query_indicies_6_2, utilities_6_2 = core_set_6.query(
+            X, y, candidates=[5, 6, 7, 8, 9], return_utilities=True
+        )
+        _, utilities_6_3 = core_set_6.query(
+            X, y, candidates=X[[5, 6, 7, 8, 9]], return_utilities=True
+        )
+
+        np.testing.assert_array_equal(query_indicies_6_1, query_indicies_6_2)
+        np.testing.assert_array_equal(utilities_6_1, utilities_6_2)
+        np.testing.assert_array_equal(utilities_6_1[:, 5:], utilities_6_3)
 
 
 class TestKGreedyCenter(unittest.TestCase):

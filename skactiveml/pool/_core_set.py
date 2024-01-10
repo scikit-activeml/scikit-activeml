@@ -244,7 +244,7 @@ def k_greedy_center(
             utilities[i] = update_dist[mapping]
 
         # select index
-        idx = rand_argmax(utilities[i], random_state=random_state_)
+        idx = rand_argmax(utilities[i], random_state=random_state_)[0]
 
         query_indices[i] = idx
 
