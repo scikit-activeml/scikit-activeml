@@ -157,7 +157,7 @@ html_theme_options = {
         "json_url": "https://github.com/AlexanderBenz/scikit-activeml-project/blob/versioning-of-docs/docs/switcher.json",
         "version_match": version,
     },
-    "navbar_start": ["version-switcher"]
+    "navbar_start": ["navbar-logo", "version-switcher"]
 }
 # TODO: automaticly generate switcher and generate new docs on release.
 # use tags to get the release version "git tag -l --sort=-creatordate | head -n 1"
