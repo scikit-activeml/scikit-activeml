@@ -155,11 +155,13 @@ html_theme_options = {
     ],
     "icon_links_label": "Quick Links",
     "switcher": {
-        "json_url": "switcher.json",
+        "json_url": "https://github.com/AlexanderBenz/scikit-activeml-project/blob/versioning-of-docs/docs/switcher.json",
+        "version_match": version,
     },
     "navbar_start": ["version-switcher"]
 }
 # TODO: automaticly generate switcher and generate new docs on release.
+# use tags to get the release version "git tag -l --sort=-creatordate | head -n 1"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
