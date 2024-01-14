@@ -2,10 +2,10 @@
     {
         "name": "latest (dev)",
         "version": "latest",
-        "url": "https://github.com/AlexanderBenz/scikit-activeml-project-docs/blob/gh-pages/v0.1/index.html"
+        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/docs/index.html"
     },
     {
         "version": "test",
-        "url": "https://github.com/AlexanderBenz/scikit-activeml-project-docs/blob/gh-pages/v0.1/index.html"
+        "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/v0.1/index.html"
     }
 ]
