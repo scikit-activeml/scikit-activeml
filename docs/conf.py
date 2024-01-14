@@ -154,7 +154,7 @@ html_theme_options = {
     ],
     "icon_links_label": "Quick Links",
     "switcher": {
-        "json_url": "https://github.com/AlexanderBenz/scikit-activeml-project/blob/versioning-of-docs/docs/switcher.json",
+        "json_url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/latest/_static/switcher.json",
         "version_match": version,
     },
     "navbar_start": ["navbar-logo", "version-switcher"]
