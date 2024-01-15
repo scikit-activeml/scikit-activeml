@@ -31,13 +31,12 @@ class TemplateEstimator:
             "random_state": 42,
             "missing_label": MISSING_LABEL,
         }
-        self.init_default_params = deepcopy(init_default_params)
+        self.init_default_params.update(deepcopy(init_default_params))
 
         check_positional_args(
             self.estimator_class.__init__,
             "__init__",
             self.init_default_params,
-            allow_kwargs=True,
         )
 
         self.fit_default_params = deepcopy(fit_default_params)
@@ -106,14 +105,15 @@ class TemplateEstimator:
             test_cases += [
                 (np.nan, ValueError),
                 (1, ValueError),
-                (np.random.rand(len(self.fit_default_params["y"])), None),
+                (np.arange(len(self.fit_default_params["y"])), None),
             ]
             self._test_param("fit", "sample_weight", test_cases)
 
     def test_partial_fit_param_X(
-        self, test_cases=None, replace_init_params=None, extras_params=None
+        self, test_cases=None, replace_init_params=None
     ):
         if hasattr(self.estimator_class, "partial_fit"):
+            extras_params = deepcopy(self.fit_default_params)
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
                 (np.nan, ValueError),
@@ -134,9 +134,9 @@ class TemplateEstimator:
         test_cases=None,
         replace_init_params=None,
         replace_fit_params=None,
-        extras_params=None,
     ):
         if hasattr(self.estimator_class, "partial_fit"):
+            extras_params = deepcopy(self.fit_default_params)
             test_cases = [] if test_cases is None else test_cases
             test_cases += [(np.nan, TypeError), ("state", TypeError)]
             self._test_param(
@@ -150,9 +150,10 @@ class TemplateEstimator:
             )
 
     def test_partial_fit_param_sample_weight(
-        self, test_cases=None, replace_init_params=None, extras_params=None
+        self, test_cases=None, replace_init_params=None
     ):
         if hasattr(self.estimator_class, "partial_fit"):
+            extras_params = deepcopy(self.fit_default_params)
             fit_params = inspect.signature(self.estimator_class.fit).parameters
             if "sample_weight" in fit_params:
                 test_cases = [] if test_cases is None else test_cases
@@ -247,8 +248,7 @@ class TemplateEstimator:
                     init_params[key] = val
 
                 fit_params = deepcopy(self.fit_default_params)
-                for key, val in replace_fit_params.items():
-                    fit_params[key] = val
+                fit_params.update(replace_fit_params)
 
                 if f"{test_func}_params" in locals():
                     locals()[f"{test_func}_params"][test_param] = test_val
@@ -337,6 +337,17 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_fit_params=replace_fit_params,
         )
 
+        test_cases = [("state", TypeError), (None, ValueError), (np.nan, None)]
+        replace_init_params["classes"] = [0, 1]
+        replace_fit_params = {"y": [0, np.nan, 1], "X": np.zeros((3, 1))}
+        self._test_param(
+            "init",
+            "missing_label",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+
     def test_init_param_classes(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -415,6 +426,15 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+        test_cases = [([], TypeError)]
+        replace_init_params = {"classes": None, "missing_label": -1}
+        self._test_param(
+            "fit",
+            "X",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
 
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -435,7 +455,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         test_cases = [
             ([0, 1, 2], None),
             (["tokyo", "nan", "paris"], TypeError),
-            ([0.4, 1.5, 2.0], None),
         ]
         replace_init_params = {"classes": [0, 1, 2], "missing_label": -1}
         replace_fit_params = {"X": np.zeros((3, 1))}
@@ -446,13 +465,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
-
-    def test_partial_fit_param_X(self, test_cases=None, extras_params=None):
-        if hasattr(self, "partial_fit"):
-            extras_params = deepcopy(self.fit_default_params)
-            super().test_partial_fit_param_X(
-                test_cases, extras_params=extras_params
-            )
 
     def test_partial_fit_param_y(self, test_cases=None):
         if hasattr(self, "partial_fit"):
@@ -467,17 +479,14 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 "missing_label": "nan",
             }
             replace_fit_params = {"X": np.zeros((3, 1))}
-            extras_params = deepcopy(self.fit_default_params)
             super().test_partial_fit_param_y(
                 test_cases,
                 replace_init_params=replace_init_params,
-                extras_params=extras_params,
                 replace_fit_params=replace_fit_params,
             )
             test_cases = [
                 ([0, 1, 2], None),
                 (["nan", "nan", "nan"], TypeError),
-                ([0.4, 1.5, 2.0], None),
             ]
             replace_init_params = {"classes": [0, 1, 2], "missing_label": -1}
             replace_fit_params = {"X": np.zeros((3, 1))}
@@ -487,17 +496,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 test_cases,
                 replace_init_params=replace_init_params,
                 replace_fit_params=replace_fit_params,
-                extras_params=extras_params,
                 exclude_fit=True,
-            )
-
-    def test_partial_fit_param_sample_weight(
-        self, test_cases=None, extras_params=None
-    ):
-        if hasattr(self, "partial_fit"):
-            extras_params = deepcopy(self.fit_default_params)
-            super().test_partial_fit_param_sample_weight(
-                test_cases, extras_params=extras_params
             )
 
     def test_predict_proba_param_X(self, test_cases=None):
@@ -508,11 +507,21 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
                 ([[1, 2, 3]], ValueError),
                 (self.fit_default_params["X"], None),
             ]
+            replace_init_params = {
+                "classes": ["tokyo", "paris"],
+                "missing_label": "nan",
+            }
+            replace_fit_params = {
+                "X": np.zeros((3, 1)),
+                "y": ["tokyo", "nan", "paris"],
+            }
             self._test_param(
                 "predict_proba",
                 "X",
                 test_cases,
                 extras_params=self.predict_default_params,
+                replace_init_params=replace_init_params,
+                replace_fit_params=replace_fit_params,
             )
 
     def test_param_test_availability(self):
@@ -545,8 +554,23 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             (None, TypeError),
             ([], ValueError),
             ([0, 1], None),
+            ([0], ValueError),
         ]
-        self._test_param("init", "class_prior", test_cases)
+        replace_init_params = {
+            "classes": ["tokyo", "paris"],
+            "missing_label": "nan",
+        }
+        replace_fit_params = {
+            "X": np.zeros((3, 1)),
+            "y": ["tokyo", "nan", "paris"],
+        }
+        self._test_param(
+            "init",
+            "class_prior",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
 
     def test_param_test_availability(self):
         not_test = ["self"]
@@ -563,11 +587,21 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             ([[1, 2, 3]], ValueError),
             (self.fit_default_params["X"], None),
         ]
+        replace_init_params = {
+            "classes": ["tokyo", "paris"],
+            "missing_label": "nan",
+        }
+        replace_fit_params = {
+            "X": np.zeros((3, 1)),
+            "y": ["tokyo", "nan", "paris"],
+        }
         self._test_param(
             "predict_freq",
             "X",
             test_cases,
             extras_params=self.predict_default_params,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
         )
 
 
@@ -615,40 +649,6 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
         self._test_param(
             "fit", "y", test_cases, replace_init_params=replace_init_params
         )
-
-    def test_partial_fit_param_X(
-        self, test_cases=None, replace_init_params=None, extras_params=None
-    ):
-        if hasattr(self, "partial_fit"):
-            extras_params = deepcopy(self.fit_default_params)
-            super().test_partial_fit_param_X(
-                test_cases,
-                replace_init_params=replace_init_params,
-                extras_params=extras_params,
-            )
-
-    def test_partial_fit_param_y(
-        self, test_cases=None, replace_init_params=None
-    ):
-        if hasattr(self, "partial_fit"):
-            test_cases = [] if test_cases is None else test_cases
-            extras_params = deepcopy(self.fit_default_params)
-            super().test_partial_fit_param_y(
-                test_cases,
-                replace_init_params=replace_init_params,
-                extras_params=extras_params,
-            )
-
-    def test_partial_fit_param_sample_weight(
-        self, test_cases=None, replace_init_params=None, extras_params=None
-    ):
-        if hasattr(self, "partial_fit"):
-            extras_params = deepcopy(self.fit_default_params)
-            super().test_partial_fit_param_sample_weight(
-                test_cases,
-                extras_params=extras_params,
-                replace_init_params=replace_init_params,
-            )
 
 
 class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):
@@ -716,25 +716,41 @@ class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):
         test_cases += [
             (np.nan, ValueError),
             ([1], ValueError),
+            (np.ones((3, 2)), ValueError),
             (np.zeros((3, 1)), None),
         ]
         extras_params = {"X": [[1]]}
+        replace_fit_params = {"X": np.zeros((3, 1)), "y": [0.5, 0.6, np.nan]}
         self._test_param(
-            "sample_y", "X", test_cases, extras_params=extras_params
+            "sample_y",
+            "X",
+            test_cases,
+            extras_params=extras_params,
+            replace_fit_params=replace_fit_params,
         )
 
     def test_sample_y_param_n_samples(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(-1, ValueError), (1.1, TypeError), (1, None)]
         extras_params = {"X": [[1]]}
+        replace_fit_params = {"X": np.zeros((3, 1)), "y": [0.5, 0.6, np.nan]}
         self._test_param(
-            "sample_y", "n_samples", test_cases, extras_params=extras_params
+            "sample_y",
+            "n_samples",
+            test_cases,
+            extras_params=extras_params,
+            replace_fit_params=replace_fit_params,
         )
 
     def test_sample_y_param_random_state(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(np.nan, ValueError), ("state", ValueError), (1, None)]
         extras_params = {"X": [[1]]}
+        replace_fit_params = {"X": np.zeros((3, 1)), "y": [0.5, 0.6, np.nan]}
         self._test_param(
-            "sample_y", "random_state", test_cases, extras_params=extras_params
+            "sample_y",
+            "random_state",
+            test_cases,
+            extras_params=extras_params,
+            replace_fit_params=replace_fit_params,
         )

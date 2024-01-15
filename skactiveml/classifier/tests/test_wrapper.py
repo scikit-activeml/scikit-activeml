@@ -10,6 +10,7 @@ from sklearn.gaussian_process import (
     GaussianProcessClassifier,
 )
 from sklearn.linear_model import Perceptron
+from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError, check_is_fitted
@@ -31,8 +32,8 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             "missing_label": "nan",
         }
         fit_default_params = {
-            "X": np.zeros((3, 1)),
-            "y": ["tokyo", "nan", "paris"],
+            "X": np.zeros((4, 1)),
+            "y": ["tokyo", "paris", "nan", "tokyo"],
         }
         predict_default_params = {"X": [[1]]}
         super().setUp(
@@ -42,8 +43,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             predict_default_params=predict_default_params,
         )
 
-        self.X = np.zeros((4, 1))
-        self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
 
@@ -53,6 +52,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             (Perceptron(), None),
             ("Test", TypeError),
             (GaussianNB(), None),
+            (LinearRegression(), TypeError),
         ]
         self._test_param("init", "estimator", test_cases)
 
@@ -73,7 +73,12 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             classes=["tokyo", "paris"],
             random_state=0,
         )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X=self.fit_default_params["X"],
+            y=self.fit_default_params["y"],
+        )
         clf = SklearnClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
         clf = SklearnClassifier(
@@ -82,9 +87,13 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
-        clf.fit(self.X, self.y1, sample_weight=np.ones_like(self.y1))
+        clf.fit(
+            self.fit_default_params["X"],
+            self.fit_default_params["y"],
+            sample_weight=np.ones_like(self.fit_default_params["y"]),
+        )
         self.assertTrue(clf.is_fitted_)
-        clf.fit(self.X, self.y1)
+        clf.fit(self.fit_default_params["X"], self.fit_default_params["y"])
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "kernel_"))
         np.testing.assert_array_equal(
@@ -93,7 +102,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertEqual(clf.missing_label, "nan")
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            clf.fit(self.X, self.y2)
+            clf.fit(self.fit_default_params["X"], self.y2)
             self.assertEqual(len(w), 1)
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
@@ -113,14 +122,20 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
-        clf.partial_fit(self.X, self.y1)
+        clf.partial_fit(
+            self.fit_default_params["X"], self.fit_default_params["y"]
+        )
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "class_count_"))
         np.testing.assert_array_equal(
             clf.classes_, ["new york", "paris", "tokyo"]
         )
         self.assertEqual(clf.missing_label, "nan")
-        clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
+        clf.partial_fit(
+            self.fit_default_params["X"],
+            self.y2,
+            sample_weight=np.ones_like(self.y2),
+        )
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
         self.assertTrue(hasattr(clf, "partial_fit"))
@@ -135,35 +150,37 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(), missing_label="nan"
         )
-        self.assertRaises(NotFittedError, clf.predict_proba, X=self.X)
-        clf.fit(X=self.X, y=self.y1)
-        P = clf.predict_proba(X=self.X)
+        self.assertRaises(
+            NotFittedError, clf.predict_proba, X=self.fit_default_params["X"]
+        )
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        P = clf.predict_proba(X=self.fit_default_params["X"])
         est = GaussianProcessClassifier().fit(
             X=np.zeros((3, 1)), y=["tokyo", "paris", "tokyo"]
         )
-        P_exp = est.predict_proba(X=self.X)
+        P_exp = est.predict_proba(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(P_exp, P)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
-        clf.fit(X=self.X, y=self.y2)
+        clf.fit(X=self.fit_default_params["X"], y=self.y2)
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            P = clf.predict_proba(X=self.X)
+            P = clf.predict_proba(X=self.fit_default_params["X"])
             self.assertEqual(len(w), 1)
-        P_exp = np.ones((len(self.X), 1))
+        P_exp = np.ones((len(self.fit_default_params["X"]), 1))
         np.testing.assert_array_equal(P_exp, P)
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(),
             classes=["ny", "paris", "tokyo"],
             missing_label="nan",
         )
-        clf.fit(X=self.X, y=self.y_nan)
-        P = clf.predict_proba(X=self.X)
-        P_exp = np.ones((len(self.X), 3)) / 3
+        clf.fit(X=self.fit_default_params["X"], y=self.y_nan)
+        P = clf.predict_proba(X=self.fit_default_params["X"])
+        P_exp = np.ones((len(self.fit_default_params["X"]), 3)) / 3
         np.testing.assert_array_equal(P_exp, P)
-        clf.fit(X=self.X, y=self.y1)
-        P = clf.predict_proba(X=self.X)
-        P_exp = np.zeros((len(self.X), 3))
-        P_exp[:, 1:] = est.predict_proba(X=self.X)
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        P = clf.predict_proba(X=self.fit_default_params["X"])
+        P_exp = np.zeros((len(self.fit_default_params["X"]), 3))
+        P_exp[:, 1:] = est.predict_proba(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(P_exp, P)
         clf = SklearnClassifier(
             estimator=Perceptron(),
@@ -176,21 +193,23 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf = SklearnClassifier(
             estimator=GaussianProcessClassifier(), missing_label="nan"
         )
-        self.assertRaises(NotFittedError, clf.predict, X=self.X)
-        clf.fit(X=self.X, y=self.y1)
-        y = clf.predict(X=self.X)
+        self.assertRaises(
+            NotFittedError, clf.predict, X=self.fit_default_params["X"]
+        )
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        y = clf.predict(X=self.fit_default_params["X"])
         est = GaussianProcessClassifier().fit(
             X=np.zeros((3, 1)), y=["tokyo", "paris", "tokyo"]
         )
-        y_exp = est.predict(X=self.X)
+        y_exp = est.predict(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(y, y_exp)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
-        clf.fit(X=self.X, y=self.y2)
+        clf.fit(X=self.fit_default_params["X"], y=self.y2)
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            y = clf.predict(X=self.X)
+            y = clf.predict(X=self.fit_default_params["X"])
             self.assertEqual(len(w), 1)
-        y_exp = ["tokyo"] * len(self.X)
+        y_exp = ["tokyo"] * len(self.fit_default_params["X"])
         np.testing.assert_array_equal(y_exp, y)
 
     def test_pipeline(self):
@@ -231,8 +250,8 @@ class TestSlidingWindowClassifier(
             "missing_label": "nan",
         }
         fit_default_params = {
-            "X": np.zeros((3, 1)),
-            "y": ["tokyo", "nan", "paris"],
+            "X": np.zeros((4, 1)),
+            "y": ["tokyo", "paris", "nan", "tokyo"],
         }
         predict_default_params = {"X": [[1]]}
         super().setUp(
@@ -242,8 +261,6 @@ class TestSlidingWindowClassifier(
             predict_default_params=predict_default_params,
         )
 
-        self.X = np.zeros((4, 1))
-        self.y1 = ["tokyo", "paris", "nan", "tokyo"]
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
 
@@ -394,7 +411,6 @@ class TestSlidingWindowClassifier(
         test_cases = [
             ([0, 1, 2], None),
             (["tokyo", "nan", "paris"], TypeError),
-            ([0.4, 1.5, 2.0], None),
         ]
         replace_init_params = {
             "classes": [0, 1, 2],
@@ -415,9 +431,9 @@ class TestSlidingWindowClassifier(
     def test_partial_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
-            ([0, 1, 2], TypeError),
+            ([0, 1, 2, -1], TypeError),
             (["tokyo"], ValueError),
-            (["nan", "tokyo", "nan"], None),
+            (["nan", "tokyo", "nan", "paris"], None),
         ]
         replace_init_params = {
             "classes": ["tokyo", "paris"],
@@ -438,9 +454,8 @@ class TestSlidingWindowClassifier(
             exclude_fit=True,
         )
         test_cases = [
-            ([0, 1, 2], None),
-            (["nan", "nan", "nan"], TypeError),
-            ([0.4, 1.5, 2.0], None),
+            ([0, 1, 2, -1], None),
+            (["nan", "nan", "nan", "nan"], TypeError),
         ]
         replace_init_params = {
             "classes": [0, 1, 2],
@@ -462,7 +477,12 @@ class TestSlidingWindowClassifier(
 
     def test_init_param_ignore_estimator_partial_fit(self):
         test_cases = []
-        test_cases += [(True, None), ("Test", TypeError), (0, TypeError)]
+        test_cases += [
+            (True, None),
+            (False, None),
+            ("Test", TypeError),
+            (0, TypeError),
+        ]
         self._test_param("init", "ignore_estimator_partial_fit", test_cases)
 
     def test_init_param_window_size(self):
@@ -472,7 +492,12 @@ class TestSlidingWindowClassifier(
 
     def test_init_param_only_labeled(self):
         test_cases = []
-        test_cases += [(True, None), ("Test", TypeError), (0, TypeError)]
+        test_cases += [
+            (True, None),
+            (False, None),
+            ("Test", TypeError),
+            (0, TypeError),
+        ]
         self._test_param("init", "only_labeled", test_cases)
 
     def test_fit(self):
@@ -499,7 +524,12 @@ class TestSlidingWindowClassifier(
             classes=["tokyo", "paris"],
             random_state=0,
         )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y1)
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X=self.fit_default_params["X"],
+            y=self.fit_default_params["y"],
+        )
 
         clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
@@ -515,7 +545,7 @@ class TestSlidingWindowClassifier(
             missing_label="nan",
             only_labeled=True,
         )
-        clf.fit(self.X, self.y1)
+        clf.fit(self.fit_default_params["X"], self.fit_default_params["y"])
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "kernel_"))
         np.testing.assert_array_equal(
@@ -525,7 +555,7 @@ class TestSlidingWindowClassifier(
         # test if warnings are correctly handeled
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            clf.fit(self.X, self.y2)
+            clf.fit(self.fit_default_params["X"], self.y2)
             self.assertEqual(len(w), 1)
         self.assertFalse(clf.is_fitted_)
         self.assertFalse(clf.estimator_.is_fitted_)
@@ -537,7 +567,9 @@ class TestSlidingWindowClassifier(
             ),
             missing_label="nan",
         )
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y_nan)
+        self.assertRaises(
+            ValueError, clf.fit, X=self.fit_default_params["X"], y=self.y_nan
+        )
         # fit clf with correct data and sample_weight
         clf = SlidingWindowClassifier(
             SklearnClassifier(
@@ -545,7 +577,11 @@ class TestSlidingWindowClassifier(
             ),
             missing_label="nan",
         )
-        clf.fit(self.X, self.y1, sample_weight=np.ones(len(self.y1)))
+        clf.fit(
+            self.fit_default_params["X"],
+            self.fit_default_params["y"],
+            sample_weight=np.ones(len(self.fit_default_params["y"])),
+        )
 
         X = [[1], [0]]
         y_true = [1, 0]
@@ -566,7 +602,9 @@ class TestSlidingWindowClassifier(
             missing_label="nan",
         )
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
-        clf.partial_fit(self.X, self.y1)
+        clf.partial_fit(
+            self.fit_default_params["X"], self.fit_default_params["y"]
+        )
         self.assertTrue(clf.is_fitted_)
         self.assertTrue(hasattr(clf, "class_count_"))
         # check if cost matrix is equal
@@ -584,7 +622,12 @@ class TestSlidingWindowClassifier(
             cost_matrix=[[1, 1, 1], [2, 1, 1], [2, 1, 3]],
         )
         # test if clf functions complete data and only_labeled=True
-        self.assertRaises(ValueError, clf.partial_fit, X=self.X, y=self.y1)
+        self.assertRaises(
+            ValueError,
+            clf.partial_fit,
+            X=self.fit_default_params["X"],
+            y=self.fit_default_params["y"],
+        )
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
                 BaggingClassifier(),
@@ -596,11 +639,20 @@ class TestSlidingWindowClassifier(
             only_labeled=True,
             window_size=5,
         )
-        clf.partial_fit(self.X, self.y1, sample_weight=np.ones_like(self.y1))
+        clf.partial_fit(
+            self.fit_default_params["X"],
+            self.fit_default_params["y"],
+            sample_weight=np.ones_like(self.fit_default_params["y"]),
+        )
         self.assertTrue(clf.is_fitted_)
 
         clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
-        self.assertRaises(TypeError, clf.partial_fit, self.X, self.y1)
+        self.assertRaises(
+            TypeError,
+            clf.partial_fit,
+            self.fit_default_params["X"],
+            self.fit_default_params["y"],
+        )
 
         # test if clf functions with complete data
         clf = SlidingWindowClassifier(
@@ -616,15 +668,27 @@ class TestSlidingWindowClassifier(
         )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(
-            self.X, self.y_nan, sample_weight=np.ones_like(self.y_nan)
+            self.fit_default_params["X"],
+            self.y_nan,
+            sample_weight=np.ones_like(self.y_nan),
         )
-        clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
+        clf.partial_fit(
+            self.fit_default_params["X"],
+            self.y2,
+            sample_weight=np.ones_like(self.y2),
+        )
         self.assertTrue(clf.is_fitted_)
         self.assertFalse(hasattr(clf, "kernel_"))
-        clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
+        clf.partial_fit(
+            self.fit_default_params["X"],
+            self.y2,
+            sample_weight=np.ones_like(self.y2),
+        )
         self.assertEqual(len(clf.X_train_), 5)
         clf.partial_fit(
-            self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
+            self.fit_default_params["X"],
+            self.y_nan,
+            sample_weight=np.ones_like(self.y2),
         )
         # test clf with classes and empty data
         clf = SlidingWindowClassifier(
@@ -641,9 +705,15 @@ class TestSlidingWindowClassifier(
         )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(
-            self.X, self.y_nan, sample_weight=np.ones_like(self.y2)
+            self.fit_default_params["X"],
+            self.y_nan,
+            sample_weight=np.ones_like(self.y2),
         )
-        clf.partial_fit(self.X, self.y2, sample_weight=np.ones_like(self.y2))
+        clf.partial_fit(
+            self.fit_default_params["X"],
+            self.y2,
+            sample_weight=np.ones_like(self.y2),
+        )
         self.assertTrue(clf.is_fitted_)
 
     def test_predict_proba(self):
@@ -653,21 +723,23 @@ class TestSlidingWindowClassifier(
             ),
             missing_label="nan",
         )
-        self.assertRaises(NotFittedError, clf.predict_proba, X=self.X)
-        clf.fit(X=self.X, y=self.y1)
-        P = clf.predict_proba(X=self.X)
+        self.assertRaises(
+            NotFittedError, clf.predict_proba, X=self.fit_default_params["X"]
+        )
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        P = clf.predict_proba(X=self.fit_default_params["X"])
         est = GaussianProcessClassifier().fit(
             X=np.zeros((3, 1)), y=["tokyo", "paris", "tokyo"]
         )
-        P_exp = est.predict_proba(X=self.X)
+        P_exp = est.predict_proba(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(P_exp, P)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
-        clf.fit(X=self.X, y=self.y2)
+        clf.fit(X=self.fit_default_params["X"], y=self.y2)
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            P = clf.predict_proba(X=self.X)
+            P = clf.predict_proba(X=self.fit_default_params["X"])
             self.assertEqual(len(w), 1)
-        P_exp = np.ones((len(self.X), 1))
+        P_exp = np.ones((len(self.fit_default_params["X"]), 1))
         np.testing.assert_array_equal(P_exp, P)
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
@@ -678,14 +750,14 @@ class TestSlidingWindowClassifier(
             classes=["ny", "paris", "tokyo"],
             missing_label="nan",
         )
-        clf.fit(X=self.X, y=self.y_nan)
-        P = clf.predict_proba(X=self.X)
-        P_exp = np.ones((len(self.X), 3)) / 3
+        clf.fit(X=self.fit_default_params["X"], y=self.y_nan)
+        P = clf.predict_proba(X=self.fit_default_params["X"])
+        P_exp = np.ones((len(self.fit_default_params["X"]), 3)) / 3
         np.testing.assert_array_equal(P_exp, P)
-        clf.fit(X=self.X, y=self.y1)
-        P = clf.predict_proba(X=self.X)
-        P_exp = np.zeros((len(self.X), 3))
-        P_exp[:, 1:] = est.predict_proba(X=self.X)
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        P = clf.predict_proba(X=self.fit_default_params["X"])
+        P_exp = np.zeros((len(self.fit_default_params["X"]), 3))
+        P_exp[:, 1:] = est.predict_proba(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(P_exp, P)
 
     def test_predict(self):
@@ -695,22 +767,24 @@ class TestSlidingWindowClassifier(
             ),
             missing_label="nan",
         )
-        self.assertRaises(NotFittedError, clf.predict, X=self.X)
-        clf.fit(X=self.X, y=self.y1)
-        y = clf.predict(X=self.X)
+        self.assertRaises(
+            NotFittedError, clf.predict, X=self.fit_default_params["X"]
+        )
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        y = clf.predict(X=self.fit_default_params["X"])
         est = GaussianProcessClassifier().fit(
             X=np.zeros((3, 1)), y=["tokyo", "paris", "tokyo"]
         )
-        y_exp = est.predict(X=self.X)
+        y_exp = est.predict(X=self.fit_default_params["X"])
         # Predicts wrong classes (numbers instead of strings)
         np.testing.assert_array_equal(y, y_exp)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
-        clf.fit(X=self.X, y=self.y2)
+        clf.fit(X=self.fit_default_params["X"], y=self.y2)
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            y = clf.predict(X=self.X)
+            y = clf.predict(X=self.fit_default_params["X"])
             self.assertEqual(len(w), 1)
-        y_exp = ["tokyo"] * len(self.X)
+        y_exp = ["tokyo"] * len(self.fit_default_params["X"])
         np.testing.assert_array_equal(y_exp, y)
 
     def test_predict_freq(self):
@@ -720,13 +794,15 @@ class TestSlidingWindowClassifier(
             ),
             missing_label="nan",
         )
-        self.assertRaises(NotFittedError, clf.predict_freq, X=self.X)
-        clf.fit(X=self.X, y=self.y1)
-        freq = clf.predict_freq(X=self.X)
+        self.assertRaises(
+            NotFittedError, clf.predict_freq, X=self.fit_default_params["X"]
+        )
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        freq = clf.predict_freq(X=self.fit_default_params["X"])
 
         self.assertEqual(len(np.unique(freq)), 2)
         est = ParzenWindowClassifier(missing_label="nan").fit(
-            X=self.X, y=self.y1
+            X=self.fit_default_params["X"], y=self.fit_default_params["y"]
         )
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
@@ -735,9 +811,9 @@ class TestSlidingWindowClassifier(
             missing_label="nan",
         )
 
-        clf.fit(X=self.X, y=self.y1)
-        freq = clf.predict_freq(X=self.X)
-        est.fit(X=self.X, y=self.y1)
-        freq_est = est.predict_freq(X=self.X)
+        clf.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        freq = clf.predict_freq(X=self.fit_default_params["X"])
+        est.fit(X=self.fit_default_params["X"], y=self.fit_default_params["y"])
+        freq_est = est.predict_freq(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(freq, freq_est)
         np.testing.assert_array_equal(clf.classes_, est.classes_)

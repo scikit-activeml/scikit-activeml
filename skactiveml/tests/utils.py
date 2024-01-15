@@ -1,14 +1,15 @@
 import inspect
 
 
-def check_positional_args(func, func_name, param_dict, allow_kwargs=False):
+def check_positional_args(func, func_name, param_dict):
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = []
-    if not allow_kwargs:
-        kwargs_var_keyword = list(
-            filter(lambda p: p.kind == p.VAR_KEYWORD, func_params.values())
-        )
+    # Get kwargs variables
+    kwargs_var_keyword = list(
+        filter(lambda p: p.kind == p.VAR_KEYWORD, func_params.values())
+    )
 
+    # Test if each required key except for kwargs is included.
     if param_dict is not None:
         for key, val in func_params.items():
             if (

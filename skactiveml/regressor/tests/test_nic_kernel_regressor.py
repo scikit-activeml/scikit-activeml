@@ -52,19 +52,34 @@ class TemplateTestNICKernelEstimator(TemplateProbabilisticRegressor):
     def test_init_param_kappa_0(self):
         if hasattr(self.estimator_class, "kappa_0"):
             test_cases = []
-            test_cases += [(0.1, None), (1, None), ("Test", TypeError)]
+            test_cases += [
+                (0.1, None),
+                (1, None),
+                (-1.0, None),
+                ("Test", TypeError),
+            ]
             self._test_param("init", "kappa_0", test_cases)
 
     def test_init_param_sigma_sq_0(self):
         if hasattr(self.estimator_class, "sigma_sq_0"):
             test_cases = []
-            test_cases += [(1.0, None), (1, None), ("Test", TypeError)]
+            test_cases += [
+                (1.0, None),
+                (1, None),
+                (-1.0, None),
+                ("Test", TypeError),
+            ]
             self._test_param("init", "sigma_sq_0", test_cases)
 
     def test_init_param_nu_0(self):
         if hasattr(self.estimator_class, "nu_0"):
             test_cases = []
-            test_cases += [(2.5, None), (1, None), ("Test", TypeError)]
+            test_cases += [
+                (2.5, None),
+                (1, None),
+                (-1.0, None),
+                ("Test", TypeError),
+            ]
             self._test_param("init", "nu_0", test_cases)
 
     def test_predict(self):

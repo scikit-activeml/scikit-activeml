@@ -219,11 +219,10 @@ class TestSklearnProbabilisticRegressor(
         ]
         self._test_param("init", "estimator", test_cases)
 
-    def test_partial_fit_param_X(self, test_cases=None, extras_params=None):
+    def test_partial_fit_param_X(self, test_cases=None):
         replace_init_params = {"estimator": SGDRegressor()}
         super().test_partial_fit_param_X(
             test_cases,
-            extras_params=extras_params,
             replace_init_params=replace_init_params,
         )
 
@@ -233,13 +232,10 @@ class TestSklearnProbabilisticRegressor(
             test_cases, replace_init_params=replace_init_params
         )
 
-    def test_partial_fit_param_sample_weight(
-        self, test_cases=None, extras_params=None
-    ):
+    def test_partial_fit_param_sample_weight(self, test_cases=None):
         replace_init_params = {"estimator": SGDRegressor()}
         super().test_partial_fit_param_sample_weight(
             test_cases,
-            extras_params=extras_params,
             replace_init_params=replace_init_params,
         )
 
