@@ -244,8 +244,7 @@ class TemplateEstimator:
         for i, (test_val, err) in enumerate(test_cases):
             with self.subTest(msg="Param", id=i, val=test_val):
                 init_params = deepcopy(self.init_default_params)
-                for key, val in replace_init_params.items():
-                    init_params[key] = val
+                init_params.update(replace_init_params)
 
                 fit_params = deepcopy(self.fit_default_params)
                 fit_params.update(replace_fit_params)
