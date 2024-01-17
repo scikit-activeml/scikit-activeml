@@ -413,12 +413,11 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_fit_params=replace_fit_params,
         )
 
-    def test_fit_param_X(self, test_cases=None, replace_init_params=None):
+    def test_fit_param_X(self, test_cases=None):
         super().test_fit_param_X(test_cases)
         test_cases = [([], None)]
         replace_fit_params = {"y": []}
-        if replace_init_params is None:
-            replace_init_params = {"classes": [0, 1], "missing_label": -1}
+        replace_init_params = {"classes": [0, 1], "missing_label": -1}
         self._test_param(
             "fit",
             "X",
@@ -427,7 +426,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_fit_params=replace_fit_params,
         )
         test_cases = [([], TypeError)]
-        replace_init_params = {"classes": None, "missing_label": -1}
+        replace_init_params["classes"] = None
         self._test_param(
             "fit",
             "X",
@@ -680,7 +679,11 @@ class TemplateProbabilisticRegressor(TemplateSkactivemlRegressor):
     def test_predict_target_distribution_param_X(self):
         test_cases = []
         X = np.array([[0, 1], [1, 0], [2, 3]])
-        test_cases += [(X, None), ("Test", ValueError)]
+        test_cases += [
+            (X, None),
+            ("Test", ValueError),
+            (np.array([[0], [1]]), ValueError),
+        ]
         replace_fit_params = {"X": X}
         extras_params = deepcopy(self.predict_default_params)
         self._test_param(

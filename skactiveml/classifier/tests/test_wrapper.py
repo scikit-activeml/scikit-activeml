@@ -378,14 +378,40 @@ class TestSlidingWindowClassifier(
         )
 
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (np.nan, ValueError),
+            ([1], ValueError),
+            (np.zeros((len(self.fit_default_params["y"]), 1)), None),
+        ]
+        self._test_param("fit", "X", test_cases)
+
         replace_init_params = {
-            "classes": [0, 1],
-            "missing_label": -1,
-            "estimator": SklearnClassifier(
-                MixtureModelClassifier(), missing_label=-1, classes=[0, 1]
-            ),
+            "estimator": MixtureModelClassifier(missing_label=-1, classes=[0, 1])
         }
-        super().test_fit_param_X(test_cases, replace_init_params)
+        test_cases = [([], None)]
+        replace_fit_params = {"y": []}
+        if replace_init_params is None:
+            replace_init_params = {}
+        replace_init_params["classes"] = [0, 1]
+        replace_init_params["missing_label"] = -1
+        self._test_param(
+            "fit",
+            "X",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
+        test_cases = [([], TypeError)]
+        replace_init_params["classes"] = None
+        replace_init_params["estimator"] = MixtureModelClassifier(missing_label=-1, classes=None)
+        self._test_param(
+            "fit",
+            "X",
+            test_cases,
+            replace_init_params=replace_init_params,
+            replace_fit_params=replace_fit_params,
+        )
 
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
