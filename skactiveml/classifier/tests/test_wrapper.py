@@ -387,7 +387,9 @@ class TestSlidingWindowClassifier(
         self._test_param("fit", "X", test_cases)
 
         replace_init_params = {
-            "estimator": MixtureModelClassifier(missing_label=-1, classes=[0, 1])
+            "estimator": MixtureModelClassifier(
+                missing_label=-1, classes=[0, 1]
+            )
         }
         test_cases = [([], None)]
         replace_fit_params = {"y": []}
@@ -404,7 +406,9 @@ class TestSlidingWindowClassifier(
         )
         test_cases = [([], TypeError)]
         replace_init_params["classes"] = None
-        replace_init_params["estimator"] = MixtureModelClassifier(missing_label=-1, classes=None)
+        replace_init_params["estimator"] = MixtureModelClassifier(
+            missing_label=-1, classes=None
+        )
         self._test_param(
             "fit",
             "X",
