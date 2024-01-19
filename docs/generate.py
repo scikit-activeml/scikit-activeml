@@ -370,12 +370,8 @@ def generate_examples(gen_path, json_path, recursive=True):
         if "num_cpus" not in os.environ:
             os.environ["num_cpus"] = "-1"
         if int(os.environ["num_cpus"]) != 1:
-            if "README.rst" in files:
-                _generate_single_example("README.rst", root, json_data, sub_dir_str, dst)
-            elif "README.txt" in files:
-                _generate_single_example("README.txt", root, json_data, sub_dir_str, dst)
-            Parallel(n_jobs=int(os.environ['num_cpus']),backend='loky')
-            (delayed(_generate_single_example)(f,root, json_data, sub_dir_str, dst) for f in files)
+            (Parallel(n_jobs=-1,backend='loky')
+            (delayed(_generate_single_example)(f,root, json_data, sub_dir_str, dst) for f in files))
         else:
             for filename in files:
                 _generate_single_example(filename, root, json_data, sub_dir_str, dst)
