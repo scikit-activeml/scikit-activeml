@@ -1,5 +1,7 @@
 from pip._internal.operations import freeze
-
+# TODO: create switscher daraus erstellen. mit git tag alle durchgehen.
+# versionen pro 0.* version erstellen
+# anschauen wie man andere workflows canceled
 # Load currently installed packages.
 packages = list(freeze.freeze())
 packages_dict = {}
