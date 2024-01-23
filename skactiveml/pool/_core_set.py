@@ -236,7 +236,12 @@ def k_greedy_center(
             update_dist = _update_distances(X, selected_samples, mapping)
         else:
             latest_dist = utilities[i - 1]
-            update_dist = _update_distances(X, [idx], mapping, latest_dist)
+            update_dist = _update_distances(
+                X=X,
+                cluster_centers=[query_indices[i - 1]],
+                mapping=mapping,
+                latest_distance=latest_dist,
+            )
 
         if n_new_cand is None:
             utilities[i] = update_dist
@@ -244,9 +249,9 @@ def k_greedy_center(
             utilities[i] = update_dist[mapping]
 
         # select index
-        idx = rand_argmax(utilities[i], random_state=random_state_)[0]
-
-        query_indices[i] = idx
+        query_indices[i] = rand_argmax(
+            utilities[i], random_state=random_state_
+        )[0]
 
     return query_indices, utilities
 
