@@ -26,7 +26,7 @@ def create_switcher(versions, rel_version, versions_short, rel_version_short):
 
 # Get all versions an new Release version 
 parser = argparse.ArgumentParser(description='')
-parser.add_argument('--versions', dest='versions', type=str, default="0.0.0")
+parser.add_argument('--versions', dest='versions', nargs='+',type=str, default="0.0.0")
 parser.add_argument('--release_version', dest='release_version', type=str, default="0.0.1")
 args = parser.parse_args()
 
@@ -34,7 +34,6 @@ args = parser.parse_args()
 cmd_args = vars(args)
 versions = cmd_args['versions']
 rel_version = cmd_args['release_version']
-versions_split = versions.split(" ")
 rel_version_split = rel_version.split(".")
 rel_version_short = f"{rel_version_split[0]}.{rel_version_split[1]}"
 
@@ -43,7 +42,7 @@ latest_versions = []
 latest_version = -1
 
 # Differential all minor from major releases
-for version in versions_split:
+for version in versions:
     version_split = version.split(".")
     version = f"{version_split[0]}.{version_split[1]}"
     if float(version) < float(start_version):
@@ -65,53 +64,3 @@ content_list = create_switcher(latest_versions, rel_version, versions_short, rel
 with open("docs/_static/switcher.json", "w") as f:
     for item in content_list:
         f.write("%s" % item)
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-
-# from pip._internal.operations import freeze
-# TODO: create switscher daraus erstellen. mit git tag alle durchgehen.
-# versionen pro 0.* version erstellen
-# anschauen wie man andere workflows canceled
-# Load currently installed packages.
-# packages = list(freeze.freeze())
-# packages_dict = {}
-# for p in packages:
-#     print(p)
-#     try:
-#         p_split = p.split("==")
-#         version_split = p_split[1].split(".")
-#         version = f"{version_split[0]}.{int(version_split[1]) + 1}"
-#         packages_dict[p_split[0]] = version
-#     except:
-#         continue
-
-# # Read requirements and add upper bounds.
-# req = open("requirements.txt", "r")
-# content_list = req.readlines()
-# print(packages_dict.keys())
-# for line_idx, line in enumerate(content_list):
-#     print(line)
-#     try:
-#         name = line.split(">=")[0]
-#         line = line.replace("\n", "")
-#         line += f",<{packages_dict[name]}\n"
-#         content_list[line_idx] = line
-#     except:
-#         continue
-
-
-# # Override requirements.
-# with open("requirements.txt", "w") as f:
-#     for item in content_list:
-#         f.write("%s" % item)
