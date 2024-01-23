@@ -19,8 +19,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: master
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -28,7 +26,9 @@ jobs:
     - name: Insert Version number
       run: |
         echo $GITHUB_REF
-        RELEASE_VERSION=${GITHUB_REF#refs/*/}
+        RELEASE_VERSION=${GITHUB_REF#refs/*/} >> $GITHUB_ENV
+        CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1) >> $GITHUB_ENV
+        RELEASE_VERSIONS=$(git tag -l --sort=-creatordate) >> $GITHUB_ENV
         echo $RELEASE_VERSION
         sed -i -E "s/__version__ = .*/__version__ = \"$RELEASE_VERSION\"/" skactiveml/__init__.py
         cat skactiveml/__init__.py
@@ -38,11 +38,12 @@ jobs:
         pip install --upgrade -r requirements.txt
         pip install twine
         pip install wheel
+    - uses: actions/checkout@v4
+      with:
+        ref: master
     - name: Update Switcher
       run: |
-        RELEASE_VERSIONS=$(git tag -l --sort=-creatordate)
         echo $RELEASE_VERSIONS
-        CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)
         echo $CURRENT_VERSION
         python .github/workflows/update_requirements.py --versions $RELEASE_VERSIONS --release_version $CURRENT_VERSION
     - name: Commit and push changes
@@ -52,7 +53,7 @@ jobs:
 
         git add docs/_static/switcher.json
         git commit -m "update switcher for release"
-        git push origin master
+        git push
     - name: Build package
       run: |
         python setup.py sdist bdist_wheel
