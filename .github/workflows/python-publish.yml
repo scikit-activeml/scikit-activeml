@@ -34,13 +34,15 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt
-        RELEASE_VERSIONS=$(git tag -l --sort=-creatordate)
-        echo $RELEASE_VERSIONS
-        RELEASE_VERSION=$(git tag -l --sort=-creatordate | head -n 1)
-        echo $RELEASE_VERSION
-        python .github/workflows/update_requirements.py --versions $RELEASE_VERSIONS --release_version $RELEASE_VERSION
         pip install twine
         pip install wheel
+    - name: Update Switcher
+      run: |
+        RELEASE_VERSIONS=$(git tag -l --sort=-creatordate)
+        echo $RELEASE_VERSIONS
+        CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)
+        echo $CURRENT_VERSION
+        python .github/workflows/update_requirements.py --versions $RELEASE_VERSIONS --release_version $CURRENT_VERSION
     # - name: Build package
     #   run: |
     #     python setup.py sdist bdist_wheel
