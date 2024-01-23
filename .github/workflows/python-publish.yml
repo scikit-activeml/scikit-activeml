@@ -27,8 +27,8 @@ jobs:
       run: |
         echo $GITHUB_REF
         RELEASE_VERSION=${GITHUB_REF#refs/*/}
-        CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1) >> $GITHUB_ENV
-        RELEASE_VERSIONS=$(git tag -l --sort=-creatordate) >> $GITHUB_ENV
+        echo "CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)" >> $GITHUB_ENV
+        echo "RELEASE_VERSIONS=$(git tag -l --sort=-creatordate)" >> $GITHUB_ENV
         echo $RELEASE_VERSION
         sed -i -E "s/__version__ = .*/__version__ = \"$RELEASE_VERSION\"/" skactiveml/__init__.py
         cat skactiveml/__init__.py
