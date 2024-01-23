@@ -1,6 +1,6 @@
 import inspect
-from functools import update_wrapper
-from operator import attrgetter
+from types import MethodType
+from makefun import with_signature
 
 
 def call_func(
@@ -42,3 +42,34 @@ def call_func(
         vars = dict(filter(lambda e: e[0] in param_keys, kwargs.items()))
 
     return f_callable(**vars)
+
+class _MatchSignatureDescriptor:
+    #TODO Docs
+    def __init__(self, fn, reference_obj_lambda, func_name):
+        self.fn = fn
+        self.reference_obj_lambda = reference_obj_lambda
+        self.func_name = func_name
+        self.__name__ = func_name
+
+    def __get__(self, obj, owner=None):
+    #TODO Docs
+        if obj is not None:
+            reference_object = self.reference_obj_lambda(obj)
+            if not hasattr(reference_object, self.func_name):
+                attr_err = AttributeError(
+                    f"This {repr(owner.__name__)} has no attribute {repr(self.attribute_name)}"
+                )
+                raise attr_err
+        
+            reference_function = getattr(reference_object, self.func_name)
+            sig_str = f'{self.fn.__name__}(self, {str(inspect.signature(reference_function))[1:-1]})'
+            fn = with_signature(sig_str)(self.fn)
+            out = MethodType(fn, obj)
+        else:
+            out = self.fn
+
+        return out
+
+def match_signature(reference_obj_lambda, func_name):
+    #TODO Docs
+    return lambda fn: _MatchSignatureDescriptor(fn, reference_obj_lambda, func_name=func_name)

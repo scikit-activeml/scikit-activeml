@@ -28,6 +28,7 @@ from ..utils import (
     check_classifier_params,
     check_type,
     check_scalar,
+    match_signature
 )
 from sklearn.utils.metaestimators import available_if
 
@@ -83,6 +84,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         self.estimator = estimator
 
+    @match_signature(lambda self: self.estimator, 'fit')
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
 
@@ -114,7 +116,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @available_if(lambda self: hasattr(self.estimator, "partial_fit"))
+    # @available_if(lambda self: hasattr(self.estimator, "partial_fit"))
+    @match_signature(lambda self: self.estimator, 'partial_fit')
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -147,6 +150,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
+    @match_signature(lambda self: self.estimator, 'predict')
     def predict(self, X, **predict_kwargs):
         """Return class label predictions for the input data X.
 
@@ -184,7 +188,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
-    @available_if(lambda self: hasattr(self.estimator, "predict_proba"))
+    # @available_if(lambda self: hasattr(self.estimator, "predict_proba"))
+    @match_signature(lambda self: self.estimator, 'predict_proba')
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
