@@ -19,8 +19,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-          ref: master
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -45,6 +43,9 @@ jobs:
         CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)
         echo $CURRENT_VERSION
         python .github/workflows/update_requirements.py --versions $RELEASE_VERSIONS --release_version $CURRENT_VERSION
+    - uses: actions/checkout@v4
+      with:
+          ref: master
     - name: Commit and push changes
       run: |
         git config --global user.name AlexanderBenz
