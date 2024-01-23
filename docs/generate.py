@@ -1,3 +1,5 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
 import distutils.dir_util
 import importlib
 import inspect
@@ -12,6 +14,7 @@ from pybtex.database import parse_file
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
+from joblib import Parallel, delayed
 
 import skactiveml
 
@@ -364,50 +367,59 @@ def generate_examples(gen_path, json_path, recursive=True):
         dst = os.path.join(gen_path, sub_dir_str)
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
-        for filename in files:
-            if filename.endswith(".json"):
-                with open(os.path.join(root, filename)) as file:
-                    # iterate over the examples in the json file
-                    for data in json.load(file):
-                        sub_package_dict = json_data
-                        package_structure = sub_dir_str.split(".")
-                        for sp in package_structure:
-                            if sp not in sub_package_dict.keys():
-                                sub_package_dict[sp] = dict()
-                            sub_package_dict = sub_package_dict[sp]
-                        if "data" not in sub_package_dict.keys():
-                            sub_package_dict["data"] = list()
-
-                        sub_package_dict["data"].append(data)
-                        # create the example python script
-                        plot_filename = (
-                            "plot-"
-                            + data["class"]
-                            + "-"
-                            + data["method"].replace(" ", "_")
-                        )
-                        generate_example_script(
-                            filename=plot_filename + ".py",
-                            dir_path=dst,
-                            data=data,
-                            package=getattr(skactiveml, data["package"]),
-                            template_path=os.path.abspath(data["template"]),
-                        )
-            elif not filename.startswith("template"):
-                if filename.endswith(".py") or filename.endswith(".ipynb"):
-                    src = os.path.join(root, filename)
-                    example_string = format_plot({}, src)
-                    with open(os.path.join(dst, filename), "w") as file:
-                        file.write(example_string)
-                else:
-                    # Copy all other files except for templates.
-                    src = os.path.join(root, filename)
-                    shutil.copyfile(src, os.path.join(dst, filename))
+        if "num_cpus" not in os.environ:
+            os.environ["num_cpus"] = "-1"
+        if int(os.environ["num_cpus"]) != 1:
+            (Parallel(n_jobs=-1,backend='loky')
+            (delayed(_generate_single_example)(f,root, json_data, sub_dir_str, dst) for f in files))
+        else:
+            for filename in files:
+                _generate_single_example(filename, root, json_data, sub_dir_str, dst)
 
         if not recursive:
             break
 
     return json_data
+
+def _generate_single_example(filename, root, json_data, sub_dir_str, dst):
+    if filename.endswith(".json"):
+        with open(os.path.join(root, filename)) as file:
+            # iterate over the examples in the json file
+            for data in json.load(file):
+                sub_package_dict = json_data
+                package_structure = sub_dir_str.split(".")
+                for sp in package_structure:
+                    if sp not in sub_package_dict.keys():
+                        sub_package_dict[sp] = dict()
+                    sub_package_dict = sub_package_dict[sp]
+                if "data" not in sub_package_dict.keys():
+                    sub_package_dict["data"] = list()
+
+                sub_package_dict["data"].append(data)
+                # create the example python script
+                plot_filename = (
+                    "plot-"
+                    + data["class"]
+                    + "-"
+                    + data["method"].replace(" ", "_")
+                )
+                generate_example_script(
+                    filename=plot_filename + ".py",
+                    dir_path=dst,
+                    data=data,
+                    package=getattr(skactiveml, data["package"]),
+                    template_path=os.path.abspath(data["template"]),
+                )
+    elif not filename.startswith("template"):
+        if filename.endswith(".py") or filename.endswith(".ipynb"):
+            src = os.path.join(root, filename)
+            example_string = format_plot({}, src)
+            with open(os.path.join(dst, filename), "w") as file:
+                file.write(example_string)
+        else:
+            # Copy all other files except for templates.
+            src = os.path.join(root, filename)
+            shutil.copyfile(src, os.path.join(dst, filename))
 
 
 def generate_example_script(filename, dir_path, data, package, template_path):

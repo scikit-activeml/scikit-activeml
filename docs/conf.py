@@ -105,7 +105,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
-
+ 
 # Set the paths for the sphinx_gallery extension:
 sphinx_gallery_conf = {
     "run_stale_examples": False,
@@ -153,7 +153,14 @@ html_theme_options = {
         }
     ],
     "icon_links_label": "Quick Links",
+    "switcher": {
+        "json_url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/latest/_static/switcher.json",
+        "version_match": version,
+    },
+    "navbar_start": ["navbar-logo", "version-switcher"]
 }
+# TODO: automaticly generate switcher and generate new docs on release.
+# use tags to get the release version "git tag -l --sort=-creatordate | head -n 1"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

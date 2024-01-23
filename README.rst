@@ -3,7 +3,7 @@
 |Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_ |Black|_
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
-.. _Doc: https://scikit-activeml.github.io/scikit-activeml-docs/
+.. _Doc: https://alexanderbenz.github.io/scikit-activeml-project-docs/
 
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
 .. _Codecov: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
