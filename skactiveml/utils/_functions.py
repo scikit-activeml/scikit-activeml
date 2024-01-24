@@ -1,6 +1,7 @@
 import inspect
 from types import MethodType
 from makefun import with_signature
+from functools import update_wrapper
 
 
 def call_func(
@@ -43,26 +44,57 @@ def call_func(
 
     return f_callable(**vars)
 
+
 class _MatchSignatureDescriptor:
-    #TODO Docs
-    def __init__(self, fn, reference_obj_lambda, func_name):
+    """_MatchSignatureDescriptor
+    
+    A descriptor that allows a wrapper to clone the signature of a
+    method `func_name` from the wrapped object `wrapped_obj_name`.
+    Furthermore, this extends upon the conditional property as implemented in
+    `available_if` from from `sklearn.utils.metaestimators`.
+
+    Parameters
+    ----------
+    fn: MethodType
+        The method that should be wrapped.
+    wrapped_obj_name: str
+        The name of the wrapped object within the wrapper class.
+    func_name : str
+        The method name of the function that should be wrapped.
+    """
+    def __init__(self, fn, wrapped_obj_name, func_name):
         self.fn = fn
-        self.reference_obj_lambda = reference_obj_lambda
+        self.wrapped_obj_name = wrapped_obj_name
         self.func_name = func_name
         self.__name__ = func_name
 
     def __get__(self, obj, owner=None):
-    #TODO Docs
+        """Wrap the method specified in `self.func_name` from the wrapped object
+        `self.wrapped_obj_name` such that the signature will be the same.
+
+        Parameters
+        ----------
+        obj: object
+            The wrapper object. This parameter will be None, if the method is
+            accessed via the class and not an instantiated object.
+        owner: class, default=None
+            The wrapper class.
+
+        Returns
+        -------
+        The wrapped method.
+        """
         if obj is not None:
-            reference_object = self.reference_obj_lambda(obj)
+            reference_object = getattr(obj, self.wrapped_obj_name)
             if not hasattr(reference_object, self.func_name):
-                attr_err = AttributeError(
-                    f"This {repr(owner.__name__)} has no attribute {repr(self.attribute_name)}"
+                raise AttributeError(
+                    f"This {reference_object} has no method {self.func_name}."
                 )
-                raise attr_err
-        
+
             reference_function = getattr(reference_object, self.func_name)
-            sig_str = f'{self.fn.__name__}(self, {str(inspect.signature(reference_function))[1:-1]})'
+            reference_signature = inspect.signature(reference_function)
+            new_fn_name = self.fn.__name__
+            sig_str = f"{new_fn_name}(self, {str(reference_signature)[1:-1]})"
             fn = with_signature(sig_str)(self.fn)
             out = MethodType(fn, obj)
         else:
@@ -70,6 +102,25 @@ class _MatchSignatureDescriptor:
 
         return out
 
-def match_signature(reference_obj_lambda, func_name):
-    #TODO Docs
-    return lambda fn: _MatchSignatureDescriptor(fn, reference_obj_lambda, func_name=func_name)
+
+def match_signature(wrapped_obj_name, func_name):
+    """A decorator that matches the signature to a given method from a
+    reference and hides it when the reference object does not have the wrapped
+    function. This is especially helpful for wrapper classes whose functions
+    should appear. This decorator is heavily inspired by the `available_if`
+    decorator from `sklearn.utils.metaestimators`.
+
+    Parameters
+    ----------
+    wrapped_obj_name : str
+        The name of the object that will be wrapped.
+    func_name : str
+        The name of the function that will be wrapped.
+
+    Returns
+    -------
+    Wrapped function
+    """
+    return lambda fn: _MatchSignatureDescriptor(
+        fn, wrapped_obj_name, func_name=func_name
+    )
