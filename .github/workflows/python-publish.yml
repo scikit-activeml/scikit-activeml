@@ -28,8 +28,9 @@ jobs:
         echo $GITHUB_REF
         RELEASE_VERSION=${GITHUB_REF#refs/*/}
         echo "CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)" >> $GITHUB_ENV
-        echo "RELEASE_VERSIONS=$(git tag -l --sort=-creatordate)" >> $GITHUB_ENV
+        echo "All_VERSIONS=$(git tag -l --sort=-creatordate)" >> $GITHUB_ENV
         echo $RELEASE_VERSION
+        echo $All_VERSIONS
         sed -i -E "s/__version__ = .*/__version__ = \"$RELEASE_VERSION\"/" skactiveml/__init__.py
         cat skactiveml/__init__.py
     - name: Install dependencies
@@ -52,9 +53,13 @@ jobs:
         ref: master
     - name: Update Switcher
       run: |
-        echo ${{ env.RELEASE_VERSIONS }} 
+        echo ${{ env.All_VERSIONS }} 
         echo ${{ env.CURRENT_VERSION }}
-        python .github/workflows/update_requirements.py --versions ${{ env.RELEASE_VERSIONS }} --release_version ${{ env.CURRENT_VERSION }}
+        echo "CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)" >> $GITHUB_ENV
+        echo "All_VERSIONS=$(git tag -l --sort=-creatordate)" >> $GITHUB_ENV
+        echo ${{ env.All_VERSIONS }} 
+        echo ${{ env.CURRENT_VERSION }}
+        python .github/workflows/update_requirements.py --versions ${{ env.All_VERSIONS }} --release_version ${{ env.CURRENT_VERSION }}
     - name: Commit and push changes
       run: |
         git config --global user.name AlexanderBenz

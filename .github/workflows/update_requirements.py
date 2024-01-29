@@ -7,7 +7,7 @@ def create_switcher(versions, rel_version, versions_short, rel_version_short):
     content_list = []
     content_list.append("[\n")
     content_list.append("  {\n")
-    content_list.append(f'    "name": "dev",\n')
+    content_list.append(f'    "name": "latest",\n')
     content_list.append(f'    "version": "latest",\n')
     content_list.append(f'    "url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/latest/"\n')
     content_list.append("  },\n")
@@ -40,7 +40,6 @@ rel_version_short = f"{rel_version_split[0]}.{rel_version_split[1]}"
 versions_short = []
 latest_versions = []
 latest_version = -1
-
 # Differential all minor from major releases
 for version in versions:
     version_split = version.split(".")
