@@ -56,10 +56,10 @@ jobs:
         echo ${{ env.All_VERSIONS }} 
         echo ${{ env.CURRENT_VERSION }}
         CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)
-        All_VERSIONS=$(git tag -l --sort=-creatordate)
+        All_VERSIONS=$(git ls-remote --tags --sort=-'v:refname' https://github.com/AlexanderBenz/scikit-activeml-project.git | cut --delimiter='/' --fields=3)
         echo $All_VERSIONS
         echo $CURRENT_VERSION
-        python .github/workflows/update_requirements.py --versions ${{ env.All_VERSIONS }} --release_version ${{ env.CURRENT_VERSION }}
+        python .github/workflows/update_requirements.py --versions $All_VERSIONS --release_version ${{ env.CURRENT_VERSION }}
     - name: Commit and push changes
       run: |
         git config --global user.name AlexanderBenz
