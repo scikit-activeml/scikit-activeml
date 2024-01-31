@@ -1,3 +1,7 @@
+# %%
+# .. note::
+# 
+#    The generated animation can be found at the bottom of the page.
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
