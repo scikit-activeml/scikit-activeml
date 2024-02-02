@@ -2,11 +2,11 @@
 {
     "class" : "TypiClust",
     "package" : "pool",
-    "method" : "Typi Clust",
+    "method" : "Typical Clustering",
     "category" : "Others",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator"],
-    "title" : "Typi Clust",
+    "title" : "Typical Clustering",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
