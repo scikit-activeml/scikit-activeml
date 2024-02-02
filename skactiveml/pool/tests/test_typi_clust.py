@@ -20,7 +20,7 @@ class TestTypiClust(
         super().setUp(
             qs_class=TypiClust,
             init_default_params={
-                "cluster_algo_param": {"n_init": "auto", "random_state": 0}
+                "cluster_algo_dict": {"n_init": "auto", "random_state": 0}
             },
             query_default_params_clf=query_default_params_clf,
         )
@@ -37,16 +37,16 @@ class TestTypiClust(
         ]
         self._test_param("init", "cluster_algo", test_cases)
 
-    def test_init_param_cluster_algo_param(self, test_cases=None):
+    def test_init_param_cluster_algo_dict(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (1, TypeError),
             ("string", TypeError),
-            (None, TypeError),
+            (None, None),
             ({}, None),
             ({"n_init": "auto", "random_state": 0}, None),
         ]
-        self._test_param("init", "cluster_algo_param", test_cases)
+        self._test_param("init", "cluster_algo_dict", test_cases)
 
     def test_init_param_n_cluster_param_name(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -66,6 +66,7 @@ class TestTypiClust(
             (10, None),
             (1, None),
             (1.5, TypeError),
+            (0, ValueError),
         ]
         self._test_param("init", "k", test_cases)
 
