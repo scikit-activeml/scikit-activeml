@@ -40,10 +40,10 @@ class TemplateQueryStrategy:
     ):
         self.super_setUp_has_been_executed = True
         self.qs_class = qs_class
-        
+
         self.init_default_params = {"random_state": 42}
         self.init_default_params.update(deepcopy(init_default_params))
-        
+
         check_positional_args(
             self.qs_class.__init__,
             "__init__",

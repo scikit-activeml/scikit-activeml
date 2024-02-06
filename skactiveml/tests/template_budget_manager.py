@@ -11,6 +11,7 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 
+
 class Dummy:
     def __init__(self):
         pass
@@ -32,7 +33,7 @@ class TemplateBudgetManager:
 
         self.query_by_utility_params = query_by_utility_params
         self.init_default_params.update(deepcopy(init_default_params))
-        
+
         check_positional_args(
             self.bm_class.__init__,
             "__init__",
@@ -93,7 +94,7 @@ class TemplateBudgetManager:
             logic_test=False,
         )
 
-        # Check query_by_utility parameters and if the function is being 
+        # Check query_by_utility parameters and if the function is being
         # tested.
         check_test_param_test_availability(
             self, self.bm_class.query_by_utility, "query_by_utility", not_test
