@@ -1,6 +1,7 @@
 """
 Module implementing 4DS active learning strategy.
 """
+
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
 

@@ -119,6 +119,11 @@ class TestAnnotatorLogisticRegression(unittest.TestCase):
         lr.fit(X=self.X, y=self.y, sample_weight=self.w)
         self.assertTrue(np.abs(lr.Alpha_ - Alpha_exp).sum() > 0)
         self.assertTrue(np.abs(lr.W_ - W_exp).sum() > 0)
+        # TODO remove next lines when restructuring multianotator tests
+        self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y[:, 0])
+        lr.fit([], [])
+        lr.predict_annotator_perf([])
+        lr.predict_proba(self.X)
 
     def test_predict_proba(self):
         lr = AnnotatorLogisticRegression(

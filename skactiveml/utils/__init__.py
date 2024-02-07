@@ -1,6 +1,7 @@
 """
 The :mod:`skactiveml.utils` module includes various utilities.
 """
+
 from ._aggregation import compute_vote_vectors, majority_vote
 from ._functions import call_func
 from ._label import (

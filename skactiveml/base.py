@@ -1481,6 +1481,8 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         entropy : numpy..ndarray, optional
             Predicted differential entropy conditioned on `X`.
         """
+        check_scalar(return_std, "return_std", bool)
+        check_scalar(return_entropy, "return_entropy", bool)
         rv = self.predict_target_distribution(X)
         result = (rv.mean(),)
         if return_std:
