@@ -48,7 +48,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         ref: master
-    - name: Update Switcher
+    - name: Update switcher
       run: | 
         echo ${{ env.CURRENT_VERSION }}
         All_VERSIONS=$(git ls-remote --tags --sort=-'v:refname' https://github.com/scikit-activeml/scikit-activeml.git | cut --delimiter='/' --fields=3)
