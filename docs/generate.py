@@ -367,10 +367,11 @@ def generate_examples(gen_path, json_path, recursive=True):
         dst = os.path.join(gen_path, sub_dir_str)
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
-        if "num_cpus" not in os.environ:
-            os.environ["num_cpus"] = "-1"
-        if int(os.environ["num_cpus"]) != 1:
-            (Parallel(n_jobs=-1,backend='loky')
+        num_cpus = -1
+        if "num_cpus" in os.environ:
+            num_cpus = int(os.environ["num_cpus"])
+        if num_cpus != 1:
+            (Parallel(n_jobs=num_cpus,backend='loky')
             (delayed(_generate_single_example)(f,root, json_data, sub_dir_str, dst) for f in files))
         else:
             for filename in files:
