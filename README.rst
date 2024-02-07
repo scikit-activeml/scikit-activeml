@@ -54,8 +54,7 @@ The easiest way of installing scikit-activeml is using ``pip``:
     pip install -U scikit-activeml
 
 .. note::
-    pip installs based on the minimum requirements. If errors accure please 
-    try using:
+    pip installs based on the minimum requirements. If you encounter any incompatibility issues use:
     ::
         pip install -r requirements_max.txt
 .. user_installation_end
