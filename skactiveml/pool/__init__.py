@@ -32,6 +32,7 @@ from ._uncertainty_sampling import (
     uncertainty_scores,
     expected_average_precision,
 )
+from ._core_set import CoreSet, k_greedy_center
 
 __all__ = [
     "multiannotator",
@@ -60,6 +61,8 @@ __all__ = [
     "DiscriminativeAL",
     "BatchBALD",
     "batch_bald",
+    "CoreSet",
+    "k_greedy_center",
     "GreedyBALD",
     "RegressionTreeBasedAL",
 ]

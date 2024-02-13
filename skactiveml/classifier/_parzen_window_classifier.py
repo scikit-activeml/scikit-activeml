@@ -156,10 +156,10 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             N = np.max([2, np.sum(is_lbld)])
             variance = np.var(X, axis=0)
             n_features = X.shape[1]
-            self.metric_dict_[
-                "gamma"
-            ] = ParzenWindowClassifier._calculate_mean_gamma(
-                N, variance, n_features
+            self.metric_dict_["gamma"] = (
+                ParzenWindowClassifier._calculate_mean_gamma(
+                    N, variance, n_features
+                )
             )
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")

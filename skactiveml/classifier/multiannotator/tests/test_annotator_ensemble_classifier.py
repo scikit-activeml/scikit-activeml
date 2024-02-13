@@ -93,6 +93,9 @@ class TestAnnotatorEnsembleClassifier(unittest.TestCase):
             classes=np.arange(3),
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y[:, 0])
+        # TODO: remove next lines when restructuring multianotator tests
+        clf.fit([], [])
+        clf.predict([])
 
     def test_predict_proba(self):
         pwc = ParzenWindowClassifier()

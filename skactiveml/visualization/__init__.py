@@ -2,6 +2,7 @@
 The :mod:`skactiveml.visualization` module includes various tools for
 visualization.
 """
+
 from ._feature_space import (
     plot_utilities,
     plot_decision_boundary,

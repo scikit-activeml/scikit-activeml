@@ -1,4 +1,5 @@
 """Utilities for selection."""
+
 import operator
 import warnings
 from functools import reduce

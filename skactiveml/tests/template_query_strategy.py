@@ -8,6 +8,11 @@ from numpy.random import RandomState
 from sklearn import clone
 import sklearn.datasets
 
+from skactiveml.tests.utils import (
+    check_positional_args,
+    check_test_param_test_availability,
+)
+
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import (
     MISSING_LABEL,
@@ -37,20 +42,13 @@ class TemplateQueryStrategy:
         self.qs_class = qs_class
 
         self.init_default_params = {"random_state": 42}
-        for key, val in init_default_params.items():
-            self.init_default_params[key] = val
+        self.init_default_params.update(deepcopy(init_default_params))
 
-        init_params = inspect.signature(self.qs_class.__init__).parameters
-        for key, val in init_params.items():
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and key not in self.init_default_params
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `__init__` in "
-                    f"`init_default_kwargs`."
-                )
+        check_positional_args(
+            self.qs_class.__init__,
+            "__init__",
+            self.init_default_params,
+        )
 
         self.query_default_params_clf = query_default_params_clf
         self.query_default_params_reg = query_default_params_reg
@@ -66,29 +64,20 @@ class TemplateQueryStrategy:
                 f"and `query_default_params_reg` must be not None. "
                 f"Use emtpy dictionary to use default values."
             )
-        query_params = inspect.signature(self.qs_class.query).parameters
-        for key, val in query_params.items():
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and self.query_default_params_clf is not None
-                and key not in self.query_default_params_clf
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `query` in "
-                    f"`query_default_kwargs_clf`."
-                )
-
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and self.query_default_params_reg is not None
-                and key not in self.query_default_params_reg
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `query` in "
-                    f"`query_default_kwargs_reg`."
-                )
+        if self.query_default_params_clf is not None:
+            check_positional_args(
+                self.qs_class.query,
+                "query",
+                self.query_default_params_clf,
+                kwargs_name="query_default_kwargs_clf",
+            )
+        if self.query_default_params_reg is not None:
+            check_positional_args(
+                self.qs_class.query,
+                "query",
+                self.query_default_params_reg,
+                kwargs_name="query_default_kwargs_reg",
+            )
 
     def test_init_param_random_state(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -209,38 +198,19 @@ class TemplateQueryStrategy:
     def test_param_test_availability(self):
         not_test = ["self", "kwargs"]
 
-        # Get initial parameters.
-        init_params = inspect.signature(self.qs_class.__init__).parameters
-        init_params = list(init_params.keys())
-
         # Check init parameters.
-        for param in np.setdiff1d(init_params, not_test):
-            test_func_name = "test_init_param_" + param
-            with self.subTest(msg=test_func_name):
-                self.assertTrue(
-                    hasattr(self, test_func_name),
-                    msg=f"'{test_func_name}()' missing in {self.__class__}",
-                )
+        check_test_param_test_availability(
+            self,
+            self.qs_class.__init__,
+            "init",
+            not_test,
+            logic_test=False,
+        )
 
-        # Get query parameters.
-        query_params = inspect.signature(self.qs_class.query).parameters
-        query_params = list(query_params.keys())
-
-        # Check init parameters.
-        for param in np.setdiff1d(query_params, not_test):
-            test_func_name = "test_query_param_" + param
-            with self.subTest(msg=test_func_name):
-                self.assertTrue(
-                    hasattr(self, test_func_name),
-                    msg=f"'{test_func_name}()' missing in {self.__class__}",
-                )
-
-        # Check if query is being tested.
-        with self.subTest(msg="test_query"):
-            self.assertTrue(
-                hasattr(self, "test_query"),
-                msg=f"'test_query' missing in {self.__class__}",
-            )
+        # Check query parameters and check if query is being tested.
+        check_test_param_test_availability(
+            self, self.qs_class.query, "query", not_test
+        )
 
     def _test_param(
         self,
