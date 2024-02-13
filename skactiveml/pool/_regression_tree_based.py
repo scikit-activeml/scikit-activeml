@@ -3,12 +3,14 @@ from collections import Counter
 
 import numpy as np
 from sklearn import clone
+from sklearn.cluster import KMeans
 from sklearn.tree import DecisionTreeRegressor
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.regressor import SklearnRegressor
 from skactiveml.utils import MISSING_LABEL, check_type, \
-    check_equal_missing_label, is_unlabeled, is_labeled, simple_batch
+    check_equal_missing_label, is_unlabeled, is_labeled, simple_batch, \
+    rand_argmax, rand_argmin, check_scalar
 
 
 class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
@@ -21,13 +23,16 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    method : str, default="random"
+    method : str, default='random'
         Possible values are 'random', 'diversity', and 'representativity'.
     missing_label : scalar or string or np.nan or None,
       default=skactiveml.utils.MISSING_LABEL
         Value to represent a missing label.
     random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
+    max_iter_representativity : int, default=5
+        Maximum number of optimisations.
+        Only used if `method=representativity`.
 
     References
     ----------
@@ -39,11 +44,13 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             method='random',
             missing_label=MISSING_LABEL,
             random_state=None,
+            max_iter_representativity=5
     ):
         super().__init__(
             random_state=random_state, missing_label=missing_label
         )
         self.method = method
+        self.max_iter_representativity = max_iter_representativity
 
     def query(
             self,
@@ -54,7 +61,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             sample_weight=None,
             candidates=None,
             batch_size=1,
-            return_utilities=False
+            return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -126,15 +133,23 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         # Validate method type.
         check_type(self.method, "method", str)
 
+        # Validate max_iter_representativity type.
+        check_scalar(
+            self.max_iter_representativity,
+            "max_iter_representativity",
+            int,
+            min_val=1
+        )
+
         # Fallback to random sampling if no sample is labeled.
         if np.sum(is_labeled(y)) == 0:
             warnings.warn("No sample is labeled. Fallback to random sampling.")
             if mapping is None:
-                utilities = np.full(len(X_cand), fill_value=1/len(X_cand))
+                utilities = np.full(len(X_cand), fill_value=1 / len(X_cand))
             else:
                 utilities = np.full(len(X), np.nan)
                 utilities[mapping] = np.full(len(mapping),
-                                             fill_value=1/len(mapping))
+                                             fill_value=1 / len(mapping))
 
             return simple_batch(
                 utilities,
@@ -155,43 +170,129 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         leaf_indices_cand = reg.apply(X_cand)
         n_cand_per_leaf = np.bincount(leaf_indices_cand, minlength=len(n_k))
 
-        # n_cand_per_leaf = np.zeros(reg.tree_.node_count)
-        # for i in range(reg.tree_.node_count):
-        #     n_cand_per_leaf[i] = Counter(np.array(leaf_indices_cand))[i]
-        # point_proportions = \
-        #     n_k/np.max(
-        #         [np.ones(reg.tree_.node_count), n_cand_per_leaf],
-        #         axis=0
-        #     )
-
-        # leaf_probas = np.array(
-        #     [point_proportions[key] for key in leaf_indices_cand]
-        # )
-        # leaf_probas = leaf_probas/sum(leaf_probas)
-        #
-        # leaves_to_sample = self.random_state_.choice(
-        #     leaf_indices_cand,
-        #     batch_size,
-        #     p=leaf_probas,
-        #     replace=False,
-        # )
-
         if self.method == 'random':
-            utilities_cand = (n_k/n_cand_per_leaf)[leaf_indices_cand]
+            utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
             selection_method = 'proportional'
-            # query_indices_cand = np.empty(len(leaves_to_sample), dtype=int)
-            # i = 0
-            # for leaf, n in Counter(leaves_to_sample).items():
-            #     query_indices_cand[i:i+n] = self.random_state_.choice(
-            #         np.argwhere(leaf_indices_cand == leaf).flatten(),
-            #         size=n,
-            #     )
-            #     i += n
 
         elif self.method == 'diversity':
-            raise NotImplementedError
+            utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
+            selection_method = 'proportional'
+
+            X_labeled = X[is_labeled(y)]
+            leaf_indices_labeled = reg.apply(X_labeled)
+            for leaf_idx in np.unique(leaf_indices_cand):
+                X_cand_leaf = X_cand[leaf_indices_cand == leaf_idx]
+                X_leaf_labeled = X_labeled[leaf_indices_labeled == leaf_idx]
+
+                # Calculate the L2 distance of each unlabeled sample in leaf k
+                # to all the labeled samples using equation (6).
+                d_ji = np.linalg.norm(
+                            np.tile(
+                                X_cand_leaf,
+                                (len(X_leaf_labeled), 1, 1)
+                            ).swapaxes(0, 1)
+                            - np.tile(
+                                X_leaf_labeled,
+                                (len(X_cand_leaf), 1, 1)
+                            ),
+                            axis=2
+                        )
+
+                # Compute the shortest distance from x_j to all labeled
+                # samples using equation (7).
+                utilities_cand[leaf_indices_cand == leaf_idx] *= \
+                    np.min(d_ji, axis=1)
+
         elif self.method == 'representativity':
-            raise NotImplementedError
+            # Convert n_k into integer.
+            n_k = np.bincount(
+                self.random_state_.choice(
+                    leaf_indices_cand,
+                    batch_size,
+                    replace=False,
+                    p=n_k[leaf_indices_cand] / np.sum(n_k[leaf_indices_cand]),
+                ),
+                minlength=len(n_k)
+            )
+
+            # Perform a k-means clustering in leaf k with n_k clusters.
+            best_indices = np.empty(shape=batch_size, dtype=int)
+            l_cand = np.full(len(X_cand), fill_value=-1, dtype=int)
+            for leaf in np.argwhere(n_k != 0).flatten():
+                X_cand_leaf = X_cand[leaf_indices_cand == leaf]
+                kmeans = KMeans(n_k[leaf]).fit(X_cand_leaf)
+
+                l_cand[leaf_indices_cand == leaf] = \
+                    kmeans.predict(X_cand_leaf) + np.sum(n_k[0:leaf])
+
+                centroids = kmeans.cluster_centers_
+                best_indices[np.sum(n_k[0:leaf]) + range(n_k[leaf])] = \
+                    rand_argmin(
+                        np.linalg.norm(
+                            np.tile(
+                                centroids, (len(X_cand), 1, 1)).swapaxes(0, 1)
+                            - np.tile(
+                                X_cand, (len(centroids), 1, 1)), axis=2
+                        ), axis=1
+                    )
+
+            # Calculate R using Eq. (9)
+            R_cand = np.zeros(len(X_cand))
+            for j in range(len(X_cand)):
+                if l_cand[j] == -1:
+                    continue
+                c_l = X_cand[l_cand == l_cand[j]]
+                if len(c_l) == 1:
+                    R_cand[j] = 0
+                else:
+                    R_cand[j] = (1 / (len(c_l) - 1)) * np.sum(
+                        np.linalg.norm(
+                            c_l - X_cand[j],
+                            axis=1
+                        )
+                    )
+
+            batch_utilities_cand = np.full((batch_size, len(X_cand)), np.nan)
+            for i in range(self.max_iter_representativity):
+                prev_best_indices = best_indices
+                for l in range(batch_size):
+                    # Update DELTA using the current centroids.
+                    X_M = X[is_labeled(y)]
+                    X_M = np.append(X_M, X_cand[best_indices[:l]], axis=0)
+                    X_M = np.append(X_M, X_cand[best_indices[l+1:]], axis=0)
+                    X_cand_l = X_cand[l_cand == l]
+                    DELTA_l = np.min(
+                        np.linalg.norm(
+                            np.tile(X_cand_l, (len(X_M), 1, 1)).swapaxes(0, 1)
+                            - np.tile(X_M, (len(X_cand_l), 1, 1)),
+                            axis=2
+                        ), axis=1
+                    )  # Equation (10)
+
+                    # Use Eq. (8) to find the next sample to be labeled.
+                    R_l = R_cand[l_cand == l]
+                    batch_utilities_cand[l, l_cand == l] = DELTA_l - R_l
+                    best_indices[l] = rand_argmax(
+                        batch_utilities_cand[l],
+                        random_state=self.random_state_
+                    )
+
+                if np.all(prev_best_indices == best_indices):
+                    break
+
+            if mapping is None:
+                batch_utilities = batch_utilities_cand
+            else:
+                batch_utilities = np.full((batch_size, len(X)), np.nan)
+                batch_utilities[:, mapping] = batch_utilities_cand
+                best_indices = mapping[best_indices]
+
+            # Check whether utilities are to be returned.
+            if return_utilities:
+                return best_indices, batch_utilities
+            else:
+                return best_indices
+
         else:
             raise ValueError(
                 f'The given method "{self.method}" is not valid. Supported '
@@ -253,23 +354,20 @@ def _rt_al(X, y, reg, batch_size=1):
                       'parameter `min_samples_leaf` of `reg` to >= 2')
 
     # Compute the probability p_k that an unlabeled sample belongs to leaf k.
+    leaf_unlabeled = reg.apply(X[is_unlabeled(y)])
     samples_per_leaf = np.zeros(reg.tree_.node_count)
-    samples_per_leaf[np.unique(leaf_labeled)] = np.array(list(Counter(leaf_labeled).values()))
-    p_k = np.full(shape=reg.tree_.node_count, fill_value=1/sum(is_unlabeled(y)))
+    samples_per_leaf[np.unique(leaf_unlabeled)] = np.array(
+        list(Counter(leaf_unlabeled).values()))
+    p_k = np.full(shape=reg.tree_.node_count,
+                  fill_value=1 / sum(is_unlabeled(y)))
     p_k *= samples_per_leaf
 
     # Compute the number of sample to be selected from each leaf of the
     # regression tree.
-    n_k = np.sqrt(p_k*v_k)
+    n_k = np.sqrt(p_k * v_k)
     if np.sum(n_k) == 0:
-        n_k = np.full_like(n_k, fill_value=batch_size/reg.tree_.node_count)
+        n_k = np.full_like(n_k, fill_value=batch_size / reg.tree_.node_count)
     else:
-        n_k = batch_size*n_k/np.sum(n_k)
-
-    leaf_indices_cand = reg.apply(X[is_unlabeled(y)])
-    n_cand_per_leaf = np.bincount(leaf_indices_cand, minlength=len(n_k))
-    utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
-    # if np.all(utilities_cand == 0):
-    #     raise ValueError
+        n_k = batch_size * n_k / np.sum(n_k)
 
     return n_k
