@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans, SpectralClustering
 from skactiveml.pool._typi_clust import TypiClust
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
@@ -17,12 +17,17 @@ class TestTypiClust(
             "X": np.linspace(0, 1, 20).reshape(10, 2),
             "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
         }
+        query_default_params_reg = {
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.hstack([[1.1, 2.1], np.full(8, MISSING_LABEL)]),
+        }
         super().setUp(
             qs_class=TypiClust,
             init_default_params={
-                "cluster_algo_dict": {"n_init": "auto", "random_state": 0}
+                "cluster_algo_dict": {"random_state": 0}
             },
             query_default_params_clf=query_default_params_clf,
+            query_default_params_reg=query_default_params_reg,
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):
@@ -32,7 +37,7 @@ class TestTypiClust(
             ("string", TypeError),
             (None, TypeError),
             (TypiClust, TypeError),
-            (DBSCAN, TypeError),
+            (SpectralClustering, None),
             (KMeans, None),
         ]
         self._test_param("init", "cluster_algo", test_cases)
