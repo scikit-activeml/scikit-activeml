@@ -1,5 +1,5 @@
 """
-Module implementing TypiClust Selection strategies.
+Module implementing TypiClust.
 
 TypiClust is a deep active learning strategy suited for low budgets.
 Its aim is to query typical examples with the corresponding high score
@@ -17,24 +17,24 @@ from sklearn.neighbors import NearestNeighbors
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
     """Typical Clustering Selection
 
-    This class implements Typical Clustering (TypiClust) query strategies [1], which considers
+    This class implements the Typical Clustering (TypiClust) query strategy [1], which considers
     both diversity and typicality (representativeness) of the samples.
 
     Parameters
     ----------
     missing_label: scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label
+        Value to represent a missing label.
     random_state: int or np.random.RandomState
         The random state to use
-    cluster_algo: class in ClusterMixin.__class__ (default=KMeans)
+    cluster_algo: ClusterMixin.__class__ (default=KMeans)
         The cluster algorithm to be used in the TypiClust
-    cluster_algo_dict: dict (default=None)
+    cluster_algo_dict: dict, optional (default=None)
         The parameters passed to the clustering algorithm `cluster_algo`,
         excluding the parameter for the number of clusters.
     n_cluster_param_name: string (default="n_clusters")
         The name of the parameter for the number of clusters
     k: int, optional (default=5)
-        The number for k-nearest-neighbors to the computation of typicality
+        The number for k-nearest-neighbors for the computation of typicality
 
     [1] G. Hacohen, A. Dekel, und D. Weinshall, „Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
@@ -113,7 +113,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate init parameter
-        check_scalar(self.k, "n_knn", target_type=int, min_val=1)
+        check_scalar(self.k, "k", target_type=int, min_val=1)
 
         if not (
             isinstance(self.cluster_algo_dict, dict)
