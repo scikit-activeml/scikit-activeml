@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 
-from skactiveml.classifier import SklearnClassifier
+from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.pool import Badge
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
@@ -142,3 +142,16 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         probas = [i for i in utilities_6[1] if not np.isnan(i)]
         probas_sum = np.sum(probas)
         self.assertAlmostEqual(probas_sum, 1)
+
+        # test case 7: return_embedding=True
+        clf_7 = ParzenWindowClassifierEmbedding(classes=self.classes, random_state=42)
+        np.testing.assert_array_equal(
+            badge_1.query(X_1, y_1, clf_7, return_embeddings=True), badge_1.query(X_1, y_1, clf_7, return_embeddings=True)
+        )
+
+class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
+    def predict_proba(self, X, return_embeddings=False):
+        probas = super().predict_proba(X)
+        if not return_embeddings:
+            return probas
+        return probas, X

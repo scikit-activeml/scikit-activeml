@@ -147,8 +147,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             )
         else:
             probas = clf.predict_proba(X_unlbld)
-        p_max = np.max(probas, axis=1).reshape(-1, 1)
-        g_x = (p_max - 1) * X_unlbld
+
+        y_pred = probas.argmax(axis=-1)
+        proba_factor = probas - np.eye(probas.shape[1])[y_pred]
+        g_x = (proba_factor[:, :, None] * X_unlbld[:, None, :])
+        g_x = g_x.reshape(*g_x.shape[:-2], -1)
 
         # init the utilities
         if mapping is not None:
@@ -227,6 +230,7 @@ def _d_2(g_x, query_indicies, d_latest=None):
     g_query_indicies = g_x[query_indicies]
     _, D = pairwise_distances_argmin_min(X=g_x, Y=g_query_indicies)
     if d_latest is not None:
-        D = np.minimum(d_latest, D)
-    D2 = np.square(D)
+        D2 = np.minimum(d_latest, np.square(D))
+    else:
+        D2 = np.square(D)
     return D2
