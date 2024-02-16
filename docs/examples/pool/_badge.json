@@ -2,11 +2,11 @@
   {
     "class" : "Badge",
     "package" : "pool",
-    "method" : "Badge",
+    "method" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
     "category" : "Others",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
-    "title" : "Badge",
+    "title" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
     "refs" : [],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
