@@ -157,7 +157,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         probas_sum = np.sum(probas)
         self.assertAlmostEqual(probas_sum, 1)
 
-        # test case 7: return_embedding=True
+        # test case 7: clf_embedding_flag = "return_embeddings"
         clf_7 = ParzenWindowClassifierEmbedding(
             classes=self.classes, random_state=42
         )
@@ -170,6 +170,19 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ),
         )
 
+        # test case 8: predict_probas returns tuple
+        clf_8 = ParzenWindowClassifierTuple(
+            classes=self.classes, random_state=42
+        )
+        np.testing.assert_array_equal(
+            badge_1.query(
+                X_1, y_1, clf_8
+            ),
+            badge_1.query(
+                X_1, y_1, clf_8
+            ),
+        )
+
 
 class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
     def predict_proba(self, X, return_embeddings=False):
@@ -177,3 +190,8 @@ class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
         if not return_embeddings:
             return probas
         return probas, X
+
+class ParzenWindowClassifierTuple(ParzenWindowClassifier):
+    def predict_proba(self, X, return_embeddings=False):
+        probas = super().predict_proba(X)
+        return (probas, X)

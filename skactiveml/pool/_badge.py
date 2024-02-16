@@ -44,15 +44,15 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         )
 
     def query(
-        self,
-        X,
-        y,
-        clf,
-        fit_clf=True,
-        candidates=None,
-        batch_size=1,
-        return_utilities=False,
-        clf_embedding_flag=None,
+            self,
+            X,
+            y,
+            clf,
+            fit_clf=True,
+            candidates=None,
+            batch_size=1,
+            return_utilities=False,
+            clf_embedding_flag=None,
     ):
         """Query the next samples to be labelled
 
@@ -230,11 +230,9 @@ def _d_2(g_x, query_indicies, d_latest=None):
         The D^2 value, for the first sample, is the value inf.
     """
     if len(query_indicies) == 0:
-        return np.sum(g_x**2, axis=-1)
+        return np.sum(g_x ** 2, axis=-1)
     g_query_indicies = g_x[query_indicies]
     _, D = pairwise_distances_argmin_min(X=g_x, Y=g_query_indicies)
     if d_latest is not None:
         D2 = np.minimum(d_latest, np.square(D))
-    else:
-        D2 = np.square(D)
     return D2
