@@ -23,9 +23,7 @@ class TestTypiClust(
         }
         super().setUp(
             qs_class=TypiClust,
-            init_default_params={
-                "cluster_algo_dict": {"random_state": 0}
-            },
+            init_default_params={"cluster_algo_dict": {"random_state": 0}},
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
         )
