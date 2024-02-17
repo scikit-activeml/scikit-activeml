@@ -192,12 +192,13 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             utilities[i, unlbld_mapping] = d_probas
             utilities[i, query_indicies] = np.nan
 
-            idx_in_unlbld_array = self.random_state_.choice(
-                len(d_probas), 1, replace=False, p=d_probas
-            )
-            idx_in_unlbld = idx_in_unlbld_array[0]
             if i == 0 and d_2_sum != 0:
                 idx_in_unlbld = np.argmax(d_2, axis=-1)
+            else:
+                idx_in_unlbld_array = self.random_state_.choice(
+                    len(d_probas), 1, replace=False, p=d_probas
+                )
+                idx_in_unlbld = idx_in_unlbld_array[0]
             query_indicies_in_unlbld.append(idx_in_unlbld)
 
             idx = unlbld_mapping[idx_in_unlbld]
