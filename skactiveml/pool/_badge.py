@@ -54,7 +54,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             return_utilities=False,
             clf_embedding_flag=None,
     ):
-        """Query the next samples to be labelled
+        """Query the next samples to be labeled
 
         Parameters
         ----------
@@ -219,11 +219,11 @@ def _d_2(g_x, query_indicies, d_latest=None):
     g_x : numpy.ndarray of shape (n_unlabeled_samples, n_features)
         The results after gradient embedding
     query_indicies : numpy.ndarray of shape (n_query_indicies)
-        the query indications that correspond to the unlabeled samples
+        the query indications that correspond to the unlabeled samples.
     d_latest : numpy.ndarray of shape (n_unlabeled_samples) default=None
         The distance between each data point and its nearest centre.
         This is used to simplify the calculation of the later distances for the
-        next selected sample
+        next selected sample.
 
     Returns
     -------
