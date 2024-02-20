@@ -65,7 +65,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         ]
         self._test_param("query", "fit_clf", test_cases=test_cases)
 
-    def test_query_param_clf_embedding_flag(self, test_cases=None):
+    def test_init_param_clf_embedding_flag(self, test_cases=None):
         super().setUp(
             qs_class=Badge,
             init_default_params={"random_state": 42},
@@ -80,7 +80,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             (True, TypeError),
             ("return_embeddings", None),
         ]
-        self._test_param("query", "clf_embedding_flag", test_cases=test_cases)
+        self._test_param("init", "clf_embedding_flag", test_cases=test_cases)
 
     def test_query(self):
         # test case 1: with the same random state the init pick-up is the same
@@ -164,13 +164,12 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         clf_7 = ParzenWindowClassifierEmbedding(
             classes=self.classes, random_state=42
         )
+        badge_7 = Badge(
+            clf_embedding_flag="return_embeddings", random_state=42
+        )
         np.testing.assert_array_equal(
-            badge_1.query(
-                X_1, y_1, clf_7, clf_embedding_flag="return_embeddings"
-            ),
-            badge_1.query(
-                X_1, y_1, clf_7, clf_embedding_flag="return_embeddings"
-            ),
+            badge_7.query(X_1, y_1, clf_7),
+            badge_7.query(X_1, y_1, clf_7),
         )
 
         # test case 8: predict_probas returns tuple
@@ -178,12 +177,8 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             classes=self.classes, random_state=42
         )
         np.testing.assert_array_equal(
-            badge_1.query(
-                X_1, y_1, clf_8
-            ),
-            badge_1.query(
-                X_1, y_1, clf_8
-            ),
+            badge_1.query(X_1, y_1, clf_8),
+            badge_1.query(X_1, y_1, clf_8),
         )
 
 
@@ -193,6 +188,7 @@ class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
         if not return_embeddings:
             return probas
         return probas, X
+
 
 class ParzenWindowClassifierTuple(ParzenWindowClassifier):
     def predict_proba(self, X, return_embeddings=False):
