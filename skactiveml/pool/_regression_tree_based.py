@@ -18,7 +18,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
     This strategy is based on a regression tree and selects the number `n_k` of
     samples to be selected from each leaf `k` given a certain `batch size`. It
-    than uses one of the three methods 'random', 'diversity', ore
+    than uses one of the three methods 'random', 'diversity', or
     'representativity' to select `n_k` samples from each leaf `k`.
 
     Parameters
@@ -36,7 +36,8 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-
+    [1] Jose, Ashna, et al. "Regression tree-based active learning."
+        Data Mining and Knowledge Discovery (2023): 1-41.
     """
 
     def __init__(
