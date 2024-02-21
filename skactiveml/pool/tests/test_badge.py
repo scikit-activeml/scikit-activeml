@@ -66,12 +66,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self._test_param("query", "fit_clf", test_cases=test_cases)
 
     def test_init_param_clf_embedding_flag(self, test_cases=None):
-        super().setUp(
-            qs_class=Badge,
-            init_default_params={"random_state": 42},
-            query_default_params_clf=self.query_default_params_clf_2,
-        )
-
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (1, TypeError),
@@ -80,7 +74,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             (True, TypeError),
             ("return_embeddings", None),
         ]
-        self._test_param("init", "clf_embedding_flag", test_cases=test_cases)
+        self._test_param("init", "clf_embedding_flag", replace_query_params=self.query_default_params_clf_2, test_cases=test_cases)
 
     def test_query(self):
         # test case 1: with the same random state the init pick-up is the same
