@@ -40,11 +40,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
         self,
-        clf_embedding_flag=None,
+        clf_embedding_flag_name=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        self.clf_embedding_flag = clf_embedding_flag
+        self.clf_embedding_flag_name = clf_embedding_flag_name
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
@@ -59,7 +59,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled
+        """Query the next samples to be labeled.
 
         Parameters
         ----------
@@ -85,7 +85,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
-        clf_embedding_flag : string, optional (default=None)
+        clf_embedding_flag_name : string, optional (default=None)
             The name of the parameter, whether to return the embedding or not,
             according to the used classifier.
             By default, `None` means no embeddings will be returned, but we use
@@ -128,8 +128,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
         check_scalar(fit_clf, "fit_clf", bool)
-        if self.clf_embedding_flag is not None:
-            check_scalar(self.clf_embedding_flag, "clf_embedding_flag", str)
+        if self.clf_embedding_flag_name is not None:
+            check_scalar(self.clf_embedding_flag_name, "clf_embedding_flag_name", str)
 
         # Fit the classifier
         if fit_clf:
@@ -150,9 +150,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = np.arange(len(X_cand))
 
         # gradient embedding, aka predict class membership probabilities
-        if self.clf_embedding_flag is not None:
+        if self.clf_embedding_flag_name is not None:
             probas, X_unlbld = clf.predict_proba(
-                X_unlbld, **{self.clf_embedding_flag: True}
+                X_unlbld, **{self.clf_embedding_flag_name: True}
             )
         else:
             probas = clf.predict_proba(X_unlbld)
