@@ -59,7 +59,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled
+        """Query the next samples to be labeled.
 
         Parameters
         ----------
