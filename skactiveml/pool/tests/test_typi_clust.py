@@ -43,7 +43,7 @@ class TestTypiClust(
             "init",
             "cluster_algo",
             test_cases,
-            replace_init_params={"random_state": 0}
+            replace_init_params={"random_state": 0},
         )
 
     def test_init_param_cluster_algo_dict(self, test_cases=None):

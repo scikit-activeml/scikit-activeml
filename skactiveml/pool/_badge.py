@@ -129,7 +129,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         check_equal_missing_label(clf.missing_label, self.missing_label_)
         check_scalar(fit_clf, "fit_clf", bool)
         if self.clf_embedding_flag_name is not None:
-            check_scalar(self.clf_embedding_flag_name, "clf_embedding_flag_name", str)
+            check_scalar(
+                self.clf_embedding_flag_name, "clf_embedding_flag_name", str
+            )
 
         # Fit the classifier
         if fit_clf:
