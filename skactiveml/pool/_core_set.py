@@ -32,9 +32,9 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    missing_label: scalar or string or np.nan or None, default=np.nan
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label
-    random_state: int or np.random.RandomState
+    random_state : int or np.random.RandomState
         The random state to use
 
     References
@@ -60,13 +60,13 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
 
         Parameters
         ----------
-        X: array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
            Training data set, usually complete, i.e. including the labeled and
            unlabeled samples
-        y: array-like of shape (n_samples, )
+        y : array-like of shape (n_samples, )
            Labels of the training data set (possibly including unlabeled ones
            indicated by self.missing_label)
-        candidates: None or array-like of shape (n_candidates), dtype = int or
+        candidates : None or array-like of shape (n_candidates), dtype = int or
            array-like of shape (n_candidates, n_features),
            optional (default=None)
            If candidates is None, the unlabeled samples from (X,y) are considered
@@ -75,14 +75,14 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
            candidates is considered as a list of the indices of the samples in (X,y).
            If candidates is of shape (n_candidates, n_features), the candidates are
            directly given in the input candidates (not necessarily contained in X)
-        batch_size: int, optional(default=1)
+        batch_size : int, optional(default=1)
            The number of samples to be selects in one AL cycle.
-        return_utilities: bool, optional(default=False)
+        return_utilities : bool, optional(default=False)
            If True, also return the utilities based on the query strategy
 
         Returns
         ----------
-        query_indices: numpy.ndarry of shape (batch_size)
+        query_indices : numpy.ndarry of shape (batch_size)
            The query_indices indicate for which candidate sample a label is
            to queried, e.g., `query_indices[0]` indicates the first selected
            sample.
@@ -90,7 +90,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
            refers to samples in X.
            If candidates is of shape (n_candidates, n_features), the indexing
            refers to samples in candidates.
-        utilities: numpy.ndarray of shape (batch_size, n_samples) or
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or
            numpy.ndarray of shape (batch_size, n_candidates)
            The utilities of samples for selecting each sample of the batch.
            Here, utilities means the distance between each data point and its nearest center.
@@ -158,35 +158,35 @@ def k_greedy_center(
 
     Parameters:
     ----------
-    X: array-like of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, n_features)
        Training data set, usually complete, i.e. including the labeled and
        unlabeled samples
-    y: np.ndarray of shape (n_selected_samples, )
+    y : np.ndarray of shape (n_selected_samples, )
        index of datapoints already selects
-    batch_size: int, optional (default=1)
+    batch_size : int, optional (default=1)
        The number of samples to be selected in one AL cycle.
-    random_state: int | np.random.RandomState, optional (default=None)
+    random_state : int | np.random.RandomState, optional (default=None)
        Random state for candidate selection.
-    missing_label: scalar or string or np.nan or None, optional (default=np.nan)
+    missing_label : scalar or string or np.nan or None, optional (default=np.nan)
        Value to represent a missing label
-    mapping: np.ndarray of shape (n_candidates, ), optional (default=None)
+    mapping : np.ndarray of shape (n_candidates, ), optional (default=None)
        Index array that maps `candidates` to `X`.
        (`candidates = X[mapping]`)
-    n_new_cand: int or None, optional (default=None)
+    n_new_cand : int or None, optional (default=None)
        The number of new candidates that are additionally added to X.
        Only used for the case, that in the query function with the
        shape of candidates is (n_candidates, n_feature)
 
     Return:
     ----------
-    query_indices: numpy.ndarry of shape (batch_size, )
+    query_indices : numpy.ndarry of shape (batch_size, )
         The query_indices indicate for which candidate sample a label is
         to queried from the candidates.
         If candidates in None or of shape (n_candidates), the indexing
         refers to samples in X.
         If candidates is of shape (n_candidates, n_features), the indexing
         refers to samples in candidates.
-    utilities: numpy.ndarray of shape (batch_size, n_samples) or
+    utilities : numpy.ndarray of shape (batch_size, n_samples) or
         numpy.ndarry of shape (batch_size, n_new_cand)
         The distance between each data point and its nearest center that used
         for selecting the next sample.
@@ -262,22 +262,22 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
 
     Parameters:
     ----------
-    X: array-like of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples
-    cluster_centers: array-like of shape (n_cluster_centers)
+    cluster_centers : array-like of shape (n_cluster_centers)
         indices of cluster centers
-    mapping: np.ndarray of shape (n_candidates, ) default None
+    mapping : np.ndarray of shape (n_candidates, ) default None
         Index array that maps `candidates` to `X`.
         (`candidates = X[mapping]`)
-    latest_distance: array-like of shape (n_samples) default None
+    latest_distance : array-like of shape (n_samples) default None
         The distance between each data point and its nearest center
         Using to facilitate the computation the later distances for the
         coming selected sample
 
     Return:
     ---------
-    result-dist: numpy.ndarray of shape (1, n_samples)
+    result-dist : numpy.ndarray of shape (1, n_samples)
         If there aren't any cluster centers existing, the default distance
         will be 0.
         If there are some cluster center exist, the return will be the
