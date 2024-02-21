@@ -179,10 +179,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         # sampling with kmeans++
         query_indicies = []
         query_indicies_in_unlbld = []
+        idx_in_unlbld = []
         d_2_s = []
         for i in range(batch_size):
             if i == 0:
-                d_2 = _d_2(g_x, [])
+                d_2 = _d_2(g_x, idx_in_unlbld)
             else:
                 d_2 = _d_2(g_x, [idx_in_unlbld], d_2_s[i - 1])
             d_2_s.append(d_2)
