@@ -4,6 +4,7 @@ This module is modified from
 https://github.com/ntucllab/libact/blob/master/libact.
 Copyright (c) 2014, National Taiwan University
 """
+
 import warnings
 
 import numpy as np

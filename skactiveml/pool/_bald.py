@@ -2,6 +2,7 @@
 Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
 the Apache-2.0 license.
 """
+
 import numpy as np
 from sklearn.utils import check_array
 

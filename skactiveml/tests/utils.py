@@ -1,7 +1,7 @@
 import inspect
 
 
-def check_positional_args(func, func_name, param_dict):
+def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
     kwargs_var_keyword = []
     # Get kwargs variables
@@ -18,10 +18,16 @@ def check_positional_args(func, func_name, param_dict):
                 and val.default == inspect._empty
                 and key not in param_dict
             ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `{func_name}` in "
-                    f"`{func_name}_default_kwargs`."
-                )
+                if kwargs_name in None:
+                    raise ValueError(
+                        f"Missing positional argument `{key}` of `{func_name}` in "
+                        f"`{func_name}_default_kwargs`."
+                    )
+                else:
+                    raise ValueError(
+                        f"Missing positional argument `{key}` of `{func_name}` in "
+                        f"`{kwargs_name}`."
+                    )
 
 
 def check_test_param_test_availability(
