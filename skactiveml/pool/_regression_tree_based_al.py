@@ -4,13 +4,15 @@ from collections import Counter
 import numpy as np
 from sklearn import clone
 from sklearn.cluster import KMeans
+from sklearn.metrics import pairwise_distances_argmin_min, \
+    pairwise_distances_argmin, pairwise_distances
 from sklearn.tree import DecisionTreeRegressor
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.regressor import SklearnRegressor
 from skactiveml.utils import MISSING_LABEL, check_type, \
     check_equal_missing_label, is_unlabeled, is_labeled, simple_batch, \
-    rand_argmax, rand_argmin, check_scalar
+    rand_argmax, rand_argmin, check_scalar, labeled_indices, unlabeled_indices
 
 
 class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
@@ -31,13 +33,14 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
     random_state : int | np.random.RandomState, optional
         Random state for candidate selection.
     max_iter_representativity : int, default=5
-        Maximum number of optimisations.
-        Only used if `method=representativity`.
+        Maximum number of optimisation iterations.
+        Only used if `method='representativity'`.
 
     References
     ----------
-    [1] Jose, Ashna, et al. "Regression tree-based active learning."
-        Data Mining and Knowledge Discovery (2023): 1-41.
+    [1] Jose, Ashna, João Paulo Almeida de Mendonça, Emilie Devijver,
+        Noël Jakse, Valérie Monbet, and Roberta Poloni. "Regression tree-based
+        active learning." Data Mining and Knowledge Discovery (2023): 420-460.
     """
 
     def __init__(
@@ -123,12 +126,14 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
         X_cand, mapping = self._transform_candidates(candidates, X, y)
+        labeled_idxs = labeled_indices(y, self.missing_label_)
 
         # Validate regressor type.
         check_type(reg, "reg", SklearnRegressor)
         check_type(reg.estimator, "reg.estimator", DecisionTreeRegressor)
-        check_equal_missing_label(reg.missing_label, self.missing_label)
+        check_equal_missing_label(reg.missing_label, self.missing_label_)
 
+        # Validate boolean flag
         check_type(fit_reg, "fit_reg", bool)
 
         # Validate method type.
@@ -143,7 +148,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         )
 
         # Fallback to random sampling if no sample is labeled.
-        if np.sum(is_labeled(y)) == 0:
+        if len(labeled_idxs) == 0:
             warnings.warn("No sample is labeled. Fallback to random sampling.")
             if mapping is None:
                 utilities = np.full(len(X_cand), fill_value=1 / len(X_cand))
@@ -165,7 +170,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             reg = clone(reg).fit(X, y, sample_weight)
 
         # Calculate the number of samples to be selected from each leaf k.
-        n_k = _rt_al(X, y, reg, batch_size)
+        n_k = _calc_acquisitions_per_leaf(
+            X, y, reg, missing_label=self.missing_label_, batch_size=batch_size
+        )
 
         # Calculate the number of candidates per leaf.
         leaf_indices_cand = reg.apply(X_cand)
@@ -179,30 +186,22 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
             selection_method = 'proportional'
 
-            X_labeled = X[is_labeled(y)]
+            X_labeled = X[labeled_idxs]
             leaf_indices_labeled = reg.apply(X_labeled)
             for leaf_idx in np.unique(leaf_indices_cand):
                 X_cand_leaf = X_cand[leaf_indices_cand == leaf_idx]
-                X_leaf_labeled = X_labeled[leaf_indices_labeled == leaf_idx]
+                X_labeled_leaf = X_labeled[leaf_indices_labeled == leaf_idx]
 
                 # Calculate the L2 distance of each unlabeled sample in leaf k
                 # to all the labeled samples using equation (6).
-                d_ji = np.linalg.norm(
-                            np.tile(
-                                X_cand_leaf,
-                                (len(X_leaf_labeled), 1, 1)
-                            ).swapaxes(0, 1)
-                            - np.tile(
-                                X_leaf_labeled,
-                                (len(X_cand_leaf), 1, 1)
-                            ),
-                            axis=2
-                        )
-
+                _, d_min = pairwise_distances_argmin_min(
+                    X_cand_leaf,
+                    X_labeled_leaf,
+                    axis=1
+                )
                 # Compute the shortest distance from x_j to all labeled
                 # samples using equation (7).
-                utilities_cand[leaf_indices_cand == leaf_idx] *= \
-                    np.min(d_ji, axis=1)
+                utilities_cand[leaf_indices_cand == leaf_idx] *= d_min
 
         elif self.method == 'representativity':
             # Convert n_k into integer.
@@ -221,58 +220,49 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             l_cand = np.full(len(X_cand), fill_value=-1, dtype=int)
             for leaf in np.argwhere(n_k != 0).flatten():
                 X_cand_leaf = X_cand[leaf_indices_cand == leaf]
-                kmeans = KMeans(n_k[leaf]).fit(X_cand_leaf)
+                kmeans = KMeans(
+                    n_k[leaf],
+                    random_state=self.random_state_
+                ).fit(X_cand_leaf)
 
                 l_cand[leaf_indices_cand == leaf] = \
                     kmeans.predict(X_cand_leaf) + np.sum(n_k[0:leaf])
 
                 centroids = kmeans.cluster_centers_
                 best_indices[np.sum(n_k[0:leaf]) + range(n_k[leaf])] = \
-                    rand_argmin(
-                        np.linalg.norm(
-                            np.tile(
-                                centroids, (len(X_cand), 1, 1)).swapaxes(0, 1)
-                            - np.tile(
-                                X_cand, (len(centroids), 1, 1)), axis=2
-                        ), axis=1
+                    pairwise_distances_argmin(
+                        centroids, X_cand, axis=1
                     )
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
-            for j in range(len(X_cand)):
-                if l_cand[j] == -1:
+            for l in np.unique(l_cand):
+                if l == -1:
                     continue
-                c_l = X_cand[l_cand == l_cand[j]]
-                if len(c_l) == 1:
-                    R_cand[j] = 0
+                C_l = X_cand[l_cand == l]
+                if len(C_l) == 1:
+                    R_cand[l_cand == l] = 0
                 else:
-                    R_cand[j] = (1 / (len(c_l) - 1)) * np.sum(
-                        np.linalg.norm(
-                            c_l - X_cand[j],
-                            axis=1
-                        )
-                    )
+                    R_cand[l_cand == l] = \
+                        pairwise_distances(C_l, C_l).sum(axis=1) / (
+                                    len(C_l) - 1)
 
             batch_utilities_cand = np.full((batch_size, len(X_cand)), np.nan)
             for i in range(self.max_iter_representativity):
                 prev_best_indices = best_indices
                 for l in range(batch_size):
                     # Update DELTA using the current centroids.
-                    X_M = X[is_labeled(y)]
+                    X_M = X[labeled_idxs]
                     X_M = np.append(X_M, X_cand[best_indices[:l]], axis=0)
-                    X_M = np.append(X_M, X_cand[best_indices[l+1:]], axis=0)
+                    X_M = np.append(X_M, X_cand[best_indices[l + 1:]], axis=0)
                     X_cand_l = X_cand[l_cand == l]
-                    DELTA_l = np.min(
-                        np.linalg.norm(
-                            np.tile(X_cand_l, (len(X_M), 1, 1)).swapaxes(0, 1)
-                            - np.tile(X_M, (len(X_cand_l), 1, 1)),
-                            axis=2
-                        ), axis=1
+                    _, delta_l = pairwise_distances_argmin_min(
+                        X_cand_l, X_M, axis=1
                     )  # Equation (10)
 
                     # Use Eq. (8) to find the next sample to be labeled.
                     R_l = R_cand[l_cand == l]
-                    batch_utilities_cand[l, l_cand == l] = DELTA_l - R_l
+                    batch_utilities_cand[l, l_cand == l] = delta_l - R_l
                     best_indices[l] = rand_argmax(
                         batch_utilities_cand[l],
                         random_state=self.random_state_
@@ -315,10 +305,10 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def _rt_al(X, y, reg, batch_size=1):
+def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
     """Regression Tree-based Active Learning
 
-    Computes the number of sample to be selected from each leaf of the
+    Computes the number of samples to be selected from each leaf of the
     regression tree.
 
     Parameters
@@ -329,6 +319,8 @@ def _rt_al(X, y, reg, batch_size=1):
     y : array-like of shape (n_samples)
         Labels of the training data set (possibly including unlabeled ones
         indicated by `self.missing_label`).
+    missing_label : scalar or string or np.nan or None
+        Value to represent a missing label.
     reg: SkactivemlRegressor
         Fitted regressor to predict the data.
     batch_size : int, default=1
@@ -338,30 +330,25 @@ def _rt_al(X, y, reg, batch_size=1):
     -------
     n_samples_per_leaf : numpy.ndarray of shape (n_leafs)
     """
+    is_lbld = is_labeled(y, missing_label=missing_label)
 
     # Compute the variance v_k on labeled samples in leaf k.
-    leaf_labeled = reg.apply(X[~is_unlabeled(y)])
-    y_labeled = y[~is_unlabeled(y)]
+    leaf_labeled = reg.apply(X[is_lbld])
+    y_labeled = y[is_lbld]
     v_k = np.empty(reg.tree_.node_count)
     for leaf in range(len(v_k)):
-        v_k[leaf] = np.var(
-            y_labeled[np.argwhere(leaf_labeled == leaf).flatten()],
-            ddof=1
-        )
+        v_k[leaf] = np.var(y_labeled[leaf_labeled == leaf], ddof=1)
+
     v_k[np.isnan(v_k)] = 0
     if 0 in v_k[np.unique(leaf_labeled)]:
         warnings.warn('There are leaves with less than two labeled samples, '
                       'which causes a variance of zero. To avoid this, set '
-                      'parameter `min_samples_leaf` of `reg` to >= 2')
+                      'parameter `min_samples_leaf` of `reg` to >= 2.')
 
     # Compute the probability p_k that an unlabeled sample belongs to leaf k.
-    leaf_unlabeled = reg.apply(X[is_unlabeled(y)])
-    samples_per_leaf = np.zeros(reg.tree_.node_count)
-    samples_per_leaf[np.unique(leaf_unlabeled)] = np.array(
-        list(Counter(leaf_unlabeled).values()))
-    p_k = np.full(shape=reg.tree_.node_count,
-                  fill_value=1 / sum(is_unlabeled(y)))
-    p_k *= samples_per_leaf
+    leaf_unlabeled = reg.apply(X[~is_lbld])
+    samples_per_leaf = np.bincount(leaf_unlabeled, minlength=len(v_k))
+    p_k = samples_per_leaf / sum(~is_lbld)
 
     # Compute the number of sample to be selected from each leaf of the
     # regression tree.

@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 
 from skactiveml.pool import RegressionTreeBasedAL
-from skactiveml.pool._regression_tree_based import _rt_al
+from skactiveml.pool._regression_tree_based_al import _calc_acquisitions_per_leaf
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
@@ -65,7 +65,10 @@ class TestRegressionTreeBasedAL(
         reg = SklearnRegressor(dummy_reg())
         X = np.array([0, 2, 10, 12, 20, 22, 1, 11, 21]).reshape(-1, 1)
         y = np.append([0, 2, 10, 12, 20, 22], np.full(3, MISSING_LABEL))
-        np.testing.assert_allclose(_rt_al(X, y, reg), np.full(3, 1/3))
+        np.testing.assert_allclose(
+            _calc_acquisitions_per_leaf(X, y, reg, MISSING_LABEL),
+            np.full(3, 1 / 3)
+        )
 
     def test_query(self):
         qs = self.qs_class(random_state=0)
