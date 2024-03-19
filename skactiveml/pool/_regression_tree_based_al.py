@@ -241,9 +241,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 ) + np.sum(n_k[0:leaf])
 
                 centroids = kmeans.cluster_centers_
-                best_indices[
-                    np.sum(n_k[0:leaf]) + range(n_k[leaf])
-                ] = pairwise_distances_argmin(centroids, X_cand, axis=1)
+                best_indices[np.sum(n_k[0:leaf]) + range(n_k[leaf])] = (
+                    pairwise_distances_argmin(centroids, X_cand, axis=1)
+                )
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
