@@ -4,15 +4,28 @@ from collections import Counter
 import numpy as np
 from sklearn import clone
 from sklearn.cluster import KMeans
-from sklearn.metrics import pairwise_distances_argmin_min, \
-    pairwise_distances_argmin, pairwise_distances
+from sklearn.metrics import (
+    pairwise_distances_argmin_min,
+    pairwise_distances_argmin,
+    pairwise_distances,
+)
 from sklearn.tree import DecisionTreeRegressor
 
 from skactiveml.base import SingleAnnotatorPoolQueryStrategy
 from skactiveml.regressor import SklearnRegressor
-from skactiveml.utils import MISSING_LABEL, check_type, \
-    check_equal_missing_label, is_unlabeled, is_labeled, simple_batch, \
-    rand_argmax, rand_argmin, check_scalar, labeled_indices, unlabeled_indices
+from skactiveml.utils import (
+    MISSING_LABEL,
+    check_type,
+    check_equal_missing_label,
+    is_unlabeled,
+    is_labeled,
+    simple_batch,
+    rand_argmax,
+    rand_argmin,
+    check_scalar,
+    labeled_indices,
+    unlabeled_indices,
+)
 
 
 class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
@@ -44,11 +57,11 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-            self,
-            method='random',
-            missing_label=MISSING_LABEL,
-            random_state=None,
-            max_iter_representativity=5
+        self,
+        method="random",
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        max_iter_representativity=5,
     ):
         super().__init__(
             random_state=random_state, missing_label=missing_label
@@ -57,15 +70,15 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         self.max_iter_representativity = max_iter_representativity
 
     def query(
-            self,
-            X,
-            y,
-            reg,
-            fit_reg=True,
-            sample_weight=None,
-            candidates=None,
-            batch_size=1,
-            return_utilities=False,
+        self,
+        X,
+        y,
+        reg,
+        fit_reg=True,
+        sample_weight=None,
+        candidates=None,
+        batch_size=1,
+        return_utilities=False,
     ):
         """Determines for which candidate samples labels are to be queried.
 
@@ -144,7 +157,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             self.max_iter_representativity,
             "max_iter_representativity",
             int,
-            min_val=1
+            min_val=1,
         )
 
         # Fallback to random sampling if no sample is labeled.
@@ -154,15 +167,16 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 utilities = np.full(len(X_cand), fill_value=1 / len(X_cand))
             else:
                 utilities = np.full(len(X), np.nan)
-                utilities[mapping] = np.full(len(mapping),
-                                             fill_value=1 / len(mapping))
+                utilities[mapping] = np.full(
+                    len(mapping), fill_value=1 / len(mapping)
+                )
 
             return simple_batch(
                 utilities,
                 self.random_state_,
                 batch_size=batch_size,
                 return_utilities=return_utilities,
-                method='proportional',
+                method="proportional",
             )
 
         # Fit the regressor.
@@ -178,13 +192,13 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         leaf_indices_cand = reg.apply(X_cand)
         n_cand_per_leaf = np.bincount(leaf_indices_cand, minlength=len(n_k))
 
-        if self.method == 'random':
+        if self.method == "random":
             utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
-            selection_method = 'proportional'
+            selection_method = "proportional"
 
-        elif self.method == 'diversity':
+        elif self.method == "diversity":
             utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
-            selection_method = 'proportional'
+            selection_method = "proportional"
 
             X_labeled = X[labeled_idxs]
             leaf_indices_labeled = reg.apply(X_labeled)
@@ -195,15 +209,13 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 # Calculate the L2 distance of each unlabeled sample in leaf k
                 # to all the labeled samples using equation (6).
                 _, d_min = pairwise_distances_argmin_min(
-                    X_cand_leaf,
-                    X_labeled_leaf,
-                    axis=1
+                    X_cand_leaf, X_labeled_leaf, axis=1
                 )
                 # Compute the shortest distance from x_j to all labeled
                 # samples using equation (7).
                 utilities_cand[leaf_indices_cand == leaf_idx] *= d_min
 
-        elif self.method == 'representativity':
+        elif self.method == "representativity":
             # Convert n_k into integer.
             n_k = np.bincount(
                 self.random_state_.choice(
@@ -212,7 +224,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     replace=False,
                     p=n_k[leaf_indices_cand] / np.sum(n_k[leaf_indices_cand]),
                 ),
-                minlength=len(n_k)
+                minlength=len(n_k),
             )
 
             # Perform a k-means clustering in leaf k with n_k clusters.
@@ -221,18 +233,17 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             for leaf in np.argwhere(n_k != 0).flatten():
                 X_cand_leaf = X_cand[leaf_indices_cand == leaf]
                 kmeans = KMeans(
-                    n_k[leaf],
-                    random_state=self.random_state_
+                    n_k[leaf], random_state=self.random_state_
                 ).fit(X_cand_leaf)
 
-                l_cand[leaf_indices_cand == leaf] = \
-                    kmeans.predict(X_cand_leaf) + np.sum(n_k[0:leaf])
+                l_cand[leaf_indices_cand == leaf] = kmeans.predict(
+                    X_cand_leaf
+                ) + np.sum(n_k[0:leaf])
 
                 centroids = kmeans.cluster_centers_
-                best_indices[np.sum(n_k[0:leaf]) + range(n_k[leaf])] = \
-                    pairwise_distances_argmin(
-                        centroids, X_cand, axis=1
-                    )
+                best_indices[
+                    np.sum(n_k[0:leaf]) + range(n_k[leaf])
+                ] = pairwise_distances_argmin(centroids, X_cand, axis=1)
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
@@ -243,9 +254,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 if len(C_l) == 1:
                     R_cand[l_cand == l] = 0
                 else:
-                    R_cand[l_cand == l] = \
-                        pairwise_distances(C_l, C_l).sum(axis=1) / (
-                                    len(C_l) - 1)
+                    R_cand[l_cand == l] = pairwise_distances(C_l, C_l).sum(
+                        axis=1
+                    ) / (len(C_l) - 1)
 
             batch_utilities_cand = np.full((batch_size, len(X_cand)), np.nan)
             for i in range(self.max_iter_representativity):
@@ -254,7 +265,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     # Update DELTA using the current centroids.
                     X_M = X[labeled_idxs]
                     X_M = np.append(X_M, X_cand[best_indices[:l]], axis=0)
-                    X_M = np.append(X_M, X_cand[best_indices[l + 1:]], axis=0)
+                    X_M = np.append(X_M, X_cand[best_indices[l + 1 :]], axis=0)
                     X_cand_l = X_cand[l_cand == l]
                     _, delta_l = pairwise_distances_argmin_min(
                         X_cand_l, X_M, axis=1
@@ -265,7 +276,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     batch_utilities_cand[l, l_cand == l] = delta_l - R_l
                     best_indices[l] = rand_argmax(
                         batch_utilities_cand[l],
-                        random_state=self.random_state_
+                        random_state=self.random_state_,
                     )
 
                 if np.all(prev_best_indices == best_indices):
@@ -301,7 +312,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             random_state=self.random_state_,
             batch_size=batch_size,
             return_utilities=return_utilities,
-            method=selection_method
+            method=selection_method,
         )
 
 
@@ -341,9 +352,11 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
 
     v_k[np.isnan(v_k)] = 0
     if 0 in v_k[np.unique(leaf_labeled)]:
-        warnings.warn('There are leaves with less than two labeled samples, '
-                      'which causes a variance of zero. To avoid this, set '
-                      'parameter `min_samples_leaf` of `reg` to >= 2.')
+        warnings.warn(
+            "There are leaves with less than two labeled samples, "
+            "which causes a variance of zero. To avoid this, set "
+            "parameter `min_samples_leaf` of `reg` to >= 2."
+        )
 
     # Compute the probability p_k that an unlabeled sample belongs to leaf k.
     leaf_unlabeled = reg.apply(X[~is_lbld])

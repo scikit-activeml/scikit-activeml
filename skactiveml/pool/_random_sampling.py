@@ -89,5 +89,5 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             self.random_state_,
             batch_size=batch_size,
             return_utilities=return_utilities,
-            method='proportional'
+            method="proportional",
         )

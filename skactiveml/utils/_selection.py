@@ -81,8 +81,11 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
 
 def simple_batch(
-    utilities, random_state=None, batch_size=1, return_utilities=False,
-        method='max'
+    utilities,
+    random_state=None,
+    batch_size=1,
+    return_utilities=False,
+    method="max",
 ):
     """Generates a batch by selecting the highest values in the 'utilities'.
     If utilities is an ND-array, the returned utilities will be an
@@ -133,19 +136,19 @@ def simple_batch(
         )
         batch_size = max_batch_size
 
-    check_type(method, 'method', str)
+    check_type(method, "method", str)
 
     # generate batch
     best_indices = np.empty((batch_size, utilities.ndim), dtype=int)
-    if method == 'max':
+    if method == "max":
         batch_utilities = np.empty((batch_size,) + utilities.shape)
         for i in range(batch_size):
             best_indices[i] = rand_argmax(utilities, random_state=random_state)
             batch_utilities[i] = utilities
             utilities[tuple(best_indices[i])] = np.nan
-    elif method == 'proportional':
+    elif method == "proportional":
         random_state = check_random_state(random_state)
-        p = utilities/np.nansum(utilities)
+        p = utilities / np.nansum(utilities)
         p[np.isnan(p)] = 0
         best_indices = random_state.choice(
             len(utilities),
@@ -158,8 +161,10 @@ def simple_batch(
         for i in range(batch_size):
             batch_utilities[i, best_indices[:i]] = np.nan
     else:
-        raise ValueError(f'"method" has to be either "max" or "proportional" '
-                         f'but {method} was given.')
+        raise ValueError(
+            f'"method" has to be either "max" or "proportional" '
+            f"but {method} was given."
+        )
 
     if utilities.ndim == 1:
         best_indices = best_indices.flatten()
