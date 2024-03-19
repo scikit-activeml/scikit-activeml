@@ -162,6 +162,6 @@ class _DummyRegressor(DecisionTreeRegressor):
         return pairwise_distances_argmin(X, self.centers, axis=1)
 
     def __getattr__(self, item):
-        if item is "tree_":
+        if item == "tree_":
             return self
         raise AttributeError
