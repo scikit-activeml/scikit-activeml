@@ -157,6 +157,8 @@ class TestSelection(unittest.TestCase):
             true_dens.flatten()[20:-20], est_dens[20:-20], rtol=0.1
         )
 
+        self.assertRaises(ValueError, simple_batch, utils, method="string")
+
     def test_combine_ranking(self):
         self.assertRaises(
             ValueError,
