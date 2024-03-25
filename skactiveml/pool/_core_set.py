@@ -218,10 +218,10 @@ def k_greedy_center(
 
     # initialize the utilities matrix with
     if n_new_cand is None:
-        utilities = np.empty(shape=(batch_size, X.shape[0]))
+        utilities = np.zeros(shape=(batch_size, X.shape[0]))
     elif isinstance(n_new_cand, int):
         if n_new_cand == len(mapping):
-            utilities = np.empty(shape=(batch_size, n_new_cand))
+            utilities = np.zeros(shape=(batch_size, n_new_cand))
         else:
             raise ValueError(
                 "n_new_cand must equal to the length of mapping array"
@@ -295,9 +295,13 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
         dist = np.min(dist_matrix, axis=1)
 
     if latest_distance is not None:
+        sum_dist = np.nansum(latest_distance)
+        latest_distance_copy = latest_distance.copy()
+        if sum_dist == 0:
+            latest_distance_copy[latest_distance_copy == 0] = np.inf
         l_distance = np.zeros(shape=X.shape[0])
-        l_distance[mapping] = latest_distance[mapping]
-        dist = np.minimum(l_distance, dist)
+        l_distance[mapping] = latest_distance_copy[mapping]
+        dist = np.minimum(latest_distance_copy, dist)
 
     result_dist = np.full(X.shape[0], np.nan)
     result_dist[mapping] = dist[mapping]
