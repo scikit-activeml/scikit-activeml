@@ -301,7 +301,7 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
             latest_distance_copy[latest_distance_copy == 0] = np.inf
         l_distance = np.zeros(shape=X.shape[0])
         l_distance[mapping] = latest_distance_copy[mapping]
-        dist = np.minimum(latest_distance_copy, dist)
+        dist = np.minimum(l_distance, dist)
 
     result_dist = np.full(X.shape[0], np.nan)
     result_dist[mapping] = dist[mapping]
