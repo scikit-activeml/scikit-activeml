@@ -1,24 +1,24 @@
 .. intro_start
 
-|Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_ |Black|_
+|Doc| |Codecov| |PythonVersion| |PyPi| |Paper| |Black|
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
-.. _Doc: https://scikit-activeml.github.io/scikit-activeml-docs/
+   :target: https://scikit-activeml.github.io/scikit-activeml-docs/
 
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
-.. _Codecov: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
+   :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
-.. _PythonVersion: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue.svg
+   :target: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
 
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
-.. _PyPi: https://badge.fury.io/py/scikit-activeml
+   :target: https://badge.fury.io/py/scikit-activeml
 
-.. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue
-.. _Paper: https://www.preprints.org/manuscript/202103.0194/v1
+.. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue.svg
+   :target: https://www.preprints.org/manuscript/202103.0194/v1
 
 .. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
-.. _Black: https://github.com/psf/black
+   :target: https://github.com/psf/black
 
 |
 
