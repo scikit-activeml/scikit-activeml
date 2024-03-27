@@ -26,6 +26,7 @@ from ._query_by_committee import (
 )
 from ._quire import Quire
 from ._random_sampling import RandomSampling
+from ._regression_tree_based_al import RegressionTreeBasedAL
 from ._uncertainty_sampling import (
     UncertaintySampling,
     uncertainty_scores,
@@ -67,4 +68,5 @@ __all__ = [
     "TypiClust",
     "Badge",
     "GreedyBALD",
+    "RegressionTreeBasedAL",
 ]

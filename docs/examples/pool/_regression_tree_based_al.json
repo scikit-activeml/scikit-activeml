@@ -1,0 +1,53 @@
+[
+  {
+    "class" : "RegressionTreeBasedAL",
+    "package" : "pool",
+    "method" : "Regression Tree Based Active Learning (RT-AL) with Random Selection",
+    "template" : "examples/template_pool_regression_batch.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Regression Tree Based Active Learning (RT-AL) with Random Selection",
+    "refs" : ["jose2023regression"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_reg" : ["from sklearn.tree import DecisionTreeRegressor", "from skactiveml.regressor import SklearnRegressor"],
+    "import_misc" : ["from skactiveml.pool import RegressionTreeBasedAL"],
+    "init_reg" : "SklearnRegressor(DecisionTreeRegressor(min_samples_leaf=2, random_state=random_state), random_state=random_state)",
+    "init_qs" : "RegressionTreeBasedAL(random_state=random_state)",
+    "query_params" : "X=X, y=y, reg=reg, return_utilities=True",
+    "batch_size" : "3"
+  },
+  {
+    "class" : "RegressionTreeBasedAL",
+    "package" : "pool",
+    "method" : "Regression Tree Based Active Learning (RT-AL) with Diversity Selection",
+    "template" : "examples/template_pool_regression_batch.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Regression Tree Based Active Learning (RT-AL) with Diversity Selection",
+    "refs" : ["jose2023regression"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_reg" : ["from sklearn.tree import DecisionTreeRegressor", "from skactiveml.regressor import SklearnRegressor"],
+    "import_misc" : ["from skactiveml.pool import RegressionTreeBasedAL"],
+    "init_reg" : "SklearnRegressor(DecisionTreeRegressor(min_samples_leaf=2, random_state=random_state), random_state=random_state)",
+    "init_qs" : "RegressionTreeBasedAL(method='diversity', random_state=random_state)",
+    "query_params" : "X=X, y=y, reg=reg, return_utilities=True",
+    "batch_size" : "3"
+  },
+  {
+    "class" : "RegressionTreeBasedAL",
+    "package" : "pool",
+    "method" : "Regression Tree Based Active Learning (RT-AL) with Representativity Selection",
+    "template" : "examples/template_pool_regression_batch.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Regression Tree Based Active Learning (RT-AL) with Representativity Selection",
+    "refs" : ["jose2023regression"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_reg" : ["from sklearn.tree import DecisionTreeRegressor", "from skactiveml.regressor import SklearnRegressor"],
+    "import_misc" : ["from skactiveml.pool import RegressionTreeBasedAL"],
+    "init_reg" : "SklearnRegressor(DecisionTreeRegressor(min_samples_leaf=2, random_state=random_state), random_state=random_state)",
+    "init_qs" : "RegressionTreeBasedAL(method='representativity', random_state=random_state)",
+    "query_params" : "X=X, y=y, reg=reg, return_utilities=True",
+    "batch_size" : "3"
+  }
+]
