@@ -172,9 +172,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         if classes is not None:
             # Compute utilities.
             if self.method == "KL_divergence":
-                probas = np.array(
-                    [est.predict_proba(X_cand) for est in est_arr]
-                )
+                # probas = np.array(
+                #     [est.predict_proba(X_cand) for est in est_arr]
+                # )
+                probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:  # self.method == "vote_entropy":
                 votes = np.array([est.predict(X_cand) for est in est_arr]).T
@@ -198,6 +199,19 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+    
+    def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
+        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble.classes_)))
+        ensemble_classes = ensemble.classes_
+        for i, est in enumerate(est_arr):
+            est_proba = est.predict_proba(X_cand)
+            est_classes = est.classes_
+            indices_est = np.where(np.isin(est_classes, ensemble_classes))[0]
+            indices_ensemble = np.searchsorted(
+                ensemble_classes, est_classes[indices_est]
+            )
+            probas[i, :, indices_ensemble] = est_proba.T
+        return probas
 
 
 def average_kl_divergence(probas, eps=1e-7):
