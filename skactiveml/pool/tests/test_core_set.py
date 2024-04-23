@@ -107,6 +107,7 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             X, y_7, batch_size=2, return_utilities=True
         )
 
+
 class TestKGreedyCenter(unittest.TestCase):
     def setUp(self):
         self.X = np.random.RandomState(42).choice(5, size=(10, 2))

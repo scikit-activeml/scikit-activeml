@@ -69,5 +69,5 @@ __all__ = [
     "Badge",
     "GreedyBALD",
     "SubSamplingWrapper",
-    "ParallelUtilityEstimationWrapper"
+    "ParallelUtilityEstimationWrapper",
 ]

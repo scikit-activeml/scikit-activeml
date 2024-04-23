@@ -395,7 +395,11 @@ def check_X_y(
         Only returned if candidates is not None.
     """
     if allow_nan is None:
-        allow_nan = True if isinstance(missing_label, float) and np.isnan(missing_label) else False
+        allow_nan = (
+            True
+            if isinstance(missing_label, float) and np.isnan(missing_label)
+            else False
+        )
     if X is not None:
         X = check_array(
             X,

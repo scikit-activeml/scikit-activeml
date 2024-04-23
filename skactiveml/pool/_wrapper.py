@@ -5,12 +5,13 @@ from ..utils import (
     is_labeled,
     unlabeled_indices,
     check_scalar,
-    simple_batch
+    simple_batch,
 )
 from math import ceil
 import numpy as np
 from joblib import Parallel, delayed, cpu_count
 import warnings
+
 
 class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
     """Sub-sampling Wrapper.
@@ -298,7 +299,9 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        seed_multiplier = int(is_labeled(y, missing_label=self.missing_label).sum())
+        seed_multiplier = int(
+            is_labeled(y, missing_label=self.missing_label).sum()
+        )
         random_state = check_random_state(self.random_state, seed_multiplier)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
@@ -307,13 +310,14 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             parallel_dict = {}
         elif isinstance(self.parallel_dict, dict):
             parallel_dict = self.parallel_dict.copy()
-            if 'n_jobs' in parallel_dict.keys():
-                warnings.warn(f"`n_jobs` ({parallel_dict['n_jobs']}) "
-                              "is specified in `self.parallel_dict`. "
-                              "This will be replaced with self.n_jobs "
-                              f"({self.n_jobs})."
-                              )
-        parallel_dict['n_jobs'] = self.n_jobs
+            if "n_jobs" in parallel_dict.keys():
+                warnings.warn(
+                    f"`n_jobs` ({parallel_dict['n_jobs']}) "
+                    "is specified in `self.parallel_dict`. "
+                    "This will be replaced with self.n_jobs "
+                    f"({self.n_jobs})."
+                )
+        parallel_dict["n_jobs"] = self.n_jobs
         parallel_pool = Parallel(**parallel_dict)
 
         query_lambda_func = lambda candidate: self.query_strategy.query(
@@ -329,9 +333,13 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             chunks = np.array_split(X_cand, cpu_count())
         else:
             chunks = np.array_split(X_cand, self.n_jobs)
-        qs_outputs = parallel_pool(delayed(query_lambda_func)(c) for c in chunks)
+        qs_outputs = parallel_pool(
+            delayed(query_lambda_func)(c) for c in chunks
+        )
 
-        utilities_cand = np.concatenate([qs_output[1][0] for qs_output in qs_outputs], axis=0)
+        utilities_cand = np.concatenate(
+            [qs_output[1][0] for qs_output in qs_outputs], axis=0
+        )
 
         if mapping is None:
             utilities = utilities_cand
