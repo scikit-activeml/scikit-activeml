@@ -224,7 +224,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
     def __init__(
         self,
         query_strategy=None,
-        n_jobs=None,
+        n_jobs=-1,
         parallel_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
@@ -299,6 +299,14 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+
         seed_multiplier = int(
             is_labeled(y, missing_label=self.missing_label).sum()
         )
@@ -317,6 +325,13 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                     "This will be replaced with self.n_jobs "
                     f"({self.n_jobs})."
                 )
+        else:
+            raise TypeError(
+                f"`parallel_dict` is of type `{type(self.parallel_dict)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`"
+                f"or None."
+            )
+
         parallel_dict["n_jobs"] = self.n_jobs
         parallel_pool = Parallel(**parallel_dict)
 
