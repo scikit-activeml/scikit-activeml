@@ -728,7 +728,7 @@ class TestValueOfInformationEER(
                 True,
                 True,
                 False,
-                np.full(shape=(1, len(cand)), fill_value=0.5)
+                np.full(shape=(1, len(cand)), fill_value=0.5),
                 # TODO Normalize each term individually
             ],
             [
@@ -738,7 +738,7 @@ class TestValueOfInformationEER(
                 True,
                 True,
                 True,
-                np.full(shape=(1, len(cand)), fill_value=0)
+                np.full(shape=(1, len(cand)), fill_value=0),
                 # TODO Normalize each term individually
             ],
             [

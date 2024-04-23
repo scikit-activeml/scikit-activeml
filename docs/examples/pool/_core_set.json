@@ -1,0 +1,19 @@
+[
+{
+    "class" : "CoreSet",
+    "package" : "pool",
+    "method" : "Core Set",
+    "category" : "Others",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "regression", "classification", "single-annotator"],
+    "title" : "Core Set",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import CoreSet",
+    "init_qs" : "CoreSet()",
+    "query_params" : "X=X, y=y"
+}
+]
+  
+  

@@ -1,6 +1,7 @@
 """
 Module implementing discriminative active learning.
 """
+
 # Authors: Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np

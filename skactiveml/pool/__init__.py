@@ -32,6 +32,9 @@ from ._uncertainty_sampling import (
     expected_average_precision,
 )
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
+from ._core_set import CoreSet, k_greedy_center
+from ._typi_clust import TypiClust
+from ._badge import Badge
 
 __all__ = [
     "multiannotator",
@@ -60,6 +63,10 @@ __all__ = [
     "DiscriminativeAL",
     "BatchBALD",
     "batch_bald",
+    "CoreSet",
+    "k_greedy_center",
+    "TypiClust",
+    "Badge",
     "GreedyBALD",
     "SubSamplingWrapper",
     "ParallelUtilityEstimationWrapper"
