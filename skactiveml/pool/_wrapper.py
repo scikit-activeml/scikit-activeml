@@ -315,11 +315,6 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
             )
 
-        seed_multiplier = int(
-            is_labeled(y, missing_label=self.missing_label).sum()
-        )
-        random_state = check_random_state(self.random_state, seed_multiplier)
-
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if self.parallel_dict is None:
@@ -340,7 +335,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"or None."
             )
 
-        parallel_dict["n_jobs"] = self.n_jobs
+        parallel_dict["n_jobs"] = min(self.n_jobs, len(X_cand))
         parallel_pool = Parallel(**parallel_dict)
 
         query_lambda_func = lambda candidate: self.query_strategy.query(
@@ -352,10 +347,10 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             **query_kwargs,
         )
 
-        if self.n_jobs < 0:
+        if parallel_dict["n_jobs"] < 0:
             chunks = np.array_split(X_cand, cpu_count())
         else:
-            chunks = np.array_split(X_cand, self.n_jobs)
+            chunks = np.array_split(X_cand, parallel_dict["n_jobs"])
         qs_outputs = parallel_pool(
             delayed(query_lambda_func)(c) for c in chunks
         )
