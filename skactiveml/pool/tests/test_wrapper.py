@@ -8,7 +8,11 @@ from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.regressor import SklearnRegressor
-from skactiveml.pool import SubSamplingWrapper, ParallelUtilityEstimationWrapper, QueryByCommittee
+from skactiveml.pool import (
+    SubSamplingWrapper,
+    ParallelUtilityEstimationWrapper,
+    QueryByCommittee,
+)
 from skactiveml.pool.multiannotator import IntervalEstimationThreshold
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
