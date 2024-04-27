@@ -31,12 +31,18 @@ from ..utils import (
 )
 from sklearn.utils.metaestimators import available_if
 
+from skorch import NeuralNet
+from skorch.dataset import ValidSplit
+import torch
+from torch import nn
+
+
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """SklearnClassifier
 
     Implementation of a wrapper class for scikit-learn classifiers such that
-    missing labels can be handled. Therefor, samples with missing labels are
+    missing labels can be handled. Therefore, samples with missing labels are
     filtered.
 
     Parameters
@@ -747,3 +753,132 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             return getattr(self.estimator_, item)
         else:
             raise AttributeError(f"{item} does not exist")
+
+class SkorchClassifier(SkactivemlClassifier, NeuralNet):
+    def __init__(
+            self,
+            module,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            random_state=None,
+            criterion=nn.NLLLoss,
+            **module_kwargs
+    ):
+        super(SkorchClassifier, self).__init__(
+            module=module,
+            classes=classes,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
+            criterion=criterion,
+            **module_kwargs
+        )
+
+
+
+    def fit(self, X, y=None, **fit_params):
+        pass
+
+    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        # Check input parameters.
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+        X, y, sample_weight = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            check_X_dict=self.check_X_dict_,
+        )
+
+        # Check whether estimator is a valid classifier.
+        if not is_classifier(estimator=self.estimator):
+            raise TypeError(
+                "'{}' must be a scikit-learn "
+                "classifier.".format(self.estimator)
+            )
+
+        # Check whether estimator can deal with cost matrix.
+        if self.cost_matrix is not None and not hasattr(
+            self.estimator, "predict_proba"
+        ):
+            raise ValueError(
+                "'cost_matrix' can be only set, if 'estimator'"
+                "implements 'predict_proba'."
+            )
+        if fit_function == "fit" or not hasattr(self, "n_features_in_"):
+            self._check_n_features(X, reset=True)
+        elif fit_function == "partial_fit":
+            self._check_n_features(X, reset=False)
+        if (
+            not has_fit_parameter(self.estimator, "sample_weight")
+            and sample_weight is not None
+        ):
+            warnings.warn(
+                f"{self.estimator} does not support `sample_weight`. "
+                f"Therefore, this parameter will be ignored."
+            )
+        if hasattr(self, "estimator_"):
+            if fit_function != "partial_fit":
+                self.estimator_ = deepcopy(self.estimator)
+        else:
+            self.estimator_ = deepcopy(self.estimator)
+        # count labels per class
+        is_lbld = is_labeled(y, missing_label=-1)
+        self._label_counts = [
+            np.sum(y[is_lbld] == c) for c in range(len(self._le.classes_))
+        ]
+        try:
+            X_lbld = X[is_lbld]
+            y_lbld = y[is_lbld].astype(np.int64)
+            if np.sum(is_lbld) == 0:
+                raise ValueError("There is no labeled data.")
+            elif (
+                not has_fit_parameter(self.estimator, "sample_weight")
+                or sample_weight is None
+            ):
+                if fit_function == "partial_fit":
+                    classes = self._le.transform(self.classes_)
+                    self.estimator_.partial_fit(
+                        X=X_lbld, y=y_lbld, classes=classes, **fit_kwargs
+                    )
+                elif fit_function == "fit":
+                    self.estimator_.fit(X=X_lbld, y=y_lbld, **fit_kwargs)
+            else:
+                if fit_function == "partial_fit":
+                    classes = self._le.transform(self.classes_)
+                    self.estimator_.partial_fit(
+                        X=X_lbld,
+                        y=y_lbld,
+                        classes=classes,
+                        sample_weight=sample_weight[is_lbld],
+                        **fit_kwargs,
+                    )
+                elif fit_function == "fit":
+                    self.estimator_.fit(
+                        X=X_lbld,
+                        y=y_lbld,
+                        sample_weight=sample_weight[is_lbld],
+                        **fit_kwargs,
+                    )
+            self.is_fitted_ = True
+        except Exception as e:
+            self.is_fitted_ = False
+            warnings.warn(
+                "The 'base_estimator' could not be fitted because of"
+                " '{}'. Therefore, the class labels of the samples "
+                "are counted and will be used to make predictions. "
+                "The class label distribution is `_label_counts={}`.".format(
+                    e, self._label_counts
+                )
+            )
+        return self
+
+
+
+
+
