@@ -9,6 +9,7 @@ import copy
 import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import check_array, check_is_fitted
+from iteration_utilities import flatten
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -201,8 +202,34 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         )
     
     def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
-        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble.classes_)))
-        ensemble_classes = ensemble.classes_
+        """Aggregate the predicted probabilities across all ensemble members and
+        ensure that all classes are mapped correctly.
+
+        Parameters                                                              
+        ----------                                                              
+        X : array-like of shape (n_samples, n_features)                         
+            Samples whose probabilities are to be predicted.                    
+        ensemble : list or tuple of SkactivemlClassifier or SkactivemlClassifier
+            If `ensemble` is a `SkactivemlClassifier`, it must have             
+            `n_estimators` and `estimators_` after fitting as attribute. Then,  
+            its estimators will be used as committee. If `ensemble` is
+            array-like, each element of this list must be `SkactivemlClassifier`
+            and will be used as committee member.
+        est_arr : list or tuple of SkactivemlClassifier
+            List of ensemble members contained in `ensemble`.
+
+        Returns
+        -------
+        probas: np.ndarray, shape (n_samples, n_classes)
+            The mapped predicted probabilities.
+        """
+        if hasattr(ensemble, 'classes_'):
+            ensemble_classes = ensemble.classes_
+        else:
+            ensemble_classes = np.unique(
+                list(flatten([est.classes_ for est in est_arr]))
+            )
+        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble_classes)))
         for i, est in enumerate(est_arr):
             est_proba = est.predict_proba(X_cand)
             est_classes = est.classes_
