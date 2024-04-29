@@ -101,6 +101,11 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         np.testing.assert_array_equal(utilities_6_1, utilities_6_2)
         np.testing.assert_array_equal(utilities_6_1[:, 5:], utilities_6_3)
 
+        # test case 7: initial selection
+        y_7 = np.full(10, MISSING_LABEL)
+        _, utilities = core_set_1.query(
+            X, y_7, batch_size=2, return_utilities=True
+        )
 
 class TestKGreedyCenter(unittest.TestCase):
     def setUp(self):

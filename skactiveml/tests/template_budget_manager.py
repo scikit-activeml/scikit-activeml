@@ -6,6 +6,11 @@ from numpy.random import RandomState
 
 from skactiveml.utils import call_func
 
+from skactiveml.tests.utils import (
+    check_positional_args,
+    check_test_param_test_availability,
+)
+
 
 class Dummy:
     def __init__(self):
@@ -27,34 +32,19 @@ class TemplateBudgetManager:
             self.init_default_params["random_state"] = 42
 
         self.query_by_utility_params = query_by_utility_params
+        self.init_default_params.update(deepcopy(init_default_params))
 
-        for key, val in init_default_params.items():
-            self.init_default_params[key] = val
+        check_positional_args(
+            self.bm_class.__init__,
+            "__init__",
+            self.init_default_params,
+        )
 
-        for key, val in init_params.items():
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and key not in self.init_default_params
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `__init__` in "
-                    f"`init_default_kwargs`."
-                )
-        query_by_utility_params = inspect.signature(
-            self.bm_class.query_by_utility
-        ).parameters
-        for key, val in query_by_utility_params.items():
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and self.query_by_utility_params is not None
-                and key not in self.query_by_utility_params
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `query_by_utility` in "
-                    f"`query_by_utility_default_kwargs_clf`."
-                )
+        check_positional_args(
+            self.bm_class.query_by_utility,
+            "query_by_utility",
+            self.query_by_utility_params,
+        )
 
     def test_init_param_random_state(self, test_cases=None):
         init_params = inspect.signature(self.bm_class.__init__).parameters
@@ -95,40 +85,20 @@ class TemplateBudgetManager:
     def test_param_test_availability(self):
         not_test = ["self", "kwargs"]
 
-        # Get initial parameters.
-        init_params = inspect.signature(self.bm_class.__init__).parameters
-        init_params = list(init_params.keys())
-
         # Check init parameters.
-        for param in np.setdiff1d(init_params, not_test):
-            test_func_name = "test_init_param_" + param
-            with self.subTest(msg=test_func_name):
-                self.assertTrue(
-                    hasattr(self, test_func_name),
-                    msg=f"'{test_func_name}()' missing in {self.__class__}",
-                )
+        check_test_param_test_availability(
+            self,
+            self.bm_class.__init__,
+            "init",
+            not_test,
+            logic_test=False,
+        )
 
-        # Get query_by_utility parameters.
-        query_by_utility_params = inspect.signature(
-            self.bm_class.query_by_utility
-        ).parameters
-        query_by_utility_params = list(query_by_utility_params.keys())
-
-        # Check query_by_utility parameters.
-        for param in np.setdiff1d(query_by_utility_params, not_test):
-            test_func_name = "test_query_by_utility_param_" + param
-            with self.subTest(msg=test_func_name):
-                self.assertTrue(
-                    hasattr(self, test_func_name),
-                    msg=f"'{test_func_name}()' missing in {self.__class__}",
-                )
-
-        # Check if query_by_utility is being tested.
-        with self.subTest(msg="test_query_by_utility"):
-            self.assertTrue(
-                hasattr(self, "test_query_by_utility"),
-                msg=f"'test_query_by_utility' missing in {self.__class__}",
-            )
+        # Check query_by_utility parameters and if the function is being
+        # tested.
+        check_test_param_test_availability(
+            self, self.bm_class.query_by_utility, "query_by_utility", not_test
+        )
 
     def test_query_by_utility_param_utilities(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
