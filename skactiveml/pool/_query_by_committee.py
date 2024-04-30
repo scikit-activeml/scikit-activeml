@@ -176,7 +176,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
                 # probas = np.array(
                 #     [est.predict_proba(X_cand) for est in est_arr]
                 # )
-                probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
+                probas = self._aggregate_predict_probas(
+                    X_cand, ensemble, est_arr
+                )
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:  # self.method == "vote_entropy":
                 votes = np.array([est.predict(X_cand) for est in est_arr]).T
@@ -200,18 +202,18 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
-    
+
     def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
         """Aggregate the predicted probabilities across all ensemble members and
         ensure that all classes are mapped correctly.
 
-        Parameters                                                              
-        ----------                                                              
-        X : array-like of shape (n_samples, n_features)                         
-            Samples whose probabilities are to be predicted.                    
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Samples whose probabilities are to be predicted.
         ensemble : list or tuple of SkactivemlClassifier or SkactivemlClassifier
-            If `ensemble` is a `SkactivemlClassifier`, it must have             
-            `n_estimators` and `estimators_` after fitting as attribute. Then,  
+            If `ensemble` is a `SkactivemlClassifier`, it must have
+            `n_estimators` and `estimators_` after fitting as attribute. Then,
             its estimators will be used as committee. If `ensemble` is
             array-like, each element of this list must be `SkactivemlClassifier`
             and will be used as committee member.
@@ -223,7 +225,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         probas: np.ndarray, shape (n_samples, n_classes)
             The mapped predicted probabilities.
         """
-        if hasattr(ensemble, 'classes_'):
+        if hasattr(ensemble, "classes_"):
             ensemble_classes = ensemble.classes_
         else:
             ensemble_classes = np.unique(
@@ -237,7 +239,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             if len(est_classes) == len(ensemble_classes):
                 indices_ensemble = np.arange(len(ensemble_classes))
             else:
-                indices_est = np.where(np.isin(est_classes, ensemble_classes))[0]
+                indices_est = np.where(np.isin(est_classes, ensemble_classes))[
+                    0
+                ]
                 indices_ensemble = np.searchsorted(
                     ensemble_classes, est_classes[indices_est]
                 )

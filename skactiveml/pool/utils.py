@@ -431,14 +431,11 @@ class IndexClassifierWrapper:
 
             # partial fit clf
             if add_sample_weight is None:
-                self.clf_.partial_fit(
-                    self.X[add_idx],
-                    add_y)
+                self.clf_.partial_fit(self.X[add_idx], add_y)
             else:
                 self.clf_.partial_fit(
-                    self.X[add_idx],
-                    add_y,
-                    sample_weight=add_sample_weight)
+                    self.X[add_idx], add_y, sample_weight=add_sample_weight
+                )
 
             if set_base_clf:
                 self.base_clf_ = deepcopy(self.clf_)

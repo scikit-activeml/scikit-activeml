@@ -47,7 +47,7 @@ def call_func(
 
 class _MatchSignatureDescriptor:
     """_MatchSignatureDescriptor
-    
+
     A descriptor that allows a wrapper to clone the signature of a
     method `func_name` from the wrapped object `wrapped_obj_name`.
     Furthermore, this extends upon the conditional property as implemented in
@@ -62,6 +62,7 @@ class _MatchSignatureDescriptor:
     func_name : str
         The method name of the function that should be wrapped.
     """
+
     def __init__(self, fn, wrapped_obj_name, func_name):
         self.fn = fn
         self.wrapped_obj_name = wrapped_obj_name

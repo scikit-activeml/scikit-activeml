@@ -28,7 +28,7 @@ from ..utils import (
     check_classifier_params,
     check_type,
     check_scalar,
-    match_signature
+    match_signature,
 )
 from sklearn.utils.metaestimators import available_if
 
@@ -84,7 +84,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         self.estimator = estimator
 
-    @match_signature('estimator', 'fit')
+    @match_signature("estimator", "fit")
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
 
@@ -116,7 +116,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @match_signature('estimator', 'partial_fit')
+    @match_signature("estimator", "partial_fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -149,7 +149,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @match_signature('estimator', 'predict')
+    @match_signature("estimator", "predict")
     def predict(self, X, **predict_kwargs):
         """Return class label predictions for the input data X.
 
@@ -187,7 +187,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
-    @match_signature('estimator', 'predict_proba')
+    @match_signature("estimator", "predict_proba")
     def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
@@ -313,7 +313,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 if fit_function == "partial_fit":
                     # classes = self._le.transform(self.classes_)
                     # fit_kwargs['classes'] = classes
-                    fit_kwargs['classes'] = self.classes_
+                    fit_kwargs["classes"] = self.classes_
                     self.estimator_.partial_fit(
                         X=X_lbld, y=y_lbld_inv, **fit_kwargs
                     )
@@ -323,15 +323,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 if fit_function == "partial_fit":
                     # classes = self._le.transform(self.classes_)
                     # fit_kwargs['classes'] = classes
-                    fit_kwargs['classes'] = self.classes_
-                    fit_kwargs['sample_weight'] = sample_weight[is_lbld]
+                    fit_kwargs["classes"] = self.classes_
+                    fit_kwargs["sample_weight"] = sample_weight[is_lbld]
                     self.estimator_.partial_fit(
                         X=X_lbld,
                         y=y_lbld_inv,
                         **fit_kwargs,
                     )
                 elif fit_function == "fit":
-                    fit_kwargs['sample_weight'] = sample_weight[is_lbld]
+                    fit_kwargs["sample_weight"] = sample_weight[is_lbld]
                     self.estimator_.fit(
                         X=X_lbld,
                         y=y_lbld_inv,
@@ -604,13 +604,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             fit_kwargs["sample_weight"] = sample_weight
 
         if fit_function == "fit":
-            self.estimator_.fit(
-                X=X, y=y, **fit_kwargs
-            )
+            self.estimator_.fit(X=X, y=y, **fit_kwargs)
         elif fit_function == "partial_fit":
-            self.estimator_.partial_fit(
-                X=X, y=y, **fit_kwargs
-            )
+            self.estimator_.partial_fit(X=X, y=y, **fit_kwargs)
 
         return self
 

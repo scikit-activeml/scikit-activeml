@@ -636,7 +636,7 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                 pred=pred,
             ):
                 if loop_i == 8:
-                    print('reached')
+                    print("reached")
                 iclf = IndexClassifierWrapper(
                     BaseClf(),
                     self.X,
