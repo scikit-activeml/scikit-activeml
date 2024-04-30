@@ -818,10 +818,7 @@ class TestSlidingWindowClassifier(
 
     def test_predict_freq(self):
         clf = SlidingWindowClassifier(
-            estimator=SklearnClassifier(
-                ParzenWindowClassifier(missing_label="nan"),
-                missing_label="nan",
-            ),
+            estimator=ParzenWindowClassifier(missing_label="nan"),
             missing_label="nan",
         )
         self.assertRaises(
@@ -835,10 +832,7 @@ class TestSlidingWindowClassifier(
             X=self.fit_default_params["X"], y=self.fit_default_params["y"]
         )
         clf = SlidingWindowClassifier(
-            estimator=SklearnClassifier(
-                ParzenWindowClassifier(missing_label="nan"),
-                missing_label="nan",
-            ),
+            estimator=ParzenWindowClassifier(missing_label="nan"),
             missing_label="nan",
         )
 
