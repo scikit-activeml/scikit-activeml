@@ -233,10 +233,14 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         for i, est in enumerate(est_arr):
             est_proba = est.predict_proba(X_cand)
             est_classes = est.classes_
-            indices_est = np.where(np.isin(est_classes, ensemble_classes))[0]
-            indices_ensemble = np.searchsorted(
-                ensemble_classes, est_classes[indices_est]
-            )
+
+            if len(est_classes) == len(ensemble_classes):
+                indices_ensemble = np.arange(len(ensemble_classes))
+            else:
+                indices_est = np.where(np.isin(est_classes, ensemble_classes))[0]
+                indices_ensemble = np.searchsorted(
+                    ensemble_classes, est_classes[indices_est]
+                )
             probas[i, :, indices_ensemble] = est_proba.T
         return probas
 
@@ -350,7 +354,10 @@ def _check_ensemble(
             check_equal_missing_label(ensemble.missing_label, missing_label)
             # Fit the ensemble.
             if fit_ensemble:
-                ensemble = clone(ensemble).fit(X, y, sample_weight)
+                if sample_weight is None:
+                    ensemble = clone(ensemble).fit(X, y)
+                else:
+                    ensemble = clone(ensemble).fit(X, y, sample_weight)
             else:
                 check_is_fitted(ensemble)
 
@@ -381,7 +388,10 @@ def _check_ensemble(
                 )
                 # Fit the ensemble.
                 if fit_ensemble:
-                    est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+                    if sample_weight is None:
+                        est_arr[i] = est_arr[i].fit(X, y)
+                    else:
+                        est_arr[i] = est_arr[i].fit(X, y, sample_weight)
                 else:
                     check_is_fitted(est_arr[i])
 

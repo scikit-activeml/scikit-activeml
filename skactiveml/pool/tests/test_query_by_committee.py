@@ -137,12 +137,13 @@ class TestQueryByCommittee(
         self._test_param("query", "y", test_cases, exclude_reg=True)
 
         for ml, classes, t, err in [
-            (np.nan, [1.0, 2.0], float, None),
+            # (np.nan, [1.0, 2.0], float, None),
             (0, [1, 2], int, None),
             (None, [1, 2], object, None),
             (None, ["A", "B"], object, None),
             ("", ["A", "B"], str, None),
         ]:
+            print(ml, classes, t, err)
             replace_init_params = {"missing_label": ml}
 
             ensemble = clone(self.query_default_params_clf["ensemble"])

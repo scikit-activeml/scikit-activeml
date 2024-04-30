@@ -624,8 +624,10 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         params = list(
             product(base_clfs[1:], speed_ups, sample_weights, preds[:2])
         )
-
+        loop_i = 0
         for BaseClf, speed_up, sample_weight, pred in params:
+            print(loop_i)
+            loop_i += 1
             with self.subTest(
                 msg="NB use fit data",
                 BaseClf=str(BaseClf()),
@@ -633,6 +635,8 @@ class TestIndexClassifierWrapper(unittest.TestCase):
                 sample_weight=sample_weight,
                 pred=pred,
             ):
+                if loop_i == 8:
+                    print('reached')
                 iclf = IndexClassifierWrapper(
                     BaseClf(),
                     self.X,

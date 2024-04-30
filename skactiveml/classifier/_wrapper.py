@@ -183,7 +183,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             y_pred = self.random_state_.choice(
                 np.arange(len(self.classes_)), len(X), replace=True, p=p
             )
-        y_pred = self._le.inverse_transform(y_pred)
+            y_pred = self._le.inverse_transform(y_pred)
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
@@ -212,9 +212,25 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
             if P.shape[1] != len(self.classes_):
                 P_ext = np.zeros((len(X), len(self.classes_)))
-                class_indices = np.asarray(self.estimator_.classes_, dtype=int)
-                # Exception for the MLPCLassifier
+
+                # est_classes = self.estimator_.classes_
+                # indices_est = np.where(np.isin(est_classes, self.classes_))[0]
+                # indices_ensemble = np.searchsorted(
+                #     self.classes_, est_classes[indices_est]
+                # )
+                # probas[:, indices_ensemble] = P_ext.T
+
+                est_classes = self.estimator_.classes_
+                indices_est = np.where(np.isin(est_classes, self.classes_))[0]
+                class_indices = np.searchsorted(
+                    self.classes_, est_classes[indices_est]
+                )
                 P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
+
+                # class_indices = np.asarray(self.estimator_.classes_, dtype=int)
+                # # Exception for the MLPCLassifier
+                # P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
+
                 P = P_ext
             if not np.any(np.isnan(P)):
                 return P
@@ -287,6 +303,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         try:
             X_lbld = X[is_lbld]
             y_lbld = y[is_lbld].astype(np.int64)
+            y_lbld_inv = self._le.inverse_transform(y_lbld)
             if np.sum(is_lbld) == 0:
                 raise ValueError("There is no labeled data.")
             elif (
@@ -294,28 +311,30 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 or sample_weight is None
             ):
                 if fit_function == "partial_fit":
-                    classes = self._le.transform(self.classes_)
-                    fit_kwargs['classes'] = classes
+                    # classes = self._le.transform(self.classes_)
+                    # fit_kwargs['classes'] = classes
+                    fit_kwargs['classes'] = self.classes_
                     self.estimator_.partial_fit(
-                        X=X_lbld, y=y_lbld, **fit_kwargs
+                        X=X_lbld, y=y_lbld_inv, **fit_kwargs
                     )
                 elif fit_function == "fit":
-                    self.estimator_.fit(X=X_lbld, y=y_lbld, **fit_kwargs)
+                    self.estimator_.fit(X=X_lbld, y=y_lbld_inv, **fit_kwargs)
             else:
                 if fit_function == "partial_fit":
-                    classes = self._le.transform(self.classes_)
-                    fit_kwargs['classes'] = classes
+                    # classes = self._le.transform(self.classes_)
+                    # fit_kwargs['classes'] = classes
+                    fit_kwargs['classes'] = self.classes_
                     fit_kwargs['sample_weight'] = sample_weight[is_lbld]
                     self.estimator_.partial_fit(
                         X=X_lbld,
-                        y=y_lbld,
+                        y=y_lbld_inv,
                         **fit_kwargs,
                     )
                 elif fit_function == "fit":
                     fit_kwargs['sample_weight'] = sample_weight[is_lbld]
                     self.estimator_.fit(
                         X=X_lbld,
-                        y=y_lbld,
+                        y=y_lbld_inv,
                         **fit_kwargs,
                     )
             self.is_fitted_ = True
