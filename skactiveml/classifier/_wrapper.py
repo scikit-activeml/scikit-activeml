@@ -752,32 +752,30 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
 class SkorchClassifier(NeuralNet, SkactivemlClassifier):
     def __init__(
-        self,
-        module,
-        classes=None,
-        missing_label=MISSING_LABEL,
-        cost_matrix=None,
-        random_state=None,
-        criterion=nn.NLLLoss,
-        train_split=False,
-        **module_kwargs,
+            self,
+            module,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            random_state=None,
+            criterion=nn.NLLLoss,
+            train_split=False,
+            **module_kwargs,
     ):
         n_classes = len(classes)
+        super(SkorchClassifier, self).__init__(
+            module,
+            criterion=criterion,
+            train_split=train_split,
+            module__n_classes=n_classes,
+            **module_kwargs)
+
         SkactivemlClassifier.__init__(
             self,
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
-        )
-
-        NeuralNet.__init__(
-            self,
-            module,
-            criterion=criterion,
-            train_split=train_split,
-            module__n_classes=n_classes,
-            **module_kwargs
         )
 
     def get_loss(self, y_pred, y_true, *args, **kwargs):
@@ -810,18 +808,23 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             return self
 
     def initialize(self):
+        super(SkorchClassifier, self).check_training_readiness()
+
         super(SkorchClassifier, self)._initialize_virtual_params()
         super(SkorchClassifier, self)._initialize_callbacks()
         super(SkorchClassifier, self)._initialize_module()
         super(SkorchClassifier, self)._initialize_criterion()
+        super(SkorchClassifier, self)._initialize_optimizer()
         super(SkorchClassifier, self)._initialize_history()
+
+        self.initialized_ = True
         return self
 
     def predict(self, X):
         return self.predict_proba(X).argmax(axis=1)
 
     def predict_proba(self, X):
-        return NeuralNet.predict_proba(self, X)
+        return super(SkorchClassifier, self).predict_proba(X)
 
     def score(self, X, y):
         pass
