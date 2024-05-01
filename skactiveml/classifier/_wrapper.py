@@ -750,7 +750,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             raise AttributeError(f"{item} does not exist")
 
 
-class SkorchClassifier(SkactivemlClassifier, NeuralNet):
+class SkorchClassifier(NeuralNet, SkactivemlClassifier):
     def __init__(
         self,
         module,
@@ -804,10 +804,10 @@ class SkorchClassifier(SkactivemlClassifier, NeuralNet):
         try:
             X_lbld = X[is_lbld]
             y_lbld = y[is_lbld].astype(np.int64)
-            NeuralNet.fit(self, X_lbld, y_lbld, **fit_params)
+            return super(SkorchClassifier, self).fit(X_lbld, y_lbld, **fit_params)
         except Exception as e:
             self.is_fitted_ = False
-        return self
+            return self
 
     def initialize(self):
         super(SkorchClassifier, self)._initialize_virtual_params()
