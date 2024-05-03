@@ -781,7 +781,7 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         loss = super(SkorchClassifier, self).get_loss(y_pred, y_true, *args, **kwargs)
         return loss
 
-    def fit(self, X, y, sample_weight=None, **fit_params):
+    def fit(self, X, y, **fit_params):
         # check input parameters
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
@@ -792,7 +792,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
-            sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
         )
 
@@ -821,12 +820,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         return self
 
     def predict(self, X):
-        return self.predict_proba(X).argmax(axis=1)
-
-    def predict_proba(self, X):
-        return super(SkorchClassifier, self).predict_proba(X)
-
-    def score(self, X, y):
-        pass
+        return SkactivemlClassifier.predict(self, X)
 
 
