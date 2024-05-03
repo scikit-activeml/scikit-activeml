@@ -754,21 +754,20 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
     def __init__(
             self,
             module,
+            *args,
             classes=None,
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
-            criterion=nn.NLLLoss,
-            train_split=False,
             **module_kwargs,
     ):
         n_classes = len(classes)
         super(SkorchClassifier, self).__init__(
             module,
-            criterion=criterion,
-            train_split=train_split,
+            *args,
             module__n_classes=n_classes,
-            **module_kwargs)
+            **module_kwargs,
+        )
 
         SkactivemlClassifier.__init__(
             self,
@@ -779,7 +778,8 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         )
 
     def get_loss(self, y_pred, y_true, *args, **kwargs):
-        pass
+        loss = super(SkorchClassifier, self).get_loss(y_pred, y_true, *args, **kwargs)
+        return loss
 
     def fit(self, X, y, sample_weight=None, **fit_params):
         # check input parameters
