@@ -210,27 +210,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self._check_n_features(X, reset=False)
         if self.is_fitted_:
             P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
+            # map the predicted classes to self.classes
             if P.shape[1] != len(self.classes_):
                 P_ext = np.zeros((len(X), len(self.classes_)))
-
-                # est_classes = self.estimator_.classes_
-                # indices_est = np.where(np.isin(est_classes, self.classes_))[0]
-                # indices_ensemble = np.searchsorted(
-                #     self.classes_, est_classes[indices_est]
-                # )
-                # probas[:, indices_ensemble] = P_ext.T
-
                 est_classes = self.estimator_.classes_
                 indices_est = np.where(np.isin(est_classes, self.classes_))[0]
                 class_indices = np.searchsorted(
                     self.classes_, est_classes[indices_est]
                 )
                 P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
-
-                # class_indices = np.asarray(self.estimator_.classes_, dtype=int)
-                # # Exception for the MLPCLassifier
-                # P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
-
                 P = P_ext
             if not np.any(np.isnan(P)):
                 return P
@@ -311,8 +299,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 or sample_weight is None
             ):
                 if fit_function == "partial_fit":
-                    # classes = self._le.transform(self.classes_)
-                    # fit_kwargs['classes'] = classes
                     fit_kwargs["classes"] = self.classes_
                     self.estimator_.partial_fit(
                         X=X_lbld, y=y_lbld_inv, **fit_kwargs
@@ -321,8 +307,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     self.estimator_.fit(X=X_lbld, y=y_lbld_inv, **fit_kwargs)
             else:
                 if fit_function == "partial_fit":
-                    # classes = self._le.transform(self.classes_)
-                    # fit_kwargs['classes'] = classes
                     fit_kwargs["classes"] = self.classes_
                     fit_kwargs["sample_weight"] = sample_weight[is_lbld]
                     self.estimator_.partial_fit(

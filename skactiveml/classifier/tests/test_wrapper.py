@@ -50,7 +50,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         test_cases = []
         test_cases += [
             (Perceptron(), None),
-            ("Test", Exception),
+            ("Test", AttributeError),
             (GaussianNB(), None),
             (LinearRegression(), TypeError),
         ]

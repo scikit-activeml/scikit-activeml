@@ -137,7 +137,7 @@ class TestQueryByCommittee(
         self._test_param("query", "y", test_cases, exclude_reg=True)
 
         for ml, classes, t, err in [
-            # (np.nan, [1.0, 2.0], float, None),
+            (np.nan, [1.0, 2.0], float, None),
             (0, [1, 2], int, None),
             (None, [1, 2], object, None),
             (None, ["A", "B"], object, None),
