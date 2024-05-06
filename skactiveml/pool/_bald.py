@@ -2,6 +2,7 @@
 Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
 the Apache-2.0 license.
 """
+
 import numpy as np
 from sklearn.utils import check_array
 
@@ -160,8 +161,10 @@ class _GeneralBALD(QueryByCommittee):
             estimator_types=[SkactivemlClassifier],
         )
 
-        probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
 
+        # probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        # print(probas[:,:5,:])
         if self.n_MC_samples is None:
             n_MC_samples_ = len(est_arr)
         else:

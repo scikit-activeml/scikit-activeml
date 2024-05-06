@@ -1,6 +1,7 @@
 """
 Epistemic uncertainty query strategy
 """
+
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
 #         Marek Herde <marek.herde@uni-kassel.de>
 import warnings

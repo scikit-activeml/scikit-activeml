@@ -31,6 +31,9 @@ from ._uncertainty_sampling import (
     uncertainty_scores,
     expected_average_precision,
 )
+from ._core_set import CoreSet, k_greedy_center
+from ._typi_clust import TypiClust
+from ._badge import Badge
 from ._wrapper import SubSamplingWrapper
 
 __all__ = [
@@ -60,6 +63,10 @@ __all__ = [
     "DiscriminativeAL",
     "BatchBALD",
     "batch_bald",
+    "CoreSet",
+    "k_greedy_center",
+    "TypiClust",
+    "Badge",
     "GreedyBALD",
     "SubSamplingWrapper",
 ]

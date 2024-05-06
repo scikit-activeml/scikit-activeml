@@ -9,6 +9,7 @@ import copy
 import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import check_array, check_is_fitted
+from iteration_utilities import flatten
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -172,8 +173,11 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         if classes is not None:
             # Compute utilities.
             if self.method == "KL_divergence":
-                probas = np.array(
-                    [est.predict_proba(X_cand) for est in est_arr]
+                # probas = np.array(
+                #     [est.predict_proba(X_cand) for est in est_arr]
+                # )
+                probas = self._aggregate_predict_probas(
+                    X_cand, ensemble, est_arr
                 )
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:  # self.method == "vote_entropy":
@@ -198,6 +202,51 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
+
+    def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
+        """Aggregate the predicted probabilities across all ensemble members and
+        ensure that all classes are mapped correctly.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Samples whose probabilities are to be predicted.
+        ensemble : list or tuple of SkactivemlClassifier or SkactivemlClassifier
+            If `ensemble` is a `SkactivemlClassifier`, it must have
+            `n_estimators` and `estimators_` after fitting as attribute. Then,
+            its estimators will be used as committee. If `ensemble` is
+            array-like, each element of this list must be `SkactivemlClassifier`
+            and will be used as committee member.
+        est_arr : list or tuple of SkactivemlClassifier
+            List of ensemble members contained in `ensemble`.
+
+        Returns
+        -------
+        probas: np.ndarray, shape (n_samples, n_classes)
+            The mapped predicted probabilities.
+        """
+        if hasattr(ensemble, "classes_"):
+            ensemble_classes = ensemble.classes_
+        else:
+            ensemble_classes = np.unique(
+                list(flatten([est.classes_ for est in est_arr]))
+            )
+        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble_classes)))
+        for i, est in enumerate(est_arr):
+            est_proba = est.predict_proba(X_cand)
+            est_classes = est.classes_
+
+            if len(est_classes) == len(ensemble_classes):
+                indices_ensemble = np.arange(len(ensemble_classes))
+            else:
+                indices_est = np.where(np.isin(est_classes, ensemble_classes))[
+                    0
+                ]
+                indices_ensemble = np.searchsorted(
+                    ensemble_classes, est_classes[indices_est]
+                )
+            probas[i, :, indices_ensemble] = est_proba.T
+        return probas
 
 
 def average_kl_divergence(probas, eps=1e-7):
@@ -309,7 +358,10 @@ def _check_ensemble(
             check_equal_missing_label(ensemble.missing_label, missing_label)
             # Fit the ensemble.
             if fit_ensemble:
-                ensemble = clone(ensemble).fit(X, y, sample_weight)
+                if sample_weight is None:
+                    ensemble = clone(ensemble).fit(X, y)
+                else:
+                    ensemble = clone(ensemble).fit(X, y, sample_weight)
             else:
                 check_is_fitted(ensemble)
 
@@ -340,7 +392,10 @@ def _check_ensemble(
                 )
                 # Fit the ensemble.
                 if fit_ensemble:
-                    est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+                    if sample_weight is None:
+                        est_arr[i] = est_arr[i].fit(X, y)
+                    else:
+                        est_arr[i] = est_arr[i].fit(X, y, sample_weight)
                 else:
                     check_is_fitted(est_arr[i])
 

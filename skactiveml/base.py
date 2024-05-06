@@ -1160,7 +1160,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
             y = self._le.fit_transform(y)
-            is_lbdl = is_labeled(y)
+            is_lbdl = is_labeled(y, missing_label=-1)
             if len(y[is_lbdl]) > 0:
                 check_classification_targets(y[is_lbdl])
             if len(self._le.classes_) == 0:
@@ -1170,7 +1170,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
                     "least on of both to overcome this error."
                 )
         else:
-            self._le.fit_transform(self.classes)
+            self._le.fit(self.classes)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
@@ -1481,6 +1481,8 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         entropy : numpy..ndarray, optional
             Predicted differential entropy conditioned on `X`.
         """
+        check_scalar(return_std, "return_std", bool)
+        check_scalar(return_entropy, "return_entropy", bool)
         rv = self.predict_target_distribution(X)
         result = (rv.mean(),)
         if return_std:
