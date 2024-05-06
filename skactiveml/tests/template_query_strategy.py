@@ -248,7 +248,13 @@ class TemplateQueryStrategy:
                         if err is None:
                             qs.query(**query_params)
                         else:
-                            self.assertRaises(err, qs.query, **query_params)
+                            if not hasattr(qs, "query"):
+                                if not issubclass(AttributeError, err):
+                                    qs.query
+                            else:
+                                self.assertRaises(
+                                    err, qs.query, **query_params
+                                )
 
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
