@@ -169,6 +169,33 @@ class TestQueryByCommittee(
         test_cases += [("string", TypeError), (None, TypeError)]
         self._test_param("query", "fit_ensemble", test_cases)
 
+    def test_query_param_sample_weight(self, test_cases=None):
+        super().test_query_param_sample_weight(test_cases)
+
+        clf = SklearnClassifier(RandomForestClassifier(random_state=42))
+        replace_clf = {"ensemble": [clf] * 5}
+        reg = SklearnRegressor(RandomForestRegressor(random_state=42))
+        replace_reg = {"ensemble": [reg] * 5}
+
+        for exclude_clf, exclude_reg, query_params, replace_query_params in [
+            (False, True, self.query_default_params_clf, replace_clf),
+            (True, False, self.query_default_params_reg, replace_reg),
+        ]:
+            if query_params is not None:
+                y = query_params["y"]
+                test_cases = [
+                    (np.ones(len(y)), None),
+                    (np.ones(len(y) + 1), ValueError),
+                ]
+                self._test_param(
+                    "query",
+                    "sample_weight",
+                    test_cases,
+                    exclude_clf=exclude_clf,
+                    exclude_reg=exclude_reg,
+                    replace_query_params=replace_query_params,
+                )
+
     def test_query(self):
         voting_classifiers = [
             (

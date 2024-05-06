@@ -23,6 +23,11 @@ from skactiveml.utils import MISSING_LABEL
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
+class DummyNonQueryStrategy:
+    def query(self, **kwargs):
+        pass
+
+
 class TestSubSamplingWrapper(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
@@ -95,6 +100,7 @@ class TestSubSamplingWrapper(
             ("1.2", AttributeError),
             (QueryByCommittee(), None),
             (IntervalEstimationThreshold(), TypeError),
+            (DummyNonQueryStrategy(), TypeError),
         ]
         self._test_param("init", "query_strategy", test_cases)
 
@@ -221,6 +227,8 @@ class TestParallelUtilityEstimationWrapper(
             (np.nan, TypeError),
             ("state", TypeError),
             (1.1, TypeError),
+            (IntervalEstimationThreshold(), TypeError),
+            (DummyNonQueryStrategy(), TypeError),
         ]
         self._test_param("init", "query_strategy", test_cases)
 
@@ -238,6 +246,7 @@ class TestParallelUtilityEstimationWrapper(
         test_cases = [
             ({"backend": "threading"}, None),
             ({"backend": "loky", "batch_size": 2}, None),
+            ({"backend": "loky", "batch_size": 2, "n_jobs": 1}, None),
             ({"abcdefg": "test"}, TypeError),
             (0, TypeError),
             ("multi", TypeError),

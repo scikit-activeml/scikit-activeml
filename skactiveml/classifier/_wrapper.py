@@ -270,14 +270,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             self._check_n_features(X, reset=True)
         elif fit_function == "partial_fit":
             self._check_n_features(X, reset=False)
-        if (
-            not has_fit_parameter(self.estimator, "sample_weight")
-            and sample_weight is not None
-        ):
-            warnings.warn(
-                f"{self.estimator} does not support `sample_weight`. "
-                f"Therefore, this parameter will be ignored."
-            )
         if hasattr(self, "estimator_"):
             if fit_function != "partial_fit":
                 self.estimator_ = deepcopy(self.estimator)
