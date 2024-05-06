@@ -6,6 +6,7 @@ from ..utils import (
     unlabeled_indices,
     check_scalar,
     simple_batch,
+    match_signature,
 )
 from math import ceil
 import numpy as np
@@ -49,6 +50,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         self.query_strategy = query_strategy
         self.max_candidates = max_candidates
 
+    @match_signature("query_strategy", "query")
     def query(
         self,
         X,

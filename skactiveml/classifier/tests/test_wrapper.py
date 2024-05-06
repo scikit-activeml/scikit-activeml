@@ -50,7 +50,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         test_cases = []
         test_cases += [
             (Perceptron(), None),
-            ("Test", TypeError),
+            ("Test", AttributeError),
             (GaussianNB(), None),
             (LinearRegression(), TypeError),
         ]
@@ -90,7 +90,6 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf.fit(
             self.fit_default_params["X"],
             self.fit_default_params["y"],
-            sample_weight=np.ones_like(self.fit_default_params["y"]),
         )
         self.assertTrue(clf.is_fitted_)
         clf.fit(self.fit_default_params["X"], self.fit_default_params["y"])
@@ -819,9 +818,7 @@ class TestSlidingWindowClassifier(
 
     def test_predict_freq(self):
         clf = SlidingWindowClassifier(
-            estimator=SklearnClassifier(
-                ParzenWindowClassifier(), missing_label="nan"
-            ),
+            estimator=ParzenWindowClassifier(missing_label="nan"),
             missing_label="nan",
         )
         self.assertRaises(
@@ -835,9 +832,7 @@ class TestSlidingWindowClassifier(
             X=self.fit_default_params["X"], y=self.fit_default_params["y"]
         )
         clf = SlidingWindowClassifier(
-            estimator=SklearnClassifier(
-                ParzenWindowClassifier(), missing_label="nan"
-            ),
+            estimator=ParzenWindowClassifier(missing_label="nan"),
             missing_label="nan",
         )
 

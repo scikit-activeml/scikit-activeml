@@ -31,10 +31,10 @@ from ._uncertainty_sampling import (
     uncertainty_scores,
     expected_average_precision,
 )
-from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 from ._core_set import CoreSet, k_greedy_center
 from ._typi_clust import TypiClust
 from ._badge import Badge
+from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 
 __all__ = [
     "multiannotator",

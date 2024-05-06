@@ -182,7 +182,10 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
         # Fit the classifier.
         if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+            if sample_weight is not None:
+                clf = clone(clf).fit(X, y, sample_weight)
+            else:
+                clf = clone(clf).fit(X, y)
 
         # Predict class-membership probabilities.
         probas = clf.predict_proba(X_cand)

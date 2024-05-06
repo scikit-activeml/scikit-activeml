@@ -1,6 +1,7 @@
 import unittest
 import warnings
 from copy import deepcopy
+import inspect
 
 import numpy as np
 from sklearn.datasets import load_breast_cancer
@@ -12,6 +13,7 @@ from skactiveml.pool import (
     SubSamplingWrapper,
     ParallelUtilityEstimationWrapper,
     QueryByCommittee,
+    UncertaintySampling,
 )
 from skactiveml.pool.multiannotator import IntervalEstimationThreshold
 from skactiveml.tests.template_query_strategy import (
@@ -89,8 +91,8 @@ class TestSubSamplingWrapper(
     def test_init_param_query_strategy(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
-            (0, TypeError),
-            ("1.2", TypeError),
+            (0, AttributeError),
+            ("1.2", AttributeError),
             (QueryByCommittee(), None),
             (IntervalEstimationThreshold(), TypeError),
         ]
@@ -127,6 +129,12 @@ class TestSubSamplingWrapper(
             query_params["return_utilities"] = False
             q_sub = qs_sub.query(**query_params)
             self.assertEqual(len(q_sub), 1)
+
+        us = UncertaintySampling()
+        qs_us = SubSamplingWrapper(us)
+        sig_qs_us = inspect.signature(qs_us.query).parameters
+        sig_us = inspect.signature(us.query).parameters
+        self.assertEqual(sig_qs_us, sig_us)
 
     def test_query_batch_variation(self):
         init_params = deepcopy(self.init_default_params)

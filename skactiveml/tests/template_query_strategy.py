@@ -64,34 +64,20 @@ class TemplateQueryStrategy:
                 f"and `query_default_params_reg` must be not None. "
                 f"Use emtpy dictionary to use default values."
             )
-        query_params = inspect.signature(self.qs_class.query).parameters
-        has_var_keyword = any(
-            filter(lambda p: p.kind == p.VAR_KEYWORD, query_params.values())
-        )
-        for key, val in query_params.items():
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and self.query_default_params_clf is not None
-                and key not in self.query_default_params_clf
-                and not has_var_keyword
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `query` in "
-                    f"`query_default_kwargs_clf`."
-                )
-
-            if (
-                key != "self"
-                and val.default == inspect._empty
-                and self.query_default_params_reg is not None
-                and key not in self.query_default_params_reg
-                and not has_var_keyword
-            ):
-                raise ValueError(
-                    f"Missing positional argument `{key}` of `query` in "
-                    f"`query_default_kwargs_reg`."
-                )
+        if self.query_default_params_clf is not None:
+            check_positional_args(
+                self.qs_class.query,
+                "query",
+                self.query_default_params_clf,
+                kwargs_name="query_default_kwargs_clf",
+            )
+        if self.query_default_params_reg is not None:
+            check_positional_args(
+                self.qs_class.query,
+                "query",
+                self.query_default_params_reg,
+                kwargs_name="query_default_kwargs_reg",
+            )
 
     def test_init_param_random_state(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -262,7 +248,13 @@ class TemplateQueryStrategy:
                         if err is None:
                             qs.query(**query_params)
                         else:
-                            self.assertRaises(err, qs.query, **query_params)
+                            if not hasattr(qs, "query"):
+                                if not issubclass(AttributeError, err):
+                                    qs.query
+                            else:
+                                self.assertRaises(
+                                    err, qs.query, **query_params
+                                )
 
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
