@@ -777,8 +777,16 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             random_state=random_state,
         )
 
+        self.regularized = module_kwargs.get("regularized")
+        self.lambda1 = module_kwargs.get("lambda1")
+
     def get_loss(self, y_pred, y_true, *args, **kwargs):
         loss = super(SkorchClassifier, self).get_loss(y_pred, y_true, *args, **kwargs)
+        if self.regularized is not None:
+            if self.regularized == 1 and self.lambda1 is float:
+                loss += self.lambda1 * sum([w.abs().sum() for w in self.module_.parameters()])
+            elif self.regularized == 2 and self.lambda1 is float:
+                loss += (self.lambda1 / 2) * ([(w ** 2).sum() for w in self.module_.parameters()])
         return loss
 
     def fit(self, X, y, **fit_params):
