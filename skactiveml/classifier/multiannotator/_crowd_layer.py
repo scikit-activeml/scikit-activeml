@@ -82,8 +82,6 @@ class CrowdLayerModule(nn.Module):
         ----------
         x : torch.Tensor of shape (batch_size, *)
             Samples.
-        return_logits_annot: bool, optional (default=True)
-            Flag whether the annotation logits are to be returned, next to the class-membership probabilities.
 
         Returns
         -------
