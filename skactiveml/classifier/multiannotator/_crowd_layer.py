@@ -1,9 +1,9 @@
+import numpy as np
 import torch
-from torch import nn
-from torch.nn import functional as F
-from torch.nn import CrossEntropyLoss
-
 from skorch import NeuralNet
+from torch import nn
+from torch.nn import CrossEntropyLoss
+from torch.nn import functional as F
 
 from skactiveml.base import AnnotatorModelMixin
 from skactiveml.classifier import SkorchClassifier
@@ -32,9 +32,17 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
     def fit(self, X, y, **fit_params):
         return NeuralNet.fit(self, X, y, **fit_params)
 
-    def predict_annotator_perf(self, X):
+    def predict_annotator_perf(self, X, return_confusion_matrix=False):
+        n_annotators = self.module__n_annotators
         p_class, logits_annot = self.forward(X)
-        return logits_annot
+        P_annot = F.softmax(logits_annot, dim=1)
+        p_class = p_class.numpy()
+        P_annot = P_annot.numpy()
+        P_perf = np.array([np.einsum("ij,ik->ijk", p_class, P_annot[:, :, i]) for i in range(n_annotators)])
+        P_perf = P_perf.swapaxes(0, 1)
+        if return_confusion_matrix:
+            return P_perf
+        return P_perf.diagonal(axis1=-2, axis2=-1).sum(axis=-1)
 
     def predict(self, X):
         p_class, logits_annot = self.forward(X)
@@ -42,6 +50,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
 
     def predict_proba(self, X):
         p_class, logits_annot = self.forward(X)
+        p_class = p_class.numpy()
         return p_class
 
 
@@ -92,5 +101,3 @@ class CrowdLayerModule(nn.Module):
         logits_annot = torch.stack(logits_annot, dim=2)
 
         return p_class, logits_annot
-
-
