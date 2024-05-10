@@ -5,19 +5,19 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.nn import functional as F
 
-from skactiveml.base import AnnotatorModelMixin
-from skactiveml.classifier import SkorchClassifier
+from ...base import AnnotatorModelMixin
+from ...classifier import SkorchClassifier
+from ...utils import unlabeled_indices
 
 
 class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
     def __init__(self, *args, **kwargs):
-        missing_label = kwargs.get("missing_label")
         super(CrowdLayerClassifier, self).__init__(
             module=CrowdLayerModule,
             *args,
             criterion=CrossEntropyLoss(),
             criterion__reduction="mean",
-            criterion__ignore_index=missing_label,
+            criterion__ignore_index=-1,
             **kwargs,
         )
 
@@ -30,15 +30,17 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         return loss
 
     def fit(self, X, y, **fit_params):
+        is_unlbld = unlabeled_indices(y, self.missing_label)
+        y[is_unlbld[:,0], is_unlbld[:,1]] = -1
         return NeuralNet.fit(self, X, y, **fit_params)
 
     def predict_annotator_perf(self, X, return_confusion_matrix=False):
         n_annotators = self.module__n_annotators
         p_class, logits_annot = self.forward(X)
-        P_annot = F.softmax(logits_annot, dim=1)
-        p_class = p_class.numpy()
-        P_annot = P_annot.numpy()
-        P_perf = np.array([np.einsum("ij,ik->ijk", p_class, P_annot[:, :, i]) for i in range(n_annotators)])
+        p_annot = F.softmax(logits_annot, dim=1)
+        P_class = torch.vstack([p for p in p_class]).numpy()
+        P_annot = p_annot.numpy()
+        P_perf = np.array([np.einsum("ij,ik->ijk", P_class, P_annot[:, :, i]) for i in range(n_annotators)])
         P_perf = P_perf.swapaxes(0, 1)
         if return_confusion_matrix:
             return P_perf
@@ -50,8 +52,8 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
 
     def predict_proba(self, X):
         p_class, logits_annot = self.forward(X)
-        p_class = p_class.numpy()
-        return p_class
+        P_class = torch.vstack([p for p in p_class]).numpy()
+        return P_class
 
 
 class CrowdLayerModule(nn.Module):
@@ -80,6 +82,8 @@ class CrowdLayerModule(nn.Module):
         ----------
         x : torch.Tensor of shape (batch_size, *)
             Samples.
+        return_logits_annot: bool, optional (default=True)
+            Flag whether the annotation logits are to be returned, next to the class-membership probabilities.
 
         Returns
         -------
@@ -101,3 +105,4 @@ class CrowdLayerModule(nn.Module):
         logits_annot = torch.stack(logits_annot, dim=2)
 
         return p_class, logits_annot
+
