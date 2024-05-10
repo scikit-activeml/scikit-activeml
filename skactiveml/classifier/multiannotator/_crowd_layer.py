@@ -25,7 +25,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         # unpack the tuple from the forward function
         p_class, logits_annot = y_pred
         if len(y_true.shape) != 2:
-            return torch.tensor(0)  # don't know why
+            return torch.tensor(0)  # don't know why (the shape of the last batch of y_true is strange)
         loss = NeuralNet.get_loss(self, logits_annot, y_true, *args, **kwargs)
         return loss
 
