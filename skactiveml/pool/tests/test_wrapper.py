@@ -229,7 +229,7 @@ class TestParallelUtilityEstimationWrapper(
             (1.1, AttributeError),
             # Fails because test is using ensemble as input for the classifier
             (UncertaintySampling(), TypeError),
-            (SingleAnnotatorWrapper(QueryByCommittee()), None),
+            (SingleAnnotatorWrapper(QueryByCommittee()), TypeError),
             (DummyNonQueryStrategy(), TypeError),
         ]
         self._test_param("init", "query_strategy", test_cases)
