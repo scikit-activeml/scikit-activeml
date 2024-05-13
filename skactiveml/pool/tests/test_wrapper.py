@@ -293,6 +293,4 @@ class TestParallelUtilityEstimationWrapper(
         pass
 
     def test_query_param_batch_size(self):
-        super().test_query_param_batch_size(
-            test_cases=[(2, ValueError)]
-        )
+        super().test_query_param_batch_size(test_cases=[(2, ValueError)])

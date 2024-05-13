@@ -138,7 +138,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             candidates=self.X_cand,
             annotators=self.A_cand,
             return_utilities=True,
-            clf=clf
+            clf=clf,
         )
 
         self.assertRaises(
