@@ -69,7 +69,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
            unlabeled samples.
         y : array-like of shape (n_samples)
            Labels of the training data set (possibly including unlabeled ones
-           indicated by self.MISSING_LABEL.
+           indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
            array-like of shape (n_candidates, n_features),
            optional (default=None)
@@ -209,8 +209,8 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
 
     This class implements a wrapper for single-annotator pool-based strategies
     such that utilities for candidates can be calculated in parallel. The main
-    assumption for this is that the utility estimations are independent from
-    another.
+    assumption for this is that the utility computations are independent from
+    another. Therefore, only `batch_size=1` is supported.
 
     Parameters
     ----------
@@ -218,9 +218,9 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         The strategy used for computing the utilities of the candidates.
     n_jobs : int, default=None
         Determines the number of maximum number of parallel utility
-        estimations. If `n_jobs` is set to -1 (default), the number of parallel
-        estimations is set to the number of available CPU cores are. For
-        further details refer to `n_jobs` in `joblib.Parallel`
+        computations. If `n_jobs` is set to -1 (default), the number of
+        parallel computations is set to the number of available CPU cores are.
+        For further details refer to `n_jobs` in `joblib.Parallel`
     parallel_dict : dict-like, default=None
         Further arguments that will be passed to `joblib.Parallel`. Note that,
         `n_jobs` should not be set in `parallel_dict`.
@@ -246,6 +246,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         self.n_jobs = n_jobs
         self.parallel_dict = parallel_dict
 
+    @match_signature("query_strategy", "query")
     def query(
         self,
         X,
@@ -264,7 +265,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
            unlabeled samples.
         y : array-like of shape (n_samples)
            Labels of the training data set (possibly including unlabeled ones
-           indicated by self.MISSING_LABEL.
+           indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
            array-like of shape (n_candidates, n_features),
            optional (default=None)
@@ -276,7 +277,8 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
            candidates are directly given in candidates (not necessarily
            contained in X). This is not supported by all query strategies.
         batch_size : int, optional (default=1)
-           The number of samples to be selected in one AL cycle.
+           The number of samples to be selected in one AL cycle. For this
+           wrapper, only `batch_size=1` is supported.
         return_utilities : bool, optional (default=False)
            If true, also return the utilities based on the query strategy.
         **query_kwargs : dict-like
@@ -309,6 +311,17 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
+        if batch_size != 1:
+            raise ValueError("`batch_size` must be set to 1.")
+
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+
         if not isinstance(
             self.query_strategy, SingleAnnotatorPoolQueryStrategy
         ):
@@ -326,28 +339,27 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             if "n_jobs" in parallel_dict.keys():
                 warnings.warn(
                     f"`n_jobs` ({parallel_dict['n_jobs']}) "
-                    "is specified in `self.parallel_dict`. "
-                    "This will be replaced with self.n_jobs "
-                    f"({self.n_jobs})."
+                    "is specified in `parallel_dict`. "
+                    f"This will be replaced with `n_jobs={self.n_jobs}`."
                 )
         else:
             raise TypeError(
                 f"`parallel_dict` is of type `{type(self.parallel_dict)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`"
-                f"or None."
+                f"but must be a dictionary or None."
             )
 
         parallel_dict["n_jobs"] = min(self.n_jobs, len(X_cand))
         parallel_pool = Parallel(**parallel_dict)
 
-        query_lambda_func = lambda candidate: self.query_strategy.query(
-            X=X,
-            y=y,
-            candidates=np.array(candidate),
-            batch_size=1,
-            return_utilities=True,
-            **query_kwargs,
-        )
+        def query_lambda_func(candidate):
+            return self.query_strategy.query(
+                X=X,
+                y=y,
+                candidates=np.array(candidate),
+                batch_size=1,
+                return_utilities=True,
+                **query_kwargs,
+            )
 
         if parallel_dict["n_jobs"] < 0:
             chunks = np.array_split(X_cand, cpu_count())

@@ -224,9 +224,10 @@ class TestParallelUtilityEstimationWrapper(
     def test_init_param_query_strategy(self):
         test_cases = [
             (QueryByCommittee(), None),
-            (np.nan, TypeError),
-            ("state", TypeError),
-            (1.1, TypeError),
+            (np.nan, AttributeError),
+            ("state", AttributeError),
+            (1.1, AttributeError),
+            # Fails because test is using ensemble as input for the classifier
             (IntervalEstimationThreshold(), TypeError),
             (DummyNonQueryStrategy(), TypeError),
         ]
@@ -285,3 +286,7 @@ class TestParallelUtilityEstimationWrapper(
             query_params["return_utilities"] = False
             q_sub = qs_sub.query(**query_params)
             self.assertEqual(len(q_sub), 1)
+
+    def test_query_batch_variation(self):
+        # The strategy does not support `batch_size > 1` (see documentation)
+        pass
