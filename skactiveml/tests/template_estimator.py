@@ -258,7 +258,11 @@ class TemplateEstimator:
                 if err is None and test_func in ["fit", "init"]:
                     estimator.fit(**fit_params)
                 elif test_func in ["fit", "init"]:
-                    self.assertRaises(err, estimator.fit, **fit_params)
+                    if not hasattr(estimator, "fit"):
+                        if not issubclass(AttributeError, err):
+                            estimator.fit
+                    else:
+                        self.assertRaises(err, estimator.fit, **fit_params)
                 else:
                     if not exclude_fit:
                         estimator.fit(**fit_params)
