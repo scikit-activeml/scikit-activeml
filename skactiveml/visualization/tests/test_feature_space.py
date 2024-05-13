@@ -872,14 +872,13 @@ class TestFeatureSpace(unittest.TestCase):
     def test_multi_with_axes(self):
         fig, axes = plt.subplots(1, 5, figsize=(10, 2))
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
-        query_params_dict = {"clf": self.clf}
         plot_annotator_utilities(
             qs=qs,
             X=self.X,
             y=self.y_active_multi,
             feature_bound=self.bound,
             axes=axes,
-            query_params_dict=query_params_dict,
+            clf=self.clf,
         )
 
         fig.savefig(self.path_prefix + "multi_with_axes.pdf")
@@ -892,13 +891,12 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_multi_without_axes(self):
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
-        query_params_dict = {"clf": self.clf}
         plot_annotator_utilities(
             qs=qs,
             X=self.X,
             y=self.y_active_multi,
             feature_bound=self.bound,
-            query_params_dict=query_params_dict,
+            clf=self.clf,
         )
 
         plt.savefig(self.path_prefix + "multi_without_axes.pdf")
@@ -911,14 +909,13 @@ class TestFeatureSpace(unittest.TestCase):
 
     def test_multi_without_axes_cand(self):
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
-        query_params_dict = {"clf": self.clf}
         plot_annotator_utilities(
             qs=qs,
             X=self.X,
             candidates=[1, 2, 3],
             y=self.y_active_multi,
             feature_bound=self.bound,
-            query_params_dict=query_params_dict,
+            clf=self.clf,
         )
 
         plt.savefig(self.path_prefix + "multi_without_axes_cand.pdf")

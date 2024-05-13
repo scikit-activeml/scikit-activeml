@@ -322,14 +322,6 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
             )
 
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
-
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if self.parallel_dict is None:

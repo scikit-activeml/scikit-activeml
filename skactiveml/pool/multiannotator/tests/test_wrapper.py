@@ -36,24 +36,24 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
     def test_init_param_strategy(self):
         wrapper = SingleAnnotatorWrapper(MixtureModelClassifier())
 
-        query_params_dict = {"X": self.X, "y": self.y}
+        query_kwargs = {"X": self.X, "y": self.y}
         self.assertRaises(
             TypeError,
             wrapper.query,
             self.X_cand,
-            query_params_dict,
             A_cand=self.A_cand,
+            **query_kwargs,
         )
 
         wrapper = SingleAnnotatorWrapper(0)
 
-        query_params_dict = {"X": self.X, "y": self.y}
+        query_kwargs = {"X": self.X, "y": self.y}
         self.assertRaises(
             TypeError,
             wrapper.query,
             self.X_cand,
-            query_params_dict,
             A_cand=self.A_cand,
+            **query_kwargs,
         )
 
     def test_init_param_y_aggregate(self):
@@ -122,10 +122,23 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             return_utilities=True,
         )
 
-    def test_query_param_query_params_dict(self):
+    def test_query_param_query_kwargs(self):
         uncertainty = UncertaintySampling(method="entropy")
         wrapper = SingleAnnotatorWrapper(
             uncertainty, random_state=self.random_state
+        )
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            random_state=self.random_state,
+        )
+
+        wrapper.query(
+            self.X,
+            self.y,
+            candidates=self.X_cand,
+            annotators=self.A_cand,
+            return_utilities=True,
+            clf=clf
         )
 
         self.assertRaises(
@@ -135,8 +148,9 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             self.y,
             candidates=self.X_cand,
             annotators=self.A_cand,
-            query_params_dict="string",
             return_utilities=True,
+            clf=clf,
+            abcd="string",
         )
 
     def test_query_param_y(self):
@@ -158,8 +172,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             y,
             candidates=self.X_cand,
             annotators=self.A_cand,
-            query_params_dict={"clf": clf},
             return_utilities=True,
+            clf=clf,
         )
 
     def test_query_param_X(self):
@@ -181,7 +195,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             self.y,
             candidates=self.X_cand,
             annotators=self.A_cand,
-            query_params_dict={"clf": clf},
+            clf=clf,
             return_utilities=True,
         )
 
@@ -304,15 +318,15 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         X = np.array([[1, 2], [5, 8], [8, 4], [5, 4], [3, 4]])
         y = np.array([[1, 0, 1], [0, 1, 1], [1, 1, 1], [0, 0, 0], [0, 1, 0]])
 
-        query_params_dict = {"clf": clf}
+        query_kwargs = {"clf": clf}
         re_val = wrapper.query(
             X,
             y,
             candidates=self.X_cand,
             annotators=self.A_cand,
             return_utilities=True,
-            query_params_dict=query_params_dict,
             batch_size=1,
+            **query_kwargs,
         )
 
         best_cand_indices, utilities = re_val

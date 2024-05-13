@@ -15,7 +15,7 @@ from skactiveml.pool import (
     QueryByCommittee,
     UncertaintySampling,
 )
-from skactiveml.pool.multiannotator import IntervalEstimationThreshold
+from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
@@ -99,7 +99,7 @@ class TestSubSamplingWrapper(
             (0, AttributeError),
             ("1.2", AttributeError),
             (QueryByCommittee(), None),
-            (IntervalEstimationThreshold(), TypeError),
+            (SingleAnnotatorWrapper(QueryByCommittee()), TypeError),
             (DummyNonQueryStrategy(), TypeError),
         ]
         self._test_param("init", "query_strategy", test_cases)
@@ -228,7 +228,8 @@ class TestParallelUtilityEstimationWrapper(
             ("state", AttributeError),
             (1.1, AttributeError),
             # Fails because test is using ensemble as input for the classifier
-            (IntervalEstimationThreshold(), TypeError),
+            (UncertaintySampling(), TypeError),
+            (SingleAnnotatorWrapper(QueryByCommittee()), None),
             (DummyNonQueryStrategy(), TypeError),
         ]
         self._test_param("init", "query_strategy", test_cases)
@@ -290,3 +291,8 @@ class TestParallelUtilityEstimationWrapper(
     def test_query_batch_variation(self):
         # The strategy does not support `batch_size > 1` (see documentation)
         pass
+
+    def test_query_param_batch_size(self):
+        super().test_query_param_batch_size(
+            test_cases=[(2, ValueError)]
+        )
