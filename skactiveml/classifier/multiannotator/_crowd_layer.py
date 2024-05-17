@@ -24,8 +24,6 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
     def get_loss(self, y_pred, y_true, *args, **kwargs):
         # unpack the tuple from the forward function
         p_class, logits_annot = y_pred
-        if len(y_true.shape) != 2:
-            return torch.tensor(0)  # don't know why (the shape of the last batch of y_true is strange)
         loss = NeuralNet.get_loss(self, logits_annot, y_true, *args, **kwargs)
         return loss
 
@@ -54,6 +52,20 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         p_class, logits_annot = self.forward(X)
         P_class = torch.vstack([p for p in p_class]).numpy()
         return P_class
+
+    def validation_step(self, batch, **fit_params):
+        # not for loss but for acc
+        self._set_training(False)
+        Xi, yi = unpack_data(batch)
+        with torch.no_grad():
+            y_pred = self.predict(Xi)
+            print(y_pred)
+            print(yi)
+            acc = torch.sum(y_pred == yi) / y_pred.shape[0]
+        return {
+            'loss': acc,
+            'y_pred': y_pred,
+        }
 
 
 class CrowdLayerModule(nn.Module):
