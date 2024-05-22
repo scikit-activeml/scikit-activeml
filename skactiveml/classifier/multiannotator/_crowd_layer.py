@@ -1,13 +1,14 @@
 import numpy as np
 import torch
 from skorch import NeuralNet
+from skorch.dataset import unpack_data
 from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.nn import functional as F
 
 from ...base import AnnotatorModelMixin
 from ...classifier import SkorchClassifier
-from ...utils import unlabeled_indices
+from ...utils import ExtLabelEncoder
 
 
 class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
@@ -28,8 +29,8 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         return loss
 
     def fit(self, X, y, **fit_params):
-        is_unlbld = unlabeled_indices(y, self.missing_label)
-        y[is_unlbld[:,0], is_unlbld[:,1]] = -1
+        label_encoder = ExtLabelEncoder(classes=self.classes, missing_label=self.missing_label)
+        y = label_encoder.fit_transform(y)
         return NeuralNet.fit(self, X, y, **fit_params)
 
     def predict_annotator_perf(self, X, return_confusion_matrix=False):
@@ -61,7 +62,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
             y_pred = self.predict(Xi)
             print(y_pred)
             print(yi)
-            acc = torch.sum(y_pred == yi) / y_pred.shape[0]
+            acc = torch.mean((y_pred == yi).float())
         return {
             'loss': acc,
             'y_pred': y_pred,
@@ -99,7 +100,7 @@ class CrowdLayerModule(nn.Module):
         -------
         p_class : torch.Tensor of shape (batch_size, n_classes)
             Class-membership probabilities.
-        logits_annot : torch.Tensor of shape (batch_size, n_annotators, n_classes)
+        logits_annot : torch.Tensor of shape (batch_size, n_classes, n_annotation)
             Annotation logits for each sample-annotator pair.
         """
         # Compute class-membership logits.
