@@ -2,7 +2,8 @@
 Wrapper for scikit-learn classifiers to deal with missing labels and labels
 from multiple annotators.
 """
-
+import inspect
+import types
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 import warnings
 from collections import deque
@@ -798,20 +799,16 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         self,
         module,
         criterion,
-        *args,
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
-        **module_kwargs,
+        **kwargs,
     ):
-        n_classes = len(classes)
         super(SkorchClassifier, self).__init__(
             module,
             criterion,
-            *args,
-            module__n_classes=n_classes,
-            **module_kwargs,
+            **kwargs,
         )
 
         SkactivemlClassifier.__init__(
@@ -825,6 +822,11 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         # set random state in PyTorch
         if isinstance(self.random_state, int):
             torch.manual_seed(self.random_state)
+
+        # In Skorch, we don't need to initialize in the init statement, because
+        # it will be called inside the fit function. But I think for the test I need
+        # to call this here.
+        # self.initialize()
 
     def fit(self, X, y, **fit_params):
         """Initialize and fit the module.
@@ -879,23 +881,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             )
             return self
 
-    def initialize(self):
-        """
-        Initializes all of its components and returns self.
-        """
-
-        super(SkorchClassifier, self).check_training_readiness()
-
-        super(SkorchClassifier, self)._initialize_virtual_params()
-        super(SkorchClassifier, self)._initialize_callbacks()
-        super(SkorchClassifier, self)._initialize_module()
-        super(SkorchClassifier, self)._initialize_criterion()
-        super(SkorchClassifier, self)._initialize_optimizer()
-        super(SkorchClassifier, self)._initialize_history()
-
-        self.initialized_ = True
-        return self
-
     def predict_proba(
         self, X, predict_nonlinearity: callable = None, **kwargs
     ):
@@ -924,3 +909,43 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             Predicted class labels of the input samples.
         """
         return SkactivemlClassifier.predict(self, X)
+
+    # def initialized_instance(self, instance_or_cls, kwargs):
+    #     """Return an instance initialized with the given parameters
+    #     Override the method in skorch to handle the test case
+    #
+    #     This is a helper method that deals with several possibilities for a
+    #     component that might need to be initialized:
+    #
+    #     * It is already an instance that's good to go
+    #     * It is an instance but it needs to be re-initialized
+    #     * It's not an instance and needs to be initialized
+    #
+    #     For the majority of use cases, this comes down to just comes down to
+    #     just initializing the class with its arguments.
+    #
+    #     Parameters
+    #     ----------
+    #     instance_or_cls
+    #       The instance or class or callable to be initialized, e.g.
+    #       ``self.module``.
+    #
+    #     kwargs : dict
+    #       The keyword arguments to initialize the instance or class. Can be an
+    #       empty dict.
+    #
+    #     Returns
+    #     -------
+    #     instance
+    #       The initialized component.
+    #     """
+    #     is_init = isinstance(instance_or_cls, torch.nn.Module)
+    #     if not is_init:
+    #         is_class = inspect.isclass(instance_or_cls)
+    #         if not is_class:
+    #             raise TypeError(f"{instance_or_cls} must be an instance of torch.nn.Module")
+    #         else:
+    #             is_subclass = issubclass(instance_or_cls, torch.nn.Module)
+    #             if not is_subclass:
+    #                 raise TypeError(f"{instance_or_cls} must be a subclass of torch.nn.Module")
+    #     return super().initialized_instance(instance_or_cls, kwargs)
