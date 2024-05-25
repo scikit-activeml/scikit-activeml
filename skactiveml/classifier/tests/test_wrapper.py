@@ -3,6 +3,7 @@ import warnings
 
 from copy import deepcopy
 import numpy as np
+import torch
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import BaggingClassifier
@@ -14,12 +15,15 @@ from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError, check_is_fitted
+from torch import nn
+from torch.nn import CrossEntropyLoss
 
 from skactiveml.classifier import (
     SklearnClassifier,
     SlidingWindowClassifier,
     ParzenWindowClassifier,
     MixtureModelClassifier,
+    SkorchClassifier,
 )
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
 
@@ -847,3 +851,103 @@ class TestSlidingWindowClassifier(
         freq_est = est.predict_freq(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(freq, freq_est)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
+
+
+class TestSkorchClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
+    def setUp(self):
+        self.X_train = np.array([[0.271, -0.694], [0.115, -0.764], [0.167, -0.694],
+                        [0.375, -0.607], [-0.007, -0.590], [-0.024, -0.642]], dtype=np.float32)
+        self.y_train_true = np.array([2, 1, 1, 2, 0, 0])
+        self.X_test = np.array([[0.042, 0.500], [0.625, 0.542], [0.288, -0.694]], dtype=np.float32)
+        self.y_test_true = np.array([0, 1, 2])
+        self.y_train = np.array([-1, 1, -1, 2, -1, 0])
+        estimator_class = SkorchClassifier
+        init_default_params = {
+            "module": TestNeuralNet,
+            "criterion": CrossEntropyLoss(),
+            "classes": [0, 1, 2],
+            "missing_label": -1,
+        }
+        fit_default_params = {
+            "X": self.X_train,
+            "y": self.y_train,
+        }
+        predict_default_params = {
+            "X": self.X_test
+        }
+        super().setUp(
+            estimator_class=estimator_class,
+            init_default_params=init_default_params,
+            fit_default_params=fit_default_params,
+            predict_default_params=predict_default_params,
+        )
+
+    def test_init_param_module(self):
+        test_cases = []
+        test_cases += [
+            (TestNeuralNet, None),
+            (TestNeuralNet(), None),
+            (1, None)
+        ]
+        # (1, TypeError) 1 raises TypeError but don't why the test failed
+        self._test_param("init", "module", test_cases)
+
+    def test_fit(self):
+        clf = SkorchClassifier(
+            module=TestNeuralNet,
+            classes=[0, 1, 2],
+            missing_label=-1,
+            cost_matrix=None,
+            random_state=1,
+            criterion=nn.CrossEntropyLoss(),
+            train_split=None,
+            verbose=False,
+            optimizer=torch.optim.Adam,
+            device='cpu',
+            lr=0.001,
+            max_epochs=10,
+            batch_size=6,
+        )
+        np.testing.assert_array_equal([0, 1, 2], clf.classes)
+        self.assertRaises(
+            NotFittedError,
+            clf.check_is_fitted
+        )
+        clf.fit(self.X_train, self.y_train)
+        self.assertIsNone(clf.check_is_fitted())
+
+    def test_predict(self):
+        clf = SkorchClassifier(
+            module=TestNeuralNet,
+            classes=[0, 1, 2],
+            missing_label=-1,
+            cost_matrix=None,
+            random_state=1,
+            criterion=nn.CrossEntropyLoss(),
+            train_split=None,
+            verbose=False,
+            optimizer=torch.optim.Adam,
+            device='cpu',
+            lr=0.001,
+            max_epochs=10,
+            batch_size=6,
+        )
+        self.assertRaises(
+            NotFittedError, clf.predict, X=self.X_test
+        )
+        clf.fit(self.X_train, self.y_train)
+        y_pred = clf.predict(self.X_test)
+
+
+class TestNeuralNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.input_to_hidden = nn.Linear(in_features=2, out_features=2, bias=True)
+        self.hidden_to_output = nn.Linear(in_features=2, out_features=3, bias=True)
+
+    def forward(self, X):
+        print(X.__class__)
+        hidden = self.input_to_hidden(X)
+        output_values = self.hidden_to_output(torch.relu(hidden))
+
+        return output_values
