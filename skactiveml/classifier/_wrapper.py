@@ -862,7 +862,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             check_X_dict=self.check_X_dict_,
         )
 
-        #
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         try:
             if np.sum(is_lbld) == 0:
@@ -870,7 +869,9 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             else:
                 X_lbld = X[is_lbld]
                 y_lbld = y[is_lbld].astype(np.int64)
-                return super(SkorchClassifier, self).fit(X_lbld, y_lbld, **fit_params)
+                return super(SkorchClassifier, self).fit(
+                    X_lbld, y_lbld, **fit_params
+                )
         except Exception as e:
             warnings.warn(
                 "The 'base_estimator' could not be fitted because of"

@@ -52,6 +52,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         artificial intelligence, vol. 32, no. 1. 2018.
 
     """
+
     def __init__(self, *args, **kwargs):
         super(CrowdLayerClassifier, self).__init__(
             module=CrowdLayerModule,
@@ -146,7 +147,12 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         P_class = P_class.numpy()
         P_annot = F.softmax(logits_annot, dim=1)
         P_annot = P_annot.numpy()
-        P_perf = np.array([np.einsum("ij,ik->ijk", P_class, P_annot[:, :, i]) for i in range(n_annotators)])
+        P_perf = np.array(
+            [
+                np.einsum("ij,ik->ijk", P_class, P_annot[:, :, i])
+                for i in range(n_annotators)
+            ]
+        )
         P_perf = P_perf.swapaxes(0, 1)
         if return_confusion_matrix:
             return P_perf
@@ -193,8 +199,8 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
             y_pred_tensor = torch.from_numpy(y_pred)
             acc = torch.mean((y_pred_tensor == yi).float())
         return {
-            'loss': acc,
-            'y_pred': y_pred,
+            "loss": acc,
+            "y_pred": y_pred,
         }
 
     def predict_P_annot(self, X):
@@ -239,11 +245,12 @@ class CrowdLayerModule(nn.Module):
     [1] Rodrigues, Filipe, and Francisco Pereira. "Deep learning from crowds." In Proceedings
     of the AAAI conference on artificial intelligence, vol. 32, no. 1. 2018.
     """
+
     def __init__(
-            self,
-            n_classes,
-            n_annotators,
-            gt_net,
+        self,
+        n_classes,
+        n_annotators,
+        gt_net,
     ):
         super().__init__()
         self.n_classes = n_classes
@@ -285,4 +292,3 @@ class CrowdLayerModule(nn.Module):
         logits_annot = torch.stack(logits_annot, dim=2)
 
         return p_class, logits_annot
-
