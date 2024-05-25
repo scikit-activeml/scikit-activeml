@@ -9,6 +9,7 @@ from collections import deque
 from copy import deepcopy
 
 import numpy as np
+import torch
 from sklearn.base import MetaEstimatorMixin, is_classifier
 from sklearn.utils import check_consistent_length
 from sklearn.utils.metaestimators import available_if
@@ -751,19 +752,63 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
 
 class SkorchClassifier(NeuralNet, SkactivemlClassifier):
+    """SkorchClassifier
+
+    Implement a wrapper class, to make it possible to use `PyTorch` with
+    `skactiveml`. This is achieved by providing a wrapper around `PyTorch`
+    that has a skactiveml interface and also be able to handle missing labels.
+    This wrapper is based on the open-source library `skorch` [1].
+
+    Parameters
+    ----------
+    module : torch module (class or instance)
+      A PyTorch :class:`~torch.nn.Module`. In general, the
+      uninstantiated class should be passed, although instantiated
+      modules will also work.
+    criterion : torch criterion (class)
+      The uninitialized criterion (loss) used to optimize the
+      module.
+    *args: arguments
+        more possible arguments for initialize your neural network
+        see: https://skorch.readthedocs.io/en/stable/net.html
+    classes : array-like of shape (n_classes,), default=None
+        Holds the label for each class. If none, the classes are determined
+        during the fit.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    cost_matrix : array-like of shape (n_classes, n_classes)
+        Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
+        `classes[j]` for a sample of class `classes[i]`. Can be only set, if
+        `classes` is not none.
+    random_state : int or RandomState instance or None, default=None
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+    **kwargs : keyword arguments
+        more possible parameters to customizing your neural network
+        see: https://skorch.readthedocs.io/en/stable/net.html
+
+    References
+    ----------
+    [1] Marian Tietz, Thomas J. Fan, Daniel Nouri, Benjamin Bossan, and
+    skorch Developers. skorch: A scikit-learn compatible neural network
+    library that wraps PyTorch, July 2017.
+    """
+
     def __init__(
-            self,
-            module,
-            *args,
-            classes=None,
-            missing_label=MISSING_LABEL,
-            cost_matrix=None,
-            random_state=None,
-            **module_kwargs,
+        self,
+        module,
+        criterion,
+        *args,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
+        **module_kwargs,
     ):
         n_classes = len(classes)
         super(SkorchClassifier, self).__init__(
             module,
+            criterion,
             *args,
             module__n_classes=n_classes,
             **module_kwargs,
@@ -777,11 +822,33 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             random_state=random_state,
         )
 
-    def get_loss(self, y_pred, y_true, *args, **kwargs):
-        loss = super(SkorchClassifier, self).get_loss(y_pred, y_true, *args, **kwargs)
-        return loss
+        # set random state in PyTorch
+        if isinstance(self.random_state, int):
+            torch.manual_seed(self.random_state)
 
     def fit(self, X, y, **fit_params):
+        """Initialize and fit the module.
+
+        If the module was already initialized, by calling fit, the
+        module will be re-initialized (unless ``warm_start`` is True).
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+        y : array-like of shape (n_samples, )
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.missing_label)
+        fit_params : dict-like
+            Further parameters as input to the 'fit' method of the 'estimator'.
+
+        Returns
+        -------
+        self: SkorchClassifier,
+            The SkorchClassifier is fitted on the training data.
+        """
+
         # check input parameters
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
@@ -795,18 +862,30 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             check_X_dict=self.check_X_dict_,
         )
 
-        # check whether model is a valid model
-
+        #
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         try:
-            X_lbld = X[is_lbld]
-            y_lbld = y[is_lbld].astype(np.int64)
-            return super(SkorchClassifier, self).fit(X_lbld, y_lbld, **fit_params)
+            if np.sum(is_lbld) == 0:
+                raise ValueError("There is no labeled data.")
+            else:
+                X_lbld = X[is_lbld]
+                y_lbld = y[is_lbld].astype(np.int64)
+                super(SkorchClassifier, self).fit(X_lbld, y_lbld, **fit_params)
+                self.is_fitted_ = True
+                return self
         except Exception as e:
             self.is_fitted_ = False
+            warnings.warn(
+                "The 'base_estimator' could not be fitted because of"
+                " '{}'. ".format(e)
+            )
             return self
 
     def initialize(self):
+        """
+        Initializes all of its components and returns self.
+        """
+
         super(SkorchClassifier, self).check_training_readiness()
 
         super(SkorchClassifier, self)._initialize_virtual_params()
@@ -819,7 +898,39 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         self.initialized_ = True
         return self
 
+    def predict_proba(
+        self, X, predict_nonlinearity: callable = None, **kwargs
+    ):
+        # Alternative 1: pass the parameter ```predict_nonlinearity: callable``` by instance creation
+        # original from Skorch, actually, in the instance predict_nonlinearity='auto',  When set to ‘auto’,
+        # infers the correct nonlinearity based on the criterion
+        # (softmax for CrossEntropyLoss and sigmoid for BCEWithLogitsLoss).
+        # see: https://skorch.readthedocs.io/en/stable/classifier.html# (search: predict_nonlinearity)
+        # that means it doesn't need to be overwritten.
+
+        # Alternative 2: pass the ```predict_nonlinearity: callable``` in the predict_proba function and also the
+        # corresponding arguments for this callable.
+        return super(SkorchClassifier, self).predict_proba(X)
+
     def predict(self, X):
-        return SkactivemlClassifier.predict(self, X)
+        """Return class label predictions for the input data X.
 
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples, n_features)
+            Input samples.
 
+        Returns
+        -------
+        y :  array-like, shape (n_samples)
+            Predicted class labels of the input samples.
+        """
+        check_is_fitted(self)
+        if self.is_fitted:
+            return SkactivemlClassifier.predict(self, X)
+        else:
+            p = self.predict_proba([X[0]])[0]
+            y_pred = self.random_state_.choice(
+                np.arange(len(self.classes_)), len(X), replace=True, p=p
+            )
+            return y_pred
