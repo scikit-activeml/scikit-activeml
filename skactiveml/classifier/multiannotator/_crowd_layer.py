@@ -8,7 +8,6 @@ from torch.nn import functional as F
 
 from ...base import AnnotatorModelMixin
 from ...classifier import SkorchClassifier
-from ...utils import ExtLabelEncoder
 
 
 class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
@@ -64,13 +63,47 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         )
 
     def get_loss(self, y_pred, y_true, *args, **kwargs):
+        """Return the loss for this batch.
+
+        Parameters
+        ----------
+        y_pred : torch.Tensor
+          Predicted target values
+        y_true : torch.Tensor
+          True target values.
+
+        Returns
+        ---------
+        loss : torch.Tensor
+            Loss for this batch
+        """
         # unpack the tuple from the forward function
         p_class, logits_annot = y_pred
         loss = NeuralNet.get_loss(self, logits_annot, y_true, *args, **kwargs)
         return loss
 
     def fit(self, X, y, **fit_params):
+        """Initialize and fit the module.
 
+        If the module was already initialized, by calling fit, the
+        module will be re-initialized (unless ``warm_start`` is True).
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+        y : array-like of shape (n_samples, )
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.missing_label)
+        fit_params : dict-like
+            Further parameters as input to the 'fit' method of the 'estimator'.
+
+        Returns
+        -------
+        self: CrowdLayerClassifier,
+            The CrowdLayerClassifier is fitted on the training data.
+        """
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
@@ -89,6 +122,25 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         return NeuralNet.fit(self, X, y, **fit_params)
 
     def predict_annotator_perf(self, X, return_confusion_matrix=False):
+        """Calculates the probability that an annotator provides the true label for a given sample.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Test samples.
+        return_confusion_matrix : bool, optional (default=False)
+            If `return_confusion_matrix=True`, the entire confusion matrix per annotator is returned.
+
+        Returns
+        -------
+        P_perf : numpy.ndarray of shape (n_samples, n_annotators) or (n_samples, n_annotators, n_classes, n_classes)
+            If `return_confusion_matrix=False`, `P_perf[n, m]` is the probability, that annotator `A[m]` provides the
+            correct class label for sample `X[n]`. If `return_confusion_matrix=False`, `P_perf[n, m, c, j]` is the
+            probability, that annotator `A[m]` provides the correct class label `classes_[j]` for sample `X[n]` and
+            that this sample belongs to class `classes_[c]`. If `return_cond=True`, `P_perf[n, m, c, j]` is the
+            probability that annotator `A[m]` provides the class label `classes_[j]` for sample `X[n]` conditioned
+            that this sample belongs to class `classes_[c]`.
+        """
         n_annotators = self.module__n_annotators
         P_class, logits_annot = self.forward(X)
         P_class = P_class.numpy()
@@ -100,28 +152,64 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
             return P_perf
         return P_perf.diagonal(axis1=-2, axis2=-1).sum(axis=-1)
 
-    def predict(self, X):
-        # maybe flag to switch between mode
-        p_class, logits_annot = self.forward(X)
-        return p_class.argmax(axis=1)
-
     def predict_proba(self, X):
+        """Returns class-membership probability estimates for the test data `X`.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Test samples.
+
+        Returns
+        -------
+        P_class : numpy.ndarray of shape (n_samples, classes)
+            `P_class[n, c]` is the probability, that instance `X[n]` belongs to the `classes_[c]`.
+        """
         P_class, logits_annot = self.forward(X)
         P_class = P_class.numpy()
         return P_class
 
     def validation_step(self, batch, **fit_params):
-        # not for loss but for acc
+        """Perform a single validation step.
+
+        Parameters
+        ----------
+        batch : list
+            A list containing the input data (Xi) and the target labels (yi) for the validation batch.
+        fit_params : dict
+            Additional fit parameters (not used in this function).
+
+        Returns
+        -------
+        A dictionary containing:
+        - 'loss' : float
+            The accuracy of the predictions for the validation batch.
+        - 'y_pred' : numpy.ndarray
+            The predicted labels for the input data in the validation batch.
+        """
         Xi, yi = unpack_data(batch)
         with torch.no_grad():
             y_pred = self.predict(Xi)
-            acc = torch.mean((y_pred == yi).float())
+            y_pred_tensor = torch.from_numpy(y_pred)
+            acc = torch.mean((y_pred_tensor == yi).float())
         return {
             'loss': acc,
             'y_pred': y_pred,
         }
 
     def predict_P_annot(self, X):
+        """Predict the probabilities of annotator assign for a label for the given input data.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Test samples.
+
+        Returns
+        -------
+        numpy.ndarray
+            The predicted probabilities for each annotator, obtained by applying softmax to the logits.
+        """
         _, logits_annot = self.forward(X)
         P_annot = F.softmax(logits_annot, dim=1)
         P_annot = P_annot.numpy()
