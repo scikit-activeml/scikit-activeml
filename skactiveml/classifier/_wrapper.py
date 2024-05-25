@@ -870,11 +870,8 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             else:
                 X_lbld = X[is_lbld]
                 y_lbld = y[is_lbld].astype(np.int64)
-                super(SkorchClassifier, self).fit(X_lbld, y_lbld, **fit_params)
-                self.is_fitted_ = True
-                return self
+                return super(SkorchClassifier, self).fit(X_lbld, y_lbld, **fit_params)
         except Exception as e:
-            self.is_fitted_ = False
             warnings.warn(
                 "The 'base_estimator' could not be fitted because of"
                 " '{}'. ".format(e)
@@ -925,12 +922,4 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         y :  array-like, shape (n_samples)
             Predicted class labels of the input samples.
         """
-        check_is_fitted(self)
-        if self.is_fitted:
-            return SkactivemlClassifier.predict(self, X)
-        else:
-            p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state_.choice(
-                np.arange(len(self.classes_)), len(X), replace=True, p=p
-            )
-            return y_pred
+        return SkactivemlClassifier.predict(self, X)
