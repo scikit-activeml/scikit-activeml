@@ -766,7 +766,7 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
       A PyTorch :class:`~torch.nn.Module`. In general, the
       uninstantiated class should be passed, although instantiated
       modules will also work.
-    criterion : torch criterion (class)
+    criterion : torch criterion (class), default: nn.NLLoss()
       The uninitialized criterion (loss) used to optimize the
       module.
     *args: arguments
@@ -798,7 +798,7 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
     def __init__(
         self,
         module,
-        criterion,
+        criterion=nn.NLLLoss(),
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
@@ -822,11 +822,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         # set random state in PyTorch
         if isinstance(self.random_state, int):
             torch.manual_seed(self.random_state)
-
-        # In Skorch, we don't need to initialize in the init statement, because
-        # it will be called inside the fit function. But I think for the test I need
-        # to call this here.
-        # self.initialize()
 
     def fit(self, X, y, **fit_params):
         """Initialize and fit the module.
@@ -865,21 +860,14 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         )
 
         is_lbld = is_labeled(y, missing_label=self.missing_label)
-        try:
-            if np.sum(is_lbld) == 0:
-                raise ValueError("There is no labeled data.")
-            else:
-                X_lbld = X[is_lbld]
-                y_lbld = y[is_lbld].astype(np.int64)
-                return super(SkorchClassifier, self).fit(
-                    X_lbld, y_lbld, **fit_params
-                )
-        except Exception as e:
-            warnings.warn(
-                "The 'base_estimator' could not be fitted because of"
-                " '{}'. ".format(e)
+        if np.sum(is_lbld) == 0:
+            raise ValueError("There is no labeled data.")
+        else:
+            X_lbld = X[is_lbld]
+            y_lbld = y[is_lbld].astype(np.int64)
+            return super(SkorchClassifier, self).fit(
+                X_lbld, y_lbld, **fit_params
             )
-            return self
 
     # def predict_proba(
     #     self, X, predict_nonlinearity: callable = None, **kwargs
@@ -912,43 +900,3 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
 
     def score(self, X, y, sample_weight=None):
         return SkactivemlClassifier.score(self, X, y)
-
-    # def initialized_instance(self, instance_or_cls, kwargs):
-    #     """Return an instance initialized with the given parameters
-    #     Override the method in skorch to handle the test case
-    #
-    #     This is a helper method that deals with several possibilities for a
-    #     component that might need to be initialized:
-    #
-    #     * It is already an instance that's good to go
-    #     * It is an instance but it needs to be re-initialized
-    #     * It's not an instance and needs to be initialized
-    #
-    #     For the majority of use cases, this comes down to just comes down to
-    #     just initializing the class with its arguments.
-    #
-    #     Parameters
-    #     ----------
-    #     instance_or_cls
-    #       The instance or class or callable to be initialized, e.g.
-    #       ``self.module``.
-    #
-    #     kwargs : dict
-    #       The keyword arguments to initialize the instance or class. Can be an
-    #       empty dict.
-    #
-    #     Returns
-    #     -------
-    #     instance
-    #       The initialized component.
-    #     """
-    #     is_init = isinstance(instance_or_cls, torch.nn.Module)
-    #     if not is_init:
-    #         is_class = inspect.isclass(instance_or_cls)
-    #         if not is_class:
-    #             raise TypeError(f"{instance_or_cls} must be an instance of torch.nn.Module")
-    #         else:
-    #             is_subclass = issubclass(instance_or_cls, torch.nn.Module)
-    #             if not is_subclass:
-    #                 raise TypeError(f"{instance_or_cls} must be a subclass of torch.nn.Module")
-    #     return super().initialized_instance(instance_or_cls, kwargs)
