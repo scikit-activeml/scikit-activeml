@@ -860,7 +860,6 @@ class TestSkorchClassifier(unittest.TestCase):
         self.y = np.copy(self.y_true)
         self.y[:100] = -1
 
-
     def test_init_param_module(self):
         clf = SkorchClassifier(module="Test")
         self.assertEqual(clf.module, "Test")
@@ -880,23 +879,21 @@ class TestSkorchClassifier(unittest.TestCase):
             module=TestNeuralNet,
             classes=[0, 1, 2],
             missing_label=-1,
-            cost_matrix=None,
             random_state=1,
-            criterion=nn.CrossEntropyLoss(),
+            criterion=nn.CrossEntropyLoss,
             train_split=None,
             verbose=False,
             optimizer=torch.optim.SGD,
             device='cpu',
             lr=0.001,
             max_epochs=10,
-            batch_size=6,
+            batch_size=1,
         )
         np.testing.assert_array_equal([0, 1, 2], clf.classes)
         self.assertRaises(
             NotFittedError,
             clf.check_is_fitted
         )
-        print(self.X.dtype)
         clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
@@ -914,13 +911,14 @@ class TestSkorchClassifier(unittest.TestCase):
             device='cpu',
             lr=0.001,
             max_epochs=10,
-            batch_size=6,
+            batch_size=1,
         )
         self.assertRaises(
             NotFittedError, clf.predict, X=self.X
         )
         clf.fit(self.X, self.y)
         y_pred = clf.predict(self.X)
+        self.assertEqual(len(y_pred), len(self.X))
 
 
 class TestNeuralNet(nn.Module):
@@ -931,6 +929,6 @@ class TestNeuralNet(nn.Module):
 
     def forward(self, X):
         hidden = self.input_to_hidden(X)
-        output_values = self.hidden_to_output(torch.relu(hidden))
-
+        hidden = torch.relu(hidden)
+        output_values = self.hidden_to_output(hidden)
         return output_values
