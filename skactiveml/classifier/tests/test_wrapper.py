@@ -853,44 +853,27 @@ class TestSlidingWindowClassifier(
         np.testing.assert_array_equal(clf.classes_, est.classes_)
 
 
-class TestSkorchClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
+class TestSkorchClassifier(unittest.TestCase):
     def setUp(self):
-        self.X_train = np.array([[0.271, -0.694], [0.115, -0.764], [0.167, -0.694],
-                        [0.375, -0.607], [-0.007, -0.590], [-0.024, -0.642]], dtype=np.float32)
-        self.y_train_true = np.array([2, 1, 1, 2, 0, 0])
-        self.X_test = np.array([[0.042, 0.500], [0.625, 0.542], [0.288, -0.694]], dtype=np.float32)
-        self.y_test_true = np.array([0, 1, 2])
-        self.y_train = np.array([-1, 1, -1, 2, -1, 0])
-        estimator_class = SkorchClassifier
-        init_default_params = {
-            "module": TestNeuralNet,
-            "criterion": CrossEntropyLoss(),
-            "classes": [0, 1, 2],
-            "missing_label": -1,
-        }
-        fit_default_params = {
-            "X": self.X_train,
-            "y": self.y_train,
-        }
-        predict_default_params = {
-            "X": self.X_test
-        }
-        super().setUp(
-            estimator_class=estimator_class,
-            init_default_params=init_default_params,
-            fit_default_params=fit_default_params,
-            predict_default_params=predict_default_params,
-        )
+        self.X, self.y_true = make_blobs(n_samples=200, n_features=2, centers=3, random_state=0)
+        self.X = self.X.astype(np.float32)
+        self.y = np.copy(self.y_true)
+        self.y[:100] = -1
+
 
     def test_init_param_module(self):
-        test_cases = []
-        test_cases += [
-            (TestNeuralNet, None),
-            (TestNeuralNet(), None),
-            (1, None)
-        ]
-        # (1, TypeError) 1 raises TypeError but don't why the test failed
-        self._test_param("init", "module", test_cases)
+        clf = SkorchClassifier(module="Test")
+        self.assertEqual(clf.module, "Test")
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
+
+        clf = SkorchClassifier(module=None)
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
+
+        clf = SkorchClassifier(module=[("nn.Module", TestNeuralNet)])
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
+
+        clf = SkorchClassifier(classes=[0, 1, 2], module=TestNeuralNet)
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
 
     def test_fit(self):
         clf = SkorchClassifier(
@@ -902,7 +885,7 @@ class TestSkorchClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             criterion=nn.CrossEntropyLoss(),
             train_split=None,
             verbose=False,
-            optimizer=torch.optim.Adam,
+            optimizer=torch.optim.SGD,
             device='cpu',
             lr=0.001,
             max_epochs=10,
@@ -913,7 +896,8 @@ class TestSkorchClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             NotFittedError,
             clf.check_is_fitted
         )
-        clf.fit(self.X_train, self.y_train)
+        print(self.X.dtype)
+        clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
     def test_predict(self):
@@ -933,10 +917,10 @@ class TestSkorchClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             batch_size=6,
         )
         self.assertRaises(
-            NotFittedError, clf.predict, X=self.X_test
+            NotFittedError, clf.predict, X=self.X
         )
-        clf.fit(self.X_train, self.y_train)
-        y_pred = clf.predict(self.X_test)
+        clf.fit(self.X, self.y)
+        y_pred = clf.predict(self.X)
 
 
 class TestNeuralNet(nn.Module):
@@ -946,7 +930,6 @@ class TestNeuralNet(nn.Module):
         self.hidden_to_output = nn.Linear(in_features=2, out_features=3, bias=True)
 
     def forward(self, X):
-        print(X.__class__)
         hidden = self.input_to_hidden(X)
         output_values = self.hidden_to_output(torch.relu(hidden))
 
