@@ -855,7 +855,9 @@ class TestSlidingWindowClassifier(
 
 class TestSkorchClassifier(unittest.TestCase):
     def setUp(self):
-        self.X, self.y_true = make_blobs(n_samples=200, n_features=2, centers=3, random_state=0)
+        self.X, self.y_true = make_blobs(
+            n_samples=200, n_features=2, centers=3, random_state=0
+        )
         self.X = self.X.astype(np.float32)
         self.y = np.copy(self.y_true)
         self.y[:100] = -1
@@ -884,16 +886,13 @@ class TestSkorchClassifier(unittest.TestCase):
             train_split=None,
             verbose=False,
             optimizer=torch.optim.SGD,
-            device='cpu',
+            device="cpu",
             lr=0.001,
             max_epochs=10,
             batch_size=1,
         )
         np.testing.assert_array_equal([0, 1, 2], clf.classes)
-        self.assertRaises(
-            NotFittedError,
-            clf.check_is_fitted
-        )
+        self.assertRaises(NotFittedError, clf.check_is_fitted)
         clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
@@ -908,14 +907,12 @@ class TestSkorchClassifier(unittest.TestCase):
             train_split=None,
             verbose=False,
             optimizer=torch.optim.Adam,
-            device='cpu',
+            device="cpu",
             lr=0.001,
             max_epochs=10,
             batch_size=1,
         )
-        self.assertRaises(
-            NotFittedError, clf.predict, X=self.X
-        )
+        self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
         y_pred = clf.predict(self.X)
         self.assertEqual(len(y_pred), len(self.X))
@@ -924,8 +921,12 @@ class TestSkorchClassifier(unittest.TestCase):
 class TestNeuralNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.input_to_hidden = nn.Linear(in_features=2, out_features=2, bias=True)
-        self.hidden_to_output = nn.Linear(in_features=2, out_features=3, bias=True)
+        self.input_to_hidden = nn.Linear(
+            in_features=2, out_features=2, bias=True
+        )
+        self.hidden_to_output = nn.Linear(
+            in_features=2, out_features=3, bias=True
+        )
 
     def forward(self, X):
         hidden = self.input_to_hidden(X)

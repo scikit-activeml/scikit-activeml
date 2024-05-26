@@ -2,8 +2,7 @@
 Wrapper for scikit-learn classifiers to deal with missing labels and labels
 from multiple annotators.
 """
-import inspect
-import types
+
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 import warnings
 from collections import deque
