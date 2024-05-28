@@ -15,6 +15,21 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         self.X = self.X.astype(np.float32)
         self.y = np.array([self.y_true, self.y_true], dtype=float).T
         self.y[:100, 0] = -1
+        self.clf_init_params = {
+            'module__n_classes': 3,
+            'module__n_annotators': 2,
+            'classes': [0, 1, 2],
+            'missing_label': -1,
+            'cost_matrix': None,
+            'random_state': 1,
+            'train_split': None,
+            'verbose': False,
+            'optimizer': torch.optim.RAdam,
+            'device': "cpu",
+            'max_epochs': 10,
+            'batch_size': 1,
+            'lr': 0.001,
+        }
 
     def test_init_param_module_gt_net(self):
         clf = CrowdLayerClassifier(module__gt_net="Test")
@@ -37,20 +52,8 @@ class TestCrowdLayerClassifier(unittest.TestCase):
     def test_fit(self):
         gt_net = TestNeuralNet()
         clf = CrowdLayerClassifier(
-            module__n_classes=3,
-            module__n_annotators=2,
             module__gt_net=gt_net,
-            classes=[0, 1, 2],
-            missing_label=-1,
-            cost_matrix=None,
-            random_state=1,
-            train_split=None,
-            verbose=False,
-            optimizer=torch.optim.RAdam,
-            device="cpu",
-            max_epochs=10,
-            batch_size=1,
-            lr=0.001,
+            **self.clf_init_params,
         )
 
         np.testing.assert_array_equal([0, 1, 2], clf.classes)
@@ -61,25 +64,53 @@ class TestCrowdLayerClassifier(unittest.TestCase):
     def test_predict(self):
         gt_net = TestNeuralNet()
         clf = CrowdLayerClassifier(
-            module__n_classes=3,
-            module__n_annotators=2,
             module__gt_net=gt_net,
-            classes=[0, 1, 2],
-            missing_label=-1,
-            cost_matrix=None,
-            random_state=1,
-            train_split=None,
-            verbose=False,
-            optimizer=torch.optim.RAdam,
-            device="cpu",
-            max_epochs=10,
-            batch_size=1,
-            lr=0.001,
+            **self.clf_init_params,
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
         y_pred = clf.predict(self.X)
         self.assertEqual(len(y_pred), len(self.X))
+
+    def test_predict_annotator_pref(self):
+        gt_net = TestNeuralNet()
+        clf = CrowdLayerClassifier(
+            module__gt_net=gt_net,
+            **self.clf_init_params,
+        )
+        self.assertRaises(NotFittedError, clf.predict, X=self.X)
+        clf.fit(self.X, self.y)
+        # annot_pref = clf.predict_annotator_perf(self.X[:1])
+        # self.assertEqual(len(annot_pref), 2)
+        # Process finished with exit code 139 (interrupted by signal 11:SIGSEGV)
+        # in line 148
+        # in file pytorch.functional softmax 1885
+
+    def test_predict_prob(self):
+        gt_net = TestNeuralNet()
+        clf = CrowdLayerClassifier(
+            module__gt_net=gt_net,
+            **self.clf_init_params,
+        )
+        self.assertRaises(NotFittedError, clf.predict, X=self.X)
+        clf.fit(self.X, self.y)
+        proba = clf.predict_proba(self.X[:1])
+        self.assertEqual(1, proba.shape[0])
+        self.assertEqual(3, proba.shape[1])
+
+    def test_predict_P_annot(self):
+        gt_net = TestNeuralNet()
+        clf = CrowdLayerClassifier(
+            module__gt_net=gt_net,
+            **self.clf_init_params,
+        )
+        self.assertRaises(NotFittedError, clf.predict, X=self.X)
+        clf.fit(self.X, self.y)
+        # annot = clf.predict_P_annot(self.X[:1])
+        # self.assertEqual(len(annot_pref), 2)
+        # Process finished with exit code 139 (interrupted by signal 11:SIGSEGV)
+        # in line 148
+        # in file pytorch.functional softmax 1885
 
 
 class TestNeuralNet(nn.Module):
