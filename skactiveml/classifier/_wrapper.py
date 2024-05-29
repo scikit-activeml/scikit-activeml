@@ -896,6 +896,3 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             Predicted class labels of the input samples.
         """
         return SkactivemlClassifier.predict(self, X)
-
-    def score(self, X, y, sample_weight=None):
-        return SkactivemlClassifier.score(self, X, y)
