@@ -818,10 +818,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             random_state=random_state,
         )
 
-        # set random state in PyTorch
-        if isinstance(self.random_state, int):
-            torch.manual_seed(self.random_state)
-
     def fit(self, X, y, **fit_params):
         """Initialize and fit the module.
 
