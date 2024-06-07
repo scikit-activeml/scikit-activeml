@@ -5,6 +5,8 @@ import torch
 from sklearn.datasets import make_blobs
 from sklearn.utils.validation import NotFittedError
 from torch import nn
+from skorch.helper import predefined_split
+from skorch.dataset import Dataset
 
 from skactiveml.classifier.multiannotator import CrowdLayerClassifier
 
@@ -16,19 +18,19 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         self.y = np.array([self.y_true, self.y_true], dtype=float).T
         self.y[:100, 0] = -1
         self.clf_init_params = {
-            'module__n_classes': 3,
-            'module__n_annotators': 2,
-            'classes': [0, 1, 2],
-            'missing_label': -1,
-            'cost_matrix': None,
-            'random_state': 1,
-            'train_split': None,
-            'verbose': False,
-            'optimizer': torch.optim.RAdam,
-            'device': "cpu",
-            'max_epochs': 10,
-            'batch_size': 1,
-            'lr': 0.001,
+            "module__n_classes": 3,
+            "module__n_annotators": 2,
+            "classes": [0, 1, 2],
+            "missing_label": -1,
+            "cost_matrix": None,
+            "random_state": 1,
+            "train_split": None,
+            "verbose": False,
+            "optimizer": torch.optim.RAdam,
+            "device": "cpu",
+            "max_epochs": 10,
+            "batch_size": 1,
+            "lr": 0.001,
         }
 
     def test_init_param_module_gt_net(self):
@@ -83,6 +85,11 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         annot_pref = clf.predict_annotator_perf(self.X[:2])
         self.assertEqual(annot_pref.shape[0], 2)
         self.assertEqual(annot_pref.shape[1], 2)
+        confusion_matrix = clf.predict_annotator_perf(self.X[:2], True)
+        self.assertEqual(confusion_matrix.shape[0], 2)
+        self.assertEqual(confusion_matrix.shape[1], 2)
+        self.assertEqual(confusion_matrix.shape[2], 3)
+        self.assertEqual(confusion_matrix.shape[3], 3)
 
     def test_predict_prob(self):
         gt_net = TestNeuralNet()
@@ -109,6 +116,17 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         self.assertEqual(annot.shape[0], 2)
         self.assertEqual(annot.shape[1], 3)
         self.assertEqual(annot.shape[2], 2)
+
+    def test_validation_step(self):
+        gt_net = TestNeuralNet()
+        valid_ds = Dataset(self.X, self.y)
+        self.clf_init_params["train_split"] = predefined_split(valid_ds)
+        clf = CrowdLayerClassifier(
+            module__gt_net=gt_net,
+            **self.clf_init_params,
+        )
+        clf.fit(self.X, self.y)
+        self.assertIsNone(clf.check_is_fitted())
 
 
 class TestNeuralNet(nn.Module):
