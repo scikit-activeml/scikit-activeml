@@ -16,7 +16,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 from torch import nn
-from torch.nn import CrossEntropyLoss
 
 from skactiveml.classifier import (
     SklearnClassifier,
@@ -893,6 +892,8 @@ class TestSkorchClassifier(unittest.TestCase):
         )
         np.testing.assert_array_equal([0, 1, 2], clf.classes)
         self.assertRaises(NotFittedError, clf.check_is_fitted)
+        y_ulbld = np.full_like(self.y, fill_value=-1)
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=y_ulbld)
         clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
