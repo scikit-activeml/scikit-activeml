@@ -871,7 +871,7 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
     #     # original from Skorch, actually, in the instance predict_nonlinearity='auto',  When set to ‘auto’,
     #     # infers the correct nonlinearity based on the criterion
     #     # (softmax for CrossEntropyLoss and sigmoid for BCEWithLogitsLoss).
-    #     # see: https://skorch.readthedocs.io/en/stable/classifier.html# (search: predict_nonlinearity)
+    #     # see: https://skorch.readthedocs.io/en/stable/net.html (search: predict_nonlinearity)
     #     # that means it doesn't need to be overwritten.
     #
     #     # Alternative 2: pass the ```predict_nonlinearity: callable``` in the predict_proba function and also the
