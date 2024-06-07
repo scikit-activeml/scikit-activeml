@@ -864,20 +864,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
                 X_lbld, y_lbld, **fit_params
             )
 
-    # def predict_proba(
-    #     self, X, predict_nonlinearity: callable = None, **kwargs
-    # ):
-    #     # Alternative 1: pass the parameter ```predict_nonlinearity: callable``` by instance creation
-    #     # original from Skorch, actually, in the instance predict_nonlinearity='auto',  When set to ‘auto’,
-    #     # infers the correct nonlinearity based on the criterion
-    #     # (softmax for CrossEntropyLoss and sigmoid for BCEWithLogitsLoss).
-    #     # see: https://skorch.readthedocs.io/en/stable/net.html (search: predict_nonlinearity)
-    #     # that means it doesn't need to be overwritten.
-    #
-    #     # Alternative 2: pass the ```predict_nonlinearity: callable``` in the predict_proba function and also the
-    #     # corresponding arguments for this callable.
-    #     return super(SkorchClassifier, self).predict_proba(X)
-
     def predict(self, X):
         """Return class label predictions for the input data X.
 
