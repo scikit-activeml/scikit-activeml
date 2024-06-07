@@ -80,11 +80,9 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
-        # annot_pref = clf.predict_annotator_perf(self.X[:1])
-        # self.assertEqual(len(annot_pref), 2)
-        # Process finished with exit code 139 (interrupted by signal 11:SIGSEGV)
-        # in line 148
-        # in file pytorch.functional softmax 1885
+        annot_pref = clf.predict_annotator_perf(self.X[:2])
+        self.assertEqual(annot_pref.shape[0], 2)
+        self.assertEqual(annot_pref.shape[1], 2)
 
     def test_predict_prob(self):
         gt_net = TestNeuralNet()
@@ -106,11 +104,11 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
-        # annot = clf.predict_P_annot(self.X[:1])
-        # self.assertEqual(len(annot_pref), 2)
-        # Process finished with exit code 139 (interrupted by signal 11:SIGSEGV)
-        # in line 148
-        # in file pytorch.functional softmax 1885
+        annot = clf.predict_P_annot(self.X[:2])
+        print(annot.shape)
+        self.assertEqual(annot.shape[0], 2)
+        self.assertEqual(annot.shape[1], 3)
+        self.assertEqual(annot.shape[2], 2)
 
 
 class TestNeuralNet(nn.Module):
