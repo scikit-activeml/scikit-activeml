@@ -145,7 +145,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         n_annotators = self.module__n_annotators
         P_class, logits_annot = self.forward(X)
         P_class = P_class.numpy()
-        P_annot = F.softmax(logits_annot, dim=1)
+        P_annot = F.softmax(logits_annot, dim=-1)
         P_annot = P_annot.numpy()
         P_perf = np.array(
             [
@@ -171,8 +171,11 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         P_class : numpy.ndarray of shape (n_samples, classes)
             `P_class[n, c]` is the probability, that instance `X[n]` belongs to the `classes_[c]`.
         """
-        P_class, logits_annot = self.forward(X)
+        NeuralNet.check_is_fitted(self)
+        self.module_.set_return_logits_annotator(False)
+        P_class = self.forward(X)
         P_class = P_class.numpy()
+        self.module_.set_return_logits_annotator(True)
         return P_class
 
     def validation_step(self, batch, **fit_params):
@@ -217,7 +220,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
             The predicted probabilities for each annotator, obtained by applying softmax to the logits.
         """
         _, logits_annot = self.forward(X)
-        P_annot = F.softmax(logits_annot, dim=1)
+        P_annot = F.softmax(logits_annot, dim=-1)
         P_annot = P_annot.numpy()
         return P_annot
 
@@ -256,6 +259,7 @@ class CrowdLayerModule(nn.Module):
         self.n_classes = n_classes
         self.n_annotators = n_annotators
         self.gt_net = gt_net
+        self.return_logits_annot = True
 
         # Setup crowd layer.
         self.annotator_layers = nn.ModuleList()
@@ -263,6 +267,10 @@ class CrowdLayerModule(nn.Module):
             layer = nn.Linear(n_classes, n_classes, bias=False)
             layer.weight = nn.Parameter(torch.eye(n_classes))
             self.annotator_layers.append(layer)
+
+    def set_return_logits_annotator(self, value):
+        self.return_logits_annot = value
+        return self
 
     def forward(self, x):
         """Forward propagation of samples through the GT and AP (optional) model.
@@ -284,6 +292,9 @@ class CrowdLayerModule(nn.Module):
 
         # Compute class-membership probabilities.
         p_class = F.softmax(logit_class, dim=-1)
+
+        if not self.return_logits_annot:
+            return p_class
 
         # Compute logits per annotator.
         logits_annot = []
