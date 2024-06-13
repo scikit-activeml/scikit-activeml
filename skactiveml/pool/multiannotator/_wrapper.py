@@ -393,11 +393,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         utilities = np.zeros((batch_size, n_samples, n_annotators))
         query_indices = np.zeros((batch_size, 2), dtype=int)
 
-        batch_index = 0  # actual batch index
         annotator_ps = 0  # current annotators per sample
         sample_index = 0  # sample batch index
 
-        while batch_index < batch_size:
+        for batch_index in range(batch_size): # actual batch index
             utilities[batch_index] = s_utilities[sample_index]
             query_indices[batch_index] = rand_argmax(
                 utilities[batch_index], random_state=random_state
@@ -407,7 +406,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 :, query_indices[batch_index, 0], query_indices[batch_index, 1]
             ] = np.nan
 
-            batch_index += 1
             annotator_ps += 1
             if annotator_ps >= n_as_annotators[sample_index]:
                 sample_index += 1
