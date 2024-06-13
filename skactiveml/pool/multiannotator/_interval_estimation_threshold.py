@@ -264,24 +264,22 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             If `candidates` is of shape (n_candidates, n_features), the
             sample candidates are directly given in `candidates` (not
             necessarily contained in `X`).
-        annotators : array-like, shape (n_candidates, n_annotators), optional
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int or
+            array-like of shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
             annotators.
-            If `annotators` is of shape (n_avl_annotators) and of type int,
+            If `annotators` is of shape (n_avl_annotators), and of type int,
             `annotators` is considered as the indices of the available
             annotators.
             If candidate samples and available annotators are specified:
-            The annotator sample pairs, for which the sample is a candidate
+            The annotator-sample-pairs, for which the sample is a candidate
             sample and the annotator is an available annotator are considered
-            as candidate annotator sample pairs.
-            If `annotators` is None and `candidates` is of shape
-            (n_candidates,), all annotator sample pairs, for which the sample
-            is indexed by `candidates` are considered as candidate annotator
-            sample pairs. If `annotators` is a boolean array of shape
-            (n_candidates, n_avl_annotators) the annotator sample pairs, for
-            which the sample is a candidate sample and the boolean matrix has
-            entry `True` are considered as candidate sample pairs.
+            as candidate annotator-sample-pairs.
+            If `annotators` is a boolean array of shape (n_candidates,
+            n_annotators) the annotator-sample-pairs, for which the sample
+            is a candidate sample and the boolean matrix has entry `True` are
+            considered as candidate sample pairs.
         sample_weight : array-like, (n_samples, n_annotators), optional
         (default=None)
             It contains the weights of the training samples' class labels.

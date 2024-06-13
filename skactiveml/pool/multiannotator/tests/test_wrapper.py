@@ -1,11 +1,13 @@
 import unittest
 
 import numpy as np
+from sklearn.datasets import make_blobs
 from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.classifier import SklearnClassifier, MixtureModelClassifier
 from skactiveml.pool import UncertaintySampling, RandomSampling
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
+from skactiveml.utils import is_labeled
 from skactiveml.utils import majority_vote, MISSING_LABEL, is_unlabeled
 
 
@@ -610,6 +612,38 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertEqual((4, 2), best_cand_indices.shape)
         self.assertEqual((4, 2, 3), utilities.shape)
         self.check_max(best_cand_indices, utilities)
+
+    def test_query_external_annotation_matrix(self):
+        X, y_true = make_blobs(n_samples=200, random_state=0)
+        X = X.astype(np.float32)
+        y = np.array([y_true, y_true], dtype=float).T
+        y[:100, 0] = -1
+        y[100:, 1] = -1
+
+        candidate_indicies = np.arange(50, 150)
+
+        sa_qs = RandomSampling(random_state=0, missing_label=-1)
+        ma_qs = SingleAnnotatorWrapper(sa_qs, random_state=0, missing_label=-1)
+
+        label_available = is_labeled(y, missing_label=-1)
+        A_perf = np.ones_like(y)
+
+        query_indices = ma_qs.query(
+            X=X,
+            y=y,
+            candidates=candidate_indicies,
+            A_perf=A_perf[candidate_indicies],
+            batch_size=50,
+            annotators=label_available[candidate_indicies],
+            n_annotators_per_sample=1,
+        )
+        self.assertEqual((50, 2), query_indices.shape)
+        # candiate indices contained in candidate_indices
+        self.assertTrue(np.isin(query_indices[:, 0], candidate_indicies).all())
+        # pair indices contained in label_available
+        self.assertTrue(
+            np.all(label_available[query_indices[:, 0], query_indices[:, 1]])
+        )
 
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]

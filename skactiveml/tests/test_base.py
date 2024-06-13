@@ -137,7 +137,7 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
         )
         X_cand, mapping, A_cand = re_val
         np.testing.assert_array_equal(
-            A_cand, np.array([[False, True], [True, True]])
+            A_cand, np.array([[False, True]])
         )
 
         re_val = self.qs._validate_data(

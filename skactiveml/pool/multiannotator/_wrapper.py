@@ -98,23 +98,20 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             If `candidates` is of shape (n_candidates, n_features), the
             sample candidates are directly given in candidates (not necessarily
             contained in X). This is not supported by all query strategies.
-        annotators : array-like of shape (n_candidates, n_annotators), optional
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int or
+            array-like of shape (n_candidates, n_annotators), optional
         (default=None)
             If `annotators` is None, all annotators are considered as available
             annotators.
-            If `annotators` is of shape (n_avl_annotators) and of type int,
+            If `annotators` is of shape (n_avl_annotators), and of type int,
             `annotators` is considered as the indices of the available
             annotators.
             If candidate samples and available annotators are specified:
-            The annotator sample pairs, for which the sample is a candidate
+            The annotator-sample-pairs, for which the sample is a candidate
             sample and the annotator is an available annotator are considered
             as candidate annotator-sample-pairs.
-            If `annotators` is None and `candidates` is of shape
-            (n_candidates), all annotator sample pairs, for which the sample is
-            indexed by `candidates` are considered as candidate
-            annotator-sample-pairs.
             If `annotators` is a boolean array of shape (n_candidates,
-            n_avl_annotators) the annotator sample pairs, for which the sample
+            n_annotators) the annotator-sample-pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
             considered as candidate sample pairs.
         batch_size : int, optional (default=1)
@@ -123,10 +120,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         query_params_dict : dict, optional (default=None)
             Dictionary for the parameters of the query method besides `X` and
             the transformed `y`.
-        A_perf : array-like, shape (n_samples, n_annotators) or
+        A_perf : array-like, shape (n_candidates, n_annotators) or
                   (n_annotators,) optional (default=None)
             The performance based ranking of each annotator.
-            1.) If `A_perf` is of shape (n_samples, n_annotators) for each
+            1.) If `A_perf` is of shape (n_candidates, n_annotators) for each
              sample `i` the value-annotators pair `(i, j)` is chosen
              over the pair `(i, k)` if `A_perf[i, j]` is greater or
              equal to `A_perf[i, k]`.
@@ -204,6 +201,12 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         check_type(
             self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
         )
+        if self.strategy.missing_label != self.missing_label:
+            raise ValueError(
+                f"`self.missing_label` must equal `self.strategy.missing_label`, but"
+                f"`self.missing_label` equals {self.missing_label} and"
+                f"`self.strategy.missing_label` equals {self.strategy.missing_label}."
+            )
 
         # check query_params_dict
         if query_params_dict is None:
@@ -325,7 +328,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
 
         candidates_sq = mapping if mapping is not None else X_cand
-        re_val = self.strategy.query(
+        _, w_utilities = self.strategy.query(
             X=X,
             y=y_sq,
             candidates=candidates_sq,
@@ -333,8 +336,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             batch_size=batch_size_sq,
             return_utilities=True,
         )
-
-        single_query_indices, w_utilities = re_val
 
         if mapping is None:
             sample_utilities = w_utilities
@@ -381,11 +382,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         n_annotators = A_cand.shape[1]
         n_samples = A_cand.shape[0]
 
-        re_val = self._get_order_preserving_s_query(
+        s_indices, s_utilities = self._get_order_preserving_s_query(
             A_cand, sample_utilities, annotator_utilities
         )
-
-        s_indices, s_utilities = re_val
 
         n_as_annotators = self._n_to_assign_annotators(
             batch_size, A_cand, s_indices, pref_n_annotators
@@ -454,11 +453,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         n_annotator_sample_pairs = np.sum(annot_per_sample)
 
-        while n_annotator_sample_pairs < batch_size:
+        for _ in range(np.max(n_max_chosen_annotators)):
             annot_per_sample = np.minimum(
                 n_max_chosen_annotators, annot_per_sample + 1
             )
 
             n_annotator_sample_pairs = np.sum(annot_per_sample)
+            if n_annotator_sample_pairs < batch_size:
+                break
 
         return annot_per_sample
