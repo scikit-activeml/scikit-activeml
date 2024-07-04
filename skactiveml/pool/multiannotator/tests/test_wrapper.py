@@ -578,7 +578,12 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             self.check_max(best_cand_indices, utilities)
 
         X = np.array([[7, 1], [9, 1]])
-        y = np.array([[MISSING_LABEL, 0, MISSING_LABEL], [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL]])
+        y = np.array(
+            [
+                [MISSING_LABEL, 0, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
         A_perf = np.array([[1, 2, 3], [3, 2, 1]])
 
         best_cand_indices, utilities = wrapper.query(
