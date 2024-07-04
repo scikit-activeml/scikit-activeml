@@ -620,11 +620,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 n_candidate_pairs = len(candidates) * len(y.T)
         elif annotators.ndim == 1:
             if candidates is None:
-                n_candidate_pairs = int(np.sum(unlabeled_pairs[:, annotators]))
+                n_candidate_pairs = len(X) * len(annotators)
             elif candidates.ndim == 1:
-                n_candidate_pairs = int(
-                    np.sum(unlabeled_pairs[candidates][:, annotators])
-                )
+                n_candidate_pairs = len(candidates) * len(annotators)
             else:
                 n_candidate_pairs = len(candidates) * len(annotators)
         else:
@@ -726,22 +724,25 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 return candidates, None, A_cand
         # mapping exists
         if candidates is None:
-            candidates = unlbd_sample_indices
-            indices_wrt_annotators = candidates
-        else:
-            candidates, indices_wrt_annotators, _ = np.intersect1d(
-                candidates, unlbd_sample_indices, return_indices=True
-            )
-
-        if annotators is None:
-            A_cand = unlbd_pairs[candidates, :]
-        elif annotators.ndim == 1:
-            available_pairs = np.full_like(y, False, dtype=bool)
-            available_pairs[:, annotators] = True
-            A_cand = (unlbd_pairs & available_pairs)[candidates, :]
-        else:
-            A_cand = annotators[indices_wrt_annotators]
-
+            if annotators is None:
+                candidates = unlbd_sample_indices
+                A_cand = unlbd_pairs[unlbd_sample_indices]
+            elif annotators.ndim == 1:
+                candidates = np.arange(len(X), dtype=int)
+                A_cand = np.full_like(y, False)
+                A_cand[:, annotators] = True
+            else:
+                candidates = np.arange(len(X), dtype=int)[np.any(annotators, axis=1)]
+                A_cand = annotators[np.any(annotators, axis=1)]
+        else: # candidates indices array
+            if annotators is None:
+                A_cand = np.full((len(candidates), y.shape[1]), True)
+            elif annotators.ndim == 1:
+                A_cand = np.full((len(candidates), y.shape[1]), False)
+                A_cand[:, annotators] = True
+            else:
+                candidates = candidates[np.any(annotators, axis=1)]
+                A_cand = annotators[np.any(annotators, axis=1)]
         return X[candidates], candidates, A_cand
 
 

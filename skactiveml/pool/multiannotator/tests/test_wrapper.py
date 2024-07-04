@@ -42,9 +42,11 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertRaises(
             TypeError,
             wrapper.query,
-            self.X_cand,
-            query_params_dict,
-            A_cand=self.A_cand,
+            self.X,
+            self.y,
+            candidates=self.X_cand,
+            annotators=self.A_cand,
+            query_params_dict=query_params_dict,
         )
 
         wrapper = SingleAnnotatorWrapper(0)
@@ -53,13 +55,27 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertRaises(
             TypeError,
             wrapper.query,
-            self.X_cand,
-            query_params_dict,
-            A_cand=self.A_cand,
+            self.X,
+            self.y,
+            candidates=self.X_cand,
+            annotators=self.A_cand,
+            query_params_dict=query_params_dict,
+        )
+
+        strategy = RandomSampling(random_state=self.random_state, missing_label=-1)
+        wrapper = SingleAnnotatorWrapper(strategy=strategy, random_state=self.random_state, missing_label=0)
+        self.assertRaises(
+            ValueError,
+            wrapper.query,
+            self.X,
+            self.y,
+            candidates=self.X_cand,
+            annotators=self.A_cand,
+            query_params_dict=query_params_dict,
         )
 
     def test_init_param_y_aggregate(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, y_aggregate="string", random_state=self.random_state
         )
@@ -76,7 +92,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
 
         dummy_function = lambda x, y: majority_vote(x)
 
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, y_aggregate=dummy_function, random_state=self.random_state
         )
@@ -92,13 +108,13 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_init_param_random_state(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(random, random_state="string")
 
         self.assertRaises(ValueError, wrapper.query, self.X, self.y)
 
     def test_query_param_candidates(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         X_cand = [1, 0, 2, 4]
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -188,7 +204,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_annotators(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -204,7 +220,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_batch_size(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -213,7 +229,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_return_utilities(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -228,7 +244,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_n_annotators_per_sample(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -253,7 +269,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_param_A_perf(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -348,7 +364,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_availability(best_cand_indices, A)
 
     def test_query_one_annotator_per_sample_batch_size_five(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -370,7 +386,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_availability(best_cand_indices, self.A_cand)
 
     def test_query_batch_size_too_large(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -386,7 +402,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_three_n_annotators_per_sample_batch_size_five(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -411,7 +427,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
     def test_query_three_n_annotators_per_sample_batch_size_five_mismatch(
         self,
     ):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         X_cand = np.array([[7, 1], [9, 1]])
 
@@ -438,7 +454,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_availability(best_cand_indices, A_cand)
 
     def test_query_varying_n_annotators_per_sample_batch_size_five(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -464,7 +480,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_per_sample_too_large(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -486,7 +502,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_unavailable_annotators(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         X_cand = np.array([[7, 1], [9, 1], [3, 5], [2, 7]])
 
@@ -519,7 +535,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_availability(best_cand_indices, A_cand)
 
     def test_query_custom_annotator_special_preference(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -550,7 +566,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_custom_annotator_general_equal_preference(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
 
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
@@ -587,7 +603,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
     def test_query_indexed_annotator_sample_candidates(self):
-        random = RandomSampling(self.random_state)
+        random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
             random, random_state=self.random_state
         )
@@ -644,6 +660,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertTrue(
             np.all(label_available[query_indices[:, 0], query_indices[:, 1]])
         )
+
 
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]

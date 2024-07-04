@@ -201,7 +201,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         check_type(
             self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
         )
-        if self.strategy.missing_label != self.missing_label:
+        if self.strategy.missing_label != self.missing_label and not(np.isnan(self.strategy.missing_label) & np.isnan(self.missing_label)):
             raise ValueError(
                 f"`self.missing_label` must equal `self.strategy.missing_label`, but"
                 f"`self.missing_label` equals {self.missing_label} and"
@@ -434,7 +434,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = np.nan
 
-        annotator_utilities[:, A == 0] = np.nan
+        annotator_utilities[:, ~A] = np.nan
 
         # combine utilities by addition
         utilities = candidate_utilities[:, :, np.newaxis] + annotator_utilities
@@ -449,15 +449,13 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             n_max_chosen_annotators, pref_n_annotators
         )
 
-        n_annotator_sample_pairs = np.sum(annot_per_sample)
-
         for _ in range(np.max(n_max_chosen_annotators)):
             annot_per_sample = np.minimum(
                 n_max_chosen_annotators, annot_per_sample + 1
             )
 
             n_annotator_sample_pairs = np.sum(annot_per_sample)
-            if n_annotator_sample_pairs < batch_size:
+            if n_annotator_sample_pairs >= batch_size:
                 break
 
         return annot_per_sample
