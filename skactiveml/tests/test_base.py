@@ -250,6 +250,44 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             A_cand, np.array([[False, True], [True, True]])
         )
 
+    def test_consistency_validate_and_transform(self):
+        X = np.array([[1, 2], [0, 1]])
+        y = np.array([[1, MISSING_LABEL], [2, 3]])
+        batch_size_initial = y.shape[0] * y.shape[1]
+        candidates_values = [
+            None,
+            np.array([0, 1]),
+            np.array([[3, 4], [0, 1]]),
+        ]
+        annotators_values = [
+            None,
+            np.array([0]),
+            np.array([[False, True], [True, True]]),
+        ]
+
+        for (i, candidates), (j, annotators) in product(
+            enumerate(candidates_values), enumerate(annotators_values)
+        ):
+            X, y, candidates, annotators, batch_size, return_utilities = (
+                self.qs._validate_data(
+                    candidates=candidates,
+                    annotators=annotators,
+                    X=X,
+                    y=y,
+                    batch_size=batch_size_initial,
+                    return_utilities=False,
+                )
+            )
+
+            X_cand, mapping, A_cand = self.qs._transform_cand_annot(
+                candidates=candidates,
+                annotators=annotators,
+                X=X,
+                y=y,
+            )
+
+            self.assertEqual(np.sum(A_cand).item(), batch_size)
+
 
 class SkactivemlClassifierTest(unittest.TestCase):
     @patch.multiple(SkactivemlClassifier, __abstractmethods__=set())
