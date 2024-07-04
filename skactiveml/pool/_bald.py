@@ -1,52 +1,65 @@
 """
-Code is based on https://blackhc.github.io/batchbald_redux/
-distributed under the Apache-2.0 license.
+Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
+the Apache-2.0 license.
 """
+
 import numpy as np
 from sklearn.utils import check_array
 
 from ..base import SkactivemlClassifier
 from ..pool._query_by_committee import _check_ensemble, QueryByCommittee
 from ..utils import (
-    rand_argmax,
     MISSING_LABEL,
+    rand_argmax,
     check_type,
     check_scalar,
     check_random_state,
+    simple_batch,
 )
 
 
-class BatchBALD(QueryByCommittee):
-    """Batch Bayesian Active Learning by Disagreement (BatchBALD)
+class _GeneralBALD(QueryByCommittee):
+    """General Bayesian Active Learning by Disagreement (_GeneralBALD)
 
-    The Bayesian-Active-Learning-by-Disagreement (BatchBALD) [1] strategy
+    The Bayesian Active Learning by Disagreement (BatchBALD) [1] strategy
     reduces the number of possible hypotheses maximally fast to minimize the
-    uncertainty about the parameters using Shannon’s entropy. It seeks the data
+    uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
-    batch case, the advanced strategy BatchBALD [2] is applied.
+    batch case, by default the advanced strategy BatchBALD [2] is used.
+    If desired a greedy (top-k) selection can be applied by setting
+    `greedy_selection=True`.
 
     Parameters
     ----------
-    n_MC_samples : int > 0, default=n_estimators
+    n_MC_samples : int > 0, optional (default=n_estimators)
         The number of monte carlo samples used for label estimation.
-    missing_label : scalar or string or np.nan or None, default=np.nan
+    greedy_selection : bool, optional (default=False)
+        Flag to either use BatchBALD (`greedy_selection=False`) or a greedy
+        (top-k) selection (`greedy_selection=True`) if `batch_size>1`.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
+    missing_label : scalar or string or np.nan or None, optional
+        (default=np.nan)
         Value to represent a missing label.
-    random_state : int or np.random.RandomState, default=None
+    random_state : int or None or np.random.RandomState, optional
+        (default=None)
         The random state to use.
 
     References
     ----------
-    [1] Houlsby, Neil, et al. Bayesian active learning for classification and
-        preference learning. arXiv preprint arXiv:1112.5745, 2011.
-    [2] Kirsch, Andreas; Van Amersfoort, Joost; GAL, Yarin.
-        Batchbald: Efficient and diverse batch acquisition for deep bayesian
-        active learning. Advances in neural information processing systems,
-        2019, 32. Jg.
+    [1] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
+        "Bayesian Active Learning for Classification and Preference Learning."
+        arXiv preprint arXiv:1112.5745 (2011).
+    [2] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
+        Efficient and Diverse Batch Acquisition for Deep Bayesian  Active
+        Learning." Advances in Neural Information Processing Systems 32 (2019).
     """
 
     def __init__(
         self,
         n_MC_samples=None,
+        greedy_selection=False,
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -54,6 +67,8 @@ class BatchBALD(QueryByCommittee):
             missing_label=missing_label, random_state=random_state
         )
         self.n_MC_samples = n_MC_samples
+        self.greedy_selection = greedy_selection
+        self.eps = eps
 
     def query(
         self,
@@ -128,7 +143,9 @@ class BatchBALD(QueryByCommittee):
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
-
+        check_scalar(
+            self.greedy_selection, "greedy_selection", target_type=bool
+        )
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         # Validate classifier type.
@@ -144,39 +161,153 @@ class BatchBALD(QueryByCommittee):
             estimator_types=[SkactivemlClassifier],
         )
 
-        probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
 
+        # probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        # print(probas[:,:5,:])
         if self.n_MC_samples is None:
             n_MC_samples_ = len(est_arr)
         else:
             n_MC_samples_ = self.n_MC_samples
         check_scalar(n_MC_samples_, "n_MC_samples", int, min_val=1)
 
+        utils_batch_size = 1 if self.greedy_selection else batch_size
         batch_utilities_cand = batch_bald(
-            probas, batch_size, n_MC_samples_, self.random_state_
+            probas=probas,
+            batch_size=utils_batch_size,
+            n_MC_samples=n_MC_samples_,
+            eps=self.eps,
+            random_state=self.random_state_,
         )
+
         if mapping is None:
             batch_utilities = batch_utilities_cand
         else:
-            batch_utilities = np.full((batch_size, len(X)), np.nan)
+            batch_utilities = np.full((utils_batch_size, len(X)), np.nan)
             batch_utilities[:, mapping] = batch_utilities_cand
 
-        best_indices = rand_argmax(
-            batch_utilities, axis=1, random_state=self.random_state_
+        if self.greedy_selection:
+            return simple_batch(
+                batch_utilities[0],
+                self.random_state_,
+                batch_size=batch_size,
+                return_utilities=return_utilities,
+            )
+        else:
+            best_indices = rand_argmax(
+                batch_utilities, axis=1, random_state=self.random_state_
+            )
+            if return_utilities:
+                return best_indices, batch_utilities
+            else:
+                return best_indices
+
+
+class BatchBALD(_GeneralBALD):
+    """Batch Bayesian Active Learning by Disagreement (BatchBALD)
+
+    The Bayesian Active Learning by Disagreement (BatchBALD) [1] strategy
+    reduces the number of possible hypotheses maximally fast to minimize the
+    uncertainty about the parameters using Shannon's entropy. It seeks the data
+    point that maximises the decrease in expected posterior entropy. For the
+    batch case, the advanced strategy BatchBALD [2] is used.
+
+    Parameters
+    ----------
+    n_MC_samples : int > 0, optional (default=n_estimators)
+        The number of monte carlo samples used for label estimation.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
+    missing_label : scalar or string or np.nan or None, optional
+        (default=np.nan)
+        Value to represent a missing label.
+    random_state : int or None or np.random.RandomState, optional
+        (default=None)
+        The random state to use.
+
+    References
+    ----------
+    [1] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
+        "Bayesian Active Learning for Classification and Preference Learning."
+        arXiv preprint arXiv:1112.5745 (2011).
+    [2] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
+        Efficient and Diverse Batch Acquisition for Deep Bayesian  Active
+        Learning." Advances in Neural Information Processing Systems 32 (2019).
+    """
+
+    def __init__(
+        self,
+        n_MC_samples=None,
+        eps=1e-7,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(
+            n_MC_samples=n_MC_samples,
+            greedy_selection=False,
+            eps=eps,
+            missing_label=missing_label,
+            random_state=random_state,
         )
 
-        if return_utilities:
-            return best_indices, batch_utilities
-        else:
-            return best_indices
+
+class GreedyBALD(_GeneralBALD):
+    """Greedy Bayesian Active Learning by Disagreement (GreedyBALD)
+
+    The Bayesian Active Learning by Disagreement (BALD) [1] strategy
+    reduces the number of possible hypotheses maximally fast to minimize the
+    uncertainty about the parameters using Shannon's entropy. It seeks the data
+    point that maximises the decrease in expected posterior entropy. For the
+    batch case, a greedy (top-k) selection is applied
+
+    Parameters
+    ----------
+    n_MC_samples : int > 0, optional (default=n_estimators)
+        The number of monte carlo samples used for label estimation.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
+    missing_label : scalar or string or np.nan or None, optional
+        (default=np.nan)
+        Value to represent a missing label.
+    random_state : int or None or np.random.RandomState, optional
+        (default=None)
+        The random state to use.
+
+    References
+    ----------
+    [1] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
+        "Bayesian Active Learning for Classification and Preference Learning."
+        arXiv preprint arXiv:1112.5745 (2011).
+    """
+
+    def __init__(
+        self,
+        n_MC_samples=None,
+        eps=1e-7,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
+        super().__init__(
+            n_MC_samples=n_MC_samples,
+            greedy_selection=True,
+            eps=eps,
+            missing_label=missing_label,
+            random_state=random_state,
+        )
 
 
-def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
-    """BatchBALD: Efficient and Diverse Batch Acquisition
-        for Deep Bayesian Active Learning
+def batch_bald(
+    probas,
+    batch_size,
+    n_MC_samples=None,
+    random_state=None,
+    eps=1e-7,
+):
+    """BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian
+    Active Learning
 
-    BatchBALD [1] is an extension of BALD (Bayesian Active Learning by
-    Disagreement) [2] whereby points are jointly scored by estimating the
+    BatchBALD [2] is an extension of BALD  [1] (Bayesian Active Learning by
+    Disagreement) whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.
 
@@ -184,25 +315,28 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
     ----------
     probas : array-like of shape (n_estimators, n_samples, n_classes)
         The probability estimates of all estimators, samples, and classes.
-    batch_size : int, default=1
+    batch_size : int, optional (default=1)
         The number of samples to be selected in one AL cycle.
-    n_MC_samples : int > 0, default=n_estimators
+    n_MC_samples : int > 0, optional (default=n_estimators)
         The number of monte carlo samples used for label estimation.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     Returns
     -------
-    scores: np.ndarray of shape (n_samples)
-        The BatchBALD-scores.
+    utilities: numpy.ndarray of shape (batch_size, n_samples)
+        Sample utilities computed according to BatchBALD [2].
 
     References
     ----------
-    [1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "Batchbald:
-        Efficient and diverse batch acquisition for deep bayesian active
-        learning." Advances in neural information processing systems 32 (2019).
-    [2] Houlsby, Neil, et al. "Bayesian active learning for classification and
-        preference learning." arXiv preprint arXiv:1112.5745 (2011).
+    [1] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
+        "Bayesian Active Learning for Classification and Preference Learning."
+        arXiv preprint arXiv:1112.5745 (2011).
+    [2] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
+        Efficient and Diverse Batch Acquisition for Deep Bayesian  Active
+        Learning." Advances in Neural Information Processing Systems 32 (2019).
     """
     # Validate input parameters.
     if probas.ndim != 3:
@@ -211,12 +345,21 @@ def batch_bald(probas, batch_size, n_MC_samples=None, random_state=None):
         )
     probs_K_N_C = check_array(probas, ensure_2d=False, allow_nd=True)
     check_scalar(batch_size, "batch_size", int, min_val=1)
+    check_scalar(
+        eps,
+        "eps",
+        min_val=0,
+        max_val=0.1,
+        target_type=(float, int),
+        min_inclusive=False,
+    )
     if n_MC_samples is None:
         n_MC_samples = len(probas)
     check_scalar(n_MC_samples, "n_MC_samples", int, min_val=1)
     random_state = check_random_state(random_state)
 
     probs_N_K_C = probs_K_N_C.swapaxes(0, 1)
+    np.clip(probs_N_K_C, a_min=eps, a_max=1, out=probs_N_K_C)
     log_probs_N_K_C = np.log(probs_N_K_C)
     N, K, C = log_probs_N_K_C.shape
 
@@ -314,7 +457,9 @@ def _batch_multi_choices(probs_b_C, M, random_state):
 
     # samples: Ni... x draw_per_xx
     choices = [
-        random_state.choice(C, size=M, p=probs_B_C[b], replace=True)
+        random_state.choice(
+            C, size=M, p=probs_B_C[b] / np.sum(probs_B_C[b]), replace=True
+        )
         for b in range(B)
     ]
     choices = np.array(choices, dtype=int)
@@ -338,11 +483,15 @@ def _gather_expand(data, axis, index):
 
 
 class _SampledJointEntropy:
-    """Random variables (all with the same # of categories $C$) can be added via `_SampledJointEntropy.add_variables`.
+    """
+    Random variables (all with the same # of categories $C$) can be added
+    via `_SampledJointEntropy.add_variables`.
 
     `_SampledJointEntropy.compute` computes the joint entropy.
 
-    `_SampledJointEntropy.compute_batch` computes the joint entropy of the added variables with each of the variables in the provided batch probabilities in turn.
+    `_SampledJointEntropy.compute_batch` computes the joint entropy of the
+    added variables with each of the variables in the provided batch
+    probabilities in turn.
     """
 
     def __init__(self, sampled_joint_probs_M_K, random_state):
@@ -432,7 +581,10 @@ class _DynamicJointEntropy:
         return self
 
     def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
-        """Computes the joint entropy of the added variables together with the batch (one by one)."""
+        """
+        Computes the joint entropy of the added variables together with the
+        batch (one by one).
+        """
         return self.inner.compute_batch(log_probs_B_K_C, output_entropies_B)
 
 

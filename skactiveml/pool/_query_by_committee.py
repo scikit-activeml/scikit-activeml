@@ -9,6 +9,7 @@ import copy
 import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import check_array, check_is_fitted
+from iteration_utilities import flatten
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -21,6 +22,7 @@ from ..utils import (
     compute_vote_vectors,
     MISSING_LABEL,
     check_equal_missing_label,
+    check_scalar,
 )
 
 
@@ -36,6 +38,9 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         The method to calculate the disagreement in the case of classification.
         KL_divergence or vote_entropy are possible. In the case of regression
         the empirical variance is used.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities (only
+        relevant for `method='KL_divergence'`).
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
@@ -58,6 +63,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     def __init__(
         self,
         method="KL_divergence",
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -65,6 +71,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             missing_label=missing_label, random_state=random_state
         )
         self.method = method
+        self.eps = eps
 
     def query(
         self,
@@ -166,10 +173,13 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         if classes is not None:
             # Compute utilities.
             if self.method == "KL_divergence":
-                probas = np.array(
-                    [est.predict_proba(X_cand) for est in est_arr]
+                # probas = np.array(
+                #     [est.predict_proba(X_cand) for est in est_arr]
+                # )
+                probas = self._aggregate_predict_probas(
+                    X_cand, ensemble, est_arr
                 )
-                utilities_cand = average_kl_divergence(probas)
+                utilities_cand = average_kl_divergence(probas, self.eps)
             else:  # self.method == "vote_entropy":
                 votes = np.array([est.predict(X_cand) for est in est_arr]).T
                 utilities_cand = vote_entropy(votes, classes)
@@ -193,8 +203,53 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             return_utilities=return_utilities,
         )
 
+    def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
+        """Aggregate the predicted probabilities across all ensemble members and
+        ensure that all classes are mapped correctly.
 
-def average_kl_divergence(probas):
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Samples whose probabilities are to be predicted.
+        ensemble : list or tuple of SkactivemlClassifier or SkactivemlClassifier
+            If `ensemble` is a `SkactivemlClassifier`, it must have
+            `n_estimators` and `estimators_` after fitting as attribute. Then,
+            its estimators will be used as committee. If `ensemble` is
+            array-like, each element of this list must be `SkactivemlClassifier`
+            and will be used as committee member.
+        est_arr : list or tuple of SkactivemlClassifier
+            List of ensemble members contained in `ensemble`.
+
+        Returns
+        -------
+        probas: np.ndarray, shape (n_samples, n_classes)
+            The mapped predicted probabilities.
+        """
+        if hasattr(ensemble, "classes_"):
+            ensemble_classes = ensemble.classes_
+        else:
+            ensemble_classes = np.unique(
+                list(flatten([est.classes_ for est in est_arr]))
+            )
+        probas = np.zeros((len(est_arr), len(X_cand), len(ensemble_classes)))
+        for i, est in enumerate(est_arr):
+            est_proba = est.predict_proba(X_cand)
+            est_classes = est.classes_
+
+            if len(est_classes) == len(ensemble_classes):
+                indices_ensemble = np.arange(len(ensemble_classes))
+            else:
+                indices_est = np.where(np.isin(est_classes, ensemble_classes))[
+                    0
+                ]
+                indices_ensemble = np.searchsorted(
+                    ensemble_classes, est_classes[indices_est]
+                )
+            probas[i, :, indices_ensemble] = est_proba.T
+        return probas
+
+
+def average_kl_divergence(probas, eps=1e-7):
     """Calculates the average Kullback-Leibler (KL) divergence for measuring
     the level of disagreement in QueryByCommittee.
 
@@ -202,6 +257,8 @@ def average_kl_divergence(probas):
     ----------
     probas : array-like, shape (n_estimators, n_samples, n_classes)
         The probability estimates of all estimators, samples, and classes.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities.
 
     Returns
     -------
@@ -214,13 +271,24 @@ def average_kl_divergence(probas):
         for text classification. In Proceedings of the International Conference
         on Machine Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
     """
-    # Check probabilities.
+    # Check parameters.
+    check_scalar(
+        eps,
+        "eps",
+        min_val=0,
+        max_val=0.1,
+        target_type=(float, int),
+        min_inclusive=False,
+    )
     probas = check_array(probas, allow_nd=True)
     if probas.ndim != 3:
         raise ValueError(
             f"Expected 3D array, got {probas.ndim}D array instead."
         )
     n_estimators = probas.shape[0]
+
+    np.clip(probas, a_min=eps, a_max=1, out=probas)
+    probas /= probas.sum(axis=2, keepdims=True)
 
     # Calculate the average KL divergence.
     probas_mean = np.mean(probas, axis=0)
@@ -290,7 +358,10 @@ def _check_ensemble(
             check_equal_missing_label(ensemble.missing_label, missing_label)
             # Fit the ensemble.
             if fit_ensemble:
-                ensemble = clone(ensemble).fit(X, y, sample_weight)
+                if sample_weight is None:
+                    ensemble = clone(ensemble).fit(X, y)
+                else:
+                    ensemble = clone(ensemble).fit(X, y, sample_weight)
             else:
                 check_is_fitted(ensemble)
 
@@ -321,7 +392,10 @@ def _check_ensemble(
                 )
                 # Fit the ensemble.
                 if fit_ensemble:
-                    est_arr[i] = est_arr[i].fit(X, y, sample_weight)
+                    if sample_weight is None:
+                        est_arr[i] = est_arr[i].fit(X, y)
+                    else:
+                        est_arr[i] = est_arr[i].fit(X, y, sample_weight)
                 else:
                     check_is_fitted(est_arr[i])
 

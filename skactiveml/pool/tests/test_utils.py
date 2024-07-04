@@ -624,7 +624,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         params = list(
             product(base_clfs[1:], speed_ups, sample_weights, preds[:2])
         )
-
         for BaseClf, speed_up, sample_weight, pred in params:
             with self.subTest(
                 msg="NB use fit data",
