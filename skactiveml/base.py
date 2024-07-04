@@ -741,10 +741,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 A_cand = np.full_like(y, False)
                 A_cand[:, annotators] = True
             else:
-                candidates = np.arange(len(X), dtype=int)[
-                    np.any(annotators, axis=1)
-                ]
-                A_cand = annotators[np.any(annotators, axis=1)]
+                candidates = np.arange(len(X), dtype=int)
+                A_cand = annotators
         else:  # candidates indices array
             if annotators is None:
                 A_cand = np.full((len(candidates), y.shape[1]), True)
@@ -752,8 +750,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 A_cand = np.full((len(candidates), y.shape[1]), False)
                 A_cand[:, annotators] = True
             else:
-                candidates = candidates[np.any(annotators, axis=1)]
-                A_cand = annotators[np.any(annotators, axis=1)]
+                candidates = candidates
+                A_cand = annotators
         return X[candidates], candidates, A_cand
 
 

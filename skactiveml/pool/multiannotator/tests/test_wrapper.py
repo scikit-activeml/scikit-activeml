@@ -555,27 +555,46 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
 
         X_cand = np.array([[7, 1], [9, 1]])
-
         A_perf = np.array([[1, 2, 3], [3, 2, 1]])
 
-        re_val = wrapper.query(
-            self.X,
-            self.y,
-            candidates=X_cand,
-            batch_size=6,
+        for candidates in [X_cand, np.array([0, 1])]:
+            best_cand_indices, utilities = wrapper.query(
+                self.X,
+                self.y,
+                candidates=candidates,
+                batch_size=6,
+                n_annotators_per_sample=3,
+                A_perf=A_perf,
+                return_utilities=True,
+            )
+
+            # assert the utilities fit A_perf
+            self.assertFalse(np.any(utilities[:, 0, 2] < utilities[:, 0, 1]))
+            self.assertFalse(np.any(utilities[:, 0, 1] < utilities[:, 0, 0]))
+
+            self.assertFalse(np.any(utilities[:, 1, 0] < utilities[:, 1, 1]))
+            self.assertFalse(np.any(utilities[:, 1, 1] < utilities[:, 1, 2]))
+
+            self.check_max(best_cand_indices, utilities)
+
+        X = np.array([[7, 1], [9, 1]])
+        y = np.array([[MISSING_LABEL, 0, MISSING_LABEL], [MISSING_LABEL, MISSING_LABEL, MISSING_LABEL]])
+        A_perf = np.array([[1, 2, 3], [3, 2, 1]])
+
+        best_cand_indices, utilities = wrapper.query(
+            X,
+            y,
+            batch_size=5,
             n_annotators_per_sample=3,
             A_perf=A_perf,
             return_utilities=True,
         )
 
-        best_cand_indices, utilities = re_val
         # assert the utilities fit A_perf
         self.assertFalse(np.any(utilities[:, 0, 2] < utilities[:, 0, 1]))
         self.assertFalse(np.any(utilities[:, 0, 1] < utilities[:, 0, 0]))
-
         self.assertFalse(np.any(utilities[:, 1, 0] < utilities[:, 1, 1]))
         self.assertFalse(np.any(utilities[:, 1, 1] < utilities[:, 1, 2]))
-
         self.check_max(best_cand_indices, utilities)
 
     def test_query_custom_annotator_general_equal_preference(self):

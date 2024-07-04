@@ -121,8 +121,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         batch_size : int, optional (default=1)
             The number of annotators sample pairs to be selected in one AL
             cycle.
-        A_perf : array-like, shape (n_candidates, n_annotators) or
-                  (n_annotators,) optional (default=None)
+        A_perf : array-like, shape (n_annotators,) or (n_candidates, n_annotators), optional (default=None)
             The performance based ranking of each annotator.
             1.) If `A_perf` is of shape (n_candidates, n_annotators) for each
              sample `i` the value-annotators pair `(i, j)` is chosen
@@ -246,6 +245,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         y_sq = y_aggregate(y)
 
+        n_selectable_candidates = len(X_cand)
         n_candidates = len(candidates) if candidates is not None else len(X)
         n_annotators = y.shape[1]
         n_samples = X.shape[0]
@@ -292,7 +292,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         # check A_perf and set annotator_utilities
         if A_perf is None:
             annotator_utilities = random_state.rand(
-                1, n_candidates, n_annotators
+                1, n_selectable_candidates, n_annotators
             ).repeat(batch_size_sq, axis=0)
         elif _is_arraylike(A_perf):
             A_perf = check_array(A_perf, ensure_2d=False)
@@ -310,16 +310,18 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 annotator_utilities = A_perf[np.newaxis, :, :].repeat(
                     batch_size_sq, axis=0
                 )
+                if candidates is None:
+                    annotator_utilities = annotator_utilities[:, mapping, :]
             elif A_perf.shape == (n_annotators,):
                 annotator_utilities = (
                     A_perf[np.newaxis, np.newaxis, :]
-                    .repeat(n_candidates, axis=1)
+                    .repeat(n_selectable_candidates, axis=1)
                     .repeat(batch_size_sq, axis=0)
                 )
             else:
                 raise ValueError(
                     f"`A_perf` is of shape {A_perf.shape}, but must be of "
-                    f"shape ({n_candidates}, {n_annotators}) or of shape "
+                    f"shape ({n_selectable_candidates}, {n_annotators}) or of shape "
                     f"({n_annotators},)."
                 )
         else:
