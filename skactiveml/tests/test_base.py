@@ -107,24 +107,32 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
 
         X = np.array([[1, 2], [0, 1]])
         y = np.array([[1, MISSING_LABEL], [2, 3]])
-        candidates_values = [None, np.array([0, 1]), np.array([[3, 4], [0, 1]])]
-        annotators_values = [None, np.array([0]), np.array([[False, True], [True, True]])]
-
-        batch_size_initial = 4
-        batch_sizes_expected = [
-            [1, 2, 3],
-            [4, 2, 3],
-            [4, 2, 3]
+        candidates_values = [
+            None,
+            np.array([0, 1]),
+            np.array([[3, 4], [0, 1]]),
+        ]
+        annotators_values = [
+            None,
+            np.array([0]),
+            np.array([[False, True], [True, True]]),
         ]
 
-        for (i, candidates), (j, annotators) in product(enumerate(candidates_values), enumerate(annotators_values)):
-            X, y, candidates, annotators, batch_size, return_utilities = self.qs._validate_data(
-                candidates=candidates,
-                annotators=annotators,
-                X=X,
-                y=y,
-                batch_size=batch_size_initial,
-                return_utilities=False,
+        batch_size_initial = 4
+        batch_sizes_expected = [[1, 2, 3], [4, 2, 3], [4, 2, 3]]
+
+        for (i, candidates), (j, annotators) in product(
+            enumerate(candidates_values), enumerate(annotators_values)
+        ):
+            X, y, candidates, annotators, batch_size, return_utilities = (
+                self.qs._validate_data(
+                    candidates=candidates,
+                    annotators=annotators,
+                    X=X,
+                    y=y,
+                    batch_size=batch_size_initial,
+                    return_utilities=False,
+                )
             )
             self.assertEqual(batch_sizes_expected[i][j], batch_size)
 
@@ -148,10 +156,20 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
 
         X = np.array([[1, 2], [0, 1]])
         y = np.array([[1, MISSING_LABEL], [2, 3]])
-        candidates_values = [None, np.array([0, 1]), np.array([[3, 4], [0, 1]])]
-        annotators_values = [None, np.array([0]), np.array([[False, True], [True, True]])]
+        candidates_values = [
+            None,
+            np.array([0, 1]),
+            np.array([[3, 4], [0, 1]]),
+        ]
+        annotators_values = [
+            None,
+            np.array([0]),
+            np.array([[False, True], [True, True]]),
+        ]
 
-        for (i, candidates), (j, annotators) in product(enumerate(candidates_values), enumerate(annotators_values)):
+        for (i, candidates), (j, annotators) in product(
+            enumerate(candidates_values), enumerate(annotators_values)
+        ):
             X_cand, mapping, A_cand = self.qs._transform_cand_annot(
                 candidates=candidates,
                 annotators=annotators,
@@ -163,7 +181,9 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             if i == 0 and j == 0:
                 np.testing.assert_array_equal(A_cand, is_unlabeled(y)[mapping])
                 np.testing.assert_array_equal(X[mapping], X_cand)
-                np.testing.assert_array_equal(mapping, np.nonzero(np.any(is_unlabeled(y), axis=1))[0])
+                np.testing.assert_array_equal(
+                    mapping, np.nonzero(np.any(is_unlabeled(y), axis=1))[0]
+                )
             if i == 0 and j == 1:
                 expected_A_cand = np.full((len(X_cand), len(y.T)), False)
                 expected_A_cand[:, annotators] = True
@@ -172,10 +192,14 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             if i == 0 and j == 2:
                 np.testing.assert_array_equal(annotators[mapping], A_cand)
                 np.testing.assert_array_equal(X[mapping], X_cand)
-                np.testing.assert_array_equal(mapping, np.nonzero(np.any(A_cand, axis=1))[0])
+                np.testing.assert_array_equal(
+                    mapping, np.nonzero(np.any(A_cand, axis=1))[0]
+                )
             if i == 1 and j == 0:
                 np.testing.assert_array_equal(X[mapping], X_cand)
-                np.testing.assert_array_equal(A_cand, np.full((len(X_cand), len(y.T)), True))
+                np.testing.assert_array_equal(
+                    A_cand, np.full((len(X_cand), len(y.T)), True)
+                )
                 np.testing.assert_array_equal(mapping, candidates)
             if i == 1 and j == 1:
                 expected_A_cand = np.full((len(X_cand), len(y.T)), False)
@@ -186,11 +210,15 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
             if i == 1 and j == 2:
                 np.testing.assert_array_equal(annotators[mapping], A_cand)
                 np.testing.assert_array_equal(X[mapping], X_cand)
-                np.testing.assert_array_equal(mapping, candidates[np.any(A_cand, axis=1)])
+                np.testing.assert_array_equal(
+                    mapping, candidates[np.any(A_cand, axis=1)]
+                )
             if i == 2 and j == 0:
                 self.assertEqual(mapping, None)
                 np.testing.assert_array_equal(X_cand, candidates)
-                np.testing.assert_array_equal(A_cand, np.full((len(X_cand),len(y.T)), True))
+                np.testing.assert_array_equal(
+                    A_cand, np.full((len(X_cand), len(y.T)), True)
+                )
             if i == 2 and j == 1:
                 self.assertEqual(mapping, None)
                 np.testing.assert_array_equal(X_cand, candidates)
@@ -201,8 +229,6 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
                 self.assertEqual(mapping, None)
                 np.testing.assert_array_equal(X_cand, candidates)
                 np.testing.assert_array_equal(A_cand, annotators)
-
-
 
         re_val = self.qs._transform_cand_annot(
             candidates=np.arange(2),

@@ -205,7 +205,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         check_type(
             self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
         )
-        if self.strategy.missing_label != self.missing_label and not(np.isnan(self.strategy.missing_label) & np.isnan(self.missing_label)):
+        if self.strategy.missing_label != self.missing_label and not (
+            np.isnan(self.strategy.missing_label)
+            & np.isnan(self.missing_label)
+        ):
             raise ValueError(
                 f"`self.missing_label` must equal `self.strategy.missing_label`, but"
                 f"`self.missing_label` equals {self.missing_label} and"
@@ -394,7 +397,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         annotator_ps = 0  # current annotators per sample
         sample_index = 0  # sample batch index
 
-        for batch_index in range(batch_size): # actual batch index
+        for batch_index in range(batch_size):  # actual batch index
             utilities[batch_index] = s_utilities[sample_index]
             query_indices[batch_index] = rand_argmax(
                 utilities[batch_index], random_state=random_state

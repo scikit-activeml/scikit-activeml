@@ -58,8 +58,12 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             annotators=self.A_cand,
         )
 
-        strategy = RandomSampling(random_state=self.random_state, missing_label=-1)
-        wrapper = SingleAnnotatorWrapper(strategy=strategy, random_state=self.random_state, missing_label=0)
+        strategy = RandomSampling(
+            random_state=self.random_state, missing_label=-1
+        )
+        wrapper = SingleAnnotatorWrapper(
+            strategy=strategy, random_state=self.random_state, missing_label=0
+        )
         self.assertRaises(
             ValueError,
             wrapper.query,
@@ -669,7 +673,6 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.assertTrue(
             np.all(label_available[query_indices[:, 0], query_indices[:, 1]])
         )
-
 
     def check_availability(self, best_cand_indices, A_cand):
         best_value_indices = best_cand_indices[:, 0]
