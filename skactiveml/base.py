@@ -439,9 +439,19 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
-            If `candidates` is None, the samples from (X,y), for which an
-            annotator exists such that the annotator sample pair is
-            unlabeled are considered as sample candidates.
+            See annotators.
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int or
+            array-like of shape (n_candidates, n_annotators), optional
+        (default=None)
+            If candidate samples and annotators are not specified, i.e.,
+            `candidates==None`, `annotators==None` the unlabeled target values, y,
+            are the candidates annotator-sample-pairs.
+            If candidate samples and available annotators are specified:
+            The annotator-sample-pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered
+            as candidate annotator-sample-pairs.
+            If `candidates` is None, all samples of `X` are considered as candidate
+            samples. In this case `n_candidates` equals `len(X)`.
             If `candidates` is of shape (n_candidates,) and of type int,
             `candidates` is considered as the indices of the sample candidates
             in (X,y).
@@ -449,18 +459,11 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             sample candidates are directly given in `candidates` (not
             necessarily contained in `X`). This is not supported by all query
             strategies.
-        annotators : None or array-like of shape (n_avl_annotators), dtype=int or
-            array-like of shape (n_candidates, n_annotators), optional
-        (default=None)
-            If `annotators` is None, all annotators are considered as available
+            If `annotators` is `None`, all annotators are considered as available
             annotators.
             If `annotators` is of shape (n_avl_annotators), and of type int,
             `annotators` is considered as the indices of the available
             annotators.
-            If candidate samples and available annotators are specified:
-            The annotator-sample-pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered
-            as candidate annotator-sample-pairs.
             If `annotators` is a boolean array of shape (n_candidates,
             n_annotators) the annotator-sample-pairs, for which the sample
             is a candidate sample and the boolean matrix has entry `True` are
