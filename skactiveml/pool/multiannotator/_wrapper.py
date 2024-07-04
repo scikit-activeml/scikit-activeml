@@ -246,8 +246,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         y_sq = y_aggregate(y)
 
-        n_candidates = X_cand.shape[0]
-        n_annotators = A_cand.shape[1]
+        n_candidates = len(candidates) if candidates is not None else len(X)
+        n_annotators = y.shape[1]
         n_samples = X.shape[0]
 
         batch_size_sq = min(batch_size, X_cand.shape[0])
