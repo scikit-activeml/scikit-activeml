@@ -63,7 +63,9 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
         check_is_fitted(reg.estimator_)
 
         reg_1 = SklearnRegressor(
-            estimator=MLPRegressor(random_state=self.random_state, max_iter=1000),
+            estimator=MLPRegressor(
+                random_state=self.random_state, max_iter=1000
+            ),
             random_state=self.random_state,
         )
 
@@ -72,7 +74,9 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
 
         reg_2 = clone(reg_1)
         sample_weight = np.arange(1, len(y) + 1)
-        self.assertRaises(TypeError, reg_1.fit, X, y, sample_weight=sample_weight)
+        self.assertRaises(
+            TypeError, reg_1.fit, X, y, sample_weight=sample_weight
+        )
         reg_2.fit(X, y)
 
         reg_1 = SklearnRegressor(estimator=LinearRegression())
@@ -301,5 +305,3 @@ class TestSklearnProbabilisticRegressor(
         reg.partial_fit(X_new, y_new)
         y_pred_new = reg.predict(X_new)
         self.assertTrue(np.abs(y_pred_new - y_pred).sum() != 0)
-
-
