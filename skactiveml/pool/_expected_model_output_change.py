@@ -166,7 +166,10 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if fit_reg:
-            reg = clone(reg).fit(X, y, sample_weight)
+            if sample_weight is None:
+                reg = reg.fit(X, y)
+            else:
+                reg = reg.fit(X, y, sample_weight)
 
         y_pred = reg.predict(X_eval)
 
