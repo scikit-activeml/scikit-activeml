@@ -293,7 +293,6 @@ class TestSklearnProbabilisticRegressor(
         X_new, y_new = X_all[200:], y_all[200:]
 
         class GaussianProcessRegressorDummy(GaussianProcessRegressor):
-
             def partial_fit(self, X, y):
                 return self.fit(X, y)
 

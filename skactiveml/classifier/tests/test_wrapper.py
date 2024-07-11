@@ -279,7 +279,6 @@ class TestSlidingWindowClassifier(
         clf = SlidingWindowClassifier(estimator=Perceptron())
         self.assertRaises(TypeError, clf.partial_fit, [[0], [1]], [[0], [1]])
 
-
     def test_init_param_missing_label(self, test_cases=None):
         replace_init_params = {
             "estimator": SklearnClassifier(
@@ -389,9 +388,10 @@ class TestSlidingWindowClassifier(
         estimator = ParzenWindowClassifier(
             classes=[0, 1], cost_matrix=np.eye(2)
         )
-        clf = SlidingWindowClassifier(estimator=estimator, classes=[0, 1], cost_matrix=2*np.eye(2))
+        clf = SlidingWindowClassifier(
+            estimator=estimator, classes=[0, 1], cost_matrix=2 * np.eye(2)
+        )
         self.assertRaises(ValueError, clf.fit, [[0], [1]], [0, 1])
-
 
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
         test_cases = [] if test_cases is None else test_cases
