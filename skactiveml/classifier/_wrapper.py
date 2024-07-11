@@ -30,7 +30,6 @@ from ..utils import (
     check_scalar,
     match_signature,
 )
-from sklearn.utils.metaestimators import available_if
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -347,7 +346,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     Parameters
     ----------
     estimator : sklearn.base.SkactivemlClassifier
-        The wrapped classifier.
+        The classifier to be wrapped. If this classifier already implements a
+        `partial_fit`, this method will be overwritten by this wrapper using
+        the sliding window approach.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -359,14 +360,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         `classes` is not none.
     window_size: int, default=None,
         Value to represent the estimator sliding window size for X, y and
-        sample weight. If 'None' the windows is unrestricted in size.
+        sample weight. If 'None' the window is unrestricted in its size.
     only_labeled: bool, default=False
         If True, unlabeled samples are discarded.
-    ignore_estimator_partial_fit: bool, default=False
-        If True, the existing partial_fit method in `estimator` is ignored and
-        the sliding window is used instead. If False, the partial_fit method
-        in estimator is used but a warning is thrown as the sliding window has
-        no effect.
     random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
@@ -380,7 +376,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         cost_matrix=None,
         window_size=None,
         only_labeled=False,
-        ignore_estimator_partial_fit=False,
         random_state=None,
     ):
         super().__init__(
@@ -392,8 +387,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator = estimator
         self.only_labeled = only_labeled
         self.window_size = window_size
-        self.ignore_estimator_partial_fit = ignore_estimator_partial_fit
 
+    @match_signature("estimator", "fit")
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as class labels.
 
@@ -441,7 +436,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         y_train = np.array(self.y_train_)
         sample_weight_train = None
         if self.sample_weight_train_ is not None:
-            sample_weight_train = np.array(self.sample_weight_train_)
+            sample_weight_train = np.array(
+                self.sample_weight_train_, dtype=float
+            )
         return self._fit(
             "fit",
             X=X_train,
@@ -450,6 +447,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
+    @match_signature("estimator", "fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels. If 'base_estimator' has no partial_fit function use fit with
@@ -478,8 +476,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         # Check whether estimator is a valid classifier.
         if not isinstance(self.estimator, SkactivemlClassifier):
             raise TypeError(
-                "'{}' must be a SkactivemlClassifier"
-                "classifier.".format(self.estimator)
+                "'{}' must be a SkactivemlClassifier.".format(self.estimator)
             )
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
@@ -496,36 +493,20 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
         self._add_samples("partial_fit", X, y, sample_weight)
-
-        if (
-            hasattr(self.estimator, "partial_fit")
-            and not self.ignore_estimator_partial_fit
-        ):
-            warnings.warn(
-                "The partial_fit method in estimator is used but the "
-                "sliding window has no effect. To avoid this set "
-                "`ignore_estimator_partial_fit`=True"
+        X_train = np.array(self.X_train_)
+        y_train = np.array(self.y_train_)
+        sample_weight_train = None
+        if self.sample_weight_train_ is not None:
+            sample_weight_train = np.array(
+                self.sample_weight_train_, dtype=float
             )
-            return self._fit(
-                "partial_fit",
-                X=X,
-                y=y,
-                sample_weight=sample_weight,
-                **fit_kwargs,
-            )
-        else:
-            X_train = np.array(self.X_train_)
-            y_train = np.array(self.y_train_)
-            sample_weight_train = None
-            if self.sample_weight_train_ is not None:
-                sample_weight_train = np.array(self.sample_weight_train_)
-            return self._fit(
-                "fit",
-                X=X_train,
-                y=y_train,
-                sample_weight=sample_weight_train,
-                **fit_kwargs,
-            )
+        return self._fit(
+            "fit",
+            X=X_train,
+            y=y_train,
+            sample_weight=sample_weight_train,
+            **fit_kwargs,
+        )
 
     def _add_samples(self, fit_func, X, y, sample_weight=None):
         if not hasattr(self, "X_train_"):
@@ -601,11 +582,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             )
         check_type(self.only_labeled, "only_labeled", bool)
 
-        check_type(
-            self.ignore_estimator_partial_fit,
-            "ignore_estimator_partial_fit",
-            bool,
-        )
         check_y_dict = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
@@ -675,7 +651,8 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         return X, y, sample_weight
 
-    def predict(self, X):
+    @match_signature("estimator", "predict")
+    def predict(self, X, **predict_kwargs):
         """Return class label predictions for the input data X.
 
         Parameters
@@ -694,9 +671,10 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_is_fitted(self)
         X = check_array(X, **self.check_X_dict_)
         self._check_n_features(X, reset=False)
-        return self.estimator_.predict(X)
+        return self.estimator_.predict(X, **predict_kwargs)
 
-    def predict_proba(self, X):
+    @match_signature("estimator", "predict_proba")
+    def predict_proba(self, X, **predict_proba_kwargs):
         """Return probability estimates for the input data X.
 
         Parameters
@@ -716,11 +694,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_is_fitted(self)
         X = check_array(X, **self.check_X_dict_)
         self._check_n_features(X, reset=False)
-        proba = self.estimator_.predict_proba(X)
+        proba = self.estimator_.predict_proba(X, **predict_proba_kwargs)
         return proba
 
-    @available_if(lambda self: hasattr(self.estimator, "predict_freq"))
-    def predict_freq(self, X):
+    @match_signature("estimator", "predict_freq")
+    def predict_freq(self, X, **predict_freq_kwargs):
         """Return class frequency estimates for the test samples `X`.
 
         Parameters
@@ -737,7 +715,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_is_fitted(self)
         X = check_array(X, **self.check_X_dict_)
         self._check_n_features(X, reset=False)
-        freq = self.estimator_.predict_freq(X)
+        freq = self.estimator_.predict_freq(X, **predict_freq_kwargs)
         return freq
 
     def __getattr__(self, item):
