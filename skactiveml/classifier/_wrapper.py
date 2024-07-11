@@ -440,7 +440,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 self.sample_weight_train_, dtype=float
             )
         return self._fit(
-            "fit",
             X=X_train,
             y=y_train,
             sample_weight=sample_weight_train,
@@ -501,7 +500,6 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 self.sample_weight_train_, dtype=float
             )
         return self._fit(
-            "fit",
             X=X_train,
             y=y_train,
             sample_weight=sample_weight_train,
@@ -536,7 +534,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             self.sample_weight_train_ = None
 
-    def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+    def _fit(self, X, y, sample_weight=None, **fit_kwargs):
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(
             self.estimator, "predict_proba"
@@ -546,24 +544,17 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 "implements 'predict_proba'."
             )
 
-        if fit_function == "fit" or not hasattr(self, "n_features_in_"):
-            self._check_n_features(X, reset=True)
-        elif fit_function == "partial_fit":
-            self._check_n_features(X, reset=False)
+        self._check_n_features(X, reset=True)
 
         if hasattr(self, "estimator_"):
-            if fit_function == "fit":
-                self.estimator_ = deepcopy(self.estimator)
+            self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
 
         if has_fit_parameter(self.estimator, "sample_weight"):
             fit_kwargs["sample_weight"] = sample_weight
 
-        if fit_function == "fit":
-            self.estimator_.fit(X=X, y=y, **fit_kwargs)
-        elif fit_function == "partial_fit":
-            self.estimator_.partial_fit(X=X, y=y, **fit_kwargs)
+        self.estimator_.fit(X=X, y=y, **fit_kwargs)
 
         return self
 

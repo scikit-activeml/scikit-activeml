@@ -276,6 +276,9 @@ class TestSlidingWindowClassifier(
             (GaussianNB(), TypeError),
         ]
         self._test_param("init", "estimator", test_cases)
+        clf = SlidingWindowClassifier(estimator=Perceptron())
+        self.assertRaises(TypeError, clf.partial_fit, [[0], [1]], [[0], [1]])
+
 
     def test_init_param_missing_label(self, test_cases=None):
         replace_init_params = {
@@ -380,6 +383,15 @@ class TestSlidingWindowClassifier(
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+
+    def test_init_param_cost_matrix(self):
+        super().test_init_param_cost_matrix()
+        estimator = ParzenWindowClassifier(
+            classes=[0, 1], cost_matrix=np.eye(2)
+        )
+        clf = SlidingWindowClassifier(estimator=estimator, classes=[0, 1], cost_matrix=2*np.eye(2))
+        self.assertRaises(ValueError, clf.fit, [[0], [1]], [0, 1])
+
 
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
         test_cases = [] if test_cases is None else test_cases
