@@ -150,9 +150,9 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
 
         if fit_reg:
             if sample_weight is None:
-                reg = reg.fit(X, y)
+                reg = clone(reg).fit(X, y)
             else:
-                reg = reg.fit(X, y, sample_weight)
+                reg = clone(reg).fit(X, y, sample_weight)
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 

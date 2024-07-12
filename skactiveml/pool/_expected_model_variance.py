@@ -135,9 +135,9 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
         if fit_reg:
             if sample_weight is None:
-                reg = reg.fit(X, y)
+                reg = clone(reg).fit(X, y)
             else:
-                reg = reg.fit(X, y, sample_weight)
+                reg = clone(reg).fit(X, y, sample_weight)
 
         old_model_variance = np.average(
             reg.predict(X_eval, return_std=True)[1] ** 2

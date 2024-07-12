@@ -167,9 +167,9 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
         if fit_reg:
             if sample_weight is None:
-                reg = reg.fit(X, y)
+                reg = clone(reg).fit(X, y)
             else:
-                reg = reg.fit(X, y, sample_weight)
+                reg = clone(reg).fit(X, y, sample_weight)
 
         y_pred = reg.predict(X_eval)
 

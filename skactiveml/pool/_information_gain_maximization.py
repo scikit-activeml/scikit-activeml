@@ -165,9 +165,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
         if fit_reg:
             if sample_weight is None:
-                reg = reg.fit(X, y)
+                reg = clone(reg).fit(X, y)
             else:
-                reg = reg.fit(X, y, sample_weight)
+                reg = clone(reg).fit(X, y, sample_weight)
 
         utilities_cand = self._kullback_leibler_divergence(
             X_eval, X_cand, mapping, reg, X, y, sample_weight=sample_weight
