@@ -30,6 +30,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState
         The random state to use.
+    clf_embedding_flag_name : str or None, default=None
+        Name of the flag, which is passed to the `predict_proba` method for
+        getting the (learned) sample representations. If
+        `clf_embedding_flag_name=None`, the input samples `X` are used.
 
     References
     ----------
@@ -55,6 +59,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         y,
         clf,
         fit_clf=True,
+        sample_weight=None,
         candidates=None,
         batch_size=1,
         return_utilities=False,
@@ -71,6 +76,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             indicated by self.missing_label).
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
+        fit_clf : bool, optional (default=True)
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        sample_weight: array-like of shape (n_samples), optional (default=None)
+            Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
@@ -85,12 +95,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional (default=False)
             If true, also return the utilities based on the query strategy.
-        clf_embedding_flag_name : string, optional (default=None)
-            The name of the parameter, whether to return the embedding or not,
-            according to the used classifier.
-            By default, `None` means no embeddings will be returned, but we use
-            the original `X` as embedding.
-
 
         Returns
         -------
@@ -135,7 +139,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
         # Fit the classifier
         if fit_clf:
-            clf = clone(clf).fit(X, y)
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
 
         # find the unlabeled dataset
         if candidates is None:

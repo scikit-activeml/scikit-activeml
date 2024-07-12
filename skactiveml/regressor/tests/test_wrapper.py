@@ -10,6 +10,7 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
 from sklearn.utils.validation import check_is_fitted
+from sklearn.datasets import make_regression
 
 from skactiveml.base import SkactivemlRegressor
 from skactiveml.regressor._wrapper import (
@@ -47,29 +48,24 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
         test_cases += [
             (GaussianProcessRegressor(), None),
             (SVC(), TypeError),
-            ("Test", TypeError),
+            ("Test", AttributeError),
         ]
         self._test_param("init", "estimator", test_cases)
 
     def test_fit_predict(self):
         estimator = LinearRegression()
-        was_fitted_dict = {"is_fitted": False}
-
-        def overwrite_fit(X_fit, y_fit):
-            was_fitted_dict["is_fitted"] = True
-            return
-
-        estimator.fit = overwrite_fit
         reg = SklearnRegressor(estimator=estimator)
         y = np.full(3, MISSING_LABEL)
         reg.fit(self.X, y)
-        self.assertFalse(was_fitted_dict["is_fitted"])
+        self.assertRaises(NotFittedError, check_is_fitted, reg.estimator_)
         y = np.zeros(3)
         reg.fit(self.X, y)
-        self.assertTrue(was_fitted_dict["is_fitted"])
+        check_is_fitted(reg.estimator_)
 
         reg_1 = SklearnRegressor(
-            estimator=MLPRegressor(random_state=self.random_state),
+            estimator=MLPRegressor(
+                random_state=self.random_state, max_iter=1000
+            ),
             random_state=self.random_state,
         )
 
@@ -78,9 +74,10 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
 
         reg_2 = clone(reg_1)
         sample_weight = np.arange(1, len(y) + 1)
-        reg_1.fit(X, y, sample_weight=sample_weight)
+        self.assertRaises(
+            TypeError, reg_1.fit, X, y, sample_weight=sample_weight
+        )
         reg_2.fit(X, y)
-        np.testing.assert_array_equal(reg_1.predict(X), reg_2.predict(X))
 
         reg_1 = SklearnRegressor(estimator=LinearRegression())
         reg_2 = clone(reg_1)
@@ -139,7 +136,7 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
 
     def test_sample(self):
         lin_reg = LinearRegression()
-        lin_reg.sample = lambda a, b: a
+        lin_reg.sample = lambda X, n_samples: n_samples
         reg = SklearnRegressor(lin_reg)
 
         X = np.array([[0], [1], [2], [3], [4]])
@@ -147,7 +144,7 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
 
         reg.fit(X, y)
 
-        self.assertEqual(reg.sample_y("a", 10), "a")
+        self.assertEqual(reg.sample("a", 10), 10)
 
     def test_partial_fit(self):
         reg_1 = SklearnRegressor(
@@ -215,9 +212,16 @@ class TestSklearnProbabilisticRegressor(
         test_cases += [
             (GaussianProcessRegressor(), None),
             (SVC(), TypeError),
-            ("Test", TypeError),
+            ("Test", AttributeError),
         ]
         self._test_param("init", "estimator", test_cases)
+
+    def test_fit_param_sample_weight(self, test_cases=None):
+        replace_init_params = {"estimator": SGDRegressor()}
+        super().test_fit_param_sample_weight(
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
 
     def test_partial_fit_param_X(self, test_cases=None):
         replace_init_params = {"estimator": SGDRegressor()}
@@ -284,5 +288,19 @@ class TestSklearnProbabilisticRegressor(
         np.testing.assert_array_equal(np.ones(3), std_pred)
 
     def test_partial_fit(self):
-        # TODO: add Test
-        pass
+        X_all, y_all = make_regression(n_samples=300, random_state=0)
+        X_fit, y_fit = X_all[:200], y_all[:200]
+        X_new, y_new = X_all[200:], y_all[200:]
+
+        class GaussianProcessRegressorDummy(GaussianProcessRegressor):
+            def partial_fit(self, X, y):
+                return self.fit(X, y)
+
+        reg = SklearnNormalRegressor(
+            estimator=GaussianProcessRegressorDummy(),
+            random_state=self.random_state,
+        ).fit(X_fit, y_fit)
+        y_pred = reg.predict(X_new)
+        reg.partial_fit(X_new, y_new)
+        y_pred_new = reg.predict(X_new)
+        self.assertTrue(np.abs(y_pred_new - y_pred).sum() != 0)

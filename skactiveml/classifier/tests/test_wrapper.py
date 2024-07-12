@@ -9,8 +9,13 @@ from sklearn.ensemble import BaggingClassifier
 from sklearn.gaussian_process import (
     GaussianProcessClassifier,
 )
-from sklearn.linear_model import Perceptron
-from sklearn.linear_model import LinearRegression
+
+from sklearn.linear_model import (
+    LinearRegression,
+    LogisticRegression,
+    Perceptron,
+    SGDClassifier,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError, check_is_fitted
@@ -242,7 +247,7 @@ class TestSlidingWindowClassifier(
         estimator_class = SlidingWindowClassifier
         init_default_params = {
             "estimator": SklearnClassifier(
-                GaussianProcessClassifier(),
+                SGDClassifier(loss="log_loss"),
                 classes=["tokyo", "paris"],
                 missing_label="nan",
             ),
@@ -267,10 +272,12 @@ class TestSlidingWindowClassifier(
         test_cases = []
         test_cases += [
             (ParzenWindowClassifier(missing_label="nan"), None),
-            ("Test", TypeError),
+            ("Test", AttributeError),
             (GaussianNB(), TypeError),
         ]
         self._test_param("init", "estimator", test_cases)
+        clf = SlidingWindowClassifier(estimator=Perceptron())
+        self.assertRaises(TypeError, clf.partial_fit, [[0], [1]], [[0], [1]])
 
     def test_init_param_missing_label(self, test_cases=None):
         replace_init_params = {
@@ -296,7 +303,7 @@ class TestSlidingWindowClassifier(
         test_cases = [("state", TypeError), (-1, None), (-2, ValueError)]
         replace_init_params["classes"] = [0, 1]
         replace_init_params["estimator"] = SklearnClassifier(
-            GaussianProcessClassifier(), missing_label=-1
+            LogisticRegression(), missing_label=-1
         )
         replace_fit_params = {"y": [0, -1, 1], "X": np.zeros((3, 1))}
         self._test_param(
@@ -310,7 +317,7 @@ class TestSlidingWindowClassifier(
         test_cases = [("state", TypeError), (None, None)]
         replace_init_params["classes"] = [0, 1]
         replace_init_params["estimator"] = SklearnClassifier(
-            GaussianProcessClassifier(), missing_label=None
+            LogisticRegression(), missing_label=None
         )
         replace_fit_params = {"y": [0, None, 1], "X": np.zeros((3, 1))}
         self._test_param(
@@ -324,7 +331,7 @@ class TestSlidingWindowClassifier(
         test_cases = [("state", TypeError), (0.0, None)]
         replace_init_params["classes"] = [0.5, 1.4]
         replace_init_params["estimator"] = SklearnClassifier(
-            GaussianProcessClassifier(), missing_label=0.0
+            LogisticRegression(), missing_label=0.0
         )
         replace_fit_params = {"y": [0.5, 0, 1.4], "X": np.zeros((3, 1))}
         self._test_param(
@@ -345,7 +352,7 @@ class TestSlidingWindowClassifier(
         ]
         replace_init_params = {
             "estimator": SklearnClassifier(
-                GaussianProcessClassifier(),
+                LogisticRegression(),
                 missing_label="nan",
                 classes=["tokyo", "paris"],
             )
@@ -365,7 +372,7 @@ class TestSlidingWindowClassifier(
         test_cases = [([1, 2], None), (["tokyo", "paris"], TypeError)]
         replace_init_params = {"missing_label": -1}
         replace_init_params["estimator"] = SklearnClassifier(
-            GaussianProcessClassifier(), missing_label=-1
+            LogisticRegression(), missing_label=-1
         )
         replace_fit_params = {"y": [2, -1, 1], "X": np.zeros((3, 1))}
         self._test_param(
@@ -375,6 +382,16 @@ class TestSlidingWindowClassifier(
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+
+    def test_init_param_cost_matrix(self):
+        super().test_init_param_cost_matrix()
+        estimator = ParzenWindowClassifier(
+            classes=[0, 1], cost_matrix=np.eye(2)
+        )
+        clf = SlidingWindowClassifier(
+            estimator=estimator, classes=[0, 1], cost_matrix=2 * np.eye(2)
+        )
+        self.assertRaises(ValueError, clf.fit, [[0], [1]], [0, 1])
 
     def test_fit_param_X(self, test_cases=None, replace_init_params=None):
         test_cases = [] if test_cases is None else test_cases
@@ -457,6 +474,15 @@ class TestSlidingWindowClassifier(
             replace_fit_params=replace_fit_params,
         )
 
+    def test_partial_fit_param_X(
+        self, test_cases=None, replace_init_params=None
+    ):
+        replace_init_params = {
+            "classes": ["tokyo", "paris"],
+            "missing_label": "nan",
+            "estimator": SklearnClassifier(GaussianNB(), missing_label="nan"),
+        }
+
     def test_partial_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -467,9 +493,7 @@ class TestSlidingWindowClassifier(
         replace_init_params = {
             "classes": ["tokyo", "paris"],
             "missing_label": "nan",
-            "estimator": SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan"
-            ),
+            "estimator": SklearnClassifier(GaussianNB(), missing_label="nan"),
         }
         replace_fit_params = {"X": np.zeros((3, 1))}
         extras_params = deepcopy(self.fit_default_params)
@@ -489,9 +513,7 @@ class TestSlidingWindowClassifier(
         replace_init_params = {
             "classes": [0, 1, 2],
             "missing_label": -1,
-            "estimator": SklearnClassifier(
-                GaussianProcessClassifier(), missing_label=-1
-            ),
+            "estimator": SklearnClassifier(GaussianNB(), missing_label=-1),
         }
         replace_fit_params = {"X": np.zeros((3, 1))}
         self._test_param(
@@ -503,16 +525,6 @@ class TestSlidingWindowClassifier(
             extras_params=extras_params,
             exclude_fit=True,
         )
-
-    def test_init_param_ignore_estimator_partial_fit(self):
-        test_cases = []
-        test_cases += [
-            (True, None),
-            (False, None),
-            ("Test", TypeError),
-            (0, TypeError),
-        ]
-        self._test_param("init", "ignore_estimator_partial_fit", test_cases)
 
     def test_init_param_window_size(self):
         test_cases = []
@@ -560,7 +572,7 @@ class TestSlidingWindowClassifier(
             y=self.fit_default_params["y"],
         )
 
-        clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
+        clf = SlidingWindowClassifier(estimator=GaussianNB())
         self.assertRaises(NotFittedError, check_is_fitted, estimator=clf)
 
         # check if classifier is correctly fitted
@@ -591,9 +603,7 @@ class TestSlidingWindowClassifier(
         self.assertFalse(hasattr(clf, "kernel_"))
         # fit clf with no prior classes and no labels
         clf = SlidingWindowClassifier(
-            SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan"
-            ),
+            SklearnClassifier(GaussianNB(), missing_label="nan"),
             missing_label="nan",
         )
         self.assertRaises(
@@ -601,9 +611,7 @@ class TestSlidingWindowClassifier(
         )
         # fit clf with correct data and sample_weight
         clf = SlidingWindowClassifier(
-            SklearnClassifier(
-                GaussianProcessClassifier(), missing_label="nan"
-            ),
+            SklearnClassifier(GaussianNB(), missing_label="nan"),
             missing_label="nan",
         )
         clf.fit(
@@ -651,15 +659,10 @@ class TestSlidingWindowClassifier(
             cost_matrix=[[1, 1, 1], [2, 1, 1], [2, 1, 3]],
         )
         # test if clf functions complete data and only_labeled=True
-        self.assertRaises(
-            ValueError,
-            clf.partial_fit,
-            X=self.fit_default_params["X"],
-            y=self.fit_default_params["y"],
-        )
+        self.assertTrue(hasattr(clf, "partial_fit"))
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
-                BaggingClassifier(),
+                Perceptron(),
                 missing_label="nan",
                 classes=["tokyo", "paris", "new york"],
             ),
@@ -675,13 +678,14 @@ class TestSlidingWindowClassifier(
         )
         self.assertTrue(clf.is_fitted_)
 
-        clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
-        self.assertRaises(
-            TypeError,
-            clf.partial_fit,
-            self.fit_default_params["X"],
-            self.fit_default_params["y"],
+        clf = SlidingWindowClassifier(
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                classes=["tokyo", "paris", "new york"],
+                missing_label="nan",
+            )
         )
+        self.assertTrue(hasattr(clf, "partial_fit"))
 
         # test if clf functions with complete data
         clf = SlidingWindowClassifier(
@@ -722,7 +726,7 @@ class TestSlidingWindowClassifier(
         # test clf with classes and empty data
         clf = SlidingWindowClassifier(
             estimator=SklearnClassifier(
-                GaussianNB(),
+                Perceptron(),
                 classes=["tokyo", "paris", "new york"],
                 missing_label="nan",
             ),
@@ -730,7 +734,6 @@ class TestSlidingWindowClassifier(
             missing_label="nan",
             only_labeled=False,
             window_size=5,
-            ignore_estimator_partial_fit=True,
         )
         self.assertEqual(clf.missing_label, "nan")
         clf.partial_fit(
@@ -738,10 +741,11 @@ class TestSlidingWindowClassifier(
             self.y_nan,
             sample_weight=np.ones_like(self.y2),
         )
+        y2 = np.array(["tokyo", "nan", "nan", "paris"])
         clf.partial_fit(
             self.fit_default_params["X"],
-            self.y2,
-            sample_weight=np.ones_like(self.y2),
+            y2,
+            sample_weight=np.ones_like(y2, dtype=float),
         )
         self.assertTrue(clf.is_fitted_)
 
