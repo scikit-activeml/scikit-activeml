@@ -678,7 +678,13 @@ class TestSlidingWindowClassifier(
         )
         self.assertTrue(clf.is_fitted_)
 
-        clf = SlidingWindowClassifier(estimator=GaussianProcessClassifier())
+        clf = SlidingWindowClassifier(
+            estimator=SklearnClassifier(
+                GaussianProcessClassifier(),
+                classes=["tokyo", "paris", "new york"],
+                missing_label="nan",
+            )
+        )
         self.assertTrue(hasattr(clf, "partial_fit"))
 
         # test if clf functions with complete data
