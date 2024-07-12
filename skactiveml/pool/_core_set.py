@@ -21,7 +21,7 @@ from sklearn.utils.validation import (
     check_random_state,
     column_or_1d,
 )
-from sklearn.metrics import pairwise_distances
+from sklearn.metrics import pairwise_distances_argmin_min
 
 
 class CoreSet(SingleAnnotatorPoolQueryStrategy):
@@ -291,16 +291,16 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
 
     if len(cluster_centers) > 0:
         cluster_center_feature = X[cluster_centers]
-        dist_matrix = pairwise_distances(X, cluster_center_feature)
-        dist = np.min(dist_matrix, axis=1)
+        _, dist = pairwise_distances_argmin_min(X, cluster_center_feature)
 
     if latest_distance is not None:
         sum_dist = np.nansum(latest_distance)
-        latest_distance_copy = latest_distance.copy()
+        latest_distance_tmp = latest_distance
         if sum_dist == 0:
-            latest_distance_copy[latest_distance_copy == 0] = np.inf
+            latest_distance_tmp = latest_distance.copy()
+            latest_distance_tmp[latest_distance_tmp == 0] = np.inf
         l_distance = np.zeros(shape=X.shape[0])
-        l_distance[mapping] = latest_distance_copy[mapping]
+        l_distance[mapping] = latest_distance_tmp[mapping]
         dist = np.minimum(l_distance, dist)
 
     result_dist = np.full(X.shape[0], np.nan)

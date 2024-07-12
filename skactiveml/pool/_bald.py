@@ -161,8 +161,10 @@ class _GeneralBALD(QueryByCommittee):
             estimator_types=[SkactivemlClassifier],
         )
 
-        probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        probas = self._aggregate_predict_probas(X_cand, ensemble, est_arr)
 
+        # probas = np.array([est.predict_proba(X_cand) for est in est_arr])
+        # print(probas[:,:5,:])
         if self.n_MC_samples is None:
             n_MC_samples_ = len(est_arr)
         else:
@@ -383,9 +385,7 @@ def batch_bald(
             query_indices
         ].sum()
 
-        utilities[i] = batch_joint_entropy.compute_batch(
-            log_probs_N_K_C, output_entropies_B=utilities[i]
-        )
+        utilities[i] = batch_joint_entropy.compute_batch(log_probs_N_K_C)
 
         utilities[i] -= conditional_entropies_N + shared_conditinal_entropies
         utilities[i, query_indices] = np.nan
@@ -420,7 +420,7 @@ class _ExactJointEntropy:
         self.joint_probs_M_K = joint_probs_K_M_1.squeeze(2).T
         return self
 
-    def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
+    def compute_batch(self, log_probs_B_K_C):
         B, K, C = log_probs_B_K_C.shape
         M = self.joint_probs_M_K.shape[0]
 
@@ -492,7 +492,7 @@ class _SampledJointEntropy:
     probabilities in turn.
     """
 
-    def __init__(self, sampled_joint_probs_M_K, random_state):
+    def __init__(self, sampled_joint_probs_M_K):
         self.sampled_joint_probs_M_K = sampled_joint_probs_M_K
 
     @staticmethod
@@ -517,9 +517,9 @@ class _SampledJointEntropy:
         samples_K_M = probs_K_K_S.reshape((K, -1))
 
         samples_M_K = samples_K_M.T
-        return _SampledJointEntropy(samples_M_K, random_state)
+        return _SampledJointEntropy(samples_M_K)
 
-    def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
+    def compute_batch(self, log_probs_B_K_C):
         B, K, C = log_probs_B_K_C.shape
         M = self.sampled_joint_probs_M_K.shape[0]
 
@@ -578,12 +578,12 @@ class _DynamicJointEntropy:
 
         return self
 
-    def compute_batch(self, log_probs_B_K_C, output_entropies_B=None):
+    def compute_batch(self, log_probs_B_K_C):
         """
         Computes the joint entropy of the added variables together with the
         batch (one by one).
         """
-        return self.inner.compute_batch(log_probs_B_K_C, output_entropies_B)
+        return self.inner.compute_batch(log_probs_B_K_C)
 
 
 def _compute_conditional_entropy(log_probs_N_K_C):

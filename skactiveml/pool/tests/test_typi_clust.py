@@ -21,9 +21,10 @@ class TestTypiClust(
             "X": np.linspace(0, 1, 20).reshape(10, 2),
             "y": np.hstack([[1.1, 2.1], np.full(8, MISSING_LABEL)]),
         }
+        cluster_dict = {"random_state": 0, "n_init": 1}
         super().setUp(
             qs_class=TypiClust,
-            init_default_params={"cluster_algo_dict": {"random_state": 0}},
+            init_default_params={"cluster_algo_dict": cluster_dict},
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
         )
@@ -38,7 +39,12 @@ class TestTypiClust(
             (SpectralClustering, None),
             (KMeans, None),
         ]
-        self._test_param("init", "cluster_algo", test_cases)
+        self._test_param(
+            "init",
+            "cluster_algo",
+            test_cases,
+            replace_init_params={"random_state": 0},
+        )
 
     def test_init_param_cluster_algo_dict(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

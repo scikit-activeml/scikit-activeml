@@ -65,10 +65,10 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         candidates=None,
         annotators=None,
         batch_size=1,
-        query_params_dict=None,
         n_annotators_per_sample=1,
         A_perf=None,
         return_utilities=False,
+        **query_kwargs,
     ):
         """Determines which candidate sample is to be annotated by which
         annotator. The samples are first and primarily ranked by the given
@@ -120,9 +120,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         batch_size : int, optional (default=1)
             The number of annotators sample pairs to be selected in one AL
             cycle.
-        query_params_dict : dict, optional (default=None)
-            Dictionary for the parameters of the query method besides `X` and
-            the transformed `y`.
         A_perf : array-like, shape (n_samples, n_annotators) or
                   (n_annotators,) optional (default=None)
             The performance based ranking of each annotator.
@@ -156,6 +153,9 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             of the n_annotators_per_sample array (k-1) indicates the
             preferred number of annotators for all candidate sample at an index
             greater of equal to k-1.
+        query_kwargs : dict, optional
+            Dictionary for the parameters of the query method besides `X` and
+            the transformed `y`.
 
         Returns
         -------
@@ -204,12 +204,6 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         check_type(
             self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
         )
-
-        # check query_params_dict
-        if query_params_dict is None:
-            query_params_dict = {}
-
-        check_type(query_params_dict, "query_params_dict", dict)
 
         # aggregate y
         if self.y_aggregate is None:
@@ -329,7 +323,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             X=X,
             y=y_sq,
             candidates=candidates_sq,
-            **query_params_dict,
+            **query_kwargs,
             batch_size=batch_size_sq,
             return_utilities=True,
         )

@@ -1,0 +1,44 @@
+[
+  {
+    "class" : "SubSamplingWrapper",
+    "package" : "pool",
+    "method" : "Sub-sampling Wrapper",
+    "category" : "Meta",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "regression", "classification", "single-annotator"],
+    "title" : "Sub-sampling Wrapper",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import SubSamplingWrapper, UncertaintySampling",
+    "init_qs" : [
+      "SubSamplingWrapper(",
+      "    query_strategy=UncertaintySampling(),",
+      "    max_candidates=0.5",
+      ")"
+    ],
+    "query_params" : "X=X, y=y, clf=clf",
+    "plot_utility_params": "candidates=X"
+  },
+  {
+    "class" : "ParallelUtilityEstimationWrapper",
+    "package" : "pool",
+    "method" : "Parallel Utility Estimation Wrapper",
+    "category" : "Meta",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "regression", "classification", "single-annotator"],
+    "title" : "Parallel Utility Estimation Wrapper",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import ParallelUtilityEstimationWrapper, ProbabilisticAL",
+    "init_qs" : [
+      "ParallelUtilityEstimationWrapper(",
+      "    query_strategy=ProbabilisticAL(),",
+      "    n_jobs=4",
+      ")"
+    ],
+    "query_params" : "X=X, y=y, clf=clf",
+    "plot_utility_params": "candidates=X"
+  }
+]

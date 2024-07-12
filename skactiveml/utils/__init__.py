@@ -3,7 +3,7 @@ The :mod:`skactiveml.utils` module includes various utilities.
 """
 
 from ._aggregation import compute_vote_vectors, majority_vote
-from ._functions import call_func
+from ._functions import call_func, match_signature
 from ._label import (
     is_unlabeled,
     is_labeled,
@@ -48,6 +48,7 @@ __all__ = [
     "check_random_state",
     "MISSING_LABEL",
     "call_func",
+    "match_signature",
     "check_class_prior",
     "ext_confusion_matrix",
     "labeled_indices",
