@@ -624,7 +624,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         params = list(
             product(base_clfs[1:], speed_ups, sample_weights, preds[:2])
         )
-
         for BaseClf, speed_up, sample_weight, pred in params:
             with self.subTest(
                 msg="NB use fit data",
@@ -787,7 +786,7 @@ class TestApproximation(unittest.TestCase):
 
 class TestFunctions(unittest.TestCase):
     def setUp(self):
-        self.reg = SklearnRegressor(GaussianProcessRegressor())
+        self.reg = SklearnRegressor(LinearRegression())
         self.X = np.arange(7 * 2).reshape(7, 2)
         self.y = np.arange(7)
         self.mapping = np.array([3, 4, 5])

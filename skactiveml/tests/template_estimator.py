@@ -98,7 +98,12 @@ class TemplateEstimator:
             replace_fit_params=replace_fit_params,
         )
 
-    def test_fit_param_sample_weight(self, test_cases=None):
+    def test_fit_param_sample_weight(
+        self,
+        test_cases=None,
+        replace_init_params=None,
+        replace_fit_params=None,
+    ):
         fit_params = inspect.signature(self.estimator_class.fit).parameters
         if "sample_weight" in fit_params:
             test_cases = [] if test_cases is None else test_cases
@@ -107,7 +112,13 @@ class TemplateEstimator:
                 (1, ValueError),
                 (np.arange(len(self.fit_default_params["y"])), None),
             ]
-            self._test_param("fit", "sample_weight", test_cases)
+            self._test_param(
+                "fit",
+                "sample_weight",
+                test_cases,
+                replace_init_params=replace_init_params,
+                replace_fit_params=replace_fit_params,
+            )
 
     def test_partial_fit_param_X(
         self, test_cases=None, replace_init_params=None
@@ -258,7 +269,11 @@ class TemplateEstimator:
                 if err is None and test_func in ["fit", "init"]:
                     estimator.fit(**fit_params)
                 elif test_func in ["fit", "init"]:
-                    self.assertRaises(err, estimator.fit, **fit_params)
+                    if not hasattr(estimator, "fit"):
+                        if not issubclass(AttributeError, err):
+                            estimator.fit
+                    else:
+                        self.assertRaises(err, estimator.fit, **fit_params)
                 else:
                     if not exclude_fit:
                         estimator.fit(**fit_params)

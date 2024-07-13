@@ -355,7 +355,10 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
 
         # Fit classifier and compute uncertainties on candidate samples.
         if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
 
         P = clf.predict_proba(X_cand)
         uncertainties = uncertainty_scores(probas=P, method="least_confident")
