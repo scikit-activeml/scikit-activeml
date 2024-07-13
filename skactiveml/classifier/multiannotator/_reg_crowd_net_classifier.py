@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from skorch import NeuralNet
 from skorch.callbacks import regularization
