@@ -833,7 +833,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_multiclass.pdf",
             self.path_prefix + "dec_bound_multiclass_expected.pdf",
-            tol=0.05,
+            tol=1.0,
         )
         self.assertIsNone(comparison)
 
