@@ -430,7 +430,12 @@ class IndexClassifierWrapper:
                 self.clf_ = deepcopy(self.base_clf_)
 
             # partial fit clf
-            self.clf_.partial_fit(self.X[add_idx], add_y, add_sample_weight)
+            if add_sample_weight is None:
+                self.clf_.partial_fit(self.X[add_idx], add_y)
+            else:
+                self.clf_.partial_fit(
+                    self.X[add_idx], add_y, sample_weight=add_sample_weight
+                )
 
             if set_base_clf:
                 self.base_clf_ = deepcopy(self.clf_)
@@ -724,7 +729,10 @@ def _update_reg(
     else:
         X_new, y_new = _update_X_y(X, y, y_update, X_update=X_update)
 
-    reg_new = clone(reg).fit(X_new, y_new, sample_weight)
+    if sample_weight is None:
+        reg_new = clone(reg).fit(X_new, y_new)
+    else:
+        reg_new = clone(reg).fit(X_new, y_new, sample_weight)
     return reg_new
 
 

@@ -248,7 +248,13 @@ class TemplateQueryStrategy:
                         if err is None:
                             qs.query(**query_params)
                         else:
-                            self.assertRaises(err, qs.query, **query_params)
+                            if not hasattr(qs, "query"):
+                                if not issubclass(AttributeError, err):
+                                    qs.query
+                            else:
+                                self.assertRaises(
+                                    err, qs.query, **query_params
+                                )
 
 
 class TemplatePoolQueryStrategy(TemplateQueryStrategy):
@@ -322,13 +328,23 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 replace_init_params = {"missing_label": ml}
                 if "classes" in self.init_default_params:
                     replace_init_params["classes"] = classes
+                if "query_strategy" in self.init_default_params:
+                    query_strategy = clone(
+                        self.init_default_params["query_strategy"]
+                    )
+                    query_strategy.missing_label = ml
+                    replace_init_params["query_strategy"] = query_strategy
+                replace_query_params = {}
                 if "clf" in self.query_default_params_clf:
                     clf = clone(self.query_default_params_clf["clf"])
                     clf.missing_label = ml
                     clf.classes = classes
-                    replace_query_params = {"clf": clf}
-                else:
-                    replace_query_params = None
+                    replace_query_params["clf"] = clf
+                if "ensemble" in self.query_default_params_clf:
+                    ensemble = clone(self.query_default_params_clf["ensemble"])
+                    ensemble.missing_label = ml
+                    ensemble.classes = classes
+                    replace_query_params["ensemble"] = ensemble
                 replace_y = np.full_like(y, ml, dtype=t)
                 replace_y[0] = classes[0]
                 replace_y[1] = classes[1]

@@ -301,7 +301,10 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         batch_size_y = batch_size - batch_size_x
 
         if fit_reg:
-            reg = clone(reg).fit(X, y, sample_weight)
+            if sample_weight is None:
+                reg = clone(reg).fit(X, y)
+            else:
+                reg = clone(reg).fit(X, y, sample_weight)
 
         sample_indices = np.arange(len(X), dtype=int)
         selected_indices = labeled_indices(y)
@@ -427,7 +430,7 @@ def _greedy_sampling(
         utilities[i, not_selected_candidates] = util
 
         idx = rand_argmax(util, random_state=random_state)
-        query_indices[i] = not_selected_candidates[idx]
+        query_indices[i] = not_selected_candidates[idx][0]
         distances[:, candidate_indices[idx]] = _measure_distance(
             candidate_indices[idx], **dist_dict
         )

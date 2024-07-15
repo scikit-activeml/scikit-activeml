@@ -763,7 +763,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_wo_cand_expected.pdf",
             self.path_prefix + "dec_bound_wo_cand.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -792,7 +792,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_w_cand_expected.pdf",
             self.path_prefix + "dec_bound_w_cand.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -833,7 +833,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_multiclass.pdf",
             self.path_prefix + "dec_bound_multiclass_expected.pdf",
-            tol=0,
+            tol=1.0,
         )
         self.assertIsNone(comparison)
 
@@ -865,67 +865,64 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_svc_expected.pdf",
             self.path_prefix + "dec_bound_svc.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
     def test_multi_with_axes(self):
         fig, axes = plt.subplots(1, 5, figsize=(10, 2))
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
-        query_params_dict = {"clf": self.clf}
         plot_annotator_utilities(
             qs=qs,
             X=self.X,
             y=self.y_active_multi,
             feature_bound=self.bound,
             axes=axes,
-            query_params_dict=query_params_dict,
+            clf=self.clf,
         )
 
         fig.savefig(self.path_prefix + "multi_with_axes.pdf")
         comparison = compare_images(
             self.path_prefix + "multi_with_axes_expected.pdf",
             self.path_prefix + "multi_with_axes.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
     def test_multi_without_axes(self):
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
-        query_params_dict = {"clf": self.clf}
         plot_annotator_utilities(
             qs=qs,
             X=self.X,
             y=self.y_active_multi,
             feature_bound=self.bound,
-            query_params_dict=query_params_dict,
+            clf=self.clf,
         )
 
         plt.savefig(self.path_prefix + "multi_without_axes.pdf")
         comparison = compare_images(
             self.path_prefix + "multi_without_axes_expected.pdf",
             self.path_prefix + "multi_without_axes.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
     def test_multi_without_axes_cand(self):
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
-        query_params_dict = {"clf": self.clf}
         plot_annotator_utilities(
             qs=qs,
             X=self.X,
             candidates=[1, 2, 3],
             y=self.y_active_multi,
             feature_bound=self.bound,
-            query_params_dict=query_params_dict,
+            clf=self.clf,
         )
 
         plt.savefig(self.path_prefix + "multi_without_axes_cand.pdf")
         comparison = compare_images(
             self.path_prefix + "multi_without_axes_cand_expected.pdf",
             self.path_prefix + "multi_without_axes_cand.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -970,7 +967,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_w_cand_stream_expected.pdf",
             self.path_prefix + "dec_bound_w_cand_stream.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 

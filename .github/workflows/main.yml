@@ -9,12 +9,12 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.8', '3.9', '3.10', '3.11']
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
 
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install oldest dependencies
@@ -47,20 +47,21 @@ jobs:
       run: |
         pytest --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
+        zip -r docs.zip docs
     - name: 'Upload Artifact'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: docs
+        name: docs_${{ matrix.python-version }}.zip
         path: docs
         retention-days: 5
-      
+
   trigger_scikit-activeml-docs:
     runs-on: ubuntu-latest
     steps:
