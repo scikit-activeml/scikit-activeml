@@ -430,7 +430,7 @@ def _greedy_sampling(
         utilities[i, not_selected_candidates] = util
 
         idx = rand_argmax(util, random_state=random_state)
-        query_indices[i] = not_selected_candidates[idx]
+        query_indices[i] = not_selected_candidates[idx][0]
         distances[:, candidate_indices[idx]] = _measure_distance(
             candidate_indices[idx], **dist_dict
         )
