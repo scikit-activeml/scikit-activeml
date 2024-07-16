@@ -436,7 +436,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         # force selected sample indices to have the maximum utility
         for i in range(len(sample_indices)):
-            candidate_utilities[i, sample_indices[i]] = np.inf
+            max_utility_i = np.nanmax(candidate_utilities[i]) + 1
+            candidate_utilities[i, sample_indices[i]] = max_utility_i
 
         # prepare candidate_utilities
         candidate_utilities = rankdata(
