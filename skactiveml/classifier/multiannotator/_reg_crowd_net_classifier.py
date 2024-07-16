@@ -35,6 +35,8 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         self.n_annotators = n_annotators
         self.lmbda = lmbda
         self.regularization = regularization
+        if self.lmbda == "auto":
+            self.lmbda = 1e-2 if self.regularization == "trace-reg" else 1e-4
         if regularization == "trace-reg":
             self.ap_confs = nn.Parameter(torch.stack([6.0 * torch.eye(n_classes) - 5.0] * n_annotators))
         elif regularization in ["geo-reg-f", "geo-reg-w"]:
@@ -71,15 +73,15 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         p_annot_log = torch.logsumexp(p_class_log_ext[:, :, None] + p_perf_log_ext, dim=1)
         loss = NeuralNet.get_loss(self, p_annot_log, z)
         if self.lmbda > 0:
-            if regularization == "trace-reg":
+            if self.regularization == "trace-reg":
                 p_perf = F.softmax(self.ap_confs, dim=-1)
                 reg_term = p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
-            elif regularization == "geo-reg-f":
+            elif self.regularization == "geo-reg-f":
                 p_class = p_class_log.exp()
                 reg_term = -torch.logdet(p_class.T @ p_class)
                 if torch.isnan(reg_term) or torch.isinf(torch.abs(reg_term)) or reg_term > 100:
                     reg_term = 0
-            elif regularization == "geo-reg-w":
+            elif self.regularization == "geo-reg-w":
                 p_perf = p_perf_log.exp().swapaxes(1, 2).flatten(start_dim=0, end_dim=1)
                 reg_term = -torch.logdet(p_perf.T @ p_perf)
                 if torch.isnan(reg_term) or torch.isinf(torch.abs(reg_term)) or reg_term > 100:
@@ -87,6 +89,7 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
             else:
                 raise ValueError("`regularization` must be in ['trace-reg', 'geo-ref-f`, `geo-reg-w'].")
             loss += self.lmbda * reg_term
+        return loss
 
     def fit(self, X, y, **fit_params):
         self.check_X_dict_ = {
@@ -143,6 +146,3 @@ class RegCrowdNetModule(nn.Module):
         x_learned = self.gt_embed_x(x)
         logits_class = self.gt_output(x_learned)
         return logits_class
-
-
-
