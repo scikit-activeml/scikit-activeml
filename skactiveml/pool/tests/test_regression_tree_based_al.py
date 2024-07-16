@@ -136,7 +136,7 @@ class TestRegressionTreeBasedAL(
         y = np.full(len(X), MISSING_LABEL)
         y[50] = 50
         print(len(X), len(y))
-        utils_expected = np.ones(len(X), dtype=float) / (len(X)-1)
+        utils_expected = np.ones(len(X), dtype=float) / (len(X) - 1)
         utils_expected[50] = MISSING_LABEL
 
         qs = self.qs_class(method="diversity")

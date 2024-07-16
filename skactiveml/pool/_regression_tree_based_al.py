@@ -243,9 +243,18 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     X_cand_leaf, X_labeled_leaf, axis=1
                 )
                 for _ in range(n_k_discrete[leaf_idx]):
-                    batch_utilities_cand[len(query_indices), leaf_indices_cand == leaf_idx] = d_min
-                    batch_utilities_cand[len(query_indices), query_indices] = np.nan
-                    query_indices.append(rand_argmax(batch_utilities_cand[len(query_indices)], random_state=self.random_state_))
+                    batch_utilities_cand[
+                        len(query_indices), leaf_indices_cand == leaf_idx
+                    ] = d_min
+                    batch_utilities_cand[len(query_indices), query_indices] = (
+                        np.nan
+                    )
+                    query_indices.append(
+                        rand_argmax(
+                            batch_utilities_cand[len(query_indices)],
+                            random_state=self.random_state_,
+                        )
+                    )
 
         elif self.method == "representativity":
             # Convert n_k into integer.
@@ -297,7 +306,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     # Update DELTA using the current centroids.
                     X_M = X[labeled_idxs]
                     X_M = np.append(X_M, X_cand[query_indices[:l]], axis=0)
-                    X_M = np.append(X_M, X_cand[query_indices[l + 1 :]], axis=0)
+                    X_M = np.append(
+                        X_M, X_cand[query_indices[l + 1 :]], axis=0
+                    )
                     X_cand_l = X_cand[l_cand == l]
                     _, delta_l = pairwise_distances_argmin_min(
                         X_cand_l, X_M, axis=1
@@ -332,21 +343,18 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         else:
             return query_indices
 
-
     def _discretize_acquisitions_per_leaf(self, n_k):
         n_k_rest, n_k_discrete = np.modf(n_k)
         rest_size = n_k_rest.sum()
         leaf_indices = np.arange(len(n_k))
-        sampled_leaf_indices = self.random_state_.choice(
-            leaf_indices,
-            p=n_k_rest / rest_size,
-            size=int(rest_size)
-        )
-        add_leaf_indices, add_leaf_counts = np.unique(
-            sampled_leaf_indices,
-            return_counts=True
-        )
-        n_k_discrete[add_leaf_indices] += add_leaf_counts
+        if rest_size > 0:
+            sampled_leaf_indices = self.random_state_.choice(
+                leaf_indices, p=n_k_rest / rest_size, size=int(rest_size)
+            )
+            add_leaf_indices, add_leaf_counts = np.unique(
+                sampled_leaf_indices, return_counts=True
+            )
+            n_k_discrete[add_leaf_indices] += add_leaf_counts
         return n_k_discrete.astype(int)
 
 
@@ -406,4 +414,3 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
         n_k = batch_size * n_k / np.sum(n_k)
 
     return n_k
-
