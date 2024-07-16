@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from skorch import NeuralNet
 from skorch.callbacks import regularization
@@ -127,11 +128,12 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         return P_class
 
     def predict_annotator_perf(self, return_confusion_matrix=False):
-        if not return_confusion_matrix:
-            return self.ap_confs.detach().numpy()
         p_perf = F.softmax(self.ap_confs, dim=-1)
         p_perf = p_perf.detach().numpy()
-        return p_perf
+        if not return_confusion_matrix:
+            return p_perf
+        perf = np.diagonal(p_perf)
+        return perf
 
 
 class RegCrowdNetModule(nn.Module):
