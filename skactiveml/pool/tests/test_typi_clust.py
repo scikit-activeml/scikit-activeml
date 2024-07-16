@@ -104,8 +104,8 @@ class TestTypiClust(
                 else:
                     self.assertTrue(np.isnan(i))
 
-        # test case 3: for an uncovered cluster with 2 samples, the utilities with k=1 is for
-        # all samples are the same
+        # test case 3: for an uncovered cluster with 2 samples, the utilities
+        # with k=1 is for all samples are the same
         X_3 = np.array([[1, 2], [3, 4]])
         y_3 = np.full(2, MISSING_LABEL)
         typi_clust_3 = TypiClust(random_state=42, k=1)

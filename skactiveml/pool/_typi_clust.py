@@ -179,7 +179,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             typicality = _typicality(X, uncovered_samples_mapping, self.k)
             utilities[i, mapping] = typicality[np.arange(len(mapping))]
             utilities[i, query_indices] = np.nan
-            idx = np.argmax(typicality)
+            idx = np.argmax(typicality[np.arange(len(mapping))])
             idx = mapping[idx]
 
             query_indices = np.append(query_indices, [idx]).astype(int)

@@ -575,12 +575,12 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 self.assertEqual(sum(np.isnan(utils[0])), n_labeled)
 
                 query_params["batch_size"] = max_batch_size + 1
-                query_params["return_utilities"] = False
+                query_params["return_utilities"] = True
                 self.assertWarns(Warning, qs.query, **query_params)
 
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
-                    ids = qs.query(**query_params)
+                    ids, utilities = qs.query(**query_params)
                     self.assertEqual(len(ids), max_batch_size)
 
     def test_query_candidate_variation(self):
