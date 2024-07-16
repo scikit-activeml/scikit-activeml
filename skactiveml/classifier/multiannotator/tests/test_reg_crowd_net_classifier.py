@@ -118,38 +118,70 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
         annot_pref = clf.predict_annotator_perf()
-        self.assertEqual(annot_pref.shape[0], 2)
-        self.assertEqual(annot_pref.shape[1], 2)
+        self.assertEqual(2, annot_pref.shape[0])
         confusion_matrix = clf.predict_annotator_perf(return_confusion_matrix=True)
         print(confusion_matrix.shape)
         self.assertEqual(2, confusion_matrix.shape[0])
-        self.assertEqual(2, confusion_matrix.shape[1])
-
-    def test_predict_P_annot(self):
-        gt_net = TestNeuralNet()
-        clf = CrowdLayerClassifier(
-            module__gt_net=gt_net,
-            **self.clf_init_params,
-        )
-        self.assertRaises(NotFittedError, clf.predict, X=self.X)
-        clf.fit(self.X, self.y)
-        annot = clf.predict_P_annot(self.X[:2])
-        print(annot.shape)
-        self.assertEqual(annot.shape[0], 2)
-        self.assertEqual(annot.shape[1], 3)
-        self.assertEqual(annot.shape[2], 2)
+        self.assertEqual(3, confusion_matrix.shape[1])
+        self.assertEqual(3, confusion_matrix.shape[2])
 
     def test_validation_step(self):
-        gt_net = TestNeuralNet()
+        gt_embed = GT_Embed_Net()
+        gt_output = GT_Output_Net()
+
         valid_ds = Dataset(self.X, self.y)
         self.clf_init_params["train_split"] = predefined_split(valid_ds)
-        clf = CrowdLayerClassifier(
-            module__gt_net=gt_net,
+        clf = RegCrowdNetClassifier(
+            module__gt_embed_x=gt_embed,
+            module__gt_output=gt_output,
+            **self.default_params,
             **self.clf_init_params,
         )
         clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
+    def test_geo_reg_f(self):
+        gt_embed = GT_Embed_Net()
+        gt_output = GT_Output_Net()
+        self.clf_init_params["regularization"] = "geo-reg-f"
+        clf = RegCrowdNetClassifier(
+            module__gt_embed_x=gt_embed,
+            module__gt_output=gt_output,
+            **self.default_params,
+            **self.clf_init_params,
+        )
+        np.testing.assert_array_equal([0, 1, 2], clf.classes)
+        self.assertRaises(NotFittedError, clf.check_is_fitted)
+        clf.fit(self.X, self.y)
+        self.assertIsNone(clf.check_is_fitted())
+
+    def test_geo_reg_w(self):
+        gt_embed = GT_Embed_Net()
+        gt_output = GT_Output_Net()
+        self.clf_init_params["regularization"] = "geo-reg-w"
+        clf = RegCrowdNetClassifier(
+            module__gt_embed_x=gt_embed,
+            module__gt_output=gt_output,
+            **self.default_params,
+            **self.clf_init_params,
+        )
+        np.testing.assert_array_equal([0, 1, 2], clf.classes)
+        self.assertRaises(NotFittedError, clf.check_is_fitted)
+        clf.fit(self.X, self.y)
+        self.assertIsNone(clf.check_is_fitted())
+
+    def test_reg(self):
+        gt_embed = GT_Embed_Net()
+        gt_output = GT_Output_Net()
+        self.clf_init_params["regularization"] = "geo-reg-w"
+        clf = RegCrowdNetClassifier(
+            module__gt_embed_x=gt_embed,
+            module__gt_output=gt_output,
+            **self.default_params,
+            **self.clf_init_params,
+        )
+        clf.regularization = "Test"
+        self.assertRaises(ValueError, clf.fit, self.X, self.y)
 
 class GT_Embed_Net(nn.Module):
     def __init__(self):
