@@ -185,7 +185,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
 
-        #if utilities.shape[1] == X.shape[0]:
+        # if utilities.shape[1] == X.shape[0]:
         #    utilities[:, labeled_sample_indices] = np.nan
 
         if return_utilities:
