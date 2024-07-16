@@ -100,7 +100,7 @@ class TestTypiClust(
         for u in utilities:
             for i in u:
                 if not np.isnan(i):
-                    self.assertGreaterEqual(i, 0)
+                    self.assertGreaterEqual(i, -1)
                 else:
                     self.assertTrue(np.isnan(i))
 
@@ -127,7 +127,7 @@ class TestTypiClust(
         for u in utilities_4:
             for idx, value in enumerate(u):
                 if idx in candidates:
-                    self.assertGreaterEqual(value, 0)
+                    self.assertGreaterEqual(value, -1)
                 else:
                     self.assertTrue(np.isnan(value))
         self.assertEqual(10, utilities_4.shape[1])

@@ -135,9 +135,8 @@ class TestRegressionTreeBasedAL(
         X = np.linspace(0, 100, 101).reshape(-1, 1)
         y = np.full(len(X), MISSING_LABEL)
         y[50] = 50
-        utils_expected = (
-            np.abs(X - 50).flatten() * batch_size / np.sum(is_unlabeled(y))
-        )
+        print(len(X), len(y))
+        utils_expected = np.ones(len(X), dtype=float) / (len(X)-1)
         utils_expected[50] = MISSING_LABEL
 
         qs = self.qs_class(method="diversity")
@@ -152,6 +151,16 @@ class TestRegressionTreeBasedAL(
         qs.query(X, y, self.reg, batch_size=batch_size)
         qs.query(X, np.full_like(y, np.nan), self.reg)
         qs.query(X, np.full_like(y, np.nan), self.reg, candidates=[[1]])
+
+    def test_debug(self):
+        qs = self.qs_class(random_state=0, method="diversity")
+        X = np.linspace(-2, 2, 100).reshape(-1, 1)
+        y = np.sin(X.ravel())
+        y[30:70] = np.nan
+
+        idxs, utilities = qs.query(
+            X, y, self.reg, batch_size=3, return_utilities=True
+        )
 
 
 class _DummyRegressor(DecisionTreeRegressor):

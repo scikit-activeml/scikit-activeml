@@ -185,9 +185,6 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
 
-        # if utilities.shape[1] == X.shape[0]:
-        #    utilities[:, labeled_sample_indices] = np.nan
-
         if return_utilities:
             return query_indices, utilities
         else:
@@ -212,7 +209,7 @@ def _typicality(X, uncovered_samples_mapping, k):
     typicality : numpy.ndarray of shape (n_X)
         The typicality of all uncovered samples in X
     """
-    typicality = np.zeros(shape=X.shape[0])
+    typicality = np.full(shape=X.shape[0], fill_value=-1.0)
     if len(uncovered_samples_mapping) == 1:
         typicality[uncovered_samples_mapping] = 1
         return typicality
