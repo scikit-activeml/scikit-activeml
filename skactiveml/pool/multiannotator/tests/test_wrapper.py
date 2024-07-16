@@ -9,6 +9,7 @@ from skactiveml.pool import UncertaintySampling, RandomSampling
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
 from skactiveml.utils import is_labeled
 from skactiveml.utils import majority_vote, MISSING_LABEL, is_unlabeled
+from skactiveml.pool import TypiClust
 
 
 class TestSingleAnnotatorWrapper(unittest.TestCase):
@@ -515,7 +516,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_unavailable_annotators(self):
-        random = RandomSampling(random_state=self.random_state)
+        random = TypiClust(random_state=0)
 
         X_cand = np.array([[7, 1], [9, 1], [3, 5], [2, 7]])
 

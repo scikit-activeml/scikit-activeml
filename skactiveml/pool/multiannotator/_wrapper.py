@@ -407,7 +407,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
 
             s_utilities[
-                :, query_indices[batch_index, 0], query_indices[batch_index, 1]
+                batch_index+1:, query_indices[batch_index, 0], query_indices[batch_index, 1]
             ] = np.nan
 
             annotator_ps += 1
@@ -435,6 +435,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
         # calculate indices of maximum sample
         indices = np.argmax(candidate_utilities, axis=1)
+        #indices = (candidate_utilities == candidate_utilities.max(axis=1, keepdims=True))
+        #indices = indices.sum(axis=0).argsort()[-len(candidate_utilities):]
 
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = np.nan
 
