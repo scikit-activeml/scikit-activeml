@@ -128,9 +128,9 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
 
     def predict_annotator_perf(self, return_confusion_matrix=False):
         if not return_confusion_matrix:
-            return self.ap_confs.numpy()
+            return self.ap_confs.detach().numpy()
         p_perf = F.softmax(self.ap_confs, dim=-1)
-        p_perf = p_perf.numpy()
+        p_perf = p_perf.detach().numpy()
         return p_perf
 
 
