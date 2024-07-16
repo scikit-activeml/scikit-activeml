@@ -129,11 +129,11 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
 
     def predict_annotator_perf(self, return_confusion_matrix=False):
         p_perf = F.softmax(self.ap_confs, dim=-1)
-        p_perf = p_perf.detach().numpy()
-        if not return_confusion_matrix:
-            return p_perf
-        perf = np.diagonal(p_perf)
-        return perf
+        p_perf_numpy = p_perf.detach().numpy()
+        if return_confusion_matrix:
+            return p_perf_numpy
+        perf = p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
+        return perf.detach().numpy()
 
 
 class RegCrowdNetModule(nn.Module):
