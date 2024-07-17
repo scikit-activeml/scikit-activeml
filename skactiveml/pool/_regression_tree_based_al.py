@@ -208,25 +208,46 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             )
 
         if self.method == "random":
-            utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
-            selection_method = "proportional"
-            if mapping is None:
-                utilities = utilities_cand
-            else:
-                utilities = np.full(len(X), np.nan)
-                utilities[mapping] = utilities_cand
+            # utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
+            # selection_method = "proportional"
+            # if mapping is None:
+            #     utilities = utilities_cand
+            # else:
+            #     utilities = np.full(len(X), np.nan)
+            #     utilities[mapping] = utilities_cand
 
-            return simple_batch(
-                utilities,
-                random_state=self.random_state_,
-                batch_size=batch_size,
-                return_utilities=return_utilities,
-                method=selection_method,
-            )
+            # return simple_batch(
+            #     utilities,
+            #     random_state=self.random_state_,
+            #     batch_size=batch_size,
+            #     return_utilities=return_utilities,
+            #     method=selection_method,
+            # )
+            n_k_discrete = self._discretize_acquisitions_per_leaf(n_k)
+            batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
+            query_indices = []
+
+            X_labeled = X[labeled_idxs]
+            leaf_indices_labeled = reg.apply(X_labeled)
+            for leaf_idx in np.unique(leaf_indices_cand):
+                X_cand_leaf = X_cand[leaf_indices_cand == leaf_idx]
+                for _ in range(n_k_discrete[leaf_idx]):
+                    batch_utilities_cand[
+                        len(query_indices), leaf_indices_cand == leaf_idx
+                    ] = 1
+                    batch_utilities_cand[len(query_indices), query_indices] = (
+                        np.nan
+                    )
+                    query_indices.append(
+                        rand_argmax(
+                            batch_utilities_cand[len(query_indices)],
+                            random_state=self.random_state_,
+                        )
+                    )
 
         elif self.method == "diversity":
             n_k_discrete = self._discretize_acquisitions_per_leaf(n_k)
-            batch_utilities_cand = np.full((batch_size, len(X_cand)), -1.0)
+            batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             query_indices = []
 
             X_labeled = X[labeled_idxs]
@@ -258,48 +279,36 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
         elif self.method == "representativity":
             # Convert n_k into integer.
-            n_k = np.bincount(
-                self.random_state_.choice(
-                    leaf_indices_cand,
-                    batch_size,
-                    replace=False,
-                    p=n_k[leaf_indices_cand] / np.sum(n_k[leaf_indices_cand]),
-                ),
-                minlength=len(n_k),
-            )
+            n_k_discrete = self._discretize_acquisitions_per_leaf(n_k)
 
             # Perform a k-means clustering in leaf k with n_k clusters.
             query_indices = np.empty(shape=batch_size, dtype=int)
             l_cand = np.full(len(X_cand), fill_value=-1, dtype=int)
-            for leaf in np.argwhere(n_k != 0).flatten():
+            for leaf in np.argwhere(n_k_discrete != 0).flatten():
                 X_cand_leaf = X_cand[leaf_indices_cand == leaf]
                 kmeans = KMeans(
-                    n_k[leaf], random_state=self.random_state_
+                    n_k_discrete[leaf], random_state=self.random_state_
                 ).fit(X_cand_leaf)
 
                 l_cand[leaf_indices_cand == leaf] = kmeans.predict(
                     X_cand_leaf
-                ) + np.sum(n_k[0:leaf])
+                ) + np.sum(n_k_discrete[0:leaf])
 
                 centroids = kmeans.cluster_centers_
-                query_indices[np.sum(n_k[0:leaf]) + range(n_k[leaf])] = (
+                query_indices[np.sum(n_k_discrete[0:leaf]) + range(n_k_discrete[leaf])] = (
                     pairwise_distances_argmin(centroids, X_cand, axis=1)
                 )
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
             for l in np.unique(l_cand):
-                if l == -1:
-                    continue
                 C_l = X_cand[l_cand == l]
-                if len(C_l) == 1:
-                    R_cand[l_cand == l] = 0
-                else:
+                if l != -1 and len(C_l) > 1:
                     R_cand[l_cand == l] = pairwise_distances(C_l, C_l).sum(
                         axis=1
                     ) / (len(C_l) - 1)
 
-            batch_utilities_cand = np.full((batch_size, len(X_cand)), np.nan)
+            batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             for i in range(self.max_iter_representativity):
                 prev_best_indices = query_indices
                 for l in range(batch_size):
@@ -324,6 +333,8 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
                 if np.all(prev_best_indices == query_indices):
                     break
+            for l in range(batch_size):
+                batch_utilities_cand[l, query_indices[:l]] = np.nan
         else:
             raise ValueError(
                 f'The given method "{self.method}" is not valid. Supported '

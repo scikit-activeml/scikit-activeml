@@ -209,7 +209,7 @@ def _typicality(X, uncovered_samples_mapping, k):
     typicality : numpy.ndarray of shape (n_X)
         The typicality of all uncovered samples in X
     """
-    typicality = np.full(shape=X.shape[0], fill_value=-1.0)
+    typicality = np.full(shape=X.shape[0], fill_value=-np.inf)
     if len(uncovered_samples_mapping) == 1:
         typicality[uncovered_samples_mapping] = 1
         return typicality

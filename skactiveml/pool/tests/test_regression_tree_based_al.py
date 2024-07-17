@@ -153,14 +153,15 @@ class TestRegressionTreeBasedAL(
         qs.query(X, np.full_like(y, np.nan), self.reg, candidates=[[1]])
 
     def test_debug(self):
-        qs = self.qs_class(random_state=0, method="diversity")
+        qs = self.qs_class(random_state=0, method="representativity")
         X = np.linspace(-2, 2, 100).reshape(-1, 1)
         y = np.sin(X.ravel())
         y[30:70] = np.nan
 
         idxs, utilities = qs.query(
-            X, y, self.reg, batch_size=3, return_utilities=True
+            X, y, self.reg, batch_size=10, return_utilities=True
         )
+        print(utilities)
 
 
 class _DummyRegressor(DecisionTreeRegressor):
