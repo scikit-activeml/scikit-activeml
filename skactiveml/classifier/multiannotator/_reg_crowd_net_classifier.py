@@ -42,6 +42,8 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
             self.ap_confs = nn.Parameter(torch.stack([6.0 * torch.eye(n_classes) - 5.0] * n_annotators))
         elif regularization in ["geo-reg-f", "geo-reg-w"]:
             self.ap_confs = nn.Parameter(torch.stack([torch.eye(n_classes)] * n_annotators))
+        else:
+            raise ValueError("`regularization` must be in ['trace-reg', 'geo-ref-f`, `geo-reg-w'].")
 
     def get_loss(self, y_pred, y_true, *args, **kwargs):
         """Return the loss for this batch.
