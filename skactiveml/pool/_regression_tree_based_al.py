@@ -1,5 +1,4 @@
 import warnings
-from collections import Counter
 
 import numpy as np
 from sklearn import clone
@@ -141,8 +140,8 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         )
         if batch_size == 1:
             warnings.warn(
-                f"This query strategy was originally developed for "
-                f"`batch_sizes > 1`."
+                "This query strategy was originally developed for "
+                "`batch_sizes > 1`."
             )
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         labeled_idxs = labeled_indices(y, self.missing_label_)
@@ -278,40 +277,42 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
-            for l in np.unique(l_cand):
-                C_l = X_cand[l_cand == l]
-                if l != -1 and len(C_l) > 1:
-                    R_cand[l_cand == l] = pairwise_distances(C_l, C_l).sum(
+            for l_idx in np.unique(l_cand):
+                C_l = X_cand[l_cand == l_idx]
+                if l_idx != -1 and len(C_l) > 1:
+                    R_cand[l_cand == l_idx] = pairwise_distances(C_l, C_l).sum(
                         axis=1
                     ) / (len(C_l) - 1)
 
             batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             for i in range(self.max_iter_representativity):
                 prev_best_indices = query_indices
-                for l in range(batch_size):
+                for l_idx in range(batch_size):
                     # Update DELTA using the current centroids.
                     X_M = X[labeled_idxs]
-                    X_M = np.append(X_M, X_cand[query_indices[:l]], axis=0)
+                    X_M = np.append(X_M, X_cand[query_indices[:l_idx]], axis=0)
                     X_M = np.append(
-                        X_M, X_cand[query_indices[l + 1 :]], axis=0
+                        X_M, X_cand[query_indices[l_idx + 1 :]], axis=0
                     )
-                    X_cand_l = X_cand[l_cand == l]
+                    X_cand_l = X_cand[l_cand == l_idx]
                     _, delta_l = pairwise_distances_argmin_min(
                         X_cand_l, X_M, axis=1
                     )  # Equation (10)
 
                     # Use Eq. (8) to find the next sample to be labeled.
-                    R_l = R_cand[l_cand == l]
-                    batch_utilities_cand[l, l_cand == l] = delta_l - R_l
-                    query_indices[l] = rand_argmax(
-                        batch_utilities_cand[l],
+                    R_l = R_cand[l_cand == l_idx]
+                    batch_utilities_cand[l_idx, l_cand == l_idx] = (
+                        delta_l - R_l
+                    )
+                    query_indices[l_idx] = rand_argmax(
+                        batch_utilities_cand[l_idx],
                         random_state=self.random_state_,
                     )[0]
 
                 if np.all(prev_best_indices == query_indices):
                     break
-            for l in range(batch_size):
-                batch_utilities_cand[l, query_indices[:l]] = np.nan
+            for l_idx in range(batch_size):
+                batch_utilities_cand[l_idx, query_indices[:l_idx]] = np.nan
         else:
             raise ValueError(
                 f'The given method "{self.method}" is not valid. Supported '
@@ -355,7 +356,9 @@ def _discretize_acquisitions_per_leaf(n_k, random_state):
     leaf_indices = np.arange(len(n_k))
     if rest_size > 0:
         sampled_leaf_indices = random_state.choice(
-            leaf_indices, p=n_k_rest / rest_size, size=int(rest_size),
+            leaf_indices,
+            p=n_k_rest / rest_size,
+            size=int(rest_size),
             replace=False,
         )
         add_leaf_indices, add_leaf_counts = np.unique(

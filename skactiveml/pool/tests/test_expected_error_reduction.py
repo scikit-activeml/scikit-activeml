@@ -2,7 +2,6 @@ import unittest
 from copy import deepcopy
 
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 

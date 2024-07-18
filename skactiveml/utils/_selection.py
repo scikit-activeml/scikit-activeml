@@ -178,10 +178,10 @@ def simple_batch(
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     """Combine different rankings hierarchically to one ranking assignment.
-    A ranking index i is ranked higher than index j iff ranking[i] > ranking[j].
-    For the combined ranking it will hold that the first ranking of iter_ranking
-    always determines the ranking position at an index, and only when
-    two ranking assignments are equal the second ranking will determine
+    A ranking index i is ranked higher than index j iff ranking[i]>ranking[j].
+    For the combined ranking it will hold that the first ranking of
+    `iter_ranking` always determines the ranking position at an index, and only
+    when two ranking assignments are equal the second ranking will determine
     the ranking position and so forth.
 
     Parameters
@@ -194,7 +194,8 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         The method by which the utilities are ranked. See `scipy.rankdata`s
         argument `method` for details.
     rank_per_batch : bool, optional (default = False)
-        Whether the first index determines the batch and is not used for ranking
+        Whether the first index determines the batch and is not used for
+        ranking.
 
     Returns
     -------

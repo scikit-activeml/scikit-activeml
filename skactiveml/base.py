@@ -1354,8 +1354,8 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
     (default=skactiveml.utils.MISSING_LABEL)
         Value to represent a missing label.
     random_state : int, RandomState or None, optional (default=None)
-        Determines random number for 'fit' and 'predict' method. Pass an int for
-        reproducible results across multiple method calls.
+        Determines random number for 'fit' and 'predict' method. Pass an int
+        for reproducible results across multiple method calls.
     """
 
     def __init__(self, missing_label=MISSING_LABEL, random_state=None):

@@ -20,13 +20,13 @@ def check_positional_args(func, func_name, param_dict, kwargs_name=None):
             ):
                 if kwargs_name in None:
                     raise ValueError(
-                        f"Missing positional argument `{key}` of `{func_name}` in "
-                        f"`{func_name}_default_kwargs`."
+                        f"Missing positional argument `{key}` of `{func_name}`"
+                        f" in `{func_name}_default_kwargs`."
                     )
                 else:
                     raise ValueError(
-                        f"Missing positional argument `{key}` of `{func_name}` in "
-                        f"`{kwargs_name}`."
+                        f"Missing positional argument `{key}` of `{func_name}`"
+                        f" in `{kwargs_name}`."
                     )
 
 

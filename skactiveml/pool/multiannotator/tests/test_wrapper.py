@@ -9,7 +9,6 @@ from skactiveml.pool import UncertaintySampling, RandomSampling
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
 from skactiveml.utils import is_labeled
 from skactiveml.utils import majority_vote, MISSING_LABEL, is_unlabeled
-from skactiveml.pool import TypiClust
 
 
 class TestSingleAnnotatorWrapper(unittest.TestCase):
@@ -90,7 +89,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             return_utilities=True,
         )
 
-        dummy_function = lambda x, y: majority_vote(x)
+        def dummy_function(x, y):
+            return majority_vote(x)
 
         random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(

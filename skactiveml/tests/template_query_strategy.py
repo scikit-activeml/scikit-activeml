@@ -1,5 +1,4 @@
 import inspect
-import unittest
 import warnings
 from copy import deepcopy
 
@@ -58,11 +57,11 @@ class TemplateQueryStrategy:
             and self.query_default_params_reg is None
         ):
             raise ValueError(
-                f"The query strategies must support either "
-                f"classification or regression. Hence, at least "
-                f"one parameter of `query_default_params_clf` "
-                f"and `query_default_params_reg` must be not None. "
-                f"Use emtpy dictionary to use default values."
+                "The query strategies must support either "
+                "classification or regression. Hence, at least "
+                "one parameter of `query_default_params_clf` "
+                "and `query_default_params_reg` must be not None. "
+                "Use emtpy dictionary to use default values."
             )
         if self.query_default_params_clf is not None:
             check_positional_args(

@@ -3,7 +3,6 @@ from copy import deepcopy
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -234,8 +233,7 @@ class TestEpistemicUncertaintySampling(
         clf = SklearnClassifier(LogisticRegression(), classes=[0, 1])
         clf.fit(X, y)
         utils = _epistemic_uncertainty_logreg(X_cand, X, y, clf, probas)
-        # TODO
-        # np.testing.assert_array_equal(utils_expected, utils)
+        np.testing.assert_array_equal([0], utils)
 
     def test_query(self):
         query_params = deepcopy(self.query_default_params_clf)

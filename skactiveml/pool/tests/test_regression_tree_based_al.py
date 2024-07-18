@@ -12,7 +12,7 @@ from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import MISSING_LABEL, is_unlabeled
+from skactiveml.utils import MISSING_LABEL
 from sklearn.tree import DecisionTreeRegressor, ExtraTreeRegressor
 
 

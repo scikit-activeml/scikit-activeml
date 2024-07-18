@@ -72,8 +72,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
         y : array-like of shape (n_samples, )
-            Labels of the training data set (possibly including unlabeled samples,
-            indicated by self.missing_label).
+            Labels of the training data set (possibly including unlabeled
+            samples, indicated by self.missing_label).
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, optional (default=True)
@@ -112,8 +112,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            For the case where the samples are uniformly randomly selected from the set,
-            the sum of all utility of samples will be 1.
+            For the case where the samples are uniformly randomly selected from
+            the set, the sum of all utility of samples will be 1.
             The utilities represent here the probabilities of samples being
             chosen.
             If candidates is None or of shape (n_candidates), the indexing

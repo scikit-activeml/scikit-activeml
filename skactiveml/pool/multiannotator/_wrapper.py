@@ -210,14 +210,19 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             & np.isnan(self.missing_label)
         ):
             raise ValueError(
-                f"`self.missing_label` must equal `self.strategy.missing_label`, but"
+                f"`self.missing_label` must equal "
+                f"`self.strategy.missing_label`, but "
                 f"`self.missing_label` equals {self.missing_label} and"
-                f"`self.strategy.missing_label` equals {self.strategy.missing_label}."
+                f"`self.strategy.missing_label` equals "
+                f"{self.strategy.missing_label}."
             )
 
         # aggregate y
         if self.y_aggregate is None:
-            y_aggregate = lambda y: majority_vote(y, random_state=random_state)
+
+            def y_aggregate(y):
+                return majority_vote(y, random_state=random_state)
+
         else:
             y_aggregate = self.y_aggregate
 
@@ -322,8 +327,8 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             else:
                 raise ValueError(
                     f"`A_perf` is of shape {A_perf.shape}, but must be of "
-                    f"shape ({n_selectable_candidates}, {n_annotators}) or of shape "
-                    f"({n_annotators},)."
+                    f"shape ({n_selectable_candidates}, {n_annotators}) or of "
+                    f"shape ({n_annotators},)."
                 )
         else:
             raise TypeError(

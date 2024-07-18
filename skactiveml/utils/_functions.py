@@ -1,7 +1,6 @@
 import inspect
 from types import MethodType
 from makefun import with_signature
-from functools import update_wrapper
 
 
 def call_func(
