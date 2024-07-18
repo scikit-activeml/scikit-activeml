@@ -1,5 +1,4 @@
 import inspect
-import unittest
 import warnings
 from copy import deepcopy
 
@@ -58,11 +57,11 @@ class TemplateQueryStrategy:
             and self.query_default_params_reg is None
         ):
             raise ValueError(
-                f"The query strategies must support either "
-                f"classification or regression. Hence, at least "
-                f"one parameter of `query_default_params_clf` "
-                f"and `query_default_params_reg` must be not None. "
-                f"Use emtpy dictionary to use default values."
+                "The query strategies must support either "
+                "classification or regression. Hence, at least "
+                "one parameter of `query_default_params_clf` "
+                "and `query_default_params_reg` must be not None. "
+                "Use emtpy dictionary to use default values."
             )
         if self.query_default_params_clf is not None:
             check_positional_args(
@@ -575,12 +574,12 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 self.assertEqual(sum(np.isnan(utils[0])), n_labeled)
 
                 query_params["batch_size"] = max_batch_size + 1
-                query_params["return_utilities"] = False
+                query_params["return_utilities"] = True
                 self.assertWarns(Warning, qs.query, **query_params)
 
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore")
-                    ids = qs.query(**query_params)
+                    ids, utilities = qs.query(**query_params)
                     self.assertEqual(len(ids), max_batch_size)
 
     def test_query_candidate_variation(self):

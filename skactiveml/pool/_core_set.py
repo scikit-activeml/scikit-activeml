@@ -67,14 +67,15 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
            Labels of the training data set (possibly including unlabeled ones
            indicated by self.missing_label)
         candidates : None or array-like of shape (n_candidates), dtype = int or
-           array-like of shape (n_candidates, n_features),
-           optional (default=None)
-           If candidates is None, the unlabeled samples from (X,y) are considered
-           as candidates
-           If candidates is of shape (n_candidates) and of type int,
-           candidates is considered as a list of the indices of the samples in (X,y).
-           If candidates is of shape (n_candidates, n_features), the candidates are
-           directly given in the input candidates (not necessarily contained in X)
+        array-like of shape (n_candidates, n_features), optional (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as a list of the indices of the samples in
+            (X, y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in the input candidates (not
+            necessarily contained in X).
         batch_size : int, optional(default=1)
            The number of samples to be selects in one AL cycle.
         return_utilities : bool, optional(default=False)
@@ -91,9 +92,10 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
            If candidates is of shape (n_candidates, n_features), the indexing
            refers to samples in candidates.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or
-           numpy.ndarray of shape (batch_size, n_candidates)
+        numpy.ndarray of shape (batch_size, n_candidates)
            The utilities of samples for selecting each sample of the batch.
-           Here, utilities means the distance between each data point and its nearest center.
+           Here, utilities means the distance between each data point and its
+           nearest center.
            If candidates is None or of shape (n_candidates), the indexing
            refers to samples in X.
            If candidates is of shape (n_candidates, n_features), the indexing
@@ -162,16 +164,16 @@ def k_greedy_center(
        Training data set, usually complete, i.e. including the labeled and
        unlabeled samples
     y : np.ndarray of shape (n_selected_samples, )
-       index of datapoints already selects
+       Index of datapoints already selected.
     batch_size : int, optional (default=1)
        The number of samples to be selected in one AL cycle.
     random_state : int | np.random.RandomState, optional (default=None)
        Random state for candidate selection.
-    missing_label : scalar or string or np.nan or None, optional (default=np.nan)
-       Value to represent a missing label
+    missing_label : scalar or string or np.nan or None, optional
+    (default=np.nan)
+       Value to represent a missing label.
     mapping : np.ndarray of shape (n_candidates, ), optional (default=None)
-       Index array that maps `candidates` to `X`.
-       (`candidates = X[mapping]`)
+       Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
     n_new_cand : int or None, optional (default=None)
        The number of new candidates that are additionally added to X.
        Only used for the case, that in the query function with the
@@ -284,8 +286,8 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
         distance between each data point and its nearest center after
         each selected sample of the batch. In the case of cluster center the
         value will be 'np.nan'.
-        For the case, that indices aren't in 'mapping', the corresponding value in
-        'result-dist' will be also 'np.nan'.
+        For the case, that indices aren't in 'mapping', the corresponding value
+        in 'result-dist' will be also 'np.nan'.
     """
     dist = np.zeros(shape=X.shape[0])
 

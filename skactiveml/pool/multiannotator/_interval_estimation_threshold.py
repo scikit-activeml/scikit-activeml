@@ -390,8 +390,8 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         # Determine actual batch size.
         if isinstance(batch_size, str) and batch_size != "adaptive":
             raise ValueError(
-                f"If `batch_size` is of type `string`, "
-                f"it must equal `'adaptive'`."
+                "If `batch_size` is of type `string`, "
+                "it must equal `'adaptive'`."
             )
         elif batch_size == "adaptive":
             required_perf = self.epsilon * np.max(A_perf)

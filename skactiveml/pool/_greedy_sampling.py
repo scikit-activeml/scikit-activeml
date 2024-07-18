@@ -19,9 +19,9 @@ from skactiveml.utils import (
 class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     """Greedy Sampling on the feature space.
 
-    This class implements greedy sampling on the feature space. A query strategy
-    that tries to select those samples that increase the diversity of the
-    feature space the most.
+    This class implements greedy sampling on the feature space. A query
+    strategy that tries to select those samples that increase the diversity of
+    the feature space the most.
 
     Parameters
     ----------
@@ -40,8 +40,9 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active learning for
-    regression using greedy sampling, Information Sciences, pages 90--105, 2019.
+    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active Learning for
+        Regression Using Greedy Sampling, Information Sciences, pages 90--105,
+        2019.
 
     """
 
@@ -192,9 +193,9 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active learning for
-    regression using greedy sampling, Information Sciences, pages 90--105, 2019.
-
+    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active Learning for
+        Regression using Greedy Sampling, Information Sciences, pages 90--105,
+        2019.
     """
 
     def __init__(

@@ -96,12 +96,12 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL.)
         ensemble : list or tuple of SkactivemlClassifier or list or tuple of
         SkactivemlRegressor, SkactivemlClassifier or SkactivemlRegressor
-            If `ensemble` is a `SkactivemlClassifier` or a `SkactivemlRegressor`
-            , it must have `n_estimators` and `estimators_` after fitting as
-            attribute. Then, its estimators will be used as committee. If
-            `ensemble` is array-like, each element of this list must be
-            `SkactivemlClassifier` or a `SkactivemlRegressor` and will be used
-            as committee member.
+            If `ensemble` is a `SkactivemlClassifier` or a
+            `SkactivemlRegressor`, it must have `n_estimators` and
+            `estimators_` after fitting as attribute. Then, its estimators will
+            be used as committee. If `ensemble` is array-like, each element of
+            this list must be `SkactivemlClassifier` or a `SkactivemlRegressor`
+            and will be used as committee member.
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -204,19 +204,20 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         )
 
     def _aggregate_predict_probas(self, X_cand, ensemble, est_arr):
-        """Aggregate the predicted probabilities across all ensemble members and
-        ensure that all classes are mapped correctly.
+        """Aggregate the predicted probabilities across all ensemble members
+        and ensure that all classes are mapped correctly.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X_cand : array-like of shape (n_samples, n_features)
             Samples whose probabilities are to be predicted.
-        ensemble : list or tuple of SkactivemlClassifier or SkactivemlClassifier
+        ensemble : SkactivemlClassifier or list or tuple of
+        SkactivemlClassifier
             If `ensemble` is a `SkactivemlClassifier`, it must have
             `n_estimators` and `estimators_` after fitting as attribute. Then,
             its estimators will be used as committee. If `ensemble` is
-            array-like, each element of this list must be `SkactivemlClassifier`
-            and will be used as committee member.
+            array-like, each element of this list must be
+            `SkactivemlClassifier` and will be used as committee member.
         est_arr : list or tuple of SkactivemlClassifier
             List of ensemble members contained in `ensemble`.
 

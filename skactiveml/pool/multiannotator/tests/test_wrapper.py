@@ -89,7 +89,8 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             return_utilities=True,
         )
 
-        dummy_function = lambda x, y: majority_vote(x)
+        def dummy_function(x, y):
+            return majority_vote(x)
 
         random = RandomSampling(random_state=self.random_state)
         wrapper = SingleAnnotatorWrapper(
@@ -515,7 +516,7 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         self.check_max(best_cand_indices, utilities)
 
     def test_query_unavailable_annotators(self):
-        random = RandomSampling(random_state=self.random_state)
+        random = RandomSampling(random_state=0)
 
         X_cand = np.array([[7, 1], [9, 1], [3, 5], [2, 7]])
 

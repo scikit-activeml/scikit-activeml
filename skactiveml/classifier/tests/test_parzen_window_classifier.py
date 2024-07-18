@@ -131,7 +131,10 @@ class TestParzenWindowClassifier(
         self.assertRaises(ValueError, pwc.predict_freq, X=[[1], [0]])
         F = pwc.predict_freq(X=[[1, 0, 0]])
         np.testing.assert_array_equal([[0, 0, 2]], F)
-        rbf_kernel = lambda x, y, gamma: np.exp(-gamma * np.sum((x - y) ** 2))
+
+        def rbf_kernel(x, y, gamma):
+            return np.exp(-gamma * np.sum((x - y) ** 2))
+
         pwc = ParzenWindowClassifier(
             classes=["tokyo", "paris"],
             missing_label="nan",

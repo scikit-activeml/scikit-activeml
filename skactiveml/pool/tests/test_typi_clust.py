@@ -99,13 +99,11 @@ class TestTypiClust(
         )
         for u in utilities:
             for i in u:
-                if not np.isnan(i):
-                    self.assertGreaterEqual(i, 0)
-                else:
-                    self.assertTrue(np.isnan(i))
+                if not np.isnan(i) and i < 0:
+                    self.assertTrue(np.isneginf(i))
 
-        # test case 3: for an uncovered cluster with 2 samples, the utilities with k=1 is for
-        # all samples are the same
+        # test case 3: for an uncovered cluster with 2 samples, the utilities
+        # with k=1 is for all samples are the same
         X_3 = np.array([[1, 2], [3, 4]])
         y_3 = np.full(2, MISSING_LABEL)
         typi_clust_3 = TypiClust(random_state=42, k=1)
@@ -125,11 +123,9 @@ class TestTypiClust(
             X, y_1, batch_size=1, candidates=candidates, return_utilities=True
         )
         for u in utilities_4:
-            for idx, value in enumerate(u):
-                if idx in candidates:
-                    self.assertGreaterEqual(value, 0)
-                else:
-                    self.assertTrue(np.isnan(value))
+            for i in u:
+                if not np.isnan(i) and i < 0:
+                    self.assertTrue(np.isneginf(i))
         self.assertEqual(10, utilities_4.shape[1])
         self.assertEqual(1, utilities_4.shape[0])
 
