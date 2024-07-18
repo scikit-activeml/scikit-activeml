@@ -17,14 +17,11 @@ from skactiveml.utils import (
     MISSING_LABEL,
     check_type,
     check_equal_missing_label,
-    is_unlabeled,
     is_labeled,
     simple_batch,
     rand_argmax,
-    rand_argmin,
     check_scalar,
     labeled_indices,
-    unlabeled_indices,
 )
 
 
@@ -207,30 +204,14 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 "`DecisionTreeRegressor` or by restricting the tree's depth."
             )
 
+        n_k_discrete = _discretize_acquisitions_per_leaf(
+            n_k, self.random_state_
+        )
         if self.method == "random":
-            # utilities_cand = (n_k / n_cand_per_leaf)[leaf_indices_cand]
-            # selection_method = "proportional"
-            # if mapping is None:
-            #     utilities = utilities_cand
-            # else:
-            #     utilities = np.full(len(X), np.nan)
-            #     utilities[mapping] = utilities_cand
-
-            # return simple_batch(
-            #     utilities,
-            #     random_state=self.random_state_,
-            #     batch_size=batch_size,
-            #     return_utilities=return_utilities,
-            #     method=selection_method,
-            # )
-            n_k_discrete = self._discretize_acquisitions_per_leaf(n_k)
             batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             query_indices = []
 
-            X_labeled = X[labeled_idxs]
-            leaf_indices_labeled = reg.apply(X_labeled)
             for leaf_idx in np.unique(leaf_indices_cand):
-                X_cand_leaf = X_cand[leaf_indices_cand == leaf_idx]
                 for _ in range(n_k_discrete[leaf_idx]):
                     batch_utilities_cand[
                         len(query_indices), leaf_indices_cand == leaf_idx
@@ -246,7 +227,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     )
 
         elif self.method == "diversity":
-            n_k_discrete = self._discretize_acquisitions_per_leaf(n_k)
             batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             query_indices = []
 
@@ -278,9 +258,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     )
 
         elif self.method == "representativity":
-            # Convert n_k into integer.
-            n_k_discrete = self._discretize_acquisitions_per_leaf(n_k)
-
             # Perform a k-means clustering in leaf k with n_k clusters.
             query_indices = np.empty(shape=batch_size, dtype=int)
             l_cand = np.full(len(X_cand), fill_value=-1, dtype=int)
@@ -295,9 +272,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                 ) + np.sum(n_k_discrete[0:leaf])
 
                 centroids = kmeans.cluster_centers_
-                query_indices[np.sum(n_k_discrete[0:leaf]) + range(n_k_discrete[leaf])] = (
-                    pairwise_distances_argmin(centroids, X_cand, axis=1)
-                )
+                query_indices[
+                    np.sum(n_k_discrete[0:leaf]) + range(n_k_discrete[leaf])
+                ] = pairwise_distances_argmin(centroids, X_cand, axis=1)
 
             # Calculate R using Eq. (9)
             R_cand = np.zeros(len(X_cand))
@@ -329,7 +306,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     query_indices[l] = rand_argmax(
                         batch_utilities_cand[l],
                         random_state=self.random_state_,
-                    )
+                    )[0]
 
                 if np.all(prev_best_indices == query_indices):
                     break
@@ -354,19 +331,38 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         else:
             return query_indices
 
-    def _discretize_acquisitions_per_leaf(self, n_k):
-        n_k_rest, n_k_discrete = np.modf(n_k)
-        rest_size = n_k_rest.sum()
-        leaf_indices = np.arange(len(n_k))
-        if rest_size > 0:
-            sampled_leaf_indices = self.random_state_.choice(
-                leaf_indices, p=n_k_rest / rest_size, size=int(rest_size)
-            )
-            add_leaf_indices, add_leaf_counts = np.unique(
-                sampled_leaf_indices, return_counts=True
-            )
-            n_k_discrete[add_leaf_indices] += add_leaf_counts
-        return n_k_discrete.astype(int)
+
+def _discretize_acquisitions_per_leaf(n_k, random_state):
+    """
+    Discretizes a given array of non-negative floats corresponding to the
+    number of acquisitions per leaf of the regression tree. Guarantees that we
+    acquire a minimum number (i.e., floored floats) per leaf.
+
+    Parameters
+    ----------
+    n_k : numpy.ndarray of shape (n_leafs,)
+        Float acquisitions per leaf of the regression tree.
+    random_state : np.random.RandomState
+        Random state for reproducibility.
+
+    Returns
+    -------
+    n_k_discrete : numpy.ndarray of shape (n_leafs,)
+        Integer acquisitions per leaf of the regression tree.
+    """
+    n_k_rest, n_k_discrete = np.modf(n_k)
+    rest_size = n_k_rest.sum()
+    leaf_indices = np.arange(len(n_k))
+    if rest_size > 0:
+        sampled_leaf_indices = random_state.choice(
+            leaf_indices, p=n_k_rest / rest_size, size=int(rest_size),
+            replace=False,
+        )
+        add_leaf_indices, add_leaf_counts = np.unique(
+            sampled_leaf_indices, return_counts=True
+        )
+        n_k_discrete[add_leaf_indices] += add_leaf_counts
+    return n_k_discrete.astype(int)
 
 
 def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
