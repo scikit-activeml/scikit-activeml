@@ -36,6 +36,7 @@ author = "Daniel Kottke, " \
          "Christoph Sandrock, " \
          "Alexander Benz, " \
          "Lukas Lührs, " \
+         "Jiaying Cheng, "\
          "Mehmet Mjüde, " \
          "Atal Roghman"
 

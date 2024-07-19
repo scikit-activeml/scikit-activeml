@@ -61,6 +61,7 @@ The easiest way of installing scikit-activeml is using ``pip``:
     we tested at the release of the current package
     version:
     ::
+
         pip install -r requirements_max.txt
 .. user_installation_end
 
