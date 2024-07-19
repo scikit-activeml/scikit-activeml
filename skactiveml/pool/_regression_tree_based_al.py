@@ -169,12 +169,10 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         if len(labeled_idxs) <= 1:
             warnings.warn("No sample is labeled. Fallback to random sampling.")
             if mapping is None:
-                utilities = np.full(len(X_cand), fill_value=1 / len(X_cand))
+                utilities = np.ones(len(X_cand))
             else:
                 utilities = np.full(len(X), np.nan)
-                utilities[mapping] = np.full(
-                    len(mapping), fill_value=1 / len(mapping)
-                )
+                utilities[mapping] = np.ones(len(mapping))
 
             return simple_batch(
                 utilities,

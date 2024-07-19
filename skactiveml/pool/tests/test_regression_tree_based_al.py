@@ -114,6 +114,10 @@ class TestRegressionTreeBasedAL(
         y[30:70] = MISSING_LABEL
         batch_size = 10
 
+        # Labels to test fallback to random sampling.
+        y_one_label = np.full_like(y, fill_value=np.nan)
+        y_one_label[0] = 1
+
         # Test varying methods.
         for method in ["diversity", "representativity"]:
             for candidates in [None, range(44, 56), X[range(44, 56)]]:
@@ -158,6 +162,18 @@ class TestRegressionTreeBasedAL(
                         self.assertEqual(n_candidates, 40)
                     else:
                         self.assertEqual(n_candidates, 12)
+
+                # Test fallback to random sampling.
+                qs = self.qs_class(random_state=0, method=method)
+                idxs, utilities = qs.query(
+                    X,
+                    y_one_label,
+                    self.reg,
+                    batch_size=batch_size,
+                    return_utilities=True,
+                    candidates=candidates,
+                )
+                self.assertTrue((np.isnan(utilities) + (utilities == 1)).all())
 
 
 class _DummyRegressor(DecisionTreeRegressor):
