@@ -395,7 +395,11 @@ def check_X_y(
         Only returned if candidates is not None.
     """
     if allow_nan is None:
-        allow_nan = True if missing_label is np.nan else False
+        allow_nan = (
+            True
+            if isinstance(missing_label, float) and np.isnan(missing_label)
+            else False
+        )
     if X is not None:
         X = check_array(
             X,
@@ -530,7 +534,9 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         The validated indices.
     """
     indices = check_array(indices, dtype=int, ensure_2d=False)
-    A = check_array(A, allow_nd=True, force_all_finite=False, ensure_2d=False)
+    A = check_array(
+        A, allow_nd=True, force_all_finite=False, ensure_2d=False, dtype=None
+    )
     if unique == "check_unique":
         if indices.ndim == 1:
             n_unique_indices = len(np.unique(indices))
@@ -538,8 +544,8 @@ def check_indices(indices, A, dim="adaptive", unique=True):
             n_unique_indices = len(np.unique(indices, axis=0))
         if n_unique_indices < len(indices):
             raise ValueError(
-                f"`indices` contains two different indices of the "
-                f"same value."
+                "`indices` contains two different indices of the "
+                "same value."
             )
     elif unique:
         if indices.ndim == 1:
@@ -624,7 +630,7 @@ def check_type(
     if wrong_type and wrong_value and wrong_index:
         error_str = f"`{name}` "
         if len(target_types) == 0 and len(target_vals) == 0:
-            error_str += f" must"
+            error_str += " must"
         if len(target_vals) == 0 and len(target_types) > 0:
             error_str += f" has type `{type(obj)}`, but must"
         elif len(target_vals) > 0 and len(target_types) == 0:

@@ -171,7 +171,10 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
 
         # Fit the classifier and predict frequencies.
         if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
         if self.metric is not None:
             if self.metric_dict is None and self.metric == "rbf":
                 self.metric_dict = {"gamma": "mean"}

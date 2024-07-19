@@ -624,7 +624,6 @@ class TestIndexClassifierWrapper(unittest.TestCase):
         params = list(
             product(base_clfs[1:], speed_ups, sample_weights, preds[:2])
         )
-
         for BaseClf, speed_up, sample_weight, pred in params:
             with self.subTest(
                 msg="NB use fit data",
@@ -680,8 +679,10 @@ class TestApproximation(unittest.TestCase):
         self.random_state = 0
 
     def test_conditional_expectation_params(self):
-        dummy_func_1 = lambda y: np.zeros_like(y)
-        dummy_func_2 = lambda x, y: np.zeros_like(y)
+        dummy_func_1 = np.zeros_like
+
+        def dummy_func_2(x, y):
+            return np.zeros_like(y)
 
         X = np.arange(4 * 2).reshape(4, 2)
         y = np.arange(4, dtype=float)
@@ -787,7 +788,7 @@ class TestApproximation(unittest.TestCase):
 
 class TestFunctions(unittest.TestCase):
     def setUp(self):
-        self.reg = SklearnRegressor(GaussianProcessRegressor())
+        self.reg = SklearnRegressor(LinearRegression())
         self.X = np.arange(7 * 2).reshape(7, 2)
         self.y = np.arange(7)
         self.mapping = np.array([3, 4, 5])

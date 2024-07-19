@@ -5,7 +5,7 @@ pool-based active learning.
 
 from . import multiannotator
 from . import utils
-from ._batch_bald import BatchBALD, batch_bald
+from ._bald import GreedyBALD, BatchBALD, batch_bald
 from ._cost_embedding_al import CostEmbeddingAL
 from ._discriminative_al import DiscriminativeAL
 from ._epistemic_uncertainty_sampling import EpistemicUncertaintySampling
@@ -26,11 +26,16 @@ from ._query_by_committee import (
 )
 from ._quire import Quire
 from ._random_sampling import RandomSampling
+from ._regression_tree_based_al import RegressionTreeBasedAL
 from ._uncertainty_sampling import (
     UncertaintySampling,
     uncertainty_scores,
     expected_average_precision,
 )
+from ._core_set import CoreSet, k_greedy_center
+from ._typi_clust import TypiClust
+from ._badge import Badge
+from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 
 __all__ = [
     "multiannotator",
@@ -59,4 +64,12 @@ __all__ = [
     "DiscriminativeAL",
     "BatchBALD",
     "batch_bald",
+    "CoreSet",
+    "k_greedy_center",
+    "TypiClust",
+    "Badge",
+    "GreedyBALD",
+    "RegressionTreeBasedAL",
+    "SubSamplingWrapper",
+    "ParallelUtilityEstimationWrapper",
 ]

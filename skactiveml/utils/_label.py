@@ -51,7 +51,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
             "n_features)' with 'n_samples > 0' and "
             "'n_features > 0'."
         )
-    if missing_label is np.nan:
+    if isinstance(missing_label, float) and np.isnan(missing_label):
         return np.isnan(y)
     else:
         # Todo check if solution is appropriate (see line 46)
