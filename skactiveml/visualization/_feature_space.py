@@ -320,7 +320,10 @@ def plot_contour_for_samples(
     matplotlib.axes.Axes: The axis on which the utility was plotted.
     """
     check_array(X, ensure_2d=True)
-    check_array(values, ensure_2d=False, force_all_finite="allow-nan")
+    values = check_array(
+        values, ensure_2d=False, force_all_finite=False, copy=True
+    )
+    values[np.isinf(values)] = np.nan
 
     feature_bound = check_bound(bound=feature_bound, X=X)
 

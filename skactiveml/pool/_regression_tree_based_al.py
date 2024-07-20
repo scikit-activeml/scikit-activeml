@@ -191,19 +191,14 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             X, y, reg, missing_label=self.missing_label_, batch_size=batch_size
         )
 
+        # Discretize number of leaf acquisitions.
+        n_k_discrete = _discretize_acquisitions_per_leaf(
+            n_k, batch_size, self.random_state_
+        )
+
         # Calculate the number of candidates per leaf.
         leaf_indices_cand = reg.apply(X_cand)
-        n_cand_per_leaf = np.bincount(leaf_indices_cand, minlength=len(n_k))
-        if (n_cand_per_leaf <= 1).any():
-            warnings.warn(
-                "Please ensure that each leaf has at least two samples, "
-                "e.g., by setting `min_samples_leaf >= 2` in case of the "
-                "`DecisionTreeRegressor` or by restricting the tree's depth."
-            )
 
-        n_k_discrete = _discretize_acquisitions_per_leaf(
-            n_k, self.random_state_
-        )
         if self.method == "random":
             batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             query_indices = []
@@ -331,7 +326,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             return query_indices
 
 
-def _discretize_acquisitions_per_leaf(n_k, random_state):
+def _discretize_acquisitions_per_leaf(n_k, batch_size, random_state):
     """
     Discretizes a given array of non-negative floats corresponding to the
     number of acquisitions per leaf of the regression tree. Guarantees that we
@@ -341,6 +336,8 @@ def _discretize_acquisitions_per_leaf(n_k, random_state):
     ----------
     n_k : numpy.ndarray of shape (n_leafs,)
         Float acquisitions per leaf of the regression tree.
+    batch_size : int
+        Number of acquisitions.
     random_state : np.random.RandomState
         Random state for reproducibility.
 
@@ -356,7 +353,7 @@ def _discretize_acquisitions_per_leaf(n_k, random_state):
         sampled_leaf_indices = random_state.choice(
             leaf_indices,
             p=n_k_rest / rest_size,
-            size=int(rest_size),
+            size=batch_size - np.sum(np.round(n_k_discrete)).astype(int),
             replace=False,
         )
         add_leaf_indices, add_leaf_counts = np.unique(
@@ -396,9 +393,11 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
     # Compute the variance v_k on labeled samples in leaf k.
     leaf_labeled = reg.apply(X[is_lbld])
     y_labeled = y[is_lbld]
-    v_k = np.empty(reg.tree_.node_count)
+    v_k = np.zeros(reg.tree_.node_count)
     for leaf in range(len(v_k)):
-        v_k[leaf] = np.var(y_labeled[leaf_labeled == leaf], ddof=1)
+        y_labeled_leaf = y_labeled[leaf_labeled == leaf]
+        if len(y_labeled_leaf) > 1:
+            v_k[leaf] = np.var(y_labeled_leaf, ddof=1)
 
     v_k[np.isnan(v_k)] = 0
     if 0 in v_k[np.unique(leaf_labeled)]:
