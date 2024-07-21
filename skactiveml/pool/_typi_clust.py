@@ -37,8 +37,10 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     k : int, default=5
         The number for k-nearest-neighbors for the computation of typicality.
 
+    References
+    ----------
     [1] G. Hacohen, A. Dekel, und D. Weinshall, "Active Learning on a Budget:
-    Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
+    Opposite Strategies Suit High and Low Budgets", ICLR, 2022.
     """
 
     def __init__(

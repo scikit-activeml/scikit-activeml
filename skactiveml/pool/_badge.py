@@ -38,9 +38,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-     [1] J. Ash, Jordan T., Chicheng Zhang, Akshay Krishnamurthy,
-     John Langford, and Alekh Agarwal, "Deep Batch Active Learning by Diverse,
-     Uncertain Gradient Lower Bounds." ICLR, 2019.
+    [1] J. Ash, Jordan T., Chicheng Zhang, Akshay Krishnamurthy,
+    John Langford, and Alekh Agarwal, "Deep Batch Active Learning by Diverse,
+    Uncertain Gradient Lower Bounds." ICLR, 2019.
     """
 
     def __init__(
