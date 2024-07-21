@@ -7,7 +7,7 @@
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
-    "refs" : [],
+    "refs" : ["ash2020deep"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : "from skactiveml.pool import Badge",
