@@ -3,7 +3,7 @@ Module implementing TypiClust.
 
 TypiClust is a deep active learning strategy suited for low budgets.
 Its aim is to query typical examples with the corresponding high score
-of Typicality.
+of 'typicality'.
 """
 
 import numpy as np
@@ -15,7 +15,7 @@ from sklearn.neighbors import NearestNeighbors
 
 
 class TypiClust(SingleAnnotatorPoolQueryStrategy):
-    """Typical Clustering Selection
+    """Typical Clustering
 
     This class implements the Typical Clustering (TypiClust) query strategy
     [1], which considers both diversity and typicality (representativeness) of
@@ -25,17 +25,17 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     ----------
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or np.random.RandomState
-        The random state to use
-    cluster_algo : ClusterMixin.__class__ (default=KMeans)
-        The cluster algorithm to be used in the TypiClust
+    random_state : None or int or np.random.RandomState, default=None
+        The random state to use.
+    cluster_algo : ClusterMixin.__class__, default=KMeans
+        The cluster algorithm to be used.
     cluster_algo_dict : dict, optional (default=None)
         The parameters passed to the clustering algorithm `cluster_algo`,
         excluding the parameter for the number of clusters.
-    n_cluster_param_name : string (default="n_clusters")
-        The name of the parameter for the number of clusters
-    k : int, optional (default=5)
-        The number for k-nearest-neighbors for the computation of typicality
+    n_cluster_param_name : string, default="n_clusters"
+        The name of the parameter for the number of clusters.
+    k : int, default=5
+        The number for k-nearest-neighbors for the computation of typicality.
 
     [1] G. Hacohen, A. Dekel, und D. Weinshall, "Active Learning on a Budget:
     Opposite Strategies Suit High and Low Budgets“, ICLR, 2022.
@@ -71,8 +71,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples, )
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label)
@@ -93,7 +93,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         ----------
-        query_indices : numpy.ndarry of shape (batch_size)
+        query_indices : np.ndarray of shape (batch_size,)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
@@ -102,7 +102,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+        np.ndarray of shape (batch_size, n_candidates)
             The utilities of samples for selecting each sample of the batch.
             Here, utilities mean the typicality in the considered cluster.
             If candidates is None or of shape (n_candidates), the indexing
@@ -198,18 +198,18 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
 def _typicality(X, uncovered_samples_mapping, k):
     """
-    Calculation the typicality of uncovers samples in X.
+    Calculation the typicality of samples `X` in uncovered clusters.
 
     Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
-        Training data set, usually complete, i.e. including the labeled and
+        Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
     uncovered_samples_mapping : np.ndarray of shape (n_candidates,),
     default=None
        Index array that maps `candidates` to `X_for_cluster`.
     k : int
-        k for computation of k nearst neighbors
+        k for computation of k nearst neighbors.
     Returns
     -------
     typicality : numpy.ndarray of shape (n_X)

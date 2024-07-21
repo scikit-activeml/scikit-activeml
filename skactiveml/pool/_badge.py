@@ -1,5 +1,6 @@
 """
-Module implementing Batch Active Learning by Diverse Gradient Embedding (BADGE)
+Module implementing the pool-based query strategy Batch Active Learning by
+Diverse Gradient Embedding (BADGE).
 """
 
 import numpy as np
@@ -28,7 +29,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     ----------
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or np.random.RandomState
+    random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
@@ -38,8 +39,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     References
     ----------
      [1] J. Ash, Jordan T., Chicheng Zhang, Akshay Krishnamurthy,
-         John Langford, and Alekh Agarwal, "Deep Batch Active Learning
-         by Diverse, Uncertain Gradient Lower Bounds." ICLR, 2019.
+     John Langford, and Alekh Agarwal, "Deep Batch Active Learning by Diverse,
+     Uncertain Gradient Lower Bounds." ICLR, 2019.
     """
 
     def __init__(
@@ -225,17 +226,17 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             return query_indicies
 
 
-def _d_2(g_x, query_indicies, d_latest=None):
+def _d_2(g_x, query_indices, d_latest=None):
     """
     Calculates the D^2 value of the embedding features of unlabeled data.
 
     Parameters
     ----------
-    g_x : numpy.ndarray of shape (n_unlabeled_samples, n_features)
+    g_x : np.ndarray of shape (n_unlabeled_samples, n_features)
         The results after gradient embedding
-    query_indicies : numpy.ndarray of shape (n_query_indicies)
+    query_indices : numpy.ndarray of shape (n_query_indices)
         the query indications that correspond to the unlabeled samples.
-    d_latest : numpy.ndarray of shape (n_unlabeled_samples) default=None
+    d_latest : np.ndarray of shape (n_unlabeled_samples) default=None
         The distance between each data point and its nearest centre.
         This is used to simplify the calculation of the later distances for the
         next selected sample.
@@ -245,10 +246,10 @@ def _d_2(g_x, query_indicies, d_latest=None):
     D2 : numpy.ndarray of shape (n_unlabeled_samples)
         The D^2 value, for the first sample, is the value inf.
     """
-    if len(query_indicies) == 0:
+    if len(query_indices) == 0:
         return np.sum(g_x**2, axis=-1)
-    g_query_indicies = g_x[query_indicies]
-    _, D = pairwise_distances_argmin_min(X=g_x, Y=g_query_indicies)
+    query_indices = g_x[query_indices]
+    _, D = pairwise_distances_argmin_min(X=g_x, Y=query_indices)
     if d_latest is not None:
         D2 = np.minimum(d_latest, np.square(D))
     return D2

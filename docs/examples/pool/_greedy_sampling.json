@@ -4,7 +4,7 @@
     "package" : "pool",
     "method" : "Greedy Sampling on the Feature Space (GSx)",
     "template" : "examples/template_pool_regression.py",
-    "tags" : ["pool",  "regression", "single-annotator"],
+    "tags" : ["pool",  "regression", "classification", "single-annotator"],
     "title" : "Greedy Sampling on the Feature Space (GSx)",
     "refs" : ["wu2019active"],
     "sequence" : ["title", "text_0", "plot", "refs"],

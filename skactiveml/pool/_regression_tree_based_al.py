@@ -184,7 +184,10 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
         # Fit the regressor.
         if fit_reg:
-            reg = clone(reg).fit(X, y, sample_weight)
+            if sample_weight is None:
+                reg = clone(reg).fit(X, y)
+            else:
+                reg = clone(reg).fit(X, y, sample_weight)
 
         # Calculate the number of samples to be selected from each leaf k.
         n_k = _calc_acquisitions_per_leaf(
