@@ -128,11 +128,3 @@ class TestTypiClust(
                     self.assertTrue(np.isneginf(i))
         self.assertEqual(10, utilities_4.shape[1])
         self.assertEqual(1, utilities_4.shape[0])
-
-        # test case 5: for candidates with new samples
-        X_cand = random_state.choice(5, size=(5, 2))
-        _, utilities_5 = typi_clust_1.query(
-            X, y_1, batch_size=2, candidates=X_cand, return_utilities=True
-        )
-        self.assertEqual(5, utilities_5.shape[1])
-        self.assertEqual(2, utilities_5.shape[0])

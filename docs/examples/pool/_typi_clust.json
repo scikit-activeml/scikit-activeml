@@ -6,12 +6,12 @@
     "category" : "Others",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator"],
-    "title" : "Typical Clustering",
+    "title" : "Typical Clustering (TypiClust)",
     "refs" : ["hacohen2022active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : "from skactiveml.pool import TypiClust",
-    "init_qs" : "TypiClust()",
+    "init_qs" : "TypiClust(random_state=0, cluster_algo_dict={\"random_state\": 0})",
     "query_params" : "X=X, y=y"
 }
 ]
