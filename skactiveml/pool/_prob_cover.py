@@ -8,7 +8,11 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, is_unlabeled, rand_argmax, check_scalar
+from ..utils import (
+    MISSING_LABEL,
+    rand_argmax,
+    check_scalar,
+)
 from sklearn.cluster import KMeans
 from sklearn.utils.validation import column_or_1d
 
@@ -24,15 +28,15 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     ----------
     n_classes : None or int, default=None
         This parameter is used to determine the delta value. If
-        `n_classes=None`, the number of classes is extracted from the 
-        given labels. If this extracted number of classes is below 2, 
+        `n_classes=None`, the number of classes is extracted from the
+        given labels. If this extracted number of classes is below 2,
         `n_classes=2` is used as a fallback.
     deltas : None or array-like of shape (n_deltas,), default=None
-        List of deltas (ball radii) to be tested for finding the maximum 
+        List of deltas (ball radii) to be tested for finding the maximum
         value satisfying a sample coverage >= `alpha`. If no value in
-        `deltas` satisfies this constraint, an error is raised asking for
-        smaller values. If `deltas=None`, the values 
-        `np.arange(0.0, 2.2, 0.2)` are used. 
+        `deltas` satisfies this constraint, an warning is raised where
+        the minimum `delta` value is used. If `deltas=None`, the values
+        `np.arange(0.0, 2.2, 0.2)` are used.
     alpha : float in (0, 1), alpha=0.95
         Minimum coverage as a constraint for the `delta` selection.
     cluster_algo : ClusterMixin.__class__, default=sklearn.cluster.KMeans
@@ -42,6 +46,10 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         excluding the parameter for the number of clusters.
     n_cluster_param_name : string, default="n_clusters"
         The name of the parameter for the number of clusters.
+    distance_func : callable, default=sklearn.metrics.pairwise_distances
+        Takes as input `X` to compute the distances between each pair of
+        samples. This function can also only return the precomputed distances
+        of each pair in `X` for speedup.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -61,6 +69,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         cluster_algo=KMeans,
         cluster_algo_dict=None,
         n_cluster_param_name="n_clusters",
+        distance_func=pairwise_distances,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -73,11 +82,13 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
         self.n_cluster_param_name = n_cluster_param_name
+        self.distance_func = distance_func
 
     def query(
         self,
         X,
         y,
+        update=False,
         candidates=None,
         batch_size=1,
         return_utilities=False,
@@ -92,6 +103,11 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label).
+        update : bool, default=False
+            This boolean flag determines whether the computed `delta_max_`
+            and the `distances_` shall be updated in the `query`. For the first
+            call of `query`, this parameter has no impact because both
+            quantities are computed for the first time.
         candidates : None or array-like of shape (n_candidates), dtype=int or
         array-like of shape (n_candidates, n_features), default=None
             If `candidates` is None, the unlabeled samples from (X, y)
@@ -99,9 +115,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             If `candidates` is of shape (n_candidates) and of type int,
             candidates is considered as a list of the indices of the samples in
             (X, y).
-            If `candidates` is of shape (n_candidates, n_features), the
-            candidates are directly given in the input candidates (not
-            necessarily contained in X).
         batch_size : int, optional(default=1)
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional(default=False)
@@ -115,8 +128,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             sample.
             If `candidates` in None or of shape (n_candidates), the indexing
             refers to samples in X.
-            If `candidates` is of shape (n_candidates, n_features), the 
-            indexing refers to samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples for selecting each sample of the batch.
             Here, utilities mean the out-degree of the candidate samples.
@@ -127,10 +138,28 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
-        _, _ = self._transform_candidates(
+        _, mapping = self._transform_candidates(
             candidates, X, y, enforce_mapping=True
         )
-        is_candidate = is_unlabeled(y, missing_label=self.missing_label)
+        is_candidate = np.full(len(X), fill_value=False)
+        is_candidate[mapping] = True
+        n_classes = self.n_classes
+        if n_classes is None:
+            n_classes = max(len(np.unique(y[~is_candidate])), 2)
+        check_scalar(
+            n_classes,
+            "n_classes",
+            min_val=2,
+            min_inclusive=True,
+            target_type=int,
+        )
+        if self.deltas is None:
+            deltas = np.arange(0.0, 2.2, 0.2)
+        else:
+            deltas = column_or_1d(self.deltas, dtype=float)
+            deltas = np.sort(deltas)
+            if (deltas < 0).any():
+                raise ValueError("`deltas` must contain non-negative floats.")
         check_scalar(
             self.alpha,
             "alpha",
@@ -140,15 +169,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             max_inclusive=False,
             target_type=float,
         )
-        if self.deltas is None:
-            deltas = np.arange(0.0, 2.2, 0.2)
-        else:
-            deltas = column_or_1d(self.deltas, dtype=float)
-            if (deltas < 0).any():
-                raise ValueError(
-                    "`deltas` must contain non-negative floats."
-                )
-
         if not (
             isinstance(self.cluster_algo_dict, dict)
             or self.cluster_algo_dict is None
@@ -162,28 +182,26 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             if self.cluster_algo_dict is None
             else self.cluster_algo_dict.copy()
         )
+        check_scalar(update, name="update", target_type=bool)
 
-        if not isinstance(self.n_cluster_param_name, str):
-            raise TypeError("`n_cluster_param_name` supports only string.")
+        if update or not hasattr(self, "delta_max_"):
+            # Compute distances between each pair of observed samples.
+            self.distances_ = self.distance_func(X)
 
-        # Compute distances between each pair of observed samples.
-        distances = pairwise_distances(X)
-
-        # Compute the maximum `delta` value satisfying a purity >= `alpha`.
-        if len(deltas) == 1:
+            # Compute the maximum `delta` value satisfying a purity >= `alpha`.
             self.delta_max_ = deltas[0]
-        elif not hasattr(self, "delta_max_"):
-            cluster_algo_dict[self.n_cluster_param_name] = self.n_classes
-            cluster_obj = self.cluster_algo(**cluster_algo_dict)
-            y_cluster = cluster_obj.fit_predict(X)
-            is_impure = y_cluster[:, None] != y_cluster
-            for delta in deltas:
-                edges = distances < delta
-                purity = 1 - (edges * is_impure).any(axis=1).mean()
-                if purity < self.alpha:
-                    break
-                self.delta_max_ = delta
-        edges = distances <= self.delta_max_
+            if len(deltas) > 1:
+                cluster_algo_dict[self.n_cluster_param_name] = n_classes
+                cluster_obj = self.cluster_algo(**cluster_algo_dict)
+                y_cluster = cluster_obj.fit_predict(X)
+                is_impure = y_cluster[:, None] != y_cluster
+                for delta in deltas:
+                    edges = self.distances_ < delta
+                    purity = 1 - (edges * is_impure).any(axis=1).mean()
+                    if purity < self.alpha:
+                        break
+                    self.delta_max_ = delta
+        edges = self.distances_ <= self.delta_max_
 
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
@@ -201,24 +219,3 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             return query_indices, utilities
         else:
             return query_indices
-
-
-def _construct_graph(X, is_candidate, delta):
-    """
-    Calculation the typicality of uncovers samples in X.
-
-    Parameters
-    ----------
-    X : array-like of shape (n_samples, n_features)
-        Training data set including the labeled and unlabeled samples.
-    is_candidate : np.ndarray of shape (n_candidates,)
-       Index array that maps `candidates` to `X_for_cluster`.
-    delta : float > 0
-        Ball radius centred at a sample.
-
-    Returns
-    -------
-    vertices : numpy.ndarray of shape (n_X)
-        The typicality of all uncovered samples in X
-    """
-    pass

@@ -11,7 +11,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : "from skactiveml.pool import ProbCover",
-    "init_qs" : "ProbCover(n_classes=4)",
+    "init_qs" : "ProbCover(n_classes=2, random_state=0, cluster_algo_dict={\"random_state\": 0})",
     "query_params" : "X=X, y=y"
 }
 ]
