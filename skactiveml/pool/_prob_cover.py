@@ -17,27 +17,40 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     """Probability Coverage
 
     This class implements the Probability Coverage (ProbCover) query strategy
-    [1], which aims at maximizing the probability coverage in a meaninfulg
+    [1], which aims at maximizing the probability coverage in a meaningful
     sample embedding space.
 
     Parameters
     ----------
-    cluster_algo : ClusterMixin.__class__ (default=KMeans)
+    n_classes : None or int, default=None
+        This parameter is used to determine the delta value. If
+        `n_classes=None`, the number of classes is extracted from the 
+        given labels. If this extracted number of classes is below 2, 
+        `n_classes=2` is used as a fallback.
+    deltas : None or array-like of shape (n_deltas,), default=None
+        List of deltas (ball radii) to be tested for finding the maximum 
+        value satisfying a sample coverage >= `alpha`. If no value in
+        `deltas` satisfies this constraint, an error is raised asking for
+        smaller values. If `deltas=None`, the values 
+        `np.arange(0.0, 2.2, 0.2)` are used. 
+    alpha : float in (0, 1), alpha=0.95
+        Minimum coverage as a constraint for the `delta` selection.
+    cluster_algo : ClusterMixin.__class__, default=sklearn.cluster.KMeans
         The cluster algorithm to be used for determining the best delta value.
-    cluster_algo_dict : dict, optional (default=None)
+    cluster_algo_dict : dict, default=None
         The parameters passed to the clustering algorithm `cluster_algo`,
         excluding the parameter for the number of clusters.
-    n_cluster_param_name : string (default="n_clusters")
+    n_cluster_param_name : string, default="n_clusters"
         The name of the parameter for the number of clusters.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : None or int or np.random.RandomState
+    random_state : None or int or np.random.RandomState, default=None
         The random state to use.
 
     References
     ----------
     [1] Yehuda, Ofer, Avihu Dekel, Guy Hacohen, and Daphna Weinshall. "Active
-        Learning Through a Covering Lens." NeurIPS, 2022.
+    Learning Through a Covering Lens." NeurIPS, 2022.
     """
 
     def __init__(
@@ -75,43 +88,40 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples
-        y : array-like of shape (n_samples, )
+            unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.missing_label)
-        candidates : None or array-like of shape (n_candidates), dtype = int or
-        array-like of shape (n_candidates, n_features), optional (default=None)
-            If candidates is None, the unlabeled samples from (X, y)
+            indicated by self.missing_label).
+        candidates : None or array-like of shape (n_candidates), dtype=int or
+        array-like of shape (n_candidates, n_features), default=None
+            If `candidates` is None, the unlabeled samples from (X, y)
             are considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
+            If `candidates` is of shape (n_candidates) and of type int,
             candidates is considered as a list of the indices of the samples in
             (X, y).
-            If candidates is of shape (n_candidates, n_features), the
+            If `candidates` is of shape (n_candidates, n_features), the
             candidates are directly given in the input candidates (not
             necessarily contained in X).
         batch_size : int, optional(default=1)
-            The number of samples to be selects in one AL cycle.
+            The number of samples to be selected in one AL cycle.
         return_utilities : bool, optional(default=False)
-            If True, also return the utilities based on the query strategy
+            If True, also return the utilities based on the query strategy.
 
         Returns
         ----------
         query_indices : numpy.ndarry of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
+            The `query_indices` indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates in None or of shape (n_candidates), the indexing
+            If `candidates` in None or of shape (n_candidates), the indexing
             refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+            If `candidates` is of shape (n_candidates, n_features), the 
+            indexing refers to samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples for selecting each sample of the batch.
-            Here, utilities mean the typicality in the considered cluster.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+            Here, utilities mean the out-degree of the candidate samples.
+            If `candidates` is None or of shape (n_candidates), the indexing
+            refers to samples in `X`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -131,12 +141,12 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             target_type=float,
         )
         if self.deltas is None:
-            deltas = np.arange(0.2, 2.2, 0.2)
+            deltas = np.arange(0.0, 2.2, 0.2)
         else:
             deltas = column_or_1d(self.deltas, dtype=float)
-            if (deltas <= 0).any():
+            if (deltas < 0).any():
                 raise ValueError(
-                    "`deltas` must contain strictly positive floats."
+                    "`deltas` must contain non-negative floats."
                 )
 
         if not (
