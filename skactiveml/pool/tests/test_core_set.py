@@ -78,9 +78,9 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         )
         self.assertEqual(5, utilities_5.shape[1])
 
-        # test case 6: remove already unlabeled samples `X[unlbld_indices]` from `X`
-        # and add them as `candidates=X[unlbld_indices]` and check whether the utilities
-        # are the same.
+        # test case 6: remove already unlabeled samples `X[unlbld_indices]`
+        # from `X` and add them as `candidates=X[unlbld_indices]` and check
+        # whether the utilities are the same.
         core_set_6 = CoreSet(random_state=42)
 
         X = random_state.choice(5, size=(10, 2))

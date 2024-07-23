@@ -41,7 +41,7 @@ def mesh(bound, res):
 
 def _get_cmap(cmap):
     if isinstance(cmap, str):
-        cmap = plt.cm.get_cmap(cmap)
+        cmap = plt.colormaps.get_cmap(cmap)
     check_type(cmap, "cmap", Colormap, str)
     return cmap
 

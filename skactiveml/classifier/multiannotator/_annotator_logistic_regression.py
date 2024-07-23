@@ -240,7 +240,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         n_features = X.shape[1]
         n_classes = len(self.classes_)
         self.n_annotators_ = y.shape[1]
-        I = np.eye(n_classes)
+        identity_matrix = np.eye(n_classes)
 
         # Convert Gamma to matrix, if it is a number:
         Gamma = self.weights_prior * np.eye(n_features)
@@ -394,7 +394,9 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
                 P_W = softmax(X @ W, axis=1)
                 for k in range(n_classes):
                     for j in range(n_classes):
-                        diagonal = P_W[:, j] * (I[k, j] - P_W[:, k])
+                        diagonal = P_W[:, j] * (
+                            identity_matrix[k, j] - P_W[:, k]
+                        )
                         D = np.diag(diagonal)
                         H_kj = X.T @ D @ X + Gamma
                         H[

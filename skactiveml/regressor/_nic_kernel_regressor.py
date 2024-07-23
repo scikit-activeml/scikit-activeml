@@ -198,9 +198,9 @@ def _combine_params(prior_params, update_params):
 class NadarayaWatsonRegressor(NICKernelRegressor):
     """NadarayaWatsonRegressor
 
-    The Nadaraya Watson Regressor predicts the target value by taking a weighted
-    average based on a kernel. It is implemented asa `NICKernelRegressor` with
-    different prior values.
+    The Nadaraya Watson Regressor predicts the target value by taking a
+    weighted average based on a kernel. It is implemented as a
+    `NICKernelRegressor` with different prior values.
 
     Parameters
     __________

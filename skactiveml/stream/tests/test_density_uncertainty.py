@@ -1,7 +1,6 @@
 import unittest
 
 import numpy as np
-from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import pairwise_distances
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier

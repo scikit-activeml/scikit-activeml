@@ -9,12 +9,12 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.8', '3.9', '3.10', '3.11']
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
 
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install oldest dependencies
@@ -28,7 +28,7 @@ jobs:
         pip install -r requirements_extra.txt
     - name: Test with pytest and oldest dependencies
       run: |
-        pytest --cov=./skactiveml --cov-report=xml
+        pytest --cov=./skactiveml --cov-report=xml --cov-fail-under=100
     - name: Install latest dependencies
       run: |
         pip install --upgrade -r requirements.txt -r requirements_max.txt
@@ -40,14 +40,14 @@ jobs:
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 skactiveml/ --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --statistics
+        flake8 skactiveml/ --ignore=E203,W503 --count --exit-zero --statistics
     - name: Test with pytest
       run: |
-        pytest --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml
+        pytest --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml --cov-fail-under=100
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true

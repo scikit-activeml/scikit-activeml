@@ -37,9 +37,9 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         The Norm to measure the gradient. Argument will be passed to
         `np.linalg.norm`.
     feature_map : callable, optional (default=None)
-        The feature map of the linear regressor. Takes in the feature data. Must
-        output a np.array of dimension 2. The default value is the identity
-        function. An example feature map is
+        The feature map of the linear regressor. Takes in the feature data.
+        Must output a np.array of dimension 2. The default value is the
+        identity function. An example feature map is
         `sklearn.preprocessing.PolynomialFeatures().fit_transform`.
     missing_label : scalar or string or np.nan or None,
     (default=skactiveml.utils.MISSING_LABEL)
@@ -99,7 +99,8 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional
+        (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),

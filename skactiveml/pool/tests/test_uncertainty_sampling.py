@@ -21,12 +21,10 @@ class TestUncertaintySampling(
         self.classes = [0, 1]
         query_default_params_clf = {
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
-            #'y': np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
             "clf": ParzenWindowClassifier(
                 random_state=0, classes=self.classes
             ),
             "y": np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
-            #'clf': SklearnClassifier(SVC(probability=True), random_state=0, classes=[0, 1]),
         }
         super().setUp(
             qs_class=UncertaintySampling,

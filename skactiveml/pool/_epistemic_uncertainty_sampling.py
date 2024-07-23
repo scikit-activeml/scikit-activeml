@@ -11,7 +11,7 @@ from scipy.interpolate import griddata
 from scipy.optimize import minimize_scalar, minimize, LinearConstraint
 from sklearn import clone
 from sklearn.linear_model import LogisticRegression
-from sklearn.utils.extmath import safe_sparse_dot, log_logistic
+from sklearn.utils.extmath import safe_sparse_dot
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..classifier import SklearnClassifier, ParzenWindowClassifier
@@ -661,7 +661,7 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
         sample_weight = np.ones(y.shape[0])
 
     # Logistic loss is the negative of the log of the logistic function.
-    out = -np.sum(sample_weight * log_logistic(yz))
+    out = -np.sum(sample_weight * (-np.logaddexp(0, -yz)))
     out += 0.5 * alpha * np.dot(w, w)
     return out
 

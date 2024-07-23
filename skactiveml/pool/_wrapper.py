@@ -166,6 +166,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
                 max_candidates = ceil(len(candidates) * self.max_candidates)
             max_candidates = min(max_candidates, len(candidates))
             if candidates.ndim == 1:
+                candidate_indices = candidates
                 new_candidates = random_state.choice(
                     a=candidates, size=max_candidates, replace=False
                 )
@@ -193,11 +194,16 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         queried_indices, utilities = qs_output
 
         if candidates is None or candidates.ndim == 1:
-            new_utilities = utilities
+            new_utilities = np.full(
+                shape=(batch_size, len(X)), fill_value=np.nan
+            )
+            new_utilities[:, candidate_indices] = -np.inf
+            new_utilities[:, new_candidates] = utilities[:, new_candidates]
         else:
             new_utilities = np.full(
                 shape=(batch_size, len(candidates)), fill_value=np.nan
             )
+            new_utilities[:, candidate_indices] = -np.inf
             new_utilities[:, new_candidate_indices] = utilities
             queried_indices = new_candidate_indices[queried_indices]
 
