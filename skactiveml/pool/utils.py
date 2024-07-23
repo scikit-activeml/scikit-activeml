@@ -14,7 +14,6 @@ from sklearn.utils.validation import check_array, check_consistent_length
 from ..base import (
     SkactivemlClassifier,
     ProbabilisticRegressor,
-    SkactivemlRegressor,
 )
 from ..classifier import ParzenWindowClassifier
 from ..utils import (
@@ -851,52 +850,53 @@ def expected_target_val(X, target_func, reg, **kwargs):
 
     Other Parameters
     ----------------
-    method: string, optional, optional (default='gauss_hermite')
+    method : string, optional, optional (default='gauss_hermite')
         The method by which the expectation is computed.
-        -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
-          thereby only takes the function value at the expected y value.
-        -'monte_carlo' Basic monte carlo integration. Taking the average
+        - 'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval])
+          and thereby only takes the function value at the expected y value.
+        - 'monte_carlo' Basic monte carlo integration. Taking the average
           of randomly drawn samples. `n_integration_samples` specifies the
           number of monte carlo samples.
-        -'quantile' Uses the quantile function to transform the integration
+        - 'quantile' Uses the quantile function to transform the integration
           space into the interval from 0 to 1 and than uses the method from
-          'quantile_method' to calculate the integral. The number of integration
-          points is specified by `n_integration_samples`.
-        -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
+          'quantile_method' to calculate the integral. The number of
+          integration points is specified by `n_integration_samples`.
+        - 'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
           to be gaussian distributed. The number of evaluation  points is given
           by `n_integration_samples`.
-        -'dynamic_quad' uses `scipy's` function `expect` on the `rv_continuous`
-          random variable of `reg`, which in turn uses a dynamic gaussian
-          quadrature routine for calculating the integral. Performance is worse
-          using a vector function.
-    quantile_method: string, optional (default='quadrature')
+        - 'dynamic_quad' uses `scipy's` function `expect` on the
+          `rv_continuous` random variable of `reg`, which in turn uses a
+          dynamic gaussian quadrature routine for calculating the integral.
+          Performance is worse using a vector function.
+    quantile_method : string, optional (default='quadrature')
         Specifies the integration methods used after the quantile
         transformation.
-        -'trapezoid' Trapezoidal method for integration using evenly spaced
+        - 'trapezoid' Trapezoidal method for integration using evenly spaced
           samples.
-        -'simpson' Simpson method for integration using evenly spaced samples.
-        -'average' Taking the average value for integration using evenly spaced
-          samples.
-        -'romberg' Romberg method for integration. If `n_integration_samples` is
-          not equal to `2**k + 1` for a natural number k, the number of
-          samples used for integration is put to the smallest such number greater
-          than `n_integration_samples`.
-        -'quadrature' Gaussian quadrature method for integration.
-    n_integration_samples: int, optional (default=10)
+        - 'simpson' Simpson method for integration using evenly spaced samples.
+        - 'average' Taking the average value for integration using evenly
+          spaced samples.
+        - 'romberg' Romberg method for integration. If `n_integration_samples`
+          is not equal to `2**k + 1` for a natural number k, the number of
+          samples used for integration is put to the smallest such number
+          greater than `n_integration_samples`.
+        - 'quadrature' Gaussian quadrature method for integration.
+    n_integration_samples : int, optional (default=10)
         The number of integration samples used in 'quantile', 'monte_carlo' and
         'gauss-hermite'.
-    quad_dict: dict, optional (default=None)
+    quad_dict : dict, optional (default=None)
         Further arguments for using `scipy's` `expect`
     random_state : int | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
     target_func : bool
         If `True` only the target values will be passed to `func`.
     vector_func : bool or str, optional (default=False)
-        If `vector_func` is `True`, the integration values are passed as a whole
-        to the function `func`. If `vector_func` is 'both', the integration
-        values might or might not be passed as a whole. The integration values
-        if passed as a whole are of the form (n_samples, n_integration), where
-        n_integration denotes the number of integration values.
+        If `vector_func` is `True`, the integration values are passed as a
+        whole to the function `func`. If `vector_func` is 'both', the
+        integration values might or might not be passed as a whole. The
+        integration values if passed as a whole are of the form (n_samples,
+        n_integration), where n_integration denotes the number of integration
+        values.
 
     Returns
     -------
@@ -948,8 +948,8 @@ def _conditional_expect(
           number of monte carlo samples.
         -'quantile' Uses the quantile function to transform the integration
           space into the interval from 0 to 1 and than uses the method from
-          'quantile_method' to calculate the integral. The number of integration
-          points is specified by `n_integration_samples`.
+          'quantile_method' to calculate the integral. The number of
+          integration points is specified by `n_integration_samples`.
         -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
           to be gaussian distributed. The number of evaluation  points is given
           by `n_integration_samples`.
@@ -957,23 +957,23 @@ def _conditional_expect(
           random variable of `reg`, which in turn uses a dynamic gaussian
           quadrature routine for calculating the integral. Performance is worse
           using a vector function.
-    quantile_method: string, optional (default='quadrature')
+    quantile_method : string, optional (default='quadrature')
         Specifies the integration methods used after the quantile
         transformation.
-        -'trapezoid' Trapezoidal method for integration using evenly spaced
+        - 'trapezoid' Trapezoidal method for integration using evenly spaced
           samples.
-        -'simpson' Simpson method for integration using evenly spaced samples.
-        -'average' Taking the average value for integration using evenly spaced
-          samples.
-        -'romberg' Romberg method for integration. If `n_integration_samples` is
-          not equal to `2**k + 1` for a natural number k, the number of
+        - 'simpson' Simpson method for integration using evenly spaced samples.
+        - 'average' Taking the average value for integration using evenly
+          spaced samples.
+        - 'romberg' Romberg method for integration. If `n_integration_samples`
+          is not equal to `2**k + 1` for a natural number k, the number of
           samples used for integration is put to the smallest such number
           greater than `n_integration_samples`.
         -'quadrature' Gaussian quadrature method for integration.
-    n_integration_samples: int, optional (default=10)
+    n_integration_samples : int, optional (default=10)
         The number of integration samples used in 'quantile', 'monte_carlo' and
         'gauss-hermite'.
-    quad_dict: dict, optional (default=None)
+    quad_dict : dict, optional (default=None)
         Further arguments for using `scipy's` `expect`
     random_state : int | np.random.RandomState, optional (default=None)
         Random state for fixing the number generation.
@@ -983,8 +983,8 @@ def _conditional_expect(
         integration values might or might not be passed in vectorized form,
         depending what is more efficient. The integration values
         are passed in vectorized form, means that in a call like
-        `func(y, x, idx)` `y` is of the form (n_samples, n_integration_samples),
-         `x` equals `X` and `idx` is an index map of `X.
+        `func(y, x, idx)` `y` is of the form (n_samples,
+        n_integration_samples), `x` equals `X` and `idx` is an index map of `X.
 
 
 

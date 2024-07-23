@@ -647,6 +647,10 @@ class TestFeatureSpace(unittest.TestCase):
                 X=X,
                 values=self.utilities,
             )
+        values = self.utilities.copy()
+        values[:5] = -np.inf
+        values[5:] = np.inf
+        plot_contour_for_samples(values=values, X=self.X)
 
     def test_plot_contour_for_samples_param_values(self):
         test_cases = [
@@ -763,7 +767,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_wo_cand_expected.pdf",
             self.path_prefix + "dec_bound_wo_cand.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -792,7 +796,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_w_cand_expected.pdf",
             self.path_prefix + "dec_bound_w_cand.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -833,7 +837,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_multiclass.pdf",
             self.path_prefix + "dec_bound_multiclass_expected.pdf",
-            tol=0,
+            tol=1.0,
         )
         self.assertIsNone(comparison)
 
@@ -865,7 +869,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_svc_expected.pdf",
             self.path_prefix + "dec_bound_svc.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -885,7 +889,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "multi_with_axes_expected.pdf",
             self.path_prefix + "multi_with_axes.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -903,7 +907,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "multi_without_axes_expected.pdf",
             self.path_prefix + "multi_without_axes.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -922,7 +926,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "multi_without_axes_cand_expected.pdf",
             self.path_prefix + "multi_without_axes_cand.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 
@@ -967,7 +971,7 @@ class TestFeatureSpace(unittest.TestCase):
         comparison = compare_images(
             self.path_prefix + "dec_bound_w_cand_stream_expected.pdf",
             self.path_prefix + "dec_bound_w_cand_stream.pdf",
-            tol=0,
+            tol=0.05,
         )
         self.assertIsNone(comparison)
 

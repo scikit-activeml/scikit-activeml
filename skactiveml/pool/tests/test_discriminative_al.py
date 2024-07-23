@@ -1,9 +1,6 @@
 import unittest
 
 import numpy as np
-from sklearn.datasets import load_breast_cancer
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
 from skactiveml.classifier import ParzenWindowClassifier

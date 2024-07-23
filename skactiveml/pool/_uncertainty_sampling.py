@@ -298,8 +298,8 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(
-                f"Method `entropy` does not support cost matrices but "
-                f"`cost_matrix` was not None."
+                "Method `entropy` does not support cost matrices but "
+                "`cost_matrix` was not None."
             )
     else:
         raise ValueError(

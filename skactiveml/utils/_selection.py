@@ -81,7 +81,11 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
 
 def simple_batch(
-    utilities, random_state=None, batch_size=1, return_utilities=False
+    utilities,
+    random_state=None,
+    batch_size=1,
+    return_utilities=False,
+    method="max",
 ):
     """Generates a batch by selecting the highest values in the 'utilities'.
     If utilities is an ND-array, the returned utilities will be an
@@ -95,17 +99,21 @@ def simple_batch(
     random_state : int | np.random.RandomState (default=None)
         The random state to use. If `random_state is None` random
         `random_state` is used.
-    batch_size : int, optional (default=1)
+    batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
-    return_utilities : bool (default=False)
+    return_utilities : bool, default=False
         If True, the utilities are returned.
+    method : str, default='max'
+        Determines how to select 'best_indices'. 'max' selects the indices with
+        the maximum utilities. 'proportional' randomly choose the
+        'best_indices' with the probabilities proportional to 'utilities'.
 
     Returns
     -------
-    best_indices : np.ndarray, shape (batch_size) if ndim == 1
-    (batch_size, ndim) else
+    best_indices : np.ndarray of shape (batch_size) if utilities.ndim == 1
+    else (batch_size, utilities.ndim)
         The index of the batch instance.
-    batch_utilities : np.ndarray,  shape (batch_size, len(utilities))
+    batch_utilities : np.ndarray of shape (batch_size, len(utilities))
         The utilities of the batch (if return_utilities=True).
 
     """
@@ -127,19 +135,41 @@ def simple_batch(
             )
         )
         batch_size = max_batch_size
+
+    check_type(method, "method", str)
+
     # generate batch
-
-    batch_utilities = np.empty((batch_size,) + utilities.shape)
     best_indices = np.empty((batch_size, utilities.ndim), dtype=int)
+    if method == "max":
+        batch_utilities = np.empty((batch_size,) + utilities.shape)
+        for i in range(batch_size):
+            best_indices[i] = rand_argmax(utilities, random_state=random_state)
+            batch_utilities[i] = utilities
+            utilities[tuple(best_indices[i])] = np.nan
+    elif method == "proportional":
+        random_state = check_random_state(random_state)
+        p = utilities / np.nansum(utilities)
+        p[np.isnan(p)] = 0
+        best_indices = random_state.choice(
+            len(utilities),
+            size=batch_size,
+            p=p,
+            replace=False,
+        )
 
-    for i in range(batch_size):
-        best_indices[i] = rand_argmax(utilities, random_state=random_state)
-        batch_utilities[i] = utilities
-        utilities[tuple(best_indices[i])] = np.nan
-    # Check whether utilities are to be returned.
+        batch_utilities = np.repeat([utilities], batch_size, axis=0)
+        for i in range(batch_size):
+            batch_utilities[i, best_indices[:i]] = np.nan
+    else:
+        raise ValueError(
+            f'"method" has to be either "max" or "proportional" '
+            f"but {method} was given."
+        )
+
     if utilities.ndim == 1:
         best_indices = best_indices.flatten()
 
+    # Check whether utilities are to be returned.
     if return_utilities:
         return best_indices, batch_utilities
     else:
@@ -148,10 +178,10 @@ def simple_batch(
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     """Combine different rankings hierarchically to one ranking assignment.
-    A ranking index i is ranked higher than index j iff ranking[i] > ranking[j].
-    For the combined ranking it will hold that the first ranking of iter_ranking
-    always determines the ranking position at an index, and only when
-    two ranking assignments are equal the second ranking will determine
+    A ranking index i is ranked higher than index j iff ranking[i]>ranking[j].
+    For the combined ranking it will hold that the first ranking of
+    `iter_ranking` always determines the ranking position at an index, and only
+    when two ranking assignments are equal the second ranking will determine
     the ranking position and so forth.
 
     Parameters
@@ -164,7 +194,8 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         The method by which the utilities are ranked. See `scipy.rankdata`s
         argument `method` for details.
     rank_per_batch : bool, optional (default = False)
-        Whether the first index determines the batch and is not used for ranking
+        Whether the first index determines the batch and is not used for
+        ranking.
 
     Returns
     -------

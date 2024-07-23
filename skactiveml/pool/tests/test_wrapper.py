@@ -130,7 +130,7 @@ class TestSubSamplingWrapper(
             u = u.ravel()
             q_sub, u_sub = qs_sub.query(**query_params)
             u_sub = u_sub.ravel()
-            mask = ~np.isnan(u_sub)
+            mask = ~np.isnan(u_sub) & ~np.isneginf(u_sub)
             np.testing.assert_array_equal(u[mask], u_sub[mask])
             query_params["return_utilities"] = False
             q_sub = qs_sub.query(**query_params)
@@ -163,7 +163,10 @@ class TestSubSamplingWrapper(
                 self.assertEqual(len(query_ids), batch_size)
                 self.assertEqual(len(utils), batch_size)
                 self.assertEqual(len(utils[0]), len(query_params["X"]))
-                self.assertEqual(sum(~np.isnan(utils[0])), qs.max_candidates)
+                self.assertEqual(
+                    sum(~np.isneginf(utils[0]) & ~np.isnan(utils[0])),
+                    qs.max_candidates,
+                )
 
                 query_params["batch_size"] = max_batch_size + 1
                 query_params["return_utilities"] = False

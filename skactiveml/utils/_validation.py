@@ -544,8 +544,8 @@ def check_indices(indices, A, dim="adaptive", unique=True):
             n_unique_indices = len(np.unique(indices, axis=0))
         if n_unique_indices < len(indices):
             raise ValueError(
-                f"`indices` contains two different indices of the "
-                f"same value."
+                "`indices` contains two different indices of the "
+                "same value."
             )
     elif unique:
         if indices.ndim == 1:
@@ -630,7 +630,7 @@ def check_type(
     if wrong_type and wrong_value and wrong_index:
         error_str = f"`{name}` "
         if len(target_types) == 0 and len(target_vals) == 0:
-            error_str += f" must"
+            error_str += " must"
         if len(target_vals) == 0 and len(target_types) > 0:
             error_str += f" has type `{type(obj)}`, but must"
         elif len(target_vals) > 0 and len(target_types) == 0:

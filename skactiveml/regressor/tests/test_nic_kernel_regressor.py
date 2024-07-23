@@ -9,7 +9,6 @@ from skactiveml.regressor._nic_kernel_regressor import (
 )
 from skactiveml.utils import MISSING_LABEL
 from scipy.stats import norm
-from copy import deepcopy
 
 from skactiveml.tests.template_estimator import TemplateProbabilisticRegressor
 

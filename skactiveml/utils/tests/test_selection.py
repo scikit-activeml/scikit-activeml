@@ -1,6 +1,8 @@
 import unittest
 
 import numpy as np
+from scipy.stats import norm
+from sklearn.neighbors import KernelDensity
 
 from skactiveml.utils import rand_argmin, rand_argmax, simple_batch
 from skactiveml.utils._selection import combine_ranking
@@ -114,6 +116,48 @@ class TestSelection(unittest.TestCase):
             return_utilities=False,
         )
         np.testing.assert_equal((0, 2), indices.shape)
+
+        batch_size = 10
+        idx, utils = simple_batch(
+            np.arange(100),
+            batch_size=batch_size,
+            return_utilities=True,
+            method="proportional",
+        )
+        self.assertEqual(batch_size, len(idx))
+        self.assertEqual(
+            np.sum(np.isnan(utils)), np.sum(np.arange(batch_size))
+        )
+        for i in range(batch_size):
+            np.testing.assert_array_equal(
+                np.argwhere(np.isnan(utils[i])).flatten(), np.sort(idx[:i])
+            )
+
+        # test proportional method
+        N = 1000
+        X = np.linspace(-5, 10, N)
+        true_dens = 0.3 * norm(0, 1).pdf(X.reshape(-1, 1)) + 0.7 * norm(
+            5, 1
+        ).pdf(X.reshape(-1, 1))
+        true_dens += np.mean(true_dens)
+        true_dens = true_dens / np.sum(true_dens)
+        sel = np.empty(100000)
+        for i in range(100000):
+            sel[i] = X[
+                simple_batch(
+                    true_dens[:, 0], method="proportional", random_state=i
+                )[0]
+            ]
+        density = KernelDensity(kernel="gaussian", bandwidth=0.2).fit(
+            sel.reshape(-1, 1)
+        )
+        est_dens = np.exp(density.score_samples(X.reshape(-1, 1))).flatten()
+        est_dens /= np.sum(est_dens)
+        np.testing.assert_allclose(
+            true_dens.flatten()[20:-20], est_dens[20:-20], rtol=0.1
+        )
+
+        self.assertRaises(ValueError, simple_batch, utils, method="string")
 
     def test_combine_ranking(self):
         self.assertRaises(

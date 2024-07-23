@@ -477,15 +477,6 @@ class TestSlidingWindowClassifier(
             replace_fit_params=replace_fit_params,
         )
 
-    def test_partial_fit_param_X(
-        self, test_cases=None, replace_init_params=None
-    ):
-        replace_init_params = {
-            "classes": ["tokyo", "paris"],
-            "missing_label": "nan",
-            "estimator": SklearnClassifier(GaussianNB(), missing_label="nan"),
-        }
-
     def test_partial_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

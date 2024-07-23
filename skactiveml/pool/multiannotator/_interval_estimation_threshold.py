@@ -45,8 +45,6 @@ class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
 
     Attributes
     ----------
-    classes_: array-like, shape (n_classes)
-        Holds the label for each class.
     n_annotators_: int
         Number of annotators.
     A_perf_ : ndarray, shape (n_annotators, 3)
@@ -255,33 +253,35 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
             optional (default=None)
-            If `candidates` is None, the samples from (X,y), for which an
-            annotator exists such that the annotator sample pairs is
-            unlabeled are considered as sample candidates.
-            If `candidates` is of shape (n_candidates,) and of type int,
-            `candidates` is considered as the indices of the sample candidates
-            in (X,y).
-            If `candidates` is of shape (n_candidates, n_features), the
-            sample candidates are directly given in `candidates` (not
-            necessarily contained in `X`).
-        annotators : array-like, shape (n_candidates, n_annotators), optional
+            See annotators.
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int
+        or array-like of shape (n_candidates, n_annotators), optional
         (default=None)
-            If `annotators` is None, all annotators are considered as available
-            annotators.
-            If `annotators` is of shape (n_avl_annotators) and of type int,
+            If candidate samples and annotators are not specified, i.e.,
+            `candidates=None`, `annotators=None` the unlabeled target values,
+            `y`, are the candidates annotator-sample-pairs.
+            If candidate samples and available annotators are specified:
+            The annotator-sample-pairs, for which the sample is a candidate
+            sample and the annotator is an available annotator are considered
+            as candidate annotator-sample-pairs.
+            If `candidates` is None, all samples of `X` are considered as
+            candidate samples. In this case `n_candidates` equals `len(X)`.
+            If `candidates` is of shape `(n_candidates,)` and of type int,
+            `candidates` is considered as the indices of the sample candidates
+            in `(X, y)`.
+            If `candidates` is of shape `(n_candidates, n_features)`, the
+            sample candidates are directly given in `candidates` (not
+            necessarily contained in `X`). This is not supported by all query
+            strategies.
+            If `annotators` is `None`, all annotators are considered as
+            available annotators.
+            If `annotators` is of shape `(n_avl_annotators)`, and of type int,
             `annotators` is considered as the indices of the available
             annotators.
-            If candidate samples and available annotators are specified:
-            The annotator sample pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered
-            as candidate annotator sample pairs.
-            If `annotators` is None and `candidates` is of shape
-            (n_candidates,), all annotator sample pairs, for which the sample
-            is indexed by `candidates` are considered as candidate annotator
-            sample pairs. If `annotators` is a boolean array of shape
-            (n_candidates, n_avl_annotators) the annotator sample pairs, for
-            which the sample is a candidate sample and the boolean matrix has
-            entry `True` are considered as candidate sample pairs.
+            If `annotators` is a boolean array of shape `(n_candidates,
+            n_annotators)` the annotator-sample-pairs, for which the sample
+            is a candidate sample and the boolean matrix has entry `True` are
+            considered as candidate annotator-sample-pairs.
         sample_weight : array-like, (n_samples, n_annotators), optional
         (default=None)
             It contains the weights of the training samples' class labels.
@@ -390,8 +390,8 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         # Determine actual batch size.
         if isinstance(batch_size, str) and batch_size != "adaptive":
             raise ValueError(
-                f"If `batch_size` is of type `string`, "
-                f"it must equal `'adaptive'`."
+                "If `batch_size` is of type `string`, "
+                "it must equal `'adaptive'`."
             )
         elif batch_size == "adaptive":
             required_perf = self.epsilon * np.max(A_perf)

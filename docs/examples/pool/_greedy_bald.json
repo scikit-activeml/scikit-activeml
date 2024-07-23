@@ -6,7 +6,7 @@
     "category" :  "Query-by-Committee",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
-    "title" : "Bayesian Active Learning by Disagreement",
+    "title" : "Bayesian Active Learning by Disagreement (BALD)",
     "refs" : ["houlsby2011bayesian"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",

@@ -1,7 +1,6 @@
 import unittest
 
 import numpy as np
-from sklearn.datasets import make_classification
 from sklearn.naive_bayes import GaussianNB
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier

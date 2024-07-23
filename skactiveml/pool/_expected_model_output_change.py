@@ -1,5 +1,3 @@
-from functools import partial
-
 import numpy as np
 from sklearn import clone
 from sklearn.utils import check_array
@@ -94,7 +92,8 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional
+        (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
