@@ -62,6 +62,10 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         )
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
 
+    def test_init_param_regularization(self):
+        self.clf_init_params["regularization"] = "Test"
+        self.assertRaises(ValueError, RegCrowdNetClassifier, **self.default_params, **self.clf_init_params)
+
     def test_fit(self):
         gt_embed = GT_Embed_Net()
         gt_output = GT_Output_Net()
@@ -172,6 +176,25 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
+    def test_compute_reg_term(self):
+        p_class = torch.randn(10,9)
+        p_class = torch.cat((p_class, torch.zeros(10,1)), dim=1)
+
+        gt_embed = GT_Embed_Net()
+        gt_output = GT_Output_Net()
+        self.clf_init_params["regularization"] = "geo-reg-f"
+        clf = RegCrowdNetClassifier(
+            module__gt_embed_x=gt_embed,
+            module__gt_output=gt_output,
+            **self.default_params,
+            **self.clf_init_params,
+        )
+        clf.fit(self.X, self.y)
+
+        self.assertIsNotNone(clf._compute_reg_term(p_class=p_class, p_perf=None))
+
+
+
     def test_reg(self):
         gt_embed = GT_Embed_Net()
         gt_output = GT_Output_Net()
@@ -184,6 +207,7 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         )
         clf.regularization = "Test"
         self.assertRaises(ValueError, clf.fit, self.X, self.y)
+
 
 
 class GT_Embed_Net(nn.Module):
