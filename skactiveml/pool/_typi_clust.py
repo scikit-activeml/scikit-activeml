@@ -9,7 +9,7 @@ of 'typicality'.
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
-from ..utils import MISSING_LABEL, labeled_indices, check_scalar
+from ..utils import MISSING_LABEL, labeled_indices, check_scalar, rand_argmax
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
@@ -116,7 +116,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        _, mapping = self._transform_candidates(
+            candidates, X, y, enforce_mapping=True
+        )
 
         # Validate init parameter
         check_scalar(self.k, "k", target_type=int, min_val=1)
@@ -146,48 +148,34 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo_dict[self.n_cluster_param_name] = n_clusters
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
 
-        X_for_cluster = np.concatenate(
-            (X_cand, X[labeled_sample_indices]), axis=0
-        )
-        selected_samples_X_c = np.arange(
-            len(X_cand), len(X_cand) + len(labeled_sample_indices)
-        )
-
-        cluster_labels = cluster_obj.fit_predict(X_for_cluster)
+        cluster_labels = cluster_obj.fit_predict(X)
 
         cluster_ids, cluster_sizes = np.unique(
             cluster_labels, return_counts=True
         )
 
         covered_cluster = np.unique(
-            [cluster_labels[i] for i in selected_samples_X_c]
+            [cluster_labels[i] for i in labeled_sample_indices]
         )
 
         if len(covered_cluster) > 0:
             cluster_sizes[covered_cluster] = 0
 
-        if mapping is not None:
-            utilities = np.full(
-                shape=(batch_size, X.shape[0]), fill_value=np.nan
-            )
-        else:
-            utilities = np.full(
-                shape=(batch_size, X_cand.shape[0]), fill_value=np.nan
-            )
-            mapping = np.arange(len(X_cand))
-
+        utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
         query_indices = []
-
         for i in range(batch_size):
-            cluster_id = np.argmax(cluster_sizes)
-            uncovered_samples_mapping = np.where(cluster_labels == cluster_id)[
-                0
-            ]
+            cluster_id = rand_argmax(
+                cluster_sizes, random_state=self.random_state_
+            )
+            is_cluster = cluster_labels == cluster_id
+            uncovered_samples_mapping = np.where(is_cluster)[0]
             typicality = _typicality(X, uncovered_samples_mapping, self.k)
-            utilities[i, mapping] = typicality[np.arange(len(mapping))]
+            utilities[i, mapping] = typicality[mapping]
             utilities[i, query_indices] = np.nan
-            idx = np.argmax(typicality[np.arange(len(mapping))])
-            idx = mapping[idx]
+            idx = rand_argmax(
+                typicality[mapping], random_state=self.random_state_
+            )
+            idx = mapping[idx[0]]
 
             query_indices = np.append(query_indices, [idx]).astype(int)
             cluster_sizes[cluster_id] = 0
