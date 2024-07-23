@@ -84,13 +84,27 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
                     reg_term = 0
             elif self.regularization == "geo-reg-w":
                 p_perf = p_perf_log.exp().swapaxes(1, 2).flatten(start_dim=0, end_dim=1)
-                reg_term = -torch.logdet(p_perf.T @ p_perf)
+                # reg_term = -torch.logdet(p_perf.T @ p_perf)
+                reg_term = self._compute_reg_term(p_class=None, p_perf=p_perf)
                 if torch.isnan(reg_term) or torch.isinf(torch.abs(reg_term)) or reg_term > 100:
                     reg_term = 0
             else:
                 raise ValueError("`regularization` must be in ['trace-reg', 'geo-ref-f`, `geo-reg-w'].")
             loss += self.lmbda * reg_term
         return loss
+
+    def _compute_reg_term(self, p_class, p_perf):
+        if self.regularization == "trace-reg":
+            reg_term = p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
+        elif self.regularization in ["geo-reg-f", "geo-reg-w"]:
+            if self.regularization == "geo-reg-f":
+                reg_term = -torch.logdet(p_class.T @ p_class)
+            else:
+                reg_term = -torch.logdet(p_perf.T @ p_perf)
+            if torch.isnan(reg_term) or torch.isinf(torch.abs(reg_term)) or reg_term > 100:
+                reg_term = 0
+
+        return reg_term
 
     def fit(self, X, y, **fit_params):
         self.check_X_dict_ = {
