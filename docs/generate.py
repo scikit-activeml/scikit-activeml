@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import warnings
+import copy
 
 import numpy as np
 from pybtex.database import parse_file
@@ -686,7 +687,7 @@ def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
     return dd_str[0:-2]
 
 
-def generate_tutorials(src_path, dst_path):
+def generate_tutorials(src_path, dst_path, dst_path_colab):
     """Includes the tutorials folder from the git root, such that tutorials are
     included in the documentation. Effectively this function copies all
     contents from src_path to dst_path.
@@ -697,8 +698,139 @@ def generate_tutorials(src_path, dst_path):
     dst_path: string
         The path where the notebooks are saved, such that tutorials.rst can
         find them.
+    dst_path_colab: string
+        The path where the notebooks are saved, such that tutorials.rst can
+        find them. This path is specially used to save the versions of the
+        notebook that are linked to Google Colab.
     """
     distutils.dir_util.copy_tree(src=src_path, dst=dst_path)
+    distutils.dir_util.copy_tree(src=src_path, dst=dst_path_colab)
+    post_process_tutorials(
+        dst_path,
+        colab_notebook_path=dst_path_colab
+    )
+    post_process_tutorials(
+        dst_path_colab,
+        colab_notebook_path=dst_path_colab,
+        show_installation_code=True
+    )
+
+
+def post_process_tutorials(
+        tutorials_path,
+        colab_notebook_path,
+        show_installation_code=False
+    ):
+    """This function allows to post-process the tutorial notebooks. In
+    particular, the placeholder (<colab_link>) within notebooks are replaced
+    with the actual link to open this notebook within Google colab and the
+    comments before pip and jupyter installation instructions are removed for
+    the Google Colab versions.
+    Parameters
+    ----------
+    tutorials_path: string
+        The folder where the files should be modified.
+    colab_notebook_path: string
+        The folder where the colab notebooks are saved.
+    show_installation_code: boolean, default=False
+        If True, the pip and jupypter installation lines are shown. If False,
+        these instructions are commented out
+    """
+    tutorials = [f for f in os.listdir(tutorials_path) if f.endswith(".ipynb")]
+    for file_name in tutorials:
+        file_path = f"{tutorials_path}/{file_name}"
+        file_path_colab = f"{colab_notebook_path}/{file_name}"
+
+        try:
+            with open(file_path, 'r') as f:
+                file_content = f.read()
+        except OSError:
+            file_content = None
+
+        if file_content is not None:
+            processed_file_content = copy.copy(file_content)
+            processed_file_content = replace_colab_link(
+                processed_file_content,
+                file_path_colab
+            )
+            if show_installation_code:
+                processed_file_content = uncomment_installation_code(
+                    processed_file_content
+                )
+
+            if file_content != processed_file_content:
+                try:
+                    with open(file_path, 'w') as f:
+                        f.write(processed_file_content)
+                except OSError:
+                    print("Error while writing {}")
+                    pass
+
+
+def replace_colab_link(file_content, colab_path, google_colab_link_prefix=None):
+    """This function replaces the placeholder (<colab_link>) within
+    `file_content` with the link that matches the location once the notebook is
+    included into the deployed documentation.
+    Parameters
+    ----------
+    file_content: string
+        The content of the jupyter notebook.
+    colab_path: string
+        The relative path to the colab notebook.
+    google_colab_link_prefix: string, default=None
+        The Google Colab address where you can specify the notebook to open in
+        Google Colab. If None, it is assumed that the official scikit-activeml
+        documentation is used.
+    Returns
+    -------
+    output : string
+        The notebook that includes the Google Colab link if there was a
+        placeholder.
+    """
+    if google_colab_link_prefix is None:
+        colab_github = 'https://colab.research.google.com/github'
+        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
+        docs_branch_path = 'blob/gh-pages'
+        google_colab_link_prefix = (
+            f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
+        )
+    colab_link = f"{google_colab_link_prefix}/{colab_path}"
+    output = re.sub(
+        pattern="<colab_link>",
+        repl=colab_link,
+        string=file_content
+    )
+    return output
+
+
+def uncomment_installation_code(file_content):
+    """This function removes the comment symbols for pip install and jupyter
+    nbextension install commands.
+    Parameters
+    ----------
+    file_content: string
+        The content of the jupyter notebook.
+    Returns
+    -------
+    output : string
+        The notebook that would install the needed packages.
+    """
+    pattern = r'\"# (!pip install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=file_content
+    )
+
+    pattern = r'\"# (!jupyter nbextension install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=output
+    )
+    return output
 
 
 def export_legend(handles, labels, ax, path="legend.pdf", expand=None):

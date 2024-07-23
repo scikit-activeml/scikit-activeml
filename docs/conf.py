@@ -249,5 +249,6 @@ generate_strategy_overview_rst(
 
 generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
-    dst_path=os.path.abspath("generated/tutorials/"),
+    dst_path="generated/tutorials/",
+    dst_path_colab="generated/tutorials_colab/",
 )
