@@ -11,9 +11,7 @@ from ...classifier import SkorchClassifier
 
 
 class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
-    """RegCrowdNetClassifier
-
-    """
+    """RegCrowdNetClassifier"""
 
     def __init__(
         self,
@@ -25,7 +23,9 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         **kwargs,
     ):
         if regularization not in ["trace-reg", "geo-reg-f", "geo-reg-w"]:
-            raise ValueError("`regularization` must be in ['trace-reg', 'geo-reg-f', 'geo-reg-w'].")
+            raise ValueError(
+                "`regularization` must be in ['trace-reg', 'geo-reg-f', 'geo-reg-w']."
+            )
 
         super(RegCrowdNetClassifier, self).__init__(
             module=RegCrowdNetModule,
@@ -63,7 +63,8 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         """
         n_samples, n_annotators = y_true.shape[0], y_true.shape[1]
         combs = torch.cartesian_prod(
-            torch.arange(n_samples, device=y_true.device), torch.arange(n_annotators, device=y_true.device)
+            torch.arange(n_samples, device=y_true.device),
+            torch.arange(n_annotators, device=y_true.device),
         )
         z = y_true.ravel()
         is_lbld = z != -1  # missing_label is -1
@@ -72,7 +73,9 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         p_class_log_ext = p_class_log[combs[:, 0]]
         p_perf_log = F.log_softmax(self.module_.ap_confs_, dim=-1)
         p_perf_log_ext = p_perf_log[combs[:, 1]]
-        p_annot_log = torch.logsumexp(p_class_log_ext[:, :, None] + p_perf_log_ext, dim=1)
+        p_annot_log = torch.logsumexp(
+            p_class_log_ext[:, :, None] + p_perf_log_ext, dim=1
+        )
         loss = NeuralNet.get_loss(self, p_annot_log, z)
         if self.lmbda > 0:
             if self.regularization == "trace-reg":
@@ -82,22 +85,34 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
                 p_class = p_class_log.exp()
                 reg_term = self._compute_reg_term(p_class=p_class, p_perf=None)
             elif self.regularization == "geo-reg-w":
-                p_perf = p_perf_log.exp().swapaxes(1, 2).flatten(start_dim=0, end_dim=1)
+                p_perf = (
+                    p_perf_log.exp()
+                    .swapaxes(1, 2)
+                    .flatten(start_dim=0, end_dim=1)
+                )
                 reg_term = self._compute_reg_term(p_class=None, p_perf=p_perf)
             else:
-                raise ValueError("`regularization` must be in ['trace-reg', 'geo-ref-f`, `geo-reg-w'].")
+                raise ValueError(
+                    "`regularization` must be in ['trace-reg', 'geo-ref-f`, `geo-reg-w']."
+                )
             loss += self.lmbda * reg_term
         return loss
 
     def _compute_reg_term(self, p_class, p_perf):
         if self.regularization == "trace-reg":
-            reg_term = p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
+            reg_term = (
+                p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
+            )
         elif self.regularization in ["geo-reg-f", "geo-reg-w"]:
             if self.regularization == "geo-reg-f":
                 reg_term = -torch.logdet(p_class.T @ p_class)
             else:
                 reg_term = -torch.logdet(p_perf.T @ p_perf)
-            if torch.isnan(reg_term) or torch.isinf(torch.abs(reg_term)) or reg_term > 100:
+            if (
+                torch.isnan(reg_term)
+                or torch.isinf(torch.abs(reg_term))
+                or reg_term > 100
+            ):
                 reg_term = 0
         return reg_term
 
@@ -146,17 +161,22 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
 
 
 class RegCrowdNetModule(nn.Module):
-    """RegCrowdNetModule
-    """
+    """RegCrowdNetModule"""
 
-    def __init__(self, gt_embed_x, gt_output, n_classes, n_annotators, regularization):
+    def __init__(
+        self, gt_embed_x, gt_output, n_classes, n_annotators, regularization
+    ):
         super().__init__()
         self.gt_embed_x = gt_embed_x
         self.gt_output = gt_output
         if regularization == "trace-reg":
-            self.ap_confs_ = nn.Parameter(torch.stack([6.0 * torch.eye(n_classes) - 5.0] * n_annotators))
+            self.ap_confs_ = nn.Parameter(
+                torch.stack([6.0 * torch.eye(n_classes) - 5.0] * n_annotators)
+            )
         elif regularization in ["geo-reg-f", "geo-reg-w"]:
-            self.ap_confs_ = nn.Parameter(torch.stack([torch.eye(n_classes)] * n_annotators))
+            self.ap_confs_ = nn.Parameter(
+                torch.stack([torch.eye(n_classes)] * n_annotators)
+            )
 
     def forward(self, x):
         x_learned = self.gt_embed_x(x)

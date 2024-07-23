@@ -119,7 +119,9 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         clf.fit(self.X, self.y)
         annot_pref = clf.predict_annotator_perf()
         self.assertEqual(2, annot_pref.shape[0])
-        confusion_matrix = clf.predict_annotator_perf(return_confusion_matrix=True)
+        confusion_matrix = clf.predict_annotator_perf(
+            return_confusion_matrix=True
+        )
         print(confusion_matrix.shape)
         self.assertEqual(2, confusion_matrix.shape[0])
         self.assertEqual(3, confusion_matrix.shape[1])
@@ -182,6 +184,7 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         )
         clf.regularization = "Test"
         self.assertRaises(ValueError, clf.fit, self.X, self.y)
+
 
 class GT_Embed_Net(nn.Module):
     def __init__(self):
