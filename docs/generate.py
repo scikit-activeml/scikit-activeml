@@ -328,7 +328,12 @@ def table_data_to_rst_table(
     return table + "\n"
 
 
-def generate_examples(gen_path, json_path, recursive=True):
+def generate_examples(
+        gen_path,
+        json_path,
+        example_notebook_directory,
+        recursive=True
+):
     """
     Creates all example scripts for the specified package and returns the data
     needed to create the strategy overview.
@@ -390,9 +395,11 @@ def generate_examples(gen_path, json_path, recursive=True):
                         generate_example_script(
                             filename=plot_filename + ".py",
                             dir_path=dst,
+                            local_dir_path=sub_dir_str,
                             data=data,
                             package=getattr(skactiveml, data["package"]),
                             template_path=os.path.abspath(data["template"]),
+                            notebook_directory=example_notebook_directory
                         )
             elif not filename.startswith("template"):
                 if filename.endswith(".py") or filename.endswith(".ipynb"):
@@ -411,7 +418,16 @@ def generate_examples(gen_path, json_path, recursive=True):
     return json_data
 
 
-def generate_example_script(filename, dir_path, data, package, template_path):
+def generate_example_script(
+        filename,
+        dir_path,
+        local_dir_path,
+        data,
+        package,
+        template_path,
+        notebook_directory,
+        google_colab_link=None
+):
     """
     Generates a python example file needed, for the 'sphinx-gallery' extension.
 
@@ -428,6 +444,9 @@ def generate_example_script(filename, dir_path, data, package, template_path):
         created.
     template_path : path-like
         The path to the template file.
+    google_colab_link: str or None, default=None
+        The link to google colab that can be used to open notebooks directly in
+        google colab.
     """
     # create directory if it does not exist.
     os.makedirs(dir_path, exist_ok=True)
@@ -435,6 +454,18 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     # Validation of 'data'.
     if data["class"] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
+
+    google_colab_link = check_google_colab_link(google_colab_link)
+
+    data["colab_link"] = "/".join([
+        google_colab_link,
+        notebook_directory,
+        local_dir_path,
+        filename
+    ]
+
+    )
+    print(data["colab_link"])
 
     first_title = True
     # Create the file.
@@ -561,7 +592,7 @@ def format_plot(data, template_path):
     Parameters
     ----------
     data : dict
-        The data from the jason example file for the example.
+        The data from the json example file for the example.
     template_path : path-like
         The path to the template file.
     Returns
@@ -719,8 +750,9 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
 def post_process_tutorials(
         tutorials_path,
         colab_notebook_path,
-        show_installation_code=False
-    ):
+        show_installation_code=False,
+        google_colab_link=None
+):
     """This function allows to post-process the tutorial notebooks. In
     particular, the placeholder (<colab_link>) within notebooks are replaced
     with the actual link to open this notebook within Google colab and the
@@ -735,6 +767,9 @@ def post_process_tutorials(
     show_installation_code: boolean, default=False
         If True, the pip and jupypter installation lines are shown. If False,
         these instructions are commented out
+    google_colab_link: str or None, default=None
+        The link to google colab that can be used to open notebooks directly in
+        google colab.
     """
     tutorials = [f for f in os.listdir(tutorials_path) if f.endswith(".ipynb")]
     for file_name in tutorials:
@@ -751,7 +786,8 @@ def post_process_tutorials(
             processed_file_content = copy.copy(file_content)
             processed_file_content = replace_colab_link(
                 processed_file_content,
-                file_path_colab
+                file_path_colab,
+                google_colab_link
             )
             if show_installation_code:
                 processed_file_content = uncomment_installation_code(
@@ -767,7 +803,11 @@ def post_process_tutorials(
                     pass
 
 
-def replace_colab_link(file_content, colab_path, google_colab_link_prefix=None):
+def replace_colab_link(
+        file_content,
+        colab_path,
+        google_colab_link=None
+):
     """This function replaces the placeholder (<colab_link>) within
     `file_content` with the link that matches the location once the notebook is
     included into the deployed documentation.
@@ -787,20 +827,25 @@ def replace_colab_link(file_content, colab_path, google_colab_link_prefix=None):
         The notebook that includes the Google Colab link if there was a
         placeholder.
     """
-    if google_colab_link_prefix is None:
-        colab_github = 'https://colab.research.google.com/github'
-        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
-        docs_branch_path = 'blob/gh-pages'
-        google_colab_link_prefix = (
-            f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
-        )
-    colab_link = f"{google_colab_link_prefix}/{colab_path}"
+    google_colab_link = check_google_colab_link(google_colab_link)
+    colab_link = f"{google_colab_link}/{colab_path}"
     output = re.sub(
         pattern="<colab_link>",
         repl=colab_link,
         string=file_content
     )
     return output
+
+
+def check_google_colab_link(google_colab_link):
+    if google_colab_link is None:
+        colab_github = 'https://colab.research.google.com/github'
+        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
+        docs_branch_path = 'blob/gh-pages'
+        google_colab_link = (
+            f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
+        )
+    return google_colab_link
 
 
 def uncomment_installation_code(file_content):

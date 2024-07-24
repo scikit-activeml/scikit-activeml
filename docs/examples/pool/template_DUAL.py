@@ -1,3 +1,10 @@
+# %%
+# .. note::
+#
+#    The generated animation can be found at the bottom of the page.
+#
+# .. image:: https://colab.research.google.com/assets/colab-badge.svg
+#    :target: "$colab_link"
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
