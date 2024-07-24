@@ -45,6 +45,7 @@ class TestProbCover(
         test_cases += [
             ([0.5], None),
             ([0.0, 1.0, 2.0], None),
+            ([500], None),
             (np.array([0.0, 1.0, 2.0]), None),
             ([-1], ValueError),
             (0.5, ValueError),
@@ -149,7 +150,7 @@ class TestProbCover(
                 cluster_algo_dict={
                     "init": "random",
                     "max_iter": 1,
-                    "random_state": 42,
+                    "random_state": 0,
                 },
             )
 
@@ -165,7 +166,7 @@ class TestProbCover(
 
             # All utilities are non-negative integers or np.nan.
             is_unlabeled = np.random.RandomState(0).choice(
-                np.arange(len(X)), size=(len(X),), replace=True
+                [False, True], size=(len(X),), replace=True
             )
             y = y_true.copy()
             y[is_unlabeled] = np.nan
@@ -193,7 +194,7 @@ class TestProbCover(
                 return_utilities=True,
             )
             np.testing.assert_array_equal(query_indices_metric, query_indices)
-            np.testing.assert_array_equal(utilities_metric, utilities_metric)
+            np.testing.assert_array_equal(utilities_metric, utilities)
 
             # Check consistence of `delta_max_`.
             self.assertEqual(qs.delta_max_, qs_metric.delta_max_)

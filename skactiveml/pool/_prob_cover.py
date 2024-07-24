@@ -3,9 +3,13 @@ Module implementing `ProbCover`, which is a deep active learning strategy
 suited for low budgets.
 """
 
+
 import numpy as np
+import warnings
 
 from sklearn.metrics import pairwise_distances
+from sklearn.cluster import KMeans
+from sklearn.utils.validation import column_or_1d
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
@@ -13,8 +17,6 @@ from ..utils import (
     rand_argmax,
     check_scalar,
 )
-from sklearn.cluster import KMeans
-from sklearn.utils.validation import column_or_1d
 
 
 class ProbCover(SingleAnnotatorPoolQueryStrategy):
@@ -34,9 +36,9 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     deltas : None or array-like of shape (n_deltas,), default=None
         List of deltas (ball radii) to be tested for finding the maximum
         value satisfying a sample coverage >= `alpha`. If no value in
-        `deltas` satisfies this constraint, an warning is raised where
+        `deltas` satisfies this constraint, a warning is raised where
         the minimum `delta` value is used. If `deltas=None`, the values
-        `np.arange(0.0, 2.2, 0.2)` are used.
+        `np.arange(0.1, 2.1, 0.1)` are used.
     alpha : float in (0, 1), alpha=0.95
         Minimum coverage as a constraint for the `delta` selection.
     cluster_algo : ClusterMixin.__class__, default=sklearn.cluster.KMeans
@@ -88,10 +90,10 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         self,
         X,
         y,
-        update=False,
         candidates=None,
         batch_size=1,
         return_utilities=False,
+        update=False,
     ):
         """Query the next samples to be labeled
 
@@ -103,11 +105,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label).
-        update : bool, default=False
-            This boolean flag determines whether the computed `delta_max_`
-            and the `distances_` shall be updated in the `query`. For the first
-            call of `query`, this parameter has no impact because both
-            quantities are computed for the first time.
         candidates : None or array-like of shape (n_candidates), dtype=int or
         array-like of shape (n_candidates, n_features), default=None
             If `candidates` is None, the unlabeled samples from (X, y)
@@ -115,14 +112,19 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             If `candidates` is of shape (n_candidates) and of type int,
             candidates is considered as a list of the indices of the samples in
             (X, y).
-        batch_size : int, optional(default=1)
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional(default=False)
+        return_utilities : bool, default=False
             If True, also return the utilities based on the query strategy.
+        update : bool, default=False
+            This boolean flag determines whether the computed `delta_max_`
+            and the `distances_` shall be updated in the `query`. For the first
+            call of `query`, this parameter has no impact because both
+            quantities are computed for the first time.
 
         Returns
         ----------
-        query_indices : numpy.ndarry of shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size)
             The `query_indices` indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
@@ -154,7 +156,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             target_type=int,
         )
         if self.deltas is None:
-            deltas = np.arange(0.0, 2.2, 0.2)
+            deltas = np.arange(0.2, 2.2, 0.2)
         else:
             deltas = column_or_1d(self.deltas, dtype=float)
             deltas = np.sort(deltas)
@@ -190,19 +192,31 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
 
             # Compute the maximum `delta` value satisfying a purity >= `alpha`.
             self.delta_max_ = deltas[0]
+            max_purity = -1
             if len(deltas) > 1:
                 cluster_algo_dict[self.n_cluster_param_name] = n_classes
                 cluster_obj = self.cluster_algo(**cluster_algo_dict)
                 y_cluster = cluster_obj.fit_predict(X)
                 is_impure = y_cluster[:, None] != y_cluster
                 for delta in deltas:
-                    edges = self.distances_ < delta
+                    edges = self.distances_ <= delta
                     purity = 1 - (edges * is_impure).any(axis=1).mean()
+                    max_purity = max(max_purity, purity)
                     if purity < self.alpha:
                         break
                     self.delta_max_ = delta
+
+            # Check whether condition defined by `alpha` was satisfied.
+            if max_purity < self.alpha:
+                warnings.warn(
+                    f"The maximum purity was {max_purity} being smaller "
+                    f"than the required value `alpha={self.alpha}`."
+                )
+
+        # Compute edges of the graph with the samples as vertices.
         edges = self.distances_ <= self.delta_max_
 
+        # Perform sample-wise selection of the batch.
         query_indices = np.full(batch_size, fill_value=-1, dtype=int)
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
         for b in range(batch_size):
