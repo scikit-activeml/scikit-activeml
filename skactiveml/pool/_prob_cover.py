@@ -3,7 +3,6 @@ Module implementing `ProbCover`, which is a deep active learning strategy
 suited for low budgets.
 """
 
-
 import numpy as np
 import warnings
 
@@ -210,7 +209,9 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             if max_purity < self.alpha:
                 warnings.warn(
                     f"The maximum purity was {max_purity} being smaller "
-                    f"than the required value `alpha={self.alpha}`."
+                    f"than the required value `alpha={self.alpha}`. You must"
+                    f"provide smaller values in `deltas` to avoid "
+                    f"this warning."
                 )
 
         # Compute edges of the graph with the samples as vertices.
