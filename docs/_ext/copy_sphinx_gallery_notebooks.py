@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 from sphinx.application import Sphinx
 
@@ -24,13 +25,30 @@ def copy_gallery_notebooks(src_dir, dst_dir):
         if len(notebook_files):
             os.makedirs(dst_root, exist_ok=True)
             for f in notebook_files:
-                shutil.copyfile(
-                    src=f"{src_root}/{f}",
-                    dst=f"{dst_root}/{f}"
-                )
+                src_path = f"{src_root}/{f}"
+                dst_path = f"{dst_root}/{f}"
+                process_notebook(src_path, dst_path)
+
+
+def process_notebook(src_path, dst_path):
+    with open(src_path, 'r') as f:
+        file_content = f.read()
+
+    pattern = r'\"# (!pip install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=file_content
+    )
+
+    with open(dst_path, 'w') as f:
+        f.write(output)
 
 
 def setup(app: Sphinx):
+    print('copy_sphinx_gallery_notebooks setup')
+
     app.add_config_value(
         'copy_gallery_notebooks_src_path',
         'generated/sphinx_gallery_examples',
