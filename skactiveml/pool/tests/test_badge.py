@@ -10,7 +10,6 @@ from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from sklearn.exceptions import NotFittedError
 
 
 class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -52,17 +51,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
-
-    def test_query_param_fit_clf(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [
-            (1, TypeError),
-            ("string", TypeError),
-            (None, TypeError),
-            (False, NotFittedError),
-            (True, None),
-        ]
-        self._test_param("query", "fit_clf", test_cases=test_cases)
 
     def test_init_param_clf_embedding_flag_name(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -191,4 +179,4 @@ class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
 class ParzenWindowClassifierTuple(ParzenWindowClassifier):
     def predict_proba(self, X, return_embeddings=False):
         probas = super().predict_proba(X)
-        return (probas, X)
+        return probas, X

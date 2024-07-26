@@ -8,11 +8,14 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from sklearn.base import clone
 
-from ..base import SingleAnnotatorPoolQueryStrategy
+from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     is_labeled,
     simple_batch,
+    check_scalar,
+    check_type,
+    check_equal_missing_label,
 )
 
 
@@ -33,6 +36,9 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations. If
         `clf_embedding_flag_name=None`, the input samples `X` are used.
+    eps : float  > 0, optional (default=1e-7)
+        Minimum probability threshold to compute log-probabilities (only
+        relevant for `method='KL_divergence'`).
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -49,6 +55,7 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
         self,
         nearest_neighbors_dict=None,
         clf_embedding_flag_name=None,
+        eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -57,6 +64,7 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
         )
         self.nearest_neighbors_dict = nearest_neighbors_dict
         self.clf_embedding_flag_name = clf_embedding_flag_name
+        self.eps = eps
 
     def query(
         self,
@@ -68,7 +76,6 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
         candidates=None,
         batch_size=1,
         return_utilities=False,
-        update=False,
     ):
         """Query the next samples to be labeled.
 
@@ -96,11 +103,6 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
             If True, also return the utilities based on the query strategy.
-        update : bool, default=False
-            This boolean flag determines whether the computed `delta_max_`
-            and the `distances_` shall be updated in the `query`. For the first
-            call of `query`, this parameter has no impact because both
-            quantities are computed for the first time.
 
         Returns
         ----------
@@ -136,6 +138,17 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
             if self.nearest_neighbors_dict is None
             else self.nearest_neighbors_dict.copy()
         )
+        check_scalar(
+            self.eps,
+            "eps",
+            min_val=0,
+            max_val=0.1,
+            target_type=(float, int),
+            min_inclusive=False,
+        )
+        check_type(clf, "clf", SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label_)
+        check_scalar(fit_clf, "fit_clf", bool)
 
         if fit_clf:
             if sample_weight is None:
@@ -162,9 +175,9 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
                     P_cand, X_cand = P_cand
 
             # Clip probabilities to avoid zeros.
-            np.clip(P_labeled, a_min=1e-3, a_max=1, out=P_labeled)
+            np.clip(P_labeled, a_min=self.eps, a_max=1, out=P_labeled)
             P_labeled /= P_labeled.sum(axis=1, keepdims=True)
-            np.clip(P_cand, a_min=1e-3, a_max=1, out=P_cand)
+            np.clip(P_cand, a_min=self.eps, a_max=1, out=P_cand)
             P_cand /= P_cand.sum(axis=1, keepdims=True)
 
             # Find nearest labeled samples of candidate samples
