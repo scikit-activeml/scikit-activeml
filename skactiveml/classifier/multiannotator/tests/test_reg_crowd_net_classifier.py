@@ -126,15 +126,17 @@ class TestRegCrowdNetClassifierClassifier(unittest.TestCase):
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
-        annot_pref = clf.predict_annotator_perf()
-        self.assertEqual(2, annot_pref.shape[0])
+        annot_pref = clf.predict_annotator_perf(X=self.X)
+        self.assertEqual(300, annot_pref.shape[0])
+        self.assertEqual(2, annot_pref.shape[1])
         confusion_matrix = clf.predict_annotator_perf(
-            return_confusion_matrix=True
+            X=self.X,
+            return_confusion_matrix=True,
         )
-        print(confusion_matrix.shape)
-        self.assertEqual(2, confusion_matrix.shape[0])
-        self.assertEqual(3, confusion_matrix.shape[1])
+        self.assertEqual(300, confusion_matrix.shape[0])
+        self.assertEqual(2, confusion_matrix.shape[1])
         self.assertEqual(3, confusion_matrix.shape[2])
+        self.assertEqual(3, confusion_matrix.shape[3])
 
     def test_validation_step(self):
         gt_embed = GT_Embed_Net()
