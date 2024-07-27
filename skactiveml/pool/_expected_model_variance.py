@@ -74,7 +74,8 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional
+        (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -134,7 +135,10 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if fit_reg:
-            reg = clone(reg).fit(X, y, sample_weight)
+            if sample_weight is None:
+                reg = clone(reg).fit(X, y)
+            else:
+                reg = clone(reg).fit(X, y, sample_weight)
 
         old_model_variance = np.average(
             reg.predict(X_eval, return_std=True)[1] ** 2

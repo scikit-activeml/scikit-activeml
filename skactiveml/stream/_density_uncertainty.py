@@ -1,6 +1,6 @@
 from collections import deque
 
-from copy import copy
+from copy import copy, deepcopy
 import warnings
 import numpy as np
 from sklearn.utils import check_array, check_consistent_length, check_scalar
@@ -207,6 +207,8 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         """
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
+            self._validate_random_state()
+            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -217,6 +219,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
+                {"random_state": random_seed},
             )
 
         if not hasattr(self, "window_"):
@@ -356,6 +359,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
+            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -366,6 +370,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
+                {"random_state": random_seed},
             )
 
         if self.dist_func is None:
@@ -417,7 +422,10 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         check_type(clf, "clf", SkactivemlClassifier)
         check_type(fit_clf, "fit_clf", bool)
         if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
         return clf
 
     def _validate_X_y_sample_weight(self, X, y, sample_weight):
@@ -689,6 +697,8 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         self._validate_force_full_budget()
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
+            self._validate_random_state()
+            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -699,6 +709,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
+                {"random_state": random_seed},
             )
         # _init_members
         if self.dist_func is None:
@@ -885,6 +896,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
+            random_seed = deepcopy(self.random_state_).randint(2**31 - 1)
             check_type(
                 self.budget_manager,
                 "budget_manager_",
@@ -895,6 +907,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
+                {"random_state": random_seed},
             )
 
         if self.dist_func is None:
@@ -952,7 +965,10 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         check_type(clf, "clf", SkactivemlClassifier)
         check_type(fit_clf, "fit_clf", bool)
         if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
         return clf
 
     def _validate_force_full_budget(self):

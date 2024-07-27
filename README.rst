@@ -1,24 +1,24 @@
 .. intro_start
 
-|Doc|_ |Codecov|_ |PythonVersion|_ |PyPi|_ |Paper|_ |Black|_
+|Doc| |Codecov| |PythonVersion| |PyPi| |Paper| |Black|
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
-.. _Doc: https://scikit-activeml.github.io/scikit-activeml-docs/
+   :target: https://scikit-activeml.github.io/scikit-activeml-docs/
 
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
-.. _Codecov: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
+   :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
-.. _PythonVersion: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue.svg
+   :target: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
 
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
-.. _PyPi: https://badge.fury.io/py/scikit-activeml
+   :target: https://badge.fury.io/py/scikit-activeml
 
-.. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue
-.. _Paper: https://www.preprints.org/manuscript/202103.0194/v1
+.. |Paper| image:: https://img.shields.io/badge/paper-10.20944/preprints202103.0194.v1-blue.svg
+   :target: https://www.preprints.org/manuscript/202103.0194/v1
 
 .. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
-.. _Black: https://github.com/psf/black
+   :target: https://github.com/psf/black
 
 |
 
@@ -53,6 +53,15 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
     pip install -U scikit-activeml
 
+.. note::
+    The installation via `pip` defines only minimum requirements to avoid
+    potential package downgrades withing your installation. If you encounter
+    any incompatibility issues, you can downgrade packages by installing the
+    `maximum requirements <https://github.com/scikit-activeml/scikit-activeml/blob/master/requirements_extra.txt>`_,
+    we tested at the release of the current package
+    version:
+    ::
+        pip install -r requirements_max.txt
 .. user_installation_end
 
 .. examples_start
@@ -64,9 +73,12 @@ We provide a broad overview of different use-cases in our `tutorial section <htt
 - `Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/00_pool_getting_started.html>`_,
 - `Deep Pool-based Active Learning - scikit-activeml with Skorch <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/01_deep_pool_al_with_skorch.html>`_,
 - `Pool-based Active Learning for Regression - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/02_pool_regression_getting_started.html>`_,
+- `Pool-based Active Learning - Sample Annotating <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/03_pool_oracle_annotations.html>`_,
+- `Pool-based Active Learning - Simple Evaluation Study <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/04_pool_simple_evaluation_study.html>`_,
 - `Multi-annotator Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/10_multiple_annotators_getting_started.html>`_,
 - `Stream-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/20_stream_getting_started.html>`_,
-- and `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.html>`_.
+- `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.html>`_,
+- and `Stream-based Active Learning With River <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/22_river_classifier.html>`_.
 
 Two simple examples illustrating the straightforwardness of implementing active learning cycles with our Python package ``skactiveml`` are given in the following.
 

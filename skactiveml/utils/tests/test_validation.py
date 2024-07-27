@@ -285,7 +285,6 @@ class TestValidation(unittest.TestCase):
         )
 
     def test_check_callable(self):
-
         self.assertRaises(
             ValueError,
             _check_callable,
@@ -309,7 +308,7 @@ class TestValidation(unittest.TestCase):
         ind = np.array([0, 2])
         self.assertRaises(ValueError, check_indices, "a", ind)
         self.assertRaises(TypeError, check_indices, 42, ind)
-        self.assertRaises(ValueError, check_indices, A, "b")
+        self.assertRaises(TypeError, check_indices, A, "b")
         self.assertRaises(TypeError, check_indices, A, 7)
         self.assertRaises(ValueError, check_indices, A, ind, dim=2)
         ind_out_of_range = np.array([0, 3])

@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn import clone
-from sklearn.utils import check_array
 
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -47,8 +46,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     References
     ----------
     [1] Elreedy, Dina and F Atiya, Amir and I Shaheen, Samir. A novel active
-        learning regression framework for balancing the exploration-exploitation
-        trade-off, page 651 and subsequently, 2019.
+        learning regression framework for balancing the
+        exploration-exploitation trade-off, page 651 and subsequently, 2019.
 
     """
 
@@ -92,7 +91,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         fit_reg : bool, optional (default=True)
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples), optional
+        (default=None)
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features),
@@ -164,7 +164,10 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
 
         if fit_reg:
-            reg = clone(reg).fit(X, y, sample_weight)
+            if sample_weight is None:
+                reg = clone(reg).fit(X, y)
+            else:
+                reg = clone(reg).fit(X, y, sample_weight)
 
         utilities_cand = self._kullback_leibler_divergence(
             X_eval, X_cand, mapping, reg, X, y, sample_weight=sample_weight
@@ -205,7 +208,8 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        sample_weight: array-like of shape (n_samples,), optional (default=None)
+        sample_weight: array-like of shape (n_samples,), optional
+        (default=None)
             Weights of training samples in `X`.
 
         Returns

@@ -2,7 +2,6 @@ import unittest
 from copy import deepcopy
 
 import numpy as np
-from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 
@@ -728,7 +727,7 @@ class TestValueOfInformationEER(
                 True,
                 True,
                 False,
-                np.full(shape=(1, len(cand)), fill_value=0.5)
+                np.full(shape=(1, len(cand)), fill_value=0.5),
                 # TODO Normalize each term individually
             ],
             [
@@ -738,7 +737,7 @@ class TestValueOfInformationEER(
                 True,
                 True,
                 True,
-                np.full(shape=(1, len(cand)), fill_value=0)
+                np.full(shape=(1, len(cand)), fill_value=0),
                 # TODO Normalize each term individually
             ],
             [

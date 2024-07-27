@@ -475,7 +475,6 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.assertEqual(len(query_indices), 0)
 
     def test_query_with_variant_available_annotators(self):
-
         ie_thresh = IntervalEstimationThreshold(epsilon=1.0)
         A_cand = np.array(
             [
@@ -500,7 +499,6 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.assertEqual(len(query_indices), 4)
 
     def test_query_with_mapping(self):
-
         ie_thresh = IntervalEstimationThreshold()
         mapping = np.arange(2)
 

@@ -7,16 +7,14 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.base import MetaEstimatorMixin, is_regressor
 from sklearn.exceptions import NotFittedError
-from sklearn.utils import metaestimators
 from sklearn.utils.validation import (
     has_fit_parameter,
     check_array,
     check_is_fitted,
 )
 
-from skactiveml.base import SkactivemlRegressor, ProbabilisticRegressor
-from skactiveml.utils._functions import _available_if
-from skactiveml.utils._label import is_labeled, MISSING_LABEL
+from ..base import SkactivemlRegressor, ProbabilisticRegressor
+from ..utils import is_labeled, match_signature, MISSING_LABEL
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
@@ -45,6 +43,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
         self.estimator = estimator
 
+    @match_signature("estimator", "fit")
     def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using X as training data and y as labels.
 
@@ -76,7 +75,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             **fit_kwargs,
         )
 
-    @_available_if("partial_fit", hasattr(metaestimators, "available_if"))
+    @match_signature("estimator", "partial_fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using X as training data and y as class
         labels.
@@ -110,7 +109,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
-
         if not is_regressor(estimator=self.estimator):
             raise TypeError(
                 "'{}' must be a scikit-learn "
@@ -164,6 +162,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         return self
 
+    @match_signature("estimator", "predict")
     def predict(self, X, **predict_kwargs):
         """Return label predictions for the input data X.
 
@@ -203,9 +202,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             else:
                 return np.full(len(X), self._label_mean)
 
-    @_available_if(
-        ("sample_y", "sample"), hasattr(metaestimators, "available_if")
-    )
+    @match_signature("estimator", "sample_y")
     def sample_y(self, X, n_samples=1, random_state=None):
         """Assumes a probabilistic regressor. Samples are drawn from
         a predicted target distribution.
@@ -227,10 +224,27 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             Drawn random target samples.
         """
         check_is_fitted(self)
-        if hasattr(self.estimator_, "sample_y"):
-            return self.estimator_.sample_y(X, n_samples, random_state)
-        else:
-            return self.estimator_.sample(X, n_samples)
+        return self.estimator_.sample_y(X, n_samples, random_state)
+
+    @match_signature("estimator", "sample")
+    def sample(self, X, n_samples=1):
+        """Assumes a probabilistic regressor. Samples are drawn from
+        a predicted target distribution.
+
+        Parameters
+        ----------
+        X :  array-like, shape (n_samples_X, n_features)
+            Input samples, where the target values are drawn from.
+        n_samples: int, optional (default=1)
+            Number of random samples to be drawn.
+
+        Returns
+        -------
+        y_samples : ndarray of shape (n_samples_X, n_samples)
+            Drawn random target samples.
+        """
+        check_is_fitted(self)
+        return self.estimator_.sample(X, n_samples)
 
     def __sklearn_is_fitted__(self):
         return hasattr(self, "_label_mean")

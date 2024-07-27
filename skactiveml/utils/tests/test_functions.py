@@ -1,13 +1,8 @@
 import unittest
 
-from sklearn.utils import metaestimators
+import inspect
 
-from skactiveml.utils import call_func
-from skactiveml.utils._functions import (
-    _available_if,
-    _IffHasAMethod,
-    _hasattr_array_like,
-)
+from skactiveml.utils import call_func, match_signature
 
 
 class TestFunctions(unittest.TestCase):
@@ -60,54 +55,79 @@ class TestFunctions(unittest.TestCase):
         )
         self.assertEqual(result, 1)
 
-    def test__available_if(self):
+    def test_match_signature(self):
+        class DummyA:
+            def __init__(self, dummy_b):
+                self.dummy_b = dummy_b
 
-        if hasattr(metaestimators, "available_if"):
-            wrapper_func = _available_if("a", True)
-            self.assertTrue(callable(wrapper_func))
+            # test case where c has to be in kwargs to not fail
+            @match_signature("dummy_b", "test_me")
+            def test_me(self, a, b=None, **kwargs):
+                return self.dummy_b.test_me(a=a, b=b, **kwargs)
 
-        for method_name in ["a", ("a", "b")]:
-            wrapper_func = _available_if(method_name, False)
-            self.assertTrue(callable(wrapper_func))
+            # test case without kwargs
+            @match_signature("dummy_b", "test_me_alt")
+            def test_me_alt(self, a, b=None, **kwargs):
+                return self.dummy_b.test_me_alt(a=a, **kwargs)
 
-    def test__hasattr_array_like(self):
-        class A:
-            def __init__(self):
-                self.v = "v"
+            # test case without kwargs
+            @match_signature("dummy_b", "test_me_hidden")
+            def test_me_hidden(self, a, b=None, **kwargs):
+                return self.dummy_b.test_me_alt(a=a, **kwargs)
 
-        a = A()
+        class DummyB:
+            def test_me(self, a, c, **kwargs):
+                output = {"a": a, "c": c}
+                output.update(kwargs)
+                return output
 
-        self.assertTrue(_hasattr_array_like(a, "v"))
-        self.assertTrue(_hasattr_array_like(a, ("w", "v")))
+            def test_me_alt(self, a, c):
+                output = {"a": a, "c": c}
+                return output
 
+        dummy_b = DummyB()
+        dummy_a = DummyA(dummy_b)
 
-class Test_IffHasAMethod(unittest.TestCase):
-    def test___get__(self):
-        def dummyMethod(x):
-            return "method_result"
+        # test default working case
+        kwargs_1 = {
+            "a": "p1",
+            "b": "p2",
+            "c": "p3",
+            "d": "p4",
+        }
+        output_1 = dummy_a.test_me(**kwargs_1)
+        self.assertEqual(kwargs_1, output_1)
 
-        class A:
-            pass
+        # test for equal signature
+        sig_a_test_me = inspect.signature(dummy_a.test_me).parameters
+        sig_b_test_me = inspect.signature(dummy_b.test_me).parameters
+        self.assertEqual(sig_a_test_me, sig_b_test_me)
 
-        class B:
-            def do_2(self):
-                pass
+        # test non working case with missing c
+        kwargs_2 = {
+            "a": "p1",
+            "b": "p2",
+            "d": "p4",
+        }
+        self.assertRaises(TypeError, dummy_a.test_me, **kwargs_2)
 
-        class WrapperOfAB:
-            wrapped = _IffHasAMethod(
-                fn=dummyMethod,
-                delegate_name="var",
-                method_names=("do_1", "do_2"),
-            )
+        # test for equal signature
+        sig_a_test_me_alt = inspect.signature(dummy_a.test_me_alt).parameters
+        sig_b_test_me_alt = inspect.signature(dummy_b.test_me_alt).parameters
+        self.assertEqual(sig_a_test_me_alt, sig_b_test_me_alt)
 
-            def __init__(self, var=None):
-                self.var = A() if var is None else var
+        kwargs_3 = {
+            "a": "p1",
+            "c": "p2",
+        }
+        dummy_a.test_me_alt(**kwargs_3)
 
-        w = WrapperOfAB()
-        self.assertFalse(hasattr(w, "wrapped"))
-        b = B()
-        b.do_2()
-        w = WrapperOfAB(var=b)
-        self.assertTrue(hasattr(w, "wrapped"))
-        res = w.wrapped()
-        self.assertEqual(res, "method_result")
+        kwargs_3 = {
+            "a": "p1",
+            "b": "p2",
+            "c": "p3",
+        }
+        self.assertRaises(TypeError, dummy_a.test_me_alt, **kwargs_3)
+
+        # test for hiding methods that the wrapped object does not have
+        self.assertFalse(hasattr(dummy_a, "test_me_hidden"))

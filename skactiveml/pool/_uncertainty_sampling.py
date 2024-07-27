@@ -182,7 +182,10 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
         # Fit the classifier.
         if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+            if sample_weight is not None:
+                clf = clone(clf).fit(X, y, sample_weight)
+            else:
+                clf = clone(clf).fit(X, y)
 
         # Predict class-membership probabilities.
         probas = clf.predict_proba(X_cand)
@@ -295,8 +298,8 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(
-                f"Method `entropy` does not support cost matrices but "
-                f"`cost_matrix` was not None."
+                "Method `entropy` does not support cost matrices but "
+                "`cost_matrix` was not None."
             )
     else:
         raise ValueError(

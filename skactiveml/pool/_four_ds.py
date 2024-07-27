@@ -1,6 +1,7 @@
 """
 Module implementing 4DS active learning strategy.
 """
+
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 
 
@@ -210,7 +211,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         )
         query_indices_cand[0] = rand_argmax(
             utilities_cand[0], self.random_state_
-        )
+        )[0]
         is_selected = np.zeros(len(X_cand), dtype=bool)
         is_selected[query_indices_cand[0]] = True
 
@@ -257,7 +258,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
                 utilities_cand[i, is_selected] = np.nan
                 query_indices_cand[i] = rand_argmax(
                     utilities_cand[i], self.random_state_
-                )
+                )[0]
                 is_selected[query_indices_cand[i]] = True
 
         # Remapping of utilities and query indices if required.

@@ -466,7 +466,6 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
             if not budget_left[-1]:
                 sample = False
             else:
-
                 eta = self.random_state_.normal(1, self.delta)
                 theta_random = tmp_theta * eta
                 sample = u < theta_random
@@ -737,7 +736,13 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
         )
         # Check v
         check_scalar(
-            self.v, "v", float, min_val=0, min_inclusive=False, max_val=1
+            self.v,
+            "v",
+            float,
+            min_val=0,
+            min_inclusive=False,
+            max_inclusive=False,
+            max_val=1,
         )
         # Check random_state
         self._validate_random_state()

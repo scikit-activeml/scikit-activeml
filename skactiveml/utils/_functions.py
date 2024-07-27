@@ -1,6 +1,6 @@
 import inspect
-from functools import update_wrapper
-from operator import attrgetter
+from types import MethodType
+from makefun import with_signature
 
 
 def call_func(
@@ -44,59 +44,87 @@ def call_func(
     return f_callable(**vars)
 
 
-def _available_if(method_name, has_available_if):
-    if has_available_if:
-        from sklearn.utils.metaestimators import available_if
+def match_signature(wrapped_obj_name, func_name):
+    """A decorator that matches the signature to a given method from a
+    reference and hides it when the reference object does not have the wrapped
+    function. This is especially helpful for wrapper classes whose functions
+    should appear. This decorator is heavily inspired by the `available_if`
+    decorator from `sklearn.utils.metaestimators`.
 
-        decorator = available_if(
-            lambda self: _hasattr_array_like(self.estimator, method_name)
-        )
-    else:
-        from sklearn.utils.metaestimators import if_delegate_has_method
+    Parameters
+    ----------
+    wrapped_obj_name : str
+        The name of the object that will be wrapped.
+    func_name : str
+        The name of the function that will be wrapped.
 
-        if not isinstance(method_name, (list, tuple)):
-            decorator = if_delegate_has_method(delegate="estimator")
-        else:
-            decorator = _if_delegate_has_methods(
-                delegate="estimator", method_names=method_name
-            )
+    Returns
+    -------
+    Wrapped function
+    """
 
-    return decorator
+    class _MatchSignatureDescriptor:
+        """_MatchSignatureDescriptor
 
+        A descriptor that allows a wrapper to clone the signature of a
+        method `func_name` from the wrapped object `wrapped_obj_name`.
+        Furthermore, this extends upon the conditional property as implemented
+        in `available_if` from from `sklearn.utils.metaestimators`.
 
-def _hasattr_array_like(obj, attribute_names):
-    if not isinstance(attribute_names, (list, tuple)):
-        attribute_names = [attribute_names]
+        Parameters
+        ----------
+        fn: MethodType
+            The method that should be wrapped.
+        wrapped_obj_name: str
+            The name of the wrapped object within the wrapper class.
+        func_name : str
+            The method name of the function that should be wrapped.
+        """
 
-    return any(hasattr(obj, attr) for attr in attribute_names)
+        def __init__(self, fn, wrapped_obj_name, func_name):
+            self.fn = fn
+            self.wrapped_obj_name = wrapped_obj_name
+            self.func_name = func_name
+            self.__name__ = func_name
 
+        def __get__(self, obj, owner=None):
+            """Wrap the method specified in `self.func_name` from the wrapped
+            object `self.wrapped_obj_name` such that the signature will be the
+            same.
 
-class _IffHasAMethod:
-    def __init__(self, fn, delegate_name, method_names):
-        self.fn = fn
-        self.delegate_name = delegate_name
-        self.method_names = method_names
+            Parameters
+            ----------
+            obj: object
+                The wrapper object. This parameter will be None, if the method
+                is accessed via the class and not an instantiated object.
+            owner: class, default=None
+                The wrapper class.
 
-        # update the docstring of the descriptor
-        update_wrapper(self, fn)
+            Returns
+            -------
+            The wrapped method.
+            """
+            if obj is not None:
+                reference_object = getattr(obj, self.wrapped_obj_name)
+                if not hasattr(reference_object, self.func_name):
+                    raise AttributeError(
+                        f"This {reference_object} has"
+                        f" no method {self.func_name}."
+                    )
 
-    def __get__(self, obj, owner=None):
+                reference_function = getattr(reference_object, self.func_name)
+                reference_signature = inspect.signature(reference_function)
+                new_fn_name = self.fn.__name__
+                sig_str = (
+                    f"{new_fn_name}(self, {str(reference_signature)[1:-1]})"
+                )
+                fn = with_signature(sig_str)(self.fn)
+                out = MethodType(fn, obj)
+            else:
+                out = self.fn
 
-        delegate = attrgetter(self.delegate_name)(obj)
-        if not _hasattr_array_like(
-            delegate, attribute_names=self.method_names
-        ):
-            raise AttributeError
+            return out
 
-        def out(*args, **kwargs):
-            return self.fn(obj, *args, **kwargs)
-
-        # update the docstring of the returned function
-        update_wrapper(out, self.fn)
-        return out
-
-
-def _if_delegate_has_methods(delegate, method_names):
-    return lambda fn: _IffHasAMethod(
-        fn, delegate_name=delegate, method_names=method_names
+    return lambda fn: _MatchSignatureDescriptor(
+        fn, wrapped_obj_name, func_name=func_name
     )

@@ -4,7 +4,6 @@ which are capable of modeling the budget constraints in stream-based active
 learning settings.
 """
 
-
 from ._balanced_incremental_quantile_filter import (
     BalancedIncrementalQuantileFilter,
 )
