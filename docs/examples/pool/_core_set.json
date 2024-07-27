@@ -7,7 +7,7 @@
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator"],
     "title" : "Core Set",
-    "refs" : [],
+    "refs" : ["sener2017active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_misc" : "from skactiveml.pool import CoreSet",

@@ -68,7 +68,6 @@ for c in range(n_cycles):
     sort_mask = np.argsort(X.flatten())
     X_plot = X.flatten()[sort_mask]
     utilities_plot = utilities[0][sort_mask]/batch_size
-    utilities_plot[np.isnan(utilities_plot)] = 0
 
     is_lbld = is_labeled(y)
 

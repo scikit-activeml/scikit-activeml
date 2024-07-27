@@ -647,6 +647,10 @@ class TestFeatureSpace(unittest.TestCase):
                 X=X,
                 values=self.utilities,
             )
+        values = self.utilities.copy()
+        values[:5] = -np.inf
+        values[5:] = np.inf
+        plot_contour_for_samples(values=values, X=self.X)
 
     def test_plot_contour_for_samples_param_values(self):
         test_cases = [

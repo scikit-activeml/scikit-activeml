@@ -57,10 +57,11 @@ The easiest way of installing scikit-activeml is using ``pip``:
     The installation via `pip` defines only minimum requirements to avoid
     potential package downgrades withing your installation. If you encounter
     any incompatibility issues, you can downgrade packages by installing the
-    `maximum requirements <https://github.com/scikit-activeml/scikit-activeml/blob/master/requirements_extra.txt>`_,
+    `maximum requirements <https://github.com/scikit-activeml/scikit-activeml/blob/master/requirements_max.txt>`_,
     we tested at the release of the current package
     version:
     ::
+
         pip install -r requirements_max.txt
 .. user_installation_end
 

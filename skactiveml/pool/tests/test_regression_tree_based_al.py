@@ -83,7 +83,7 @@ class TestRegressionTreeBasedAL(
     def test__discretize_acquisitions_per_leaf(self):
         n_k = np.array([2.5, 4.0, 3.9, 7.3, 9.6])
         n_k_discrete = _discretize_acquisitions_per_leaf(
-            n_k, np.random.RandomState(0)
+            n_k, np.round(n_k.sum()).astype(int), np.random.RandomState(0)
         )
         # Ensures the correct `batch_size`, i.e., number of acquisitions.
         self.assertEqual(n_k_discrete.sum(), np.floor(n_k.sum()))
@@ -94,17 +94,17 @@ class TestRegressionTreeBasedAL(
         # Checks reproducibility.
         for _ in range(5):
             n_k_discrete_new = _discretize_acquisitions_per_leaf(
-                n_k, np.random.RandomState(0)
+                n_k, np.round(n_k.sum()).astype(int), np.random.RandomState(0)
             )
             np.testing.assert_array_equal(n_k_discrete, n_k_discrete_new)
 
         # Checks that different random states can lead to different results.
         n_k = np.array([0.9] * 100)
         n_k_discrete = _discretize_acquisitions_per_leaf(
-            n_k, np.random.RandomState(0)
+            n_k, np.round(n_k.sum()).astype(int), np.random.RandomState(0)
         )
         n_k_discrete_new = _discretize_acquisitions_per_leaf(
-            n_k, np.random.RandomState(2)
+            n_k, np.round(n_k.sum()).astype(int), np.random.RandomState(2)
         )
         self.assertTrue((n_k_discrete != n_k_discrete_new).any())
 
