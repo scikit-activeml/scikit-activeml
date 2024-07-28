@@ -23,11 +23,12 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         Number of classes
     n_annotators : int
         Number of annotators.
-    module__gt_net : nn.Module
+    module__gt_embed_x : nn.Module
         Pytorch module of the GT model taking samples
         as input to compute the embedding.
-    module__output_net: nn.Module
-        Pytorch module of the
+    module__gt_output : nn.Module
+        Pytorch module of the GT model taking the embeding
+        as input to compute the logits
     arguments
         more possible arguments for initialize your neural network
         see: https://skorch.readthedocs.io/en/stable/net.html
@@ -43,6 +44,11 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
+    lmbda : non-negative float, optional (default=0.01)
+        Degree of regularization.
+    regularization : "trace-reg" or "geo-reg-f" or "geo-reg-w" (default="trace-reg")
+        Defines which regularization for the annotator confusion matrices is applied, either by regularizing the traces
+        of the confusion matrices [1] or a geometrically motivated regularization [2].
     **kwargs : keyword arguments
         more possible parameters to customizing your neural network
         see: https://skorch.readthedocs.io/en/stable/net.html
@@ -51,8 +57,11 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
 
     References
     ----------
-    [1] Rodrigues, Filipe, and Francisco Pereira. "Deep learning from crowds." In Proceedings of the AAAI conference on
-        artificial intelligence, vol. 32, no. 1. 2018.
+    [1] Tanno, Ryutaro, Ardavan Saeedi, Swami Sankaranarayanan, Daniel C. Alexander, and Nathan Silberman.
+        "Learning from noisy labels by regularized estimation of annotator confusion." IEEE/CVF Conf. Comput. Vis.
+         Pattern Recognit., pp. 11244-11253. 2019.
+    [2] Ibrahim, Shahana, Tri Nguyen, and Xiao Fu. "Deep Learning From Crowdsourced Labels: Coupled Cross-Entropy
+        Minimization, Identifiability, and Regularization." Int. Conf. Learn. Represent. 2023.
     """
 
     def __init__(
@@ -89,7 +98,7 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
             self.lmbda = 1e-2 if self.regularization == "trace-reg" else 1e-4
 
     def get_loss(self, y_pred, y_true, *args, **kwargs):
-        """Return the loss for this batch.
+        """Computes RegCrowdNet's loss according either to the article [1] or to the article [2].
 
         Parameters
         ----------
@@ -140,25 +149,28 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
             loss += self.lmbda * reg_term
         return loss
 
-    def _compute_reg_term(self, p_class, p_perf):
-        if self.regularization == "trace-reg":
-            reg_term = (
-                p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
-            )
-        elif self.regularization in ["geo-reg-f", "geo-reg-w"]:
-            if self.regularization == "geo-reg-f":
-                reg_term = -torch.logdet(p_class.T @ p_class)
-            else:
-                reg_term = -torch.logdet(p_perf.T @ p_perf)
-            if (
-                torch.isnan(reg_term)
-                or torch.isinf(torch.abs(reg_term))
-                or reg_term > 100
-            ):
-                reg_term = 0
-        return reg_term
-
     def fit(self, X, y, **fit_params):
+        """Initialize and fit the module.
+
+        If the module was already initialized, by calling fit, the
+        module will be re-initialized (unless ``warm_start`` is True).
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples
+        y : array-like of shape (n_samples, )
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.missing_label)
+        fit_params : dict-like
+            Further parameters as input to the 'fit' method of the 'estimator'.
+
+        Returns
+        -------
+        self: RegCrowdNetClassifier,
+              The CrowdLayerClassifier is fitted on the training data.
+        """
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
@@ -177,6 +189,23 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         return NeuralNet.fit(self, X, y, **fit_params)
 
     def validation_step(self, batch, **fit_params):
+        """Perform a single validation step.
+
+        Parameters
+        ----------
+        batch : list
+            A list containing the input data (Xi) and the target labels (yi) for the validation batch.
+        fit_params : dict
+            Additional fit parameters (not used in this function).
+
+        Returns
+        -------
+        A dictionary containing:
+        - 'loss' : float
+            The accuracy of the predictions for the validation batch.
+        - 'y_pred' : numpy.ndarray
+            The predicted labels for the input data in the validation batch.
+        """
         Xi, yi = unpack_data(batch)
         with torch.no_grad():
             y_pred = self.predict(Xi)
@@ -188,12 +217,43 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         }
 
     def predict_proba(self, X):
+        """Returns class-membership probability estimates for the test data `X`.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Test samples.
+
+        Returns
+        -------
+        P_class : numpy.ndarray of shape (n_samples, classes)
+            `P_class[n, c]` is the probability, that instance `X[n]` belongs to the `classes_[c]`.
+        """
         logits_class = self.forward(X)
         P_class = F.softmax(logits_class, dim=-1)
         P_class = P_class.numpy()
         return P_class
 
     def predict_annotator_perf(self, X, return_confusion_matrix=False):
+        """Calculates the probability that an annotator provides the true label for a given sample.
+
+        Parameters
+        ----------
+        X : matrix-like, shape (n_samples, n_features)
+            Test samples.
+        return_confusion_matrix : bool, optional (default=False)
+            If `return_confusion_matrix=True`, the entire confusion matrix per annotator is returned.
+
+        Returns
+        -------
+        P_perf : numpy.ndarray of shape (n_samples, n_annotators) or (n_samples, n_annotators, n_classes, n_classes)
+            If `return_confusion_matrix=False`, `P_perf[n, m]` is the probability, that annotator `A[m]` provides the
+            correct class label for sample `X[n]`. If `return_confusion_matrix=False`, `P_perf[n, m, c, j]` is the
+            probability, that annotator `A[m]` provides the correct class label `classes_[j]` for sample `X[n]` and
+            that this sample belongs to class `classes_[c]`. If `return_cond=True`, `P_perf[n, m, c, j]` is the
+            probability that annotator `A[m]` provides the class label `classes_[j]` for sample `X[n]` conditioned
+            that this sample belongs to class `classes_[c]`.
+        """
         p_class = self.predict_proba(X)
         p_perf = F.softmax(self.module_.ap_confs_, dim=-1)
         p_perf = p_perf.detach().numpy()
@@ -203,9 +263,46 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         perf = p_perf.diagonal(axis1=-2, axis2=-1).sum(axis=-1)
         return perf
 
+    def _compute_reg_term(self, p_class, p_perf):
+        if self.regularization == "trace-reg":
+            reg_term = (
+                p_perf.diagonal(offset=0, dim1=-2, dim2=-1).sum(-1).mean()
+            )
+        elif self.regularization in ["geo-reg-f", "geo-reg-w"]:
+            if self.regularization == "geo-reg-f":
+                reg_term = -torch.logdet(p_class.T @ p_class)
+            else:
+                reg_term = -torch.logdet(p_perf.T @ p_perf)
+            if (
+                torch.isnan(reg_term)
+                or torch.isinf(torch.abs(reg_term))
+                or reg_term > 100
+            ):
+                reg_term = 0
+        return reg_term
+
 
 class RegCrowdNetModule(nn.Module):
-    """RegCrowdNetModule"""
+    """RegCrowdNetModule
+
+    This module combined the embedding layers and the output layer.
+
+    Parameters
+    -------------
+    n_classes : int
+        Number of classes
+    n_annotators : int
+        Number of annotators.
+    gt_embed_x : nn.Module
+        Pytorch module of the GT model taking samples
+        as input to compute the embedding.
+    gt_output : nn.Module
+        Pytorch module of the GT model taking the embeding
+        as input to compute the logits
+    regularization : "trace-reg" or "geo-reg-f" or "geo-reg-w" (default="trace-reg")
+        Defines which regularization for the annotator confusion matrices is applied, either by regularizing the traces
+        of the confusion matrices [1] or a geometrically motivated regularization [2].
+    """
 
     def __init__(
         self, gt_embed_x, gt_output, n_classes, n_annotators, regularization
@@ -223,6 +320,18 @@ class RegCrowdNetModule(nn.Module):
             )
 
     def forward(self, x):
+        """Forward propagation of samples through the GT model.
+
+        Parameters
+        ----------
+        x : torch.tensor of shape (batch_size, *)
+            Sample features.
+
+        Returns
+        -------
+        logits_class : torch.tensor of shape (batch_size, n_classes)
+            Class-membership logits.
+        """
         x_learned = self.gt_embed_x(x)
         logits_class = self.gt_output(x_learned)
         return logits_class
