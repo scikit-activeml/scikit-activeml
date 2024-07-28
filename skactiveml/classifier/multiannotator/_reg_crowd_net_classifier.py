@@ -11,7 +11,50 @@ from ...classifier import SkorchClassifier
 
 
 class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
-    """RegCrowdNetClassifier"""
+    """RegCrowdNetClassifier
+
+    The "regularized crowd network" (RegCrowdNet) [1, 2] jointly learns the underlying ground truth (GT) distribution
+    and the individual confusion matrix as proxy of each annotator's performance. Therefor, a regularization term is
+    added to the loss function that encourages convergence to the true annotator confusion matrix.
+
+    Parameters
+    ----------
+    n_classes : int
+        Number of classes
+    n_annotators : int
+        Number of annotators.
+    module__gt_net : nn.Module
+        Pytorch module of the GT model taking samples
+        as input to predict class-membership logits.
+    module__output_net
+    module__n_annotators : int
+         Number of annotators.
+    arguments
+        more possible arguments for initialize your neural network
+        see: https://skorch.readthedocs.io/en/stable/net.html
+    classes : array-like of shape (n_classes,), default=None
+        Holds the label for each class. If none, the classes are determined
+        during the fit.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    cost_matrix : array-like of shape (n_classes, n_classes)
+        Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
+        `classes[j]` for a sample of class `classes[i]`. Can be only set, if
+        `classes` is not none.
+    random_state : int or RandomState instance or None, default=None
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
+    **kwargs : keyword arguments
+        more possible parameters to customizing your neural network
+        see: https://skorch.readthedocs.io/en/stable/net.html
+    ATTENTION: Criterion is in this methode predefined. Please don't overwrite the
+    'criterion' parameter.
+
+    References
+    ----------
+    [1] Rodrigues, Filipe, and Francisco Pereira. "Deep learning from crowds." In Proceedings of the AAAI conference on
+        artificial intelligence, vol. 32, no. 1. 2018.
+    """
 
     def __init__(
         self,
