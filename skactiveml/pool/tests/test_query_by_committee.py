@@ -14,6 +14,7 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.utils.validation import NotFittedError
 
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool._query_by_committee import (
     QueryByCommittee,
@@ -75,7 +76,19 @@ class TestQueryByCommittee(
         ]
         self._test_param("init", "eps", test_cases, exclude_reg=True)
 
-    def test_query_param_ensemble(self, test_cases=None):
+    def test_init_param_n_sampled_members(self):
+        test_cases = [
+            (0, ValueError),
+            (1, None),
+            (50, None),
+            (0.1, TypeError),
+            ("1", TypeError),
+        ]
+        self._test_param(
+            "init", "n_sampled_members", test_cases, exclude_reg=True
+        )
+
+    def test_query_param_ensemble(self):
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
             ("pwc2", ParzenWindowClassifier()),
@@ -99,8 +112,9 @@ class TestQueryByCommittee(
             (None, TypeError),
             ("test", TypeError),
             (1, TypeError),
-            (ParzenWindowClassifier(classes=self.classes), TypeError),
+            (ParzenWindowClassifier(classes=self.classes), None),
             (GaussianProcessRegressor(), TypeError),
+            (SklearnRegressor(GaussianProcessRegressor()), None),
             (RandomForestRegressor(), TypeError),
             (RandomForestClassifier(), TypeError),
             (
