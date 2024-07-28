@@ -25,10 +25,9 @@ class RegCrowdNetClassifier(SkorchClassifier, AnnotatorModelMixin):
         Number of annotators.
     module__gt_net : nn.Module
         Pytorch module of the GT model taking samples
-        as input to predict class-membership logits.
-    module__output_net
-    module__n_annotators : int
-         Number of annotators.
+        as input to compute the embedding.
+    module__output_net: nn.Module
+        Pytorch module of the
     arguments
         more possible arguments for initialize your neural network
         see: https://skorch.readthedocs.io/en/stable/net.html
