@@ -119,11 +119,10 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
             indexing refers to samples in X.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples for selecting each sample of the batch.
-            Here, utilities refers to the Kullback-Leibler divergence to
-            between the sample's own and its nearest labeled sampled predicted
-            class-membership probabilities.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to the samples in `X`.
+            Here, utilities refers to the Kullback-Leibler divergence between
+            the sample's own and its labeled nearest neighbors' predicted
+            class-membership probabilities. If `candidates` is `None` or of
+            shape `(n_candidates,)`, the indexing refers to the samples in `X`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
