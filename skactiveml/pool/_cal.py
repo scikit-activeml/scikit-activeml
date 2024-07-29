@@ -30,15 +30,14 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
     Parameters
     ----------
     nearest_neighbors_dict : dict, default=None
-        The parameters passed to the clustering algorithm `cluster_algo`,
-        excluding the parameter for the number of clusters.
+        The parameters passed to the nearest neighboring algorithm
+        `sklearn.neighbors.NearestNeighbors`.
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations. If
         `clf_embedding_flag_name=None`, the input samples `X` are used.
     eps : float  > 0, optional (default=1e-7)
-        Minimum probability threshold to compute log-probabilities (only
-        relevant for `method='KL_divergence'`).
+        Minimum probability threshold to compute log-probabilities.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -46,9 +45,9 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Margatina, Katerina, Giorgos Vernikos, Loïc Barrault, and Nikolaos
-    Aletras. "Active Learning by Acquiring Contrastive Examples." In EMNLP,
-    pp. 650-663. 2021.
+    .. [1] Margatina, Katerina, Giorgos Vernikos, Loïc Barrault, and Nikolaos
+       Aletras. "Active Learning by Acquiring Contrastive Examples." In EMNLP,
+       pp. 650-663. 2021.
     """
 
     def __init__(
@@ -92,31 +91,39 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-        array-like of shape (n_candidates, n_features), default=None
-            If `candidates` is None, the unlabeled samples from (X, y)
+        sample_weight: array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates) with \
+                dtype=int or array-like of shape (n_candidates, n_features), \
+                default=None
+            If `candidates` is `None`, the unlabeled samples from `(X, y)`
             are considered as candidates.
-            If `candidates` is of shape (n_candidates) and of type int,
-            candidates is considered as a list of the indices of the samples in
-            (X, y).
+            If `candidates` is of shape `(n_candidates)` and of type `int`,
+            `candidates` is considered as a list of the indices of the samples
+            in `(X, y)`.
+            If `candidates` is of shape `(n_candidates, n_features)`, the
+            candidate samples are directly given in `candidates` (not
+            necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
-            If True, also return the utilities based on the query strategy.
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         ----------
-        query_indices : numpy.ndarray of shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size,)
             The `query_indices` indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If `candidates` in None or of shape (n_candidates), the indexing
-            refers to samples in X.
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+            If `candidates` is `None` or of shape `(n_candidates,)`, the
+            indexing refers to samples in X.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples for selecting each sample of the batch.
-            Here, utilities mean the out-degree of the candidate samples.
-            If `candidates` is None or of shape (n_candidates), the indexing
-            refers to samples in `X`.
+            Here, utilities refers to the Kullback-Leibler divergence to
+            between the sample's own and its nearest labeled sampled predicted
+            class-membership probabilities.
+            If `candidates` is `None` or of shape `(n_candidates,)`, the
+            indexing refers to the samples in `X`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

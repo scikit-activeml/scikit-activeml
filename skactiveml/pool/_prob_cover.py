@@ -58,8 +58,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Yehuda, Ofer, Avihu Dekel, Guy Hacohen, and Daphna Weinshall. "Active
-    Learning Through a Covering Lens." NeurIPS, 2022.
+    .. [1] Yehuda, Ofer, Avihu Dekel, Guy Hacohen, and Daphna Weinshall.
+       "Active Learning Through a Covering Lens." NeurIPS, 2022.
     """
 
     def __init__(
@@ -104,13 +104,13 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label).
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-        array-like of shape (n_candidates, n_features), default=None
-            If `candidates` is None, the unlabeled samples from (X, y)
+        candidates : None or array-like of shape (n_candidates) with \
+                dtype=int, default=None
+            If `candidates` is None, the unlabeled samples from `(X, y)`
             are considered as candidates.
-            If `candidates` is of shape (n_candidates) and of type int,
-            candidates is considered as a list of the indices of the samples in
-            (X, y).
+            If `candidates` is of shape `(n_candidates,)` and of type int,
+            `candidates` is considered as a list of the indices of the samples
+            in `(X, y)`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -123,17 +123,17 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         ----------
-        query_indices : numpy.ndarray of shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size,)
             The `query_indices` indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If `candidates` in None or of shape (n_candidates), the indexing
-            refers to samples in X.
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+            If `candidates` in `None` or of shape `(n_candidates,)`, the
+            indexing refers to samples in `X`.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples for selecting each sample of the batch.
             Here, utilities mean the out-degree of the candidate samples.
-            If `candidates` is None or of shape (n_candidates), the indexing
-            refers to samples in `X`.
+            If `candidates` is `None` or of shape `(n_candidates,)`, the
+            indexing refers to the samples in `X`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
