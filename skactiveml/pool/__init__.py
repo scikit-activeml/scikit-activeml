@@ -35,6 +35,7 @@ from ._uncertainty_sampling import (
 from ._core_set import CoreSet, k_greedy_center
 from ._typi_clust import TypiClust
 from ._badge import Badge
+from ._prob_cover import ProbCover
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 
 __all__ = [
@@ -68,6 +69,7 @@ __all__ = [
     "k_greedy_center",
     "TypiClust",
     "Badge",
+    "ProbCover",
     "GreedyBALD",
     "RegressionTreeBasedAL",
     "SubSamplingWrapper",
