@@ -104,7 +104,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.missing_label).
-        candidates : None or array-like of shape (n_candidates) with dtype=int
+        candidates : None or array-like of shape (n_candidates) with \
+                dtype=int, default=None
             If `candidates` is None, the unlabeled samples from `(X, y)`
             are considered as candidates.
             If `candidates` is of shape `(n_candidates,)` and of type int,
@@ -132,7 +133,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples for selecting each sample of the batch.
             Here, utilities mean the out-degree of the candidate samples.
             If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to samples in `X`.
+            indexing refers to the samples in `X`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
