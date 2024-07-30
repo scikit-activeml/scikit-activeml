@@ -5,6 +5,20 @@ from sphinx.application import Sphinx
 
 
 def copy_gallery_notebooks_callback(app: Sphinx, exception):
+    """A callback for the `build-finished` signal that is used by the
+    `copy_gallery_notebooks` extension, that copies and post-processes
+    notebooks from sphinx gallery examples.
+
+    Parameters
+    ----------
+    app : Sphinx
+        The Sphinx application object that is used to access the parsed sphinx
+        config.
+    exception : Exception or None
+        This parameter is `None` if no exceptions were raised during the
+        building process. If an exception was raised, that exception will be
+        accessible via `exception`.
+    """
     if exception is not None:
         return
 
@@ -17,6 +31,16 @@ def copy_gallery_notebooks_callback(app: Sphinx, exception):
 
 
 def copy_gallery_notebooks(src_dir, dst_dir):
+    """This function copies and post-processes notebooks from sphinx gallery
+    examples.
+
+    Parameters
+    ----------
+    src_dir : str
+        The source directory from which notebooks are copied.
+    dst_dir : str
+        The destination directory to which all notebooks are copied.
+    """
     os.makedirs(dst_dir, exist_ok=True)
 
     for src_root, dirs, files in os.walk(src_dir):
@@ -31,6 +55,17 @@ def copy_gallery_notebooks(src_dir, dst_dir):
 
 
 def process_notebook(src_path, dst_path):
+    """This function copies a jupyter notebook and removes the comment symbol
+    from `!pip install <packeges>` commands such that they will be executed by
+    default.
+
+    Parameters
+    ----------
+    src_path : str
+        The file path to the notebook that needs to be modified.
+    dst_path : str
+        The file path where the modified notebook is saved to.
+    """
     with open(src_path, 'r') as f:
         file_content = f.read()
 
@@ -47,7 +82,22 @@ def process_notebook(src_path, dst_path):
 
 
 def setup(app: Sphinx):
-    print('copy_sphinx_gallery_notebooks setup')
+    """This function is called during the initialization of the Sphinx
+    extension. Here, default values are added to the config and callbacks
+    are connected, such that they can be called after the corresponding signal
+    is emitted.
+
+    Parameters
+    ----------
+    app : Sphinx
+        The Sphinx application object where config values are added and the
+        callback is connected to.
+
+    Returns
+    -------
+    dict
+        Extension meta data and restrictions in parallel processing.
+    """
 
     app.add_config_value(
         'copy_gallery_notebooks_src_path',
@@ -68,9 +118,3 @@ def setup(app: Sphinx):
         'parallel_read_safe': True,
         'parallel_write_safe': True,
     }
-
-
-# if __name__ == '__main__':
-#     src_dir = 'docs/generated/sphinx_gallery_examples'
-#     dst_dir = 'docs/test_output/generated/sphinx_gallery_notebooks'
-#     copy_gallery_notebooks(src_dir, dst_dir)

@@ -758,6 +758,7 @@ def post_process_tutorials(
     with the actual link to open this notebook within Google colab and the
     comments before pip and jupyter installation instructions are removed for
     the Google Colab versions.
+
     Parameters
     ----------
     tutorials_path: string
@@ -811,6 +812,7 @@ def replace_colab_link(
     """This function replaces the placeholder (<colab_link>) within
     `file_content` with the link that matches the location once the notebook is
     included into the deployed documentation.
+
     Parameters
     ----------
     file_content: string
@@ -821,6 +823,7 @@ def replace_colab_link(
         The Google Colab address where you can specify the notebook to open in
         Google Colab. If None, it is assumed that the official scikit-activeml
         documentation is used.
+
     Returns
     -------
     output : string
@@ -838,23 +841,44 @@ def replace_colab_link(
 
 
 def check_google_colab_link(google_colab_link):
+    """This function checks if `google_colab_link` is a string. If it is, it is
+    returned as is. If it is `None`, a valid string that points to the official
+    scikit-activeml documentation is returned.
+
+    Parameters
+    ----------
+    google_colab_link : str or None, default=None
+        The Google Colab address where you can specify the notebook to open in
+        Google Colab. If None, it is assumed that the official scikit-activeml
+        documentation is used.
+
+    Returns
+    -------
+    output : str
+        Returns the string that was provided if it was not None. If it is None,
+        the string that points to the official scikit-activeml documentation
+        is returned
+    """
+    output = google_colab_link
     if google_colab_link is None:
         colab_github = 'https://colab.research.google.com/github'
         docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
         docs_branch_path = 'blob/gh-pages'
-        google_colab_link = (
+        output = (
             f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
         )
-    return google_colab_link
+    return output
 
 
 def uncomment_installation_code(file_content):
     """This function removes the comment symbols for pip install and jupyter
     nbextension install commands.
+
     Parameters
     ----------
     file_content: string
         The content of the jupyter notebook.
+
     Returns
     -------
     output : string

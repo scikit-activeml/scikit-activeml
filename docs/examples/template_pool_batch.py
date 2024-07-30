@@ -10,7 +10,7 @@
 #    :target: "$colab_link"
 #
 # | **Notebook Dependencies**
-# | Uncomment the following cells to install all dependencies for this
+# | Uncomment the following cell to install all dependencies for this
 #   tutorial.
 
 "$install_dependencies|# !pip install scikit-activeml"
