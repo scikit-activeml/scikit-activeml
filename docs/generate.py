@@ -346,6 +346,8 @@ def generate_examples(
     json_path : string
         The path of the directory where to find the json example files for the
         specified package.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
     recursive : bool, default=True
         If True, examples for sub-packagers are also created.
 
@@ -444,6 +446,8 @@ def generate_example_script(
         created.
     template_path : path-like
         The path to the template file.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
     google_colab_link: str or None, default=None
         The link to google colab that can be used to open notebooks directly in
         google colab.
@@ -465,7 +469,6 @@ def generate_example_script(
     ]
 
     )
-    print(data["colab_link"])
 
     first_title = True
     # Create the file.
@@ -738,7 +741,8 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
     distutils.dir_util.copy_tree(src=src_path, dst=dst_path_colab)
     post_process_tutorials(
         dst_path,
-        colab_notebook_path=dst_path_colab
+        colab_notebook_path=dst_path_colab,
+        show_installation_code=False
     )
     post_process_tutorials(
         dst_path_colab,
