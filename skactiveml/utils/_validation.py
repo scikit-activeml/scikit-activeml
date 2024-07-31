@@ -334,7 +334,7 @@ def check_X_y(
           be infinite.
 
         .. versionadded:: 0.20
-           ``force_all_finite`` accepts the string ``'allow-nan'``.
+           `force_all_finite` accepts the string `'allow-nan'`.
 
         .. versionchanged:: 0.23
            Accepts `pd.NA` and converts it into `np.nan`
@@ -361,7 +361,7 @@ def check_X_y(
         Make sure that the 2D array has some minimum number of features
         (columns). The default value of 1 rejects empty datasets.
         This check is only enforced when X has effectively 2 dimensions or
-        is originally 1D and ``ensure_2d`` is True. Setting to 0 disables
+        is originally 1D and `ensure_2d` is True. Setting to 0 disables
         this check.
 
     y_numeric : boolean (default=False)

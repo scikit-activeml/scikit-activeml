@@ -15,7 +15,7 @@ def ext_confusion_matrix(
 ):
     """Compute confusion matrix to evaluate the accuracy of a classification.
 
-    This is an extension of the 'sklearn.metric.confusion_matrix function' by
+    This is an extension of the `sklearn.metric.confusion_matrix` function by
     allowing missing labels and labels predicted by multiple annotators.
 
     By definition a confusion matrix :math:`C` is such that :math:`C_{i, j}`
@@ -34,8 +34,8 @@ def ext_confusion_matrix(
             Estimated targets as returned by multiple annotators.
     classes : array-like of shape (n_classes), default=None
         List of class labels to index the matrix. This may be used to reorder
-        or select a subset of labels. If ``None`` is given, those that appear
-        at least once in ``y_true`` or ``y_pred`` are used in sorted order.
+        or select a subset of labels. If `None` is given, those that appear
+        at least once in `y_true` or `y_pred` are used in sorted order.
     missing_label : {scalar, string, np.nan, None}, default=np.nan
         Value to represent a missing label.
     normalize : {'true', 'pred', 'all'}, default=None
@@ -47,7 +47,7 @@ def ext_confusion_matrix(
     -------
     conf_matrices : numpy.ndarray, shape (n_annotators, n_classes, n_classes)
         Confusion matrix whose i-th row and j-th column entry indicates the
-        number of samples with true label being i-th class and prediced label
+        number of samples with true label being i-th class and predicted label
         being j-th class.
 
     References

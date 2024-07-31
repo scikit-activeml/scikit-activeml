@@ -27,7 +27,7 @@ from ..utils import (
 
 
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
-    """Query-by-Committee.
+    """Query-by-Committee (QBC)
 
     The Query-by-Committee (QBC) strategy uses an ensemble of estimators to
     identify on which samples many estimators disagree.
@@ -43,9 +43,32 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities (only
         relevant for `method='KL_divergence'`).
-    n_sampled_members : int, default=10
-        Number of ensemble members to be sampled. This parameter is only
-        relevant for estimators supporting the method `sample` or `sample_y`.
+    sample_predictions_method_name : str, default=None
+        Certain estimators may offer methods enabling to construct a committee
+        by sampling predictions of committee members. This parameter is to
+        indicate the name of such a method.
+            - If `sample_predictions_method_name=None` no sampling is
+              performed.
+            - If `sample_predictions_method_name` is not `None` and in the
+              case of classification, the method is expected to take samples of
+              the shape `(n_samples, *)` as input and to output probabilities
+              of the shape `(n_members, n_samples, n_classes)`, e.g.,
+              `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
+            - If `sample_predictions_method_name` is not `None` and in the
+              case of regression, the method is expected to take samples of the
+              shape `(n_samples, *)` as input and to output probabilities of
+              the shape `(n_members, n_samples)`, e.g., `sample_y` in
+              `sklearn.gaussian_process.GaussianProcessRegressor`.
+    sample_predictions_dict : dict, default=None
+        Parameters (excluding the samples) that are passed to the method with
+        the name `sample_predictions_method_name`.
+        - This parameter must be `None`, if
+          `sample_predictions_method_name` is `None`.
+        - Otherwise, it may be used to define the number of sampled members,
+          e.g., by defining `n_samples` as parameter to the method
+          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
+          `sample_y` of
+          `sklearn.gaussian_process.GaussianProcessRegressor`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
@@ -75,7 +98,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         self,
         method="KL_divergence",
         eps=1e-7,
-        n_sampled_members=100,
+        sample_predictions_method_name=None,
+        sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -84,7 +108,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         )
         self.method = method
         self.eps = eps
-        self.n_sampled_members = n_sampled_members
+        self.sample_predictions_method_name = sample_predictions_method_name
+        self.sample_predictions_dict = sample_predictions_dict
 
     def query(
         self,
@@ -110,17 +135,17 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         ensemble : array-like of SkactivemlClassifier or array-like of \
                 SkactivemlRegressor or SkactivemlClassifier or \
                 SkactivemlRegressor
-            If `ensemble` is a `SkactivemlClassifier` or a
-            `SkactivemlRegressor` and has `n_estimators` plus
-            `estimators_` after fitting as attributes, its estimators will be
-            used as committee.
-            If `ensemble` is a `SkactivemlClassifier` or a
-            `SkactivemlRegressor` and implements `sample` or `sample_y` as
-            methods, this method is used to sample a committee of
-            `n_sampled_members` members.
-            If `ensemble` is array-like, each element of this list must be
-            `SkactivemlClassifier` or a `SkactivemlRegressor` and will be used
-            as committee member.
+            - If `ensemble` is a `SkactivemlClassifier` or a
+              `SkactivemlRegressor` and has `n_estimators` plus
+              `estimators_` after fitting as attributes, its estimators will
+              be used as committee.
+            - If `ensemble` is array-like, each element of this list must be
+              `SkactivemlClassifier` or a `SkactivemlRegressor` and will be
+              used as committee member.
+            - If `ensemble` is a `SkactivemlClassifier` or a
+              `SkactivemlRegressor` and implements a method with the name
+              `sample_predictions_method_name`, this method is used to sample
+              predictions of committee members.
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -128,14 +153,15 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
-            If `candidates` is `None`, the unlabeled samples from `(X,y)` are
-            considered as `candidates`.
-            If `candidates` is of shape `(n_candidates,)` and of type `int`,
-            `candidates` is considered as the indices of the samples in
-            `(X,y)`.
-            If `candidates` is of shape `(n_candidates, *)`, the candidate
-            samples are directly given in `candidates` (not necessarily
-            contained in `X`). This is not supported by all query strategies.
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -143,24 +169,26 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size,)
+        query_indices : numpy.ndarray of shape (batch_size)
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to samples in `X`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            indexing refers to samples in `candidates`.
+                - If `candidates` is `None` or of shape
+                  `(n_candidates,)`, the indexing refers to the samples in
+                  `X`.
+                - If `candidates` is of shape `(n_candidates, n_features)`,
+                  the indexing refers to the samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or \
-                    numpy.ndarray of shape (batch_size, n_candidates)
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to samples in X.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            indexing refers to samples in `candidates`.
+                - If `candidates` is `None` or of shape
+                  `(n_candidates,)`, the indexing refers to the samples in
+                  `X`.
+                - If `candidates` is of shape `(n_candidates, n_features)`,
+                  the indexing refers to the samples in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -169,7 +197,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         check_type(fit_ensemble, "fit_ensemble", bool)
-        ensemble, est_arr, classes = _check_ensemble(
+        ensemble, est_arr, classes, sample_func, sample_dict = _check_ensemble(
             ensemble=ensemble,
             X=X,
             y=y,
@@ -177,70 +205,45 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             fit_ensemble=fit_ensemble,
             missing_label=self.missing_label_,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
+            sample_predictions_method_name=self.sample_predictions_method_name,
+            sample_predictions_dict=self.sample_predictions_dict,
         )
         check_type(
             self.method,
             "method",
             target_vals=["KL_divergence", "vote_entropy", "variation_ratios"],
         )
-        check_scalar(
-            self.n_sampled_members,
-            "n_sampled_members",
-            int,
-            min_val=1,
-            min_inclusive=True,
-        )
 
-        # Define sample function, if available.
-        sample_function = None
-        if est_arr is None:
-            if hasattr(ensemble, "sample"):
-                sample_function = ensemble.sample
-            else:
-                sample_function = ensemble.sample_y
-
-        # `classes` is `None` if `ensemble` is a regressor.
+        # `classes` is `None`, if `ensemble` is a regressor.
         if classes is not None:
             # Compute utilities.
             if self.method == "KL_divergence":
-                if sample_function is None:
+                if est_arr is not None:
                     probas = self._aggregate_predict_probas(
                         X_cand, ensemble, est_arr
                     )
                 else:
-                    probas = sample_function(
-                        X=X_cand,
-                        n_samples=self.n_sampled_members,
-                        random_state=self.random_state_,
-                    )
+                    probas = sample_func(X_cand, **sample_dict)
                 utilities_cand = average_kl_divergence(probas, self.eps)
             else:
-                if sample_function is None:
+                if sample_func is None:
                     votes = np.array(
                         [est.predict(X_cand) for est in est_arr]
                     ).T
                 else:
-                    probas = sample_function(
-                        X=X_cand,
-                        n_samples=self.n_sampled_members,
-                        random_state=self.random_state_,
-                    )
+                    probas = sample_func(X_cand, **sample_dict)
                     votes = probas.argmax(axis=-1).T
                 if self.method == "vote_entropy":
                     utilities_cand = vote_entropy(votes, classes)
                 else:
                     utilities_cand = variation_ratios(votes)
         else:
-            if sample_function is None:
+            if sample_func is None:
                 results = np.array(
                     [learner.predict(X_cand) for learner in est_arr]
                 )
             else:
-                results = sample_function(
-                    X_cand,
-                    n_samples=self.n_sampled_members,
-                    random_state=self.random_state_,
-                ).T
+                results = sample_func(X_cand, **sample_dict).T
             utilities_cand = np.std(results, axis=0)
 
         if mapping is None:
@@ -266,13 +269,13 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             Samples whose probabilities are to be predicted.
         ensemble : SkactivemlClassifier or list or tuple of \
                 SkactivemlClassifier
-            If `ensemble` is a `SkactivemlClassifier`, it must have
-            `n_estimators` and `estimators_` after fitting as attribute. Then,
-            its estimators will be used as committee. If `ensemble` is
-            array-like, each element of this list must be
-            `SkactivemlClassifier` and will be used as committee member.
+            - If ``ensemble`` is a ``SkactivemlClassifier``, it must have
+              ``n_estimators`` and ``estimators_`` after fitting as attribute.
+              Then, its estimators will be used as committee.
+            - If ``ensemble`` is array-like, each element of this list must be
+              ``SkactivemlClassifier`` and will be used as committee member.
         est_arr : list or tuple of SkactivemlClassifier
-            List of ensemble members contained in `ensemble`.
+            List of ensemble members contained in ``ensemble``.
 
         Returns
         -------
@@ -369,7 +372,7 @@ def vote_entropy(votes, classes):
     Returns
     -------
     vote_entropy : np.ndarray of shape (n_samples,)
-        The vote entropy of each row in `votes`.
+        The vote entropy of each row in ``votes``.
 
     References
     ----------
@@ -396,7 +399,7 @@ def vote_entropy(votes, classes):
 
 def variation_ratios(votes):
     """Calculates the variation ratios for measuring the level of disagreement
-    in `QueryByCommittee`.
+    in ``QueryByCommittee``.
 
     Parameters
     ----------
@@ -406,7 +409,7 @@ def variation_ratios(votes):
     Returns
     -------
     scores : np.ndarray of shape (n_samples,)
-        The variation ratios of each row in `votes`.
+        The variation ratios of each row in ``votes``.
 
     References
     ----------
@@ -434,11 +437,14 @@ def _check_ensemble(
     sample_weight,
     fit_ensemble=True,
     missing_label=MISSING_LABEL,
+    sample_predictions_method_name=None,
+    sample_predictions_dict=None,
 ):
     error_msg = (
         f"`ensemble` must either be a `{estimator_types} "
-        f"with the attribute `n_ensembles` or `estimators_` or `sample` or "
-        f"`sample_y` after fitting or a list of {estimator_types} objects."
+        f"with the attribute `n_ensembles` or `estimators_` or an array-like "
+        f"of {estimator_types} objects or implement a method with the name "
+        f"`{sample_predictions_method_name}`."
     )
 
     # Check if the parameter `ensemble` is valid.
@@ -454,25 +460,73 @@ def _check_ensemble(
             else:
                 check_is_fitted(ensemble)
 
+            if sample_predictions_method_name is not None:
+                check_type(
+                    sample_predictions_method_name,
+                    "sample_predictions_method_name",
+                    str,
+                )
+                if not hasattr(ensemble, sample_predictions_method_name):
+                    raise ValueError(
+                        "If `sample_predictions_method_name` is not `None`, "
+                        "`ensemble` must implement a method with this name."
+                    )
+                sample_func = getattr(ensemble, sample_predictions_method_name)
+                if sample_predictions_dict is None:
+                    sample_predictions_dict = {}
+                if not isinstance(sample_predictions_dict, dict):
+                    raise ValueError(
+                        "`sample_predictions_dict` must be a `dict`, if "
+                        "`sample_predictions_method_name` is not `None`."
+                    )
+            else:
+                sample_func = None
+                if sample_predictions_dict is not None:
+                    raise ValueError(
+                        "`sample_predictions_dict` must be `None`, if "
+                        "`sample_predictions_method_name` is `None`."
+                    )
+
             if hasattr(ensemble, "estimators_"):
                 est_arr = ensemble.estimators_
             elif hasattr(ensemble, "estimators"):
                 est_arr = [ensemble] * len(ensemble.estimators)
             elif hasattr(ensemble, "n_estimators"):
                 est_arr = [ensemble] * ensemble.n_estimators
-            elif hasattr(ensemble, "sample") or hasattr(ensemble, "sample_y"):
+            elif sample_func is not None:
                 est_arr = None
             else:
                 raise TypeError(error_msg)
 
             if estimator_type == SkactivemlClassifier:
-                return ensemble, est_arr, ensemble.classes_
+                return (
+                    ensemble,
+                    est_arr,
+                    ensemble.classes_,
+                    sample_func,
+                    sample_predictions_dict,
+                )
             else:
-                return ensemble, est_arr, None
+                return (
+                    ensemble,
+                    est_arr,
+                    None,
+                    sample_func,
+                    sample_predictions_dict,
+                )
 
         elif isinstance(ensemble, (list, tuple)) and isinstance(
             ensemble[0], estimator_type
         ):
+            if (
+                sample_predictions_dict is not None
+                or sample_predictions_method_name is not None
+            ):
+                raise ValueError(
+                    "`sample_predictions_method_name` and "
+                    "`sample_predictions_dict` must be `None`, if `ensemble` "
+                    "is array-like."
+                )
             est_arr = copy.deepcopy(ensemble)
             for i in range(len(est_arr)):
                 check_type(
@@ -500,7 +554,19 @@ def _check_ensemble(
                         f"this error.",
                     )
             if estimator_type == SkactivemlClassifier:
-                return ensemble, est_arr, est_arr[0].classes_
+                return (
+                    ensemble,
+                    est_arr,
+                    est_arr[0].classes_,
+                    None,
+                    None,
+                )
             else:
-                return ensemble, est_arr, None
+                return (
+                    ensemble,
+                    est_arr,
+                    None,
+                    None,
+                    None,
+                )
     raise TypeError(error_msg)

@@ -206,7 +206,7 @@ class TestParzenWindowClassifier(
         P = pwc.predict_proba(X=[[1, 0, 0]])
         np.testing.assert_array_equal([[0, 0, 1]], P)
 
-    def test_sample(self):
+    def test_sample_proba(self):
         # Setup test cases.
         X, y_full = make_blobs(n_samples=200, centers=4, random_state=0)
         classes = np.unique(y_full)
@@ -224,7 +224,7 @@ class TestParzenWindowClassifier(
 
             for n_samples in [1, 10]:
                 # Check shape of probabilities.
-                P_sampled = pwc.sample(X, n_samples=n_samples)
+                P_sampled = pwc.sample_proba(X, n_samples=n_samples)
                 shape_Expected = [n_samples, len(X), len(classes)]
                 np.testing.assert_array_equal(P_sampled.shape, shape_Expected)
 
@@ -238,10 +238,10 @@ class TestParzenWindowClassifier(
             classes=np.unique(y_full), class_prior=0, missing_label=-1
         )
         pwc.fit(X, y_missing)
-        self.assertRaises(ValueError, pwc.sample, X=X, n_samples=10)
+        self.assertRaises(ValueError, pwc.sample_proba, X=X, n_samples=10)
 
         pwc.fit(X, y_class_0_missing)
-        self.assertRaises(ValueError, pwc.sample, X=X, n_samples=10)
+        self.assertRaises(ValueError, pwc.sample_proba, X=X, n_samples=10)
 
     def test_predict(self):
         pwc = ParzenWindowClassifier(

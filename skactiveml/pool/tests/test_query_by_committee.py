@@ -14,12 +14,12 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.utils.validation import NotFittedError
 
-from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool._query_by_committee import (
     QueryByCommittee,
     average_kl_divergence,
     vote_entropy,
+    variation_ratios,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
@@ -76,16 +76,95 @@ class TestQueryByCommittee(
         ]
         self._test_param("init", "eps", test_cases, exclude_reg=True)
 
-    def test_init_param_n_sampled_members(self):
+    def test_init_param_sample_predictions_method_name(self):
         test_cases = [
-            (0, ValueError),
-            (1, None),
-            (50, None),
+            (0, TypeError),
             (0.1, TypeError),
-            ("1", TypeError),
+            ("Test", ValueError),
+        ]
+        self._test_param("init", "sample_predictions_method_name", test_cases)
+        test_cases = [
+            ("predict_proba", ValueError),
         ]
         self._test_param(
-            "init", "n_sampled_members", test_cases, exclude_reg=True
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": [ParzenWindowClassifier(), ParzenWindowClassifier]
+            },
+        )
+        test_cases = [
+            ("sample_proba", None),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": ParzenWindowClassifier(),
+                "fit_ensemble": True,
+            },
+        )
+        test_cases = [
+            ("sample_y", None),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": SklearnRegressor(GaussianProcessRegressor()),
+                "fit_ensemble": True,
+            },
+        )
+
+    def test_init_param_sample_predictions_dict(self):
+        test_cases = [
+            (None, None),
+            ({}, None),
+            ({"n_samples": 1000}, None),
+            ("Test", ValueError),
+            ({"Test": 2}, TypeError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": "sample_proba",
+            },
+            replace_query_params={
+                "ensemble": ParzenWindowClassifier(),
+                "fit_ensemble": True,
+            },
+        )
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": "sample_y",
+            },
+            replace_query_params={
+                "ensemble": SklearnRegressor(GaussianProcessRegressor()),
+                "fit_ensemble": True,
+            },
+        )
+        test_cases = [
+            (None, None),
+            ({}, ValueError),
+            ({"n_samples": 1000}, ValueError),
+            ("Test", ValueError),
+            ({"Test": 2}, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": None,
+            },
         )
 
     def test_query_param_ensemble(self):
@@ -112,9 +191,8 @@ class TestQueryByCommittee(
             (None, TypeError),
             ("test", TypeError),
             (1, TypeError),
-            (ParzenWindowClassifier(classes=self.classes), None),
+            (ParzenWindowClassifier(), TypeError),
             (GaussianProcessRegressor(), TypeError),
-            (SklearnRegressor(GaussianProcessRegressor()), None),
             (RandomForestRegressor(), TypeError),
             (RandomForestClassifier(), TypeError),
             (
@@ -258,8 +336,8 @@ class TestQueryByCommittee(
             query_params = deepcopy(self.query_default_params_clf)
             query_params["ensemble"] = ensemble
             query_params["return_utilities"] = True
-            for method in ["KL_divergence", "vote_entropy"]:
-                qs = QueryByCommittee(method=method)
+            for m in ["KL_divergence", "vote_entropy", "variation_ratios"]:
+                qs = QueryByCommittee(method=m)
                 idx, u = qs.query(**query_params)
                 self.assertEqual(len(idx), 1)
                 self.assertEqual(len(u), 1)
@@ -342,4 +420,32 @@ class TestVoteEntropy(unittest.TestCase):
 
     def test_vote_entropy(self):
         scores = vote_entropy(votes=self.votes, classes=self.classes)
+        np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
+
+
+class TestVariationRatios(unittest.TestCase):
+    def setUp(self):
+        self.votes = np.array(
+            [
+                [0, 0, 2],
+                [1, 0, 2],
+                [2, 1, 2],
+                [0, 0, 0],
+            ],
+        )
+        self.scores = np.array([1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, 0.0])
+
+    def test_param_votes(self):
+        self.assertRaises(ValueError, variation_ratios, votes="string")
+        self.assertRaises(ValueError, variation_ratios, votes=1)
+        self.assertRaises(ValueError, variation_ratios, votes=[1])
+        self.assertRaises(ValueError, variation_ratios, votes=[[[1]]])
+        self.assertRaises(
+            ValueError,
+            variation_ratios,
+            votes=np.full((9, 9), np.nan),
+        )
+
+    def test_variation_ratios(self):
+        scores = variation_ratios(votes=self.votes)
         np.testing.assert_array_equal(scores.round(10), self.scores.round(10))

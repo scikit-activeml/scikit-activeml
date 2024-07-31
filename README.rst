@@ -21,7 +21,7 @@
    :target: https://github.com/psf/black
 
 .. |Downloads| image:: https://static.pepy.tech/badge/scikit-activeml
-   :target: https://static.pepy.tech/badge/scikit-activeml/
+   :target: https://pepy.tech/project/scikit-activeml
 
 |
 

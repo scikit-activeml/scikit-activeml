@@ -1317,7 +1317,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
-    def sample(self, X, n_samples=10, random_state=None):
+    def sample_proba(self, X, n_samples=10, random_state=None):
         """Samples probability vectors from Dirichlet distributions whose
         parameters `alphas` are defined as the sum of the frequency outputted
         by `predict_freq` and `class_prior` estimates.

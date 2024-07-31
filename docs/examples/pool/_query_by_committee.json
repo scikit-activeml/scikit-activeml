@@ -14,7 +14,7 @@
                      "from skactiveml.pool import QueryByCommittee"],
     "import_clf" : "from skactiveml.classifier import ParzenWindowClassifier",
     "init_clf" : "ParzenWindowClassifier(classes=np.unique(y_true), class_prior=0.1)",
-    "init_qs" : "QueryByCommittee(method='KL_divergence')",
+    "init_qs" : "QueryByCommittee(method='KL_divergence', sample_predictions_method_name='sample_proba', sample_predictions_dict={'n_samples': 100})",
     "query_params" : "X=X, y=y, ensemble=clf"
   },
   {
@@ -31,7 +31,7 @@
     "import_misc" : ["from skactiveml.pool import QueryByCommittee"],
     "import_clf" : "from skactiveml.classifier import ParzenWindowClassifier",
     "init_clf" : "ParzenWindowClassifier(classes=np.unique(y_true), class_prior=0.1)",
-    "init_qs" : "QueryByCommittee(method='vote_entropy')",
+    "init_qs" : "QueryByCommittee(method='vote_entropy', sample_predictions_method_name='sample_proba', sample_predictions_dict={'n_samples': 100})",
     "query_params" : "X=X, y=y, ensemble=clf"
   },
   {
@@ -48,7 +48,7 @@
     "import_misc" : ["from skactiveml.pool import QueryByCommittee"],
     "import_clf" : "from skactiveml.classifier import ParzenWindowClassifier",
     "init_clf" : "ParzenWindowClassifier(classes=np.unique(y_true), class_prior=0.1)",
-    "init_qs" : "QueryByCommittee(method='variation_ratios')",
+    "init_qs" : "QueryByCommittee(method='variation_ratios', sample_predictions_method_name='sample_proba', sample_predictions_dict={'n_samples': 100})",
     "query_params" : "X=X, y=y, ensemble=clf"
   },
   {
@@ -68,7 +68,7 @@
     ],
     "import_reg" : "from sklearn.gaussian_process import GaussianProcessRegressor",
     "init_reg" : "SklearnRegressor(GaussianProcessRegressor())",
-    "init_qs" : "QueryByCommittee()",
+    "init_qs" : "QueryByCommittee(sample_predictions_method_name='sample_y', sample_predictions_dict={'n_samples': 100})",
     "query_params" : "X=X, y=y, ensemble=reg"
   }
 ]
