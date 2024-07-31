@@ -166,6 +166,7 @@ html_theme_options = {
         # "json_url": switcher_json_path,
         "version_match": version,
     },
+    "check_switcher": False,
     "navbar_start": ["navbar-logo", "version-switcher"]
 }
 
