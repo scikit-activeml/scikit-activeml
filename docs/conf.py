@@ -163,7 +163,7 @@ html_theme_options = {
     ],
     "icon_links_label": "Quick Links",
     "switcher": {
-        # "json_url": switcher_json_path,
+        "json_url": switcher_json_path,
         "version_match": version,
     },
     "check_switcher": False,
