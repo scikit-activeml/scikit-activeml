@@ -31,8 +31,9 @@ class TestExamples(unittest.TestCase):
     def test_example_files(self):
         # Temporary generate the examples from the json files.
         examples_path = path.join(self.skaml_path, "docs", "temp_examples")
+        notebooks_path = path.join(self.skaml_path, "docs", "temp_notebooks")
         os.chdir(self.docs_path)
-        generate_examples(examples_path, self.json_path)
+        generate_examples(examples_path, self.json_path, notebooks_path)
         os.chdir(self.working_dir)
 
         # Execute the examples.
@@ -42,12 +43,12 @@ class TestExamples(unittest.TestCase):
                     msg = os.path.join(root, filename).replace(
                         examples_path, ""
                     )
+                    file_path = path.join(root, filename)
                     with self.subTest(msg=msg):
-                        file_path = path.join(root, filename)
                         with open(file_path, "r") as f:
                             exec(f.read(), locals())
 
-        # Remove the created examples from disk.
+        # Remove the created examples and notebooks from disk.
         shutil.rmtree(examples_path)
 
     def test_json(self):

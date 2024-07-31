@@ -1,3 +1,27 @@
+# %%
+# .. note::
+#    The generated animation can be found at the bottom of the page.
+#
+# | **Google Colab Note**: If the notebook fails to run after installing the
+#   needed packages, try to restart the runtime (Ctrl + M) under
+#   Runtime -> Restart session.
+#
+# .. image:: https://colab.research.google.com/assets/colab-badge.svg
+#    :target: "$colab_link"
+#
+# | **Notebook Dependencies**
+# | Uncomment the following cell to install all dependencies for this
+#   tutorial.
+
+"$install_dependencies|# !pip install scikit-activeml"
+
+# %%
+#.. raw:: html
+#
+#   <hr style="border-style: solid; border-top: 1px solid; border-right: 0; border-bottom: 0; border-left: 0;">
+#
+
+# %%
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from sklearn.datasets import make_blobs
