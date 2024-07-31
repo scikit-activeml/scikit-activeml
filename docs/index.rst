@@ -10,7 +10,7 @@ Welcome to scikit-activeml's documentation!
    Strategy Overview <generated/strategy_overview>
    generated/api_reference
    generated/sphinx_gallery_examples/index
-   developers_guide
+   contributing
 
 .. include:: ../README.rst
    :start-after: intro_start
