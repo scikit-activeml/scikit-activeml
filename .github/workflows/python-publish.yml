@@ -40,28 +40,14 @@ jobs:
       run: |
         python setup.py sdist bdist_wheel
         twine check dist/*
-    # - name: Publish package
-    #   uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
-    #   with:
-    #     user: __token__
-    #     password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Publish package
+      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
     - uses: actions/checkout@v4
       with:
         ref: master
-    - name: Update switcher
-      run: | 
-        echo ${{ env.CURRENT_VERSION }}
-        All_VERSIONS=$(git ls-remote --tags --sort=-'v:refname' https://github.com/scikit-activeml/scikit-activeml.git | cut --delimiter='/' --fields=3)
-        echo $All_VERSIONS
-        python .github/workflows/update_requirements.py --versions $All_VERSIONS --release_version ${{ env.CURRENT_VERSION }}
-    - name: Commit and push changes
-      run: |
-        git config --global user.name AlexanderBenz
-        git config --global user.email AlexanderBenz@users.noreply.github.com
-
-        git add docs/_static/switcher.json
-        git commit -m "update switcher for release"
-        git push
-    - name: Trigger realease documentation for scikit-activeml-docs
+    - name: Trigger release documentation for scikit-activeml-docs
       run: |
         curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"release\"}"

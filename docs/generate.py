@@ -1,4 +1,5 @@
 import os
+
 os.environ["OMP_NUM_THREADS"] = "1"
 import distutils.dir_util
 import importlib
@@ -15,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 from joblib import Parallel, delayed
+import git
 
 import skactiveml
 
@@ -175,13 +177,13 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "\n"
             '   <input type="checkbox" class="input-tag" '
             'value="regression">\n'
-            '   <label>Regression</label>\n'
+            "   <label>Regression</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="classification">\n '
-            '   <label>Classification</label>\n'
+            "   <label>Classification</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="multi-annotator">\n '
-            '   <label>Multi-Annotator</label>\n'
+            "   <label>Multi-Annotator</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="single-annotator">\n '
             "   <label>Single-Annotator</label>\n"
@@ -331,9 +333,8 @@ def table_data_to_rst_table(
 
 
 def generate_examples(gen_path, json_path, recursive=True):
-    """
-    Creates all example scripts for the specified package and returns the data
-    needed to create the strategy overview.
+    """Creates all example scripts for the specified package and returns the
+    data needed to create the strategy overview.
 
     Parameters
     ----------
@@ -356,8 +357,9 @@ def generate_examples(gen_path, json_path, recursive=True):
 
     json_data = dict()
     # iterate over json example files
-    for (root, dirs, files) in os.walk(json_path, topdown=True):
-        if root.endswith('__pycache__'): continue
+    for root, dirs, files in os.walk(json_path, topdown=True):
+        if root.endswith("__pycache__"):
+            continue
         if "README.rst" not in files and "README.txt" not in files:
             raise FileNotFoundError(
                 f"No README.rst or README.txt found in \n" f'"{root}"'
@@ -368,35 +370,58 @@ def generate_examples(gen_path, json_path, recursive=True):
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
         num_cpus = -1
+        num_cpus = 1
         if "num_cpus" in os.environ:
             num_cpus = int(os.environ["num_cpus"])
         if num_cpus != 1:
-            (Parallel(n_jobs=num_cpus,backend='loky')
-            (delayed(_generate_single_example)(f,root, json_data, sub_dir_str, dst) for f in files))
+            json_data_lists = Parallel(n_jobs=num_cpus, backend="loky")(
+                (
+                    delayed(_generate_single_example)(
+                        f, root, dst
+                    )
+                    for f in files
+                )
+            )
         else:
+            json_data_lists = []
             for filename in files:
-                _generate_single_example(filename, root, json_data, sub_dir_str, dst)
+                json_data_lists.append(
+                    _generate_single_example(filename, root, dst)
+                )
+        for json_data_list in json_data_lists:
+            package_structure = sub_dir_str.split(os.sep)
+            json_data_entry = json_data
+            for sp in package_structure:
+                if sp not in json_data_entry.keys():
+                    json_data_entry[sp] = dict()
+                json_data_entry = json_data_entry[sp]
+            if "data" not in json_data_entry.keys():
+                json_data_entry["data"] = list()
+            json_data_entry["data"].extend(json_data_list)
 
         if not recursive:
             break
-
     return json_data
 
-def _generate_single_example(filename, root, json_data, sub_dir_str, dst):
+
+def _generate_single_example(filename, root, dst):
+    """_summary_
+
+    Parameters
+    ----------
+    filename : str
+        The path to the json file for which an example is generated.
+    root : str
+        The root directory where the json file is stored.
+    dst : str
+        The root directory where the examples are saved.
+    """
+    data_list = []
     if filename.endswith(".json"):
         with open(os.path.join(root, filename)) as file:
             # iterate over the examples in the json file
             for data in json.load(file):
-                sub_package_dict = json_data
-                package_structure = sub_dir_str.split(".")
-                for sp in package_structure:
-                    if sp not in sub_package_dict.keys():
-                        sub_package_dict[sp] = dict()
-                    sub_package_dict = sub_package_dict[sp]
-                if "data" not in sub_package_dict.keys():
-                    sub_package_dict["data"] = list()
-
-                sub_package_dict["data"].append(data)
+                data_list.append(data)
                 # create the example python script
                 plot_filename = (
                     "plot-"
@@ -421,6 +446,7 @@ def _generate_single_example(filename, root, json_data, sub_dir_str, dst):
             # Copy all other files except for templates.
             src = os.path.join(root, filename)
             shutil.copyfile(src, os.path.join(dst, filename))
+    return data_list
 
 
 def generate_example_script(filename, dir_path, data, package, template_path):
@@ -600,11 +626,11 @@ def format_plot(data, template_path):
 
             if "FULLEXAMPLES" not in os.environ:
                 if key == "n_samples":
-                    data[key] = "10"
+                    data[key] = "20"
                 elif key == "n_cycles":
-                    data[key] = "2"
+                    data[key] = "5"
                 elif key == "res":
-                    data[key] = "3"
+                    data[key] = "5"
             if key in data.keys():
                 if isinstance(data[key], list):
                     new_str = ""
@@ -719,15 +745,17 @@ def export_legend(handles, labels, ax, path="legend.pdf", expand=None):
         expand = [-5, -5, 5, 5]
 
     ax.axis("off")
-    legend = ax.legend(handles, labels,
-                       loc=3,
-                       framealpha=1,
-                       frameon=True,
-                       ncol=4,
-                       mode="expand",
-                       bbox_to_anchor=(0., 0., 1., 1.),
-                       fontsize=8,
-                       )
+    legend = ax.legend(
+        handles,
+        labels,
+        loc=3,
+        framealpha=1,
+        frameon=True,
+        ncol=4,
+        mode="expand",
+        bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
+        fontsize=8,
+    )
 
     fig = legend.figure
     fig.canvas.draw()
@@ -765,8 +793,9 @@ def generate_classification_legend(path):
     labels.append("Decision Boundary")
     handles.append(ax.plot([], [], color="black")[0])
     labels.append("Labeled Sample")
-    handles.append(ax.scatter([], [], marker=".", color="gray", s=100,
-                              alpha=0.8))
+    handles.append(
+        ax.scatter([], [], marker=".", color="gray", s=100, alpha=0.8)
+    )
     labels.append("Sample Of Class 0")
     handles.append(ax.scatter([], [], marker=".", color="blue"))
     labels.append("Sample Of Class 1")
@@ -776,9 +805,9 @@ def generate_classification_legend(path):
     labels.append("75% Confidence Class 1")
     handles.append(ax.plot([], [], color="red", ls="--")[0])
     labels.append("High Utility Score")
-    handles.append(mpatches.Patch(color='green', alpha=1.0))
+    handles.append(mpatches.Patch(color="green", alpha=1.0))
     labels.append("Low Utility Score")
-    handles.append(mpatches.Patch(color='green', alpha=0.2))
+    handles.append(mpatches.Patch(color="green", alpha=0.2))
 
     export_legend(handles, labels, ax, path=path)
 
@@ -798,3 +827,73 @@ def generate_regression_legend(path):
     labels.append("Labeled Sample")
 
     export_legend(handles, labels, ax, path=path)
+
+
+def generate_switcher(repo_path=None, switcher_location=None):
+    """Creates the version switcher file used by the PyDate theme.
+
+    Parameters
+    ----------
+    repo_path : str or None, default=None
+        The path to the repository root. If this parameter is None, ".." is
+        used instead.
+    switcher_location : str or None, default=None
+        The path where the switcher json is saved to. If this parameter is None,
+        "_static/switcher.json" is used instead.
+    """
+    if repo_path is None:
+        repo_path = ".."
+
+    if switcher_location is None:
+        switcher_location = "_static/switcher.json"
+
+    repo = git.Repo(repo_path)
+    tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
+    versions = [t.name for t in tags]
+
+    switcher_text = create_switcher_text(versions)
+    with open(switcher_location, "w") as f:
+        for item in switcher_text:
+            f.write(item)
+
+
+def create_switcher_text(versions, docs_link=None):
+    """This function generates the content for the switcher json file.
+
+    Parameters
+    ----------
+    versions : list of str
+        A list of versions for which documentations are saved.
+    docs_link : _type_, optional
+        The address to the documentation. If None, the address for the official
+        documentation is used instead.
+
+    Returns
+    -------
+    list of str
+        The content of the switcher json file separated by line
+    """
+    versions_short = [".".join(version.split(".")[:2]) for version in versions]
+    unique_versions, unique_index, unique_counts = np.unique(
+        versions_short, return_index=True, return_counts=True
+    )
+    versions_highest = np.array(versions)[unique_index + unique_counts - 1]
+    if docs_link is None:
+        docs_link = "https://scikit-activeml.github.io/scikit-activeml-docs"
+    # Create an entry for every version
+    content_list = []
+    content_list.append("[\n")
+    content_list.append("  {\n")
+    content_list.append('    "name": "latest",\n')
+    content_list.append('    "version": "latest",\n')
+    content_list.append(f'    "url": "{docs_link}/latest/"\n')
+    content_list.append("  },\n")
+    for ver, ver_s in zip(versions_highest[::-1], unique_versions[::-1]):
+        content_list.append("  {\n")
+        content_list.append(f'    "name": "{ver_s}",\n')
+        content_list.append(f'    "version": "{ver}",\n')
+        content_list.append(f'    "url": "{docs_link}/{ver_s}/"\n')
+        content_list.append("  },\n")
+    content_list[-1] = "  }\n"
+    content_list.append("]")
+    return content_list

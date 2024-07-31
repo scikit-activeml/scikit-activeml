@@ -23,6 +23,7 @@ from docs.generate import (
     generate_api_reference_rst,
     generate_examples,
     generate_tutorials,
+    generate_switcher
 )
 
 # -- Project information -----------------------------------------------------
@@ -97,7 +98,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -106,11 +107,14 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
- 
+
 # Set the paths for the sphinx_gallery extension:
+num_cpus = -1
+if "num_cpus" in os.environ:
+    num_cpus = int(os.environ["num_cpus"])
 sphinx_gallery_conf = {
     "run_stale_examples": False,
-    "line_numbers": True,
+    "line_numbers": False,
     # path to your example scripts
     "examples_dirs": os.path.normpath("generated/examples"),
     # the path where to save gallery generated output
@@ -126,6 +130,7 @@ sphinx_gallery_conf = {
         # The module you locally document uses None
         "skactiveml": None
     },
+    'parallel': num_cpus
 }
 os.makedirs(
     os.path.abspath(sphinx_gallery_conf["gallery_dirs"]), exist_ok=True
@@ -144,6 +149,9 @@ html_logo = "logos/scikit-activeml-logo.png"
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
+docs_address = "https://scikit-activeml.github.io/scikit-activeml-docs/latest"
+switcher_json_path = "{docs_address}/_static/switcher.json"
+
 html_theme_options = {
     "github_url": "https://github.com/scikit-activeml/scikit-activeml",
     "icon_links": [
@@ -155,13 +163,11 @@ html_theme_options = {
     ],
     "icon_links_label": "Quick Links",
     "switcher": {
-        "json_url": "https://alexanderbenz.github.io/scikit-activeml-project-docs/latest/_static/switcher.json",
+        # "json_url": switcher_json_path,
         "version_match": version,
     },
     "navbar_start": ["navbar-logo", "version-switcher"]
 }
-# TODO: automaticly generate switcher and generate new docs on release.
-# use tags to get the release version "git tag -l --sort=-creatordate | head -n 1"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -257,4 +263,9 @@ generate_strategy_overview_rst(
 generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
     dst_path=os.path.abspath("generated/tutorials/"),
+)
+
+generate_switcher(
+    repo_path="..",
+    switcher_location="_static/switcher.json"
 )
