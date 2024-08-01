@@ -1,5 +1,5 @@
 """
-Module implementing `Cal`, which is a deep active learning strategy selecting
+Module implementing `ContrastiveAL`, which is a deep active learning strategy selecting
 contrastive samples.
 """
 
@@ -19,12 +19,12 @@ from ..utils import (
 )
 
 
-class Cal(SingleAnnotatorPoolQueryStrategy):
-    """Contrastive Active Learning (Cal)
+class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
+    """Contrastive Active Learning (ContrastiveAL)
 
-    This class implements the Contrastive Active Learning (Cal) query strategy
+    This class implements the Contrastive Active Learning (ContrastiveAL) query strategy
     [1], which  selects samples similar in the (classifier's learned) feature
-    space, while the classifier outputs maximally different class-membership
+    space, while the classifier predicts maximally different class-membership
     probabilities.
 
     Parameters
@@ -35,8 +35,11 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations. If
-        `clf_embedding_flag_name=None`, the input samples `X` are used.
-    eps : float  > 0, optional (default=1e-7)
+        `clf_embedding_flag_name=None` and `predict_proba` returns only one
+        output, the input samples `X` are used. If `predict_proba` returns
+        two outputs or `clf_embedding_name` is not `None`,
+        `(proba, embeddings)` are expected as outputs.
+    eps : float  > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -119,11 +122,10 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
             indexing refers to samples in X.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples for selecting each sample of the batch.
-            Here, utilities refers to the Kullback-Leibler divergence to
-            between the sample's own and its nearest labeled sampled predicted
-            class-membership probabilities.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to the samples in `X`.
+            Here, utilities refers to the Kullback-Leibler divergence between
+            the sample's own and its labeled nearest neighbors' predicted
+            class-membership probabilities. If `candidates` is `None` or of
+            shape `(n_candidates,)`, the indexing refers to the samples in `X`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -166,20 +168,15 @@ class Cal(SingleAnnotatorPoolQueryStrategy):
         if len(X_labeled) > 0:
             # Obtain classifier predictions and optionally learned feature
             # embeddings (cf. line 3 and 4 in [1]).
+            predict_proba_kwargs = {}
             if self.clf_embedding_flag_name is not None:
-                P_labeled, X_labeled = clf.predict_proba(
-                    X_labeled, **{self.clf_embedding_flag_name: True}
-                )
-                P_cand, X_cand = clf.predict_proba(
-                    X_cand, **{self.clf_embedding_flag_name: True}
-                )
-            else:
-                P_labeled = clf.predict_proba(X_labeled)
-                P_cand = clf.predict_proba(X_cand)
-                if isinstance(P_labeled, tuple):
-                    P_labeled, X_labeled = P_labeled
-                if isinstance(P_cand, tuple):
-                    P_cand, X_cand = P_cand
+                predict_proba_kwargs = {self.clf_embedding_flag_name: True}
+            P_labeled = clf.predict_proba(X_labeled, **predict_proba_kwargs)
+            P_cand = clf.predict_proba(X_cand, **predict_proba_kwargs)
+            if isinstance(P_labeled, tuple):
+                P_labeled, X_labeled = P_labeled
+            if isinstance(P_cand, tuple):
+                P_cand, X_cand = P_cand
 
             # Clip probabilities to avoid zeros.
             np.clip(P_labeled, a_min=self.eps, a_max=1, out=P_labeled)

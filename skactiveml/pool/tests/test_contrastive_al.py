@@ -4,19 +4,21 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
-from skactiveml.pool import Cal
+from skactiveml.pool import ContrastiveAL
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.pool.tests.test_badge import (
+from skactiveml.tests.utils import (
     ParzenWindowClassifierEmbedding,
     ParzenWindowClassifierTuple,
 )
 
 
-class TestCal(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestContrastiveAL(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         X = np.linspace(0, 1, 20).reshape(10, 2)
         y = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
@@ -36,7 +38,7 @@ class TestCal(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ),
         }
         super().setUp(
-            qs_class=Cal,
+            qs_class=ContrastiveAL,
             init_default_params={"nearest_neighbors_dict": {"n_neighbors": 2}},
             query_default_params_clf=self.query_default_params_clf,
         )
@@ -100,11 +102,11 @@ class TestCal(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         for candidates in [None, np.arange(10, 30), X[10:30]]:
             prev_clf_utilities = None
             for clf in [clf_orig, clf_emb, clf_tuple]:
-                qs_1 = Cal(
+                qs_1 = ContrastiveAL(
                     nearest_neighbors_dict={"n_neighbors": 1},
                     random_state=42,
                 )
-                qs_5 = Cal(
+                qs_5 = ContrastiveAL(
                     nearest_neighbors_dict={"n_neighbors": 5},
                     random_state=42,
                 )
@@ -151,7 +153,7 @@ class TestCal(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                         # Check that different numbers of nearest neighbors
                         # lead to different utilities.
                         self.assertTrue(
-                            np.nansum(utilities), np.nansum(prev_utilities)
+                            np.nansum(utilities) != np.nansum(prev_utilities)
                         )
                     else:
                         # Check that the utilties are consistent across

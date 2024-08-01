@@ -4,11 +4,16 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 
-from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
+from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import Badge
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
+)
+
+from skactiveml.tests.utils import (
+    ParzenWindowClassifierEmbedding,
+    ParzenWindowClassifierTuple,
 )
 
 
@@ -166,17 +171,3 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             badge_1.query(X_1, y_1, clf_8),
             badge_1.query(X_1, y_1, clf_8),
         )
-
-
-class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
-    def predict_proba(self, X, return_embeddings=False):
-        probas = super().predict_proba(X)
-        if not return_embeddings:
-            return probas
-        return probas, X
-
-
-class ParzenWindowClassifierTuple(ParzenWindowClassifier):
-    def predict_proba(self, X, return_embeddings=False):
-        probas = super().predict_proba(X)
-        return probas, X
