@@ -1319,8 +1319,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
     def sample_proba(self, X, n_samples=10, random_state=None):
         """Samples probability vectors from Dirichlet distributions whose
-        parameters `alphas` are defined as the sum of the frequency outputted
-        by `predict_freq` and `class_prior` estimates.
+        parameters `alphas` are defined as the sum of the frequency estimates
+        returned by `predict_freq` and the `class_prior`.
 
         Parameters
         ----------
@@ -1335,7 +1335,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Returns
         -------
-        P : array-like of shape (n_samples, n_test_samples, classes)
+        P : array-like of shape (n_samples, n_test_samples, n_classes)
             There are `n_samples` class probability vectors for each test
             sample in `X`. Classes are ordered according to classes_.
         """
@@ -1356,7 +1356,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         R[is_zero, sampled_class_indices] = 1.0
         P = R / R.sum(axis=-1, keepdims=True)
         P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
-        return P.astype(np.float64)
+        return P
 
     def _validate_data(
         self,

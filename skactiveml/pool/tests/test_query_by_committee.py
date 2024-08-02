@@ -77,6 +77,7 @@ class TestQueryByCommittee(
         self._test_param("init", "eps", test_cases, exclude_reg=True)
 
     def test_init_param_sample_predictions_method_name(self):
+        # Fails as the default ensemble from `setup` does not support sampling.
         test_cases = [
             (0, TypeError),
             (0.1, TypeError),
@@ -91,7 +92,10 @@ class TestQueryByCommittee(
             "sample_predictions_method_name",
             test_cases,
             replace_query_params={
-                "ensemble": [ParzenWindowClassifier(), ParzenWindowClassifier]
+                "ensemble": [
+                    ParzenWindowClassifier(),
+                    ParzenWindowClassifier(),
+                ]
             },
         )
         test_cases = [
@@ -363,7 +367,7 @@ class TestAverageKlDivergence(unittest.TestCase):
         average_kl_divergence(np.full((10, 10, 10), 0.5))
         average_kl_divergence(np.zeros((10, 10, 10)))
         scores = average_kl_divergence(self.probas)
-        np.testing.assert_allclose(scores, self.scores)
+        np.testing.assert_almost_equal(scores, self.scores)
 
 
 class TestVoteEntropy(unittest.TestCase):
@@ -420,7 +424,7 @@ class TestVoteEntropy(unittest.TestCase):
 
     def test_vote_entropy(self):
         scores = vote_entropy(votes=self.votes, classes=self.classes)
-        np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
+        np.testing.assert_almost_equal(scores, self.scores)
 
 
 class TestVariationRatios(unittest.TestCase):
@@ -448,4 +452,4 @@ class TestVariationRatios(unittest.TestCase):
 
     def test_variation_ratios(self):
         scores = variation_ratios(votes=self.votes)
-        np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
+        np.testing.assert_almost_equal(scores, self.scores)

@@ -1,6 +1,10 @@
 """
 Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
-the Apache-2.0 license.
+the Apache-2.0 license and the associated query strategy is presented in [1].
+
+[1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
+Efficient and Diverse Batch Acquisition for Deep Bayesian Active
+Learning." Advances in Neural Information Processing Systems 32 (2019).
 """
 
 import numpy as np
@@ -49,21 +53,14 @@ class _GeneralBALD(QueryByCommittee):
               the shape `(n_samples, *)` as input and to output probabilities
               of the shape `(n_members, n_samples, n_classes)`, e.g.,
               `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of regression, the method is expected to take samples of the
-              shape `(n_samples, *)` as input and to output probabilities of
-              the shape `(n_members, n_samples)`, e.g., `sample_y` in
-              `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-        - This parameter must be `None`, if
-          `sample_predictions_method_name` is `None`.
-        - Otherwise, it may be used to define the number of sampled members,
-          e.g., by defining `n_samples` as parameter to the method
-          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
-          `sample_y` of
-          `sklearn.gaussian_process.GaussianProcessRegressor`.
+            - This parameter must be `None`, if
+              `sample_predictions_method_name` is `None`.
+            - Otherwise, it may be used to define the number of sampled
+              members, e.g., by defining `n_samples` as parameter to the method
+              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
@@ -266,21 +263,14 @@ class BatchBALD(_GeneralBALD):
               the shape `(n_samples, *)` as input and to output probabilities
               of the shape `(n_members, n_samples, n_classes)`, e.g.,
               `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of regression, the method is expected to take samples of the
-              shape `(n_samples, *)` as input and to output probabilities of
-              the shape `(n_members, n_samples)`, e.g., `sample_y` in
-              `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-        - This parameter must be `None`, if
-          `sample_predictions_method_name` is `None`.
-        - Otherwise, it may be used to define the number of sampled members,
-          e.g., by defining `n_samples` as parameter to the method
-          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
-          `sample_y` of
-          `sklearn.gaussian_process.GaussianProcessRegressor`.
+            - This parameter must be `None`, if
+              `sample_predictions_method_name` is `None`.
+            - Otherwise, it may be used to define the number of sampled
+              members, e.g., by defining `n_samples` as parameter to the method
+              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
@@ -339,21 +329,14 @@ class GreedyBALD(_GeneralBALD):
               the shape `(n_samples, *)` as input and to output probabilities
               of the shape `(n_members, n_samples, n_classes)`, e.g.,
               `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of regression, the method is expected to take samples of the
-              shape `(n_samples, *)` as input and to output probabilities of
-              the shape `(n_members, n_samples)`, e.g., `sample_y` in
-              `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-        - This parameter must be `None`, if
-          `sample_predictions_method_name` is `None`.
-        - Otherwise, it may be used to define the number of sampled members,
-          e.g., by defining `n_samples` as parameter to the method
-          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
-          `sample_y` of
-          `sklearn.gaussian_process.GaussianProcessRegressor`.
+            - This parameter must be `None`, if
+              `sample_predictions_method_name` is `None`.
+            - Otherwise, it may be used to define the number of sampled
+              members, e.g., by defining `n_samples` as parameter to the method
+              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None

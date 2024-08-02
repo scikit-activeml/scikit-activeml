@@ -62,13 +62,13 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-        - This parameter must be `None`, if
-          `sample_predictions_method_name` is `None`.
-        - Otherwise, it may be used to define the number of sampled members,
-          e.g., by defining `n_samples` as parameter to the method
-          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
-          `sample_y` of
-          `sklearn.gaussian_process.GaussianProcessRegressor`.
+            - This parameter must be `None`, if
+              `sample_predictions_method_name` is `None`.
+            - Otherwise, it may be used to define the number of sampled
+              members, e.g., by defining `n_samples` as parameter to the method
+              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
+              `sample_y` of
+              `sklearn.gaussian_process.GaussianProcessRegressor`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
@@ -218,7 +218,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         if classes is not None:
             # Compute utilities.
             if self.method == "KL_divergence":
-                if est_arr is not None:
+                if sample_func is None:
                     probas = self._aggregate_predict_probas(
                         X_cand, ensemble, est_arr
                     )
@@ -487,33 +487,19 @@ def _check_ensemble(
                         "`sample_predictions_method_name` is `None`."
                     )
 
-            if hasattr(ensemble, "estimators_"):
+            if sample_func is not None:
+                est_arr = None
+            elif hasattr(ensemble, "estimators_"):
                 est_arr = ensemble.estimators_
             elif hasattr(ensemble, "estimators"):
                 est_arr = [ensemble] * len(ensemble.estimators)
             elif hasattr(ensemble, "n_estimators"):
                 est_arr = [ensemble] * ensemble.n_estimators
-            elif sample_func is not None:
-                est_arr = None
             else:
                 raise TypeError(error_msg)
 
-            if estimator_type == SkactivemlClassifier:
-                return (
-                    ensemble,
-                    est_arr,
-                    ensemble.classes_,
-                    sample_func,
-                    sample_predictions_dict,
-                )
-            else:
-                return (
-                    ensemble,
-                    est_arr,
-                    None,
-                    sample_func,
-                    sample_predictions_dict,
-                )
+            cls = getattr(ensemble, "classes_", None)
+            return ensemble, est_arr, cls, sample_func, sample_predictions_dict
 
         elif isinstance(ensemble, (list, tuple)) and isinstance(
             ensemble[0], estimator_type
@@ -553,20 +539,7 @@ def _check_ensemble(
                         f"parameter of each ensemble member to avoid "
                         f"this error.",
                     )
-            if estimator_type == SkactivemlClassifier:
-                return (
-                    ensemble,
-                    est_arr,
-                    est_arr[0].classes_,
-                    None,
-                    None,
-                )
-            else:
-                return (
-                    ensemble,
-                    est_arr,
-                    None,
-                    None,
-                    None,
-                )
+            cls = getattr(est_arr[0], "classes_", None)
+            return ensemble, est_arr, cls, None, None
+
     raise TypeError(error_msg)

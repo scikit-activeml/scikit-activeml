@@ -88,6 +88,7 @@ class TestGeneralBALD(
         )
 
     def test_init_param_sample_predictions_method_name(self):
+        # Fails as the default ensemble from `setup` does not support sampling.
         test_cases = [
             (0, TypeError),
             (0.1, TypeError),
@@ -102,7 +103,10 @@ class TestGeneralBALD(
             "sample_predictions_method_name",
             test_cases,
             replace_query_params={
-                "ensemble": [ParzenWindowClassifier(), ParzenWindowClassifier]
+                "ensemble": [
+                    ParzenWindowClassifier(),
+                    ParzenWindowClassifier(),
+                ]
             },
         )
         test_cases = [
