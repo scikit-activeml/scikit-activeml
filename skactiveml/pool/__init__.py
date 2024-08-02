@@ -23,6 +23,7 @@ from ._query_by_committee import (
     QueryByCommittee,
     average_kl_divergence,
     vote_entropy,
+    variation_ratios,
 )
 from ._quire import Quire
 from ._random_sampling import RandomSampling
@@ -55,6 +56,7 @@ __all__ = [
     "Quire",
     "average_kl_divergence",
     "vote_entropy",
+    "variation_ratios",
     "FourDs",
     "CostEmbeddingAL",
     "ExpectedModelChangeMaximization",

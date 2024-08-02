@@ -51,7 +51,7 @@ y_true = true_function(X) + noise(X).flatten()
 y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 X_test = np.linspace(0, 2, num="$res|100").reshape(-1, 1)
 
-# Initialise the classifier.
+# Initialise the regressor.
 reg = "$init_reg|NICKernelRegressor(random_state=random_state, metric_dict={'gamma': 15.0})"
 # Initialise the query strategy.
 qs = "$init_qs"

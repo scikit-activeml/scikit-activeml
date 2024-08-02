@@ -8,7 +8,10 @@ import numpy as np
 import warnings
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted, check_scalar
+from sklearn.utils.validation import (
+    check_is_fitted,
+    check_scalar,
+)
 
 from ..base import ClassFrequencyEstimator
 from ..utils import MISSING_LABEL, compute_vote_vectors, is_labeled
@@ -28,7 +31,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         during the fit.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    cost_matrix : array-like of shape (n_classes, n_classes)
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
         `classes` is not none.
@@ -39,16 +42,19 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
     metric : str or callable, default='rbf'
-        The metric must a be a valid kernel defined by the function
+        The metric must be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int or None, default=None
         Number of nearest neighbours. Default is None, which means all
         available samples are considered.
-    metric_dict : dict,
+    metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-        For the the kernel 'rbf' we allow the use of mean kernel [2] and use
+        For the kernel 'rbf' we allow the use of mean kernel [2] and use
         it when gamma is set to 'mean' (i.e., {'gamma': 'mean'}). While N is
         defined as the labeled data the variance is calculated over all X.
+    random_state : int or RandomState instance or None, default=None
+        Determines random number for 'predict' method. Pass an int for
+        reproducible results across multiple method calls.
 
     Attributes
     ----------
@@ -73,7 +79,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
     .. [1] O. Chapelle, "Active Learning for Parzen Window Classifier",
        Proceedings of the Tenth International Workshop Artificial Intelligence
        and Statistics, 2005.
-       [2] Chaudhuri, A., Kakde, D., Sadek, C., Gonzalez, L., & Kong, S.,
+    .. [2] Chaudhuri, A., Kakde, D., Sadek, C., Gonzalez, L., & Kong, S.,
        "The Mean and Median Criteria for Kernel Bandwidth Selection for Support
        Vector Data Description" IEEE International Conference on Data
        Mining Workshops (ICDMW), 2017.
@@ -113,9 +119,9 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             samples.
         y : array-like of shape (n_samples)
             It contains the class labels of the training samples.
-        sample_weight : array-like of shape (n_samples)
+        sample_weight : array-like of shape (n_samples), default=None
             It contains the weights of the training samples' class labels.
-            It must have the same shape as y.
+            It must have the same shape as `y`.
 
         Returns
         -------
@@ -186,8 +192,8 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         Parameters
         ----------
-        X: array-like or shape (n_samples, n_features) or shape
-        (n_samples, m_samples) if metric == 'precomputed'
+        X: array-like or shape (n_samples, n_features) or shape \
+                (n_samples, m_samples) if metric == 'precomputed'
             Input samples.
 
         Returns
@@ -230,6 +236,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
                 F[i, :] = K[i, indices[i]] @ self.V_[indices[i], :]
         return F
 
+    @staticmethod
     def _calculate_mean_gamma(
         N, variance, n_features, delta=(np.sqrt(2) * 1e-6)
     ):

@@ -1,6 +1,6 @@
 """
-Module implementing `ContrastiveAL`, which is a deep active learning strategy selecting
-contrastive samples.
+Module implementing `ContrastiveAL`, which is a deep active learning strategy
+selecting contrastive samples.
 """
 
 import numpy as np
@@ -22,10 +22,10 @@ from ..utils import (
 class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
     """Contrastive Active Learning (ContrastiveAL)
 
-    This class implements the Contrastive Active Learning (ContrastiveAL) query strategy
-    [1], which  selects samples similar in the (classifier's learned) feature
-    space, while the classifier predicts maximally different class-membership
-    probabilities.
+    This class implements the Contrastive Active Learning (ContrastiveAL) query
+    strategy [1], which  selects samples similar in the (classifier's learned)
+    feature space, while the classifier predicts maximally different
+    class-membership probabilities.
 
     Parameters
     ----------

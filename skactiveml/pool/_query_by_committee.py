@@ -27,43 +27,79 @@ from ..utils import (
 
 
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
-    """Query-by-Committee.
+    """Query-by-Committee (QBC)
 
-    The Query-by-Committee (QueryByCommittee) strategy uses an ensemble of
-    estimators to identify on which instances many estimators disagree.
+    The Query-by-Committee (QBC) strategy uses an ensemble of estimators to
+    identify on which samples many estimators disagree.
 
     Parameters
     ----------
-    method : string, default='KL_divergence'
+    method : "KL_divergence" or "vote_entropy" or "variation_ratios, \
+            default='KL_divergence'
         The method to calculate the disagreement in the case of classification.
-        KL_divergence or vote_entropy are possible. In the case of regression
-        the empirical variance is used.
-    eps : float  > 0, optional (default=1e-7)
+        'KL_divergence', 'vote_entropy', and 'variation_ratios' are possible.
+        In the case of regression, this parameter is ignored and the empirical
+        variance is used.
+    eps : float > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities (only
         relevant for `method='KL_divergence'`).
+    sample_predictions_method_name : str, default=None
+        Certain estimators may offer methods enabling to construct a committee
+        by sampling predictions of committee members. This parameter is to
+        indicate the name of such a method.
+            - If `sample_predictions_method_name=None` no sampling is
+              performed.
+            - If `sample_predictions_method_name` is not `None` and in the
+              case of classification, the method is expected to take samples of
+              the shape `(n_samples, *)` as input and to output probabilities
+              of the shape `(n_members, n_samples, n_classes)`, e.g.,
+              `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
+            - If `sample_predictions_method_name` is not `None` and in the
+              case of regression, the method is expected to take samples of the
+              shape `(n_samples, *)` as input and to output numerical values of
+              the shape `(n_members, n_samples)`, e.g., `sample_y` in
+              `sklearn.gaussian_process.GaussianProcessRegressor`.
+    sample_predictions_dict : dict, default=None
+        Parameters (excluding the samples) that are passed to the method with
+        the name `sample_predictions_method_name`.
+            - This parameter must be `None`, if
+              `sample_predictions_method_name` is `None`.
+            - Otherwise, it may be used to define the number of sampled
+              members, e.g., by defining `n_samples` as parameter to the method
+              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
+              `sample_y` of
+              `sklearn.gaussian_process.GaussianProcessRegressor`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or np.random.RandomState, default=None
+    random_state : int or np.random.RandomState or None, default=None
         The random state to use.
 
     References
     ----------
-    [1] H.S. Seung, M. Opper, and H. Sompolinsky. Query by committee.
-        In Proceedings of the ACM Workshop on Computational Learning Theory,
-        pages 287-294, 1992.
-    [2] N. Abe and H. Mamitsuka. Query learning strategies using boosting and
-        bagging. In Proceedings of the International Conference on Machine
-        Learning (ICML), pages 1-9. Morgan Kaufmann, 1998.
-    [3] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active learning
-        for regression based on query by committee. International conference on
-        intelligent data engineering and automated learning, pages 209--218,
-        2007.
+    .. [1] H.S. Seung, M. Opper, and H. Sompolinsky. Query by committee.
+       In ACM Workshop on Computational Learning Theory, pages 287-294, 1992.
+
+    .. [2] N. Abe and H. Mamitsuka. Query Learning Strategies Using Boosting
+       and Bagging. In International Conference on Machine Learning, pages 1-9,
+       1998.
+
+    .. [3] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active
+       Learning for Regression Based on Query by Committee. In International
+       Conference on Intelligent Data Engineering and Automated Learning,
+       pages 209-218, 2007.
+
+    .. [4] Beluch, W. H., Genewein, T., Nürnberger, A., and Köhler, J. M.
+       The Power of Ensembles for Active Learning in Image Classification. In
+       Conference on Computer Vision and Pattern Recognition, pages 9368-9377,
+       2018
     """
 
     def __init__(
         self,
         method="KL_divergence",
         eps=1e-7,
+        sample_predictions_method_name=None,
+        sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -72,6 +108,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         )
         self.method = method
         self.eps = eps
+        self.sample_predictions_method_name = sample_predictions_method_name
+        self.sample_predictions_dict = sample_predictions_dict
 
     def query(
         self,
@@ -91,31 +129,39 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.)
-        ensemble : list or tuple of SkactivemlClassifier or list or tuple of
-        SkactivemlRegressor, SkactivemlClassifier or SkactivemlRegressor
-            If `ensemble` is a `SkactivemlClassifier` or a
-            `SkactivemlRegressor`, it must have `n_estimators` and
-            `estimators_` after fitting as attribute. Then, its estimators will
-            be used as committee. If `ensemble` is array-like, each element of
-            this list must be `SkactivemlClassifier` or a `SkactivemlRegressor`
-            and will be used as committee member.
+            indicated by `self.missing_label`.)
+        ensemble : array-like of SkactivemlClassifier or array-like of \
+                SkactivemlRegressor or SkactivemlClassifier or \
+                SkactivemlRegressor
+            - If `ensemble` is a `SkactivemlClassifier` or a
+              `SkactivemlRegressor` and has `n_estimators` plus
+              `estimators_` after fitting as attributes, its estimators will
+              be used as committee.
+            - If `ensemble` is array-like, each element of this list must be
+              `SkactivemlClassifier` or a `SkactivemlRegressor` and will be
+              used as committee member.
+            - If `ensemble` is a `SkactivemlClassifier` or a
+              `SkactivemlRegressor` and implements a method with the name
+              `sample_predictions_method_name`, this method is used to sample
+              predictions of committee members.
         fit_ensemble : bool, default=True
             Defines whether the ensemble should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), default=None
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -127,20 +173,22 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
+                - If `candidates` is `None` or of shape
+                  `(n_candidates,)`, the indexing refers to the samples in
+                  `X`.
+                - If `candidates` is of shape `(n_candidates, n_features)`,
+                  the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
                 numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+                - If `candidates` is `None` or of shape
+                  `(n_candidates,)`, the indexing refers to the samples in
+                  `X`.
+                - If `candidates` is of shape `(n_candidates, n_features)`,
+                  the indexing refers to the samples in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -148,11 +196,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         )
 
         X_cand, mapping = self._transform_candidates(candidates, X, y)
-
-        # Validate classifier type.
         check_type(fit_ensemble, "fit_ensemble", bool)
-
-        ensemble, est_arr, classes = _check_ensemble(
+        ensemble, est_arr, classes, sample_func, sample_dict = _check_ensemble(
             ensemble=ensemble,
             X=X,
             y=y,
@@ -160,34 +205,45 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             fit_ensemble=fit_ensemble,
             missing_label=self.missing_label_,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
+            sample_predictions_method_name=self.sample_predictions_method_name,
+            sample_predictions_dict=self.sample_predictions_dict,
         )
-
-        # Validate 'method'
         check_type(
             self.method,
             "method",
-            target_vals=["KL_divergence", "vote_entropy"],
+            target_vals=["KL_divergence", "vote_entropy", "variation_ratios"],
         )
 
-        # classes is None if the ensemble is a regressor
+        # `classes` is `None`, if `ensemble` is a regressor.
         if classes is not None:
             # Compute utilities.
             if self.method == "KL_divergence":
-                # probas = np.array(
-                #     [est.predict_proba(X_cand) for est in est_arr]
-                # )
-                probas = self._aggregate_predict_probas(
-                    X_cand, ensemble, est_arr
-                )
+                if sample_func is None:
+                    probas = self._aggregate_predict_probas(
+                        X_cand, ensemble, est_arr
+                    )
+                else:
+                    probas = sample_func(X_cand, **sample_dict)
                 utilities_cand = average_kl_divergence(probas, self.eps)
-            else:  # self.method == "vote_entropy":
-                votes = np.array([est.predict(X_cand) for est in est_arr]).T
-                utilities_cand = vote_entropy(votes, classes)
-
+            else:
+                if sample_func is None:
+                    votes = np.array(
+                        [est.predict(X_cand) for est in est_arr]
+                    ).T
+                else:
+                    probas = sample_func(X_cand, **sample_dict)
+                    votes = probas.argmax(axis=-1).T
+                if self.method == "vote_entropy":
+                    utilities_cand = vote_entropy(votes, classes)
+                else:
+                    utilities_cand = variation_ratios(votes)
         else:
-            results = np.array(
-                [learner.predict(X_cand) for learner in est_arr]
-            )
+            if sample_func is None:
+                results = np.array(
+                    [learner.predict(X_cand) for learner in est_arr]
+                )
+            else:
+                results = sample_func(X_cand, **sample_dict).T
             utilities_cand = np.std(results, axis=0)
 
         if mapping is None:
@@ -211,19 +267,19 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         ----------
         X_cand : array-like of shape (n_samples, n_features)
             Samples whose probabilities are to be predicted.
-        ensemble : SkactivemlClassifier or list or tuple of
-        SkactivemlClassifier
-            If `ensemble` is a `SkactivemlClassifier`, it must have
-            `n_estimators` and `estimators_` after fitting as attribute. Then,
-            its estimators will be used as committee. If `ensemble` is
-            array-like, each element of this list must be
-            `SkactivemlClassifier` and will be used as committee member.
+        ensemble : SkactivemlClassifier or list or tuple of \
+                SkactivemlClassifier
+            - If `ensemble` is a `SkactivemlClassifier`, it must have
+              `n_estimators` and `estimators_` after fitting as attribute.
+              Then, its estimators will be used as committee.
+            - If `ensemble` is array-like, each element of this list must be
+              `SkactivemlClassifier` and will be used as committee member.
         est_arr : list or tuple of SkactivemlClassifier
             List of ensemble members contained in `ensemble`.
 
         Returns
         -------
-        probas: np.ndarray, shape (n_samples, n_classes)
+        probas : np.ndarray of shape (n_samples, n_classes)
             The mapped predicted probabilities.
         """
         if hasattr(ensemble, "classes_"):
@@ -256,21 +312,21 @@ def average_kl_divergence(probas, eps=1e-7):
 
     Parameters
     ----------
-    probas : array-like, shape (n_estimators, n_samples, n_classes)
+    probas : array-like of shape (n_estimators, n_samples, n_classes)
         The probability estimates of all estimators, samples, and classes.
     eps : float  > 0, optional (default=1e-7)
         Minimum probability threshold to compute log-probabilities.
 
     Returns
     -------
-    scores: np.ndarray, shape (n_samples)
+    scores : np.ndarray, shape (n_samples,)
         The Kullback-Leibler (KL) divergences.
 
     References
     ----------
-    [1] A. McCallum and K. Nigam. Employing EM in pool-based active learning
-        for text classification. In Proceedings of the International Conference
-        on Machine Learning (ICML), pages 359-367. Morgan Kaufmann, 1998.
+    .. [1] A. McCallum and K. Nigam. Employing EM in pool-based active learning
+       for text classification. In International Conference on Machine
+       Learning, pages 359-367, 1998.
     """
     # Check parameters.
     check_scalar(
@@ -315,14 +371,14 @@ def vote_entropy(votes, classes):
 
     Returns
     -------
-    vote_entropy : np.ndarray, shape (n_samples)
+    vote_entropy : np.ndarray of shape (n_samples,)
         The vote entropy of each row in `votes`.
 
     References
     ----------
-    [1] Engelson, Sean P., and Ido Dagan.
-        Minimizing manual annotation cost in supervised training from corpora.
-        arXiv preprint cmp-lg/9606030 (1996).
+    .. [1] Engelson, Sean P., and Ido Dagan. "Minimizing Manual Annotation Cost
+       in Supervised Training from Corpora." In Annual Meeting of the
+       Association for Computational Linguistics, pages 319-326, 1996.
     """
     # Check `votes` array.
     votes = check_array(votes)
@@ -341,6 +397,38 @@ def vote_entropy(votes, classes):
     return scores
 
 
+def variation_ratios(votes):
+    """Calculates the variation ratios for measuring the level of disagreement
+    in `QueryByCommittee`.
+
+    Parameters
+    ----------
+    votes : array-like of shape (n_samples, n_estimators)
+        The class predicted by the estimators for each sample.
+
+    Returns
+    -------
+    scores : np.ndarray of shape (n_samples,)
+        The variation ratios of each row in `votes`.
+
+    References
+    ----------
+    .. [1] Beluch, W. H., Genewein, T., Nürnberger, A., and Köhler, J. M.
+       The Power of Ensembles for Active Learning in Image Classification. In
+       Conference on Computer Vision and Pattern Recognition, pages 9368-9377,
+       2018.
+    """
+    # Check `votes` array.
+    votes = check_array(votes)
+    n_estimators = votes.shape[1]
+
+    # Count the votes.
+    vote_count = compute_vote_vectors(y=votes, missing_label=None)
+    scores = 1 - (vote_count.max(axis=-1) / n_estimators)
+
+    return scores
+
+
 def _check_ensemble(
     ensemble,
     estimator_types,
@@ -349,13 +437,19 @@ def _check_ensemble(
     sample_weight,
     fit_ensemble=True,
     missing_label=MISSING_LABEL,
+    sample_predictions_method_name=None,
+    sample_predictions_dict=None,
 ):
+    error_msg = (
+        f"`ensemble` must either be a `{estimator_types} "
+        f"with the attribute `n_ensembles` or `estimators_` or an array-like "
+        f"of {estimator_types} objects or implement a method with the name "
+        f"`{sample_predictions_method_name}`."
+    )
+
     # Check if the parameter `ensemble` is valid.
     for estimator_type in estimator_types:
-        if isinstance(ensemble, estimator_type) and (
-            hasattr(ensemble, "n_estimators")
-            or hasattr(ensemble, "estimators")
-        ):
+        if isinstance(ensemble, estimator_type):
             check_equal_missing_label(ensemble.missing_label, missing_label)
             # Fit the ensemble.
             if fit_ensemble:
@@ -366,23 +460,59 @@ def _check_ensemble(
             else:
                 check_is_fitted(ensemble)
 
-            if hasattr(ensemble, "estimators_"):
-                est_arr = ensemble.estimators_
+            if sample_predictions_method_name is not None:
+                check_type(
+                    sample_predictions_method_name,
+                    "sample_predictions_method_name",
+                    str,
+                )
+                if not hasattr(ensemble, sample_predictions_method_name):
+                    raise ValueError(
+                        "If `sample_predictions_method_name` is not `None`, "
+                        "`ensemble` must implement a method with this name."
+                    )
+                sample_func = getattr(ensemble, sample_predictions_method_name)
+                if sample_predictions_dict is None:
+                    sample_predictions_dict = {}
+                if not isinstance(sample_predictions_dict, dict):
+                    raise ValueError(
+                        "`sample_predictions_dict` must be a `dict`, if "
+                        "`sample_predictions_method_name` is not `None`."
+                    )
             else:
-                if hasattr(ensemble, "estimators"):
-                    n_estimators = len(ensemble.estimators)
-                else:
-                    n_estimators = ensemble.n_estimators
-                est_arr = [ensemble] * n_estimators
+                sample_func = None
+                if sample_predictions_dict is not None:
+                    raise ValueError(
+                        "`sample_predictions_dict` must be `None`, if "
+                        "`sample_predictions_method_name` is `None`."
+                    )
 
-            if estimator_type == SkactivemlClassifier:
-                return ensemble, est_arr, ensemble.classes_
+            if sample_func is not None:
+                est_arr = None
+            elif hasattr(ensemble, "estimators_"):
+                est_arr = ensemble.estimators_
+            elif hasattr(ensemble, "estimators"):
+                est_arr = [ensemble] * len(ensemble.estimators)
+            elif hasattr(ensemble, "n_estimators"):
+                est_arr = [ensemble] * ensemble.n_estimators
             else:
-                return ensemble, est_arr, None
+                raise TypeError(error_msg)
+
+            cls = getattr(ensemble, "classes_", None)
+            return ensemble, est_arr, cls, sample_func, sample_predictions_dict
 
         elif isinstance(ensemble, (list, tuple)) and isinstance(
             ensemble[0], estimator_type
         ):
+            if (
+                sample_predictions_dict is not None
+                or sample_predictions_method_name is not None
+            ):
+                raise ValueError(
+                    "`sample_predictions_method_name` and "
+                    "`sample_predictions_dict` must be `None`, if `ensemble` "
+                    "is array-like."
+                )
             est_arr = copy.deepcopy(ensemble)
             for i in range(len(est_arr)):
                 check_type(
@@ -409,13 +539,7 @@ def _check_ensemble(
                         f"parameter of each ensemble member to avoid "
                         f"this error.",
                     )
-            if estimator_type == SkactivemlClassifier:
-                return ensemble, est_arr, est_arr[0].classes_
-            else:
-                return ensemble, est_arr, None
+            cls = getattr(est_arr[0], "classes_", None)
+            return ensemble, est_arr, cls, None, None
 
-    raise TypeError(
-        f"`ensemble` must either be a `{estimator_types} "
-        f"with the attribute `n_ensembles` and `estimators_` after "
-        f"fitting or a list of {estimator_types} objects."
-    )
+    raise TypeError(error_msg)
