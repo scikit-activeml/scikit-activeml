@@ -269,13 +269,13 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             Samples whose probabilities are to be predicted.
         ensemble : SkactivemlClassifier or list or tuple of \
                 SkactivemlClassifier
-            - If ``ensemble`` is a ``SkactivemlClassifier``, it must have
-              ``n_estimators`` and ``estimators_`` after fitting as attribute.
+            - If `ensemble` is a `SkactivemlClassifier`, it must have
+              `n_estimators` and `estimators_` after fitting as attribute.
               Then, its estimators will be used as committee.
-            - If ``ensemble`` is array-like, each element of this list must be
-              ``SkactivemlClassifier`` and will be used as committee member.
+            - If `ensemble` is array-like, each element of this list must be
+              `SkactivemlClassifier` and will be used as committee member.
         est_arr : list or tuple of SkactivemlClassifier
-            List of ensemble members contained in ``ensemble``.
+            List of ensemble members contained in `ensemble`.
 
         Returns
         -------
@@ -372,7 +372,7 @@ def vote_entropy(votes, classes):
     Returns
     -------
     vote_entropy : np.ndarray of shape (n_samples,)
-        The vote entropy of each row in ``votes``.
+        The vote entropy of each row in `votes`.
 
     References
     ----------
@@ -399,7 +399,7 @@ def vote_entropy(votes, classes):
 
 def variation_ratios(votes):
     """Calculates the variation ratios for measuring the level of disagreement
-    in ``QueryByCommittee``.
+    in `QueryByCommittee`.
 
     Parameters
     ----------
@@ -409,7 +409,7 @@ def variation_ratios(votes):
     Returns
     -------
     scores : np.ndarray of shape (n_samples,)
-        The variation ratios of each row in ``votes``.
+        The variation ratios of each row in `votes`.
 
     References
     ----------
