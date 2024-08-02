@@ -56,7 +56,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
               `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
             - If `sample_predictions_method_name` is not `None` and in the
               case of regression, the method is expected to take samples of the
-              shape `(n_samples, *)` as input and to output probabilities of
+              shape `(n_samples, *)` as input and to output numerical values of
               the shape `(n_members, n_samples)`, e.g., `sample_y` in
               `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
