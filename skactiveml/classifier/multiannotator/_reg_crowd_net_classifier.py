@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 from skorch import NeuralNet
-from skorch.callbacks import regularization
 from skorch.dataset import unpack_data
 from torch import nn
 from torch.nn import functional as F
