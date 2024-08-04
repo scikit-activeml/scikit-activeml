@@ -93,7 +93,6 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         ]
         self._test_param("init", "method", test_cases)
 
-
     def test_init_param_clf_embedding_flag_name(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
