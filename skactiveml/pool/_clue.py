@@ -33,7 +33,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     cluster_algo : ClusterMixin.__class__, default=KMeans
-        The cluster algorithm to be used. It must allow
+        The cluster algorithm to be used. It must implement a `fit_transform`
+        method, which takes samples `X` and `sample_weight` as inputs, e.g.,
+        sklearn.clustering.KMeans and sklearn.clustering.MiniBatchKMeans.
     cluster_algo_dict : dict, default=None
         The parameters passed to the clustering algorithm `cluster_algo`,
         excluding the parameter for the number of clusters.
@@ -192,7 +194,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             utilities[b][mapping] = -dist[:, b]
             utilities[b][query_indices] = np.nan
             idx_b = rand_argmax(utilities[b], random_state=self.random_state_)
-            query_indices.append(idx_b)
+            query_indices.append(idx_b[0])
         query_indices = np.array(query_indices, dtype=int)
 
         if return_utilities:

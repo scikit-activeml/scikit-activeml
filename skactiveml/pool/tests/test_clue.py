@@ -131,32 +131,36 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         for candidates in [None, np.arange(10, 30)]:
             prev_clf_utilities = None
             for clf in [clf_orig, clf_emb, clf_tuple]:
-                qs_1 = Clue(
+                qs_plus = Clue(
                     cluster_algo_dict={"init": "k-means++", "random_state": 0},
                     random_state=42,
                 )
-                qs_5 = Clue(
+                qs_random = Clue(
                     cluster_algo_dict={"init": "random", "random_state": 0},
                     random_state=42,
                 )
 
                 # Without labeled samples, the initial selection is the same,
-                # even for different nearest neighbor numbers.
+                # even for different clustering initializations.
                 y = np.full(len(y_true), MISSING_LABEL)
-                query_indices_1, utilities_1 = qs_1.query(
+                query_indices_plus, utilities_plus = qs_plus.query(
                     X, y, clf=clf, candidates=candidates, return_utilities=True
                 )
-                query_indices_5, utilities_5 = qs_5.query(
+                query_indices_random, utilities_random = qs_random.query(
                     X, y, clf=clf, candidates=candidates, return_utilities=True
                 )
-                np.testing.assert_array_equal(query_indices_1, query_indices_5)
-                np.testing.assert_almost_equal(utilities_1, utilities_5)
+                np.testing.assert_array_equal(
+                    query_indices_plus, query_indices_random
+                )
+                np.testing.assert_almost_equal(
+                    utilities_plus, utilities_random
+                )
                 if candidates is not None:
-                    self.assertTrue(np.isnan(utilities_1[0, :10]).all())
-                    self.assertTrue(np.isnan(utilities_1[0, 30:]).all())
-                    self.assertTrue((utilities_1[30:50] <= 0).all())
+                    self.assertTrue(np.isnan(utilities_plus[0, :10]).all())
+                    self.assertTrue(np.isnan(utilities_plus[0, 30:]).all())
+                    self.assertTrue((utilities_plus[30:50] <= 0).all())
                 else:
-                    self.assertTrue((utilities_1 <= 0).all())
+                    self.assertTrue((utilities_plus <= 0).all())
 
                 # All utilities are non-positive values or np.nan.
                 is_unlabeled = np.random.RandomState(0).choice(
@@ -165,7 +169,7 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 y = y_true.copy()
                 y[is_unlabeled] = np.nan
                 prev_utilities = None
-                for qs in [qs_1, qs_5]:
+                for qs in [qs_plus, qs_random]:
                     query_indices, utilities = qs.query(
                         X,
                         y,
@@ -180,7 +184,7 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                     is_non_positive = utilities_copy <= 0
                     self.assertTrue(is_non_positive.all())
                     if prev_utilities is not None:
-                        # Check that different numbers of nearest neighbors
+                        # Check that different clustering initializations
                         # lead to different utilities.
                         self.assertTrue(
                             np.nansum(utilities) != np.nansum(prev_utilities)
