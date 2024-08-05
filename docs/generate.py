@@ -379,16 +379,19 @@ def generate_examples(
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
         num_cpus = -1
-        num_cpus = 1
         if "num_cpus" in os.environ:
             num_cpus = int(os.environ["num_cpus"])
         if num_cpus != 1:
             json_data_lists = Parallel(n_jobs=num_cpus, backend="loky")(
                 (
                     delayed(_generate_single_example)(
-                        f, root, dst
+                        filename=filename,
+                        root=root,
+                        local_dir_path=sub_dir_str,
+                        dst=dst,
+                        notebook_directory=example_notebook_directory
                     )
-                    for f in files
+                    for filename in files
                 )
             )
         else:
@@ -1088,7 +1091,7 @@ def create_switcher_text(versions, docs_link=None):
     ----------
     versions : list of str
         A list of versions for which documentations are saved.
-    docs_link : _type_, optional
+    docs_link : str, default=None
         The address to the documentation. If None, the address for the official
         documentation is used instead.
 
