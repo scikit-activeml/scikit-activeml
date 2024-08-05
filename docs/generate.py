@@ -521,11 +521,13 @@ def generate_example_script(
 
     google_colab_link = check_google_colab_link(google_colab_link)
 
+    notebook_filename = filename.replace('.py', '.ipynb')
+
     data["colab_link"] = "/".join([
         google_colab_link,
         notebook_directory,
         local_dir_path,
-        filename
+        notebook_filename
     ]
 
     )
