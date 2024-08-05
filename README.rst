@@ -3,6 +3,7 @@
 |
 
 .. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
+   :class: dark-light
    :align: center
    :width: 40%
 
