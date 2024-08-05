@@ -2,11 +2,10 @@
 
 |
 
-.. raw:: html
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
+   :align: center
+   :width: 40%
 
-   <p align="center">
-      <img src="https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png" width="300px"\>
-   </p>
 |
 
 =====================================================================
