@@ -1,6 +1,5 @@
 import os
 
-os.environ["OMP_NUM_THREADS"] = "1"
 import distutils.dir_util
 import importlib
 import inspect
@@ -32,7 +31,7 @@ def generate_api_reference_rst(gen_path):
 
     Parameters
     ----------
-    gen_path : string
+    gen_path : str
         The path of the main directory in which all generated files should be
         created.
     """
@@ -69,7 +68,7 @@ def automodule(module, level=0):
 
     Returns
     -------
-        String : The restructured text
+        str : The restructured text
     """
     rst_str = ""
     modules = []
@@ -147,7 +146,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
     Parameters
     ----------
-    gen_path : string
+    gen_path : str
         The path of the main directory in which all generated files should be
         created.
     json_data : dict
@@ -301,7 +300,7 @@ def table_data_to_rst_table(
         Contains the data for the table..
     caption : str, optional (default='')
         The caption of the table.
-    widths : string, optional (default=None)
+    widths : str, optional (default=None)
         A list of relative column widths separated with comma or space
         or 'auto'.
     header_lines : int, optional (default=0)
@@ -311,7 +310,7 @@ def table_data_to_rst_table(
 
     Returns
     -------
-    string : reStructuredText list-table as String.
+    str : reStructuredText list-table as String.
     """
     a = np.asarray(a)
     indents = "".ljust(indent, " ")
@@ -345,10 +344,10 @@ def generate_examples(
 
     Parameters
     ----------
-    gen_path : string
+    gen_path : str
         The path of the main directory in which all generated files should be
         created.
-    json_path : string
+    json_path : str
         The path of the directory where to find the json example files for the
         specified package.
     example_notebook_directory: str
@@ -437,7 +436,7 @@ def _generate_single_example(
         The path to the json file for which an example is generated.
     root : str
         The root directory where the json file is stored.
-    local_dir_path : string
+    local_dir_path : str
         The directory relative from the root directory.
     dst : str
         The root directory where the examples are saved.
@@ -494,11 +493,11 @@ def generate_example_script(
 
     Parameters
     ----------
-    filename : string
+    filename : str
         The name of the python example file
-    dir_path : string
+    dir_path : str
         The directory path in which to save the python example file.
-    local_dir_path : string
+    local_dir_path : str
         The directory relative from the root directory.
     data : dict
         The data from the json example file for the example.
@@ -566,14 +565,14 @@ def format_title(title, first_title):
 
     Parameters
     ----------
-    title : string
+    title : str
         The title string.
     first_title : boolean
         Indicates whether the title is the first title of the example script.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     if first_title:
         block_str = (
@@ -595,12 +594,12 @@ def format_subtitle(title):
 
     Parameters
     ----------
-    title : string
+    title : str
         The subtitle string.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     block_str = (
         "# %%\n" "# " + title + "\n" "# ".ljust(len(title) + 1, "-") + "\n\n"
@@ -615,12 +614,12 @@ def format_text(text):
 
     Parameters
     ----------
-    text : string
+    text : str
         The paragraph text.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     block_str = "# %%\n"
     for line in text.split("\n"):
@@ -635,12 +634,12 @@ def format_code(code):
 
     Parameters
     ----------
-    code : string
+    code : str
         The python source code to be formatted.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     block_str = ""
     for line in code:
@@ -661,7 +660,7 @@ def format_plot(data, template_path):
         The path to the template file.
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     pattern = (
         r'"""\$[^"""]*"""|"\$[^"&^\n]*"|' + r"'''\$[^''']*'''|'\$[^'&^\n]*'"
@@ -718,7 +717,7 @@ def format_refs(refs: list):
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     if not refs:
         return ""
@@ -755,12 +754,12 @@ def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
         specific key. If idx is not given, the first value in the list is
         always used. It is not necessary to specify all keys from d.
         shape: {key1:int1,...}
-    allocator: string, optional (Default='=')
+    allocator: str, optional (Default='=')
         The allocator is used to separate the key and the value.
 
     Returns
     -------
-    String : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or
+    str : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or
              'key1=value1, key2=value2...' or a combination of both.
     """
     dd_str = ""
@@ -788,12 +787,12 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
     contents from src_path to dst_path.
     Parameters
     ----------
-    src_path: string
+    src_path: str
         The path where the notebooks are found.
-    dst_path: string
+    dst_path: str
         The path where the notebooks are saved, such that tutorials.rst can
         find them.
-    dst_path_colab: string
+    dst_path_colab: str
         The path where the notebooks are saved, such that tutorials.rst can
         find them. This path is specially used to save the versions of the
         notebook that are linked to Google Colab.
@@ -826,9 +825,9 @@ def post_process_tutorials(
 
     Parameters
     ----------
-    tutorials_path: string
+    tutorials_path: str
         The folder where the files should be modified.
-    colab_notebook_path: string
+    colab_notebook_path: str
         The folder where the colab notebooks are saved.
     show_installation_code: boolean, default=False
         If True, the pip and jupypter installation lines are shown. If False,
@@ -880,18 +879,18 @@ def replace_colab_link(
 
     Parameters
     ----------
-    file_content: string
+    file_content: str
         The content of the jupyter notebook.
-    colab_path: string
+    colab_path: str
         The relative path to the colab notebook.
-    google_colab_link_prefix: string, default=None
+    google_colab_link_prefix: str, default=None
         The Google Colab address where you can specify the notebook to open in
         Google Colab. If None, it is assumed that the official scikit-activeml
         documentation is used.
 
     Returns
     -------
-    output : string
+    output : str
         The notebook that includes the Google Colab link if there was a
         placeholder.
     """
@@ -941,12 +940,12 @@ def uncomment_installation_code(file_content):
 
     Parameters
     ----------
-    file_content: string
+    file_content: str
         The content of the jupyter notebook.
 
     Returns
     -------
-    output : string
+    output : str
         The notebook that would install the needed packages.
     """
     pattern = r'\"# (!pip install .*?)\"'
@@ -1057,7 +1056,7 @@ def generate_regression_legend(path):
 
 
 def generate_switcher(repo_path=None, switcher_location=None):
-    """Creates the version switcher file used by the PyDate theme.
+    """Creates the version switcher file used by the PyData theme.
 
     Parameters
     ----------
