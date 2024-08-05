@@ -1,6 +1,7 @@
 flake8
 pytest
 pytest-cov
+pytest-xdist
 jupyter
 sphinx==5.3.0
 sphinxcontrib-bibtex~=2.3
