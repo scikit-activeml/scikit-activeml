@@ -111,9 +111,9 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 pygments_style = "sphinx"
 
 # Set the paths for the sphinx_gallery extension:
-# num_cpus = -1
-# if "num_cpus" in os.environ:
-#     num_cpus = int(os.environ["num_cpus"])
+num_cpus = -1
+if "num_cpus" in os.environ:
+    num_cpus = int(os.environ["num_cpus"])
 sphinx_gallery_conf = {
     "run_stale_examples": False,
     "line_numbers": False,
@@ -132,7 +132,7 @@ sphinx_gallery_conf = {
         # The module you locally document uses None
         "skactiveml": None
     },
-    # 'parallel': num_cpus
+    'parallel': num_cpus
 }
 os.makedirs(
     os.path.abspath(sphinx_gallery_conf["gallery_dirs"]), exist_ok=True
