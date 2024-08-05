@@ -351,7 +351,7 @@ def generate_examples(
     json_path : string
         The path of the directory where to find the json example files for the
         specified package.
-    notebook_directory: str
+    example_notebook_directory: str
         The path to the directory where the notebooks are saved.
     recursive : bool, default=True
         If True, examples for sub-packagers are also created.
@@ -399,7 +399,8 @@ def generate_examples(
                         filename=filename,
                         root=root,
                         local_dir_path=sub_dir_str,
-                        dst=dst
+                        dst=dst,
+                        notebook_directory=example_notebook_directory
                     )
                 )
         for json_data_list in json_data_lists:
@@ -418,7 +419,13 @@ def generate_examples(
     return json_data
 
 
-def _generate_single_example(filename, root, local_dir_path, dst):
+def _generate_single_example(
+        filename,
+        root,
+        local_dir_path,
+        dst,
+        notebook_directory
+        ):
     """_summary_
 
     Parameters
@@ -431,6 +438,8 @@ def _generate_single_example(filename, root, local_dir_path, dst):
         The directory relative from the root directory.
     dst : str
         The root directory where the examples are saved.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
     """
     data_list = []
     if filename.endswith(".json"):
@@ -452,6 +461,7 @@ def _generate_single_example(filename, root, local_dir_path, dst):
                     data=data,
                     package=getattr(skactiveml, data["package"]),
                     template_path=os.path.abspath(data["template"]),
+                    notebook_directory=notebook_directory
                 )
     elif not filename.startswith("template"):
         if filename.endswith(".py") or filename.endswith(".ipynb"):
