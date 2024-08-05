@@ -87,6 +87,77 @@ class TestGeneralBALD(
             test_cases,
         )
 
+    def test_init_param_sample_predictions_method_name(self):
+        # Fails as the default ensemble from `setup` does not support sampling.
+        test_cases = [
+            (0, TypeError),
+            (0.1, TypeError),
+            ("Test", ValueError),
+        ]
+        self._test_param("init", "sample_predictions_method_name", test_cases)
+        test_cases = [
+            ("predict_proba", ValueError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": [
+                    ParzenWindowClassifier(),
+                    ParzenWindowClassifier(),
+                ]
+            },
+        )
+        test_cases = [
+            ("sample_proba", None),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": ParzenWindowClassifier(),
+                "fit_ensemble": True,
+            },
+        )
+
+    def test_init_param_sample_predictions_dict(self):
+        test_cases = [
+            (None, None),
+            ({}, None),
+            ({"n_samples": 1000}, None),
+            ("Test", ValueError),
+            ({"Test": 2}, TypeError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": "sample_proba",
+            },
+            replace_query_params={
+                "ensemble": ParzenWindowClassifier(),
+                "fit_ensemble": True,
+            },
+        )
+        test_cases = [
+            (None, None),
+            ({}, ValueError),
+            ({"n_samples": 1000}, ValueError),
+            ("Test", ValueError),
+            ({"Test": 2}, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": None,
+            },
+        )
+
     def test_query_param_ensemble(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

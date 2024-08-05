@@ -368,7 +368,7 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
         )
 
 
-class ScaktivemlRegressorTest(unittest.TestCase):
+class SkactivemlRegressorTest(unittest.TestCase):
     @patch.multiple(SkactivemlRegressor, __abstractmethods__=set())
     def setUp(self):
         self.reg = SkactivemlRegressor(missing_label=-1)

@@ -14,7 +14,7 @@
 #
 import os
 import sys
-
+sys.path.append(os.path.abspath("./_ext"))
 sys.path.insert(0, os.path.abspath(".."))
 import skactiveml
 
@@ -70,9 +70,11 @@ extensions = [
     "sphinxcontrib.bibtex",
     "nbsphinx",
     "numpydoc",
+    "copy_sphinx_gallery_notebooks"
 ]
 
 # nbsphinx_execute = 'always'
+nbsphinx_execute = 'never'
 
 # Napoleon settings
 napoleon_numpy_docstring = True
@@ -250,20 +252,27 @@ autodoc_default_options = {
 autoclass_content = "class"
 # os.environ["FULLEXAMPLES"] = "True"
 
+
+# -- Options for copy_sphinx_gallery_notebooks extension ---------------------
+copy_gallery_notebooks_src_path = 'generated/sphinx_gallery_examples/'
+copy_gallery_notebooks_dst_path = 'generated/sphinx_gallery_notebooks/'
+
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
 json_data = generate_examples(
-    gen_path=os.path.abspath("generated/examples"),
-    json_path=os.path.abspath("examples"),
+    gen_path="generated/examples/",
+    json_path="examples/",
+    example_notebook_directory=copy_gallery_notebooks_dst_path
 )
 
 generate_strategy_overview_rst(
-    gen_path=os.path.abspath("generated"), json_data=json_data
+    gen_path=os.path.abspath("generated/"), json_data=json_data
 )
 
 generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
-    dst_path=os.path.abspath("generated/tutorials/"),
+    dst_path="generated/tutorials/",
+    dst_path_colab="generated/tutorials_colab/",
 )
 
 generate_switcher(

@@ -4,13 +4,17 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 
-from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
+from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import Badge
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from sklearn.exceptions import NotFittedError
+
+from skactiveml.tests.utils import (
+    ParzenWindowClassifierEmbedding,
+    ParzenWindowClassifierTuple,
+)
 
 
 class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
@@ -52,17 +56,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             ),
         ]
         super().test_query_param_clf(test_cases=add_test_cases)
-
-    def test_query_param_fit_clf(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [
-            (1, TypeError),
-            ("string", TypeError),
-            (None, TypeError),
-            (False, NotFittedError),
-            (True, None),
-        ]
-        self._test_param("query", "fit_clf", test_cases=test_cases)
 
     def test_init_param_clf_embedding_flag_name(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -178,17 +171,3 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             badge_1.query(X_1, y_1, clf_8),
             badge_1.query(X_1, y_1, clf_8),
         )
-
-
-class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
-    def predict_proba(self, X, return_embeddings=False):
-        probas = super().predict_proba(X)
-        if not return_embeddings:
-            return probas
-        return probas, X
-
-
-class ParzenWindowClassifierTuple(ParzenWindowClassifier):
-    def predict_proba(self, X, return_embeddings=False):
-        probas = super().predict_proba(X)
-        return (probas, X)

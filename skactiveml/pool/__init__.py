@@ -23,6 +23,7 @@ from ._query_by_committee import (
     QueryByCommittee,
     average_kl_divergence,
     vote_entropy,
+    variation_ratios,
 )
 from ._quire import Quire
 from ._random_sampling import RandomSampling
@@ -35,6 +36,8 @@ from ._uncertainty_sampling import (
 from ._core_set import CoreSet, k_greedy_center
 from ._typi_clust import TypiClust
 from ._badge import Badge
+from ._prob_cover import ProbCover
+from ._contrastive_al import ContrastiveAL
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 
 __all__ = [
@@ -53,6 +56,7 @@ __all__ = [
     "Quire",
     "average_kl_divergence",
     "vote_entropy",
+    "variation_ratios",
     "FourDs",
     "CostEmbeddingAL",
     "ExpectedModelChangeMaximization",
@@ -68,6 +72,8 @@ __all__ = [
     "k_greedy_center",
     "TypiClust",
     "Badge",
+    "ProbCover",
+    "ContrastiveAL",
     "GreedyBALD",
     "RegressionTreeBasedAL",
     "SubSamplingWrapper",

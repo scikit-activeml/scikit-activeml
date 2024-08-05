@@ -1,6 +1,6 @@
 .. intro_start
 
-|Doc| |Codecov| |PythonVersion| |PyPi| |Paper| |Black|
+|Doc| |Codecov| |PythonVersion| |PyPi| |Paper| |Black| |Downloads|
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
    :target: https://scikit-activeml.github.io/scikit-activeml-docs/
@@ -19,6 +19,9 @@
 
 .. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
    :target: https://github.com/psf/black
+
+.. |Downloads| image:: https://static.pepy.tech/badge/scikit-activeml
+   :target: https://www.pepy.tech/projects/scikit-activeml
 
 |
 
@@ -76,6 +79,7 @@ We provide a broad overview of different use-cases in our `tutorial section <htt
 - `Pool-based Active Learning for Regression - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/02_pool_regression_getting_started.html>`_,
 - `Pool-based Active Learning - Sample Annotating <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/03_pool_oracle_annotations.html>`_,
 - `Pool-based Active Learning - Simple Evaluation Study <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/04_pool_simple_evaluation_study.html>`_,
+- `Active Image Classification via Self-supervised Learning <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/05_pool_al_with_self_supervised_learning.html>`_,
 - `Multi-annotator Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/10_multiple_annotators_getting_started.html>`_,
 - `Stream-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/20_stream_getting_started.html>`_,
 - `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.html>`_,

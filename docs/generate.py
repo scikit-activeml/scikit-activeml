@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import warnings
+import copy
 
 import numpy as np
 from pybtex.database import parse_file
@@ -332,9 +333,15 @@ def table_data_to_rst_table(
     return table + "\n"
 
 
-def generate_examples(gen_path, json_path, recursive=True):
-    """Creates all example scripts for the specified package and returns the
-    data needed to create the strategy overview.
+def generate_examples(
+        gen_path,
+        json_path,
+        example_notebook_directory,
+        recursive=True
+):
+    """
+    Creates all example scripts for the specified package and returns the data
+    needed to create the strategy overview.
 
     Parameters
     ----------
@@ -344,6 +351,8 @@ def generate_examples(gen_path, json_path, recursive=True):
     json_path : string
         The path of the directory where to find the json example files for the
         specified package.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
     recursive : bool, default=True
         If True, examples for sub-packagers are also created.
 
@@ -386,7 +395,12 @@ def generate_examples(gen_path, json_path, recursive=True):
             json_data_lists = []
             for filename in files:
                 json_data_lists.append(
-                    _generate_single_example(filename, root, dst)
+                    _generate_single_example(
+                        filename=filename,
+                        root=root,
+                        local_dir_path=sub_dir_str,
+                        dst=dst
+                    )
                 )
         for json_data_list in json_data_lists:
             package_structure = sub_dir_str.split(os.sep)
@@ -404,7 +418,7 @@ def generate_examples(gen_path, json_path, recursive=True):
     return json_data
 
 
-def _generate_single_example(filename, root, dst):
+def _generate_single_example(filename, root, local_dir_path, dst):
     """_summary_
 
     Parameters
@@ -413,6 +427,8 @@ def _generate_single_example(filename, root, dst):
         The path to the json file for which an example is generated.
     root : str
         The root directory where the json file is stored.
+    local_dir_path : string
+        The directory relative from the root directory.
     dst : str
         The root directory where the examples are saved.
     """
@@ -432,6 +448,7 @@ def _generate_single_example(filename, root, dst):
                 generate_example_script(
                     filename=plot_filename + ".py",
                     dir_path=dst,
+                    local_dir_path=local_dir_path,
                     data=data,
                     package=getattr(skactiveml, data["package"]),
                     template_path=os.path.abspath(data["template"]),
@@ -449,7 +466,16 @@ def _generate_single_example(filename, root, dst):
     return data_list
 
 
-def generate_example_script(filename, dir_path, data, package, template_path):
+def generate_example_script(
+        filename,
+        dir_path,
+        local_dir_path,
+        data,
+        package,
+        template_path,
+        notebook_directory,
+        google_colab_link=None
+):
     """
     Generates a python example file needed, for the 'sphinx-gallery' extension.
 
@@ -459,6 +485,8 @@ def generate_example_script(filename, dir_path, data, package, template_path):
         The name of the python example file
     dir_path : string
         The directory path in which to save the python example file.
+    local_dir_path : string
+        The directory relative from the root directory.
     data : dict
         The data from the json example file for the example.
     package : module
@@ -466,6 +494,11 @@ def generate_example_script(filename, dir_path, data, package, template_path):
         created.
     template_path : path-like
         The path to the template file.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
+    google_colab_link: str or None, default=None
+        The link to google colab that can be used to open notebooks directly in
+        google colab.
     """
     # create directory if it does not exist.
     os.makedirs(dir_path, exist_ok=True)
@@ -473,6 +506,17 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     # Validation of 'data'.
     if data["class"] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
+
+    google_colab_link = check_google_colab_link(google_colab_link)
+
+    data["colab_link"] = "/".join([
+        google_colab_link,
+        notebook_directory,
+        local_dir_path,
+        filename
+    ]
+
+    )
 
     first_title = True
     # Create the file.
@@ -599,7 +643,7 @@ def format_plot(data, template_path):
     Parameters
     ----------
     data : dict
-        The data from the jason example file for the example.
+        The data from the json example file for the example.
     template_path : path-like
         The path to the template file.
     Returns
@@ -725,7 +769,7 @@ def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
     return dd_str[0:-2]
 
 
-def generate_tutorials(src_path, dst_path):
+def generate_tutorials(src_path, dst_path, dst_path_colab):
     """Includes the tutorials folder from the git root, such that tutorials are
     included in the documentation. Effectively this function copies all
     contents from src_path to dst_path.
@@ -736,8 +780,178 @@ def generate_tutorials(src_path, dst_path):
     dst_path: string
         The path where the notebooks are saved, such that tutorials.rst can
         find them.
+    dst_path_colab: string
+        The path where the notebooks are saved, such that tutorials.rst can
+        find them. This path is specially used to save the versions of the
+        notebook that are linked to Google Colab.
     """
     distutils.dir_util.copy_tree(src=src_path, dst=dst_path)
+    distutils.dir_util.copy_tree(src=src_path, dst=dst_path_colab)
+    post_process_tutorials(
+        dst_path,
+        colab_notebook_path=dst_path_colab,
+        show_installation_code=False
+    )
+    post_process_tutorials(
+        dst_path_colab,
+        colab_notebook_path=dst_path_colab,
+        show_installation_code=True
+    )
+
+
+def post_process_tutorials(
+        tutorials_path,
+        colab_notebook_path,
+        show_installation_code=False,
+        google_colab_link=None
+):
+    """This function allows to post-process the tutorial notebooks. In
+    particular, the placeholder (<colab_link>) within notebooks are replaced
+    with the actual link to open this notebook within Google colab and the
+    comments before pip and jupyter installation instructions are removed for
+    the Google Colab versions.
+
+    Parameters
+    ----------
+    tutorials_path: string
+        The folder where the files should be modified.
+    colab_notebook_path: string
+        The folder where the colab notebooks are saved.
+    show_installation_code: boolean, default=False
+        If True, the pip and jupypter installation lines are shown. If False,
+        these instructions are commented out
+    google_colab_link: str or None, default=None
+        The link to google colab that can be used to open notebooks directly in
+        google colab.
+    """
+    tutorials = [f for f in os.listdir(tutorials_path) if f.endswith(".ipynb")]
+    for file_name in tutorials:
+        file_path = f"{tutorials_path}/{file_name}"
+        file_path_colab = f"{colab_notebook_path}/{file_name}"
+
+        try:
+            with open(file_path, 'r') as f:
+                file_content = f.read()
+        except OSError:
+            file_content = None
+
+        if file_content is not None:
+            processed_file_content = copy.copy(file_content)
+            processed_file_content = replace_colab_link(
+                processed_file_content,
+                file_path_colab,
+                google_colab_link
+            )
+            if show_installation_code:
+                processed_file_content = uncomment_installation_code(
+                    processed_file_content
+                )
+
+            if file_content != processed_file_content:
+                try:
+                    with open(file_path, 'w') as f:
+                        f.write(processed_file_content)
+                except OSError:
+                    print("Error while writing {}")
+                    pass
+
+
+def replace_colab_link(
+        file_content,
+        colab_path,
+        google_colab_link=None
+):
+    """This function replaces the placeholder (<colab_link>) within
+    `file_content` with the link that matches the location once the notebook is
+    included into the deployed documentation.
+
+    Parameters
+    ----------
+    file_content: string
+        The content of the jupyter notebook.
+    colab_path: string
+        The relative path to the colab notebook.
+    google_colab_link_prefix: string, default=None
+        The Google Colab address where you can specify the notebook to open in
+        Google Colab. If None, it is assumed that the official scikit-activeml
+        documentation is used.
+
+    Returns
+    -------
+    output : string
+        The notebook that includes the Google Colab link if there was a
+        placeholder.
+    """
+    google_colab_link = check_google_colab_link(google_colab_link)
+    colab_link = f"{google_colab_link}/{colab_path}"
+    output = re.sub(
+        pattern="<colab_link>",
+        repl=colab_link,
+        string=file_content
+    )
+    return output
+
+
+def check_google_colab_link(google_colab_link):
+    """This function checks if `google_colab_link` is a string. If it is, it is
+    returned as is. If it is `None`, a valid string that points to the official
+    scikit-activeml documentation is returned.
+
+    Parameters
+    ----------
+    google_colab_link : str or None, default=None
+        The Google Colab address where you can specify the notebook to open in
+        Google Colab. If None, it is assumed that the official scikit-activeml
+        documentation is used.
+
+    Returns
+    -------
+    output : str
+        Returns the string that was provided if it was not None. If it is None,
+        the string that points to the official scikit-activeml documentation
+        is returned
+    """
+    output = google_colab_link
+    if google_colab_link is None:
+        colab_github = 'https://colab.research.google.com/github'
+        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
+        docs_branch_path = 'blob/gh-pages'
+        output = (
+            f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
+        )
+    return output
+
+
+def uncomment_installation_code(file_content):
+    """This function removes the comment symbols for pip install and jupyter
+    nbextension install commands.
+
+    Parameters
+    ----------
+    file_content: string
+        The content of the jupyter notebook.
+
+    Returns
+    -------
+    output : string
+        The notebook that would install the needed packages.
+    """
+    pattern = r'\"# (!pip install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=file_content
+    )
+
+    pattern = r'\"# (!jupyter nbextension install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=output
+    )
+    return output
 
 
 def export_legend(handles, labels, ax, path="legend.pdf", expand=None):
