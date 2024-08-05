@@ -622,11 +622,11 @@ def format_plot(data, template_path):
 
             if "FULLEXAMPLES" not in os.environ:
                 if key == "n_samples":
-                    data[key] = "10"
+                    data[key] = "50"
                 elif key == "n_cycles":
-                    data[key] = "2"
+                    data[key] = "5"
                 elif key == "res":
-                    data[key] = "3"
+                    data[key] = "8"
             if key in data.keys():
                 if isinstance(data[key], list):
                     new_str = ""

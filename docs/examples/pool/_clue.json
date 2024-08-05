@@ -1,0 +1,18 @@
+[
+{
+    "class" : "Clue",
+    "package" : "pool",
+    "method" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
+    "category" : "Uncertainty Sampling",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool", "classification", "single-annotator"],
+    "title" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
+    "refs" : ["prabhu2021active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import Clue",
+    "init_qs" : "Clue()",
+    "query_params" : "X=X, y=y, clf=clf"
+}
+]
+
