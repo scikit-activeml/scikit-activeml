@@ -1064,8 +1064,8 @@ def generate_switcher(repo_path=None, switcher_location=None):
         The path to the repository root. If this parameter is None, ".." is
         used instead.
     switcher_location : str or None, default=None
-        The path where the switcher json is saved to. If this parameter is None,
-        "_static/switcher.json" is used instead.
+        The path where the switcher json is saved to. If this parameter is
+        None, "_static/switcher.json" is used instead.
     """
     if repo_path is None:
         repo_path = ".."
