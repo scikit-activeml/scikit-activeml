@@ -1,6 +1,3 @@
-Welcome to scikit-activeml's documentation!
-===========================================
-
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -10,7 +7,7 @@ Welcome to scikit-activeml's documentation!
    Strategy Overview <generated/strategy_overview>
    generated/api_reference
    generated/sphinx_gallery_examples/index
-   developers_guide
+   contributing
 
 .. include:: ../README.rst
    :start-after: intro_start
@@ -23,8 +20,6 @@ Welcome to scikit-activeml's documentation!
 .. include:: ../README.rst
    :start-after: examples_start
    :end-before: examples_end
-
-You can find more examples under :doc:`Examples </generated/sphinx_gallery_examples/index>`.
 
 .. include:: ../README.rst
    :start-after: dev_start

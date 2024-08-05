@@ -1,5 +1,7 @@
 import inspect
 
+from ..classifier import ParzenWindowClassifier
+
 
 def check_positional_args(func, func_name, param_dict, kwargs_name=None):
     func_params = inspect.signature(func).parameters
@@ -56,3 +58,17 @@ def check_test_param_test_availability(
                 hasattr(class_, f"test_{func_name}"),
                 msg=f"'test_{func_name}' missing in {class_.__class__}",
             )
+
+
+class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
+    def predict_proba(self, X, return_embeddings=False):
+        probas = super().predict_proba(X)
+        if not return_embeddings:
+            return probas
+        return probas, X
+
+
+class ParzenWindowClassifierTuple(ParzenWindowClassifier):
+    def predict_proba(self, X, return_embeddings=False):
+        probas = super().predict_proba(X)
+        return probas, X
