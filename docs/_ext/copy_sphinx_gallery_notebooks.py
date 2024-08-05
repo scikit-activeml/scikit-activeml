@@ -25,6 +25,7 @@ def copy_gallery_notebooks_callback(app: Sphinx, exception):
     src_dir = app.config['copy_gallery_notebooks_src_path']
     dst_dir = app.config['copy_gallery_notebooks_dst_path']
 
+    src_dir = f"{app.srcdir}/{src_dir}"
     dst_dir = f"{app.outdir}/{dst_dir}"
 
     copy_gallery_notebooks(src_dir, dst_dir)
