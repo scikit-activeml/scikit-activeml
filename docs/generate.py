@@ -1086,11 +1086,14 @@ def generate_switcher(
     tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
     versions = [t.name for t in tags]
 
+    print(f"Found versions: {versions}")
     # remove versions which are not accessible
     if blacklisted_versions is not None:
+        print(f"Versions to remove: {blacklisted_versions}")
         for blacklisted_version in blacklisted_versions:
             versions.remove(blacklisted_version)
 
+    print(f"Versions to create switcher for: {versions}")
     switcher_text = create_switcher_text(versions)
     with open(switcher_location, "w") as f:
         for item in switcher_text:
