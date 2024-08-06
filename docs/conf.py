@@ -152,7 +152,7 @@ html_logo = "logos/scikit-activeml-logo.png"
 # documentation.
 #
 docs_address = "https://scikit-activeml.github.io/scikit-activeml-docs/latest"
-switcher_json_path = "{docs_address}/_static/switcher.json"
+switcher_json_path = f"{docs_address}/_static/switcher.json"
 
 html_theme_options = {
     "github_url": "https://github.com/scikit-activeml/scikit-activeml",
