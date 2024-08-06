@@ -1061,7 +1061,7 @@ def generate_switcher(
         repo_path=None,
         switcher_location=None,
         blacklisted_versions=None
-    ):
+):
     """Creates the version switcher file used by the PyDate theme.
 
     Parameters

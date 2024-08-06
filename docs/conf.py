@@ -278,5 +278,6 @@ generate_tutorials(
 blacklisted_versions = ['0.0.0', '0.1.0', '0.1.1', '0.1.2']
 generate_switcher(
     repo_path="..",
-    switcher_location="_static/switcher.json"
+    switcher_location="_static/switcher.json",
+    blacklisted_versions=blacklisted_versions
 )
