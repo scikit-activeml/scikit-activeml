@@ -1057,8 +1057,12 @@ def generate_regression_legend(path):
     export_legend(handles, labels, ax, path=path)
 
 
-def generate_switcher(repo_path=None, switcher_location=None):
-    """Creates the version switcher file used by the PyData theme.
+def generate_switcher(
+        repo_path=None,
+        switcher_location=None,
+        blacklisted_versions=None
+    ):
+    """Creates the version switcher file used by the PyDate theme.
 
     Parameters
     ----------
@@ -1068,6 +1072,9 @@ def generate_switcher(repo_path=None, switcher_location=None):
     switcher_location : str or None, default=None
         The path where the switcher json is saved to. If this parameter is
         None, "_static/switcher.json" is used instead.
+    blacklisted_versions : list of str or None, default=None
+        A list of versions which should be ignored for the switcher. If this
+        parameter is None, no versions are ignored.
     """
     if repo_path is None:
         repo_path = ".."
@@ -1078,6 +1085,11 @@ def generate_switcher(repo_path=None, switcher_location=None):
     repo = git.Repo(repo_path)
     tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
     versions = [t.name for t in tags]
+
+    # remove versions which are not accessible
+    if blacklisted_versions is not None:
+        for blacklisted_version in blacklisted_versions:
+            versions.remove(blacklisted_version)
 
     switcher_text = create_switcher_text(versions)
     with open(switcher_location, "w") as f:

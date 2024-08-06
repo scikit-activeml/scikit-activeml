@@ -275,6 +275,7 @@ generate_tutorials(
     dst_path_colab="generated/tutorials_colab/",
 )
 
+blacklisted_versions = ['0.0.0', '0.1.0', '0.1.1', '0.1.2']
 generate_switcher(
     repo_path="..",
     switcher_location="_static/switcher.json"
