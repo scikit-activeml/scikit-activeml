@@ -1082,6 +1082,8 @@ def generate_switcher(
     if switcher_location is None:
         switcher_location = "_static/switcher.json"
 
+    print(f"current path: {os.path.abspath('.')}")
+    print(f"repository path: {os.path.abspath(repo_path)}")
     repo = git.Repo(repo_path)
     tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
     versions = [t.name for t in tags]
@@ -1091,7 +1093,8 @@ def generate_switcher(
     if blacklisted_versions is not None:
         print(f"Versions to remove: {blacklisted_versions}")
         for blacklisted_version in blacklisted_versions:
-            versions.remove(blacklisted_version)
+            if blacklisted_version in versions:
+                versions.remove(blacklisted_version)
 
     print(f"Versions to create switcher for: {versions}")
     switcher_text = create_switcher_text(versions)
