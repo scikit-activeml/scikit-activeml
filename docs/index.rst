@@ -8,6 +8,7 @@
    generated/api_reference
    generated/sphinx_gallery_examples/index
    contributing
+   Changelog <https://github.com/scikit-activeml/scikit-activeml/releases>
 
 .. include:: ../README.rst
    :start-after: intro_start
