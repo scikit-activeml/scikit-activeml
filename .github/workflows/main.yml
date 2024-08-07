@@ -3,14 +3,12 @@ name: skactiveml
 on: [push]
 
 jobs:
-  build:
-
+  test_oldest_dependencies:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
       matrix:
         python-version: [ '3.9', '3.10', '3.11', '3.12' ]
-
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -29,8 +27,53 @@ jobs:
     - name: Test with pytest and oldest dependencies
       run: |
         pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
-    - name: Install latest dependencies
+
+  test_newest_dependencies:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
       run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
+    - name: Test with pytest and newest dependencies
+      run: |
+        pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: true
+
+  check_formatting_and_linting:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt -r requirements_max.txt
     - name: Black
       uses: psf/black@stable
@@ -46,11 +89,26 @@ jobs:
     - name: Test with pytest
       run: |
         pytest -n auto --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml --cov-fail-under=100
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+
+  create_documentation:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: true
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
