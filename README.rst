@@ -1,6 +1,18 @@
 .. intro_start
 
-|Doc| |Codecov| |PythonVersion| |PyPi| |Paper| |Black|
+|
+
+.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
+   :class: dark-light
+   :align: center
+   :width: 40%
+
+|
+
+=====================================================================
+scikit-activeml: A Library and Toolbox for Active Learning Algorithms
+=====================================================================
+|Doc| |Codecov| |PythonVersion| |PyPi| |Black| |Downloads| |Paper|
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
    :target: https://scikit-activeml.github.io/scikit-activeml-docs/
@@ -20,25 +32,16 @@
 .. |Black| image:: https://img.shields.io/badge/code%20style-black-000000.svg
    :target: https://github.com/psf/black
 
-|
+.. |Downloads| image:: https://static.pepy.tech/badge/scikit-activeml
+   :target: https://www.pepy.tech/projects/scikit-activeml
 
-.. image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/scikit-activeml-logo.png
-   :width: 200
-
-|
-
-Machine learning applications often need large amounts of training data to
+Machine learning models often need large amounts of training data to
 perform well. Whereas unlabeled data can be easily gathered, the labeling process
 is difficult, time-consuming, or expensive in most applications. Active learning can help solve
-this problem by querying labels for those data samples that will improve the performance
+this problem by querying labels for those data samples improving the performance
 the most. Thereby, the goal is that the learning algorithm performs sufficiently well with
-fewer labels
-
-With this goal in mind, **scikit-activeml** has been developed as a Python module for active learning
-on top of `scikit-learn <https://scikit-learn.org/stable/>`_. The project was initiated in 2020 by the
-`Intelligent Embedded Systems Group <https://www.uni-kassel.de/eecs/en/sections/intelligent-embedded-systems/home>`_
-at the University of Kassel and is distributed under the `3-Clause BSD licence
-<https://github.com/scikit-activeml/scikit-activeml/blob/master/LICENSE.txt>`_.
+fewer labels. With this goal in mind, **scikit-activeml** has been developed as a Python library for active learning
+on top of `scikit-learn <https://scikit-learn.org/stable/>`_.
 
 .. intro_end
 
@@ -53,16 +56,17 @@ The easiest way of installing scikit-activeml is using ``pip``:
 
     pip install -U scikit-activeml
 
-.. note::
-    The installation via `pip` defines only minimum requirements to avoid
-    potential package downgrades withing your installation. If you encounter
-    any incompatibility issues, you can downgrade packages by installing the
-    `maximum requirements <https://github.com/scikit-activeml/scikit-activeml/blob/master/requirements_max.txt>`_,
-    we tested at the release of the current package
-    version:
-    ::
+The installation via `pip` defines only minimum requirements to avoid
+potential package downgrades withing your installation. If you encounter
+any incompatibility issues, you can downgrade packages by installing the
+`maximum requirements <https://github.com/scikit-activeml/scikit-activeml/blob/master/requirements_max.txt>`_,
+we tested at the release of the current package
+version:
 
-        pip install -r requirements_max.txt
+::
+
+    pip install -r requirements_max.txt
+
 .. user_installation_end
 
 .. examples_start
@@ -76,12 +80,13 @@ We provide a broad overview of different use-cases in our `tutorial section <htt
 - `Pool-based Active Learning for Regression - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/02_pool_regression_getting_started.html>`_,
 - `Pool-based Active Learning - Sample Annotating <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/03_pool_oracle_annotations.html>`_,
 - `Pool-based Active Learning - Simple Evaluation Study <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/04_pool_simple_evaluation_study.html>`_,
+- `Active Image Classification via Self-supervised Learning <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/05_pool_al_with_self_supervised_learning.html>`_,
 - `Multi-annotator Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/10_multiple_annotators_getting_started.html>`_,
 - `Stream-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/20_stream_getting_started.html>`_,
 - `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.html>`_,
 - and `Stream-based Active Learning With River <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/22_river_classifier.html>`_.
 
-Two simple examples illustrating the straightforwardness of implementing active learning cycles with our Python package ``skactiveml`` are given in the following.
+Two simple code snippets illustrating the straightforwardness of implementing active learning cycles with our Python package ``skactiveml`` are given in the following.
 
 Pool-based Active Learning
 ##########################
@@ -136,7 +141,7 @@ Stream-based Active Learning
 ############################
 
 The following code snippet implements an active learning cycle with 200 data points and
-the default budget of 10% using a pwc classifier and split uncertainty sampling. 
+the default budget of 10% using a pwc classifier and split uncertainty sampling.
 Like in the pool-based example you can wrap other classifiers from ``sklearn``,
 ``sklearn`` compatible classifiers or like the example classifiers provided by ``skactiveml``.
 
@@ -184,16 +189,16 @@ Query Strategy Overview
 #######################
 
 For better orientation, we provide an `overview <https://scikit-activeml.github.io/scikit-activeml-docs/generated/strategy_overview.html>`_
-(incl. paper references and `visualizations <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
+(incl. paper references and `visual examples <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
 of the query strategies implemented by ``skactiveml``.
 
 |Overview| |Visualization|
 
 .. |Overview| image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/strategy-overview.gif
-   :width: 400
-   
+   :width: 365
+
 .. |Visualization| image:: https://raw.githubusercontent.com/scikit-activeml/scikit-activeml/master/docs/logos/example-overview.gif
-   :width: 400
+   :width: 365
 
 .. examples_end
 

@@ -1,7 +1,27 @@
 # %%
 # .. note::
-# 
 #    The generated animation can be found at the bottom of the page.
+#
+# | **Google Colab Note**: If the notebook fails to run after installing the
+#   needed packages, try to restart the runtime (Ctrl + M) under
+#   Runtime -> Restart session.
+#
+# .. image:: https://colab.research.google.com/assets/colab-badge.svg
+#    :target: "$colab_link"
+#
+# | **Notebook Dependencies**
+# | Uncomment the following cell to install all dependencies for this
+#   tutorial.
+
+"$install_dependencies|# !pip install scikit-activeml"
+
+# %%
+#.. raw:: html
+#
+#   <hr style="border-style: solid; border-top: 1px solid; border-right: 0; border-bottom: 0; border-left: 0;">
+#
+
+# %%
 import numpy as np
 from matplotlib import pyplot as plt, animation
 from scipy.stats import uniform
@@ -31,7 +51,7 @@ y_true = true_function(X) + noise(X).flatten()
 y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 X_test = np.linspace(0, 2, num="$res|100").reshape(-1, 1)
 
-# Initialise the classifier.
+# Initialise the regressor.
 reg = "$init_reg|NICKernelRegressor(random_state=random_state, metric_dict={'gamma': 15.0})"
 # Initialise the query strategy.
 qs = "$init_qs"

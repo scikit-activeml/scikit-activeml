@@ -6,6 +6,7 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 import numpy as np
+from sklearn.datasets import make_blobs
 from skactiveml.utils import (
     MISSING_LABEL,
 )
@@ -616,6 +617,43 @@ class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+
+    def test_sample_proba(self):
+        # Setup test cases.
+        X, y_full = make_blobs(n_samples=200, centers=4, random_state=0)
+        classes = np.unique(y_full)
+        pwc = self.estimator_class(
+            classes=classes, class_prior=1, missing_label=-1
+        )
+        y_missing = np.full_like(y_full, fill_value=-1)
+        y_partial_missing = y_full.copy()
+        y_partial_missing[30:50] = -1
+        y_class_0_missing = y_full.copy()
+        y_class_0_missing[y_full == 0] = -1
+
+        for y in [y_missing, y_partial_missing, y_class_0_missing, y_full]:
+            pwc.fit(X, y)
+
+            for n_samples in [1, 10]:
+                # Check shape of probabilities.
+                P_sampled = pwc.sample_proba(X, n_samples=n_samples)
+                shape_Expected = [n_samples, len(X), len(classes)]
+                np.testing.assert_array_equal(P_sampled.shape, shape_Expected)
+
+                # Check normalization of probabilities.
+                P_sums = P_sampled.sum(axis=-1)
+                P_sums_expected = np.ones_like(P_sums)
+                np.testing.assert_allclose(P_sums, P_sums_expected)
+
+        # Check value error if `alphas` as input to dirichlet are zero.
+        pwc = self.estimator_class(
+            classes=np.unique(y_full), class_prior=0, missing_label=-1
+        )
+        pwc.fit(X, y_missing)
+        self.assertRaises(ValueError, pwc.sample_proba, X=X, n_samples=10)
+
+        pwc.fit(X, y_class_0_missing)
+        self.assertRaises(ValueError, pwc.sample_proba, X=X, n_samples=10)
 
 
 class TemplateSkactivemlRegressor(TemplateEstimator):

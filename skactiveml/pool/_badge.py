@@ -34,13 +34,16 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations. If
-        `clf_embedding_flag_name=None`, the input samples `X` are used.
+        `clf_embedding_flag_name=None` and `predict_proba` returns only one
+        output, the input samples `X` are used. If `predict_proba` returns
+        two outputs or `clf_embedding_name` is not `None`,
+        `(proba, embeddings)` are expected as outputs.
 
     References
     ----------
-    [1] J. Ash, Jordan T., Chicheng Zhang, Akshay Krishnamurthy,
-    John Langford, and Alekh Agarwal, "Deep Batch Active Learning by Diverse,
-    Uncertain Gradient Lower Bounds." ICLR, 2019.
+    .. [1] J. Ash, Jordan T., Chicheng Zhang, Akshay Krishnamurthy, John
+       Langford, and Alekh Agarwal, "Deep Batch Active Learning by Diverse,
+       Uncertain Gradient Lower Bounds." ICLR, 2019.
     """
 
     def __init__(

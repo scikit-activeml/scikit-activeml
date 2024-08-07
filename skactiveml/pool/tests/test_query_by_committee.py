@@ -19,6 +19,7 @@ from skactiveml.pool._query_by_committee import (
     QueryByCommittee,
     average_kl_divergence,
     vote_entropy,
+    variation_ratios,
 )
 from skactiveml.regressor import NICKernelRegressor, SklearnRegressor
 from skactiveml.tests.template_query_strategy import (
@@ -75,7 +76,102 @@ class TestQueryByCommittee(
         ]
         self._test_param("init", "eps", test_cases, exclude_reg=True)
 
-    def test_query_param_ensemble(self, test_cases=None):
+    def test_init_param_sample_predictions_method_name(self):
+        # Fails as the default ensemble from `setup` does not support sampling.
+        test_cases = [
+            (0, TypeError),
+            (0.1, TypeError),
+            ("Test", ValueError),
+        ]
+        self._test_param("init", "sample_predictions_method_name", test_cases)
+        test_cases = [
+            ("predict_proba", ValueError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": [
+                    ParzenWindowClassifier(),
+                    ParzenWindowClassifier(),
+                ]
+            },
+        )
+        test_cases = [
+            ("sample_proba", None),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": ParzenWindowClassifier(),
+                "fit_ensemble": True,
+            },
+        )
+        test_cases = [
+            ("sample_y", None),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_method_name",
+            test_cases,
+            replace_query_params={
+                "ensemble": SklearnRegressor(GaussianProcessRegressor()),
+                "fit_ensemble": True,
+            },
+        )
+
+    def test_init_param_sample_predictions_dict(self):
+        test_cases = [
+            (None, None),
+            ({}, None),
+            ({"n_samples": 1000}, None),
+            ("Test", ValueError),
+            ({"Test": 2}, TypeError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": "sample_proba",
+            },
+            replace_query_params={
+                "ensemble": ParzenWindowClassifier(),
+                "fit_ensemble": True,
+            },
+        )
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": "sample_y",
+            },
+            replace_query_params={
+                "ensemble": SklearnRegressor(GaussianProcessRegressor()),
+                "fit_ensemble": True,
+            },
+        )
+        test_cases = [
+            (None, None),
+            ({}, ValueError),
+            ({"n_samples": 1000}, ValueError),
+            ("Test", ValueError),
+            ({"Test": 2}, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "sample_predictions_dict",
+            test_cases,
+            replace_init_params={
+                "sample_predictions_method_name": None,
+            },
+        )
+
+    def test_query_param_ensemble(self):
         estimators = [
             ("pwc1", ParzenWindowClassifier()),
             ("pwc2", ParzenWindowClassifier()),
@@ -99,7 +195,7 @@ class TestQueryByCommittee(
             (None, TypeError),
             ("test", TypeError),
             (1, TypeError),
-            (ParzenWindowClassifier(classes=self.classes), TypeError),
+            (ParzenWindowClassifier(), TypeError),
             (GaussianProcessRegressor(), TypeError),
             (RandomForestRegressor(), TypeError),
             (RandomForestClassifier(), TypeError),
@@ -244,8 +340,8 @@ class TestQueryByCommittee(
             query_params = deepcopy(self.query_default_params_clf)
             query_params["ensemble"] = ensemble
             query_params["return_utilities"] = True
-            for method in ["KL_divergence", "vote_entropy"]:
-                qs = QueryByCommittee(method=method)
+            for m in ["KL_divergence", "vote_entropy", "variation_ratios"]:
+                qs = QueryByCommittee(method=m)
                 idx, u = qs.query(**query_params)
                 self.assertEqual(len(idx), 1)
                 self.assertEqual(len(u), 1)
@@ -271,7 +367,7 @@ class TestAverageKlDivergence(unittest.TestCase):
         average_kl_divergence(np.full((10, 10, 10), 0.5))
         average_kl_divergence(np.zeros((10, 10, 10)))
         scores = average_kl_divergence(self.probas)
-        np.testing.assert_allclose(scores, self.scores)
+        np.testing.assert_almost_equal(scores, self.scores)
 
 
 class TestVoteEntropy(unittest.TestCase):
@@ -328,4 +424,32 @@ class TestVoteEntropy(unittest.TestCase):
 
     def test_vote_entropy(self):
         scores = vote_entropy(votes=self.votes, classes=self.classes)
-        np.testing.assert_array_equal(scores.round(10), self.scores.round(10))
+        np.testing.assert_almost_equal(scores, self.scores)
+
+
+class TestVariationRatios(unittest.TestCase):
+    def setUp(self):
+        self.votes = np.array(
+            [
+                [0, 0, 2],
+                [1, 0, 2],
+                [2, 1, 2],
+                [0, 0, 0],
+            ],
+        )
+        self.scores = np.array([1.0 / 3.0, 2.0 / 3.0, 1.0 / 3.0, 0.0])
+
+    def test_param_votes(self):
+        self.assertRaises(ValueError, variation_ratios, votes="string")
+        self.assertRaises(ValueError, variation_ratios, votes=1)
+        self.assertRaises(ValueError, variation_ratios, votes=[1])
+        self.assertRaises(ValueError, variation_ratios, votes=[[[1]]])
+        self.assertRaises(
+            ValueError,
+            variation_ratios,
+            votes=np.full((9, 9), np.nan),
+        )
+
+    def test_variation_ratios(self):
+        scores = variation_ratios(votes=self.votes)
+        np.testing.assert_almost_equal(scores, self.scores)
