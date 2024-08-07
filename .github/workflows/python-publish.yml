@@ -27,7 +27,7 @@ jobs:
       run: |
         echo $GITHUB_REF
         RELEASE_VERSION=${GITHUB_REF#refs/*/}
-        echo $RELEASE_VERSION
+        echo "CURRENT_VERSION=$(git tag -l --sort=-creatordate | head -n 1)" >> $GITHUB_ENV
         sed -i -E "s/__version__ = .*/__version__ = \"$RELEASE_VERSION\"/" skactiveml/__init__.py
         cat skactiveml/__init__.py
     - name: Install dependencies
@@ -45,3 +45,9 @@ jobs:
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
+    - uses: actions/checkout@v4
+      with:
+        ref: master
+    - name: Trigger release documentation for scikit-activeml-docs
+      run: |
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"release\"}"

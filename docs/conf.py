@@ -14,7 +14,7 @@
 #
 import os
 import sys
-
+sys.path.append(os.path.abspath("./_ext"))
 sys.path.insert(0, os.path.abspath(".."))
 import skactiveml
 
@@ -23,6 +23,7 @@ from docs.generate import (
     generate_api_reference_rst,
     generate_examples,
     generate_tutorials,
+    generate_switcher
 )
 
 # -- Project information -----------------------------------------------------
@@ -69,9 +70,11 @@ extensions = [
     "sphinxcontrib.bibtex",
     "nbsphinx",
     "numpydoc",
+    "copy_sphinx_gallery_notebooks"
 ]
 
 # nbsphinx_execute = 'always'
+nbsphinx_execute = 'never'
 
 # Napoleon settings
 napoleon_numpy_docstring = True
@@ -97,7 +100,7 @@ master_doc = "index"
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -108,9 +111,12 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 pygments_style = "sphinx"
 
 # Set the paths for the sphinx_gallery extension:
+num_cpus = -1
+if "num_cpus" in os.environ:
+    num_cpus = int(os.environ["num_cpus"])
 sphinx_gallery_conf = {
     "run_stale_examples": False,
-    "line_numbers": True,
+    "line_numbers": False,
     # path to your example scripts
     "examples_dirs": os.path.normpath("generated/examples"),
     # the path where to save gallery generated output
@@ -126,6 +132,7 @@ sphinx_gallery_conf = {
         # The module you locally document uses None
         "skactiveml": None
     },
+    'parallel': num_cpus
 }
 os.makedirs(
     os.path.abspath(sphinx_gallery_conf["gallery_dirs"]), exist_ok=True
@@ -144,6 +151,9 @@ html_logo = "logos/scikit-activeml-logo.png"
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
+docs_address = "https://scikit-activeml.github.io/scikit-activeml-docs/latest"
+switcher_json_path = f"{docs_address}/_static/switcher.json"
+
 html_theme_options = {
     "github_url": "https://github.com/scikit-activeml/scikit-activeml",
     "icon_links": [
@@ -154,6 +164,12 @@ html_theme_options = {
         }
     ],
     "icon_links_label": "Quick Links",
+    "switcher": {
+        "json_url": switcher_json_path,
+        "version_match": version,
+    },
+    "check_switcher": False,
+    "navbar_start": ["navbar-logo", "version-switcher"]
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -236,18 +252,32 @@ autodoc_default_options = {
 autoclass_content = "class"
 # os.environ["FULLEXAMPLES"] = "True"
 
+
+# -- Options for copy_sphinx_gallery_notebooks extension ---------------------
+copy_gallery_notebooks_src_path = 'generated/sphinx_gallery_examples/'
+copy_gallery_notebooks_dst_path = 'generated/sphinx_gallery_notebooks/'
+
 generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 
 json_data = generate_examples(
-    gen_path=os.path.abspath("generated/examples"),
-    json_path=os.path.abspath("examples"),
+    gen_path="generated/examples/",
+    json_path="examples/",
+    example_notebook_directory=copy_gallery_notebooks_dst_path
 )
 
 generate_strategy_overview_rst(
-    gen_path=os.path.abspath("generated"), json_data=json_data
+    gen_path=os.path.abspath("generated/"), json_data=json_data
 )
 
 generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
-    dst_path=os.path.abspath("generated/tutorials/"),
+    dst_path="generated/tutorials/",
+    dst_path_colab="generated/tutorials_colab/",
+)
+
+blacklisted_versions = ['0.0.0', '0.1.0', '0.1.1', '0.1.2']
+generate_switcher(
+    repo_path="..",
+    switcher_location="_static/switcher.json",
+    blacklisted_versions=blacklisted_versions
 )

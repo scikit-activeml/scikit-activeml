@@ -1317,6 +1317,47 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
         return P
 
+    def sample_proba(self, X, n_samples=10, random_state=None):
+        """Samples probability vectors from Dirichlet distributions whose
+        parameters `alphas` are defined as the sum of the frequency estimates
+        returned by `predict_freq` and the `class_prior`.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_test_samples, n_features)
+            Test samples for which `n_samples` probability vectors are to be
+            sampled.
+        n_samples : int, default=10
+            Number of probability vectors to sample for each `X[i]`.
+        random_state : int or numpy.random.RandomState or None, default=None
+            Ensure reproducibility when sampling probability vectors from the
+            Dirichlet distributions.
+
+        Returns
+        -------
+        P : array-like of shape (n_samples, n_test_samples, n_classes)
+            There are `n_samples` class probability vectors for each test
+            sample in `X`. Classes are ordered according to classes_.
+        """
+        random_state = check_random_state(random_state)
+        alphas = self.predict_freq(X) + self.class_prior_
+        alphas = alphas.repeat(repeats=n_samples, axis=0)
+        if (alphas == 0).any():
+            raise ValueError(
+                "There are zero frequency observations. "
+                "Set `class_prior > 0` to avoid this error."
+            )
+        R = random_state.standard_gamma(alphas)
+        R_sums = R.sum(axis=-1)
+        is_zero = (R_sums == 0.0).ravel()
+        sampled_class_indices = random_state.choice(
+            np.array(R.shape[-1]), size=is_zero.sum()
+        )
+        R[is_zero, sampled_class_indices] = 1.0
+        P = R / R.sum(axis=-1, keepdims=True)
+        P = P.reshape(n_samples, len(X), P.shape[-1], order="F")
+        return P
+
     def _validate_data(
         self,
         X,

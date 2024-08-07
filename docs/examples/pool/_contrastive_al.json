@@ -1,0 +1,18 @@
+[
+{
+    "class" : "ContrastiveAL",
+    "package" : "pool",
+    "method" : "Contrastive Active Learning (CAL)",
+    "category" : "Uncertainty Sampling",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "classification", "single-annotator"],
+    "title" : "Contrastive Active Learning (CAL)",
+    "refs" : ["margatina2021active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import ContrastiveAL",
+    "init_qs" : "ContrastiveAL(random_state=0)",
+    "query_params" : "X=X, y=y, clf=clf"
+}
+]
+

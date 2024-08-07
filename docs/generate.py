@@ -1,3 +1,5 @@
+import os
+
 import distutils.dir_util
 import importlib
 import inspect
@@ -6,12 +8,15 @@ import os
 import re
 import shutil
 import warnings
+import copy
 
 import numpy as np
 from pybtex.database import parse_file
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
+from joblib import Parallel, delayed
+import git
 
 import skactiveml
 
@@ -26,7 +31,7 @@ def generate_api_reference_rst(gen_path):
 
     Parameters
     ----------
-    gen_path : string
+    gen_path : str
         The path of the main directory in which all generated files should be
         created.
     """
@@ -63,7 +68,7 @@ def automodule(module, level=0):
 
     Returns
     -------
-        String : The restructured text
+        str : The restructured text
     """
     rst_str = ""
     modules = []
@@ -141,7 +146,7 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
     Parameters
     ----------
-    gen_path : string
+    gen_path : str
         The path of the main directory in which all generated files should be
         created.
     json_data : dict
@@ -172,13 +177,13 @@ def generate_strategy_overview_rst(gen_path, json_data):
             "\n"
             '   <input type="checkbox" class="input-tag" '
             'value="regression">\n'
-            '   <label>Regression</label>\n'
+            "   <label>Regression</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="classification">\n '
-            '   <label>Classification</label>\n'
+            "   <label>Classification</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="multi-annotator">\n '
-            '   <label>Multi-Annotator</label>\n'
+            "   <label>Multi-Annotator</label>\n"
             '   <input type="checkbox" class="input-tag" '
             'value="single-annotator">\n '
             "   <label>Single-Annotator</label>\n"
@@ -295,7 +300,7 @@ def table_data_to_rst_table(
         Contains the data for the table..
     caption : str, optional (default='')
         The caption of the table.
-    widths : string, optional (default=None)
+    widths : str, optional (default=None)
         A list of relative column widths separated with comma or space
         or 'auto'.
     header_lines : int, optional (default=0)
@@ -305,7 +310,7 @@ def table_data_to_rst_table(
 
     Returns
     -------
-    string : reStructuredText list-table as String.
+    str : reStructuredText list-table as String.
     """
     a = np.asarray(a)
     indents = "".ljust(indent, " ")
@@ -327,19 +332,26 @@ def table_data_to_rst_table(
     return table + "\n"
 
 
-def generate_examples(gen_path, json_path, recursive=True):
+def generate_examples(
+        gen_path,
+        json_path,
+        example_notebook_directory,
+        recursive=True
+):
     """
     Creates all example scripts for the specified package and returns the data
     needed to create the strategy overview.
 
     Parameters
     ----------
-    gen_path : string
+    gen_path : str
         The path of the main directory in which all generated files should be
         created.
-    json_path : string
+    json_path : str
         The path of the directory where to find the json example files for the
         specified package.
+    example_notebook_directory: str
+        The path to the directory where the notebooks are saved.
     recursive : bool, default=True
         If True, examples for sub-packagers are also created.
 
@@ -353,8 +365,9 @@ def generate_examples(gen_path, json_path, recursive=True):
 
     json_data = dict()
     # iterate over json example files
-    for (root, dirs, files) in os.walk(json_path, topdown=True):
-        if root.endswith('__pycache__'): continue
+    for root, dirs, files in os.walk(json_path, topdown=True):
+        if root.endswith("__pycache__"):
+            continue
         if "README.rst" not in files and "README.txt" not in files:
             raise FileNotFoundError(
                 f"No README.rst or README.txt found in \n" f'"{root}"'
@@ -364,62 +377,128 @@ def generate_examples(gen_path, json_path, recursive=True):
         dst = os.path.join(gen_path, sub_dir_str)
         os.makedirs(dst, exist_ok=True)
         # Iterate over all files in 'root'.
-        for filename in files:
-            if filename.endswith(".json"):
-                with open(os.path.join(root, filename)) as file:
-                    # iterate over the examples in the json file
-                    for data in json.load(file):
-                        sub_package_dict = json_data
-                        package_structure = sub_dir_str.split(".")
-                        for sp in package_structure:
-                            if sp not in sub_package_dict.keys():
-                                sub_package_dict[sp] = dict()
-                            sub_package_dict = sub_package_dict[sp]
-                        if "data" not in sub_package_dict.keys():
-                            sub_package_dict["data"] = list()
-
-                        sub_package_dict["data"].append(data)
-                        # create the example python script
-                        plot_filename = (
-                            "plot-"
-                            + data["class"]
-                            + "-"
-                            + data["method"].replace(" ", "_")
-                        )
-                        generate_example_script(
-                            filename=plot_filename + ".py",
-                            dir_path=dst,
-                            data=data,
-                            package=getattr(skactiveml, data["package"]),
-                            template_path=os.path.abspath(data["template"]),
-                        )
-            elif not filename.startswith("template"):
-                if filename.endswith(".py") or filename.endswith(".ipynb"):
-                    src = os.path.join(root, filename)
-                    example_string = format_plot({}, src)
-                    with open(os.path.join(dst, filename), "w") as file:
-                        file.write(example_string)
-                else:
-                    # Copy all other files except for templates.
-                    src = os.path.join(root, filename)
-                    shutil.copyfile(src, os.path.join(dst, filename))
+        num_cpus = -1
+        if "num_cpus" in os.environ:
+            num_cpus = int(os.environ["num_cpus"])
+        if num_cpus != 1:
+            json_data_lists = Parallel(n_jobs=num_cpus, backend="loky")(
+                (
+                    delayed(_generate_single_example)(
+                        filename=filename,
+                        root=root,
+                        local_dir_path=sub_dir_str,
+                        dst=dst,
+                        notebook_directory=example_notebook_directory
+                    )
+                    for filename in files
+                )
+            )
+        else:
+            json_data_lists = []
+            for filename in files:
+                json_data_lists.append(
+                    _generate_single_example(
+                        filename=filename,
+                        root=root,
+                        local_dir_path=sub_dir_str,
+                        dst=dst,
+                        notebook_directory=example_notebook_directory
+                    )
+                )
+        for json_data_list in json_data_lists:
+            package_structure = sub_dir_str.split(os.sep)
+            json_data_entry = json_data
+            for sp in package_structure:
+                if sp not in json_data_entry.keys():
+                    json_data_entry[sp] = dict()
+                json_data_entry = json_data_entry[sp]
+            if "data" not in json_data_entry.keys():
+                json_data_entry["data"] = list()
+            json_data_entry["data"].extend(json_data_list)
 
         if not recursive:
             break
-
     return json_data
 
 
-def generate_example_script(filename, dir_path, data, package, template_path):
+def _generate_single_example(
+        filename,
+        root,
+        local_dir_path,
+        dst,
+        notebook_directory
+        ):
+    """_summary_
+
+    Parameters
+    ----------
+    filename : str
+        The path to the json file for which an example is generated.
+    root : str
+        The root directory where the json file is stored.
+    local_dir_path : str
+        The directory relative from the root directory.
+    dst : str
+        The root directory where the examples are saved.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
+    """
+    data_list = []
+    if filename.endswith(".json"):
+        with open(os.path.join(root, filename)) as file:
+            # iterate over the examples in the json file
+            for data in json.load(file):
+                data_list.append(data)
+                # create the example python script
+                plot_filename = (
+                    "plot-"
+                    + data["class"]
+                    + "-"
+                    + data["method"].replace(" ", "_")
+                )
+                generate_example_script(
+                    filename=plot_filename + ".py",
+                    dir_path=dst,
+                    local_dir_path=local_dir_path,
+                    data=data,
+                    package=getattr(skactiveml, data["package"]),
+                    template_path=os.path.abspath(data["template"]),
+                    notebook_directory=notebook_directory
+                )
+    elif not filename.startswith("template"):
+        if filename.endswith(".py") or filename.endswith(".ipynb"):
+            src = os.path.join(root, filename)
+            example_string = format_plot({}, src)
+            with open(os.path.join(dst, filename), "w") as file:
+                file.write(example_string)
+        else:
+            # Copy all other files except for templates.
+            src = os.path.join(root, filename)
+            shutil.copyfile(src, os.path.join(dst, filename))
+    return data_list
+
+
+def generate_example_script(
+        filename,
+        dir_path,
+        local_dir_path,
+        data,
+        package,
+        template_path,
+        notebook_directory,
+        google_colab_link=None
+):
     """
     Generates a python example file needed, for the 'sphinx-gallery' extension.
 
     Parameters
     ----------
-    filename : string
+    filename : str
         The name of the python example file
-    dir_path : string
+    dir_path : str
         The directory path in which to save the python example file.
+    local_dir_path : str
+        The directory relative from the root directory.
     data : dict
         The data from the json example file for the example.
     package : module
@@ -427,6 +506,11 @@ def generate_example_script(filename, dir_path, data, package, template_path):
         created.
     template_path : path-like
         The path to the template file.
+    notebook_directory: str
+        The path to the directory where the notebooks are saved.
+    google_colab_link: str or None, default=None
+        The link to google colab that can be used to open notebooks directly in
+        google colab.
     """
     # create directory if it does not exist.
     os.makedirs(dir_path, exist_ok=True)
@@ -434,6 +518,19 @@ def generate_example_script(filename, dir_path, data, package, template_path):
     # Validation of 'data'.
     if data["class"] not in package.__all__:
         raise ValueError(f'"{data["class"]}" is not in "{package}.__all__".')
+
+    google_colab_link = check_google_colab_link(google_colab_link)
+
+    notebook_filename = filename.replace('.py', '.ipynb')
+
+    data["colab_link"] = "/".join([
+        google_colab_link,
+        notebook_directory,
+        local_dir_path,
+        notebook_filename
+    ]
+
+    )
 
     first_title = True
     # Create the file.
@@ -470,14 +567,14 @@ def format_title(title, first_title):
 
     Parameters
     ----------
-    title : string
+    title : str
         The title string.
     first_title : boolean
         Indicates whether the title is the first title of the example script.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     if first_title:
         block_str = (
@@ -499,12 +596,12 @@ def format_subtitle(title):
 
     Parameters
     ----------
-    title : string
+    title : str
         The subtitle string.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     block_str = (
         "# %%\n" "# " + title + "\n" "# ".ljust(len(title) + 1, "-") + "\n\n"
@@ -519,12 +616,12 @@ def format_text(text):
 
     Parameters
     ----------
-    text : string
+    text : str
         The paragraph text.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     block_str = "# %%\n"
     for line in text.split("\n"):
@@ -539,12 +636,12 @@ def format_code(code):
 
     Parameters
     ----------
-    code : string
+    code : str
         The python source code to be formatted.
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     block_str = ""
     for line in code:
@@ -560,12 +657,12 @@ def format_plot(data, template_path):
     Parameters
     ----------
     data : dict
-        The data from the jason example file for the example.
+        The data from the json example file for the example.
     template_path : path-like
         The path to the template file.
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     pattern = (
         r'"""\$[^"""]*"""|"\$[^"&^\n]*"|' + r"'''\$[^''']*'''|'\$[^'&^\n]*'"
@@ -587,11 +684,11 @@ def format_plot(data, template_path):
 
             if "FULLEXAMPLES" not in os.environ:
                 if key == "n_samples":
-                    data[key] = "10"
+                    data[key] = "50"
                 elif key == "n_cycles":
-                    data[key] = "2"
+                    data[key] = "5"
                 elif key == "res":
-                    data[key] = "3"
+                    data[key] = "8"
             if key in data.keys():
                 if isinstance(data[key], list):
                     new_str = ""
@@ -622,7 +719,7 @@ def format_refs(refs: list):
 
     Returns
     -------
-    string : The formatted string for the example script.
+    str : The formatted string for the example script.
     """
     if not refs:
         return ""
@@ -659,12 +756,12 @@ def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
         specific key. If idx is not given, the first value in the list is
         always used. It is not necessary to specify all keys from d.
         shape: {key1:int1,...}
-    allocator: string, optional (Default='=')
+    allocator: str, optional (Default='=')
         The allocator is used to separate the key and the value.
 
     Returns
     -------
-    String : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or
+    str : dict_ as String. Shape: 'key1=value[idx[key1]], key2...' or
              'key1=value1, key2=value2...' or a combination of both.
     """
     dd_str = ""
@@ -686,19 +783,189 @@ def dict_to_str(d, idx=None, allocator="=", key_as_string=False):
     return dd_str[0:-2]
 
 
-def generate_tutorials(src_path, dst_path):
+def generate_tutorials(src_path, dst_path, dst_path_colab):
     """Includes the tutorials folder from the git root, such that tutorials are
     included in the documentation. Effectively this function copies all
     contents from src_path to dst_path.
     Parameters
     ----------
-    src_path: string
+    src_path: str
         The path where the notebooks are found.
-    dst_path: string
+    dst_path: str
         The path where the notebooks are saved, such that tutorials.rst can
         find them.
+    dst_path_colab: str
+        The path where the notebooks are saved, such that tutorials.rst can
+        find them. This path is specially used to save the versions of the
+        notebook that are linked to Google Colab.
     """
     distutils.dir_util.copy_tree(src=src_path, dst=dst_path)
+    distutils.dir_util.copy_tree(src=src_path, dst=dst_path_colab)
+    post_process_tutorials(
+        dst_path,
+        colab_notebook_path=dst_path_colab,
+        show_installation_code=False
+    )
+    post_process_tutorials(
+        dst_path_colab,
+        colab_notebook_path=dst_path_colab,
+        show_installation_code=True
+    )
+
+
+def post_process_tutorials(
+        tutorials_path,
+        colab_notebook_path,
+        show_installation_code=False,
+        google_colab_link=None
+):
+    """This function allows to post-process the tutorial notebooks. In
+    particular, the placeholder (<colab_link>) within notebooks are replaced
+    with the actual link to open this notebook within Google colab and the
+    comments before pip and jupyter installation instructions are removed for
+    the Google Colab versions.
+
+    Parameters
+    ----------
+    tutorials_path: str
+        The folder where the files should be modified.
+    colab_notebook_path: str
+        The folder where the colab notebooks are saved.
+    show_installation_code: boolean, default=False
+        If True, the pip and jupypter installation lines are shown. If False,
+        these instructions are commented out
+    google_colab_link: str or None, default=None
+        The link to google colab that can be used to open notebooks directly in
+        google colab.
+    """
+    tutorials = [f for f in os.listdir(tutorials_path) if f.endswith(".ipynb")]
+    for file_name in tutorials:
+        file_path = f"{tutorials_path}/{file_name}"
+        file_path_colab = f"{colab_notebook_path}/{file_name}"
+
+        try:
+            with open(file_path, 'r') as f:
+                file_content = f.read()
+        except OSError:
+            file_content = None
+
+        if file_content is not None:
+            processed_file_content = copy.copy(file_content)
+            processed_file_content = replace_colab_link(
+                processed_file_content,
+                file_path_colab,
+                google_colab_link
+            )
+            if show_installation_code:
+                processed_file_content = uncomment_installation_code(
+                    processed_file_content
+                )
+
+            if file_content != processed_file_content:
+                try:
+                    with open(file_path, 'w') as f:
+                        f.write(processed_file_content)
+                except OSError:
+                    print("Error while writing {}")
+                    pass
+
+
+def replace_colab_link(
+        file_content,
+        colab_path,
+        google_colab_link=None
+):
+    """This function replaces the placeholder (<colab_link>) within
+    `file_content` with the link that matches the location once the notebook is
+    included into the deployed documentation.
+
+    Parameters
+    ----------
+    file_content: str
+        The content of the jupyter notebook.
+    colab_path: str
+        The relative path to the colab notebook.
+    google_colab_link_prefix: str, default=None
+        The Google Colab address where you can specify the notebook to open in
+        Google Colab. If None, it is assumed that the official scikit-activeml
+        documentation is used.
+
+    Returns
+    -------
+    output : str
+        The notebook that includes the Google Colab link if there was a
+        placeholder.
+    """
+    google_colab_link = check_google_colab_link(google_colab_link)
+    colab_link = f"{google_colab_link}/{colab_path}"
+    output = re.sub(
+        pattern="<colab_link>",
+        repl=colab_link,
+        string=file_content
+    )
+    return output
+
+
+def check_google_colab_link(google_colab_link):
+    """This function checks if `google_colab_link` is a string. If it is, it is
+    returned as is. If it is `None`, a valid string that points to the official
+    scikit-activeml documentation is returned.
+
+    Parameters
+    ----------
+    google_colab_link : str or None, default=None
+        The Google Colab address where you can specify the notebook to open in
+        Google Colab. If None, it is assumed that the official scikit-activeml
+        documentation is used.
+
+    Returns
+    -------
+    output : str
+        Returns the string that was provided if it was not None. If it is None,
+        the string that points to the official scikit-activeml documentation
+        is returned
+    """
+    output = google_colab_link
+    if google_colab_link is None:
+        colab_github = 'https://colab.research.google.com/github'
+        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
+        docs_branch_path = 'blob/gh-pages'
+        output = (
+            f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
+        )
+    return output
+
+
+def uncomment_installation_code(file_content):
+    """This function removes the comment symbols for pip install and jupyter
+    nbextension install commands.
+
+    Parameters
+    ----------
+    file_content: str
+        The content of the jupyter notebook.
+
+    Returns
+    -------
+    output : str
+        The notebook that would install the needed packages.
+    """
+    pattern = r'\"# (!pip install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=file_content
+    )
+
+    pattern = r'\"# (!jupyter nbextension install .*?)\"'
+    repl = r'"\1"'
+    output = re.sub(
+        pattern=pattern,
+        repl=repl,
+        string=output
+    )
+    return output
 
 
 def export_legend(handles, labels, ax, path="legend.pdf", expand=None):
@@ -706,15 +973,17 @@ def export_legend(handles, labels, ax, path="legend.pdf", expand=None):
         expand = [-5, -5, 5, 5]
 
     ax.axis("off")
-    legend = ax.legend(handles, labels,
-                       loc=3,
-                       framealpha=1,
-                       frameon=True,
-                       ncol=4,
-                       mode="expand",
-                       bbox_to_anchor=(0., 0., 1., 1.),
-                       fontsize=8,
-                       )
+    legend = ax.legend(
+        handles,
+        labels,
+        loc=3,
+        framealpha=1,
+        frameon=True,
+        ncol=4,
+        mode="expand",
+        bbox_to_anchor=(0.0, 0.0, 1.0, 1.0),
+        fontsize=8,
+    )
 
     fig = legend.figure
     fig.canvas.draw()
@@ -752,8 +1021,9 @@ def generate_classification_legend(path):
     labels.append("Decision Boundary")
     handles.append(ax.plot([], [], color="black")[0])
     labels.append("Labeled Sample")
-    handles.append(ax.scatter([], [], marker=".", color="gray", s=100,
-                              alpha=0.8))
+    handles.append(
+        ax.scatter([], [], marker=".", color="gray", s=100, alpha=0.8)
+    )
     labels.append("Sample Of Class 0")
     handles.append(ax.scatter([], [], marker=".", color="blue"))
     labels.append("Sample Of Class 1")
@@ -763,9 +1033,9 @@ def generate_classification_legend(path):
     labels.append("75% Confidence Class 1")
     handles.append(ax.plot([], [], color="red", ls="--")[0])
     labels.append("High Utility Score")
-    handles.append(mpatches.Patch(color='green', alpha=1.0))
+    handles.append(mpatches.Patch(color="green", alpha=1.0))
     labels.append("Low Utility Score")
-    handles.append(mpatches.Patch(color='green', alpha=0.2))
+    handles.append(mpatches.Patch(color="green", alpha=0.2))
 
     export_legend(handles, labels, ax, path=path)
 
@@ -785,3 +1055,91 @@ def generate_regression_legend(path):
     labels.append("Labeled Sample")
 
     export_legend(handles, labels, ax, path=path)
+
+
+def generate_switcher(
+        repo_path=None,
+        switcher_location=None,
+        blacklisted_versions=None
+):
+    """Creates the version switcher file used by the PyDate theme.
+
+    Parameters
+    ----------
+    repo_path : str or None, default=None
+        The path to the repository root. If this parameter is None, ".." is
+        used instead.
+    switcher_location : str or None, default=None
+        The path where the switcher json is saved to. If this parameter is
+        None, "_static/switcher.json" is used instead.
+    blacklisted_versions : list of str or None, default=None
+        A list of versions which should be ignored for the switcher. If this
+        parameter is None, no versions are ignored.
+    """
+    if repo_path is None:
+        repo_path = ".."
+
+    if switcher_location is None:
+        switcher_location = "_static/switcher.json"
+
+    print(f"current path: {os.path.abspath('.')}")
+    print(f"repository path: {os.path.abspath(repo_path)}")
+    repo = git.Repo(repo_path)
+    tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
+    versions = [t.name for t in tags]
+
+    print(f"Found versions: {versions}")
+    # remove versions which are not accessible
+    if blacklisted_versions is not None:
+        print(f"Versions to remove: {blacklisted_versions}")
+        for blacklisted_version in blacklisted_versions:
+            if blacklisted_version in versions:
+                versions.remove(blacklisted_version)
+
+    print(f"Versions to create switcher for: {versions}")
+    switcher_text = create_switcher_text(versions)
+    with open(switcher_location, "w") as f:
+        for item in switcher_text:
+            f.write(item)
+
+
+def create_switcher_text(versions, docs_link=None):
+    """This function generates the content for the switcher json file.
+
+    Parameters
+    ----------
+    versions : list of str
+        A list of versions for which documentations are saved.
+    docs_link : str, default=None
+        The address to the documentation. If None, the address for the official
+        documentation is used instead.
+
+    Returns
+    -------
+    list of str
+        The content of the switcher json file separated by line
+    """
+    versions_short = [".".join(version.split(".")[:2]) for version in versions]
+    unique_versions, unique_index, unique_counts = np.unique(
+        versions_short, return_index=True, return_counts=True
+    )
+    versions_highest = np.array(versions)[unique_index + unique_counts - 1]
+    if docs_link is None:
+        docs_link = "https://scikit-activeml.github.io/scikit-activeml-docs"
+    # Create an entry for every version
+    content_list = []
+    content_list.append("[\n")
+    content_list.append("  {\n")
+    content_list.append('    "name": "latest",\n')
+    content_list.append('    "version": "latest",\n')
+    content_list.append(f'    "url": "{docs_link}/latest/"\n')
+    content_list.append("  },\n")
+    for ver, ver_s in zip(versions_highest[::-1], unique_versions[::-1]):
+        content_list.append("  {\n")
+        content_list.append(f'    "name": "{ver_s}",\n')
+        content_list.append(f'    "version": "{ver}",\n')
+        content_list.append(f'    "url": "{docs_link}/{ver_s}/"\n')
+        content_list.append("  },\n")
+    content_list[-1] = "  }\n"
+    content_list.append("]")
+    return content_list
