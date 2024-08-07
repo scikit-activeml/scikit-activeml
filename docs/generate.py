@@ -1,6 +1,6 @@
 import os
 
-import distutils.dir_util
+import packaging.version
 import importlib
 import inspect
 import json
@@ -799,8 +799,8 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
         find them. This path is specially used to save the versions of the
         notebook that are linked to Google Colab.
     """
-    distutils.dir_util.copy_tree(src=src_path, dst=dst_path)
-    distutils.dir_util.copy_tree(src=src_path, dst=dst_path_colab)
+    shutil.copytree(src=src_path, dst=dst_path)
+    shutil.copytree(src=src_path, dst=dst_path_colab)
     post_process_tutorials(
         dst_path,
         colab_notebook_path=dst_path_colab,
@@ -1085,19 +1085,20 @@ def generate_switcher(
     print(f"current path: {os.path.abspath('.')}")
     print(f"repository path: {os.path.abspath(repo_path)}")
     repo = git.Repo(repo_path)
-    tags = sorted(repo.tags, key=lambda t: t.commit.committed_datetime)
-    versions = [t.name for t in tags]
+    tag_list_str = repo.git.ls_remote("--tags", "origin")
+    versions_str = re.findall(r"\trefs\/tags\/(\d+.\d+.\d)", tag_list_str)
+    sorted_versions = sorted(versions_str, key=packaging.version.Version)
 
-    print(f"Found versions: {versions}")
+    print(f"Found versions: {sorted_versions}")
     # remove versions which are not accessible
     if blacklisted_versions is not None:
         print(f"Versions to remove: {blacklisted_versions}")
         for blacklisted_version in blacklisted_versions:
-            if blacklisted_version in versions:
-                versions.remove(blacklisted_version)
+            if blacklisted_version in sorted_versions:
+                sorted_versions.remove(blacklisted_version)
 
-    print(f"Versions to create switcher for: {versions}")
-    switcher_text = create_switcher_text(versions)
+    print(f"Versions to create switcher for: {sorted_versions}")
+    switcher_text = create_switcher_text(sorted_versions)
     with open(switcher_location, "w") as f:
         for item in switcher_text:
             f.write(item)
