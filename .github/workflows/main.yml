@@ -47,6 +47,7 @@ jobs:
         sudo apt-get install ghostscript
         python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
     - name: Test with pytest and newest dependencies
       run: |
         pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
@@ -75,6 +76,7 @@ jobs:
         sudo apt-get install ghostscript
         python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
     - name: Black
       uses: psf/black@stable
       with:
@@ -109,6 +111,7 @@ jobs:
         sudo apt-get install ghostscript
         python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
