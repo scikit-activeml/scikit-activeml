@@ -211,9 +211,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     batch_utilities_cand[
                         len(query_indices), leaf_indices_cand == leaf_idx
                     ] = 1
-                    batch_utilities_cand[len(query_indices), query_indices] = (
-                        np.nan
-                    )
+                    batch_utilities_cand[
+                        len(query_indices), query_indices
+                    ] = np.nan
                     query_indices.append(
                         rand_argmax(
                             batch_utilities_cand[len(query_indices)],
@@ -242,9 +242,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
                     batch_utilities_cand[
                         len(query_indices), leaf_indices_cand == leaf_idx
                     ] = d_min
-                    batch_utilities_cand[len(query_indices), query_indices] = (
-                        np.nan
-                    )
+                    batch_utilities_cand[
+                        len(query_indices), query_indices
+                    ] = np.nan
                     query_indices.append(
                         rand_argmax(
                             batch_utilities_cand[len(query_indices)],
