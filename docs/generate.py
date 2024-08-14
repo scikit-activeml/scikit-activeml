@@ -929,7 +929,7 @@ def check_google_colab_link(google_colab_link):
     if google_colab_link is None:
         colab_github = 'https://colab.research.google.com/github'
         docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
-        docs_branch_path = 'blob/gh-pages'
+        docs_branch_path = 'blob/gh-pages/latest'
         output = (
             f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
         )

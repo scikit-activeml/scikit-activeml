@@ -15,7 +15,7 @@ scikit-activeml: A Library and Toolbox for Active Learning Algorithms
 |Doc| |Codecov| |PythonVersion| |PyPi| |Black| |Downloads| |Paper|
 
 .. |Doc| image:: https://img.shields.io/badge/docs-latest-green
-   :target: https://scikit-activeml.github.io/scikit-activeml-docs/
+   :target: https://scikit-activeml.github.io/scikit-activeml-docs/latest/
 
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
    :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
@@ -73,18 +73,18 @@ version:
 
 Examples
 ========
-We provide a broad overview of different use-cases in our `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/tutorials.html>`_ offering
+We provide a broad overview of different use-cases in our `tutorial section <https://scikit-activeml.github.io/scikit-activeml-docs/latest/tutorials.html>`_ offering
 
-- `Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/00_pool_getting_started.html>`_,
-- `Deep Pool-based Active Learning - scikit-activeml with Skorch <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/01_deep_pool_al_with_skorch.html>`_,
-- `Pool-based Active Learning for Regression - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/02_pool_regression_getting_started.html>`_,
-- `Pool-based Active Learning - Sample Annotating <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/03_pool_oracle_annotations.html>`_,
-- `Pool-based Active Learning - Simple Evaluation Study <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/04_pool_simple_evaluation_study.html>`_,
-- `Active Image Classification via Self-supervised Learning <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/05_pool_al_with_self_supervised_learning.html>`_,
-- `Multi-annotator Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/10_multiple_annotators_getting_started.html>`_,
-- `Stream-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/20_stream_getting_started.html>`_,
-- `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/21_stream_batch_with_pool_al.html>`_,
-- and `Stream-based Active Learning With River <https://scikit-activeml.github.io/scikit-activeml-docs/generated/tutorials/22_river_classifier.html>`_.
+- `Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/00_pool_getting_started.html>`_,
+- `Deep Pool-based Active Learning - scikit-activeml with Skorch <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/01_deep_pool_al_with_skorch.html>`_,
+- `Pool-based Active Learning for Regression - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/02_pool_regression_getting_started.html>`_,
+- `Pool-based Active Learning - Sample Annotating <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/03_pool_oracle_annotations.html>`_,
+- `Pool-based Active Learning - Simple Evaluation Study <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/04_pool_simple_evaluation_study.html>`_,
+- `Active Image Classification via Self-supervised Learning <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/05_pool_al_with_self_supervised_learning.html>`_,
+- `Multi-annotator Pool-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/10_multiple_annotators_getting_started.html>`_,
+- `Stream-based Active Learning - Getting Started <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/20_stream_getting_started.html>`_,
+- `Batch Stream-based Active Learning with Pool Query Strategies <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/21_stream_batch_with_pool_al.html>`_,
+- and `Stream-based Active Learning With River <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/tutorials/22_river_classifier.html>`_.
 
 Two simple code snippets illustrating the straightforwardness of implementing active learning cycles with our Python package ``skactiveml`` are given in the following.
 
@@ -188,8 +188,8 @@ cycle is given below.
 Query Strategy Overview
 #######################
 
-For better orientation, we provide an `overview <https://scikit-activeml.github.io/scikit-activeml-docs/generated/strategy_overview.html>`_
-(incl. paper references and `visual examples <https://scikit-activeml.github.io/scikit-activeml-docs/generated/sphinx_gallery_examples/index.html>`_)
+For better orientation, we provide an `overview <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/strategy_overview.html>`_
+(incl. paper references and `visual examples <https://scikit-activeml.github.io/scikit-activeml-docs/latest/generated/sphinx_gallery_examples/index.html>`_)
 of the query strategies implemented by ``skactiveml``.
 
 |Overview| |Visualization|

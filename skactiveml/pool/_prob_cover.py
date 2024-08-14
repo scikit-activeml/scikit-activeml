@@ -22,7 +22,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     """Probability Coverage
 
     This class implements the Probability Coverage (ProbCover) query strategy
-    [1], which aims at maximizing the probability coverage in a meaningful
+    [1]_, which aims at maximizing the probability coverage in a meaningful
     sample embedding space.
 
     Parameters

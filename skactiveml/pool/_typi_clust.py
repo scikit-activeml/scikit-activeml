@@ -18,7 +18,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     """Typical Clustering
 
     This class implements the Typical Clustering (TypiClust) query strategy
-    [1], which considers both diversity and typicality (representativeness) of
+    [1]_, which considers both diversity and typicality (representativeness) of
     the samples.
 
     Parameters
@@ -39,8 +39,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] G. Hacohen, A. Dekel, und D. Weinshall, "Active Learning on a Budget:
-    Opposite Strategies Suit High and Low Budgets", ICLR, 2022.
+    .. [1] G. Hacohen, A. Dekel, und D. Weinshall, "Active Learning on a
+       Budget: Opposite Strategies Suit High and Low Budgets", ICML, 2022.
     """
 
     def __init__(
