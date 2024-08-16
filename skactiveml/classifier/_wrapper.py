@@ -39,7 +39,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """SklearnClassifier
 
     Implementation of a wrapper class for scikit-learn classifiers such that
-    missing labels can be handled. Therefore, samples with missing labels are
+    missing labels can be handled. Therefor, samples with missing labels are
     filtered.
 
     Parameters
@@ -725,7 +725,7 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
     Implement a wrapper class, to make it possible to use `PyTorch` with
     `skactiveml`. This is achieved by providing a wrapper around `PyTorch`
     that has a skactiveml interface and also be able to handle missing labels.
-    This wrapper is based on the open-source library `skorch` [1].
+    This wrapper is based on the open-source library `skorch` [1]_.
 
     Parameters
     ----------
@@ -733,12 +733,12 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
       A PyTorch :class:`~torch.nn.Module`. In general, the
       uninstantiated class should be passed, although instantiated
       modules will also work.
-    criterion : torch criterion (class), default: nn.NLLoss()
-      The uninitialized criterion (loss) used to optimize the
-      module.
+    criterion : nn.Module.__class, default=nn.NLLoss
+      The uninitialized criterion (loss) used to optimize the module.\
+      By default, `nn.NLLLoss` is used as criterion.
     *args: arguments
-        more possible arguments for initialize your neural network
-        see: https://skorch.readthedocs.io/en/stable/net.html
+        More possible arguments for initializing your neural network
+        (cf. https://skorch.readthedocs.io/en/stable/net.html).
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -752,20 +752,20 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
     **kwargs : keyword arguments
-        more possible parameters to customizing your neural network
-        see: https://skorch.readthedocs.io/en/stable/net.html
+        More possible parameters to customizing your neural network
+        (cf. https://skorch.readthedocs.io/en/stable/net.html).
 
     References
     ----------
-    [1] Marian Tietz, Thomas J. Fan, Daniel Nouri, Benjamin Bossan, and
-    skorch Developers. skorch: A scikit-learn compatible neural network
-    library that wraps PyTorch, July 2017.
+    .. [1] Marian Tietz, Thomas J. Fan, Daniel Nouri, Benjamin Bossan, and
+       skorch Developers. skorch: A scikit-learn compatible neural network
+       library that wraps PyTorch, July 2017.
     """
 
     def __init__(
         self,
         module,
-        criterion=nn.NLLLoss(),
+        criterion=nn.NLLLoss,
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
@@ -822,7 +822,7 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             check_X_dict=self.check_X_dict_,
         )
 
-        is_lbld = is_labeled(y, missing_label=self.missing_label)
+        is_lbld = is_labeled(y, missing_label=self.missing_label_)
         if np.sum(is_lbld) == 0:
             raise ValueError("There is no labeled data.")
         else:
