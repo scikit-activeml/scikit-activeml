@@ -103,7 +103,7 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         self.assertEqual(1, proba.shape[0])
         self.assertEqual(3, proba.shape[1])
 
-    def test_predict_P_annot(self):
+    def test_predict_proba_annot(self):
         gt_net = TestNeuralNet()
         clf = CrowdLayerClassifier(
             module__gt_net=gt_net,
@@ -111,7 +111,7 @@ class TestCrowdLayerClassifier(unittest.TestCase):
         )
         self.assertRaises(NotFittedError, clf.predict, X=self.X)
         clf.fit(self.X, self.y)
-        annot = clf.predict_P_annot(self.X[:2])
+        annot = clf.predict_proba_annot(self.X[:2])
         print(annot.shape)
         self.assertEqual(annot.shape[0], 2)
         self.assertEqual(annot.shape[1], 3)

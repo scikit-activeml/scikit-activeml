@@ -12,9 +12,9 @@ from ...classifier import SkorchClassifier
 
 class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
     """
-    CrowdLayerClassifier
+    Crowd Layer
 
-    CrowdLayer [1] is a layer added at the end of a classifying neural network
+    Crowd Layer [1]_ is a layer added at the end of a classifying neural network
     and allows us to train deep neural networks end-to-end, directly from the
     noisy labels of multiple annotators, using only backpropagation.
 
@@ -25,9 +25,9 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
     module__gt_net : nn.Module
         Pytorch module of the GT model taking samples
         as input to predict class-membership logits.
-    arguments
-        more possible arguments for initialize your neural network
-        see: https://skorch.readthedocs.io/en/stable/net.html
+    *args :
+        More possible arguments for initializing your neural network
+        (cf. https://skorch.readthedocs.io/en/stable/net.html).
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If none, the classes are determined
         during the fit.
@@ -41,15 +41,15 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
     **kwargs : keyword arguments
-        more possible parameters to customizing your neural network
-        see: https://skorch.readthedocs.io/en/stable/net.html
+        More possible parameters for customizing your neural network
+        (cf. https://skorch.readthedocs.io/en/stable/net.html).
     ATTENTION: Criterion is in this methode predefined. Please don't overwrite the
     'criterion' parameter.
 
     References
     ----------
-    [1] Rodrigues, Filipe, and Francisco Pereira. "Deep learning from crowds." In Proceedings of the AAAI conference on
-        artificial intelligence, vol. 32, no. 1. 2018.
+    .. [1] Rodrigues, Filipe, and Francisco Pereira. "Deep Learning from Crowds." AAAI Conference on
+        Artificial Intelligence, 2018.
 
     """
 
@@ -57,7 +57,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
         super(CrowdLayerClassifier, self).__init__(
             module=CrowdLayerModule,
             *args,
-            criterion=CrossEntropyLoss(),
+            criterion=CrossEntropyLoss,
             criterion__reduction="mean",
             criterion__ignore_index=-1,
             **kwargs,
@@ -91,7 +91,7 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples
         y : array-like of shape (n_samples, )
@@ -127,9 +127,9 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features)
             Test samples.
-        return_confusion_matrix : bool, optional (default=False)
+        return_confusion_matrix : bool, default=False
             If `return_confusion_matrix=True`, the entire confusion matrix per annotator is returned.
 
         Returns
@@ -206,12 +206,12 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
             "y_pred": y_pred,
         }
 
-    def predict_P_annot(self, X):
+    def predict_proba_annot(self, X):
         """Predict the probabilities of annotator assign for a label for the given input data.
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features)
             Test samples.
 
         Returns
@@ -227,9 +227,9 @@ class CrowdLayerClassifier(SkorchClassifier, AnnotatorModelMixin):
 
 class CrowdLayerModule(nn.Module):
     """
-    CrowdLayerModule
+    Crowd Layer Module
 
-    CrowdLayer [1] is a layer added at the end of a classifying neural network
+    Crowd Layer [1]_ is a layer added at the end of a classifying neural network
     and allows us to train deep neural networks end-to-end, directly from the
     noisy labels of multiple annotators, using only backpropagation.
 
@@ -245,8 +245,8 @@ class CrowdLayerModule(nn.Module):
 
     References
     ----------
-    [1] Rodrigues, Filipe, and Francisco Pereira. "Deep learning from crowds." In Proceedings
-    of the AAAI conference on artificial intelligence, vol. 32, no. 1. 2018.
+    .. [1] Rodrigues, Filipe, and Francisco Pereira. "Deep Learning from Crowds."  AAAI
+       Conference on Artificial Intelligence, 2018.
     """
 
     def __init__(
