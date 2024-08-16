@@ -124,20 +124,24 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
         for (i, candidates), (j, annotators) in product(
             enumerate(candidates_values), enumerate(annotators_values)
         ):
-            X, y, candidates, annotators, batch_size, return_utilities = (
-                self.qs._validate_data(
-                    candidates=candidates,
-                    annotators=annotators,
-                    X=X,
-                    y=y,
-                    batch_size=batch_size_initial,
-                    return_utilities=False,
-                )
+            (
+                X,
+                y,
+                candidates,
+                annotators,
+                batch_size,
+                return_utilities,
+            ) = self.qs._validate_data(
+                candidates=candidates,
+                annotators=annotators,
+                X=X,
+                y=y,
+                batch_size=batch_size_initial,
+                return_utilities=False,
             )
             self.assertEqual(batch_sizes_expected[i][j], batch_size)
 
     def test__transform_cand_annot(self):
-
         self.assertRaises(
             ValueError,
             self.qs._transform_cand_annot,
@@ -268,15 +272,20 @@ class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
         for (i, candidates), (j, annotators) in product(
             enumerate(candidates_values), enumerate(annotators_values)
         ):
-            X, y, candidates, annotators, batch_size, return_utilities = (
-                self.qs._validate_data(
-                    candidates=candidates,
-                    annotators=annotators,
-                    X=X,
-                    y=y,
-                    batch_size=batch_size_initial,
-                    return_utilities=False,
-                )
+            (
+                X,
+                y,
+                candidates,
+                annotators,
+                batch_size,
+                return_utilities,
+            ) = self.qs._validate_data(
+                candidates=candidates,
+                annotators=annotators,
+                X=X,
+                y=y,
+                batch_size=batch_size_initial,
+                return_utilities=False,
             )
 
             X_cand, mapping, A_cand = self.qs._transform_cand_annot(
