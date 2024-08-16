@@ -21,7 +21,6 @@ scikit-activeml: A Library and Toolbox for Active Learning Algorithms
    :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
 .. |PythonVersion| image:: https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue.svg
-
    :target: https://img.shields.io/badge/python-3.8%20%7C%203.9%20%7C%203.10-blue
 
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
