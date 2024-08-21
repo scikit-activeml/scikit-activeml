@@ -1135,6 +1135,11 @@ def create_switcher_text(versions, docs_link=None):
     content_list.append('    "version": "latest",\n')
     content_list.append(f'    "url": "{docs_link}/latest/"\n')
     content_list.append("  },\n")
+    content_list.append("  {\n")
+    content_list.append('    "name": "development",\n')
+    content_list.append('    "version": "development",\n')
+    content_list.append(f'    "url": "{docs_link}/development/"\n')
+    content_list.append("  },\n")
     for ver, ver_s in zip(versions_highest[::-1], unique_versions[::-1]):
         content_list.append("  {\n")
         content_list.append(f'    "name": "{ver_s}",\n')
