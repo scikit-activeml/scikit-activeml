@@ -126,7 +126,7 @@ jobs:
     - name: Trigger latest documentation for scikit-activeml-docs
       if: github.ref == 'refs/heads/master'
       run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs\"}"
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_latest\"}"
 
   trigger_scikit-activeml-docs-dev:
     runs-on: ubuntu-latest
@@ -134,4 +134,4 @@ jobs:
     - name: Trigger development documentation for scikit-activeml-docs
       if: github.ref == 'refs/heads/development'
       run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_dev\"}"
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_development\"}"
