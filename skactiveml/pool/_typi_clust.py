@@ -150,26 +150,31 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         cluster_labels = cluster_obj.fit_predict(X)
 
-        cluster_ids, cluster_sizes = np.unique(
+        # determine number of samples per cluster and mask clusters with
+        # labeled samples
+        cluster_sizes = np.zeros(n_clusters)
+        cluster_ids, cluster_ids_sizes = np.unique(
             cluster_labels, return_counts=True
         )
-
+        cluster_sizes[cluster_ids] = cluster_ids_sizes
         covered_cluster = np.unique(
             [cluster_labels[i] for i in labeled_sample_indices]
         )
-
         if len(covered_cluster) > 0:
             cluster_sizes[covered_cluster] = 0
 
         utilities = np.full(shape=(batch_size, X.shape[0]), fill_value=np.nan)
         query_indices = []
         for i in range(batch_size):
-            cluster_id = rand_argmax(
-                cluster_sizes, random_state=self.random_state_
-            )
-            is_cluster = cluster_labels == cluster_id
-            uncovered_samples_mapping = np.where(is_cluster)[0]
-            typicality = _typicality(X, uncovered_samples_mapping, self.k)
+            if cluster_sizes.max() == 0:
+                typicality = np.ones(len(X))
+            else:
+                cluster_id = rand_argmax(
+                    cluster_sizes, random_state=self.random_state_
+                )
+                is_cluster = cluster_labels == cluster_id
+                uncovered_samples_mapping = np.where(is_cluster)[0]
+                typicality = _typicality(X, uncovered_samples_mapping, self.k)
             utilities[i, mapping] = typicality[mapping]
             utilities[i, query_indices] = np.nan
             idx = rand_argmax(
@@ -186,7 +191,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             return query_indices
 
 
-def _typicality(X, uncovered_samples_mapping, k):
+def _typicality(X, uncovered_samples_mapping, k, eps=1e-7):
     """
     Calculation the typicality of samples `X` in uncovered clusters.
 
@@ -200,6 +205,9 @@ def _typicality(X, uncovered_samples_mapping, k):
        Index array that maps `candidates` to `X_for_cluster`.
     k : int
         k for computation of k nearst neighbors.
+    eps : float > 0, default=1e-7
+        Minimum distance sum to compute typicality.
+
     Returns
     -------
     typicality : numpy.ndarray of shape (n_X)
@@ -214,7 +222,7 @@ def _typicality(X, uncovered_samples_mapping, k):
     dist_matrix_sort_inc, _ = nn.kneighbors(
         X[uncovered_samples_mapping], n_neighbors=k + 1, return_distance=True
     )
-    knn = np.sum(dist_matrix_sort_inc, axis=1)
+    knn = np.sum(dist_matrix_sort_inc, axis=1) + eps
     typi = ((1 / k) * knn) ** (-1)
     typicality[uncovered_samples_mapping] = typi
     return typicality
