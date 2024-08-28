@@ -3,14 +3,12 @@ name: skactiveml
 on: [push]
 
 jobs:
-  build:
-
+  test_oldest_dependencies:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
       matrix:
         python-version: [ '3.9', '3.10', '3.11', '3.12' ]
-
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
@@ -29,9 +27,56 @@ jobs:
     - name: Test with pytest and oldest dependencies
       run: |
         pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
-    - name: Install latest dependencies
+
+  test_newest_dependencies:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
       run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
         pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
+    - name: Test with pytest and newest dependencies
+      run: |
+        pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: true
+
+  check_formatting_and_linting:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
     - name: Black
       uses: psf/black@stable
       with:
@@ -43,14 +88,27 @@ jobs:
         flake8 skactiveml/ --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 skactiveml/ --ignore=E203,W503 --count --exit-zero --statistics
-    - name: Test with pytest
-      run: |
-        pytest -n auto --cov-config=.coveragerc --cov=./skactiveml --cov-report=xml --cov-fail-under=100
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+
+  create_documentation:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        fail_ci_if_error: true
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
@@ -65,7 +123,15 @@ jobs:
   trigger_scikit-activeml-docs:
     runs-on: ubuntu-latest
     steps:
-    - name: Trigger documentation for scikit-activeml-docs
+    - name: Trigger latest documentation for scikit-activeml-docs
       if: github.ref == 'refs/heads/master'
       run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs\"}"
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_latest\"}"
+
+  trigger_scikit-activeml-docs-dev:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Trigger development documentation for scikit-activeml-docs
+      if: github.ref == 'refs/heads/development'
+      run: |
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_development\"}"
