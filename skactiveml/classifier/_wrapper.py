@@ -310,11 +310,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     )
                 elif fit_function == "fit":
                     fit_kwargs["sample_weight"] = sample_weight[is_lbld]
-                    self.estimator_.fit(
-                        X=X_lbld,
-                        y=y_lbld_inv,
-                        **fit_kwargs,
-                    )
+                    self.estimator_.fit(X=X_lbld, y=y_lbld_inv, **fit_kwargs)
             self.is_fitted_ = True
         except Exception as e:
             self.is_fitted_ = False
@@ -822,15 +818,31 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             check_X_dict=self.check_X_dict_,
         )
 
-        is_lbld = is_labeled(y, missing_label=self.missing_label_)
-        if np.sum(is_lbld) == 0:
-            raise ValueError("There is no labeled data.")
-        else:
-            X_lbld = X[is_lbld]
-            y_lbld = y[is_lbld].astype(np.int64)
-            return super(SkorchClassifier, self).fit(
-                X_lbld, y_lbld, **fit_params
+        is_lbld = is_labeled(y, missing_label=self.missing_label)
+        self._label_counts = [
+            np.sum(y[is_lbld] == c) for c in range(len(self.classes))
+        ]
+        try:
+            if np.sum(is_lbld) == 0:
+                raise ValueError("There is no labeled data.")
+            else:
+                X_lbld = X[is_lbld]
+                y_lbld = y[is_lbld].astype(np.int64)
+                super(SkorchClassifier, self).fit(
+                    X_lbld, y_lbld, **fit_params
+                )
+                self.is_fitted_ = True
+        except Exception as e:
+            super(SkorchClassifier, self).initialize()
+            self.is_fitted_ = False
+            warnings.warn(
+                "The 'base_estimator' could not be fitted because of"
+                " '{}'. Therefore, the class labels of the samples "
+                "are counted and will be used to make predictions. ".format(
+                    e
+                )
             )
+        return self
 
     def predict(self, X):
         """Return class label predictions for the input data X.
@@ -846,3 +858,24 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             Predicted class labels of the input samples.
         """
         return SkactivemlClassifier.predict(self, X)
+
+    def perdict_proba(self, X):
+        X = check_array(X, **self.check_X_dict_)
+        self._check_n_features(X, reset=False)
+        print(self.is_fitted_)
+        if self.is_fitted_:
+            return super(SkorchClassifier, self).predict_proba(X)
+
+        warnings.warn(
+            f"Since the 'base_estimator' could not be fitted when"
+            f" calling the `fit` method, the class label "
+            f"distribution`_label_counts={self._label_counts}` is used to "
+            f"make the predictions."
+        )
+        if sum(self._label_counts) == 0:
+            print('Hi')
+            return np.ones([len(X), len(self.classes_)]) / len(self.classes)
+        else:
+            return np.tile(
+                self._label_counts / np.sum(self._label_counts), [len(X), 1]
+            )

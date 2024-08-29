@@ -850,6 +850,7 @@ class TestSkorchClassifier(unittest.TestCase):
         self.X = self.X.astype(np.float32)
         self.y = np.copy(self.y_true)
         self.y[:100] = -1
+        self.y_ulbld = np.full_like(self.y, fill_value=-1)
 
     def test_init_param_module(self):
         clf = SkorchClassifier(module="Test")
@@ -882,8 +883,8 @@ class TestSkorchClassifier(unittest.TestCase):
         )
         np.testing.assert_array_equal([0, 1, 2], clf.classes)
         self.assertRaises(NotFittedError, clf.check_is_fitted)
-        y_ulbld = np.full_like(self.y, fill_value=-1)
-        self.assertRaises(ValueError, clf.fit, X=self.X, y=y_ulbld)
+        clf.fit(self.X, self.y_ulbld)
+        self.assertFalse(clf.is_fitted_)
         clf.fit(self.X, self.y)
         self.assertIsNone(clf.check_is_fitted())
 
@@ -907,6 +908,30 @@ class TestSkorchClassifier(unittest.TestCase):
         clf.fit(self.X, self.y)
         y_pred = clf.predict(self.X)
         self.assertEqual(len(y_pred), len(self.X))
+
+    def test_predict_proba(self):
+        clf = SkorchClassifier(
+            module=TestNeuralNet,
+            classes=[0, 1, 2],
+            missing_label=-1,
+            cost_matrix=None,
+            random_state=1,
+            criterion=nn.CrossEntropyLoss(),
+            train_split=None,
+            verbose=False,
+            optimizer=torch.optim.Adam,
+            device="cpu",
+            lr=0.001,
+            max_epochs=10,
+            batch_size=1,
+        )
+        clf.fit(self.X, self.y_ulbld)
+        print(clf.is_fitted_)
+        predict_proba = clf.predict_proba(self.X)
+        clf.fit(self.X, self.y)
+        predict_proba = clf.predict_proba(self.X)
+        self.assertEqual(len(predict_proba), len(self.X))
+        self.assertEqual(predict_proba.shape[1], 3)
 
 
 class TestNeuralNet(nn.Module):
