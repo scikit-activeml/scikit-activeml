@@ -926,8 +926,8 @@ class TestSkorchClassifier(unittest.TestCase):
             batch_size=1,
         )
         clf.fit(self.X, self.y_ulbld)
-        print(clf.is_fitted_)
         predict_proba = clf.predict_proba(self.X)
+        self.assertEqual(predict_proba[0, 0], 1/3)
         clf.fit(self.X, self.y)
         predict_proba = clf.predict_proba(self.X)
         self.assertEqual(len(predict_proba), len(self.X))

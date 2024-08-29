@@ -859,10 +859,8 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
         """
         return SkactivemlClassifier.predict(self, X)
 
-    def perdict_proba(self, X):
+    def predict_proba(self, X):
         X = check_array(X, **self.check_X_dict_)
-        self._check_n_features(X, reset=False)
-        print(self.is_fitted_)
         if self.is_fitted_:
             return super(SkorchClassifier, self).predict_proba(X)
 
@@ -873,7 +871,6 @@ class SkorchClassifier(NeuralNet, SkactivemlClassifier):
             f"make the predictions."
         )
         if sum(self._label_counts) == 0:
-            print('Hi')
             return np.ones([len(X), len(self.classes_)]) / len(self.classes)
         else:
             return np.tile(
