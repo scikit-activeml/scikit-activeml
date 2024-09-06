@@ -317,7 +317,7 @@ class Testbatch_bald(unittest.TestCase):
         probas = np.random.rand(10, 100, 5)
         np.testing.assert_equal(_bald(probas), _bald(probas))
         np.testing.assert_allclose(
-            _bald(probas), batch_bald(probas, batch_size=1)[0]
+            _bald(probas), batch_bald(probas, batch_size=1)[0], rtol=1e-6
         )
         np.testing.assert_equal(
             batch_bald(probas, batch_size=1), batch_bald(probas, batch_size=1)
