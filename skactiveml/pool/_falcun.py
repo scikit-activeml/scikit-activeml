@@ -18,18 +18,18 @@ from ._uncertainty_sampling import uncertainty_scores
 
 
 class Falcun(SingleAnnotatorPoolQueryStrategy):
-    """Fast active learning by contrastive uncertainty (Falcun)
+    """Fast Active Learning by Contrastive UNcertainty (FALCUN)
 
-    This class implements the Fast active learning by contrastive uncertainty
-    (Falcun) query strategy [1]_, is a hybrid pool-based strategy that jointly
-    selects uncertain samples via margin sampling while considering diversity
-    within the probability space.
+    This class implements the "Fast Active Learning by Contrastive UNcertainty"
+    (FALCUN) query strategy [1]_, which is a hybrid pool-based strategy that
+    jointly selects uncertain samples via margin sampling while considering
+    diversity within the class probability space.
 
     Parameters
     ----------
     gamma : float > 0, default=1
         Controls the randomness in the selection. A value of 0 corresponds to
-        random sampling while a value going to infinity corresponds to always
+        random sampling, while a value going to infinity corresponds to
         select the sample with the highest utility.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -104,12 +104,13 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-                - If `candidates` is `None`, the indexing refers to the samples
-                  in `X`.
-                - If `candidates` is of shape `(n_candidates,)` and of type
-                  `int`, `utilities` refers to the samples in `X`.
-                - If `candidates` is of shape `(n_candidates, *)`, `utilities`
-                  refers to the indexing in `candidates`.
+
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

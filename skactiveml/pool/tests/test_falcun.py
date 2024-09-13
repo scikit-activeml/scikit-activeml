@@ -109,7 +109,9 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 utilities_copy[is_nan] = 0.0
                 is_non_negative = utilities_copy >= 0
                 self.assertTrue(is_non_negative.all())
-                self.assertAlmostEqual(np.nansum(utilities), 2)
+                np.testing.assert_allclose(
+                    np.nansum(utilities, axis=1), [1, 1]
+                )
                 if prev_utilities is not None:
                     self.assertTrue((utilities_copy != prev_utilities).sum())
                     # Check that different `gamma` values lead to the same
