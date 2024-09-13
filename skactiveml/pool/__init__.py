@@ -40,6 +40,7 @@ from ._prob_cover import ProbCover
 from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
+from ._falcun import Falcun
 
 __all__ = [
     "multiannotator",
@@ -80,4 +81,5 @@ __all__ = [
     "RegressionTreeBasedAL",
     "SubSamplingWrapper",
     "ParallelUtilityEstimationWrapper",
+    "Falcun",
 ]
