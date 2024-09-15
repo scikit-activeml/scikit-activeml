@@ -23,14 +23,14 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     This class implements the "Fast Active Learning by Contrastive UNcertainty"
     (FALCUN) query strategy [1]_, which is a hybrid pool-based strategy that
     jointly selects uncertain samples via margin sampling while considering
-    diversity within the class probability space.
+    batch diversity within the class probability space.
 
     Parameters
     ----------
     gamma : float > 0, default=1
         Controls the randomness in the selection. A value of 0 corresponds to
         random sampling, while a value going to infinity corresponds to
-        select the sample with the highest utility.
+        selecting the sample with the highest utility (relevance).
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -119,7 +119,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         check_scalar(
             self.gamma,
-            "eps",
+            "gamma",
             min_val=0,
             target_type=(float, int),
             min_inclusive=True,
@@ -147,7 +147,8 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         cand_indices = np.arange(len(X_cand))
         for b in range(batch_size):
             if b > 0:
-                # Update distances (diversity) values (cf. Eq. (4) in [1]).
+                # Update distances (diversity) values in the class probability
+                # space (cf. Eqs. (2) and (4) in [1]).
                 probas_q = probas_cand[query_indices[int(b - 1)]]
                 dist_new = np.abs(probas_cand - probas_q[None, :]).sum(axis=1)
                 dist_cand = np.minimum(dist_new, dist_cand)
@@ -157,7 +158,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
                 if dist_range > 0:
                     dist_cand /= dist_range
 
-            # Compute relevance score for candidates (cf. Eq. (5) in [1]).
+            # Compute relevance scores for candidates (cf. Eq. (5) in [1]).
             rel_cand = (unc_cand + dist_cand) ** self.gamma
             rel_cand[query_indices] = 0
             rel_cand_sum = np.sum(rel_cand)
