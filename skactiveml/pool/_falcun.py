@@ -158,7 +158,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
                 if dist_range > 0:
                     dist_cand /= dist_range
 
-            # Compute relevance scores for candidates (cf. Eq. (5) in [1]).
+            # Compute relevance scores for candidates (cf. Eq. (5) and (6) in [1]).
             rel_cand = (unc_cand + dist_cand) ** self.gamma
             rel_cand[query_indices] = 0
             rel_cand_sum = np.sum(rel_cand)
