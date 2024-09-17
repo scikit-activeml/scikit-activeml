@@ -149,8 +149,8 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             if b > 0:
                 # Update distances (diversity) values in the class probability
                 # space (cf. Eqs. (2) and (4) in [1]).
-                probas_q = probas_cand[query_indices[int(b - 1)]]
-                dist_new = np.abs(probas_cand - probas_q[None, :]).sum(axis=1)
+                probas_q = probas_cand[[query_indices[int(b - 1)]]]
+                dist_new = np.abs(probas_cand - probas_q).sum(axis=1)
                 dist_cand = np.minimum(dist_new, dist_cand)
                 dist_min = dist_cand.min()
                 dist_range = dist_cand.max() - dist_min
