@@ -3,6 +3,7 @@ import warnings
 
 from copy import deepcopy
 import numpy as np
+import torch
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import BaggingClassifier
@@ -19,12 +20,14 @@ from sklearn.linear_model import (
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError, check_is_fitted
+from torch import nn
 
 from skactiveml.classifier import (
     SklearnClassifier,
     SlidingWindowClassifier,
     ParzenWindowClassifier,
     MixtureModelClassifier,
+    SkorchClassifier,
 )
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
 
@@ -837,3 +840,112 @@ class TestSlidingWindowClassifier(
         freq_est = est.predict_freq(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(freq, freq_est)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
+
+
+class TestSkorchClassifier(unittest.TestCase):
+    def setUp(self):
+        self.X, self.y_true = make_blobs(
+            n_samples=200, n_features=2, centers=3, random_state=0
+        )
+        self.X = self.X.astype(np.float32)
+        self.y = np.copy(self.y_true)
+        self.y[:100] = -1
+        self.y_ulbld = np.full_like(self.y, fill_value=-1)
+
+    def test_init_param_module(self):
+        clf = SkorchClassifier(module="Test")
+        self.assertEqual(clf.module, "Test")
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
+
+        clf = SkorchClassifier(module=None)
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
+
+        clf = SkorchClassifier(module=[("nn.Module", TestNeuralNet)])
+        self.assertRaises(TypeError, clf.fit, X=self.X, y=self.y)
+
+        clf = SkorchClassifier(classes=[0, 1, 2], module=TestNeuralNet)
+        self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
+
+    def test_fit(self):
+        clf = SkorchClassifier(
+            module=TestNeuralNet,
+            classes=[0, 1, 2],
+            missing_label=-1,
+            random_state=1,
+            criterion=nn.CrossEntropyLoss,
+            train_split=None,
+            verbose=False,
+            optimizer=torch.optim.SGD,
+            device="cpu",
+            lr=0.001,
+            max_epochs=10,
+            batch_size=1,
+        )
+        np.testing.assert_array_equal([0, 1, 2], clf.classes)
+        self.assertRaises(NotFittedError, clf.check_is_fitted)
+        clf.fit(self.X, self.y_ulbld)
+        self.assertFalse(clf.is_fitted_)
+        clf.fit(self.X, self.y)
+        self.assertIsNone(clf.check_is_fitted())
+
+    def test_predict(self):
+        clf = SkorchClassifier(
+            module=TestNeuralNet,
+            classes=[0, 1, 2],
+            missing_label=-1,
+            cost_matrix=None,
+            random_state=1,
+            criterion=nn.CrossEntropyLoss(),
+            train_split=None,
+            verbose=False,
+            optimizer=torch.optim.Adam,
+            device="cpu",
+            lr=0.001,
+            max_epochs=10,
+            batch_size=1,
+        )
+        self.assertRaises(NotFittedError, clf.predict, X=self.X)
+        clf.fit(self.X, self.y)
+        y_pred = clf.predict(self.X)
+        self.assertEqual(len(y_pred), len(self.X))
+
+    def test_predict_proba(self):
+        clf = SkorchClassifier(
+            module=TestNeuralNet,
+            classes=[0, 1, 2],
+            missing_label=-1,
+            cost_matrix=None,
+            random_state=1,
+            criterion=nn.CrossEntropyLoss(),
+            train_split=None,
+            verbose=False,
+            optimizer=torch.optim.Adam,
+            device="cpu",
+            lr=0.001,
+            max_epochs=10,
+            batch_size=1,
+        )
+        clf.fit(self.X, self.y_ulbld)
+        predict_proba = clf.predict_proba(self.X)
+        self.assertEqual(predict_proba[0, 0], 1/3)
+        clf.fit(self.X, self.y)
+        predict_proba = clf.predict_proba(self.X)
+        self.assertEqual(len(predict_proba), len(self.X))
+        self.assertEqual(predict_proba.shape[1], 3)
+
+
+class TestNeuralNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.input_to_hidden = nn.Linear(
+            in_features=2, out_features=2, bias=True
+        )
+        self.hidden_to_output = nn.Linear(
+            in_features=2, out_features=3, bias=True
+        )
+
+    def forward(self, X):
+        hidden = self.input_to_hidden(X)
+        hidden = torch.relu(hidden)
+        output_values = self.hidden_to_output(hidden)
+        return output_values
