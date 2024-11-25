@@ -76,7 +76,7 @@
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Density-weighted Uncertainty Sampling",
-    "refs" : ["donmez2007dual", "nguyen2004active"],
+    "refs" : ["tang2002active"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
     "import_clf" : "from sklearn.linear_model import LogisticRegression\nfrom sklearn.mixture import GaussianMixture\nfrom skactiveml.classifier import SklearnClassifier",
@@ -95,7 +95,7 @@
     "template" : "examples/pool/template_DUAL.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Dual strategy for Active Learning",
-    "refs" : ["donmez2007dual", "nguyen2004active"],
+    "refs" : ["donmez2007dual"],
     "sequence" : ["title", "plot", "refs"]
   }
 ]

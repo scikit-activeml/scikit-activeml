@@ -16,7 +16,7 @@
 "$install_dependencies|# !pip install scikit-activeml"
 
 # %%
-#.. raw:: html
+# .. raw:: html
 #
 #   <hr style="border-style: solid; border-top: 1px solid; border-right: 0; border-bottom: 0; border-left: 0;">
 #
@@ -37,14 +37,18 @@ random_state = np.random.RandomState(0)
 def true_function(X_):
     return (X_**3 + 2 * X_**2 + X_ - 1).flatten()
 
+
 n_samples = "$n_samples|100"
 X = np.concatenate(
-        [uniform.rvs(0, 1.5, 9 * n_samples // 10, random_state=random_state),
-         uniform.rvs(1.5, 0.5, n_samples // 10, random_state=random_state)]
-    ).reshape(-1, 1)
+    [
+        uniform.rvs(0, 1.5, 9 * n_samples // 10, random_state=random_state),
+        uniform.rvs(1.5, 0.5, n_samples // 10, random_state=random_state),
+    ]
+).reshape(-1, 1)
 
-noise = np.vectorize(lambda x : random_state.rand() * 1.5 if x < 1
-                                else random_state.rand() * 0.5)
+noise = np.vectorize(
+    lambda x: random_state.rand() * 1.5 if x < 1 else random_state.rand() * 0.5
+)
 
 # Build a dataset.
 y_true = true_function(X) + noise(X).flatten()
