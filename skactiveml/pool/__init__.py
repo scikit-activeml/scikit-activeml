@@ -41,6 +41,7 @@ from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
 from ._drop_query import DropQuery
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
+from ._falcun import Falcun
 
 __all__ = [
     "multiannotator",
@@ -82,4 +83,5 @@ __all__ = [
     "RegressionTreeBasedAL",
     "SubSamplingWrapper",
     "ParallelUtilityEstimationWrapper",
+    "Falcun",
 ]
