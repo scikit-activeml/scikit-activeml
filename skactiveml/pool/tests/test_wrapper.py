@@ -122,15 +122,14 @@ class TestSubSamplingWrapper(
             self.query_default_params_reg,
         ]:
             init_params_base = deepcopy(self.init_default_params)
-            init_params_base.pop('exclude_non_subsample')
+            init_params_base.pop("exclude_non_subsample")
             candidate_indices = unlabeled_indices(
-                query_params['y'],
-                init_params_base['missing_label']
+                query_params["y"], init_params_base["missing_label"]
             )
             candidates_list = [
                 None,
                 candidate_indices,
-                query_params['X'][candidate_indices]
+                query_params["X"][candidate_indices],
             ]
             for batch_size in [1, 3]:
                 for candidates in candidates_list:
@@ -140,12 +139,10 @@ class TestSubSamplingWrapper(
                         query_params_base["candidates"] = candidates
                         query_params_base["batch_size"] = batch_size
                         qs_false = SubSamplingWrapper(
-                            exclude_non_subsample=False,
-                            **init_params_base
+                            exclude_non_subsample=False, **init_params_base
                         )
                         qs_true = SubSamplingWrapper(
-                            exclude_non_subsample=True,
-                            **init_params_base
+                            exclude_non_subsample=True, **init_params_base
                         )
                         query_indices_false, utilities_false = qs_false.query(
                             **query_params_base
@@ -155,12 +152,10 @@ class TestSubSamplingWrapper(
                         )
 
                         np.testing.assert_array_equal(
-                            query_indices_false,
-                            query_indices_true
+                            query_indices_false, query_indices_true
                         )
                         np.testing.assert_array_equal(
-                            utilities_false,
-                            utilities_true
+                            utilities_false, utilities_true
                         )
 
     def test_query_param_query_kwargs(self, test_cases=None):

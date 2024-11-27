@@ -235,9 +235,8 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
         # retransform queried indices and utilities as if no training data was
         # removed
-        if (
-            self.exclude_non_subsample
-            and (candidates is None or candidates.ndim == 1)
+        if self.exclude_non_subsample and (
+            candidates is None or candidates.ndim == 1
         ):
             # transform to original candidate indices
             queried_indices = subset_and_labeled_indices[queried_indices]
