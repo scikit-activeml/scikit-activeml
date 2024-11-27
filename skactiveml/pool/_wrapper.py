@@ -3,6 +3,7 @@ from ..utils import (
     MISSING_LABEL,
     check_random_state,
     is_labeled,
+    labeled_indices,
     unlabeled_indices,
     check_scalar,
     simple_batch,
@@ -31,6 +32,11 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
          integer, `max_candidates` is the maximum number of candidates whose
          utilities are computed. If `max_candidates` is a float,
          `max_candidates` is the fraction of the original number of candidates.
+    exclude_non_subsample : bool, optional (default=False)
+         If True, unlabeled candidates in X and Y are excluded which are not
+         part of the subsample. If `candidates` is an array-like of shape
+         (n_candidates, n_features), all unlabeled data will be removed from
+         `X` and `y`. If False, `X` and `y` stays the same.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState
@@ -40,7 +46,8 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
     def __init__(
         self,
         query_strategy=None,
-        max_candidates=None,
+        max_candidates=0.1,
+        exclude_non_subsample=False,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -49,6 +56,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         )
         self.query_strategy = query_strategy
         self.max_candidates = max_candidates
+        self.exclude_non_subsample = exclude_non_subsample
 
     @match_signature("query_strategy", "query")
     def query(
@@ -120,6 +128,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"`query_strategy` is of type `{type(self.query_strategy)}` "
                 f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
             )
+        check_scalar(self.exclude_non_subsample, "exclude_non_subsample", bool)
         seed_multiplier = (
             int(is_labeled(y, missing_label=self.missing_label_).sum()) + 1
         )
@@ -177,37 +186,82 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
                 )
                 new_candidates = candidates[new_candidate_indices]
 
+        if self.exclude_non_subsample:
+            all_labeled = labeled_indices(
+                y=y, missing_label=self.missing_label_
+            )
+            if candidates is not None and candidates.ndim > 1:
+                subset_and_labeled_indices = all_labeled
+            else:
+                subset_and_labeled_indices = np.concatenate(
+                    [all_labeled, new_candidates]
+                )
+            subset_and_labeled_indices = np.sort(subset_and_labeled_indices)
+
+            new_X = X[subset_and_labeled_indices]
+            new_y = y[subset_and_labeled_indices]
+            if candidates is None or candidates.ndim == 1:
+                new_candidates = unlabeled_indices(
+                    y=new_y, missing_label=self.missing_label_
+                )
+        else:
+            new_X = X
+            new_y = y
+
         qs_output = self.query_strategy.query(
-            X=X,
-            y=y,
+            X=new_X,
+            y=new_y,
             candidates=new_candidates,
             batch_size=batch_size,
             return_utilities=return_utilities,
             **query_kwargs,
         )
 
-        if not return_utilities:
-            if candidates is not None and candidates.ndim > 1:
-                return new_candidate_indices[qs_output]
-            return qs_output
+        queried_indices = qs_output
+        utilities = None
+        if return_utilities:
+            queried_indices, utilities = qs_output
 
-        queried_indices, utilities = qs_output
+        if (
+            self.exclude_non_subsample
+            and (candidates is None or candidates.ndim == 1)
+        ):
+            queried_indices = subset_and_labeled_indices[queried_indices]
+            if utilities is not None:
+                new_utilities = np.full(
+                    shape=(batch_size, len(X)), fill_value=np.nan
+                )
+                transformed_new_candidates = subset_and_labeled_indices[
+                    new_candidates
+                ]
+                new_utilities[:, transformed_new_candidates] = utilities[
+                    :, new_candidates
+                ]
+                utilities = new_utilities
+                new_candidates = transformed_new_candidates
 
-        if candidates is None or candidates.ndim == 1:
-            new_utilities = np.full(
-                shape=(batch_size, len(X)), fill_value=np.nan
-            )
-            new_utilities[:, candidate_indices] = -np.inf
-            new_utilities[:, new_candidates] = utilities[:, new_candidates]
+        if candidates is not None and candidates.ndim > 1:
+            new_queried_indices = new_candidate_indices[queried_indices]
         else:
-            new_utilities = np.full(
-                shape=(batch_size, len(candidates)), fill_value=np.nan
-            )
-            new_utilities[:, candidate_indices] = -np.inf
-            new_utilities[:, new_candidate_indices] = utilities
-            queried_indices = new_candidate_indices[queried_indices]
+            new_queried_indices = queried_indices
+        if return_utilities:
+            if candidates is None or candidates.ndim == 1:
+                new_utilities = np.full(
+                    shape=(batch_size, len(X)), fill_value=np.nan
+                )
+                new_utilities[:, candidate_indices] = -np.inf
+                new_utilities[:, new_candidates] = utilities[:, new_candidates]
+            else:
+                new_utilities = np.full(
+                    shape=(batch_size, len(candidates)), fill_value=np.nan
+                )
+                new_utilities[:, candidate_indices] = -np.inf
+                new_utilities[:, new_candidate_indices] = utilities
 
-        return queried_indices, new_utilities
+        if return_utilities:
+            return new_queried_indices, new_utilities
+        else:
+            return new_queried_indices
 
 
 class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
