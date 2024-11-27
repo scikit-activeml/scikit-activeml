@@ -158,34 +158,42 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             )
         random_state = check_random_state(self.random_state, seed_multiplier)
 
+        # subsampling with no explicit provided candidates
         if candidates is None:
             candidate_indices = unlabeled_indices(
                 y=y, missing_label=self.missing_label_
             )
+            # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
                 max_candidates = ceil(
                     len(candidate_indices) * self.max_candidates
                 )
             max_candidates = min(max_candidates, len(candidate_indices))
+            # subsample new candidates
             new_candidates = random_state.choice(
                 a=candidate_indices, size=max_candidates, replace=False
             )
+        # subsampling with privided explicit candidates
         else:
+            # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
                 max_candidates = ceil(len(candidates) * self.max_candidates)
             max_candidates = min(max_candidates, len(candidates))
             if candidates.ndim == 1:
                 candidate_indices = candidates
+                # subsample new candidates
                 new_candidates = random_state.choice(
                     a=candidates, size=max_candidates, replace=False
                 )
             else:
                 candidate_indices = range(len(candidates))
+                # subsample new candidates
                 new_candidate_indices = random_state.choice(
                     a=candidate_indices, size=max_candidates, replace=False
                 )
                 new_candidates = candidates[new_candidate_indices]
 
+        # check if to exclude unlabeled non-candidate training data
         if self.exclude_non_subsample:
             all_labeled = labeled_indices(
                 y=y, missing_label=self.missing_label_
@@ -200,6 +208,8 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
             new_X = X[subset_and_labeled_indices]
             new_y = y[subset_and_labeled_indices]
+            # for explicitely provided candidates recalculate candidate indices
+            # that are passed to the wrapped query strategy
             if candidates is None or candidates.ndim == 1:
                 new_candidates = unlabeled_indices(
                     y=new_y, missing_label=self.missing_label_
@@ -217,16 +227,21 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             **query_kwargs,
         )
 
+        # unpack result of query strategy if needed
         queried_indices = qs_output
         utilities = None
         if return_utilities:
             queried_indices, utilities = qs_output
 
+        # retransform queried indices and utilities as if no training data was
+        # removed
         if (
             self.exclude_non_subsample
             and (candidates is None or candidates.ndim == 1)
         ):
+            # transform to original candidate indices
             queried_indices = subset_and_labeled_indices[queried_indices]
+            # transform to original utilities shape
             if utilities is not None:
                 new_utilities = np.full(
                     shape=(batch_size, len(X)), fill_value=np.nan
@@ -240,10 +255,14 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
                 utilities = new_utilities
                 new_candidates = transformed_new_candidates
 
+        # transform indices if candidates was provided in the shape of
+        # (n_candidates, n_features)
         if candidates is not None and candidates.ndim > 1:
             new_queried_indices = new_candidate_indices[queried_indices]
         else:
             new_queried_indices = queried_indices
+
+        # transform utilities from subsampled shape to original utilities shape
         if return_utilities:
             if candidates is None or candidates.ndim == 1:
                 new_utilities = np.full(

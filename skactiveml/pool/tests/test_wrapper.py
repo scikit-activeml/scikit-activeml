@@ -132,34 +132,36 @@ class TestSubSamplingWrapper(
                 candidate_indices,
                 query_params['X'][candidate_indices]
             ]
-            for candidates in candidates_list:
-                if query_params is not None:
-                    query_params_base = deepcopy(query_params)
-                    query_params_base["return_utilities"] = True
-                    query_params_base["candidates"] = candidates
-                    qs_false = SubSamplingWrapper(
-                        exclude_non_subsample=False,
-                        **init_params_base
-                    )
-                    qs_true = SubSamplingWrapper(
-                        exclude_non_subsample=True,
-                        **init_params_base
-                    )
-                    query_indices_false, utilities_false = qs_false.query(
-                        **query_params_base
-                    )
-                    query_indices_true, utilities_true = qs_true.query(
-                        **query_params_base
-                    )
+            for batch_size in [1, 3]:
+                for candidates in candidates_list:
+                    if query_params is not None:
+                        query_params_base = deepcopy(query_params)
+                        query_params_base["return_utilities"] = True
+                        query_params_base["candidates"] = candidates
+                        query_params_base["batch_size"] = batch_size
+                        qs_false = SubSamplingWrapper(
+                            exclude_non_subsample=False,
+                            **init_params_base
+                        )
+                        qs_true = SubSamplingWrapper(
+                            exclude_non_subsample=True,
+                            **init_params_base
+                        )
+                        query_indices_false, utilities_false = qs_false.query(
+                            **query_params_base
+                        )
+                        query_indices_true, utilities_true = qs_true.query(
+                            **query_params_base
+                        )
 
-                    np.testing.assert_array_equal(
-                        query_indices_false,
-                        query_indices_true
-                    )
-                    np.testing.assert_array_equal(
-                        utilities_false,
-                        utilities_true
-                    )
+                        np.testing.assert_array_equal(
+                            query_indices_false,
+                            query_indices_true
+                        )
+                        np.testing.assert_array_equal(
+                            utilities_false,
+                            utilities_true
+                        )
 
     def test_query_param_query_kwargs(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
