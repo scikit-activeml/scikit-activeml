@@ -56,7 +56,7 @@ jobs:
     - name: 'Upload Coverage Artifact'
       uses: actions/upload-artifact@v4
       with:
-        name: cov_${{ matrix.python-version }}.xml
+        name: cov_${{ matrix.python-version }}
         path: coverage.xml
         retention-days: 5
 
