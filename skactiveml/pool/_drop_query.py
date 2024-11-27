@@ -19,12 +19,12 @@ from ..utils import (
 class DropQuery(SingleAnnotatorPoolQueryStrategy):
     """Dropout Query (DropQuery)
 
-    This class implements the DropQuery [1]_. This query strategy is
-    designed to incorporate both uncertainty and
-    sample diversity into every selected batch. For this purpose, samples
-    are filtered according to a disagreement-based measure via dropout such
-    that only the samples with a disagreement above a threshold are clustered
-    for selecting the samples nearest to the respective clusters.
+    This class implements  the query strategy Dropout Query (DropQuery) [1]_
+    that incorporates both uncertainty and sample diversity into every selected
+    batch. For this purpose, samples are filtered according to a
+    disagreement-based measure via dropout such that only the samples with a
+    disagreement above a threshold are clustered for selecting the samples
+    nearest to the respective clusters.
 
     Parameters
     ----------
@@ -44,10 +44,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations.
-            - If `clf_embedding_flag_name=None` and `predict_proba` returns
-              only one output, the input samples `X` are used.
-            - If `predict_proba` returns two outputs or `clf_embedding_name` is
-              not `None`, `(proba, embeddings)` are expected as outputs.
+
+        - If `clf_embedding_flag_name=None` and `predict_proba` returns
+          only one output, the input samples `X` are used.
+        - If `predict_proba` returns two outputs or `clf_embedding_name` is
+          not `None`, `(proba, embeddings)` are expected as outputs.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -122,9 +123,9 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample. The indexing refers to the samples in `X`.
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample. The indexing refers to the samples in `X`.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
@@ -139,8 +140,22 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         X_cand, mapping = self._transform_candidates(
             candidates, X, y, enforce_mapping=True
         )
-        check_scalar(self.dropout_rate, name="dropout_rate", min_val=0.0, max_val=1.0, min_inclusive=False, max_inclusive=False, target_type=float)
-        check_scalar(self.n_dropout_samples, name="n_dropout_samples", min_val=3, min_inclusive=True, target_type=int)
+        check_scalar(
+            self.dropout_rate,
+            name="dropout_rate",
+            min_val=0.0,
+            max_val=1.0,
+            min_inclusive=False,
+            max_inclusive=False,
+            target_type=float,
+        )
+        check_scalar(
+            self.n_dropout_samples,
+            name="n_dropout_samples",
+            min_val=3,
+            min_inclusive=True,
+            target_type=int,
+        )
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
         )
@@ -201,9 +216,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         # Perform clustering to get centroids.
         cluster_algo_dict[self.n_cluster_param_name] = batch_size
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
-        dist = cluster_obj.fit_transform(
-            X_cand[prefiltered_indices], y=None
-        )
+        dist = cluster_obj.fit_transform(X_cand[prefiltered_indices], y=None)
 
         # Determine `query_indices` of the samples being closest to the
         # respective centroids.

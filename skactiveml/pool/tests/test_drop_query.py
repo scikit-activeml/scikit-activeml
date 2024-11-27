@@ -17,7 +17,9 @@ from skactiveml.tests.utils import (
 )
 
 
-class TestDropQuery(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
+class TestDropQuery(
+    TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
+):
     def setUp(self):
         X = np.linspace(0, 1, 20).reshape(10, 2)
         y = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])

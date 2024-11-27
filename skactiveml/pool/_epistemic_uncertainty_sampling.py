@@ -26,7 +26,7 @@ from ..utils import (
 
 
 class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
-    """Epistemic Uncertainty Sampling.
+    """Epistemic Uncertainty Sampling
 
     Epistemic uncertainty sampling query strategy for two class problems.
     Based on [1]. This strategy is only implemented for skactiveml parzen
