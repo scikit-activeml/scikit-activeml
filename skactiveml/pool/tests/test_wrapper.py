@@ -117,6 +117,41 @@ class TestSubSamplingWrapper(
         ]
         self._test_param("init", "exclude_non_subsample", test_cases)
 
+    def test_query_param_query_kwargs(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(2, TypeError), (True, None), ("Hello", TypeError)]
+        # Check is adjusted for ensemble since it is exemplary used
+        # as parameters to the default query strategy of this test.
+        self._test_param("query", "fit_ensemble", test_cases)
+
+    def test_query(self):
+        # check consistency with wrapped and non-wrapped query strategy
+        qs = deepcopy(self.init_default_params["query_strategy"])
+        qs_sub = self.qs_class(**deepcopy(self.init_default_params))
+
+        for query_params in [
+            self.query_default_params_clf,
+            self.query_default_params_reg,
+        ]:
+            query_params = deepcopy(query_params)
+            query_params["return_utilities"] = True
+            query_params["batch_size"] = 1
+            query_params["candidates"] = query_params["X"]
+            (
+                q,
+                u,
+            ) = qs.query(**query_params)
+            u = u.ravel()
+            q_sub, u_sub = qs_sub.query(**query_params)
+            u_sub = u_sub.ravel()
+            mask = ~np.isnan(u_sub) & ~np.isneginf(u_sub)
+            np.testing.assert_array_equal(u[mask], u_sub[mask])
+            query_params["return_utilities"] = False
+            q_sub = qs_sub.query(**query_params)
+            self.assertEqual(len(q_sub), 1)
+        
+        # check consistency of exclude_non_subsample with varying candidates
+        # and batch_sizes for classification and regression
         for query_params in [
             self.query_default_params_clf,
             self.query_default_params_reg,
@@ -157,38 +192,6 @@ class TestSubSamplingWrapper(
                         np.testing.assert_array_equal(
                             utilities_false, utilities_true
                         )
-
-    def test_query_param_query_kwargs(self, test_cases=None):
-        test_cases = [] if test_cases is None else test_cases
-        test_cases += [(2, TypeError), (True, None), ("Hello", TypeError)]
-        # Check is adjusted for ensemble since it is exemplary used
-        # as parameters to the default query strategy of this test.
-        self._test_param("query", "fit_ensemble", test_cases)
-
-    def test_query(self):
-        qs = deepcopy(self.init_default_params["query_strategy"])
-        qs_sub = self.qs_class(**deepcopy(self.init_default_params))
-
-        for query_params in [
-            self.query_default_params_clf,
-            self.query_default_params_reg,
-        ]:
-            query_params = deepcopy(query_params)
-            query_params["return_utilities"] = True
-            query_params["batch_size"] = 1
-            query_params["candidates"] = query_params["X"]
-            (
-                q,
-                u,
-            ) = qs.query(**query_params)
-            u = u.ravel()
-            q_sub, u_sub = qs_sub.query(**query_params)
-            u_sub = u_sub.ravel()
-            mask = ~np.isnan(u_sub) & ~np.isneginf(u_sub)
-            np.testing.assert_array_equal(u[mask], u_sub[mask])
-            query_params["return_utilities"] = False
-            q_sub = qs_sub.query(**query_params)
-            self.assertEqual(len(q_sub), 1)
 
         us = UncertaintySampling()
         qs_us = SubSamplingWrapper(us)

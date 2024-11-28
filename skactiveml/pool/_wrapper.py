@@ -28,15 +28,16 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         The strategy used for computing the utilities of the candidate
         sub-sample.
     max_candidates : int or float
-         Determines the number of candidates. If `max_candidates` is an
-         integer, `max_candidates` is the maximum number of candidates whose
-         utilities are computed. If `max_candidates` is a float,
-         `max_candidates` is the fraction of the original number of candidates.
-    exclude_non_subsample : bool, optional (default=False)
-         If True, unlabeled candidates in X and Y are excluded which are not
-         part of the subsample. If `candidates` is an array-like of shape
-         (n_candidates, n_features), all unlabeled data will be removed from
-         `X` and `y`. If False, `X` and `y` stays the same.
+        Determines the number of candidates. If `max_candidates` is an
+        integer, `max_candidates` is the maximum number of candidates whose
+        utilities are computed. If `max_candidates` is a float,
+        `max_candidates` is the fraction of the original number of candidates.
+    exclude_non_subsample : bool, default=False
+        - If `True`, unlabeled candidates in `X` and `y` are excluded which
+          are not part of the subsample.  If `candidates` is an array-like of
+          shape `(n_candidates, n_features)`, all unlabeled data will be
+          removed from `X` and `y`. 
+        - If `False`, `X` and `y` stay the same.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState
@@ -73,25 +74,24 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-           Training data set, usually complete, i.e. including the labeled and
-           unlabeled samples.
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
         y : array-like of shape (n_samples)
-           Labels of the training data set (possibly including unlabeled ones
-           indicated by self.MISSING_LABEL).
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
-           array-like of shape (n_candidates, n_features),
-           optional (default=None)
-           If candidates is None, the unlabeled samples from (X,y) are
-           considered as candidates.
-           If candidates is of shape (n_candidates) and of type int,
-           candidates is considered as the indices of the samples in (X,y).
-           If candidates is of shape (n_candidates, n_features), the
-           candidates are directly given in candidates (not necessarily
-           contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
-           The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
-           If true, also return the utilities based on the query strategy.
+            array-like of shape (n_candidates, n_features), default=None
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int, default=1
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, default=False
+            If true, also return the utilities based on the query strategy.
         **query_kwargs : dict-like
             Further keyword arguments are passed to the `query` method of the
             `query_strategy` object.
@@ -99,23 +99,23 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-           The query_indices indicate for which candidate sample a label is
-           to queried, e.g., `query_indices[0]` indicates the first selected
-           sample.
-           If candidates is None or of shape (n_candidates), the indexing
-           refers to samples in X.
-           If candidates is of shape (n_candidates, n_features), the indexing
-           refers to samples in candidates.
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or
-           numpy.ndarray of shape (batch_size, n_candidates)
-           The utilities of samples after each selected sample of the batch,
-           e.g., `utilities[0]` indicates the utilities used for selecting
-           the first sample (with index `query_indices[0]`) of the batch.
-           Utilities for labeled samples will be set to np.nan.
-           If candidates is None or of shape (n_candidates), the indexing
-           refers to samples in X.
-           If candidates is of shape (n_candidates, n_features), the indexing
-           refers to samples in candidates.
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -339,26 +339,25 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-           Training data set, usually complete, i.e. including the labeled and
-           unlabeled samples.
+            Training data set, usually complete, i.e. including the labeled and
+            unlabeled samples.
         y : array-like of shape (n_samples)
-           Labels of the training data set (possibly including unlabeled ones
-           indicated by self.MISSING_LABEL).
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
-           array-like of shape (n_candidates, n_features),
-           optional (default=None)
-           If candidates is None, the unlabeled samples from (X,y) are
-           considered as candidates.
-           If candidates is of shape (n_candidates) and of type int,
-           candidates is considered as the indices of the samples in (X,y).
-           If candidates is of shape (n_candidates, n_features), the
-           candidates are directly given in candidates (not necessarily
-           contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
-           The number of samples to be selected in one AL cycle. For this
-           wrapper, only `batch_size=1` is supported.
-        return_utilities : bool, optional (default=False)
-           If true, also return the utilities based on the query strategy.
+            array-like of shape (n_candidates, n_features), (default=None)
+            If candidates is None, the unlabeled samples from (X,y) are
+            considered as candidates.
+            If candidates is of shape (n_candidates) and of type int,
+            candidates is considered as the indices of the samples in (X,y).
+            If candidates is of shape (n_candidates, n_features), the
+            candidates are directly given in candidates (not necessarily
+            contained in X). This is not supported by all query strategies.
+        batch_size : int, default=1
+            The number of samples to be selected in one AL cycle. For this
+            wrapper, only `batch_size=1` is supported.
+        return_utilities : bool, default=False
+            If true, also return the utilities based on the query strategy.
         **query_kwargs : dict-like
             Further keyword arguments are passed to the `query` method of the
             `query_strategy` object.
@@ -366,23 +365,23 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-           The query_indices indicate for which candidate sample a label is
-           to queried, e.g., `query_indices[0]` indicates the first selected
-           sample.
-           If candidates is None or of shape (n_candidates), the indexing
-           refers to samples in X.
-           If candidates is of shape (n_candidates, n_features), the indexing
-           refers to samples in candidates.
+            The query_indices indicate for which candidate sample a label is
+            to queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or
-           numpy.ndarray of shape (batch_size, n_candidates)
-           The utilities of samples after each selected sample of the batch,
-           e.g., `utilities[0]` indicates the utilities used for selecting
-           the first sample (with index `query_indices[0]`) of the batch.
-           Utilities for labeled samples will be set to np.nan.
-           If candidates is None or of shape (n_candidates), the indexing
-           refers to samples in X.
-           If candidates is of shape (n_candidates, n_features), the indexing
-           refers to samples in candidates.
+            numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+            If candidates is None or of shape (n_candidates), the indexing
+            refers to samples in X.
+            If candidates is of shape (n_candidates, n_features), the indexing
+            refers to samples in candidates.
         """
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
