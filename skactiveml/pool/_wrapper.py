@@ -27,7 +27,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
     query_strategy : skactiveml.base.SingleAnnotatorPoolQueryStrategy
         The strategy used for computing the utilities of the candidate
         sub-sample.
-    max_candidates : int or float
+    max_candidates : int or float, default=0.1
         Determines the number of candidates. If `max_candidates` is an
         integer, `max_candidates` is the maximum number of candidates whose
         utilities are computed. If `max_candidates` is a float,
