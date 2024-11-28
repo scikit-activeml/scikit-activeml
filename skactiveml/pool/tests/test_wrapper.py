@@ -19,7 +19,7 @@ from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 
@@ -71,6 +71,7 @@ class TestSubSamplingWrapper(
         init_default_params = {
             "query_strategy": QueryByCommittee(random_state=0),
             "max_candidates": 10,
+            "exclude_non_subsample": False,
             "random_state": 0,
             "missing_label": MISSING_LABEL,
         }
@@ -104,6 +105,18 @@ class TestSubSamplingWrapper(
         ]
         self._test_param("init", "query_strategy", test_cases)
 
+    def test_init_param_exclude_non_subsample(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (True, None),
+            (False, None),
+            (0, TypeError),
+            (1, TypeError),
+            ("1.2", TypeError),
+            (DummyNonQueryStrategy(), TypeError),
+        ]
+        self._test_param("init", "exclude_non_subsample", test_cases)
+
     def test_query_param_query_kwargs(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(2, TypeError), (True, None), ("Hello", TypeError)]
@@ -112,6 +125,7 @@ class TestSubSamplingWrapper(
         self._test_param("query", "fit_ensemble", test_cases)
 
     def test_query(self):
+        # check consistency with wrapped and non-wrapped query strategy
         qs = deepcopy(self.init_default_params["query_strategy"])
         qs_sub = self.qs_class(**deepcopy(self.init_default_params))
 
@@ -135,6 +149,49 @@ class TestSubSamplingWrapper(
             query_params["return_utilities"] = False
             q_sub = qs_sub.query(**query_params)
             self.assertEqual(len(q_sub), 1)
+
+        # check consistency of exclude_non_subsample with varying candidates
+        # and batch_sizes for classification and regression
+        for query_params in [
+            self.query_default_params_clf,
+            self.query_default_params_reg,
+        ]:
+            init_params_base = deepcopy(self.init_default_params)
+            init_params_base.pop("exclude_non_subsample")
+            candidate_indices = unlabeled_indices(
+                query_params["y"], init_params_base["missing_label"]
+            )
+            candidates_list = [
+                None,
+                candidate_indices,
+                query_params["X"][candidate_indices],
+            ]
+            for batch_size in [1, 3]:
+                for candidates in candidates_list:
+                    if query_params is not None:
+                        query_params_base = deepcopy(query_params)
+                        query_params_base["return_utilities"] = True
+                        query_params_base["candidates"] = candidates
+                        query_params_base["batch_size"] = batch_size
+                        qs_false = SubSamplingWrapper(
+                            exclude_non_subsample=False, **init_params_base
+                        )
+                        qs_true = SubSamplingWrapper(
+                            exclude_non_subsample=True, **init_params_base
+                        )
+                        query_indices_false, utilities_false = qs_false.query(
+                            **query_params_base
+                        )
+                        query_indices_true, utilities_true = qs_true.query(
+                            **query_params_base
+                        )
+
+                        np.testing.assert_array_equal(
+                            query_indices_false, query_indices_true
+                        )
+                        np.testing.assert_array_equal(
+                            utilities_false, utilities_true
+                        )
 
         us = UncertaintySampling()
         qs_us = SubSamplingWrapper(us)
