@@ -36,7 +36,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         - If `True`, unlabeled candidates in `X` and `y` are excluded which
           are not part of the subsample.  If `candidates` is an array-like of
           shape `(n_candidates, n_features)`, all unlabeled data will be
-          removed from `X` and `y`. 
+          removed from `X` and `y`.
         - If `False`, `X` and `y` stay the same.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.

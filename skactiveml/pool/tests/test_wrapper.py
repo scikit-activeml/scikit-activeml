@@ -149,7 +149,7 @@ class TestSubSamplingWrapper(
             query_params["return_utilities"] = False
             q_sub = qs_sub.query(**query_params)
             self.assertEqual(len(q_sub), 1)
-        
+
         # check consistency of exclude_non_subsample with varying candidates
         # and batch_sizes for classification and regression
         for query_params in [
