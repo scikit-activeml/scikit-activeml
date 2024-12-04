@@ -6,6 +6,7 @@ on:
 
 jobs:
   test_oldest_dependencies:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -31,6 +32,7 @@ jobs:
         pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
 
   test_newest_dependencies:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -61,6 +63,7 @@ jobs:
         retention-days: 5
 
   check_formatting_and_linting:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -93,6 +96,7 @@ jobs:
         flake8 skactiveml/ --ignore=E203,W503 --count --exit-zero --statistics
 
   create_documentation:
+    if: ${{github.event.pull_request.head.repo.full_name != github.repository }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
