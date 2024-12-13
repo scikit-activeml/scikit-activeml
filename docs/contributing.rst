@@ -884,8 +884,8 @@ General advice
 ^^^^^^^^^^^^^^
 
 Check parameter ``X`` regarding its shape, i.e., use superclass method
-``_check_n_features`` to ensure a correct number of features. Check that the
-classifier has been fitted. If the classifier is a
+``self._check_n_features`` to ensure a correct number of features. Check that
+the classifier has been fitted. If the classifier is a
 ``skactiveml.base.ClassFrequencyEstimator``, this method is already
 implemented in the superclass.
 
@@ -1103,8 +1103,8 @@ General advice
 ^^^^^^^^^^^^^^
 
 Check parameter ``X`` regarding its shape, i.e., use superclass method
-``_check_n_features`` to ensure a correct number of features. Check that the
-regressor has been fitted. If the classifier is a
+``self._check_n_features`` to ensure a correct number of features. Check that
+the regressor has been fitted. If the classifier is a
 ``skactiveml.base.ProbabilisticRegressor``, this method is already
 implemented in the superclass.
 
