@@ -100,7 +100,7 @@ class IndexClassifierWrapper:
         self.y = check_array(
             self.y,
             ensure_2d=False,
-            force_all_finite=False,
+            ensure_all_finite=False,
             dtype=None,
         )
         check_consistent_length(self.X, self.y)
@@ -290,7 +290,7 @@ class IndexClassifierWrapper:
             y = check_array(
                 y,
                 ensure_2d=False,
-                force_all_finite=False,
+                ensure_all_finite=False,
                 dtype=self.y.dtype,
                 input_name="`y`",
             )
@@ -406,7 +406,7 @@ class IndexClassifierWrapper:
             add_y = check_array(
                 y,
                 ensure_2d=False,
-                force_all_finite=False,
+                ensure_all_finite=False,
                 dtype=self.y.dtype,
                 input_name="`y`",
             )
@@ -762,7 +762,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     X = check_array(X, input_name="`X`")
     y = column_or_1d(
         check_array(
-            y, force_all_finite=False, ensure_2d=False, input_name="`y`"
+            y, ensure_all_finite=False, ensure_2d=False, input_name="`y`"
         )
     )
     check_consistent_length(X, y)
@@ -772,7 +772,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     else:
         y_update = check_array(
             y_update,
-            force_all_finite=False,
+            ensure_all_finite=False,
             ensure_2d=False,
             ensure_min_samples=0,
             input_name="`y`",

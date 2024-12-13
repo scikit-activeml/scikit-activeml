@@ -267,7 +267,7 @@ def _alce(
         y,
         X_cand,
         sample_weight,
-        force_all_finite=False,
+        ensure_all_finite=False,
         missing_label=missing_label,
     )
 

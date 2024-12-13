@@ -334,6 +334,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             return getattr(self.estimator, item)
 
+    def __sklearn_tags__(self):
+        if hasattr(self, "estimator_"):
+            return self.estimator_.__sklearn_tags__()
+        else:
+            return self.estimator.__sklearn_tags__()
+
 
 class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """SlidingWindowClassifier
@@ -577,7 +583,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "ensure_2d": False,
-            "force_all_finite": False,
+            "ensure_all_finite": False,
             "dtype": None,
         }
 
