@@ -248,9 +248,3 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         else:
             gamma = 0.5 * numerator / denominator
         return gamma
-
-    # def __sklearn_tags__(self):
-    #     if hasattr(self, "estimator_"):
-    #         return self.estimator_.__sklearn_tags__()
-    #     else:
-    #         return self.estimator.__sklearn_tags__()
