@@ -5,6 +5,7 @@ from sklearn.datasets import make_blobs
 from sklearn.linear_model import Perceptron
 from sklearn.naive_bayes import GaussianNB
 from sklearn.utils.validation import NotFittedError
+from sklearn.utils import get_tags
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier

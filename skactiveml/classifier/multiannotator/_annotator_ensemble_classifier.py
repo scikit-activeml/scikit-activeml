@@ -224,7 +224,7 @@ class AnnotatorEnsembleClassifier(
                 raise ValueError(error_msg)
 
     def __sklearn_tags__(self):
-        if hasattr(self, "self.estimators_"):
+        if hasattr(self, "estimators_"):
             return self.estimators_[0][1].__sklearn_tags__()
         else:
             return self.estimators[0][1].__sklearn_tags__()
