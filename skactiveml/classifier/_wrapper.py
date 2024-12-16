@@ -330,30 +330,28 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if hasattr(self, "is_fitted_"):
             return True
 
-        if not hasattr(self, "estimator_"):
-            try:
-                check_is_fitted(self.estimator)
-            except NotFittedError:
-                return False
+        try:
+            check_is_fitted(self.estimator)
+        except NotFittedError:
+            return False
 
-            # set attributes that would be set by the fit function
-            self.is_fitted_ = True
-            self.estimator_ = deepcopy(self.estimator)
-            self.check_X_dict_ = {
-                "ensure_min_samples": 0,
-                "ensure_min_features": 0,
-                "allow_nd": True,
-                "dtype": None,
-            }
+        # set attributes that would be set by the fit function
+        self.is_fitted_ = True
+        self.estimator_ = deepcopy(self.estimator)
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
 
-            # initialize all attributes using dummy data
-            _ = self._validate_data(
-                X=np.zeros([1, self.estimator_.n_features_in_]),
-                y=[self.missing_label],
-                check_X_dict=self.check_X_dict_,
-            )
-            return True
-        return False
+        # initialize all attributes using dummy data
+        _ = self._validate_data(
+            X=np.zeros([1, self.estimator_.n_features_in_]),
+            y=[self.missing_label],
+            check_X_dict=self.check_X_dict_,
+        )
+        return True
 
     def __getattr__(self, item):
         if "estimator_" in self.__dict__:
