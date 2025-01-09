@@ -60,12 +60,14 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        ml_agg:callable=np.nanmax
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
         self.method = method
         self.cost_matrix = cost_matrix
+        self.ml_agg = ml_agg
 
     def query(
         self,
@@ -139,11 +141,14 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             refers to samples in candidates.
         """
         # Validate input parameters.
+
+        is_multilabel = np.array(y).ndim == 2
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel,)
 
         # Validate classifier type.
         check_type(clf, "clf", SkactivemlClassifier)
@@ -188,6 +193,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 clf = clone(clf).fit(X, y)
 
         # Predict class-membership probabilities.
+        #print(f"{X.shape=}")
+        #print(f"{X_cand.shape=}")
         probas = clf.predict_proba(X_cand)
 
         # Choose the method and calculate corresponding utilities.
@@ -201,6 +208,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                     probas=probas,
                     method=self.method,
                     cost_matrix=self.cost_matrix,
+                    is_multilabel=is_multilabel,
+                    ml_agg=self.ml_agg
                 )
             elif self.method == "expected_average_precision":
                 classes = clf.classes_
@@ -227,7 +236,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
+def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_multilabel=False, ml_agg: callable=np.nanmax):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]. For the least confident and
@@ -265,7 +274,13 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
     # Check probabilities.
     probas = check_array(probas)
 
-    if not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3):
+    if is_multilabel and not np.all(probas <= 1) and not np.all(0 <= probas):
+        raise ValueError(
+            "'probas' are invalid. They need to be <=1 and 0<=."
+        )
+
+
+    if not is_multilabel and not np.allclose(np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3):
         raise ValueError(
             "'probas' are invalid. The sum over axis 1 must be one."
         )
@@ -279,6 +294,8 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
     # Compute uncertainties.
     if method == "least_confident":
         if cost_matrix is None:
+            if is_multilabel:
+                return ml_agg(-np.abs(.5 - probas), axis=1)
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
@@ -295,6 +312,8 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
     elif method == "entropy":
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
+                if is_multilabel:
+                    return ml_agg(-probas * np.log(probas), axis=1) # TODO same as least_confident
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(

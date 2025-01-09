@@ -115,9 +115,12 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             If `candidates` is of shape `(n_candidates, n_features)`, the
             indexing refers to samples in `candidates`.
         """
+
+        is_multilabel = np.array(y).ndim == 2  # TODO
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
@@ -125,7 +128,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         # Retransform candidates and create a potential mapping to the samples
         # in `X`.
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
         )
 
         # Re-define discriminator to fit the setting of classifying
@@ -138,6 +141,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             # Return the top samples with the highest probabilities of
             # being unlabeled, which correspond to their utilities.
             y_discriminator = is_unlabeled(y, missing_label=self.missing_label)
+            if is_multilabel:
+                y_discriminator = np.sum(np.all(y_discriminator, axis=1))
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
             utilities_cand = discriminator.predict_proba(X_cand)[:, 1]
@@ -164,6 +169,10 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
                 y_discriminator = is_unlabeled(
                     y, missing_label=self.missing_label
                 )
+
+                if is_multilabel:
+                    y_discriminator = np.all(y_discriminator, axis=1)
+
                 y_discriminator = y_discriminator.astype(int)
 
                 # Mark already selected samples as labeled.

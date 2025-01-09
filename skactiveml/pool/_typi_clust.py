@@ -112,12 +112,15 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
+
+        is_multilabel = np.array(y).ndim == 2
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel,
         )
 
         _, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel,
         )
 
         # Validate init parameter
@@ -143,6 +146,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         labeled_sample_indices = labeled_indices(
             y, missing_label=self.missing_label
         )
+
+        if is_multilabel: # TODO changes, process labeled indices to not have shape [500, 2]
+            labeled_sample_indices = np.unique(labeled_sample_indices[:,0])
 
         n_clusters = len(labeled_sample_indices) + batch_size
         cluster_algo_dict[self.n_cluster_param_name] = n_clusters

@@ -102,11 +102,13 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
            refers to samples in candidates.
         """
 
+        is_multilabel = np.array(y).ndim == 2 # TODO
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         if mapping is not None:
             query_indices, utilities = k_greedy_center(
@@ -121,6 +123,10 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             selected_samples = labeled_indices(
                 y=y, missing_label=self.missing_label_
             )
+
+            if is_multilabel:  # TODO changes, process labeled indices to not have shape [500, 2]
+                selected_samples = np.unique(selected_samples[:, 0])
+
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
             y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
@@ -198,14 +204,24 @@ def k_greedy_center(
     """
 
     # valid the input shape whether is valid or not.
+
+    is_multilabel = np.array(y).ndim == 2  # TODO maybe as argument
+
     X = check_array(X, allow_nd=True)
-    y = check_array(
-        y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
-    )
-    y = column_or_1d(y, warn=True)
+    if not is_multilabel:
+        y = check_array(
+            y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+        )
+        y = column_or_1d(y, warn=True)
+    else:
+        y = check_array(y, ensure_2d=True, force_all_finite="allow-nan")
     check_consistent_length(X, y)
 
     selected_samples = labeled_indices(y, missing_label=missing_label)
+
+
+    if is_multilabel:  # TODO changes, process labeled indices to not have shape [500, 2]
+        selected_samples = np.unique(selected_samples[:, 0])
 
     random_state_ = check_random_state(random_state)
 

@@ -136,12 +136,14 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             indexing refers to the samples in `X`.
         """
         # Check parameters.
+
+        is_multilabel = np.array(y).ndim == 2  # TODO
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )
-        _, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
-        )
+        _, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel)
+
         is_candidate = np.full(len(X), fill_value=False)
         is_candidate[mapping] = True
         n_classes = self.n_classes

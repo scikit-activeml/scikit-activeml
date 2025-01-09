@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.utils.multiclass import type_of_target
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import MISSING_LABEL, simple_batch
@@ -71,12 +72,13 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
-
+        is_multilabel = np.array(y).ndim == 2
+        #is_multilabel = type_of_target(y) == "multilabel-indicator"  # TODO doesnt work with nan in array
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         if mapping is None:
             utilities = np.ones(len(X_cand))

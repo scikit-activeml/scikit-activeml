@@ -257,6 +257,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
+        is_multilabel=False, # TODO update documentation
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -314,12 +315,21 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         ) = super()._validate_data(
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
-        y = column_or_1d(y, warn=True)
+
+        y = column_or_1d(y, warn=True) if not is_multilabel else check_array(y, ensure_2d=True, force_all_finite="allow-nan")
+        # TODO all nan or none nan
+        if is_multilabel and not np.all(np.isin(y, [0, 1]) | np.isnan(y)): # possible 0,1-encoded check
+            raise ValueError("All elements in y must be either 0 or 1 for multilabel classification.")
 
         if candidates is None:
-            n_candidates = int(
-                np.sum(is_unlabeled(y, missing_label=self.missing_label_))
-            )
+            if not is_multilabel:
+                n_candidates = int(
+                    np.sum(is_unlabeled(y, missing_label=self.missing_label_))
+                )
+            else:
+                n_candidates = int(
+                    np.sum(np.all(is_unlabeled(y, missing_label=self.missing_label_), axis=1))
+                )
         else:
             n_candidates = len(candidates)
 
@@ -339,6 +349,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y,
         enforce_mapping=False,
         allow_only_unlabeled=False,
+        is_multilabel=False,
     ):
         """
         Transforms the `candidates` parameter into a sample array and the
@@ -378,7 +389,11 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         """
 
         if candidates is None:
-            ulbd_idx = unlabeled_indices(y, self.missing_label_)
+            if not is_multilabel:
+                ulbd_idx = unlabeled_indices(y, self.missing_label_)
+            else:
+                # a label is unlabeled as long as there is at least one MISSING_LABEL
+                ulbd_idx = np.unique(np.argwhere(is_unlabeled(y, MISSING_LABEL)[:, 0]))
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
             if allow_only_unlabeled:
