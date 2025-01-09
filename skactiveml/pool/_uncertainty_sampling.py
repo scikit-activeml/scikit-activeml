@@ -292,6 +292,7 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_mu
         cost_matrix = check_cost_matrix(cost_matrix, n_classes=n_classes)
 
     # Compute uncertainties.
+    # here changes, multilabel cases
     if method == "least_confident":
         if cost_matrix is None:
             if is_multilabel:
@@ -313,7 +314,7 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_mu
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
                 if is_multilabel:
-                    return ml_agg(-probas * np.log(probas), axis=1) # TODO same as least_confident
+                    return ml_agg(-probas * np.log(probas), axis=1)
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(

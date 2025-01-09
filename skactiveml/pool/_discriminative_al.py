@@ -116,7 +116,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             indexing refers to samples in `candidates`.
         """
 
-        is_multilabel = np.array(y).ndim == 2  # TODO
+        is_multilabel = np.array(y).ndim == 2  # here changes
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -141,7 +141,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             # Return the top samples with the highest probabilities of
             # being unlabeled, which correspond to their utilities.
             y_discriminator = is_unlabeled(y, missing_label=self.missing_label)
-            if is_multilabel:
+            if is_multilabel: # here changes
                 y_discriminator = np.sum(np.all(y_discriminator, axis=1))
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
@@ -170,7 +170,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
                     y, missing_label=self.missing_label
                 )
 
-                if is_multilabel:
+                if is_multilabel: # here changes
                     y_discriminator = np.all(y_discriminator, axis=1)
 
                 y_discriminator = y_discriminator.astype(int)

@@ -73,7 +73,7 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             refers to samples in candidates.
         """
         is_multilabel = np.array(y).ndim == 2
-        #is_multilabel = type_of_target(y) == "multilabel-indicator"  # TODO doesnt work with nan in array
+        #is_multilabel = type_of_target(y) == "multilabel-indicator"  # here doesnt work with nan in array
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )

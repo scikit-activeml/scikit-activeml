@@ -317,7 +317,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         )
 
         y = column_or_1d(y, warn=True) if not is_multilabel else check_array(y, ensure_2d=True, force_all_finite="allow-nan")
-        # TODO all nan or none nan
+        # here check
         if is_multilabel and not np.all(np.isin(y, [0, 1]) | np.isnan(y)): # possible 0,1-encoded check
             raise ValueError("All elements in y must be either 0 or 1 for multilabel classification.")
 
@@ -327,6 +327,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                     np.sum(is_unlabeled(y, missing_label=self.missing_label_))
                 )
             else:
+                # here
                 n_candidates = int(
                     np.sum(np.all(is_unlabeled(y, missing_label=self.missing_label_), axis=1))
                 )

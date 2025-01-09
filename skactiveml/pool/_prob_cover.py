@@ -137,7 +137,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         """
         # Check parameters.
 
-        is_multilabel = np.array(y).ndim == 2  # TODO
+        is_multilabel = np.array(y).ndim == 2  # here changes
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel

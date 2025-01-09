@@ -102,7 +102,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
            refers to samples in candidates.
         """
 
-        is_multilabel = np.array(y).ndim == 2 # TODO
+        is_multilabel = np.array(y).ndim == 2 # here changes
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel,
@@ -124,7 +124,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 y=y, missing_label=self.missing_label_
             )
 
-            if is_multilabel:  # TODO changes, process labeled indices to not have shape [500, 2]
+            if is_multilabel:  # here changes, process labeled indices to not have shape [500, 2]
                 selected_samples = np.unique(selected_samples[:, 0])
 
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
@@ -220,7 +220,7 @@ def k_greedy_center(
     selected_samples = labeled_indices(y, missing_label=missing_label)
 
 
-    if is_multilabel:  # TODO changes, process labeled indices to not have shape [500, 2]
+    if is_multilabel:  # here changes, process labeled indices to not have shape [500, 2]
         selected_samples = np.unique(selected_samples[:, 0])
 
     random_state_ = check_random_state(random_state)
