@@ -315,8 +315,8 @@ class TestSklearnProbabilisticRegressor(
         missing_label = np.nan
 
         sgd_regressor_instance = SGDRegressor(
-                loss="huber",
-                random_state=0,
+            loss="huber",
+            random_state=0,
         )
         gp_regressor_instance = GaussianProcessRegressor(random_state=0)
         lr_regressor_instance = LinearRegression()
@@ -324,7 +324,7 @@ class TestSklearnProbabilisticRegressor(
         cases = [
             sgd_regressor_instance,
             gp_regressor_instance,
-            lr_regressor_instance
+            lr_regressor_instance,
         ]
 
         for estimator in cases:
@@ -334,9 +334,9 @@ class TestSklearnProbabilisticRegressor(
                 pretrained_estimator = deepcopy(estimator)
                 pretrained_estimator.fit(X_train, y_train)
 
-                has_sample = hasattr(pretrained_estimator, 'sample')
-                has_sample_y = hasattr(pretrained_estimator, 'sample_y')
-                has_partial_fit = hasattr(pretrained_estimator, 'partial_fit')
+                has_sample = hasattr(pretrained_estimator, "sample")
+                has_sample_y = hasattr(pretrained_estimator, "sample_y")
+                has_partial_fit = hasattr(pretrained_estimator, "partial_fit")
 
                 reg = SklearnRegressor(
                     estimator=deepcopy(pretrained_estimator),
