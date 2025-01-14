@@ -328,8 +328,16 @@ class TestSklearnProbabilisticRegressor(
         ]
 
         for estimator in cases:
+            # check that non-pretrained regressors fail without fitting
+            reg_no_pretrain = SklearnRegressor(
+                estimator=deepcopy(estimator),
+                missing_label=missing_label,
+                random_state=0,
+            )
+            self.assertRaises(NotFittedError, reg_no_pretrain.predict, X_test)
+
             for use_partial_fit in [False, True]:
-                # pretrain classifier and test consistency of results after
+                # pretrain regressor and test consistency of results after
                 # wrapping
                 pretrained_estimator = deepcopy(estimator)
                 pretrained_estimator.fit(X_train, y_train)
