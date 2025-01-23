@@ -17,34 +17,7 @@ from ..utils import (
 )
 
 
-class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
-    """Discriminative Active Learning.
-
-    This class implement the "Discriminative Active Learning" (DAL) strategy.
-    Its idea is to solve a binary classification task to choose samples for
-    labeling such that the labeled set and the unlabeled pool are
-    indistinguishable.
-
-    Parameters
-    ----------
-    greedy_selection : bool, optional (default=False)
-        This parameter is only relevant for `batch_size>1`. If
-        `greedy_selection=False` the classifying discriminator is refitted
-        after each sample selection within a batch. Otherwise, the
-        discriminator is kept fixed.
-    missing_label : scalar or string or np.nan or None, optional
-    (default=np.nan)
-        Value to represent a missing label.
-    random_state : None or int or np.random.RandomState, optional
-    (default=None)
-        The random state to use.
-
-    References
-    ----------
-    [1] Gissin D, Shalev-Shwartz S. "Discriminative active learning."
-        arXiv:1907.06347. 2019.
-    """
-
+class MMC(SingleAnnotatorPoolQueryStrategy):
     def __init__(
         self,
         greedy_selection=False,
@@ -61,6 +34,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         X,
         y,
         discriminator,
+        clf,
+        fit_clf=True,
         candidates=None,
         batch_size=1,
         return_utilities=False,
@@ -122,79 +97,52 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel,)
+
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
 
-        # Retransform candidates and create a potential mapping to the samples
-        # in `X`.
-        X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
-        )
 
-        # Re-define discriminator to fit the setting of classifying
-        # labeled (y=0) and unlabeled samples (y=1).
         discriminator = clone(discriminator)
-        discriminator.classes = [0, 1]
+        discriminator.classes = list(range(y.shape[1] + 1))
         discriminator.missing_label = -1
 
-        if self.greedy_selection:
-            # Return the top samples with the highest probabilities of
-            # being unlabeled, which correspond to their utilities.
-            y_discriminator = is_unlabeled(y, missing_label=self.missing_label)
-            if is_multilabel: # here changes
-                y_discriminator = np.sum(np.all(y_discriminator, axis=1))
-            y_discriminator = y_discriminator.astype(int)
-            discriminator.fit(X, y_discriminator)
-            utilities_cand = discriminator.predict_proba(X_cand)[:, 1]
+        probas = clf.predict_proba(X)
+        probas_sorted = np.flip(np.sort(probas, axis=1))
+        # Determine unlabeled vs. labeled samples.
+        unlbld_mask = is_unlabeled(y, missing_label=self.missing_label)
+        lbld_mask = np.all(~unlbld_mask, axis=1)
+        unlbld_mask = np.all(unlbld_mask, axis=1)
 
-            # Remapping of `utilities` and `query_indices` if required.
+        if y[lbld_mask].shape[0] == 0:
+            print("no labels, fallback case?") # TODO
+
+        X_discriminator = probas_sorted[lbld_mask]
+        y_discriminator = y[lbld_mask].sum(axis=1)
+        discriminator.fit(X_discriminator, y_discriminator)
+
+        X_discriminator_pred = probas_sorted[unlbld_mask]
+        pred_n_lbl = discriminator.predict(X_discriminator_pred)
+
+        yhat = np.full(probas_sorted[unlbld_mask].shape, -1)
+        idx_sorted_unlbld = np.flip(np.argsort(probas[unlbld_mask], axis=1))
+        for j, p in enumerate(pred_n_lbl):
+            yhat[j, idx_sorted_unlbld[j, :p]] = 1
+
+        utilities_cand = ((1 - yhat * (probas[unlbld_mask])) / 2).sum(axis=1)
+
+        if mapping is None:
+            utilities = utilities_cand
+        else:
             utilities = np.full(len(X), np.nan)
             utilities[mapping] = utilities_cand
 
-            # Return `query_indices` and potential `utilities`.
-            return simple_batch(
-                utilities,
-                self.random_state_,
-                batch_size=batch_size,
-                return_utilities=return_utilities,
-            )
-        else:
-            # Refit the binary classifier, i.e., the discriminator, after each
-            # selected sample in a batch.
-            X_discriminator = X
-            query_indices_cand = []
-            utilities_cand = np.empty((batch_size, len(X_cand)), dtype=float)
-            for i in range(batch_size):
-                # Determine unlabeled vs. labeled samples.
-                y_discriminator = is_unlabeled(
-                    y, missing_label=self.missing_label
-                )
+        return simple_batch(
+            utilities,
+            self.random_state_,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+        )
 
-                if is_multilabel: # here changes
-                    y_discriminator = np.all(y_discriminator, axis=1)
 
-                y_discriminator = y_discriminator.astype(int)
-
-                # Mark already selected samples as labeled.
-                y_discriminator[mapping[query_indices_cand]] = 0
-
-                # Fit discriminator to classify unlabeled vs. labeled samples.
-                discriminator.fit(X_discriminator, y_discriminator)
-
-                # Compute utilities as probabilities of being unlabeled.
-                utilities_cand[i] = discriminator.predict_proba(X_cand)[:, 1]
-                utilities_cand[i, query_indices_cand] = np.nan
-                query_indices_cand.append(
-                    rand_argmax(utilities_cand[i], self.random_state_)[0]
-                )
-
-            # Remapping of `utilities` and `query_indices`
-            utilities = np.full((batch_size, len(X)), np.nan)
-            utilities[:, mapping] = utilities_cand
-            query_indices = mapping[query_indices_cand]
-
-            # Check whether `utilities` are to be returned.
-            if return_utilities:
-                return query_indices, utilities
-            else:
-                return query_indices

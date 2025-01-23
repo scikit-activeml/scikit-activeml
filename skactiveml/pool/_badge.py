@@ -14,6 +14,7 @@ from ..utils import (
     check_equal_missing_label,
     unlabeled_indices,
     check_scalar,
+    is_unlabeled
 )
 
 
@@ -125,12 +126,15 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             If candidates is of shape (n_candidates, n_features), the indexing
             refers to samples in candidates.
         """
+
+        is_multilabel = np.array(y).ndim == 2
+
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         # Validate classifier type
         check_type(clf, "clf", SkactivemlClassifier)
@@ -153,11 +157,15 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             X_unlbld = X_cand
             unlbld_mapping = mapping
         elif mapping is not None:
-            unlbld_mapping = unlabeled_indices(
-                y[mapping], missing_label=self.missing_label
-            )
+            if not is_multilabel:
+                unlbld_mapping = unlabeled_indices(
+                    y[mapping], missing_label=self.missing_label
+                )
+            else:
+                unlbld_mapping = np.unique(np.argwhere(is_unlabeled(y[mapping], MISSING_LABEL)[:, 0]))
             X_unlbld = X_cand[unlbld_mapping]
             unlbld_mapping = mapping[unlbld_mapping]
+
         else:
             X_unlbld = X_cand
             unlbld_mapping = np.arange(len(X_cand))
@@ -173,7 +181,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
                 probas, X_unlbld = probas
 
         y_pred = probas.argmax(axis=-1)
+        # print(y_pred[:5]) # [0 0 0 0 0] [1 1 1 1 2] [3 1 1 1 2] [3 3 1 1 2] [3 0 1 1 2]
+        # TODO works fine, could be improved ?
         proba_factor = probas - np.eye(probas.shape[1])[y_pred]
+        #print(proba_factor[:2])
         g_x = proba_factor[:, :, None] * X_unlbld[:, None, :]
         g_x = g_x.reshape(*g_x.shape[:-2], -1)
 
