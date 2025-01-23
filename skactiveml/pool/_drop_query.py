@@ -1,90 +1,86 @@
 """
-Module implementing Clustering Uncertainty-weighted Embeddings (CLUE).
-
-CLUE is a deep active learning strategy, which performs a clustering with
-uncertainties as sample weights.
+Module implementing the pool-based query strategy `DropQuery`.
 """
 
 import numpy as np
-
-from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
-from ..pool import uncertainty_scores
-from ..utils import (
-    MISSING_LABEL,
-    rand_argmax,
-    check_type,
-    check_equal_missing_label,
-)
-from sklearn.base import clone
+from sklearn import clone
 from sklearn.cluster import KMeans
 
+from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
+from ..utils import (
+    MISSING_LABEL,
+    check_type,
+    check_equal_missing_label,
+    rand_argmax,
+    check_scalar,
+)
 
-class Clue(SingleAnnotatorPoolQueryStrategy):
-    """Clustering Uncertainty-weighted Embeddings (CLUE)
 
-    This class implements the Clustering Uncertainty-weighted Embeddings (CLUE)
-    query strategy [1]_, which considers both diversity and uncertainty of the
-    samples.
+class DropQuery(SingleAnnotatorPoolQueryStrategy):
+    """Dropout Query (DropQuery)
+
+    This class implements  the query strategy Dropout Query (DropQuery) [1]_
+    that incorporates both uncertainty and sample diversity into every selected
+    batch. For this purpose, samples are filtered according to a
+    disagreement-based measure via dropout such that only the samples with a
+    disagreement above a threshold are clustered for selecting the samples
+    nearest to the respective clusters.
 
     Parameters
     ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label.
-    random_state : None or int or np.random.RandomState, default=None
-        The random state to use.
+    dropout_rate : float, default=0.75
+        Dropout rate used to generate samples.
+    n_dropout_samples : int, default=3
+        Number of dropout samples
     cluster_algo : ClusterMixin.__class__, default=KMeans
         The cluster algorithm to be used. It must implement a `fit_transform`
-        method, which takes samples `X` and `sample_weight` as inputs, e.g.,
+        method, which takes samples `X` as inputs, e.g.,
         sklearn.clustering.KMeans and sklearn.clustering.MiniBatchKMeans.
     cluster_algo_dict : dict, default=None
         The parameters passed to the clustering algorithm `cluster_algo`,
         excluding the parameter for the number of clusters.
     n_cluster_param_name : string, default="n_clusters"
         The name of the parameter for the number of clusters.
-    method : 'least_confident' or 'margin_sampling' or 'entropy', \
-            default="entropy"
-        - `method='least_confident'` queries the sample whose maximal posterior
-          probability is minimal.
-        - `method='margin_sampling'` queries the sample whose posterior
-          probability gap between the most and the second most probable class
-          label is minimal.
-        - `method='entropy'` queries the sample whose posterior's have the
-          maximal entropy.
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations.
-            - If `clf_embedding_flag_name=None` and `predict_proba` returns
-              only one output, the input samples `X` are used.
-            - If `predict_proba` returns two outputs or `clf_embedding_name` is
-              not `None`, `(proba, embeddings)` are expected as outputs.
+
+        - If `clf_embedding_flag_name=None` and `predict_proba` returns
+          only one output, the input samples `X` are used.
+        - If `predict_proba` returns two outputs or `clf_embedding_name` is
+          not `None`, `(proba, embeddings)` are expected as outputs.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : None or int or np.random.RandomState, default=None
+        The random state to use.
 
     References
     ----------
-    .. [1] Prabhu, Viraj, Arjun Chandrasekaran, Kate Saenko, and Judy Hoffman,
-       "Active Domain Adaptation via Clustering Uncertainty-weighted
-       Embeddings", ICCV, 2022.
+    .. [1] S. R. Gupte, J. Aklilu, J. J. Nirschl, and S. Yeung-Levy,
+       "Revisiting Active Learning in the Era of Vision Foundation Models."
+       Trans. Mach. Learn., 2024.
     """
 
     def __init__(
         self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
+        dropout_rate=0.75,
+        n_dropout_samples=5,
         cluster_algo=KMeans,
         cluster_algo_dict=None,
         n_cluster_param_name="n_clusters",
-        method="entropy",
         clf_embedding_flag_name=None,
-        ml_agg:callable=np.nanmax,
+        missing_label=MISSING_LABEL,
+        random_state=None,
     ):
-        super().__init__(
-            missing_label=missing_label, random_state=random_state
-        )
+        self.dropout_rate = dropout_rate
+        self.n_dropout_samples = n_dropout_samples
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
         self.n_cluster_param_name = n_cluster_param_name
-        self.method = method
         self.clf_embedding_flag_name = clf_embedding_flag_name
-        self.ml_agg = ml_agg
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
 
     def query(
         self,
@@ -97,7 +93,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled
+        """Query the next samples to be labeled.
 
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
@@ -110,7 +106,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates, ) of type \
                 int, default=None
@@ -127,9 +123,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample. The indexing refers to the samples in `X`.
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample. The indexing refers to the samples in `X`.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
@@ -145,7 +141,23 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
         )
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel,
+            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
+        )
+        check_scalar(
+            self.dropout_rate,
+            name="dropout_rate",
+            min_val=0.0,
+            max_val=1.0,
+            min_inclusive=False,
+            max_inclusive=False,
+            target_type=float,
+        )
+        check_scalar(
+            self.n_dropout_samples,
+            name="n_dropout_samples",
+            min_val=3,
+            min_inclusive=True,
+            target_type=int,
         )
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
@@ -160,14 +172,14 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         check_type(fit_clf, "fit_clf", bool)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
 
-        # Fit the classifier.
+        # Fit the classifier, if requested.
         if fit_clf:
             if sample_weight is not None:
                 clf = clone(clf).fit(X, y, sample_weight)
             else:
                 clf = clone(clf).fit(X, y)
 
-        # Compute class-membership predictions and optionally embeddings.
+        # Compute predictions and optionally embeddings for original samples.
         if self.clf_embedding_flag_name is not None:
             probas, X_cand = clf.predict_proba(
                 X_cand, **{self.clf_embedding_flag_name: True}
@@ -177,26 +189,46 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             if isinstance(probas, tuple):
                 probas, X_cand = probas
 
-        # Compute uncertainties according to given `method`.
-        uncertainties = uncertainty_scores(probas=probas, method=self.method, is_multilabel=is_multilabel, ml_agg=self.ml_agg)
+        y_pred = rand_argmax(probas, axis=-1, random_state=self.random_state_)
 
-        # Implement a fallback, if all uncertainties are zero.
-        if np.sum(uncertainties) == 0:
-            uncertainties = np.ones_like(uncertainties)
+        # Compute dropout features.
+        X_dropout = np.repeat(X_cand, self.n_dropout_samples, axis=0)
+        dropout_mask = self.random_state_.choice(
+            [True, False],
+            size=X_dropout.size,
+            p=[self.dropout_rate, 1 - self.dropout_rate],
+        )
+        dropout_mask = dropout_mask.reshape(X_dropout.shape)
+        X_dropout[dropout_mask] = 0.0
+
+        # Compute class predictions for dropout samples.
+        probas_dropout = clf.predict_proba(X_dropout)
+        if isinstance(probas_dropout, tuple):
+            probas_dropout, _ = probas_dropout
+        y_pred_dropout = rand_argmax(
+            probas_dropout, axis=-1, random_state=self.random_state_
+        )
+        new_shape = (len(X_cand), self.n_dropout_samples)
+        y_pred_dropout = y_pred_dropout.reshape(new_shape)
+
+        # Filter candidates for clustering based on disagreement.
+        n_disagrees = (y_pred[:, None] != y_pred_dropout).sum(axis=-1)
+        disagree_rate = n_disagrees.astype(float) / self.n_dropout_samples
+        n_threshold_samples = max(((disagree_rate > 0.5).sum(), batch_size))
+        prefiltered_indices = np.argsort(disagree_rate)[-n_threshold_samples:]
 
         # Perform clustering to get centroids.
         cluster_algo_dict[self.n_cluster_param_name] = batch_size
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
-        dist = cluster_obj.fit_transform(
-            X_cand, y=None, sample_weight=uncertainties
-        )
+        dist = cluster_obj.fit_transform(X_cand[prefiltered_indices], y=None)
 
         # Determine `query_indices` of the samples being closest to the
         # respective centroids.
         query_indices = []
         utilities = np.full((batch_size, len(X)), fill_value=np.nan)
         for b in range(batch_size):
-            utilities[b][mapping] = -dist[:, b]
+            utilities[b][mapping] = -np.inf
+            utilities[b][mapping[prefiltered_indices]] = -dist[:, b]
             utilities[b][query_indices] = np.nan
             idx_b = rand_argmax(utilities[b], random_state=self.random_state_)
             query_indices.append(idx_b[0])

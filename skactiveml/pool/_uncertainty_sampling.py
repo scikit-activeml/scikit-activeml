@@ -60,7 +60,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        ml_agg:callable=np.nanmax
+        ml_agg:callable=np.max
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -193,8 +193,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 clf = clone(clf).fit(X, y)
 
         # Predict class-membership probabilities.
-        #print(f"{X.shape=}")
-        #print(f"{X_cand.shape=}")
         probas = clf.predict_proba(X_cand)
 
         # Choose the method and calculate corresponding utilities.
@@ -236,7 +234,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_multilabel=False, ml_agg: callable=np.nanmax):
+def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_multilabel=False, ml_agg: callable=np.max):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]. For the least confident and
@@ -314,7 +312,7 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_mu
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
                 if is_multilabel:
-                    return ml_agg(-probas * np.log(probas), axis=1)
+                    return ml_agg(-probas * np.log(probas + 1e-10), axis=1)
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(
