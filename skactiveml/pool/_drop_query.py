@@ -35,7 +35,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     cluster_algo : ClusterMixin.__class__, default=KMeans
         The cluster algorithm to be used. It must implement a `fit_transform`
         method, which takes samples `X` as inputs, e.g.,
-        sklearn.clustering.KMeans and sklearn.clustering.MiniBatchKMeans.
+        `sklearn.clustering.KMeans` and `sklearn.clustering.MiniBatchKMeans`.
     cluster_algo_dict : dict, default=None
         The parameters passed to the clustering algorithm `cluster_algo`,
         excluding the parameter for the number of clusters.
@@ -108,7 +108,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates, ) of type \
+        candidates : None or array-like of shape (n_candidates,) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.
@@ -122,7 +122,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size,)
             The query indices indicate for which candidate sample a label is
             to be queried, e.g., `query_indices[0]` indicates the first
             selected sample. The indexing refers to the samples in `X`.

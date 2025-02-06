@@ -30,7 +30,7 @@ class _GeneralBALD(QueryByCommittee):
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
     batch case, by default the advanced strategy BatchBALD [2]_ is used.
-    If desired a greedy (top-k) selection can be applied by setting
+    If desired, a greedy (top-k) selection can be applied by setting
     `greedy_selection=True`.
 
     Parameters
@@ -73,6 +73,7 @@ class _GeneralBALD(QueryByCommittee):
     .. [1] N. Houlsby, F. Huszár, Z. Ghahramani, and M. Lengyel. Bayesian
        Active Learning for Classification and Preference Learning.
        arXiv:1112.5745, 2011.
+
     .. [2] A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and
        Diverse Batch Acquisition for Deep Bayesian Active Learning. In Adv.
        Neural Inf. Process. Syst., 2019.

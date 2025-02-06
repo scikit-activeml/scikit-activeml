@@ -25,7 +25,7 @@ from sklearn.metrics import pairwise_distances_argmin_min
 
 
 class CoreSet(SingleAnnotatorPoolQueryStrategy):
-    """CoreSet
+    """Core Set
 
     This class implement a core-set based query strategies, i.e., the
     standard greedy algorithm for the k-center problem [1]_.
@@ -75,8 +75,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
               samples in `(X,y)`.
             - If `candidates` is of shape `(n_candidates, *)`, the
               candidate samples are directly given in `candidates` (not
-              necessarily contained in `X`). This is not supported by all
-              query strategies.
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -162,7 +161,7 @@ def k_greedy_center(
     An active learning method that greedily forms a batch to minimize the
     maximum distance to a cluster center among all unlabeled datapoints.
 
-    Parameters:
+    Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
        Training data set, usually complete, i.e., including the labeled and
@@ -183,8 +182,8 @@ def k_greedy_center(
        Only used for the case, that in the query function with the shape of
        `candidates` is `(n_candidates, n_feature)`.
 
-    Return:
-    ----------
+    Returns
+    -------
     query_indices : numpy.ndarray of shape (batch_size)
         The query_indices indicate for which candidate sample a label is
         to queried, e.g., `query_indices[0]` indicates the first selected
@@ -273,7 +272,7 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
     """
     Update minimum distances by given cluster centers.
 
-    Parameters:
+    Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e., including the labeled and
@@ -286,8 +285,8 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
         The distance between each sample and its nearest center. Used to
         speed up the computation of distances for the next selected sample.
 
-    Return:
-    ---------
+    Returns
+    -------
     result-dist : np.ndarray of shape (1, n_samples)
         - If there aren't any cluster centers existing, the default distance
         will be 0.

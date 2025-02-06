@@ -51,7 +51,7 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
     ----------
     .. [1] K. Margatina, G. Vernikos, L. Barrault, and N. Aletras. Active
        Learning by Acquiring Contrastive Examples. In Conf. Empir. Methods Nat.
-        Lang. Process., pages 650–663, 2021.
+       Lang. Process., pages 650–663, 2021.
     """
 
     def __init__(

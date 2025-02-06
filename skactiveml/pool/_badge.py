@@ -18,12 +18,11 @@ from ..utils import (
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
-    """
-    Batch Active Learning by Diverse Gradient Embedding (BADGE)
+    """Batch Active Learning by Diverse Gradient Embedding (BADGE)
 
-    This class implements the BADGE algorithm [1]_. This query strategy is
-    designed to incorporate both predictive uncertainty and
-    sample diversity into every selected batch.
+    This class implements the BADGE algorithm [1]_, which is designed to
+    incorporate both predictive uncertainty and sample diversity into every
+    selected batch.
 
     Parameters
     ----------
@@ -84,9 +83,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`..
-        sample_weight: array-like of shape (n_samples), default=None
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or \
+        candidates : None or array-like of shape (n_candidates,), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.
@@ -95,8 +94,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
               samples in `(X,y)`.
             - If `candidates` is of shape `(n_candidates, *)`, the
               candidate samples are directly given in `candidates` (not
-              necessarily contained in `X`). This is not supported by all
-              query strategies.
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -239,16 +237,16 @@ def _d_2(g_x, query_indices, d_latest=None):
     ----------
     g_x : np.ndarray of shape (n_unlabeled_samples, n_features)
         The results after gradient embedding
-    query_indices : numpy.ndarray of shape (n_query_indices)
+    query_indices : numpy.ndarray of shape (n_query_indices,)
         the query indications that correspond to the unlabeled samples.
-    d_latest : np.ndarray of shape (n_unlabeled_samples) default=None
+    d_latest : np.ndarray of shape (n_unlabeled_samples,) default=None
         The distance between each data point and its nearest centre.
         This is used to simplify the calculation of the later distances for the
         next selected sample.
 
     Returns
     -------
-    D2 : numpy.ndarray of shape (n_unlabeled_samples)
+    D2 : numpy.ndarray of shape (n_unlabeled_samples,)
         The D^2 value, for the first sample, is the value inf.
     """
     if len(query_indices) == 0:

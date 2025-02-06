@@ -20,39 +20,37 @@ from skactiveml.utils import (
 
 
 class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
-    """Expected Model Change.
+    """Expected Model Change (EMC)
 
-    This class implements expected model change, an active learning
-    query strategy for linear regression.
+    This class implements "Expected Model Change" (EMC) [1]_, an active
+    learning query strategy for linear regression.
 
     Parameters
     ----------
-    bootstrap_size : int, optional (default=3)
+    bootstrap_size : int, default=3
         The number of bootstraps used to estimate the true model.
-    n_train : int or float, optional (default=0.5)
+    n_train : int or float, default=0.5
         The size of a bootstrap compared to the training data if of type float.
         Must lie in the range of (0, 1]. The total size of a bootstrap if of
         type int. Must be greater or equal to 1.
-    ord : int or string, optional (default=2)
-        The Norm to measure the gradient. Argument will be passed to
+    ord : int or string, default=2
+        The norm to measure the gradient length. Argument will be passed to
         `np.linalg.norm`.
-    feature_map : callable, optional (default=None)
+    feature_map : callable, default=None
         The feature map of the linear regressor. Takes in the feature data.
         Must output a np.array of dimension 2. The default value is the
         identity function. An example feature map is
         `sklearn.preprocessing.PolynomialFeatures().fit_transform`.
-    missing_label : scalar or string or np.nan or None,
-    (default=skactiveml.utils.MISSING_LABEL)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int | np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
 
     References
     ----------
-    [1] Cai, Wenbin, Ya Zhang, and Jun Zhou. Maximizing expected model change
-    for active learning in regression, 2013 IEEE 13th international conference
-    on data mining pages 51--60, 2013.
-
+    .. [1] Cai, Wenbin, Ya Zhang, and Jun Zhou. Maximizing expected model
+       change for active learning in regression, IEEE International Conference
+       on Data Mining, pages 51--60, 2013.
     """
 
     def __init__(
@@ -88,55 +86,57 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         reg : SkactivemlRegressor
             Regressor to predict the data. Assumes a linear regressor with
             respect to the parameters.
-        fit_reg : bool, optional (default=True)
+        fit_reg : bool, default=True
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), optional
-        (default=None)
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X).
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, `candidates` is
+              considered as the candidate samples in `(X,y)`.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
         """
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -204,21 +204,20 @@ def _bootstrap_estimators(
     Parameters
     ----------
     est : SkactivemlClassifier or SkactivemlRegressor
-        The estimator to be be trained.
+        The estimator to be trained.
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
     y : array-like of shape (n_samples)
         Labels of the training data set.
-    bootstrap_size : int, optional (default=5)
+    bootstrap_size : int, default=5
         The number of trained bootstraps.
-    n_train : int or float, optional (default=0.5)
+    n_train : int or float, default=0.5
         The size of each bootstrap training data set.
-    sample_weight: array-like of shape (n_samples), optional (default=None)
+    sample_weight: array-like of shape (n_samples,), default=None
         Weights of training samples in `X`.
-    random_state : int | np.random.RandomState (default=None)
-        The random state to use. If `random_state is None` random
-        `random_state` is used.
+    random_state : int or np.random.RandomState or None, default=None
+        The random state to use.
 
     Returns
     -------

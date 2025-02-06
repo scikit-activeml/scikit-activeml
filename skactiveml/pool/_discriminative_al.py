@@ -30,8 +30,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
     greedy_selection : bool, default=False
         This parameter is only relevant for `batch_size>1`.
 
-        - If `greedy_selection=False`, the classifying discriminator is refitted
-        after each sample selection within a batch.
+        - If `greedy_selection=False`, the classifying discriminator is
+        refitted after each sample selection within a batch.
         - If `greedy_selection=True`, the discriminator is kept fixed.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -88,8 +88,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
               samples in `(X,y)`.
             - If `candidates` is of shape `(n_candidates, *)`, the
               candidate samples are directly given in `candidates` (not
-              necessarily contained in `X`). This is not supported by all
-              query strategies.
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False

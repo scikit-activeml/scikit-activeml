@@ -111,9 +111,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`..
-        sample_weight: array-like of shape (n_samples), default=None
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or \
+        candidates : None or array-like of shape (n_candidates,), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.
@@ -127,7 +127,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
+        query_indices : numpy.ndarray of shape (batch_size,)
             The query indices indicate for which candidate sample a label is
             to be queried, e.g., `query_indices[0]` indicates the first
             selected sample. The indexing refers to the samples in `X`.

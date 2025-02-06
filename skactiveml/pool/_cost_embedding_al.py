@@ -251,7 +251,6 @@ def _alce(
     nn_params : dict, default=None
         Parameters passed to `sklearn.neighbors.NearestNeighbors`.
 
-
     Returns
     -------
     utilities : np.ndarray of shape (n_candidates,)
@@ -659,7 +658,7 @@ class MDSP(BaseEstimator):
 
     Parameters
     ----------
-    metric : boolean, optional, default=True
+    metric : boolean, default=True
         compute metric or nonmetric SMACOF (Scaling by Majorizing a
         Complicated Function) algorithm.
     n_uq : int, default=1
@@ -678,15 +677,15 @@ class MDSP(BaseEstimator):
     eps : float, default=1e-6
         Relative tolerance w.r.t stress to declare converge.
     n_jobs : int, default=1
-            The number of jobs to use for the computation. This works by breaking
-            down the pairwise matrix into n_jobs even slices and computing them in
-            parallel.
+        The number of jobs to use for the computation. This works by breaking
+        down the pairwise matrix into n_jobs even slices and computing them in
+        parallel.
 
-            - If -1 all CPUs are used.
-            - If 1 is given, no parallel computing code is used at all, which is
-            useful for debugging.
-            - For `n_jobs` below -1, `(n_cpus + 1 + n_jobs)` are used. Thus, for
-            `n_jobs=-2, all CPUs but one are used.
+        - If -1 all CPUs are used.
+        - If 1 is given, no parallel computing code is used at all, which is
+        useful for debugging.
+        - For `n_jobs` below -1, `(n_cpus + 1 + n_jobs)` are used. Thus, for
+        `n_jobs=-2, all CPUs but one are used.
     random_state : integer or numpy.RandomState, default=None
         The generator used to initialize the centers. If an integer is
         given, it fixes the seed. Defaults to the global numpy random
@@ -759,7 +758,7 @@ class MDSP(BaseEstimator):
         ----------
         X : array-like of shape (n_samples, n_features), or \
                         (n_samples, n_samples) if dissimilarity='precomputed'
-                    Input data.
+            Input data.
         init : None or ndarray of shape (n_samples,), default=None
             - If `None`, randomly chooses the initial configuration.
             - If `np.ndarray`, initialize the SMACOF algorithm with this array.
