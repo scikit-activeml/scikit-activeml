@@ -111,12 +111,15 @@ def match_signature(wrapped_obj_name, func_name):
                         f"This {reference_object} has"
                         f" no method {self.func_name}."
                     )
-
                 reference_function = getattr(reference_object, self.func_name)
-                reference_signature = inspect.signature(reference_function)
-                new_fn_name = self.fn.__name__
-                sig_str = f"{new_fn_name}(self, {str(reference_signature)[1:]}"
-                fn = with_signature(sig_str)(self.fn)
+                reference_signature = inspect.signature(
+                    reference_function.__func__
+                )
+                function_decorator = with_signature(
+                    func_signature=reference_signature,
+                    func_name=self.fn.__name__,
+                )
+                fn = function_decorator(self.fn)
                 out = MethodType(fn, obj)
             else:
                 out = self.fn
