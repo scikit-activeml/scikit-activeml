@@ -112,11 +112,25 @@ def match_signature(wrapped_obj_name, func_name):
                         f" no method {self.func_name}."
                     )
                 reference_function = getattr(reference_object, self.func_name)
-                reference_signature = inspect.signature(
-                    reference_function.__func__
-                )
+                if hasattr(reference_function, "__func__"):
+                    new_sig = inspect.signature(reference_function.__func__)
+                else:
+                    reference_sig = inspect.signature(reference_function)
+                    reference_sig.return_annotation
+                    new_parameters = list(reference_sig.parameters.values())
+                    new_parameters.insert(
+                        0,
+                        inspect.Parameter(
+                            "self",
+                            kind=inspect._ParameterKind.POSITIONAL_OR_KEYWORD,
+                        ),
+                    )
+                    new_sig = inspect.Signature(
+                        new_parameters,
+                        return_annotation=reference_sig.return_annotation,
+                    )
                 function_decorator = with_signature(
-                    func_signature=reference_signature,
+                    func_signature=new_sig,
                     func_name=self.fn.__name__,
                 )
                 fn = function_decorator(self.fn)
