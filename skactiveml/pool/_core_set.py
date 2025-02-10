@@ -200,7 +200,7 @@ def k_greedy_center(
     # valid the input shape whether is valid or not.
     X = check_array(X, allow_nd=True)
     y = check_array(
-        y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+        y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
     )
     y = column_or_1d(y, warn=True)
     check_consistent_length(X, y)

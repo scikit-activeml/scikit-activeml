@@ -577,7 +577,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "ensure_2d": False,
-            "force_all_finite": False,
+            "ensure_all_finite": False,
             "dtype": None,
         }
 

@@ -321,7 +321,7 @@ def plot_contour_for_samples(
     """
     check_array(X, ensure_2d=True)
     values = check_array(
-        values, ensure_2d=False, force_all_finite=False, copy=True
+        values, ensure_2d=False, ensure_all_finite=False, copy=True
     )
     values[np.isinf(values)] = np.nan
 
@@ -401,7 +401,7 @@ def plot_stream_training_data(
          The axes on which the utilities were plotted.
     """
     column_or_1d(X)
-    check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
     check_consistent_length(X, y)
     check_array(queried_indices, ensure_2d=False)
     check_array(classes, ensure_2d=False)
@@ -590,7 +590,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         raise ValueError("Samples in `X` must have 2 features.")
 
     # Check labels
-    y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    y = check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
     check_consistent_length(X, y)
 
     if y.ndim == 2:
@@ -687,7 +687,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         candidates,
         allow_nd=False,
         ensure_2d=False,
-        force_all_finite="allow-nan",
+        ensure_all_finite="allow-nan",
     )
     if candidates.ndim == 1:
         X_utils = X

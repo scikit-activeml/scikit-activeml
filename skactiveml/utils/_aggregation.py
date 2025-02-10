@@ -46,7 +46,7 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
         np.ones_like(y)
         if w is None
         else check_array(
-            w, ensure_2d=False, force_all_finite=False, dtype=float, copy=True
+            w, ensure_2d=False, ensure_all_finite=False, dtype=float, copy=True
         )
     )
     w = w if w.ndim == 2 else w.reshape((-1, 1))
@@ -93,14 +93,14 @@ def majority_vote(
 
     """
     # check input parameters
-    y = check_array(y, ensure_2d=False, dtype=None, force_all_finite=False)
+    y = check_array(y, ensure_2d=False, dtype=None, ensure_all_finite=False)
     y = y if y.ndim == 2 else y.reshape((-1, 1))
     n_samples = y.shape[0]
     w = (
         np.ones_like(y)
         if w is None
         else check_array(
-            w, ensure_2d=False, force_all_finite=False, dtype=None, copy=True
+            w, ensure_2d=False, ensure_all_finite=False, dtype=None, copy=True
         )
     )
 

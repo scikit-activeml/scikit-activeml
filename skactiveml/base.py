@@ -15,6 +15,7 @@ from sklearn.utils.validation import (
     check_array,
     check_consistent_length,
     column_or_1d,
+    _check_n_features,
 )
 
 from .exceptions import MappingError
@@ -152,7 +153,7 @@ class PoolQueryStrategy(QueryStrategy):
 
         # Check labels
         y = check_array(
-            y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
         )
         check_consistent_length(X, y)
 
@@ -594,7 +595,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        check_array(y, ensure_2d=True, force_all_finite="allow-nan")
+        check_array(y, ensure_2d=True, ensure_all_finite="allow-nan")
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
@@ -1005,7 +1006,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return candidates, return_utilities
 
 
-class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
+class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     """SkactivemlClassifier
 
     Base class for scikit-activeml classifiers such that missing labels,
@@ -1148,7 +1149,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
                 "ensure_min_samples": 0,
                 "ensure_min_features": 0,
                 "ensure_2d": False,
-                "force_all_finite": False,
+                "ensure_all_finite": False,
                 "dtype": None,
             }
 
@@ -1219,7 +1220,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             self.n_features_in_ = X.shape[1] if len(X) > 0 else None
         elif not reset:
             if self.n_features_in_ is not None:
-                super()._check_n_features(X, reset=reset)
+                _check_n_features(self, X, reset=reset)
 
 
 class ClassFrequencyEstimator(SkactivemlClassifier):
@@ -1384,7 +1385,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return X, y, sample_weight
 
 
-class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
+class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     """SkactivemlRegressor
 
     Base class for scikit-activeml regressors.
@@ -1457,7 +1458,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
                 "ensure_min_samples": 0,
                 "ensure_min_features": 0,
                 "ensure_2d": False,
-                "force_all_finite": False,
+                "ensure_all_finite": False,
                 "dtype": None,
             }
 
