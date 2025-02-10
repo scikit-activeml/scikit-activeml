@@ -259,7 +259,7 @@ def check_X_y(
     dtype="numeric",
     order=None,
     copy=False,
-    force_all_finite=True,
+    ensure_all_finite=True,
     ensure_2d=True,
     allow_nd=False,
     multi_output=False,
@@ -323,7 +323,7 @@ def check_X_y(
         Whether a forced copy will be triggered. If copy=False, a copy might
         be triggered by a conversion.
 
-    force_all_finite : boolean or 'allow-nan', (default=True)
+    ensure_all_finite : boolean or 'allow-nan', (default=True)
         Whether to raise an error on np.inf, np.nan, pd.NA in X. This parameter
         does not influence whether y can have np.inf, np.nan, pd.NA values.
         The possibilities are:
@@ -334,7 +334,7 @@ def check_X_y(
           be infinite.
 
         .. versionadded:: 0.20
-           `force_all_finite` accepts the string `'allow-nan'`.
+           `ensure_all_finite` accepts the string `'allow-nan'`.
 
         .. versionchanged:: 0.23
            Accepts `pd.NA` and converts it into `np.nan`
@@ -408,7 +408,7 @@ def check_X_y(
             dtype=dtype,
             order=order,
             copy=copy,
-            force_all_finite=force_all_finite,
+            ensure_all_finite=ensure_all_finite,
             ensure_2d=ensure_2d,
             allow_nd=allow_nd,
             ensure_min_samples=ensure_min_samples,
@@ -420,7 +420,7 @@ def check_X_y(
             y = check_array(
                 y,
                 accept_sparse="csr",
-                force_all_finite=True,
+                ensure_all_finite=True,
                 ensure_2d=False,
                 dtype=None,
             )
@@ -451,7 +451,7 @@ def check_X_y(
             dtype=dtype,
             order=order,
             copy=copy,
-            force_all_finite=force_all_finite,
+            ensure_all_finite=ensure_all_finite,
             ensure_2d=ensure_2d,
             allow_nd=allow_nd,
             ensure_min_samples=ensure_min_samples,
@@ -535,7 +535,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
     """
     indices = check_array(indices, dtype=int, ensure_2d=False)
     A = check_array(
-        A, allow_nd=True, force_all_finite=False, ensure_2d=False, dtype=None
+        A, allow_nd=True, ensure_all_finite=False, ensure_2d=False, dtype=None
     )
     if unique == "check_unique":
         if indices.ndim == 1:

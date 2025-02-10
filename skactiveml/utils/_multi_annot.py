@@ -63,7 +63,7 @@ def ext_confusion_matrix(
     # Check input.
     y_true = column_or_1d(y_true)
     y_pred = check_array(
-        y_pred, force_all_finite=False, ensure_2d=False, dtype=None
+        y_pred, ensure_all_finite=False, ensure_2d=False, dtype=None
     )
     if y_pred.ndim == 1:
         y_pred = y_pred.reshape(-1, 1)

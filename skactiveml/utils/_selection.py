@@ -122,7 +122,7 @@ def simple_batch(
         utilities,
         ensure_2d=False,
         dtype=float,
-        force_all_finite="allow-nan",
+        ensure_all_finite="allow-nan",
         allow_nd=True,
     )
     check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
@@ -211,7 +211,7 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     iter_ranking = list(iter_ranking)
     for idx, ranking in enumerate(iter_ranking):
         iter_ranking[idx] = check_array(
-            ranking, allow_nd=True, ensure_2d=False, force_all_finite=False
+            ranking, allow_nd=True, ensure_2d=False, ensure_all_finite=False
         ).astype(float)
         if idx != 0 and iter_ranking[idx - 1].ndim != ranking.ndim:
             raise ValueError(
