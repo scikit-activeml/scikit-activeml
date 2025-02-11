@@ -142,7 +142,9 @@ class TestDropQuery(
         super().test_query_param_clf(test_cases=test_cases)
 
     def test_query(self):
-        X, y_true = make_blobs(n_samples=100, centers=10, random_state=0)
+        X, y_true = make_blobs(
+            n_samples=1000, centers=10, cluster_std=4, random_state=0
+        )
         y_true = y_true.astype(float)
         clf_orig = ParzenWindowClassifier(classes=np.unique(y_true))
         clf_emb = ParzenWindowClassifierEmbedding(classes=np.unique(y_true))

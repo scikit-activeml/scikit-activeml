@@ -187,25 +187,36 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
                 probas, X_cand = probas
         y_pred = rand_argmax(probas, axis=-1, random_state=self.random_state_)
 
-        # Compute dropout features.
-        X_dropout = np.repeat(X_cand, self.n_dropout_samples, axis=0)
-        dropout_mask = self.random_state_.choice(
-            [True, False],
-            size=X_dropout.size,
-            p=[self.dropout_rate, 1 - self.dropout_rate],
-        )
-        dropout_mask = dropout_mask.reshape(X_dropout.shape)
-        X_dropout[dropout_mask] = 0.0
+        # Number of candidate samples.
+        n_candidates = len(X_cand)
 
-        # Compute class predictions for dropout samples.
-        probas_dropout = clf.predict_proba(X_dropout)
-        if isinstance(probas_dropout, tuple):
-            probas_dropout, _ = probas_dropout
-        y_pred_dropout = rand_argmax(
-            probas_dropout, axis=-1, random_state=self.random_state_
+        # Prepare an array to hold the dropout predictions.
+        y_pred_dropout = np.empty(
+            (n_candidates, self.n_dropout_samples), dtype=int
         )
-        new_shape = (len(X_cand), self.n_dropout_samples)
-        y_pred_dropout = y_pred_dropout.reshape(new_shape)
+
+        # Loop over the number of dropout inferences.
+        for i in range(self.n_dropout_samples):
+            # Copy the candidates so as not to modify the original data.
+            X_dropout = X_cand.copy()
+
+            # Generate and apply the dropout mask.
+            dropout_mask = self.random_state_.choice(
+                [True, False],
+                size=X_dropout.shape,
+                p=[self.dropout_rate, 1 - self.dropout_rate],
+            )
+            X_dropout[dropout_mask] = 0.0
+
+            # Compute class predictions for this dropout instance.
+            probas_dropout = clf.predict_proba(X_dropout)
+            if isinstance(probas_dropout, tuple):
+                probas_dropout, _ = probas_dropout
+
+            # Compute the predictions (using a random argmax for tie-breaking).
+            y_pred_dropout[:, i] = rand_argmax(
+                probas_dropout, axis=-1, random_state=self.random_state_
+            )
 
         # Filter candidates for clustering based on disagreement.
         n_disagrees = (y_pred[:, None] != y_pred_dropout).sum(axis=-1)
