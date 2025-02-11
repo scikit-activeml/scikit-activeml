@@ -112,11 +112,17 @@ def match_signature(wrapped_obj_name, func_name):
                         f" no method {self.func_name}."
                     )
                 reference_function = getattr(reference_object, self.func_name)
+
+                # check if refrenced function is a method of that object
+                # if it is, use `__func__` to copy the name of the `self``
+                # parameter
+                # if it is not, because it might have been added outside of the
+                # class definition, add a provisory self argument in the first
+                # position
                 if hasattr(reference_function, "__func__"):
                     new_sig = inspect.signature(reference_function.__func__)
                 else:
                     reference_sig = inspect.signature(reference_function)
-                    reference_sig.return_annotation
                     new_parameters = list(reference_sig.parameters.values())
                     new_parameters.insert(
                         0,
@@ -129,6 +135,9 @@ def match_signature(wrapped_obj_name, func_name):
                         new_parameters,
                         return_annotation=reference_sig.return_annotation,
                     )
+
+                # create a wrapper with the new signature and the correct
+                # function name
                 function_decorator = with_signature(
                     func_signature=new_sig,
                     func_name=self.fn.__name__,
