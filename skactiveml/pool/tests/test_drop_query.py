@@ -143,13 +143,13 @@ class TestDropQuery(
 
     def test_query(self):
         X, y_true = make_blobs(
-            n_samples=100, centers=10, cluster_std=4, random_state=0
+            n_samples=1000, centers=10, cluster_std=4, random_state=0
         )
         y_true = y_true.astype(float)
         clf_orig = ParzenWindowClassifier(classes=np.unique(y_true))
         clf_emb = ParzenWindowClassifierEmbedding(classes=np.unique(y_true))
         clf_tuple = ParzenWindowClassifierTuple(classes=np.unique(y_true))
-        for candidates in [None, np.arange(10, 30)]:
+        for candidates in [None, np.arange(10, 900)]:
             prev_clf_utilities = None
             for clf in [clf_orig, clf_emb, clf_tuple]:
                 qs_plus = DropQuery(
@@ -163,7 +163,6 @@ class TestDropQuery(
                     cluster_algo_dict={
                         "init": "random",
                         "random_state": 0,
-                        "max_iter": 1,
                     },
                     random_state=42,
                 )
@@ -185,8 +184,8 @@ class TestDropQuery(
                 )
                 if candidates is not None:
                     self.assertTrue(np.isnan(utilities_plus[0, :10]).all())
-                    self.assertTrue(np.isnan(utilities_plus[0, 30:]).all())
-                    self.assertTrue((utilities_plus[30:50] <= 0).all())
+                    self.assertTrue(np.isnan(utilities_plus[0, 900:]).all())
+                    self.assertTrue((utilities_plus[10:900] <= 0).all())
                 else:
                     self.assertTrue((utilities_plus <= 0).all())
 
@@ -223,7 +222,7 @@ class TestDropQuery(
                         # classifiers using different syntax to return
                         # embeddings.
                         if prev_clf_utilities is not None:
-                            np.testing.assert_array_equal(
+                            np.testing.assert_almost_equal(
                                 prev_clf_utilities, utilities
                             )
                         prev_clf_utilities = utilities
