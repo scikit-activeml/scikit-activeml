@@ -113,12 +113,11 @@ def match_signature(wrapped_obj_name, func_name):
                     )
                 reference_function = getattr(reference_object, self.func_name)
 
-                # check if refrenced function is a method of that object
-                # if it is, use `__func__` to copy the name of the `self``
+                # Check if the refrenced function is a method of that object.
+                # If it is, use `__func__` to copy the name of the `self`
                 # parameter
-                # if it is not, because it might have been added outside of the
-                # class definition, add a provisory self argument in the first
-                # position
+                # If it is not, (i.e. it has been added as a lambda function),
+                # add a provisory self argument in the first position
                 if hasattr(reference_function, "__func__"):
                     new_sig = inspect.signature(reference_function.__func__)
                 else:
