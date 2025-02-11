@@ -163,6 +163,7 @@ class TestDropQuery(
                     cluster_algo_dict={
                         "init": "random",
                         "random_state": 0,
+                        "max_iter": 1,
                     },
                     random_state=42,
                 )
