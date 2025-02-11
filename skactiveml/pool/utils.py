@@ -49,7 +49,7 @@ class IndexClassifierWrapper:
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samplesm)
+    y : array-like of shape (n_samples,)
         Labels of the training data set (possibly including unlabeled ones
         indicated by `self.missing_label`).
     sample_weight : array-like of shape (n_samples,),default=None
