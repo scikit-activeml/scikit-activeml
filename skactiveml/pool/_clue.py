@@ -113,7 +113,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`..
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates,), dtype=int or \
+        candidates : None or array-like of shape (n_candidates,), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.

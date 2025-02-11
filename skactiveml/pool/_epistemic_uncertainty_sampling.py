@@ -47,7 +47,7 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
+    .. [1] V.-L. Nguyen, S. Destercke, and E. Hüllermeier. Epistemic
        Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
 
@@ -225,7 +225,7 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
 
     References
     ---------
-    .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
+    .. [1] V.-L. Nguyen, S. Destercke, and E. Hüllermeier. Epistemic
        Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     if freq.shape[1] != 2:
@@ -403,7 +403,7 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
 
     References
     ---------
-    .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
+    .. [1] V.-L. Nguyen, S. Destercke, and E. Hüllermeier. Epistemic
        Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     if not isinstance(clf, SklearnClassifier) or not isinstance(
@@ -586,29 +586,29 @@ def _loglike_logreg(w, X, y, sample_weight=None, gamma=1):
 def _theta(func, alpha, x0, A, args=()):
     """Calculates the parameter vector as it is shown in Eq. (22) in [1]_.
 
-    Parameters
-    ----------
-    func : callable
-        The function to be optimized.
-    alpha : float
-        ln(alpha/(1-alpha)) will used as bound for the constraint.
-    x0 : np.ndarray of shape (n,)
-        Initial guess. Array of real elements of size (n,), where `n` is the
-        number of independent variables.
-    A : np.ndarray
-        Matrix defining the constraint.
-    args : tuple
-        Will be pass to func.
+     Parameters
+     ----------
+     func : callable
+         The function to be optimized.
+     alpha : float
+         ln(alpha/(1-alpha)) will used as bound for the constraint.
+     x0 : np.ndarray of shape (n,)
+         Initial guess. Array of real elements of size (n,), where `n` is the
+         number of independent variables.
+     A : np.ndarray
+         Matrix defining the constraint.
+     args : tuple
+         Will be pass to func.
 
-    Returns
-    -------
-    x : np.ndarray
-        The optimized parameter vector.
+     Returns
+     -------
+     x : np.ndarray
+         The optimized parameter vector.
 
-    References
-    ---------
-   .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
-       Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
+     References
+     ---------
+    .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
+        Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     bounds = np.log(alpha / (1 - alpha))
     constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
