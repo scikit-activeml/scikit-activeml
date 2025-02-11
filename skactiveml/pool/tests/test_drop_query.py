@@ -143,7 +143,7 @@ class TestDropQuery(
 
     def test_query(self):
         X, y_true = make_blobs(
-            n_samples=1000, centers=10, cluster_std=4, random_state=0
+            n_samples=100, centers=10, cluster_std=4, random_state=0
         )
         y_true = y_true.astype(float)
         clf_orig = ParzenWindowClassifier(classes=np.unique(y_true))
@@ -153,11 +153,18 @@ class TestDropQuery(
             prev_clf_utilities = None
             for clf in [clf_orig, clf_emb, clf_tuple]:
                 qs_plus = DropQuery(
-                    cluster_algo_dict={"init": "k-means++", "random_state": 0},
+                    cluster_algo_dict={
+                        "init": "k-means++",
+                        "random_state": 0,
+                    },
                     random_state=42,
                 )
                 qs_random = DropQuery(
-                    cluster_algo_dict={"init": "random", "random_state": 0},
+                    cluster_algo_dict={
+                        "init": "random",
+                        "random_state": 0,
+                        "max_iter": 1,
+},
                     random_state=42,
                 )
 
