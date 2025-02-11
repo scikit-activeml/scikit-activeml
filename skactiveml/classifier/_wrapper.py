@@ -345,12 +345,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "dtype": None,
         }
 
-        # initialize all attributes using dummy data
-        _ = self._validate_data(
-            X=np.zeros([1, self.estimator_.n_features_in_]),
-            y=[self.missing_label],
-            check_X_dict=self.check_X_dict_,
-        )
         return True
 
     def __getattr__(self, item):
