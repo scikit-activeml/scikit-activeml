@@ -17,6 +17,7 @@ from sklearn.utils.validation import (
     has_fit_parameter,
 )
 from sklearn.utils import check_consistent_length
+from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
 from ..utils import (
@@ -326,7 +327,25 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         return self
 
     def __sklearn_is_fitted__(self):
-        return hasattr(self, "is_fitted_")
+        if hasattr(self, "is_fitted_"):
+            return True
+
+        try:
+            check_is_fitted(self.estimator)
+        except NotFittedError:
+            return False
+
+        # set attributes that would be set by the fit function
+        self.is_fitted_ = True
+        self.estimator_ = deepcopy(self.estimator)
+        self.check_X_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "allow_nd": True,
+            "dtype": None,
+        }
+
+        return True
 
     def __getattr__(self, item):
         if "estimator_" in self.__dict__:
