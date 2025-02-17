@@ -321,20 +321,24 @@ class TestSklearnProbabilisticRegressor(
         gp_regressor_instance = GaussianProcessRegressor(random_state=0)
         lr_regressor_instance = LinearRegression()
         # TODO: Is there a scikit-learn regressor that supports .sample(..)?
+        # GaussianProcessRegressor does not seem to throw a NotFittedError
         cases = [
-            sgd_regressor_instance,
-            gp_regressor_instance,
-            lr_regressor_instance,
+            (sgd_regressor_instance, NotFittedError),
+            (gp_regressor_instance, None),
+            (lr_regressor_instance, NotFittedError),
         ]
 
-        for estimator in cases:
+        for estimator, fit_exception in cases:
             # check that non-pretrained regressors fail without fitting
             reg_no_pretrain = SklearnRegressor(
                 estimator=deepcopy(estimator),
                 missing_label=missing_label,
                 random_state=0,
             )
-            self.assertRaises(NotFittedError, reg_no_pretrain.predict, X_test)
+            if fit_exception is not None:
+                self.assertRaises(
+                    fit_exception, reg_no_pretrain.predict, X_test
+                )
 
             for use_partial_fit in [False, True]:
                 # pretrain regressor and test consistency of results after
