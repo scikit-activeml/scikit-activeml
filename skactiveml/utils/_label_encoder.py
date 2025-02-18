@@ -46,7 +46,9 @@ class ExtLabelEncoder(BaseEstimator):
         check_classifier_params(
             classes=self.classes, missing_label=self.missing_label
         )
-        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
+        y = check_array(
+            y, ensure_2d=False, ensure_all_finite=False, dtype=None
+        )
         check_missing_label(
             missing_label=self.missing_label, target_type=y.dtype
         )
@@ -96,7 +98,7 @@ class ExtLabelEncoder(BaseEstimator):
         y = check_array(
             y,
             ensure_2d=False,
-            force_all_finite=False,
+            ensure_all_finite=False,
             ensure_min_samples=0,
             dtype=None,
         )
@@ -124,7 +126,7 @@ class ExtLabelEncoder(BaseEstimator):
         y = check_array(
             y,
             ensure_2d=False,
-            force_all_finite=False,
+            ensure_all_finite=False,
             ensure_min_samples=0,
             dtype=None,
         )
