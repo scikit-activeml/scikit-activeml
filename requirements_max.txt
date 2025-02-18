@@ -1,7 +1,7 @@
 joblib<=1.4.2
 numpy<=2.2.2
 scipy<=1.15.2
-scikit-learn<=1.6.0
+scikit-learn<=1.6.1
 matplotlib<=3.10.0
 iteration-utilities<=0.13.0
 makefun<=1.15.6
