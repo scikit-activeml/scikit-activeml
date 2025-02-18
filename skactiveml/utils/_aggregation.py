@@ -12,19 +12,19 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     Parameters
     ----------
     y : array-like, shape (n_samples) or (n_samples, n_annotators)
-        Class labels.
-    w : array-like, shape (n_samples) or (n_samples, n_annotators),
-    default=np.ones_like(y)
+        Class labels, which may contain also missing labels.
+    w : array-like, shape (n_samples) or (n_samples, n_annotators),\
+            default=np.ones_like(y)
         Class label weights.
-    classes : array-like, shape (n_classes), default=None
+    classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
-    missing_label : scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar or string or np.nan orNone, default=np.nan
         Value to represent a missing label.
 
     Returns
     -------
-    v : array-like, shape (n_samples, n_classes)
-        V[i,j] counts number of votes per class j for sample i.
+    v : numpy.ndarray of shape (n_samples, n_classes)
+        `V[i,j]` counts number of votes per class `j` for sample `i`.
     """
     # check input parameters
     le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
@@ -73,24 +73,23 @@ def majority_vote(
 
     Parameters
     ----------
-    y : array-like, shape (n_samples) or (n_samples, n_annotators)
-        Class labels.
-    w : array-like, shape (n_samples) or (n_samples, n_annotators),
-    default=np.ones_like(y)
+    y : array-like, shape (n_samples,) or (n_samples, n_annotators)
+        Class labels, which may contain also missing labels.
+    w : array-like of shape (n_samples,) or (n_samples, n_annotators),\
+            default=np.ones_like(y)
         Class label weights.
-    classes : array-like, shape (n_classes), default=None
+    classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
-    missing_label : scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int, RandomState instance or None, optional (default=None)
+    random_state : int or RandomState instance or None, default=None
         Determines random number generation for shuffling the data. Pass an int
         for reproducible results across multiple function calls.
 
     Returns
     -------
-    y_aggregated : array-like, shape (n_samples)
+    y_aggregated : numpy.ndarray of shape (n_samples,)
         Assigned labels for each sample.
-
     """
     # check input parameters
     y = check_array(y, ensure_2d=False, dtype=None, force_all_finite=False)

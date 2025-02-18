@@ -14,30 +14,30 @@ from skactiveml.utils import (
 
 
 class NICKernelRegressor(ProbabilisticRegressor):
-    """NICKernelRegressor
+    """NIC Kernel Regressor
 
-    The NICKernelRegressor (Normal inverse chi kernel regressor) locally
-    fits a t-distribution using the training data, weighting the samples
-    by a kernel.
+    The NICKernelRegressor (Normal Inverse Chi-square Kernel Regressor)
+    locally fits a t-distribution using the training data, weighting the
+    samples by a kernel.
 
     Parameters
     __________
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
-    metric_dict : dict, optional (default=None)
+    metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-    mu_0 : int or float, optional (default=0)
+    mu_0 : int or float, default=0
         The prior mean.
-    kappa_0 : int or float, optional (default=0.1)
+    kappa_0 : int or float, default=0.1
         The weight of the prior mean.
-    sigma_sq_0: int or float, optional (default=1.0)
+    sigma_sq_0: int or float, default=1.0
         The prior variance.
-    nu_0 : int or float, optional (default=2.5)
+    nu_0 : int or float, default=2.5
         The weight of the prior variance.
-    missing_label : scalar, string, np.nan, or None, default=np.nan
+    missing_label : scalar or string or np.nan or or None, default=np.nan
         Value to represent a missing label.
-    random_state : int, RandomState instance or None, optional (default=None)
+    random_state : int, RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
     """
@@ -66,17 +66,17 @@ class NICKernelRegressor(ProbabilisticRegressor):
         self.metric_dict = metric_dict
 
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
+        """Fit the model using `X` as training data and `y` as labels.
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like, shape (n_samples) or (n_samples, n_targets)
+        X : matrix-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,) or (n_samples, n_targets)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        sample_weight : array-like, shape (n_samples)
+        sample_weight : array-like of shape (n_samples,)
             It contains the weights of the training samples' values.
 
         Returns
@@ -84,7 +84,6 @@ class NICKernelRegressor(ProbabilisticRegressor):
         self: SkactivemlRegressor,
             The SkactivemlRegressor is fitted on the training data.
         """
-
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
         for value, name in [
@@ -155,14 +154,13 @@ class NICKernelRegressor(ProbabilisticRegressor):
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features)
+        X :  array-like of shape (n_samples, n_features)
             Input samples.
 
         Returns
         -------
         dist : scipy.stats._distn_infrastructure.rv_frozen
             The distribution of the targets at the test samples.
-
         """
         check_is_fitted(self)
 
@@ -196,7 +194,7 @@ def _combine_params(prior_params, update_params):
 
 
 class NadarayaWatsonRegressor(NICKernelRegressor):
-    """NadarayaWatsonRegressor
+    """Nadaraya Watson Regressor
 
     The Nadaraya Watson Regressor predicts the target value by taking a
     weighted average based on a kernel. It is implemented as a
@@ -207,11 +205,11 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
-    metric_dict : dict, optional (default=None)
+    metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-    missing_label : scalar, string, np.nan, or None, default=np.nan
+    missing_label : scalar or string or np.nan or or None, default=np.nan
         Value to represent a missing label.
-    random_state : int, RandomState instance or None, optional (default=None)
+    random_state : int or RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
         reproducible results across multiple method calls.
     """

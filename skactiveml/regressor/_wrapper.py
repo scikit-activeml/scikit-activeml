@@ -18,7 +18,7 @@ from ..utils import is_labeled, match_signature, MISSING_LABEL
 
 
 class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
-    """SklearnRegressor
+    """Sklearn Regressor
 
     Implementation of a wrapper class for scikit-learn regressors such that
     missing labels can be handled. Therefore, samples with missing values are
@@ -49,12 +49,12 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples)
-            It contains the values of the training samples.
-            Missing labels are represented as 'np.nan'.
-        sample_weight : array-like, shape (n_samples), optional (default=None)
+        y : array-like of shape (n_samples,)
+            It contains the numeric target values of the training samples.
+            Missing labels are represented as `self.missing_label`.
+        sample_weight : array-like of shape (n_samples,), default=None
             It contains the weights of the training samples´ labels. It
             must have the same shape as y.
         fit_kwargs : dict-like
@@ -66,7 +66,6 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         self: SklearnRegressor,
             The SklearnRegressor is fitted on the training data.
         """
-
         return self._fit(
             fit_function="fit",
             X=X,
@@ -82,23 +81,21 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
-        y : array-like, shape (n_samples) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,)
             It contains the numeric labels of the training samples.
-            Missing labels are represented the attribute 'missing_label'.
-            In case of multiple labels per sample (i.e., n_outputs > 1), the
-            samples are duplicated.
-        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
+            Missing labels are represented the attribute `self.missing_label`.
+        sample_weight : array-like of shape (n_samples,)
             It contains the weights of the training samples' numeric labels. It
             must have the same shape as y.
         fit_kwargs : dict-like
-            Further parameters as input to the 'fit' method of the 'estimator'.
+            Further parameters as input to the `fit` method of the `estimator`.
 
         Returns
         -------
         self : SklearnRegressor,
-            The SklearnRegressor is fitted on the training data.
+            The `SklearnRegressor` is fitted on the training data.
         """
         return self._fit(
             fit_function="partial_fit",
@@ -164,11 +161,11 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
     @match_signature("estimator", "predict")
     def predict(self, X, **predict_kwargs):
-        """Return label predictions for the input data X.
+        """Return label predictions for the input data `X`.
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features)
+        X :  array-like of shape (n_samples, n_features)
             Input samples.
         predict_kwargs : dict-like
             Further parameters are passed as input to the 'predict' method of
@@ -177,7 +174,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         Returns
         -------
-        y :  array-like, shape (n_samples)
+        y :  ndarray of shape (n_samples,)
             Predicted labels of the input samples.
         """
         check_is_fitted(self)
@@ -209,12 +206,11 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples_X, n_features)
+        X :  array-like of shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
-        n_samples: int, optional (default=1)
+        n_samples: int, default=1
             Number of random samples to be drawn.
-        random_state : int, RandomState instance or None, optional
-        (default=None)
+        random_state : int, RandomState instance or None, default=None
             Determines random number generation to randomly draw samples. Pass
             an int for reproducible results across multiple method calls.
 
@@ -233,9 +229,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples_X, n_features)
+        X :  array-like of shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
-        n_samples: int, optional (default=1)
+        n_samples: int, default=1
             Number of random samples to be drawn.
 
         Returns
@@ -257,12 +253,12 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
 
 class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
-    """SklearnNormalRegressor
+    """Sklearn Normal Regressor
 
     Implementation of a wrapper class for scikit-learn probabilistic regressors
     such that missing labels can be handled and the target distribution can be
     estimated. Therefore, samples with missing values are filtered and a normal
-    distribution is fitted to the predicted standard deviation.
+    distribution is fitted using the predicted means and standard deviations.
 
     The wrapped regressor of sklearn needs `return_std` as a key_word argument
     for `predict`.
@@ -291,7 +287,7 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features)
+        X :  array-like of shape (n_samples, n_features)
             Input samples.
 
         Returns

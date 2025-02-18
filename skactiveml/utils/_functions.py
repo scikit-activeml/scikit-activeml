@@ -6,19 +6,19 @@ from makefun import with_signature
 def call_func(
     f_callable, only_mandatory=False, ignore_var_keyword=False, **kwargs
 ):
-    """Calls a function with the given parameters given in kwargs if they
-    exist as parameters in f_callable.
+    """Calls a function with the given parameters given in `kwargs`, if they
+    exist as parameters in `f_callable`.
 
     Parameters
     ----------
     f_callable : callable
-        The function or object that is to be called
+        The function or object that is to be called.
     only_mandatory : boolean
-        If True only mandatory parameters are set.
+        If `True`, only mandatory parameters are set.
     ignore_var_keyword : boolean
-        If False all kwargs are passed when f_callable uses a parameter that is
-        of kind Parameter.VAR_KEYWORD, i.e., **kwargs. For further reference
-        see inspect package.
+        If `False`, all kwargs are passed when `f_callable` uses a parameter
+        that is of kind `Parameter.VAR_KEYWORD`, i.e., `**kwargs`. For further
+        reference see the `inspect` package.
     kwargs : kwargs
         All parameters that could be used for calling f_callable.
 
@@ -69,7 +69,7 @@ def match_signature(wrapped_obj_name, func_name):
         A descriptor that allows a wrapper to clone the signature of a
         method `func_name` from the wrapped object `wrapped_obj_name`.
         Furthermore, this extends upon the conditional property as implemented
-        in `available_if` from from `sklearn.utils.metaestimators`.
+        in `available_if` from `sklearn.utils.metaestimators`.
 
         Parameters
         ----------
@@ -94,10 +94,10 @@ def match_signature(wrapped_obj_name, func_name):
 
             Parameters
             ----------
-            obj: object
+            obj : object
                 The wrapper object. This parameter will be None, if the method
                 is accessed via the class and not an instantiated object.
-            owner: class, default=None
+            owner : class, default=None
                 The wrapper class.
 
             Returns
