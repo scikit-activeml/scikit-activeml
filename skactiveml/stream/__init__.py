@@ -1,5 +1,5 @@
 """
-The :mod:`skactiveml.stream` module implements query strategies for
+The :mod:`skactiveml.stream` package implements query strategies for
 stream-based active learning.
 """
 

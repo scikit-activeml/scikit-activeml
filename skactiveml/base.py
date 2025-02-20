@@ -771,27 +771,27 @@ class BudgetManager(ABC, BaseEstimator):
 
     @abstractmethod
     def query_by_utility(self, utilities, *args, **kwargs):
-        """Ask the budget manager which utilities are sufficient to query the
-        corresponding instance.
+        """Ask the budget manager which `utilities` are sufficient to query the
+        corresponding labels.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
+        utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
             strategy, which are used to determine whether sampling an instance
-            is worth it, given the budgeting constraint.
+            is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances represented by utilities which should be
-            queried, with `0 <= n_queried_instances <= n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_instances,)
+            The indices of instances represented by `utilities` which should be
+            queried, with 0 <= `n_queried_instances` <= `n_samples`.
         """
         raise NotImplementedError
 
     @abstractmethod
     def update(self, candidates, queried_indices, *args, **kwargs):
-        """Updates the BudgetManager.
+        """Updates the budget manager.
 
         Parameters
         ----------
@@ -799,19 +799,19 @@ class BudgetManager(ABC, BaseEstimator):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like
-            Indicates which instances from candidates have been queried.
+        queried_indices : array-like of shape (n_queried_instances,)
+            Indicates which instances from `candidates` have been queried.
 
         Returns
         -------
         self : BudgetManager
-            The BudgetManager returns itself, after it is updated.
+            The budget manager returns itself, after it is updated.
         """
         raise NotImplementedError
 
     def _validate_budget(self):
-        """check the assigned budget and set the default value 0.1 if budget is
-        set to None.
+        """check the assigned `budget` and set the default value 0.1 if
+        `budget` is set to `None`.
         """
         if self.budget is not None:
             self.budget_ = self.budget
@@ -831,14 +831,14 @@ class BudgetManager(ABC, BaseEstimator):
 
         Parameters
         ----------
-        utilities: ndarray of shape (n_samples,)
-            The utilities provided by the stream-based active learning
+        utilities: array-like of shape (n_samples,)
+            The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
         utilities: ndarray of shape (n_samples,)
-            Checked utilities
+            Checked `utilities`.
         """
         # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
@@ -856,8 +856,8 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     Parameters
     ----------
     budget : float
-        The budget which models the budgeting constraint used in the
-        stream-based active learning setting.
+        Specifies the ratio of labels which are allowed to be queried, with
+        `0 <= budget <= 1`..
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -868,32 +868,29 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
     @abstractmethod
     def query(self, candidates, *args, return_utilities=False, **kwargs):
-        """Ask the query strategy which instances in candidates to acquire.
+        """Determines for which candidate samples labels are to be queried.
 
         The query startegy determines the most useful instances in candidates,
-        which can be acquired within the budgeting constraint specified by the
-        budgetmanager.
-        Please note that, this method does not alter the internal state of the
-        query strategy. To adapt the query strategy to the selected candidates,
-        use update(...) with the selected candidates.
+        which can be acquired within the budgeting constraint specified by
+        `budget`. Please note that, this method does not change the internal
+        state of the query strategy. To adapt the query strategy to the
+        selected candidates, use `update(...)`.
 
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-
+            (n_candidates, n_features) The instances which may be queried.
+            Sparse matrices are accepted only if they are supported by the base
+            query strategy.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in candidates which should be sampled,
-            with `0 <= n_sampled_instances <= n_samples`.
-
-        utilities: ndarray of shape (n_samples,),
+        queried_indices : np.ndarray of shape (n_queried_indices,) The indices
+            of instances in candidates whose label should be queried, with `0
+            <= n_queried_indices <= n_candidates`.
+        utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
         """
@@ -908,30 +905,26 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         budget_manager_param_dict=None,
         **kwargs,
     ):
-        """Update the query strategy with the decisions taken.
-
-        This function should be used in conjunction with the query function,
-        when the instances queried from query(...) may differ from the
-        instances queried in the end. In this case use query(...) with
-        simulate=true and provide the final decisions via update(...).
-        This is especially helpful, when developing wrapper query strategies.
+        """Updates the budget manager and the count for seen and queried
+        labels. This function should be used in conjunction with the `query`
+        function.
 
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-                (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
-
-        queried_indices : array-like
-            Indicates which instances from candidates have been queried.
-        budget_manager_param_dict : kwargs, default=None
-            Optional kwargs for budgetmanager.
+            (n_candidates, n_features) The instances which may be queried.
+            Sparse matrices are accepted only if they are supported by the base
+            query strategy.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        budget_manager_param_dict : dict, default=None
+            Optional kwargs for budget_manager.
 
         Returns
         -------
-        self : StreamBasedQueryStrategy
-            The StreamBasedQueryStrategy returns itself, after it is updated.
+        self : SingleAnnotatorStreamQueryStrategy
+            The query strategy returns itself, after it is updated.
         """
         raise NotImplementedError
 
@@ -945,6 +938,9 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget(self):
+        """Creates a copy "budget_" if budget is a float between 0 and 1. If it
+        is `None`, `budget_` is set to 0.1.
+        """
         if self.budget is not None:
             self.budget_ = self.budget
         else:
@@ -985,7 +981,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Returns
         -------
         candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """

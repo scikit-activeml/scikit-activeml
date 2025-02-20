@@ -299,7 +299,10 @@ class TestCognitiveDualQueryStrategyFixUn(
         }
         super().setUp(
             qs_class=CognitiveDualQueryStrategyFixUn,
-            init_default_params={"force_full_budget": True},
+            init_default_params={
+                "force_full_budget": True,
+                "classes": self.classes,
+            },
             query_default_params_clf=query_default_params_clf,
         )
 
@@ -324,6 +327,22 @@ class TestCognitiveDualQueryStrategyFixUn(
             2.5658824e-03,
         ]
         return super().test_query(expected_output, expected_utilities)
+
+    def test_init_param_classes(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (None, TypeError),
+            (CognitiveDualQueryStrategyFixUn, TypeError),
+        ]
+        self._test_param("init", "classes", test_cases)
+        self._test_param("init", "classes", [([0, 1], None)])
+        self._test_param(
+            "init",
+            "classes",
+            [(["0", "1"], None)],
+            {},
+            {"y": ["0", "1", "none", "none"]},
+        )
 
 
 class TestStreamDensityBasedAL(
