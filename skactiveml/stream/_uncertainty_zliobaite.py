@@ -402,6 +402,7 @@ class FixedUncertainty(UncertaintyZliobaite):
         Networks and Learning Systems, 25(1), 27-39.
 
     """
+
     def __init__(
         self,
         classes,
@@ -412,7 +413,7 @@ class FixedUncertainty(UncertaintyZliobaite):
         super().__init__(
             budget_manager=budget_manager,
             budget=budget,
-            random_state=random_state
+            random_state=random_state,
         )
         self.classes = classes
 

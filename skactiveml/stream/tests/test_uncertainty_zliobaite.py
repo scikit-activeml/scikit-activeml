@@ -58,10 +58,7 @@ class TestFixedUncertainty(
             {"y": ["0", "1", "none", "none"]},
         )
 
-        qs_2 = FixedUncertainty(
-            classes=[0, 1],
-            random_state=0
-        )
+        qs_2 = FixedUncertainty(classes=[0, 1], random_state=0)
         queried_indices_2, utilities_2 = qs_2.query(
             candidates=[[1, 2]],
             X=[[0, 2], [2, 2]],
@@ -71,10 +68,7 @@ class TestFixedUncertainty(
             return_utilities=True,
         )
 
-        qs_3 = FixedUncertainty(
-            classes=[0, 1, 2],
-            random_state=0
-        )
+        qs_3 = FixedUncertainty(classes=[0, 1, 2], random_state=0)
         queried_indices_3, utilities_3 = qs_3.query(
             candidates=[[1, 2]],
             X=[[0, 2], [2, 2]],

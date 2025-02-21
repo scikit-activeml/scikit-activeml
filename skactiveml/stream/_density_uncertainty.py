@@ -269,9 +269,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         )
         return self
 
-    def _get_default_budget_manager_kwargs():
-        return {}
-
     def _calculate_ldf(self, candidates):
         """Calculate the number of new nearest neighbors for candidates in the
         sliding window.
