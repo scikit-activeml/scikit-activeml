@@ -174,11 +174,15 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 BudgetManager,
                 type(None),
             )
+            default_budget_manager_kwargs = (
+                self._get_default_budget_manager_kwargs()
+            )
+            default_budget_manager_kwargs["random_state"] = random_seed
             self.budget_manager_ = check_budget_manager(
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
-                {"random_state": random_seed},
+                default_budget_manager_kwargs,
             )
 
         budget_manager_param_dict = (
@@ -273,14 +277,29 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
                 BudgetManager,
                 type(None),
             )
+            default_budget_manager_kwargs = (
+                self._get_default_budget_manager_kwargs()
+            )
+            default_budget_manager_kwargs["random_state"] = random_seed
             self.budget_manager_ = check_budget_manager(
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
-                {"random_state": random_seed},
+                default_budget_manager_kwargs,
             )
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
+
+    def _get_default_budget_manager_kwargs(self):
+        """Provide the kwargs for the budget manager that will be used as
+        default.
+
+        Returns
+        -------
+        default_budget_manager_kwargs : dict
+            The arguments necessary to initialize the budget manager.
+        """
+        return {}
 
     def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
         """Validate if clf is a valid SkactivemlClassifier. If clf is
@@ -356,6 +375,8 @@ class FixedUncertainty(UncertaintyZliobaite):
 
     Parameters
     ----------
+    classes : array-like of shape (n_classes,), default=None
+        Holds the label for each class.
     budget : float, optional (default=None)
         The budget which models the budgeting constraint used in
         the stream-based active learning setting.
@@ -382,6 +403,20 @@ class FixedUncertainty(UncertaintyZliobaite):
 
     """
 
+    def __init__(
+        self,
+        classes,
+        budget_manager=None,
+        budget=None,
+        random_state=None,
+    ):
+        super().__init__(
+            budget_manager=budget_manager,
+            budget=budget,
+            random_state=random_state,
+        )
+        self.classes = classes
+
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
 
@@ -391,6 +426,17 @@ class FixedUncertainty(UncertaintyZliobaite):
             The BudgetManager that should be used by default.
         """
         return FixedUncertaintyBudgetManager
+
+    def _get_default_budget_manager_kwargs(self):
+        """Provide the kwargs for the budget manager that will be used as
+        default.
+
+        Returns
+        -------
+        default_budget_manager_kwargs : dict
+            The arguments necessary to initialize the budget manager.
+        """
+        return {"classes": self.classes}
 
 
 class VariableUncertainty(UncertaintyZliobaite):
