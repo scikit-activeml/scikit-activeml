@@ -1,7 +1,8 @@
 import unittest
+import numpy as np
 
 from copy import deepcopy
-import numpy as np
+
 from sklearn import clone
 from sklearn.exceptions import NotFittedError
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -14,7 +15,7 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.datasets import make_regression
 
 from skactiveml.base import SkactivemlRegressor
-from skactiveml.regressor._wrapper import (
+from skactiveml.regressor import (
     SklearnRegressor,
     SklearnNormalRegressor,
 )
@@ -116,6 +117,7 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
         np.testing.assert_array_equal(np.zeros(3), y_pred)
         _, std_pred = reg.predict(X, return_std=True)
         np.testing.assert_array_equal(np.ones(3), std_pred)
+        self.assertRaises(ValueError, reg.predict, X=[])
 
     def test_getattr(self):
         reg = SklearnRegressor(
@@ -127,25 +129,64 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertTrue(hasattr(reg, "coef_"))
 
     def test_sample_y(self):
-        reg = SklearnRegressor(estimator=GaussianProcessRegressor())
+        gpr = GaussianProcessRegressor(random_state=0)
+        reg = SklearnRegressor(estimator=gpr)
         X = np.arange(4 * 2).reshape(4, 2)
         y = np.arange(4) - 1
         X_sample = 1 / 2 * np.arange(3 * 2).reshape(3, 2) + 1
         reg.fit(X, y)
-        result = reg.sample_y(X_sample, 5)
-        self.assertEqual(result.shape, (3, 5))
+        y_sample = reg.sample_y(X_sample, 5)
+        y_sample_exp = gpr.fit(X, y).sample_y(X_sample, 5)
+        np.testing.assert_array_equal(y_sample, y_sample_exp)
 
-    def test_sample(self):
         lin_reg = LinearRegression()
-        lin_reg.sample = lambda X, n_samples: n_samples
+        lin_reg.sample_y = lambda X, n_samples=1: np.vstack(
+            [lin_reg.predict(X) for _ in range(n_samples)]
+        )
         reg = SklearnRegressor(lin_reg)
 
         X = np.array([[0], [1], [2], [3], [4]])
         y = np.array([3, 4, 1, 2, 1])
 
-        reg.fit(X, y)
+        # Test without labels.
+        reg.fit(X=[], y=[])
+        y_sample = reg.sample_y(X, 10)
+        np.testing.assert_array_equal(y_sample.shape, [5, 10])
+        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL))
+        y_sample = reg.sample_y(X, 10)
+        np.testing.assert_array_equal(y_sample.shape, [5, 10])
 
-        self.assertEqual(reg.sample("a", 10), 10)
+        # Test with labels.
+        reg.fit(X=X, y=y)
+        y_sample_exp = lin_reg.fit(X=X, y=y).sample_y(X, 10)
+        y_sample = reg.sample_y(X, 10)
+        np.testing.assert_array_equal(y_sample, y_sample_exp)
+        self.assertRaises(ValueError, reg.sample_y, X=[])
+
+    def test_sample(self):
+        lin_reg = LinearRegression()
+        lin_reg.sample = lambda X, n_samples=1: np.vstack(
+            [lin_reg.predict(X) for _ in range(n_samples)]
+        )
+        reg = SklearnRegressor(lin_reg)
+
+        X = np.array([[0], [1], [2], [3], [4]])
+        y = np.array([3, 4, 1, 2, 1])
+
+        # Test without labels.
+        reg.fit(X=[], y=[])
+        y_sample = reg.sample(X, 10)
+        np.testing.assert_array_equal(y_sample.shape, [5, 10])
+        reg.fit(X=X, y=np.full_like(y, MISSING_LABEL))
+        y_sample = reg.sample(X, 10)
+        np.testing.assert_array_equal(y_sample.shape, [5, 10])
+
+        # Test with labels.
+        reg.fit(X=X, y=y)
+        y_sample_exp = lin_reg.fit(X=X, y=y).sample(X, 10)
+        y_sample = reg.sample(X, 10)
+        np.testing.assert_array_equal(y_sample, y_sample_exp)
+        self.assertRaises(ValueError, reg.sample, X=[])
 
     def test_partial_fit(self):
         reg_1 = SklearnRegressor(

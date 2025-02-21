@@ -819,7 +819,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
                 idx_unlabeled, idx_cx, assume_unique=True
             )
 
-        y_labeled_c_id = le.transform(y_labeled)
+        y_labeled_c_id = None
+        if len(idx_labeled) > 0:
+            y_labeled_c_id = le.transform(y_labeled)
 
         err = 0
         norm = 0
@@ -857,7 +859,9 @@ class ValueOfInformationEER(ExpectedErrorReduction):
             y_labeled = id_clf.y[idx_labeled]
             idx_unlabeled = idx_train[is_unlabeled(y_eval)]
 
-            y_labeled_c_id = le.transform(y_labeled)
+            y_labeled_c_id = None
+            if len(idx_labeled) > 0:
+                y_labeled_c_id = le.transform(y_labeled)
 
             err = 0
             norm = 0

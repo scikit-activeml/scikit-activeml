@@ -333,8 +333,7 @@ the query strategy can handle regression/classification or both settings, one
 needs to additionally define the parameters
 ``query_default_params_reg/query_default_params_clf``.
 Once, the parameters are set, the developer needs to adjust the test until
-all errors are resolved. In particular, the method ``test_query`` must
-be implemented. We refer to the test template for more detailed information.
+all errors are resolved. We refer to the test template for more detailed information.
 
 Single-annotator Stream-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -474,21 +473,18 @@ update). If a ``budget_manager`` is used forward the update call to the
 
 Testing
 ^^^^^^^
-All stream query strategies are tested by a general unittest
-(``stream/tests/test_stream.py``) -For every class
-``ExampleQueryStrategy`` that inherits from
-``SingleAnnotatorStreamQueryStrategy`` (stored in ``_example.py``), it
-is automatically tested if there exists a file ``test/test_example.py``.
-It is necessary that both filenames are the same. Moreover, the test
-class must be called ``TestExampleQueryStrategy`` and inherit from
-``unittest.TestCase``. Every parameter in ``init()`` will be tested if
-it is written the same as a class variable. Every parameter arg in
-``init()`` will be evaluated if there exists a method in the testclass
-``TestExampleQueryStrategy`` that is called ``test_init_param_arg()``.
-Every parameter arg in ``query()`` will be evaluated if there exists a
-method in the testclass ``TestExampleQueryStrategy`` that is called
-``test_query_param_arg()``. It is tested if the internal state of ``query()``
-is unchanged after multiple calls without using ``update()``.
+The test classes ``skactiveml.stream.test.TestQueryStrategy`` of single-annotator
+stream-based query strategies need to inherit from the test template
+``skactiveml.tests.template_query_strategy.TemplateSingleAnnotatorStreamQueryStrategy``.
+As a result, many required functionalities will be automatically tested.
+As a requirement, one needs to specify the parameters of ``qs_class``,
+``init_default_params`` of the ``__init__`` accordingly. Depending on whether
+the query strategy can handle regression/classification or both settings, one
+needs to additionally define the parameters
+``query_default_params_reg/query_default_params_clf``.
+Once, the parameters are set, the developer needs to adjust the test until
+all errors are resolved. We refer to the test template for more detailed
+information.
 
 
 .. _general-advice-4:
@@ -575,16 +571,15 @@ the same.
 
 Testing
 ^^^^^^^
-Moreover, the test class must be called ``TestExampleBudgetManager`` and
-inheriting from ``unittest.TestCase``. Every parameter in ``__init__()``
-will be tested if it is written the same as a class variable. Every
-parameter ``arg`` in ``__init__()`` will be evaluated if there exists a
-method in the testclass ``TestExampleQueryStrategy`` that is called
-``test_init_param_arg()``. Every parameter ``arg`` in
-``query_by_utility()`` will be evaluated if there exists a method in the
-testclass ``TestExampleQueryStrategy`` that is called
-``test_query_by_utility`` ``_param_arg()``. It is tested if the internal state
-of ``query()`` is unchanged after multiple calls without using ``update()``.
+The test classes ``skactiveml.stream.budgetmanager.test.TestQueryStrategy``
+of budget managers need to inherit from the test template
+``skactiveml.tests.template_budget_manager.TemplateBudgetManager``.
+As a result, many required functionalities will be automatically tested.
+As a requirement, one needs to specify the parameters of ``bm_class``,
+``init_default_params`` and ``query_by_utility_params`` of the ``__init__``
+accordingly. Once, the parameters are set, the developer needs to adjust the
+test until all errors are resolved. We refer to the test template for more
+detailed information.
 
 Multi-Annotator Pool-based Query Strategies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -883,9 +878,9 @@ Returns:
 General advice
 ^^^^^^^^^^^^^^
 
-Check parameter ``X`` regarding its shape, i.e., use superclass method
-``self._check_n_features`` to ensure a correct number of features. Check that
-the classifier has been fitted. If the classifier is a
+Check parameter ``X`` regarding its shape, i.e., use method
+``skactiveml.utils.check_n_features`` to ensure a correct number of
+features. Check that the classifier has been fitted. If the classifier is a
 ``skactiveml.base.ClassFrequencyEstimator``, this method is already
 implemented in the superclass.
 
@@ -971,21 +966,16 @@ and that the classifier has been fitted.
 Testing
 ~~~~~~~
 
-All classifiers are tested by a general unittest
-(``skactiveml/classifier/tests/test_classifier.py``). For every class
-``ExampleClassifier`` that inherits from
-``skactiveml.base.SkactivemlClassifier`` (stored in
-``_example_classifier.py``), it is automatically tested if there exists
-a file ``tests/test_example_classifier.py``. It is necessary that both
-filenames are the same. Moreover, the test class must be called
-``TestExampleClassifier`` and inherit from ``unittest.TestCase``. For
-each parameter of an implemented method, there must be a test method
-called ``test_methodname_parametername`` in the Python file
-``tests/test_example_classifier.py``. It is to check whether invalid parameters
-are handled correctly. For each implemented method, there must be a test
-method called ``test_methodname`` in the Python file
-``tests/test_example_classifier.py``. It is to check whether the method works
-as intended.
+The test classes ``skactiveml.classifier.TestClassifier``
+of classifiers need to inherit from the test template
+``skactiveml.tests.template_estimators.TemplateSkactivemlClassifier``.
+As a result, many required functionalities will be automatically tested.
+As a requirement, one needs to specify the parameters of ``estimator_class``,
+``init_default_params``, ``fit_default_params``, and ``predict_default_params``
+of the ``__init__`` accordingly. Once, the parameters are set, the developer
+needs to adjust the test until all errors are resolved. We refer to the test
+template for more detailed information.
+
 
 Regressors
 ----------
@@ -1102,9 +1092,9 @@ Returns:
 General advice
 ^^^^^^^^^^^^^^
 
-Check parameter ``X`` regarding its shape, i.e., use superclass method
-``self._check_n_features`` to ensure a correct number of features. Check that
-the regressor has been fitted. If the classifier is a
+Check parameter ``X`` regarding its shape, i.e., use method
+``skactiveml.utils.check_n_features`` to ensure a correct number of
+features. Check that the regressor has been fitted. If the classifier is a
 ``skactiveml.base.ProbabilisticRegressor``, this method is already
 implemented in the superclass.
 
@@ -1154,19 +1144,15 @@ and that the regressor has been fitted.
 Testing
 ~~~~~~~
 
-For every class ``ExampleRegressor`` that inherits from
-``skactiveml.base.SkactivemlRegressor`` (stored in
-``_example_regressor.py``), there need to be a file
-``tests/test_example_classifier.py``. It is necessary that both
-filenames are the same. Moreover, the test class must be called
-``TestExampleRegressor`` and inherit from ``unittest.TestCase``. For
-each parameter of an implemented method, there must be a test method
-called ``test_methodname_parametername`` in the Python file
-``tests/test_example_regressor.py``. It is to check whether invalid parameters
-are handled correctly. For each implemented method, there must be a test
-method called ``test_methodname`` in the Python file
-``tests/test_example_regressor.py``. It is to check whether the method works
-as intended.
+The test classes ``skactiveml.classifier.TestRegressor``
+of regressors need to inherit from the test template
+``skactiveml.tests.template_estimators.TemplateSkactivemlRegressor``.
+As a result, many required functionalities will be automatically tested.
+As a requirement, one needs to specify the parameters of ``estimator_class``,
+``init_default_params``, ``fit_default_params``, and ``predict_default_params``
+of the ``__init__`` accordingly. Once, the parameters are set, the developer
+needs to adjust the test until all errors are resolved. We refer to the test
+template for more detailed information.
 
 Annotators Models
 -----------------

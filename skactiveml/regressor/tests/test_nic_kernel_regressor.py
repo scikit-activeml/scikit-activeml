@@ -161,7 +161,7 @@ class TestNICKernelEstimator(
         reg = NICKernelRegressor(**self.start_parameter)
         X = 5
         y = 7
-        self.assertRaises(ValueError, reg.fit, X, y)
+        self.assertRaises(TypeError, reg.fit, X, y)
 
         w = np.zeros_like(self.y)
         self.assertRaises(ValueError, reg.fit, self.X, self.y, w)

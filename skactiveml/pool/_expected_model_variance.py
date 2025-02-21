@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn import clone
-from sklearn.utils import check_array
+from sklearn.utils.validation import check_array, _check_n_features
 
 from skactiveml.base import (
     ProbabilisticRegressor,
@@ -124,7 +124,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
             X_eval = X
         else:
             X_eval = check_array(X_eval)
-            self._check_n_features(X_eval, reset=False)
+            _check_n_features(self, X_eval, reset=False)
         if self.integration_dict is None:
             self.integration_dict = {"method": "assume_linear"}
         check_type(self.integration_dict, "self.integration_dict", dict)

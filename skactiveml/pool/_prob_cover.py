@@ -58,8 +58,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] Yehuda, Ofer, Avihu Dekel, Guy Hacohen, and Daphna Weinshall.
-       "Active Learning Through a Covering Lens." NeurIPS, 2022.
+    .. [1] O. Yehuda, A. Dekel, G. Hacohen, and D. Weinshall. Active Learning
+       Through a Covering Lens. In Adv. Neural Inf. Process. Syst., 2022.
     """
 
     def __init__(

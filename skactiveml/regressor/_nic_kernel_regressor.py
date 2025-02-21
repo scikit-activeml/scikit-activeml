@@ -10,6 +10,7 @@ from skactiveml.utils import (
     MISSING_LABEL,
     check_scalar,
     check_type,
+    check_n_features,
 )
 
 
@@ -35,7 +36,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
         The prior variance.
     nu_0 : int or float, default=2.5
         The weight of the prior variance.
-    missing_label : scalar or string or np.nan or or None, default=np.nan
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int, RandomState instance or None, default=None
         Determines random number for 'predict' method. Pass an int for
@@ -84,7 +85,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
         self: SkactivemlRegressor,
             The SkactivemlRegressor is fitted on the training data.
         """
-        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(
+            X, y, sample_weight, reset=self.metric != "precomputed"
+        )
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
         for value, name in [
             (self.kappa_0, "self.kappa_0"),
@@ -163,8 +166,9 @@ class NICKernelRegressor(ProbabilisticRegressor):
             The distribution of the targets at the test samples.
         """
         check_is_fitted(self)
-
         X = check_array(X)
+        check_n_features(self, X, reset=False)
+
         prior_params = self.prior_params_
         update_params = self._estimate_update_params(X)
         post_params = _combine_params(prior_params, update_params)

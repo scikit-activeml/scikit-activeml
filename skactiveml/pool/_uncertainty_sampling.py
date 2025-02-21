@@ -338,8 +338,8 @@ def expected_average_precision(classes, probas):
         ensure_all_finite=True,
         ensure_2d=True,
         allow_nd=False,
-        ensure_min_samples=1,
-        ensure_min_features=1,
+        ensure_min_samples=0,
+        ensure_min_features=0,
         estimator=None,
     )
 

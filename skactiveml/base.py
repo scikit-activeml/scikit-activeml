@@ -15,7 +15,6 @@ from sklearn.utils.validation import (
     check_array,
     check_consistent_length,
     column_or_1d,
-    _check_n_features,
 )
 
 from .exceptions import MappingError
@@ -33,6 +32,7 @@ from .utils import (
     check_class_prior,
     check_missing_label,
     check_indices,
+    check_n_features,
 )
 
 # '__all__' is necessary to create the sphinx docs.
@@ -149,7 +149,7 @@ class PoolQueryStrategy(QueryStrategy):
         X = check_array(X, **check_X_dict)
 
         # Check number of features.
-        self._check_n_features(X, reset=reset)
+        check_n_features(self, X, reset=reset)
 
         # Check labels
         y = check_array(
@@ -171,7 +171,7 @@ class PoolQueryStrategy(QueryStrategy):
                 check_candidates_dict = deepcopy(check_X_dict)
                 check_candidates_dict["ensure_2d"] = False
                 candidates = check_array(candidates, **check_candidates_dict)
-                self._check_n_features(candidates, reset=False)
+                check_n_features(self, candidates, reset=False)
 
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
@@ -870,7 +870,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     def query(self, candidates, *args, return_utilities=False, **kwargs):
         """Ask the query strategy which instances in candidates to acquire.
 
-        The query startegy determines the most useful instances in candidates,
+        The query strategy determines the most useful instances in candidates,
         which can be acquired within the budgeting constraint specified by the
         budgetmanager.
         Please note that, this method does not alter the internal state of the
@@ -993,7 +993,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         candidates = check_array(candidates, **check_candidates_params)
 
         # Check number of features.
-        self._check_n_features(candidates, reset=reset)
+        check_n_features(self, candidates, reset=reset)
 
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
@@ -1141,6 +1141,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         check_X_dict=None,
         check_y_dict=None,
         y_ensure_1d=True,
+        reset=True,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1168,6 +1169,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
+        error_msg = (
+            "No class label is known because 'y' contains no actual "
+            "class labels and 'classes' is not defined. Change at "
+            "least on of both to overcome this error."
+        )
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
             y = self._le.fit_transform(y)
@@ -1175,16 +1181,15 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             if len(y[is_lbdl]) > 0:
                 check_classification_targets(y[is_lbdl])
             if len(self._le.classes_) == 0:
-                raise ValueError(
-                    "No class label is known because 'y' contains no actual "
-                    "class labels and 'classes' is not defined. Change at "
-                    "least on of both to overcome this error."
-                )
+                raise ValueError(error_msg)
         else:
+            if self.classes is None:
+                raise ValueError(error_msg)
             self._le.fit(self.classes)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
+        check_n_features(self, X, reset=reset)
 
         # Update detected classes.
         self.classes_ = self._le.classes_
@@ -1214,13 +1219,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 
         return X, y, sample_weight
-
-    def _check_n_features(self, X, reset):
-        if reset:
-            self.n_features_in_ = X.shape[1] if len(X) > 0 else None
-        elif not reset:
-            if self.n_features_in_ is not None:
-                _check_n_features(self, X, reset=reset)
 
 
 class ClassFrequencyEstimator(SkactivemlClassifier):
@@ -1448,6 +1446,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         check_X_dict=None,
         check_y_dict=None,
         y_ensure_1d=True,
+        reset=True,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1466,10 +1465,11 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        X = check_array(X, **check_X_dict)
         y = check_array(y, **check_y_dict)
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
+        else:
+            check_X_dict["ensure_2d"] = False
 
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
@@ -1479,6 +1479,9 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
                     f"shape {sample_weight.shape}. Both need to have "
                     f"identical shapes."
                 )
+        X = check_array(X, **check_X_dict)
+        check_consistent_length(X, y)
+        check_n_features(self, X, reset=reset)
 
         return X, y, sample_weight
 

@@ -10,6 +10,7 @@ from sklearn.utils.validation import (
     assert_all_finite,
     check_consistent_length,
     check_random_state as check_random_state_sklearn,
+    _check_n_features as sklearn_check_n_features,
 )
 
 from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
@@ -802,3 +803,37 @@ def check_budget_manager(
             )
         budget_manager_ = copy.deepcopy(budget_manager)
     return budget_manager_
+
+
+def check_n_features(obj, X, reset):
+    """
+    Validate and update the number of features for an estimator based on the
+    input data.
+
+    This function either sets or verifies the estimator's expected number of
+    features using the provided data array. When `reset` is True, it updates
+    the estimator's attribute `n_features_in_` with the number of features in
+    `X` (i.e., `X.shape[1]`). If `X` is empty (has zero rows), the attribute is
+    set to `None`. When `reset` is False and `n_features_in_` is already
+    defined, the function delegates the verification process to
+    `sklearn_check_n_features`.
+
+    Parameters
+    ----------
+    obj : object
+        An estimator or any object that is expected to have an attribute
+        `n_features_in_` indicating the number of features it was fitted on.
+    X : array-like of shape (n_samples, n_features)
+        The input data to check. The number of columns in X represents the
+        number of features.
+    reset : bool
+        If True, the function will set `obj.n_features_in_` to the number of
+        features in X. If False, and if `obj.n_features_in_` is already set,
+        the function will check that X has the expected number of features
+        using `sklearn_check_n_features`.
+    """
+    if reset:
+        obj.n_features_in_ = X.shape[1] if len(X) > 0 else None
+    elif not reset:
+        if obj.n_features_in_ is not None:
+            sklearn_check_n_features(obj, X, reset=reset)

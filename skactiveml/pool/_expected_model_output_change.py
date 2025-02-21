@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn import clone
-from sklearn.utils import check_array
+from sklearn.utils.validation import check_array, _check_n_features
 from sklearn.metrics import mean_squared_error
 
 from skactiveml.base import (
@@ -155,7 +155,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
                 )
         else:
             X_eval = check_array(X_eval)
-            self._check_n_features(X_eval, reset=False)
+            _check_n_features(self, X_eval, reset=False)
         check_type(fit_reg, "fit_reg", bool)
         if self.loss is None:
             self.loss = mean_squared_error
