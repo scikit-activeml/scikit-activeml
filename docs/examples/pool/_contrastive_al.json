@@ -3,7 +3,7 @@
     "class" : "ContrastiveAL",
     "package" : "pool",
     "method" : "Contrastive Active Learning (CAL)",
-    "category" : "Uncertainty Sampling",
+    "category" : "Hybrid",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "classification", "single-annotator"],
     "title" : "Contrastive Active Learning (CAL)",

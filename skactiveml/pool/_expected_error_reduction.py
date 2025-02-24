@@ -501,7 +501,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
 
 
 class MonteCarloEER(ExpectedErrorReduction):
-    """MonteCarloEER
+    """Monte Carlo Expected Error Reduction
 
     This class implements the expected error method from [1]_ that uses a
     Monte-Carlo approach to estimate the error.

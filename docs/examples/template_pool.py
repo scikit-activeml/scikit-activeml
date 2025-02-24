@@ -47,37 +47,35 @@ y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
 # Initialise the classifier.
 clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], random_state=random_state)"
+
 # Initialise the query strategy.
 qs = "$init_qs"
 "$preproc"
-
 # Preparation for plotting.
 fig, ax = plt.subplots()
 feature_bound = [[min(X[:, 0]), min(X[:, 1])], [max(X[:, 0]), max(X[:, 1])]]
 artists = []
 
-# The active learning cycle:
+# Active learning cycle:
 n_cycles = "$n_cycles|20"
 for c in range(n_cycles):
-    # Fit the classifier.
+    # Fit the classifier with current labels.
     clf.fit(X, y)
 
-    # Get labeled instances.
-    X_labeled = X[labeled_indices(y)]
-
-    # Query the next instance/s.
+    # Query the next sample(s).
     query_idx = qs.query("$query_params")
 
-    # Plot the labeled data.
+    # Capture the current plot state.
     coll_old = list(ax.collections)
     title = ax.text(
-        0.5,
-        1.05,
-        f"Decision boundary after acquring {c} labels",
+        0.5, 1.05,
+        f"Decision boundary after acquiring {c} labels",
         size=plt.rcParams["axes.titlesize"],
-        ha="center",
-        transform=ax.transAxes,
+        ha="center", transform=ax.transAxes,
     )
+
+    # Update plot with utility values, samples, and decision boundary.
+    X_labeled = X[labeled_indices(y)]
     ax = plot_utilities(
         qs,
         "$query_params",
@@ -101,9 +99,9 @@ for c in range(n_cycles):
 
     coll_new = list(ax.collections)
     coll_new.append(title)
-    artists.append([x for x in coll_new if (x not in coll_old)])
+    artists.append([x for x in coll_new if x not in coll_old])
 
-    # Label the queried instances.
+    # Update labels based on query.
     y[query_idx] = y_true[query_idx]
 
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)

@@ -19,7 +19,7 @@ from ...utils import (
 
 
 class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
-    """SingleAnnotatorWrapper
+    """Single Annotator Wrapper
 
     Implementation of a wrapper class for pool-based active
     learning query strategies with a single annotator such that it transforms

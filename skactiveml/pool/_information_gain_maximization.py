@@ -143,9 +143,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         if len(X_eval) == 0:
             raise ValueError(
                 "The training data contains no unlabeled "
-                "data. This can be fixed by setting the "
-                "evaluation set manually, e.g. set "
-                "`X_eval=X`."
+                "data."
             )
 
         if self.integration_dict_target_val is None:

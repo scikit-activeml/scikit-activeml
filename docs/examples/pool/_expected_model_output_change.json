@@ -2,7 +2,7 @@
   {
     "class" : "ExpectedModelOutputChange",
     "package" : "pool",
-    "category" : "Expected Error Reduction",
+    "category" : "Informativeness",
     "method" : "Expected Model Output Change",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],

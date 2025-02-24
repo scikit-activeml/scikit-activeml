@@ -3,7 +3,7 @@
     "class" : "CostEmbeddingAL",
     "package" : "pool",
     "method" : "Active Learning with Cost Embedding (ALCE)",
-    "category" : "",
+    "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Active Learning with Cost Embedding",

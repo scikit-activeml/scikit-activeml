@@ -3,7 +3,7 @@
     "class" : "DropQuery",
     "package" : "pool",
     "method" : "Dropout Query (DropQuery)",
-    "category" : "Uncertainty Sampling",
+    "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool", "classification", "single-annotator"],
     "title" : "Dropout Query (DropQuery)",

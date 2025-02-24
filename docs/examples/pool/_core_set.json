@@ -3,7 +3,7 @@
     "class" : "CoreSet",
     "package" : "pool",
     "method" : "Core Set",
-    "category" : "Others",
+    "category" : "Representativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator"],
     "title" : "Core Set",

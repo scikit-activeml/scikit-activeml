@@ -3,7 +3,7 @@
     "class" : "TypiClust",
     "package" : "pool",
     "method" : "Typical Clustering (TypiClust)",
-    "category" : "Others",
+    "category" : "Representativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator"],
     "title" : "Typical Clustering (TypiClust)",

@@ -3,7 +3,7 @@
     "class" : "ProbCover",
     "package" : "pool",
     "method" : "Probability Coverage (ProbCover)",
-    "category" : "Others",
+    "category" : "Representativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "classification", "single-annotator"],
     "title" : "Probability Coverage (ProbCover)",

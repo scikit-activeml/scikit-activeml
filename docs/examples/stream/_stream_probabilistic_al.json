@@ -3,7 +3,7 @@
     "class" : "StreamProbabilisticAL",
     "package" : "stream",
     "method" : "Probabilistic Active Learning in Datastreams",
-    "category" : "Probalistic Sampling",
+    "category" : "Hybrid",
     "template" : "examples/template_stream.py",
     "tags" : ["stream",  "classification", "single-annotator"],
     "title" : "Probabilistic Active Learning in Datastreams",
