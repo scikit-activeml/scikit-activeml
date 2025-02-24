@@ -142,8 +142,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         X_eval = X[is_unlabeled(y, missing_label=self.missing_label_)]
         if len(X_eval) == 0:
             raise ValueError(
-                "The training data contains no unlabeled "
-                "data."
+                "The training data contains no unlabeled " "data."
             )
 
         if self.integration_dict_target_val is None:
