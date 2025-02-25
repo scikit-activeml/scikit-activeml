@@ -64,18 +64,18 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Specifies the ratio of instances which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
-    random_state : int or RandomState instance or None, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     References
     ----------
-    [1] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [1] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
     """
 
     def __init__(
@@ -114,9 +114,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         X : array-like of shape (n_samples, n_features), default=None
@@ -134,9 +134,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,) The indices
-            of instances in candidates whose label should be queried, with `0
-            <= n_queried_indices <= n_candidates`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -200,14 +200,14 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of instances in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for budget_manager.
+            Optional kwargs for `budget_manager`.
 
         Returns
         -------
@@ -314,9 +314,9 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         X : array-like of shape (n_samples, n_features), default=None
@@ -352,8 +352,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             Checked training sample weight.
         fit_clf : bool,
             Checked boolean value of `fit_clf`.
-        candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -529,7 +527,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Specifies the ratio of instances which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
-    random_state : int or RandomState instance or None, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
 
@@ -546,13 +544,13 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
     References
     ----------
-    [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
         Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
         Learn. Syst., 34(1):186–200, 2023.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014.
-    [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.
@@ -598,9 +596,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         X : array-like of shape (n_samples, n_features), default=None
@@ -618,9 +616,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,) The indices
-            of instances in candidates whose label should be queried, with `0
-            <= n_queried_indices <= n_candidates`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -693,14 +691,14 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of instances in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         budget_manager_param_dict : dict, default=None
-            Optional kwargs for budget_manager.
+            Optional kwargs for `budget_manager`.
 
         Returns
         -------
@@ -848,9 +846,9 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         X : array-like of shape (n_samples, n_features), default=None
@@ -886,8 +884,6 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
             Checked training sample weight.
         fit_clf : bool,
             Checked boolean value of `fit_clf`.
-        candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -1060,13 +1056,13 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyRan
 
-    This class implements the CognitiveDualQueryStrategy strategy with Random
-    Sampling. The CognitiveDualQueryStrategy strategy is an extension to the
-    uncertainty based query strategies proposed by Žliobaitė et al. [2]_ and
-    follows the same idea as StreamDensityBasedAL [3]_ where queries for labels
-    is only allowed if the local density around the corresponding instance is
-    sufficiently high. The authors propose the use of a cognitive window that
-    monitors the most representative samples within a data stream.
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
+    Random Sampling. The CognitiveDualQueryStrategy strategy is an extension to
+    the uncertainty based query strategies proposed by Žliobaitė et al. [2]_
+    and follows the same idea as StreamDensityBasedAL [3]_ where queries for
+    labels is only allowed if the local density around the corresponding
+    instance is sufficiently high. The authors propose the use of a cognitive
+    window that monitors the most representative samples within a data stream.
 
     Parameters
     ----------
@@ -1101,7 +1097,7 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
         Specifies the ratio of instances which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
-    random_state : int or RandomState instance or None, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
@@ -1112,13 +1108,13 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
 
     References
     ----------
-    [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
         Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
         Learn. Syst., 34(1):186–200, 2023.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014.
-    [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.
@@ -1159,7 +1155,7 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
 class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyFixUn
 
-    This class implements the CognitiveDualQueryStrategy strategy with
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     FixedUncertainty. The CognitiveDualQueryStrategy strategy is an extension
     to the uncertainty based query strategies proposed by Žliobaitė et al. [2]
     and follows the same idea as StreamDensityBasedAL [3] where queries for
@@ -1169,6 +1165,8 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
 
     Parameters
     ----------
+    classes : array-like of shape (n_classes,)
+        Holds the label for each class.
     force_full_budget : bool, default=False
             If `True`, tries to utilize the full budget. The article does not
             update the budget manager if the locale density factor is 0.
@@ -1200,7 +1198,7 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         Specifies the ratio of instances which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
-    random_state : int or RandomState instance or None, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
@@ -1211,13 +1209,13 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
 
     References
     ----------
-    [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
         Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
         Learn. Syst., 34(1):186–200, 2023.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014.
-    [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.
@@ -1271,7 +1269,7 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
 class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyVarUn
 
-    This class implements the CognitiveDualQueryStrategy strategy with
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     VariableUncertainty. The CognitiveDualQueryStrategy strategy is an
     extension to the uncertainty based query strategies proposed by Žliobaitė
     et al. [2]_ and follows the same idea as StreamDensityBasedAL [3]_ where
@@ -1299,8 +1297,8 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
     budget_manager : BudgetManager, default=None
         The BudgetManager which models the budgeting constraint used in the
         stream-based active learning setting. if set to `None`,
-        `VariableUncertaintyBudgetManager` will be used by default. The budget manager will
-        be initialized based on the following conditions:
+        `VariableUncertaintyBudgetManager` will be used by default. The budget
+        manager will be initialized based on the following conditions:
             - If only a `budget` is given the default budget manager is
               initialized with the given budget.
             - If only a budget manager is given use the budget manager.
@@ -1313,7 +1311,7 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
         Specifies the ratio of instances which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
-    random_state : int or RandomState instance or None, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
@@ -1324,13 +1322,13 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
 
     References
     ----------
-    [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
         Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
         Learn. Syst., 34(1):186–200, 2023.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014.
-    [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.
@@ -1371,7 +1369,7 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
 class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyRanVarUn
 
-    This class implements the CognitiveDualQueryStrategy strategy with
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     RandomVariableUncertainty. The CognitiveDualQueryStrategy strategy is an
     extension to the uncertainty based query strategies proposed by Žliobaitė
     et al. [2]_ and follows the same idea as StreamDensityBasedAL [3]_ where
@@ -1413,7 +1411,7 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
         Specifies the ratio of instances which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
-    random_state : int or RandomState instance or None, default=None
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
 
     See Also
@@ -1424,13 +1422,13 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
 
     References
     ----------
-    [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
         Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
         Learn. Syst., 34(1):186–200, 2023.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014.
-    [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.

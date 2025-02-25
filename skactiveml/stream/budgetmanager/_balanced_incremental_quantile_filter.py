@@ -34,7 +34,7 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
     References
     ----------
-    [1] D. Kottke, G. Krempl, and M. Spiliopoulou. Probabilistic Active
+    .. [1] D. Kottke, G. Krempl, and M. Spiliopoulou. Probabilistic Active
         Learning in Datastreams. In Adv. Intell. Data Anal., pages 145–157,
         2015.
     """
@@ -57,9 +57,9 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by utilities which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
 
@@ -100,8 +100,9 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------

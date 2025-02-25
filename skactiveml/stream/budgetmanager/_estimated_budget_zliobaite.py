@@ -34,9 +34,9 @@ class EstimatedBudgetZliobaite(BudgetManager):
 
     References
     ----------
-    [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014
+    .. [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(self, w=100, budget=None):
@@ -52,8 +52,9 @@ class EstimatedBudgetZliobaite(BudgetManager):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
@@ -116,9 +117,9 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     References
     ----------
-    [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014
+    .. [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(self, classes, w=100, budget=None):
@@ -138,9 +139,9 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -180,8 +181,9 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
@@ -241,9 +243,9 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     References
     ----------
-    [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014
+    .. [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(self, theta=1.0, s=0.01, w=100, budget=None):
@@ -264,9 +266,9 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -305,8 +307,9 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
@@ -398,9 +401,9 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
     References
     ----------
-    [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014
+    .. [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(
@@ -431,9 +434,9 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -479,8 +482,9 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
@@ -564,7 +568,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
     Parameters
     ----------
-    v : float, optional (default=0.1)
+    v : float, default=0.1
         Specifies the percent value of instances queried randomly.
     theta : float, default=1.0
         Specifies the initial value for `theta_` that is compared to
@@ -584,9 +588,9 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
     References
     ----------
-    [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014
+    .. [1] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(
@@ -611,9 +615,9 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -665,8 +669,9 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
@@ -784,9 +789,9 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -827,8 +832,9 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------

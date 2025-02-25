@@ -783,9 +783,9 @@ class BudgetManager(ABC, BaseEstimator):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         raise NotImplementedError
 
@@ -796,11 +796,12 @@ class BudgetManager(ABC, BaseEstimator):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-                (n_samples, n_features)
+                (n_candidates, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
@@ -879,17 +880,17 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_indices,) The indices
-            of instances in candidates whose label should be queried, with `0
-            <= n_queried_indices <= n_candidates`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
             `return_utilities` is `True`.
@@ -912,9 +913,9 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
-            (n_candidates, n_features) The instances which may be queried.
-            Sparse matrices are accepted only if they are supported by the base
-            query strategy.
+                (n_candidates, n_features)
+            The instances which may be queried. Sparse matrices are accepted
+            only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
             The indices of instances in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.

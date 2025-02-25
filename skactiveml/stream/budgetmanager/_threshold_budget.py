@@ -36,13 +36,13 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
     References
     ----------
-    [1] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+    .. [1] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
         Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
         Program. Models Appl., pages 133–148, 2014.
-    [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active Learning
-        With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn. Syst.,
-        25(1):27–39, 2014
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(
@@ -72,9 +72,9 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Returns
         -------
-        queried_indices : np.ndarray of shape (n_queried_instances,)
-            The indices of instances represented by `utilities` which should be
-            queried, with 0 <= `n_queried_instances` <= `n_samples`.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -118,8 +118,9 @@ class DensityBasedSplitBudgetManager(BudgetManager):
                 (n_samples, n_features)
             The instances which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like of shape (n_queried_instances,)
-            Indicates which instances from `candidates` have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of instances in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
