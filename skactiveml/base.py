@@ -1430,7 +1430,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
             Input samples.
         Returns
         -------
-        y : numpy.ndarray of shape (n_samples)
+        y : numpy.ndarray of shape (n_samples,)
             Predicted values of the test samples 'X'.
         """
         raise NotImplementedError
