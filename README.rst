@@ -139,7 +139,7 @@ Stream-based Active Learning
 ----------------------------
 
 The following snippet implements an active learning cycle with 200 data points and a default budget of 10%
-using a Parzen window classifier (previously abbreviated as "pwc") and split uncertainty sampling.
+using a Parzen window classifier and split uncertainty sampling.
 Similar to the pool-based example, you can wrap classifiers from ``sklearn``, use sklearn-compatible classifiers,
 or choose from the example classifiers provided by ``skactiveml``.
 
