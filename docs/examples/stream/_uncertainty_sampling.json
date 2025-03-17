@@ -51,7 +51,7 @@
     "class" : "Split",
     "package" : "stream",
     "method" : "Split",
-    "category" : "Informativeness",
+    "category" : "Hybrid",
     "template" : "examples/template_stream.py",
     "tags" : ["stream",  "classification", "single-annotator"],
     "title" : "Split",
