@@ -90,7 +90,7 @@
   {
     "class" : "UncertaintySampling",
     "package" : "pool",
-    "method" : "Dual strategy for Active Learning",
+    "method" : "Dual Strategy for Active Learning",
     "category" : "Hybrid",
     "template" : "examples/pool/template_DUAL.py",
     "tags" : ["pool",  "classification", "single-annotator"],
