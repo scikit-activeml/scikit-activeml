@@ -365,7 +365,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
               necessarily contained in `X`).
         X : np.ndarray of shape (n_samples, n_features)
             Checked training data set.
-        y : np.ndarray of shape (n_samples,),
+        y : np.ndarray of shape (n_samples,)
             Checked labels of the training data set.
         enforce_mapping : bool, default=False
             If True, an exception is raised when no exact mapping can be
