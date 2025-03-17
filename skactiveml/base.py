@@ -658,7 +658,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         Parameters
         ----------
         candidates : None or array-like of shape (n_candidates), dtype=int or\
-            array-like of shape (n_candidates, n_features),
+                array-like of shape (n_candidates, n_features),
             See annotators.
         annotators : None or array-like of shape (n_avl_annotators), dtype=int\
                 or array-like of shape (n_candidates, n_annotators),
