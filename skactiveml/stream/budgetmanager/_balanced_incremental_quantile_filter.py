@@ -28,7 +28,7 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         The window in which the number of acquisitions should stay within the
         budget. w_tol should be higher than 0.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
@@ -52,13 +52,13 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         ----------
         utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
+            strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
@@ -66,12 +66,12 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         # intialize return parameters
         queried_indices = []
 
-        tmp_queried_instances_ = self.queried_instances_
-        tmp_observed_instances_ = self.observed_instances_
+        tmp_queried_samples_ = self.queried_samples_
+        tmp_observed_samples_ = self.observed_samples_
         tmp_history_sorted_ = copy(self.history_sorted_)
 
         for i, u in enumerate(utilities):
-            tmp_observed_instances_ += 1
+            tmp_observed_samples_ += 1
             tmp_history_sorted_.append(u)
             theta = np.quantile(tmp_history_sorted_, (1 - self.budget_))
 
@@ -80,13 +80,13 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             range_ranking = max_ranking - min_ranking
 
             acq_left = (
-                self.budget_ * tmp_observed_instances_ - tmp_queried_instances_
+                self.budget_ * tmp_observed_samples_ - tmp_queried_samples_
             )
             theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
             sample = u >= theta_bal
 
             if sample:
-                tmp_queried_instances_ += 1
+                tmp_queried_samples_ += 1
                 queried_indices.append(i)
 
         return queried_indices
@@ -98,10 +98,10 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
 
         Returns
@@ -114,8 +114,8 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
 
-        self.observed_instances_ += len(queried)
-        self.queried_instances_ += np.sum(queried)
+        self.observed_samples_ += len(queried)
+        self.queried_samples_ += np.sum(queried)
         self.history_sorted_.extend(utilities)
 
         return self
@@ -140,11 +140,11 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             self.w_tol, "w_tol", (float, int), min_val=0, min_inclusive=False
         )
 
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
+        # check if counting of samples has begun
+        if not hasattr(self, "observed_samples_"):
+            self.observed_samples_ = 0
+        if not hasattr(self, "queried_samples_"):
+            self.queried_samples_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
 

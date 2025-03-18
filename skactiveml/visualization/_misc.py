@@ -6,7 +6,7 @@ from ..utils import check_scalar, check_type, check_bound
 
 
 def mesh(bound, res):
-    """Function to get instances of a mesh grid as well as x-mesh and y-mesh
+    """Function to get samples of a mesh grid as well as x-mesh and y-mesh
     with given resolution in the specified bounds.
 
     Parameters

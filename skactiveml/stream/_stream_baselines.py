@@ -8,11 +8,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     """Random Sampling for Data Streams.
 
     The RandomSampling strategy queries labels completely randomly. The
-    probability to sample an instance is dependent on the budget specified in
+    probability to query a sample is dependent on the budget specified in
     the budget manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1)
-    with a probability of 10%. Instances are queried regardless of their
+    with a probability of 10%. samples are queried regardless of their
     position in the feature space and disregards any information about the
-    instance. Thus, it should only be used as a baseline strategy. The
+    sample. Thus, it should only be used as a baseline strategy. The
     `allow_exceeding_budget` parameter allows to configure the strategy to
     strictly adhere to a given budget.
 
@@ -38,7 +38,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
     def query(self, candidates, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
 
-        The query startegy determines the most useful instances in candidates,
+        The query startegy determines the most useful samples in candidates,
         which can be acquired within the budgeting constraint specified by
         `budget`. Please note that, this method does not change the internal
         state of the query strategy. To adapt the query strategy to the
@@ -48,7 +48,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool, default=False
             If `True`, also return the `utilities` based on the query strategy.
@@ -56,7 +56,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
@@ -73,26 +73,26 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
 
         self.random_state_.set_state(prior_random_state)
 
-        # keep record if the instance is queried and if there was budget left,
+        # keep record if the sample is queried and if there was budget left,
         # when assessing the corresponding utilities
         queried = np.full(len(utilities), False)
 
         # keep the internal state to reset it later if simulate is true
-        tmp_observed_instances = self.observed_instances_
-        tmp_queried_instances = self.queried_instances_
+        tmp_observed_samples = self.observed_samples_
+        tmp_queried_samples = self.queried_samples_
         # check for each sample separately if budget is left and the utility is
         # high enough
         for i, utility in enumerate(utilities):
-            tmp_observed_instances += 1
+            tmp_observed_samples += 1
             available_budget = (
-                tmp_observed_instances * self.budget_ - tmp_queried_instances
+                tmp_observed_samples * self.budget_ - tmp_queried_samples
             )
             queried[i] = (
                 self.allow_exceeding_budget or available_budget > 1
             ) and (utility >= 1 - self.budget_)
-            tmp_queried_instances += queried[i]
+            tmp_queried_samples += queried[i]
 
-        # get the indices instances that should be queried
+        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
 
         # queried_indices = self.budget_manager_.query_by_utility(utilities)
@@ -111,10 +111,10 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
 
         Returns
@@ -124,11 +124,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         """
         # check if a random state is set
         self._validate_data([[0]], False)
-        # update observed instances and queried instances
+        # update observed samples and queried samples
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
-        self.observed_instances_ += candidates.shape[0]
-        self.queried_instances_ += np.sum(queried)
+        self.observed_samples_ += candidates.shape[0]
+        self.queried_samples_ += np.sum(queried)
         # update the random state assuming, that query(..., simulate=True) was
         # used
         self.random_state_.random_sample(len(candidates))
@@ -147,7 +147,7 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
@@ -165,11 +165,11 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
+        # check if counting of samples has begun
+        if not hasattr(self, "observed_samples_"):
+            self.observed_samples_ = 0
+        if not hasattr(self, "queried_samples_"):
+            self.queried_samples_ = 0
 
         check_scalar(
             self.allow_exceeding_budget, "allow_exceeding_budget", bool
@@ -192,10 +192,10 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
     The PeriodicSampling strategy samples labels periodically. The length of
     that period is determined by the `budget`. For instance, a `budget` of 0.25
-    would result in querying every fourth instance. The main idea behind this
+    would result in querying every fourth sample. The main idea behind this
     query strategy is to exhaust a given budget as soon as it is available.
-    Instances are queried regardless of their position in the feature space and
-    disregards any information about the instance. Thus, it should only be used
+    samples are queried regardless of their position in the feature space and
+    disregards any information about the sample. Thus, it should only be used
     as a baseline strategy.
 
     Parameters
@@ -213,7 +213,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
     def query(self, candidates, return_utilities=False):
         """Determines for which candidate samples labels are to be queried.
 
-        The query startegy determines the most useful instances in candidates,
+        The query startegy determines the most useful samples in candidates,
         which can be acquired within the budgeting constraint specified by
         `budget`. Please note that, this method does not change the internal
         state of the query strategy. To adapt the query strategy to the
@@ -223,7 +223,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool, default=False
             If `True`, also return the `utilities` based on the query strategy.
@@ -231,7 +231,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
@@ -243,23 +243,23 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         utilities = np.zeros(candidates.shape[0])
 
-        # keep record if the instance is queried and if there was budget left,
+        # keep record if the sample is queried and if there was budget left,
         # when assessing the corresponding utilities
         queried = np.full(len(candidates), False)
 
-        tmp_observed_instances = self.observed_instances_
-        tmp_queried_instances = self.queried_instances_
+        tmp_observed_samples = self.observed_samples_
+        tmp_queried_samples = self.queried_samples_
         for i, x in enumerate(candidates):
-            tmp_observed_instances += 1
+            tmp_observed_samples += 1
             remaining_budget = (
-                tmp_observed_instances * self.budget_ - tmp_queried_instances
+                tmp_observed_samples * self.budget_ - tmp_queried_samples
             )
             queried[i] = remaining_budget >= 1
             if queried[i]:
                 utilities[i] = 1
-            tmp_queried_instances += queried[i]
+            tmp_queried_samples += queried[i]
 
-        # get the indices instances that should be queried
+        # get the indices samples that should be queried
         queried_indices = np.where(queried)[0]
 
         # queried_indices = self.budget_manager_.query_by_utility(utilities)
@@ -278,10 +278,10 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
 
         Returns
@@ -293,8 +293,8 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         self._validate_data(np.array([[0]]), False)
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
-        self.observed_instances_ += len(queried)
-        self.queried_instances_ += np.sum(queried)
+        self.observed_samples_ += len(queried)
+        self.queried_samples_ += np.sum(queried)
         return self
 
     def _validate_data(
@@ -310,7 +310,7 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
@@ -337,10 +337,10 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
 
         self._validate_random_state()
 
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
+        # check if counting of samples has begun
+        if not hasattr(self, "observed_samples_"):
+            self.observed_samples_ = 0
+        if not hasattr(self, "queried_samples_"):
+            self.queried_samples_ = 0
 
         return candidates, return_utilities

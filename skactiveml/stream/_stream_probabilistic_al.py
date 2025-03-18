@@ -63,7 +63,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
@@ -107,13 +107,13 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         utility_weight=None,
         return_utilities=False,
     ):
-        """Ask the query strategy which instances in candidates to acquire.
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
@@ -136,7 +136,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
@@ -199,10 +199,10 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         budget_manager_param_dict : dict, default=None
             Optional kwargs for `budget_manager`.
@@ -257,7 +257,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
@@ -423,7 +423,7 @@ class StreamProbabilisticAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         utility_weight: array-like of shape (n_candidates,)
             Densities for each sample in `candidates`.

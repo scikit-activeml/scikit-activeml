@@ -14,7 +14,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
     mainly differs in how the available budget ist estimated. Instead of the
     estimated budget proposed by Žliobaitė et. al. [2]_, this budget manager
     counts the number of queried and seen instance, such that the number of
-    available queries is given as`n_seen_instances-n_queried_instances*budget`.
+    available queries is given as`n_seen_samples-n_queried_samples*budget`.
 
     Parameters
     ----------
@@ -23,14 +23,14 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         the threshold.
     s : float, default=0.1
         Specifies the relative increase or decrease of the threshold if an
-        instance is queried or not, respectively.
+        sample is queried or not, respectively.
     delta : float, default=1.0
         Specifies the standart deviation of the normal distribution used for
         randomization of the threshold.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the budget manager.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
 
@@ -67,13 +67,13 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         ----------
         utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
+            strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
@@ -97,7 +97,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
                 eta = self.random_state_.normal(1, self.delta)
                 theta_random = tmp_theta * eta
                 sample = u < theta_random
-                # get the indices instances that should be queried
+                # get the indices samples that should be queried
                 if sample:
                     tmp_theta *= 1 - self.s
                     queried_indices.append(i)
@@ -116,10 +116,10 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
 
         Returns

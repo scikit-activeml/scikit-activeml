@@ -254,7 +254,7 @@ def _alce(
     Returns
     -------
     utilities : np.ndarray of shape (n_candidates,)
-        The utilities of all candidate instances.
+        The utilities of all candidate samples.
     """
     # Check base regressor
     if base_regressor is None:
@@ -286,11 +286,11 @@ def _alce(
     y = y[labeled].astype(int)
     sample_weight = sample_weight[labeled]
 
-    # If all samples are unlabeled, the strategy randomly selects an instance
+    # If all samples are unlabeled, the strategy randomly selects a sample
     if len(X) == 0:
         warnings.warn(
-            "There are no labeled instances. The strategy selects "
-            "one random instance."
+            "There are no labeled samples. The strategy selects "
+            "one random sample."
         )
         return np.ones(len(X_cand))
 

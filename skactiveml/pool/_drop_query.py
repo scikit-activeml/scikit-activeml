@@ -208,7 +208,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             )
             X_dropout[dropout_mask] = 0.0
 
-            # Compute class predictions for this dropout instance.
+            # Compute class predictions for this dropout sample.
             probas_dropout = clf.predict_proba(X_dropout)
             if isinstance(probas_dropout, tuple):
                 probas_dropout, _ = probas_dropout

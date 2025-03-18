@@ -761,7 +761,7 @@ class BudgetManager(ABC, BaseEstimator):
     Parameters
     ----------
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     """
@@ -778,13 +778,13 @@ class BudgetManager(ABC, BaseEstimator):
         ----------
         utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
+            strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         """
         raise NotImplementedError
@@ -797,10 +797,10 @@ class BudgetManager(ABC, BaseEstimator):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
 
         Returns
@@ -871,7 +871,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     def query(self, candidates, *args, return_utilities=False, **kwargs):
         """Determines for which candidate samples labels are to be queried.
 
-        The query startegy determines the most useful instances in candidates,
+        The query startegy determines the most useful samples in candidates,
         which can be acquired within the budgeting constraint specified by
         `budget`. Please note that, this method does not change the internal
         state of the query strategy. To adapt the query strategy to the
@@ -881,7 +881,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
@@ -889,7 +889,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
@@ -914,10 +914,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         budget_manager_param_dict : dict, default=None
             Optional kwargs for budget_manager.
@@ -968,7 +968,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Parameters
         ----------
         candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
             If `True`, also return the utilities based on the query strategy.
@@ -986,7 +986,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # Check candidate instances.
+        # Check candidate samples.
         candidates = check_array(candidates, **check_candidates_params)
 
         # Check number of features.

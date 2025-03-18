@@ -34,7 +34,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
     addition to the uncertainty assessment, StreamDensityBasedAL assesses the
     local density and only allows querying the label for a candidate if that
     local density is sufficiently high. The local density is represented by the
-    number of instances, the new instance is the new nearest neighbor from
+    number of other samples, the new sample is the new nearest neighbor to
     within a sliding window.
 
     Parameters
@@ -61,7 +61,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
@@ -105,7 +105,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
     ):
         """Determines for which candidate samples labels are to be queried.
 
-        The query startegy determines the most useful instances in candidates,
+        The query startegy determines the most useful samples in candidates,
         which can be acquired within the budgeting constraint specified by
         `budget`. Please note that, this method does not change the internal
         state of the query strategy. To adapt the query strategy to the
@@ -115,7 +115,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
@@ -135,7 +135,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
@@ -201,10 +201,10 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         budget_manager_param_dict : dict, default=None
             Optional kwargs for `budget_manager`.
@@ -276,7 +276,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         Returns
@@ -315,7 +315,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
@@ -490,7 +490,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
     The CognitiveDualQueryStrategy strategy is an extension to the uncertainty
     based query strategies proposed by Žliobaitė et al. [2]_ and follows the
     same idea as StreamDensityBasedAL [3]_ where queries for labels is only
-    allowed if the local density around the corresponding instance is
+    allowed if the local density around the corresponding sample is
     sufficiently high. The authors propose the use of a cognitive window that
     monitors the most representative samples within a data stream.
 
@@ -524,7 +524,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
@@ -587,7 +587,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
     ):
         """Determines for which candidate samples labels are to be queried.
 
-        The query startegy determines the most useful instances in candidates,
+        The query startegy determines the most useful samples in candidates,
         which can be acquired within the budgeting constraint specified by
         `budget`. Please note that, this method does not change the internal
         state of the query strategy. To adapt the query strategy to the
@@ -597,7 +597,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
@@ -617,7 +617,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
@@ -692,10 +692,10 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of instances in candidates whose labels are queried,
+            The indices of samples in candidates whose labels are queried,
             with `0 <= queried_indices <= n_candidates`.
         budget_manager_param_dict : dict, default=None
             Optional kwargs for `budget_manager`.
@@ -782,7 +782,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         Returns
@@ -847,7 +847,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
@@ -1061,7 +1061,7 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
     the uncertainty based query strategies proposed by Žliobaitė et al. [2]_
     and follows the same idea as StreamDensityBasedAL [3]_ where queries for
     labels is only allowed if the local density around the corresponding
-    instance is sufficiently high. The authors propose the use of a cognitive
+    sample is sufficiently high. The authors propose the use of a cognitive
     window that monitors the most representative samples within a data stream.
 
     Parameters
@@ -1094,7 +1094,7 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
@@ -1160,7 +1160,7 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
     to the uncertainty based query strategies proposed by Žliobaitė et al. [2]
     and follows the same idea as StreamDensityBasedAL [3] where queries for
     labels is only allowed if the local density around the corresponding
-    instance is sufficiently high. The authors propose the use of a cognitive
+    sample is sufficiently high. The authors propose the use of a cognitive
     window that monitors the most representative samples within a data stream.
 
     Parameters
@@ -1195,7 +1195,7 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
@@ -1274,7 +1274,7 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
     extension to the uncertainty based query strategies proposed by Žliobaitė
     et al. [2]_ and follows the same idea as StreamDensityBasedAL [3]_ where
     queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
+    corresponding sample is sufficiently high. The authors propose the use of
     a cognitive window that monitors the most representative samples within a
     data stream.
 
@@ -1308,7 +1308,7 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None
@@ -1374,7 +1374,7 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
     extension to the uncertainty based query strategies proposed by Žliobaitė
     et al. [2]_ and follows the same idea as StreamDensityBasedAL [3]_ where
     queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
+    corresponding sample is sufficiently high. The authors propose the use of
     a cognitive window that monitors the most representative samples within a
     data stream.
 
@@ -1408,7 +1408,7 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
               `budgetmanager.budget`, throw a warning and the budget manager is
               used as is.
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be sampled, with
+        Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
         default budget 0.1.
     random_state : int or RandomState instance, default=None

@@ -30,7 +30,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
     ----------
     enforce_mapping : bool
         If True, an exception is raised when no exact mapping between
-        instances in `X` and instances in `candidates` can be determined.
+        samples in `X` and samples in `candidates` can be determined.
     cost_matrix: array-like, shape (n_classes, n_classes), default=None
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`.
@@ -800,7 +800,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
 
         # Handle problem that if only one candidate is remaining, this should
         # be the one to be selected although the error cannot be estimated
-        # as there are no instances left for estimating
+        # as there are no samples left for estimating
 
         le = id_clf._le
         y_eval = id_clf.y[idx_eval]
@@ -911,7 +911,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         #                       fit_params='all', pred_params='labeled')
         #     if self.candidate_to_labeled:
         #         # idx_train ('labeled'), idx_cand ('all') exists above
-        #         # TODO: consider only equal instances would be sufficient
+        #         # TODO: consider only equal samples would be sufficient
         #         id_clf.precompute(idx_cand, idx_cand,
         #                           fit_params='all', pred_params='all')
         # if self.consider_unlabeled:

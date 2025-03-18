@@ -36,7 +36,7 @@ from ..utils._validation import _check_callable
 class IndexClassifierWrapper:
     """
     Classifier to simplify retraining classifiers in an active learning
-    scenario. The idea is to pass all instances at once and use their indices
+    scenario. The idea is to pass all samples at once and use their indices
     to access them. Thereby, optimization is possible e.g. by pre-computing
     kernel-matrices. Moreover, this wrapper implements partial fit for all
     classifiers and includes a base classifier that can be used to simulate

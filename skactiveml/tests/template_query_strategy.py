@@ -880,7 +880,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             query_default_params["candidates"] = candidates
             query_default_params["return_utilities"] = True
 
-            # update query as to already have queried the initial instances
+            # update query as to already have queried the initial samples
             # as well as test if update can be called before query
             if X is not None:
                 call_func(

@@ -22,7 +22,7 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the query strategy Multi-class Probabilistic Active
     Learning (McPAL) [1]_, which estimates the performance gain when labeling
-    instances.
+    samples.
 
     Parameters
     ----------

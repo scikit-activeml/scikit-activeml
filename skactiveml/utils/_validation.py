@@ -764,7 +764,7 @@ def check_budget_manager(
     Parameters
     ----------
     budget : float, default=None
-        Specifies the ratio of instances which are allowed to be queried, with
+        Specifies the ratio of samples which are allowed to be queried, with
         0 <= budget <= 1. See Also :class:`BudgetManager`.
     budget_manager : BudgetManager, default=None
         Budget manager to be checked. If `budget_manager` is `None`, a new

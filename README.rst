@@ -109,7 +109,7 @@ are available in our documentation.
     X, y_true = make_blobs(n_samples=200, centers=4, random_state=0)
     y = np.full(shape=y_true.shape, fill_value=MISSING_LABEL)
 
-    # Use the first 10 instances as initial training data.
+    # Use the first 10 samples as initial training data.
     y[:10] = y_true[:10]
 
     # Create classifier and query strategy.

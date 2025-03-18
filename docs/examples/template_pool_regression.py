@@ -75,7 +75,7 @@ for c in range(n_cycles):
     # Fit the regressor using the current labels.
     reg.fit(X, y)
 
-    # Query the next instance(s).
+    # Query the next sample(s).
     query_idx = qs.query("$query_params")
 
     # Record current plot elements.

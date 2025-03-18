@@ -319,7 +319,7 @@ def expected_average_precision(classes, probas):
     Returns
     -------
     score : np.ndarray of shape=(n_samples,)
-        The expected average precision score of all instances in candidates.
+        The expected average precision score of all samples in candidates.
 
     References
     ----------
