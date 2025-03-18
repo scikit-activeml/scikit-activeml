@@ -62,10 +62,10 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
     Other Parameters
     ----------------
     replace_nan : numeric or None, default=0.0
-        Only used if plotting with mesh instances is not possible.
-        If numeric, the utility of labeled instances will be plotted with
+        Only used if plotting with mesh samples is not possible.
+        If numeric, the utility of labeled samples will be plotted with
         value `replace_nan`. If None, these samples will be ignored.
-    ignore_undefined_query_params : bool, optional (default=False)
+    ignore_undefined_query_params : bool, default=False
         If True, query parameters that are not defined in the query function
         are ignored and will not raise an exception.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
@@ -110,7 +110,7 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
         indicated by `qs.missing_label`).
     candidates : None or array-like of shape (n_candidates,), dtype=int or
         array-like of shape (n_candidates, n_features),
-        optional (default=None)
+        default=None
         If `candidates` is None, the unlabeled samples from (X,y) are
         considered as candidates.
         If `candidates` is of shape (n_candidates,) and of type int,
@@ -122,8 +122,8 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
     Other Parameters
     ----------------
     replace_nan : numeric or None, default=0.0
-        Only used if plotting with mesh instances is not possible.
-        If numeric, the utility of labeled instances will be plotted with
+        Only used if plotting with mesh samples is not possible.
+        If numeric, the utility of labeled samples will be plotted with
         value `replace_nan`. If None, these samples will be ignored.
     ignore_undefined_query_params : bool, default=False
         If True, query parameters that are not defined in the query function
@@ -185,7 +185,7 @@ def plot_decision_boundary(
         each entry has to be an `matplotlib.axes.Axes`.
     res : int, default=21
         The resolution of the plot.
-    boundary_dict : dict, optional (default=None)
+    boundary_dict : dict, default=None
         Additional parameters for the boundary contour.
     confidence : scalar or None, default=0.75
         The confidence interval plotted with dashed lines. It is not plotted if
@@ -229,11 +229,11 @@ def plot_decision_boundary(
     confidence_args = _get_confidence_args(confidence_dict)
 
     # Create mesh for plotting
-    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+    X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
     # Calculate predictions
     if hasattr(clf, "predict_proba"):
-        predictions = clf.predict_proba(mesh_instances)
+        predictions = clf.predict_proba(mesh_samples)
         classes = np.arange(predictions.shape[1])
     elif hasattr(clf, "predict"):
         if confidence is not None:
@@ -243,7 +243,7 @@ def plot_decision_boundary(
                 "plotted."
             )
             confidence = None
-        predicted_classes = clf.predict(mesh_instances)
+        predicted_classes = clf.predict(mesh_samples)
         classes = np.arange(len(np.unique(predicted_classes)))
         predictions = np.zeros((len(predicted_classes), len(classes)))
         for idx, y in enumerate(predicted_classes):
@@ -330,7 +330,7 @@ def plot_contour_for_samples(
 
     feature_bound = check_bound(bound=feature_bound, X=X)
 
-    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+    X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
     if ax is None:
         ax = plt.gca()
@@ -347,7 +347,7 @@ def plot_contour_for_samples(
     neighbors = KNeighborsRegressor(n_neighbors=1)
     neighbors.fit(X, values)
 
-    scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
+    scores = neighbors.predict(mesh_samples).reshape(X_mesh.shape)
     ax.contourf(X_mesh, Y_mesh, scores, **contour_args)
     return ax
 
@@ -540,8 +540,8 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     Other Parameters
     ----------------
     replace_nan : numeric or None, default=0.0
-        Only used if plotting with mesh instances is not possible.
-        If numeric, the utility of labeled instances will be plotted with
+        Only used if plotting with mesh samples is not possible.
+        If numeric, the utility of labeled samples will be plotted with
         value `replace_nan`. If None, these samples will be ignored.
     ignore_undefined_query_params : bool, default=False
         If True, query parameters that are not defined in the query function
@@ -649,17 +649,17 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
             check_scalar(res, "res", int, min_val=1)
             feature_bound = check_bound(bound=feature_bound, X=X)
 
-            X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+            X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
             contour_args = _get_contour_args(contour_dict)
 
             if ignore_undefined_query_params:
                 _, utilities = call_func(
-                    qs.query, X=X, y=y, candidates=mesh_instances, **kwargs
+                    qs.query, X=X, y=y, candidates=mesh_samples, **kwargs
                 )
             else:
                 _, utilities = qs.query(
-                    X=X, y=y, candidates=mesh_instances, **kwargs
+                    X=X, y=y, candidates=mesh_samples, **kwargs
                 )
 
             for a_idx, ax_ in zip(plot_annotators, axes):
