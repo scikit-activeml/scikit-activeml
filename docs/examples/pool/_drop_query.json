@@ -1,17 +1,17 @@
 [
 {
-    "class" : "Clue",
+    "class" : "DropQuery",
     "package" : "pool",
-    "method" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
+    "method" : "Dropout Query (DropQuery)",
     "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool", "classification", "single-annotator"],
-    "title" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
-    "refs" : ["prabhu2021active"],
+    "title" : "Dropout Query (DropQuery)",
+    "refs" : ["gupte2024revisiting"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",
-    "import_misc" : "from skactiveml.pool import Clue",
-    "init_qs" : "Clue()",
+    "import_misc" : "from skactiveml.pool import DropQuery",
+    "init_qs" : "DropQuery()",
     "query_params" : "X=X, y=y, clf=clf"
 }
 ]

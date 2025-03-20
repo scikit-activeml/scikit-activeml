@@ -66,10 +66,10 @@ for c in range(n_cycles):
     # Fit the classifier.
     clf.fit(X, y)
 
-    # Get labeled instances.
+    # Get labeled samples.
     X_labeled = X[is_labeled(y)]
 
-    # Query the next instance/s.
+    # Query the next sample(s).
     if not switching_point:
         # DWUS
         query_idx, utils = qs.query(X=X, y=y, clf=clf, utility_weight=density, return_utilities=True)
@@ -104,7 +104,7 @@ for c in range(n_cycles):
     coll_new.append(title)
     artists.append([x for x in coll_new if (x not in coll_old)])
 
-    # Label the queried instances.
+    # Label the queried samples.
     y[query_idx] = y_true[query_idx]
 
 ani = animation.ArtistAnimation(fig, artists, interval=1000, blit=True)

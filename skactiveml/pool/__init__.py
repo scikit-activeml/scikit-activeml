@@ -39,6 +39,7 @@ from ._badge import Badge
 from ._prob_cover import ProbCover
 from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
+from ._drop_query import DropQuery
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 from ._falcun import Falcun
 
@@ -70,6 +71,7 @@ __all__ = [
     "DiscriminativeAL",
     "BatchBALD",
     "Clue",
+    "DropQuery",
     "batch_bald",
     "CoreSet",
     "k_greedy_center",

@@ -3,7 +3,7 @@
     "class" : "ProbabilisticAL",
     "package" : "pool",
     "method" : "Multi-class Probabilistic Active Learning (McPAL)",
-    "categories" : "",
+    "category" : "Hybrid",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Multi-class Probabilistic Active Learning",

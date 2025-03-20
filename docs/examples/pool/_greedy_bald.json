@@ -3,7 +3,7 @@
     "class" : "GreedyBALD",
     "package" : "pool",
     "method" : "Bayesian Active Learning by Disagreement (BALD)",
-    "category" :  "Query-by-Committee",
+    "category" :  "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Bayesian Active Learning by Disagreement (BALD)",

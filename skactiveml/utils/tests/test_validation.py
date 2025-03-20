@@ -14,8 +14,10 @@ from skactiveml.utils import (
     check_budget_manager,
     check_classifier_params,
     check_indices,
+    check_n_features,
+    check_random_state,
+    check_class_prior,
 )
-from skactiveml.utils import check_random_state, check_class_prior
 from skactiveml.utils._validation import _check_callable
 
 
@@ -370,3 +372,47 @@ class TestValidation(unittest.TestCase):
             check_budget_manager(
                 0.1, SplitBudgetManager(budget=0.2), SplitBudgetManager
             )
+
+    def test_check_n_features(self):
+
+        # Define a simple DummyEstimator
+        class DummyEstimator:
+            def __init__(self, n_features_in_=None):
+                self.n_features_in_ = n_features_in_
+
+        # Test 1: reset=True with non-empty X
+        with self.subTest("reset True with non-empty X"):
+            est = DummyEstimator()
+            X = np.array([[1, 2, 3], [4, 5, 6]])
+            check_n_features(est, X, reset=True)
+            self.assertEqual(est.n_features_in_, 3)
+
+        # Test 2: reset=True with empty X
+        with self.subTest("reset True with empty X"):
+            est = DummyEstimator()
+            X = np.empty((0, 3))
+            check_n_features(est, X, reset=True)
+            self.assertIsNone(est.n_features_in_)
+
+        # Test 3: reset=False when n_features_in_ is None (no check)
+        with self.subTest("reset False without n_features_in_ set"):
+            est = DummyEstimator()
+            X = np.array([[1, 2, 3], [4, 5, 6]])
+            check_n_features(est, X, reset=False)
+            self.assertIsNone(est.n_features_in_)
+
+        # Test 4: reset=False with correct feature count
+        with self.subTest("reset False with matching features"):
+            est = DummyEstimator(n_features_in_=3)
+            X = np.array([[1, 2, 3], [7, 8, 9]])
+            try:
+                check_n_features(est, X, reset=False)
+            except ValueError:
+                self.fail("check_n_features raised ValueError unexpectedly!")
+
+        # Test 5: reset=False with incorrect feature count
+        with self.subTest("reset False with mismatched features"):
+            est = DummyEstimator(n_features_in_=3)
+            X = np.array([[1, 2], [3, 4]])
+            with self.assertRaises(ValueError):
+                check_n_features(est, X, reset=False)

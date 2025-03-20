@@ -27,7 +27,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    gamma : float > 0, default=1
+    gamma : float > 0, default=10
         Controls the randomness in the selection. A value of 0 corresponds to
         random sampling, while a value going to infinity corresponds to
         selecting the sample with the highest utility (relevance).
@@ -38,13 +38,14 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] Gilhuber, S., Beer, A., Ma, Y., Seidl, T. (2024). FALCUN: A Simple
-       and Efficient Deep Active Learning Strategy. In: ECML-PKDD 2024.
+    .. [1] S. Gilhuber, A. Beer, Y. Ma, and T. Seidl. FALCUN: A Simple and
+       Efficient Deep Active Learning Strategy. In Joint Eur. Conf. Mach.
+       Learn. Knowl. Discov. Databases, pages 421–439, 2024.
     """
 
     def __init__(
         self,
-        gamma=1,
+        gamma=10,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -64,11 +65,11 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled
+        """Query the next samples to be labeled.
 
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`.)
@@ -79,15 +80,16 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates, ) of type \
-                int, default=None
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
-            - If `candidates` is of shape `(n_candidates, *)`, `candidates` is
-              considered as the candidate samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -96,9 +98,15 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample. The indexing refers to the samples in `X`.
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
+            sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
@@ -158,7 +166,8 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
                 if dist_range > 0:
                     dist_cand /= dist_range
 
-            # Compute relevance scores for candidates (cf. Eq. (5) and (6) in [1]).
+            # Compute relevance scores for candidates (cf. Eq. (5) and
+            # (6) in [1]).
             rel_cand = (unc_cand + dist_cand) ** self.gamma
             rel_cand[query_indices] = 0
             rel_cand_sum = np.sum(rel_cand)

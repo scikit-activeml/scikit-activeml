@@ -23,7 +23,7 @@ class TestFixedUncertainty(
     def setUp(self):
         self.classes = [0, 1]
         X = np.array([[1, 2], [5, 8], [8, 4], [5, 4]])
-        y = np.array([0, 0, MISSING_LABEL, MISSING_LABEL])
+        y = np.array([0, 1, MISSING_LABEL, MISSING_LABEL])
         clf = ParzenWindowClassifier(random_state=0, classes=self.classes).fit(
             X, y
         )
@@ -33,11 +33,55 @@ class TestFixedUncertainty(
             "clf": clf,
             "y": y,
         }
+        init_default_params = {
+            "classes": self.classes,
+        }
         super().setUp(
             qs_class=FixedUncertainty,
-            init_default_params={},
+            init_default_params=init_default_params,
             query_default_params_clf=query_default_params_clf,
         )
+
+    def test_init_param_classes(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (None, TypeError),
+            (FixedUncertainty, TypeError),
+        ]
+        self._test_param("init", "classes", test_cases)
+        self._test_param("init", "classes", [([0, 1], None)])
+        self._test_param(
+            "init",
+            "classes",
+            [(["0", "1"], None)],
+            {},
+            {"y": ["0", "1", "none", "none"]},
+        )
+
+        qs_2 = FixedUncertainty(classes=[0, 1], random_state=0)
+        queried_indices_2, utilities_2 = qs_2.query(
+            candidates=[[1, 2]],
+            X=[[0, 2], [2, 2]],
+            y=[0, 1],
+            clf=ParzenWindowClassifier(classes=[0, 1], random_state=0),
+            fit_clf=True,
+            return_utilities=True,
+        )
+
+        qs_3 = FixedUncertainty(classes=[0, 1, 2], random_state=0)
+        queried_indices_3, utilities_3 = qs_3.query(
+            candidates=[[1, 2]],
+            X=[[0, 2], [2, 2]],
+            y=[0, 1],
+            clf=ParzenWindowClassifier(classes=[0, 1, 2], random_state=0),
+            fit_clf=True,
+            return_utilities=True,
+        )
+        # The probabilities should be 50/50 for class 0 and 1. Thus, the
+        # confidence of the classifier is 0.5, which is sufficient to query the
+        # label in a 2-class setting but not in a 3-class setting
+        self.assertEqual(len(queried_indices_2), 1)
+        self.assertEqual(len(queried_indices_3), 0)
 
     def test_query_param_clf(self):
         add_test_cases = [

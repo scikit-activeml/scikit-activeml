@@ -29,8 +29,9 @@ from ..utils import (
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     """Query-by-Committee (QBC)
 
-    The Query-by-Committee (QBC) strategy uses an ensemble of estimators to
-    identify on which samples many estimators disagree.
+    The Query-by-Committee (QBC) [1]_, [2]_, [3]_, [4]_, [5]_ strategy uses an
+    ensemble of estimators to identify on which samples many estimators
+    disagree.
 
     Parameters
     ----------
@@ -47,28 +48,30 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         Certain estimators may offer methods enabling to construct a committee
         by sampling predictions of committee members. This parameter is to
         indicate the name of such a method.
-            - If `sample_predictions_method_name=None` no sampling is
-              performed.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of classification, the method is expected to take samples of
-              the shape `(n_samples, *)` as input and to output probabilities
-              of the shape `(n_members, n_samples, n_classes)`, e.g.,
-              `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of regression, the method is expected to take samples of the
-              shape `(n_samples, *)` as input and to output numerical values of
-              the shape `(n_members, n_samples)`, e.g., `sample_y` in
-              `sklearn.gaussian_process.GaussianProcessRegressor`.
+
+        - If `sample_predictions_method_name=None` no sampling is
+          performed.
+        - If `sample_predictions_method_name` is not `None` and in the
+          case of classification, the method is expected to take samples of
+          the shape `(n_samples, *)` as input and to output probabilities
+          of the shape `(n_members, n_samples, n_classes)`, e.g.,
+          `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
+        - If `sample_predictions_method_name` is not `None` and in the
+          case of regression, the method is expected to take samples of the
+          shape `(n_samples, *)` as input and to output numerical values of
+          the shape `(n_members, n_samples)`, e.g., `sample_y` in
+          `sklearn.gaussian_process.GaussianProcessRegressor`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-            - This parameter must be `None`, if
-              `sample_predictions_method_name` is `None`.
-            - Otherwise, it may be used to define the number of sampled
-              members, e.g., by defining `n_samples` as parameter to the method
-              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
-              `sample_y` of
-              `sklearn.gaussian_process.GaussianProcessRegressor`.
+
+        - This parameter must be `None`, if
+          `sample_predictions_method_name` is `None`.
+        - Otherwise, it may be used to define the number of sampled
+          members, e.g., by defining `n_samples` as parameter to the method
+          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator` or
+          `sample_y` of
+          `sklearn.gaussian_process.GaussianProcessRegressor`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
@@ -76,22 +79,24 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] H.S. Seung, M. Opper, and H. Sompolinsky. Query by committee.
-       In ACM Workshop on Computational Learning Theory, pages 287-294, 1992.
+    .. [1] H. S. Seung, M. Opper, and H. Sompolinsky. Query by Committee. In
+       Annu. Workshop Comput. Learn. Theory., pages 287–294, 1992.
 
-    .. [2] N. Abe and H. Mamitsuka. Query Learning Strategies Using Boosting
-       and Bagging. In International Conference on Machine Learning, pages 1-9,
-       1998.
+    .. [2] A. K. McCallum and K. Nigamy. Employing EM and Pool-Based Active
+       Learning for Text Classification. In Int. Conf. Mach. Learn.,
+       pages 359–367, 1998.
 
-    .. [3] Burbidge, Robert and Rowland, Jem J and King, Ross D. Active
-       Learning for Regression Based on Query by Committee. In International
-       Conference on Intelligent Data Engineering and Automated Learning,
-       pages 209-218, 2007.
+    .. [3] S. P. Engelson and I. Dagan. Minimizing Manual Annotation Cost in
+       Supervised Training from Corpora. In Annu. Meet. Assoc. Comput.
+       Linguist., pages 319–326, 1996.
 
-    .. [4] Beluch, W. H., Genewein, T., Nürnberger, A., and Köhler, J. M.
-       The Power of Ensembles for Active Learning in Image Classification. In
-       Conference on Computer Vision and Pattern Recognition, pages 9368-9377,
-       2018
+    .. [4] R. Burbidge, J. J. Rowland, and R. D. King. Active Learning for
+       Regression Based on Query by Committee. In Intell. Data Eng. Autom.
+       Learn., pages 209–218, 2007.
+
+    .. [5] W. H. Beluch, T. Genewein, A. Nürnberger, and J. M. Köhler. The
+       Power of Ensembles for Active Learning in Image Classification. In
+       IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages 9368–9377, 2018.
     """
 
     def __init__(
@@ -127,8 +132,8 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`.)
@@ -173,22 +178,24 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             The query_indices indicate for which candidate sample a label is
             to queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-                - If `candidates` is `None` or of shape
-                  `(n_candidates,)`, the indexing refers to the samples in
-                  `X`.
-                - If `candidates` is of shape `(n_candidates, n_features)`,
-                  the indexing refers to the samples in `candidates`.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or \
                 numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-                - If `candidates` is `None` or of shape
-                  `(n_candidates,)`, the indexing refers to the samples in
-                  `X`.
-                - If `candidates` is of shape `(n_candidates, n_features)`,
-                  the indexing refers to the samples in `candidates`.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -324,9 +331,9 @@ def average_kl_divergence(probas, eps=1e-7):
 
     References
     ----------
-    .. [1] A. McCallum and K. Nigam. Employing EM in pool-based active learning
-       for text classification. In International Conference on Machine
-       Learning, pages 359-367, 1998.
+    .. [1] A. K. McCallum and K. Nigamy. Employing EM and Pool-Based Active
+       Learning for Text Classification. In Int. Conf. Mach. Learn.,
+       pages 359–367, 1998.
     """
     # Check parameters.
     check_scalar(
@@ -376,9 +383,9 @@ def vote_entropy(votes, classes):
 
     References
     ----------
-    .. [1] Engelson, Sean P., and Ido Dagan. "Minimizing Manual Annotation Cost
-       in Supervised Training from Corpora." In Annual Meeting of the
-       Association for Computational Linguistics, pages 319-326, 1996.
+    .. [1] S. P. Engelson and I. Dagan. Minimizing Manual Annotation Cost in
+       Supervised Training from Corpora. In Annu. Meet. Assoc. Comput.
+       Linguist., pages 319–326, 1996.
     """
     # Check `votes` array.
     votes = check_array(votes)
@@ -413,10 +420,9 @@ def variation_ratios(votes):
 
     References
     ----------
-    .. [1] Beluch, W. H., Genewein, T., Nürnberger, A., and Köhler, J. M.
-       The Power of Ensembles for Active Learning in Image Classification. In
-       Conference on Computer Vision and Pattern Recognition, pages 9368-9377,
-       2018.
+    .. [1] W. H. Beluch, T. Genewein, A. Nürnberger, and J. M. Köhler. The
+       Power of Ensembles for Active Learning in Image Classification. In
+       IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages 9368–9377, 2018.
     """
     # Check `votes` array.
     votes = check_array(votes)

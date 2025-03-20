@@ -2,7 +2,7 @@
   {
     "class" : "ExpectedModelVarianceReduction",
     "package" : "pool",
-    "category" : "Expected Error Reduction",
+    "category" : "Informativeness",
     "method" : "Expected Model Variance Reduction",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],

@@ -3,7 +3,7 @@
     "class" : "DiscriminativeAL",
     "package" : "pool",
     "method" : "Discriminative Active Learning (DAL)",
-    "category" : "",
+    "category" : "Representativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "regression", "single-annotator"],
     "title" : "Discriminative Active Learning",

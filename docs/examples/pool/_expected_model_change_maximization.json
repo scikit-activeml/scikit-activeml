@@ -2,11 +2,11 @@
   {
     "class" : "ExpectedModelChangeMaximization",
     "package" : "pool",
-    "category" : "Model Change",
+    "category" : "Informativeness",
     "method" : "Expected Model Change",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],
-    "title" : "Expected Model Change",
+    "title" : "Expected Model Change Maximization",
     "refs" : ["cai2013maximizing"],
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "",

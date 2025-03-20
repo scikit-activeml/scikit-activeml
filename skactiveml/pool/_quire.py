@@ -15,33 +15,33 @@ from skactiveml.utils import (
 
 
 class Quire(SingleAnnotatorPoolQueryStrategy):
-    """Quire
+    """QUerying Informative and Representative Examples (QUIRE)
 
     Implementation of the AL strategy "QUerying Informative and Representative
-    Examples" (QUIRE for short) [1].
+    Examples" (QUIRE) [1]_.
 
     Parameters
     ----------
-    classes: array-like, shape (n_classes)
+    classes : array-like of shape (n_classes)
         Array of class labels.
     lmbda : float, default=1.0
         Controls informativeness (high) and representativeness (low). Values
         must be greater than 0.
     metric : str or callable, default='rbf'
-        The metric must a be a valid kernel defined by the function
+        The metric must be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels` or 'precomputed'.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the metric function.
     missing_label : scalar or string or np.nan or None, default=MISSING_LABEL
         Value to represent a missing label.
-    random_state : int or np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     References
-    ---------
-    [1] Huang, S. J., Jin, R., & Zhou, Z. H. (2010). Active learning by
-        querying informative and representative examples. Advances in neural
-        information processing systems, 23.
+    ----------
+    .. [1] S.-J. Huang, R. Jin, and Z.-H. Zhou. Active Learning by Querying
+       Informative and Representative Examples. In Adv. Neural Inf. Process.
+       Syst., 2010.
     """
 
     METRICS = list(KERNEL_PARAMS.keys()) + ["precomputed"]
@@ -75,41 +75,37 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features) or shape
-        (n_samples, n_samples) if metric == 'precomputed'
-            Training data set, including the labeled and unlabeled samples.
-        y : array-like of shape (n_samples)
-            Labels of the training data set, including unlabeled ones
-            indicated by self.missing_label.
-        candidates : None or array-like of shape (n_candidates), dtype=int,
-        default=None
-            If `candidates` is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If `candidates` is of shape (n_candidates) and of type int,
-            `candidates` is considered as the indices of the samples in (X,y).
-            The option `candidates` with shape (n_candidates, n_features) is
-            not supported.
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
-            If true, also return the utilities based on the query strategy.
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample. The indexing refers to the samples in `X`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
+            Utilities for labeled samples will be set to np.nan. The indexing
+            refers to the samples in `X`.
         """
         # --- Validation -----------------------------------------------------
         # Check standard parameters.

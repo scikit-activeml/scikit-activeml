@@ -1,6 +1,6 @@
 import numpy as np
 from sklearn import clone
-from sklearn.utils import check_array
+from sklearn.utils.validation import check_array, _check_n_features
 from sklearn.metrics import mean_squared_error
 
 from skactiveml.base import (
@@ -18,38 +18,35 @@ from skactiveml.utils import (
 
 
 class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
-    """Regression based Expected Model Output Change.
+    """Regression based Expected Model Output Change (EMOC)
 
-    This class implements an expected model output change based approach for
-    regression, where samples are queried that change the output of the model
-    the most.
+    This class implements an "Expected Model Output Change" (EMOC) based
+    approach for regression [1]_, where samples are queried that change the
+    output of the regression model the most.
 
     Parameters
     ----------
-    integration_dict : dict, optional (default=None)
+    integration_dict : dict, default=None
         Dictionary for integration arguments, i.e. `integration_method` etc.,
         used for calculating the expected `y` value for the candidate samples.
         For details see method `skactiveml.pool.utils._conditional_expect`.
         The default `integration_method` is `assume_linear`.
-    loss : callable, optional (default=None)
+    loss : callable, default=None
         The loss for predicting a target value instead of the true value.
         Takes in the predicted values of an evaluation set and the true values
         of the evaluation set and returns the error, a scalar value.
         The default loss is `sklearn.metrics.mean_squared_error` an alternative
         might be `sklearn.metrics.mean_absolute_error`.
-    missing_label : scalar or string or np.nan or None,
-    (default=skactiveml.utils.MISSING_LABEL)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int | np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
 
     References
     ----------
-    [1] Christoph Kaeding, Erik Rodner, Alexander Freytag, Oliver Mothes,
-        Oliver, Bjoern Barz and Joachim Denzler. Active
-        Learning for Regression Tasks with Expected Model Output Change, BMVC,
-        page 1-15, 2018.
-
+    .. [1] Christoph Kaeding, Erik Rodner, Alexander Freytag, Oliver Mothes,
+       Oliver, Bjoern Barz and Joachim Denzler. Active Learning for Regression
+       Tasks with Expected Model Output Change, BMVC, page 1-15, 2018.
     """
 
     def __init__(
@@ -82,60 +79,62 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         reg : ProbabilisticRegressor
             Predicts the output and the target distribution.
-        fit_reg : bool, optional (default=True)
+        fit_reg : bool, default=True
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), optional
-        (default=None)
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X).
-        X_eval : array-like of shape (n_eval_samples, n_features),
-        optional (default=None)
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
+        X_eval : array-like of shape (n_eval_samples, n_features), default=None
             Evaluation data set that is used for estimating the probability
             distribution of the feature space. In the referenced paper it is
-            proposed to use the unlabeled data, i.e.
+            proposed to use the unlabeled data, i.e.,
             `X_eval=X[is_unlabeled(y)]`.
-        batch_size : int, optional (default=1)
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
@@ -156,7 +155,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
                 )
         else:
             X_eval = check_array(X_eval)
-            self._check_n_features(X_eval, reset=False)
+            _check_n_features(self, X_eval, reset=False)
         check_type(fit_reg, "fit_reg", bool)
         if self.loss is None:
             self.loss = mean_squared_error

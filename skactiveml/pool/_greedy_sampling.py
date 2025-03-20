@@ -17,33 +17,30 @@ from skactiveml.utils import (
 
 
 class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
-    """Greedy Sampling on the feature space.
+    """Greedy Sampling in the Feature Space (GSx)
 
-    This class implements greedy sampling on the feature space. A query
-    strategy that tries to select those samples that increase the diversity of
-    the feature space the most.
+    This class implements the query strategy Greedy Sampling in the Feature
+    Space (GSx) [1]_ that tries to select those samples that increase the
+    diversity of the feature space the most.
 
     Parameters
     ----------
-    metric : str, optional (default="euclidean")
+    metric : str, default="euclidean"
         Metric used for calculating the distances of the samples in the feature
         space. It must be a valid argument for
         `sklearn.metrics.pairwise_distances` argument `metric`.
-    metric_dict : dict, optional (default=None)
+    metric_dict : dict, default=None
         Any further parameters are passed directly to the pairwise_distances
         function.
-    missing_label : scalar or string or np.nan or None,
-    (default=skactiveml.utils.MISSING_LABEL)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int | np.random.RandomState, optional
+    random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
 
     References
     ----------
-    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active Learning for
-        Regression Using Greedy Sampling, Information Sciences, pages 90--105,
-        2019.
-
+    .. [1] D. Wu, C.-T. Lin, and J. Huang. Active Learning for Regression using
+       Greedy Sampling. Inf. Sci., 474:90–105, 2019.
     """
 
     def __init__(
@@ -62,53 +59,53 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     def query(
         self, X, y, candidates=None, batch_size=1, return_utilities=False
     ):
-        """Determines for which candidate samples labels are to be queried.
+        """Query the next samples to be labeled.
 
-        Parameters
-        ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X).
-        batch_size : int, optional (default=1)
+            indicated by `self.missing_label`.)
+        candidates : None or array-like of shape (n_candidates, ) of type \
+                int, default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, `candidates` is
+              considered as the candidate samples in `(X,y)`.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        """
 
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
+        """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
@@ -152,50 +149,48 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
 
 
 class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
-    """Greedy Sampling on the target space.
+    """Greedy Sampling in the Target Space (GSi or GSy)
 
-    This class implements greedy sampling on the target space. A query strategy
-    that at first selects samples to maximize the diversity in the
-    feature space and than selects samples to maximize the diversity in the
-    feature and the target space (GSi), optionally only the diversity in the
-    target space can be maximized (GSy).
+    This class implements the query strategy Greedy Sampling in the Target
+    Space (GSi or GSy) [1]_ that at first selects samples to maximize the
+    diversity in the feature space and than selects samples to maximize the
+    diversity in the feature and the target space (GSi), optionally only the
+    diversity in the target space can be maximized (GSy).
 
     Parameters
     ----------
-    x_metric : str, optional (default=None)
+    x_metric : str, default=None
         Metric used for calculating the distances of the samples in the feature
         space. It must be a valid argument for
         `sklearn.metrics.pairwise_distances` argument `metric`.
-    y_metric : str, optional (default=None)
+    y_metric : str, default=None
         Metric used for calculating the distances of the samples in the target
         space. It must be a valid argument for
         `sklearn.metrics.pairwise_distances` argument `metric`.
-    x_metric_dict : dict, optional (default=None)
+    x_metric_dict : dict, default=None
         Any further parameters for computing the distances of the samples in
         the feature space are passed directly to the pairwise_distances
         function.
-    y_metric_dict : dict, optional (default=None)
+    y_metric_dict : dict, default=None
         Any further parameters for computing the distances of the samples in
         the target space are passed directly to the pairwise_distances
         function.
-    n_GSx_samples : int, optional (default=1)
+    n_GSx_samples : int, default=1
         Indicates the number of selected samples required till the query
         strategy switches from GSx to the strategy specified by `method`.
     method : "GSy" or "GSi", optional (default="GSi")
-        Specifies whether only the diversity in the target space (`GSy`) or the
-        diversity in the feature and the target space (`GSi`) should be
+        Specifies whether only the diversity in the target space ("GSy") or the
+        diversity in the feature and the target space ("GSi") should be
         maximized, when the number of selected samples exceeds `n_GSx_samples`.
-    missing_label : scalar or string or np.nan or None,
-    (default=skactiveml.utils.MISSING_LABEL)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int | np.random.RandomState, optional
+    random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
 
     References
     ----------
-    [1] Wu, Dongrui, Chin-Teng Lin, and Jian Huang. Active Learning for
-        Regression using Greedy Sampling, Information Sciences, pages 90--105,
-        2019.
+    .. [1] D. Wu, C.-T. Lin, and J. Huang. Active Learning for Regression using
+       Greedy Sampling. Inf. Sci., 474:90–105, 2019.
     """
 
     def __init__(
@@ -230,60 +225,53 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Determines for which candidate samples labels are to be queried.
+        """Query the next samples to be labeled.
 
-        Parameters
-        ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
-        reg: SkactivemlRegressor
-            Regressor to predict the data.
-        fit_reg : bool, optional (default=True)
-            Defines whether the regressor should be fitted on `X`, `y`, and
-            `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
-            Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X).
-        batch_size : int, optional (default=1)
+            indicated by `self.missing_label`.)
+        candidates : None or array-like of shape (n_candidates, ) of type \
+                int, default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, `candidates` is
+              considered as the candidate samples in `(X,y)`.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        """
 
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
+        """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )

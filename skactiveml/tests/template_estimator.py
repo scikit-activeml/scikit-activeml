@@ -440,7 +440,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
-        test_cases = [([], TypeError)]
+        test_cases = [([], ValueError)]
         replace_init_params["classes"] = None
         self._test_param(
             "fit",
@@ -673,12 +673,23 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
-        test_cases = [(1.2, None)]
+        test_cases += [(1.2, None)]
         # TODO: check_missing_label is only used to check if missing_label
         # is correct but strings are therfore also accepted
         # after fixing this issue add test below again.
         # ("nan", TypeError),
         super().test_init_param_missing_label(test_cases)
+
+    def test_fit_param_X(self, test_cases=None):
+        super().test_fit_param_X(test_cases)
+        test_cases = [([], None)]
+        replace_fit_params = {"y": []}
+        self._test_param(
+            "fit",
+            "X",
+            test_cases,
+            replace_fit_params=replace_fit_params,
+        )
 
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

@@ -18,16 +18,17 @@ from ..utils import (
 
 
 class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
-    """(Multi-class) Probabilistic Active Learning
+    """Multi-class Probabilistic Active Learning (McPAL)
 
-    This class implements multi-class probabilistic active learning (McPAL) [1]
-    strategy.
+    This class implements the query strategy Multi-class Probabilistic Active
+    Learning (McPAL) [1]_, which estimates the performance gain when labeling
+    samples.
 
     Parameters
     ----------
-    prior: float, optional (default=1)
+    prior : float, default=1.0
         Prior probabilities for the Dirichlet distribution of the samples.
-    m_max: int, optional (default=1)
+    m_max : int, default=1.0
         Maximum number of hypothetically acquired labels.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -43,15 +44,14 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         Any further parameters that should be passed directly to the kernel
         function. If metric_dict is None and metric is 'rbf' metric_dict is set
         to {'gamma': 'mean'}.
-    random_state: numeric | np.random.RandomState, optional
-        Random state for candidate selection.
+    random_state : None or int or np.random.RandomState, default=None
+        The random state to use.
 
     References
     ----------
-    [1] Daniel Kottke, Georg Krempl, Dominik Lang, Johannes Teschner, and Myra
-        Spiliopoulou. Multi-Class Probabilistic Active Learning,
-        vol. 285 of Frontiers in Artificial Intelligence and Applications,
-        pages 586-594. IOS Press, 2016
+    .. [1] D. Kottke, G. Krempl, D. Lang, J. Teschner, and M. Spiliopoulou.
+       Multi-class Probabilistic Active Learning. In Eur. Conf. Artif. Intell.,
+       pages 586–594, 2016.
     """
 
     def __init__(
@@ -83,55 +83,65 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next instance to be labeled.
+        """Query the next samples to be labeled.
 
-        Parameters
-        ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
-        clf : skactiveml.base.ClassFrequencyEstimator
-            Model implementing the methods `fit` and `predict_freq`.
+            indicated by `self.missing_label`.)
+        clf : skactiveml.base.SkactivemlClassifier
+            Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+            Defines whether the classifier `clf` should be fitted on `X`, `y`,
+            and `sample_weight`.
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        utility_weight: array-like, optional (default=None)
+        utility_weight : array-like, default=None
             Weight for each candidate (multiplied with utilities). Usually,
             this is to be the density of a candidate in ProbabilisticAL. The
             length of `utility_weight` is usually n_samples, except for the
             case when candidates contains samples (ndim >= 2). Then the length
             is `n_candidates`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates, ) of type \
+                int, default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, `candidates` is
+              considered as the candidate samples in `(X,y)`.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray, shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
+        query_indices : numpy.ndarray of shape (batch_size)
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-        utilities : numpy.ndarray, shape (batch_size, n_samples)
-            The utilities of all candidate samples after each selected
-            sample of the batch, e.g., `utilities[0]` indicates the utilities
-            used for selecting the first sample (with index `query_indices[0]`)
-            of the batch.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -219,13 +229,13 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
 
     Parameters
     ----------
-    k_vec_list: array-like, shape (n_samples, n_classes)
+    k_vec_list : array-like of shape (n_samples, n_classes)
         Observed class labels.
-    C: array-like, shape = (n_classes, n_classes)
+    C : array-like of shape (n_classes, n_classes), default=None
         Cost matrix.
-    m_max: int
+    m_max : int
         Maximal number of hypothetically acquired labels.
-    prior : float | array-like, shape (n_classes)
+    prior : float or array-like of shape (n_classes,)
        Prior value for each class.
 
     Returns
@@ -302,21 +312,20 @@ def cost_reduction(k_vec_list, C=None, m_max=2, prior=1.0e-3):
 
 
 def _gen_l_vec_list(m_approx, n_classes):
-    """
-    Creates all possible class labeling vectors for given number of
+    """Creates all possible class labeling vectors for given number of
     hypothetically acquired labels and given number of classes.
 
     Parameters
     ----------
-    m_approx: int
-        Number of hypothetically acquired labels..
-    n_classes: int,
-        Number of classes
+    m_approx : int
+        Number of hypothetically acquired labels.
+    n_classes : int
+        Number of classes.
 
     Returns
     -------
-    label_vec_list: array-like, shape = [n_labelings, n_classes]
-        All possible class labelings for given parameters.
+    label_vec_list : array-like of shape (n_labels, n_classes)
+        All possible class label lists for given parameters.
     """
 
     label_vec_list = [[]]
@@ -339,18 +348,18 @@ def _gen_l_vec_list(m_approx, n_classes):
 
 
 def _euler_beta(a):
-    """
-    Represents Euler beta function:
-    B(a(i)) = Gamma(a(i,1))*...*Gamma(a_n)/Gamma(a(i,1)+...+a(i,n))
+    """Represents Euler beta function:
+
+    B(a(i)) = (Gamma(a(i,1))*...*Gamma(a_n))/Gamma(a(i,1)+...+a(i,n)).
 
     Parameters
     ----------
-    a: array-like, shape (m, n)
+    a : array-like of shape (m, n)
         Vectors to evaluated.
 
     Returns
     -------
-    result: array-like, shape (m)
+    result : array-like of shape (m,)
         Euler beta function results [B(a(0)), ..., B(a(m))
     """
     return np.exp(np.sum(gammaln(a), axis=1) - gammaln(np.sum(a, axis=1)))
@@ -359,16 +368,17 @@ def _euler_beta(a):
 def _multinomial(a):
     """
     Computes Multinomial coefficient:
+
     Mult(a(i)) = (a(i,1)+...+a(i,n))!/(a(i,1)!...a(i,n)!)
 
     Parameters
     ----------
-    a: array-like, shape (m, n)
+    a : array-like of shape (m, n)
         Vectors to evaluated.
 
     Returns
     -------
-    result: array-like, shape (m)
-        Multinomial coefficients [Mult(a(0)), ..., Mult(a(m))
+    result : array-like of shape (m)
+        Multinomial coefficients [Mult(a(0)), ..., Mult(a(m)].
     """
     return factorial(np.sum(a, axis=1)) / np.prod(factorial(a), axis=1)

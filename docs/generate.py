@@ -90,7 +90,7 @@ def automodule(module, level=0):
         if isinstance(getattr(module, item), object) and item.isupper():
             constants.append(item)
 
-    title = f":mod:`{module.__name__}`:"
+    title = f":mod:`{module.__name__}`"
     rst_str += title + "\n"
     rst_str += "".ljust(len(title), "=") + "\n\n"
 
@@ -164,12 +164,25 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
         file.write(
             f"This is an overview of all implemented active learning "
-            f"strategies.\n"
+            f"strategies, which are often divided into three main "
+            "categories based on the utilities they compute for sample "
+            "selection:\n\n"
+            "1. **Informativeness-based** strategies mostly select samples "
+            "for which the model is most uncertain (e.g., via "
+            "information-theoretic measures).\n\n"
+            "2. **Representativeness-based** strategies select samples that "
+            "capture the overall data distribution (e.g., via clustering or"
+            "density estimation).\n\n"
+            "3. **Hybrid** strategies combine both criteria to select "
+            "samples that are informative and representative.\n\n"
         )
         file.write("\n")
         file.write(
-            f"You can use the following checkboxes to filter the "
-            f"tables below.\n"
+            "Furthermore, we distinguish between **regression** and "
+            "**classification** as supervised learning tasks, where labels can"
+            "be provided by a **single annotator** or **multiple annotators**. "
+            "You can use the checkboxes below to filter the query strategies "
+            "based on these distinctions.\n"
         )
         file.write("\n")
         file.write(
