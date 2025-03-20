@@ -360,7 +360,7 @@ University All rights reserved.)
 
 and
 
-https://github.com/ntucllab/libact/blob/master/libact/query_strategies/multiclass/mdsp.py.
+https://github.com/scikit-learn/scikit-learn/blob/14031f6/sklearn/manifold/mds.py.
 written by Nelle Varoquaux <nelle.varoquaux@gmail.com> (BSD license.
 Copyright (c) 2007–2016 The scikit-learn developers. All rights reserved.).
 """
