@@ -61,6 +61,12 @@ def check_test_param_test_availability(
 
 
 class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
+    def predict(self, X, return_embeddings=False):
+        y_pred = super().predict(X)
+        if not return_embeddings:
+            return y_pred
+        return y_pred, X
+
     def predict_proba(self, X, return_embeddings=False):
         probas = super().predict_proba(X)
         if not return_embeddings:
@@ -69,6 +75,10 @@ class ParzenWindowClassifierEmbedding(ParzenWindowClassifier):
 
 
 class ParzenWindowClassifierTuple(ParzenWindowClassifier):
-    def predict_proba(self, X, return_embeddings=False):
+    def predict(self, X):
+        y_pred = super().predict_proba(X).argmax(axis=-1)
+        return y_pred, X
+
+    def predict_proba(self, X):
         probas = super().predict_proba(X)
         return probas, X

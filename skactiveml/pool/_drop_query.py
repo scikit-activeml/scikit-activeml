@@ -42,12 +42,12 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     n_cluster_param_name : string, default="n_clusters"
         The name of the parameter for the number of clusters.
     clf_embedding_flag_name : str or None, default=None
-        Name of the flag, which is passed to the `predict_proba` method for
+        Name of the flag, which is passed to the `predict` method for
         getting the (learned) sample representations.
 
-        - If `clf_embedding_flag_name=None` and `predict_proba` returns
+        - If `clf_embedding_flag_name=None` and `predict` returns
           only one output, the input samples `X` are used.
-        - If `predict_proba` returns two outputs or `clf_embedding_name` is
+        - If `predict` returns two outputs or `clf_embedding_name` is
           not `None`, `(proba, embeddings)` are expected as outputs.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -102,7 +102,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`.)
         clf : skactiveml.base.SkactivemlClassifier
-            Classifier implementing the methods `fit` and `predict_proba`.
+            Classifier implementing the methods `fit` and `predict`.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
@@ -178,21 +178,20 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
 
         # Compute predictions and optionally embeddings for original samples.
         if self.clf_embedding_flag_name is not None:
-            probas, X_cand = clf.predict_proba(
+            y_pred, X_cand = clf.predict(
                 X_cand, **{self.clf_embedding_flag_name: True}
             )
         else:
-            probas = clf.predict_proba(X_cand)
-            if isinstance(probas, tuple):
-                probas, X_cand = probas
-        y_pred = rand_argmax(probas, axis=-1, random_state=self.random_state_)
+            y_pred = clf.predict(X_cand)
+            if isinstance(y_pred, tuple):
+                y_pred, X_cand = y_pred
 
         # Number of candidate samples.
         n_candidates = len(X_cand)
 
         # Prepare an array to hold the dropout predictions.
         y_pred_dropout = np.empty(
-            (n_candidates, self.n_dropout_samples), dtype=int
+            (n_candidates, self.n_dropout_samples), dtype=object
         )
 
         # Loop over the number of dropout inferences.
@@ -209,14 +208,10 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             X_dropout[dropout_mask] = 0.0
 
             # Compute class predictions for this dropout sample.
-            probas_dropout = clf.predict_proba(X_dropout)
-            if isinstance(probas_dropout, tuple):
-                probas_dropout, _ = probas_dropout
-
-            # Compute the predictions (using a random argmax for tie-breaking).
-            y_pred_dropout[:, i] = rand_argmax(
-                probas_dropout, axis=-1, random_state=self.random_state_
-            )
+            y_pred_dropout_current = clf.predict(X_dropout)
+            if isinstance(y_pred_dropout_current, tuple):
+                y_pred_dropout_current, _ = y_pred_dropout_current
+            y_pred_dropout[:, i] = y_pred_dropout_current
 
         # Filter candidates for clustering based on disagreement.
         n_disagrees = (y_pred[:, None] != y_pred_dropout).sum(axis=-1)

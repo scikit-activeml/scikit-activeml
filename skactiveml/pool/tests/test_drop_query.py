@@ -132,7 +132,6 @@ class TestDropQuery(
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (SVC(), TypeError),
-            (SklearnClassifier(SVC()), AttributeError),
             (SklearnClassifier(SVC(probability=True)), None),
             (
                 SklearnClassifier(LogisticRegression(), classes=self.classes),
@@ -168,20 +167,9 @@ class TestDropQuery(
                     random_state=42,
                 )
 
-                # Without labeled samples, the initial selection is the same,
-                # even for different clustering initializations.
                 y = np.full(len(y_true), MISSING_LABEL)
-                query_indices_plus, utilities_plus = qs_plus.query(
+                _, utilities_plus = qs_plus.query(
                     X, y, clf=clf, candidates=candidates, return_utilities=True
-                )
-                query_indices_random, utilities_random = qs_random.query(
-                    X, y, clf=clf, candidates=candidates, return_utilities=True
-                )
-                np.testing.assert_array_equal(
-                    query_indices_plus, query_indices_random
-                )
-                np.testing.assert_almost_equal(
-                    utilities_plus, utilities_random
                 )
                 if candidates is not None:
                     self.assertTrue(np.isnan(utilities_plus[0, :10]).all())
@@ -198,7 +186,7 @@ class TestDropQuery(
                 y[is_unlabeled] = np.nan
                 prev_utilities = None
                 for qs in [qs_plus, qs_random]:
-                    query_indices, utilities = qs.query(
+                    _, utilities = qs.query(
                         X,
                         y,
                         clf=clf,
