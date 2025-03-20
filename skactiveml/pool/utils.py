@@ -52,7 +52,7 @@ class IndexClassifierWrapper:
     y : array-like of shape (n_samples,)
         Labels of the training data set (possibly including unlabeled ones
         indicated by `self.missing_label`).
-    sample_weight : array-like of shape (n_samples,),default=None
+    sample_weight : array-like of shape (n_samples,), default=None
         Weights of training samples in `X`.
     set_base_clf : bool, default=False
         If `True`, the base classifier will be set to the newly fitted
