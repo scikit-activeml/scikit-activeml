@@ -47,7 +47,11 @@ class ExtLabelEncoder(BaseEstimator):
             classes=self.classes, missing_label=self.missing_label
         )
         y = check_array(
-            y, ensure_2d=False, ensure_all_finite=False, dtype=None
+            y,
+            ensure_2d=False,
+            ensure_all_finite=False,
+            ensure_min_samples=0,
+            dtype=None,
         )
         check_missing_label(
             missing_label=self.missing_label, target_type=y.dtype
