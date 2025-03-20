@@ -354,7 +354,7 @@ def _alce(
 Implementation of Multi-dimensional Scaling Partial (MDSP), which
 is a modification of:
 
-https://github.com/scikit-learn/scikit-learn/blob/14031f6/sklearn/manifold/mds.py
+https://github.com/ntucllab/libact/blob/master/libact/query_strategies/multiclass/mdsp.py
 written by Kuan-Hao Huang (BSD license. Copyright (c) 2014, National Taiwan
 University All rights reserved.)
 
