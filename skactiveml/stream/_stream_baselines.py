@@ -103,9 +103,8 @@ class StreamRandomSampling(SingleAnnotatorStreamQueryStrategy):
             return queried_indices
 
     def update(self, candidates, queried_indices):
-        """Updates the budget manager and the count for seen and queried
-        labels. This function should be used in conjunction with the `query`
-        function.
+        """Updates the count for seen and queried labels. This function should
+        be used in conjunction with the `query` function.
 
         Parameters
         ----------
@@ -270,19 +269,18 @@ class PeriodicSampling(SingleAnnotatorStreamQueryStrategy):
             return queried_indices
 
     def update(self, candidates, queried_indices):
-        """Updates the budget manager and the count for seen and queried
-        labels. This function should be used in conjunction with the `query`
-        function.
+        """Updates the count for seen and queried labels. This function should
+        be used in conjunction with the `query` function.
 
         Parameters
         ----------
         candidates : {array-like, sparse matrix} of shape\
                 (n_candidates, n_features)
-            The samples which may be queried. Sparse matrices are accepted
-            only if they are supported by the base query strategy.
+            The samples which may be queried. Sparse matrices are accepted only
+            if they are supported by the base query strategy.
         queried_indices : np.ndarray of shape (n_queried_indices,)
-            The indices of samples in candidates whose labels are queried,
-            with `0 <= queried_indices <= n_candidates`.
+            The indices of samples in candidates whose labels are queried, with
+            `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------

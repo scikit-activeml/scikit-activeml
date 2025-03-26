@@ -52,14 +52,15 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         stream-based active learning setting. if set to `None`,
         `DensityBasedBudgetManager` will be used by default. The budget manager
         will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -515,14 +516,15 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         stream-based active learning setting. if set to `None`,
         `DensityBasedBudgetManager` will be used by default. The budget manager
         will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1085,14 +1087,15 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
         stream-based active learning setting. if set to `None`,
         `RandomBudgetManager` will be used by default. The budget manager will
         be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1157,8 +1160,8 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
 
     This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     FixedUncertainty. The CognitiveDualQueryStrategy strategy is an extension
-    to the uncertainty based query strategies proposed by Žliobaitė et al. [2]
-    and follows the same idea as StreamDensityBasedAL [3] where queries for
+    to the uncertainty based query strategies proposed by Žliobaitė et al. [2]_
+    and follows the same idea as StreamDensityBasedAL [3]_ where queries for
     labels is only allowed if the local density around the corresponding
     sample is sufficiently high. The authors propose the use of a cognitive
     window that monitors the most representative samples within a data stream.
@@ -1186,14 +1189,15 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         stream-based active learning setting. if set to `None`,
         `FixedUncertaintyBudgetManager` will be used by default. The budget
         manager will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1299,14 +1303,15 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
         stream-based active learning setting. if set to `None`,
         `VariableUncertaintyBudgetManager` will be used by default. The budget
         manager will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -1399,14 +1404,15 @@ class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
         stream-based active learning setting. if set to `None`,
         `RandomBudgetManager` will be used by default. The budget manager will
         be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the

@@ -38,14 +38,15 @@ class UncertaintyZliobaite(SingleAnnotatorStreamQueryStrategy):
         stream-based active learning setting. if set to `None`, a default
         budger manager will be used. The budget manager will be initialized
         based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -391,14 +392,15 @@ class FixedUncertainty(UncertaintyZliobaite):
         stream-based active learning setting. if set to `None`,
         `FixedUncertaintyBudgetManager` will be used by default. The budget
         manager will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -466,14 +468,15 @@ class VariableUncertainty(UncertaintyZliobaite):
         stream-based active learning setting. if set to `None`,
         `VariableUncertaintyBudgetManager` will be used by default. The budget
         manager will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -518,14 +521,15 @@ class RandomVariableUncertainty(UncertaintyZliobaite):
         stream-based active learning setting. if set to `None`,
         `RandomVariableUncertaintyBudgetManager` will be used by default. The
         budget manager will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
@@ -569,14 +573,15 @@ class Split(UncertaintyZliobaite):
         stream-based active learning setting. if set to `None`,
         `SplitBudgetManager` will be used by default. The budget
         manager will be initialized based on the following conditions:
-            - If only a `budget` is given the default budget manager is
-              initialized with the given budget.
-            - If only a budget manager is given use the budget manager.
-            - If both are not given the default budget manager with the default
-              budget.
-            - If both are given and the budget differs from
-              `budgetmanager.budget`, throw a warning and the budget manager is
-              used as is.
+
+        - If only a `budget` is given the default budget manager is
+            initialized with the given budget.
+        - If only a budget manager is given use the budget manager.
+        - If both are not given the default budget manager with the default
+            budget.
+        - If both are given and the budget differs from
+            `budgetmanager.budget`, throw a warning and the budget manager is
+            used as is.
     budget : float, default=None
         Specifies the ratio of samples which are allowed to be sampled, with
         `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the

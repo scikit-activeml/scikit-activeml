@@ -812,6 +812,10 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
         find them. This path is specially used to save the versions of the
         notebook that are linked to Google Colab.
     """
+    if os.path.exists(dst_path):
+        shutil.rmtree(dst_path)
+    if os.path.exists(dst_path_colab):
+        shutil.rmtree(dst_path_colab)
     shutil.copytree(src=src_path, dst=dst_path)
     shutil.copytree(src=src_path, dst=dst_path_colab)
     post_process_tutorials(
