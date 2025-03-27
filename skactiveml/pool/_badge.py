@@ -82,7 +82,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
-            and `sample_weight`..
+            and `sample_weight`.
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\

@@ -31,7 +31,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
     sklearn.mixture.BayesianGaussianMixture or None, default=None
         (Bayesian) Gaussian Mixture model that is trained with unsupervised
         algorithm on train data. If the initial mixture model is not fitted, it
-        will be refitted in each call of the 'fit' method. If `None`,
+        will be refitted in each call of the `fit` method. If `None`,
         `mixture_model=BayesianMixtureModel(n_components=n_classes)` will be
         used.
     weight_mode : 'responsibilities' or 'similarities',\
@@ -47,7 +47,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
     cost_matrix : array-like, shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
+        `classes` is not `None`.
     class_prior : float or array-like of shape (n_classes,), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -113,9 +113,8 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
 
         Returns
         -------
-        self: skactiveml.classifier.MixtureModelClassifier,
-            `skactiveml.classifier.MixtureModelClassifier` object fitted on the
-             training data.
+        self: skactiveml.classifier.MixtureModelClassifier
+            The `MixtureModelClassifier` fitted on the training data.
         """
         # Check input parameters.
         X, y, sample_weight = self._validate_data(X, y, sample_weight)

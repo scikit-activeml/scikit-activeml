@@ -499,7 +499,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator-pair (with indices `query_indices[0]`).
 
-            - If `candidates` is `None` or of shape `(n_candidates,), the
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to samples in `X`.
             - If `candidates` is of shape `(n_candidates, n_features)`, the
               indexing refers to samples in `candidates`.
@@ -858,7 +858,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
     ----------
     budget : float
         Specifies the ratio of labels which are allowed to be queried, with
-        `0 <= budget <= 1`..
+        `0 <= budget <= 1`.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
@@ -1007,7 +1007,7 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     """Skactiveml Classifier
 
-    Base class for scikit-activeml classifiers such that missing labels,
+    Base class for `scikit-activeml` classifiers such that missing labels,
     user-defined classes, and cost-sensitive classification (i.e., cost matrix)
     can be handled.
 
@@ -1054,14 +1054,15 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         Parameters
         ----------
         X : matrix-like, shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
+            The sample matrix `X` is the feature matrix representing the
+            samples.
         y : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
+            missing labels are represented the attribute `missing_label`.
         sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the weights of the training samples' class labels.
-            It must have the same shape as y.
+            It must have the same shape as `y`.
 
         Returns
         -------
@@ -1083,7 +1084,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         -------
         P : numpy.ndarray of shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to 'self.classes_'.
+            according to `self.classes_`.
         """
         raise NotImplementedError
 
@@ -1221,20 +1222,20 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 class ClassFrequencyEstimator(SkactivemlClassifier):
     """Class Frequency Estimator
 
-    Extends scikit-activeml classifiers to estimators that are able to estimate
-    class frequencies for given samples (by calling 'predict_freq').
+    Extends `scikit-activeml` classifiers to estimators that are able to
+    estimate class frequencies for given samples (by calling `predict_freq`).
 
     Parameters
     ----------
     classes : array-like, shape (n_classes), default=None
-        Holds the label for each class. If none, the classes are determined
+        Holds the label for each class. If `None`, the classes are determined
         during the fit.
     missing_label : scalar or str or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        classes is not none.
+        classes is not `None`.
     class_prior : float or array-like, shape (n_classes), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -1242,7 +1243,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
     random_state : int or np.RandomState or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
@@ -1286,8 +1287,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Returns
         -------
         F: array-like of shape (n_samples, classes)
-            The class frequency estimates of the test samples 'X'. Classes are
-            ordered according to attribute 'classes_'.
+            The class frequency estimates of the test samples `X`. Classes are
+            ordered according to attribute `classes_`.
         """
         raise NotImplementedError
 
@@ -1382,14 +1383,14 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     """Skactiveml Regressor
 
-    Base class for scikit-activeml regressors.
+    Base class for `scikit-activeml` regressors.
 
     Parameters
     __________
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     random_state : int, RandomState or None, default=None
-        Determines random number for 'fit' and 'predict' method. Pass an int
+        Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
     """
 
@@ -1408,7 +1409,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         y : array-like, shape (n_samples) or (n_samples, n_targets)
             It contains the labels of the training samples.
             The number of numerical labels may be variable for the samples,
-            where missing labels are represented as 'self.missing_label_'.
+            where missing labels are represented as `missing_label_`.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -1431,7 +1432,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         Returns
         -------
         y : numpy.ndarray of shape (n_samples,)
-            Predicted values of the test samples 'X'.
+            Predicted values of the test samples `X`.
         """
         raise NotImplementedError
 
@@ -1486,7 +1487,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
 class ProbabilisticRegressor(SkactivemlRegressor):
     """ProbabilisticRegressor
 
-    Base class for scikit-activeml probabilistic regressors.
+    Base class for `scikit-activeml` probabilistic regressors.
 
     """
 

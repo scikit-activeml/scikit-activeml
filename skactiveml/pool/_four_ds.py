@@ -31,14 +31,14 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
     lmbda : float between 0 and 1, default=min((batch_size-1)*0.05, 0.5)
         For the selection of more than one sample within each query round, 4DS
         uses a diversity measure to avoid the selection of redundant samples
-        whose influence is regulated by the weighting factor 'lmbda'.
+        whose influence is regulated by the weighting factor `lmbda`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     References
-    ---------
+    ----------
     .. [1] T. Reitmaier and B. Sick. Let us know your decision: Pool-based
        active training of a generative classifier with the selection strategy
        4DS. Inf. Sci., 230:106–131, 2013.

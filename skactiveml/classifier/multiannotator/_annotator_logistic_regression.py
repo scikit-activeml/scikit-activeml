@@ -162,7 +162,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
+            missing labels are represented the attribute `missing_label`.
         sample_weight : array-like of shape (n_samples,) or\
                 (n_samples, n_outputs)
             It contains the weights of the training samples' class labels.

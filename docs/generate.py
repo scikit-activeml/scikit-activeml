@@ -310,7 +310,7 @@ def table_data_to_rst_table(
     Parameters
     ----------
     a : array-like, shape=(columns, rows)
-        Contains the data for the table..
+        Contains the data for the table.
     caption : str, optional (default='')
         The caption of the table.
     widths : str, optional (default=None)
@@ -319,7 +319,7 @@ def table_data_to_rst_table(
     header_lines : int, optional (default=0)
         The number of rows to use in the table header.
     indent : int, optional (default=0)
-        Number of spaces as indent in each line
+        Number of spaces as indent in each line.
 
     Returns
     -------

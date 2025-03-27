@@ -29,14 +29,14 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
     Parameters
     ----------
     classes : array-like of shape (n_classes), default=None
-        Holds the label for each class. If none, the classes are determined
+        Holds the label for each class. If `None`, the classes are determined
         during the fit.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
+        `classes` is not `None`.
     class_prior : float or array-like of shape (n_classes,), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -47,14 +47,14 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         The metric must be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int or None, default=None
-        Number of nearest neighbours. Default is None, which means all
+        Number of nearest neighbours. Default is `None`, which means all
         available samples are considered.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
         For the kernel 'rbf' we allow the use of mean bandwidth criterion [2]_
         and use it when gamma is set to 'mean' (i.e., {'gamma': 'mean'})..
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
@@ -186,7 +186,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         return self
 
     def predict_freq(self, X):
-        """Return class frequency estimates for the input samples 'X'.
+        """Return class frequency estimates for the input samples `X`.
 
         Parameters
         ----------
