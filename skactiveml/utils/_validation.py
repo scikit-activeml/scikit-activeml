@@ -35,16 +35,16 @@ def check_scalar(
         The name of the parameter to be printed in error messages.
     target_type : type or tuple
         Acceptable data types for the parameter.
+    min_inclusive : bool, default=True
+        If `True`, the minimum valid value is inclusive, otherwise exclusive.
+    max_inclusive : bool, default=True
+        If `True`, the maximum valid value is inclusive, otherwise exclusive.
     min_val : float or int, default=None
         The minimum valid value the parameter can take. If `None` (default), it
         is implied that the parameter does not have a lower bound.
-    min_inclusive : bool, default=True
-        If `True`, the minimum valid value is inclusive, otherwise exclusive.
     max_val : float or int, default=None
         The maximum valid value the parameter can take. If `None` (default), it
         is implied that the parameter does not have an upper bound.
-    max_inclusive : bool, default=True
-        If `True`, the maximum valid value is inclusive, otherwise exclusive.
 
     Raises
     ------
@@ -194,13 +194,13 @@ def check_cost_matrix(
         Cost matrix.
     n_classes : int
         Number of classes.
-    only_non_negative : bool, default=True
+    only_non_negative : bool, default=False
         This parameter determines whether the matrix must contain only
         non-negative cost entries.
-    contains_non_zero : bool, default=True
+    contains_non_zero : bool, default=False
         This parameter determines whether the matrix must contain at least on
         non-zero cost entry.
-    diagonal_is_zero : bool, default=True
+    diagonal_is_zero : bool, default=False
         This parameter determines whether the diagonal cost entries must be
         zero.
 
@@ -283,9 +283,9 @@ def check_X_y(
 
     Parameters
     ----------
-    X : nd-array or list or sparse matrix
+    X : nd-array or list or sparse matrix, default=None
         Labeled input data.
-    y : nd-array or list or sparse matrix
+    y : nd-array or list or sparse matrix, default=None
         Labels for X.
     X_cand : nd-array or list or sparse matrix, default=None
         Unlabeled input data
@@ -502,12 +502,12 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         `indices[i]` is interpreted as an index to the array `A`.
     A : array-like
         The array that is indexed.
-    dim : int or tuple of ints
+    dim : int or tuple of ints or 'adaptive', default='adaptive'
         The dimensions of the array that are indexed.
         If `dim` equals `'adaptive'`, `dim` is set to first indices
         corresponding to the shape of `indices`. E.g., if `indices` is of
         shape (n_indices,), `dim` is set `0`.
-    unique : bool or `check_unique`
+    unique : bool or 'check_unique', default=True
         If `unique` is `True` unique indices are returned. If `unique` is
         `'check_unique'` an exception is raised if the indices are not unique.
 
@@ -759,7 +759,7 @@ def check_budget_manager(
     default_budget_manager_dict=None,
 ):
     """Validate if `budget_manager` is a budget manager class and create a
-    copy 'budget_manager_'.
+    copy `budget_manager_`.
 
     Parameters
     ----------

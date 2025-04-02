@@ -13,7 +13,7 @@ def mesh(bound, res):
     ----------
     bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         The bounds of the mesh grid.
-    res : int, default=21
+    res : int
         The resolution of the plot.
 
     Returns

@@ -13,9 +13,9 @@ def call_func(
     ----------
     f_callable : callable
         The function or object that is to be called.
-    only_mandatory : boolean
+    only_mandatory : boolean, default=False
         If `True`, only mandatory parameters are set.
-    ignore_var_keyword : boolean
+    ignore_var_keyword : boolean, default=False
         If `False`, all kwargs are passed when `f_callable` uses a parameter
         that is of kind `Parameter.VAR_KEYWORD`, i.e., `**kwargs`. For further
         reference see the `inspect` package.
@@ -24,7 +24,8 @@ def call_func(
 
     Returns
     -------
-    called object
+    f_callable_result : return type of `f_callable`
+        The return value of f_callable.
     """
     params = inspect.signature(f_callable).parameters
     param_keys = params.keys()
@@ -60,7 +61,8 @@ def match_signature(wrapped_obj_name, func_name):
 
     Returns
     -------
-    Wrapped function
+    wrapped_obj : callable
+        The wrapped function.
     """
 
     class _MatchSignatureDescriptor:

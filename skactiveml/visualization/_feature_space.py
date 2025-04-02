@@ -108,16 +108,17 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
     y : array-like of shape (n_samples,) or (n_samples, n_annotators)
         Labels of the training data set (possibly including unlabeled ones
         indicated by `qs.missing_label`).
-    candidates : None or array-like of shape (n_candidates,), dtype=int or
-        array-like of shape (n_candidates, n_features),
-        default=None
-        If `candidates` is None, the unlabeled samples from (X,y) are
-        considered as candidates.
-        If `candidates` is of shape (n_candidates,) and of type int,
-        candidates is considered as the indices of the samples in (X,y).
-        If `candidates` is of shape (n_candidates, n_features), the
-        candidates are directly given in candidates (not necessarily
-        contained in X). This is not supported by all query strategies.
+    candidates : None or array-like of shape (n_candidates), dtype=int or \
+            array-like of shape (n_candidates, n_features), default=None
+        - If `candidates` is `None`, the unlabeled samples from
+          `(X,y)` are considered as `candidates`.
+        - If `candidates` is of shape `(n_candidates,)` and of type
+          `int`, `candidates` is considered as the indices of the
+          samples in `(X,y)`.
+        - If `candidates` is of shape `(n_candidates, *)`, the
+          candidate samples are directly given in `candidates` (not
+          necessarily contained in `X`). This is not supported by all
+          query strategies.
 
     Other Parameters
     ----------------
@@ -389,11 +390,11 @@ def plot_stream_training_data(
         The color for the unlabeled samples.
     cmap : str or matplotlib.colors.Colormap, default='coolwarm_r'
         The colormap for the confidence levels.
-    alpha : scalar
+    alpha : scalar, default=0.2
         Set the alpha value used for blending - not supported on all backends.
-    linewidth : float
+    linewidth : float, default=3
         Set the line width in points.
-    plot_cand_highlight : bool
+    plot_cand_highlight : bool, default=True
         The indicator to highlight the current candidate.
 
     Returns

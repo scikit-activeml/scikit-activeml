@@ -13,9 +13,10 @@ def compute_vote_vectors(y, w=None, classes=None, missing_label=np.nan):
     ----------
     y : array-like, shape (n_samples) or (n_samples, n_annotators)
         Class labels, which may contain also missing labels.
-    w : array-like, shape (n_samples) or (n_samples, n_annotators),\
-            default=np.ones_like(y)
-        Class label weights.
+    w : array-like, shape (n_samples) or (n_samples, n_annotators) or None,\
+            default=None
+        Class label weights. If the weights are None, weights are assumed to be
+        equal for every sample.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
     missing_label : scalar or string or np.nan orNone, default=np.nan
@@ -75,9 +76,10 @@ def majority_vote(
     ----------
     y : array-like, shape (n_samples,) or (n_samples, n_annotators)
         Class labels, which may contain also missing labels.
-    w : array-like of shape (n_samples,) or (n_samples, n_annotators),\
-            default=np.ones_like(y)
-        Class label weights.
+    w : array-like, shape (n_samples) or (n_samples, n_annotators) or None,\
+            default=None
+        Class label weights. If the weights are None, weights are assumed to be
+        equal for every sample.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
     missing_label : scalar or string or np.nan or None, default=np.nan
