@@ -41,14 +41,14 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
       default=skactiveml.utils.MISSING_LABEL
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
-        Random state for candidate selection. Ensure that
+        The random state to use.
     max_iter_representativity : int, default=5
         Maximum number of optimisation iterations.
         Only used if `method='representativity'`.
 
     References
     ----------
-    .. [1] A. Jose, J. P. A. de Mendon¸ca, E. Devijver, N. Jakse, V. Monbet,
+    .. [1] A. Jose, J. P. A. de Mendonça, E. Devijver, N. Jakse, V. Monbet,
        and R. Poloni. Regression Tree-based Active Learning. Data Min. Knowl.
        Discov., pages 420–460, 2023.
     """

@@ -48,7 +48,7 @@ class AnnotatorEnsembleClassifier(
         `classes[j]`  for a sample of class `classes[i]. Can be only set, if
         classes is not none.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes

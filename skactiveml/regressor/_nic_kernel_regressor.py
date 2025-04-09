@@ -39,7 +39,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int, RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
     """
 
@@ -214,7 +214,7 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     missing_label : scalar or string or np.nan or or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
     """
 

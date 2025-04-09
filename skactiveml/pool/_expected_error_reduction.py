@@ -651,7 +651,7 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         evaluated under the `consider_labeled` flag then.
     subtract_current : bool, default=False
         If `True`, the current error estimate is subtracted from the simulated
-        score. This might be helpful to define a stopping criterion as in [2].
+        score. This might be helpful to define a stopping criterion as in [2]_.
     normalize : bool, default=False
         If `True` the error terms are normalized by the number of evaluation
         samples such that the errors represent the average error instead of the

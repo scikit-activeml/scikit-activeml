@@ -14,7 +14,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
     mainly differs in how the available budget ist estimated. Instead of the
     estimated budget proposed by Žliobaitė et. al. [2]_, this budget manager
     counts the number of queried and seen instance, such that the number of
-    available queries is given as`n_seen_samples-n_queried_samples*budget`.
+    available queries is given as `n_seen_samples-n_queried_samples*budget`.
 
     Parameters
     ----------

@@ -310,7 +310,7 @@ def table_data_to_rst_table(
     Parameters
     ----------
     a : array-like, shape=(columns, rows)
-        Contains the data for the table..
+        Contains the data for the table.
     caption : str, optional (default='')
         The caption of the table.
     widths : str, optional (default=None)
@@ -319,7 +319,7 @@ def table_data_to_rst_table(
     header_lines : int, optional (default=0)
         The number of rows to use in the table header.
     indent : int, optional (default=0)
-        Number of spaces as indent in each line
+        Number of spaces as indent in each line.
 
     Returns
     -------
@@ -812,6 +812,10 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
         find them. This path is specially used to save the versions of the
         notebook that are linked to Google Colab.
     """
+    if os.path.exists(dst_path):
+        shutil.rmtree(dst_path)
+    if os.path.exists(dst_path_colab):
+        shutil.rmtree(dst_path_colab)
     shutil.copytree(src=src_path, dst=dst_path)
     shutil.copytree(src=src_path, dst=dst_path_colab)
     post_process_tutorials(
@@ -941,7 +945,7 @@ def check_google_colab_link(google_colab_link):
     output = google_colab_link
     if google_colab_link is None:
         colab_github = 'https://colab.research.google.com/github'
-        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
+        docs_repo_name = 'scikit-activeml/scikit-activeml.github.io'
         docs_branch_path = 'blob/gh-pages/latest'
         output = (
             f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
@@ -1139,7 +1143,7 @@ def create_switcher_text(versions, docs_link=None):
     )
     versions_highest = np.array(versions)[unique_index + unique_counts - 1]
     if docs_link is None:
-        docs_link = "https://scikit-activeml.github.io/scikit-activeml-docs"
+        docs_link = "https://scikit-activeml.github.io"
     # Create an entry for every version
     content_list = []
     content_list.append("[\n")

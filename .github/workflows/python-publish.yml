@@ -50,4 +50,4 @@ jobs:
         ref: master
     - name: Trigger release documentation for scikit-activeml-docs
       run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"release\"}"
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml.github.io/dispatches -d "{\"event_type\":\"release\"}"

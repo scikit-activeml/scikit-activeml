@@ -31,7 +31,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     ----------
     method : 'least_confident' or 'margin' or 'entropy' or \
             'expected_average_precision', default='least_confident'
-        The method to calculate the uncertainty..
+        The method to calculate the uncertainty.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for

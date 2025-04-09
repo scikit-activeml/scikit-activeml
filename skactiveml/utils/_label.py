@@ -14,7 +14,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
     y : array-like of shape (n_samples) or (n_samples, n_outputs)
         Class labels to be checked w.r.t. to missing labels.
     missing_label : number or str or None or np.nan, default=np.nan
-        Symbol to represent a missing label.
+        Value to represent a missing label.
 
     Returns
     -------
@@ -68,7 +68,7 @@ def is_labeled(y, missing_label=MISSING_LABEL):
     y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
-        Symbol to represent a missing label.
+        Value to represent a missing label.
 
     Returns
     -------
@@ -86,7 +86,7 @@ def unlabeled_indices(y, missing_label=MISSING_LABEL):
     y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
-        Symbol to represent a missing label.
+        Value to represent a missing label.
 
     Returns
     -------
@@ -107,7 +107,7 @@ def labeled_indices(y, missing_label=MISSING_LABEL):
     y : array-like, shape (n_samples,) or (n_samples, n_outputs)
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
-        Symbol to represent a missing label.
+        Value to represent a missing label.
 
     Returns
     -------
@@ -126,12 +126,13 @@ def check_missing_label(missing_label, target_type=None, name=None):
     Parameters
     ----------
     missing_label : number or str or None or np.nan
-        Symbol to represent a missing label.
-    target_type : type or tuple
-        Acceptable data types for the parameter `missing_label`.
-    name : str
+        Value to represent a missing label.
+    target_type : type or tuple, default=None
+        Acceptable data types for the parameter `missing_label` if it is not
+        set to None.
+    name : str, default=None
         The name of the variable to which `missing_label` is not compatible.
-        The name will be printed in error messages.
+        The name will be printed in error messages if it is not None.
     """
     is_None = missing_label is None
     is_character = np.issubdtype(type(missing_label), np.character)
@@ -165,9 +166,9 @@ def check_equal_missing_label(missing_label1, missing_label2):
     Parameters
     ----------
     missing_label1 : number or str or None or np.nan
-        Symbol to represent a missing label.
+        Value to represent a missing label.
     missing_label2 : number or str or None or np.nan
-        Other symbol to represent a missing label.
+        Other value to represent a missing label.
 
     Raises
     -------

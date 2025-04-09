@@ -37,25 +37,25 @@ from ..utils import (
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """Sklearn Classifier
 
-    Implementation of a wrapper class for scikit-learn classifiers such that
+    Implementation of a wrapper class for `scikit-learn` classifiers such that
     missing labels can be handled. Therefor, samples with missing labels are
     filtered.
 
     Parameters
     ----------
     estimator : sklearn.base.ClassifierMixin with predict_proba method
-        scikit-learn classifier that is able to deal with missing labels.
+        The `scikit-learn` classifier to be wrapped.
     classes : array-like of shape (n_classes,), default=None
-        Holds the label for each class. If none, the classes are determined
-        during the fit.
+        Holds the label for each class. If `None`, the classes are determined
+        during `fit`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
+        `classes` is not `None`.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
@@ -66,7 +66,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
         class `classes_[j]` for a sample of class `classes_[i]`.
     estimator_ : sklearn.base.ClassifierMixin with predict_proba method
-        The scikit-learn classifier after calling the fit method.
+        The scikit-learn classifier after calling the `fit` method.
     """
 
     def __init__(
@@ -103,12 +103,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             It contains the weights of the training samples' class labels. It
             must have the same shape as `y`.
         fit_kwargs : dict-like
-            Further parameters as input to the 'fit' method of the 'estimator'.
+            Further parameters as input to the `fit` method of the `estimator`.
 
         Returns
         -------
         self: SklearnClassifier,
-            The `SklearnClassifier` is fitted on the training data.
+            The `SklearnClassifier` fitted on the training data.
         """
         return self._fit(
             fit_function="fit",
@@ -137,8 +137,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             It contains the weights of the training samples' class labels. It
             must have the same shape as `y`.
         fit_kwargs : dict-like
-            Further parameters as input to the 'partial_fit' method of the
-            'estimator'.
+            Further parameters as input to the `partial_fit` method of the
+            `estimator`.
 
         Returns
         -------
@@ -382,11 +382,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         `classes` is not none.
     window_size : int, default=None,
         Value to represent the estimator sliding window size for X, y and
-        sample weight. If 'None' the window is unrestricted in its size.
+        sample weight. If `None` the window is unrestricted in its size.
     only_labeled : bool, default=False
         If `True`, unlabeled samples are discarded.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
     """
 
@@ -472,7 +472,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     @match_signature("estimator", "fit")
     def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using `X` as training data and `y` as
-        class labels. If 'base_estimator' has no `partial_fit` function use
+        class labels. If `base_estimator` has no `partial_fit` function use
         `fit` with the sliding window for X, y and sample_weight.
 
         Parameters
