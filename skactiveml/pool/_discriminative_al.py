@@ -18,31 +18,30 @@ from ..utils import (
 
 
 class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
-    """Discriminative Active Learning.
+    """Discriminative Active Learning (DAL)
 
-    This class implement the "Discriminative Active Learning" (DAL) strategy.
-    Its idea is to solve a binary classification task to choose samples for
-    labeling such that the labeled set and the unlabeled pool are
+    This class implements the "Discriminative Active Learning" (DAL) [1]_
+    strategy. Its idea is to solve a binary classification task to choose
+    samples for labeling such that the labeled set and the unlabeled pool are
     indistinguishable.
 
     Parameters
     ----------
-    greedy_selection : bool, optional (default=False)
-        This parameter is only relevant for `batch_size>1`. If
-        `greedy_selection=False` the classifying discriminator is refitted
-        after each sample selection within a batch. Otherwise, the
-        discriminator is kept fixed.
-    missing_label : scalar or string or np.nan or None, optional
-    (default=np.nan)
+    greedy_selection : bool, default=False
+        This parameter is only relevant for `batch_size>1`.
+
+        - If `greedy_selection=False`, the classifying discriminator is
+          refitted after each sample selection within a batch.
+        - If `greedy_selection=True`, the discriminator is kept fixed.
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : None or int or np.random.RandomState, optional
-    (default=None)
+    random_state : None or int or np.random.RandomState, default=None
         The random state to use.
 
     References
     ----------
-    [1] Gissin D, Shalev-Shwartz S. "Discriminative active learning."
-        arXiv:1907.06347. 2019.
+    .. [1] D. Gissin and S. Shalev-Shwartz. Discriminative Active Learning.
+       arXiv:1907.06347, 2019.
     """
 
     def __init__(
@@ -72,48 +71,53 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         discriminator : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-            The parameters `classes` and `missing_label` will be internally
-            redefined.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-        array-like of shape (n_candidates, n_features), optional (default=None)
-            If `candidates` is `None`, the unlabeled samples from `(X, y)` are
-            considered as candidates.
-            If `candidates` is of shape `(n_candidates,)` and of type int,
-            `candidates` is considered as the indices of the samples in
-            `(X, y)`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            candidates are directly given in candidates (not necessarily
-            contained in `X`).
-        batch_size : int, optional (default=1)
+            Classification model implementing the methods `fit` and
+            `predict_proba`. It will be used to solve the binary classification
+            problem of separating labeled and unlabeled samples. The parameters
+            `classes` and `missing_label` will be internally redefined.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size,)
-            The `query_indices` indicate for which candidate sample a label is
-            to be queried, e.g., `query_indices[0]` indicates the index of
-            the first selected sample.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to samples in `X`.
-            If `candidates` is of shape (n_candidates, n_features), the
-            indexing refers to samples in `candidates`.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-        numpy.ndarray of shape (batch_size, n_candidates)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to samples in `X`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            indexing refers to samples in `candidates`.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

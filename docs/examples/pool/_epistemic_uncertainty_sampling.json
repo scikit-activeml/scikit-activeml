@@ -2,8 +2,8 @@
   {
     "class" : "EpistemicUncertaintySampling",
     "package" : "pool",
-    "method" : "Epistemic Uncertainty Sampling",
-    "category" : "Uncertainty Sampling",
+    "method" : "Epistemic Uncertainty Sampling (EpisUS)",
+    "category" : "Informativeness",
     "template" : "examples/template_pool.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Epistemic Uncertainty Sampling",

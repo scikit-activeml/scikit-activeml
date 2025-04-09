@@ -8,36 +8,35 @@ from ...utils import check_scalar
 
 
 class BalancedIncrementalQuantileFilter(BudgetManager):
-    """
+    """Balanced Incremental Quantile Filter (BIQF)
+
     The Balanced Incremental Quantile Filter has been proposed together with
-    Probabilistic Active Learning for Datastreams [1]. It assesses whether a
-    given spatial utility (i.e., obtained via ProbabilisticAL) warrants to
-    query the label in question. The spatial ultilities are compared against
-    a threshold that is derived from a quantile (budget) of the last w observed
-    utilities.
-    To balance the number of queries, w_tol is used to increase or decrease the
-    threshold based on the number of available acquisitions.
+    Probabilistic Active Learning for Datastreams [1]_. It assesses whether a
+    given spatial utility (i.e., obtained via :class:`ProbabilisticAL`)
+    warrants to query the label in question. The spatial ultilities are
+    compared against a threshold that is derived from a quantile (`budget`) of
+    the last `w` observed utilities. To balance the number of queries, `w_tol`
+    is used to increase or decrease the threshold based on the number of
+    available acquisitions.
 
     Parameters
     ----------
-    w : int, optional (default=100)
+    w : int, default=100
         The number of observed utilities that are used to infer the threshold.
-        w should be higher than 0.
-
-    w_tol : int, optional (default=50)
+        `w` should be higher than 0.
+    w_tol : int, default=50
         The window in which the number of acquisitions should stay within the
-        budget. w_tol should be higher than 0.
-
-    budget : float, optional (default=None)
-        Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1. See Also :class:`BudgetManager`.
+        budget. `w_tol` should be higher than 0.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
 
     References
     ----------
-    [1] Kottke D., Krempl G., Spiliopoulou M. (2015) Probabilistic Active
-        Learning in Datastreams. In: Fromont E., De Bie T., van Leeuwen M.
-        (eds) Advances in Intelligent Data Analysis XIV. IDA 2015. Lecture
-        Notes in Computer Science, vol 9385. Springer, Cham.
+    .. [1] D. Kottke, G. Krempl, and M. Spiliopoulou. Probabilistic Active
+        Learning in Datastreams. In Adv. Intell. Data Anal., pages 145–157,
+        2015.
     """
 
     def __init__(self, w=100, w_tol=50, budget=None):
@@ -46,33 +45,33 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
         self.w_tol = w_tol
 
     def query_by_utility(self, utilities):
-        """Ask the budget manager which utilities are sufficient to query the
-        corresponding instance.
+        """Ask the budget manager which `utilities` are sufficient to query the
+        corresponding labels.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
+        utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
+            strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances represented by utilities which should be
-            queried, with 0 <= n_queried_instances <= n_samples.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
 
         # intialize return parameters
         queried_indices = []
 
-        tmp_queried_instances_ = self.queried_instances_
-        tmp_observed_instances_ = self.observed_instances_
+        tmp_queried_samples_ = self.queried_samples_
+        tmp_observed_samples_ = self.observed_samples_
         tmp_history_sorted_ = copy(self.history_sorted_)
 
         for i, u in enumerate(utilities):
-            tmp_observed_instances_ += 1
+            tmp_observed_samples_ += 1
             tmp_history_sorted_.append(u)
             theta = np.quantile(tmp_history_sorted_, (1 - self.budget_))
 
@@ -81,13 +80,13 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
             range_ranking = max_ranking - min_ranking
 
             acq_left = (
-                self.budget_ * tmp_observed_instances_ - tmp_queried_instances_
+                self.budget_ * tmp_observed_samples_ - tmp_queried_samples_
             )
             theta_bal = theta - (range_ranking * (acq_left / self.w_tol))
             sample = u >= theta_bal
 
             if sample:
-                tmp_queried_instances_ += 1
+                tmp_queried_samples_ += 1
                 queried_indices.append(i)
 
         return queried_indices
@@ -97,59 +96,55 @@ class BalancedIncrementalQuantileFilter(BudgetManager):
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_samples, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        queried_indices : array-like
-            Indicates which instances from candidates have been queried.
-
-        utilities : ndarray of shape (n_samples,)
-            The utilities based on the query strategy.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
-        self : EstimatedBudget
-            The EstimatedBudget returns itself, after it is updated.
+        self : BalancedIncrementalQuantileFilter
+            The budget manager returns itself, after it is updated.
         """
-
         self._validate_data(np.array([0]))
 
         queried = np.zeros(len(candidates))
         queried[queried_indices] = 1
 
-        self.observed_instances_ += len(queried)
-        self.queried_instances_ += np.sum(queried)
+        self.observed_samples_ += len(queried)
+        self.queried_samples_ += np.sum(queried)
         self.history_sorted_.extend(utilities)
 
         return self
 
     def _validate_data(self, utilities):
-        """Validate input data and set or check the `n_features_in_` attribute.
+        """Validate input data.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
-            candidate samples
+        utilities: array-like of shape (n_samples,)
+            The `utilities` provided by the stream-based active learning
+            strategy.
 
         Returns
         -------
-        utilities : ndarray of shape (n_samples,)
-            Checked candidate samples
+        utilities: ndarray of shape (n_samples,)
+            Checked `utilities`.
         """
-
         utilities = super()._validate_data(utilities)
         check_scalar(self.w, "w", int, min_val=0, min_inclusive=False)
         check_scalar(
             self.w_tol, "w_tol", (float, int), min_val=0, min_inclusive=False
         )
 
-        # check if counting of instances has begun
-        if not hasattr(self, "observed_instances_"):
-            self.observed_instances_ = 0
-        if not hasattr(self, "queried_instances_"):
-            self.queried_instances_ = 0
+        # check if counting of samples has begun
+        if not hasattr(self, "observed_samples_"):
+            self.observed_samples_ = 0
+        if not hasattr(self, "queried_samples_"):
+            self.queried_samples_ = 0
         if not hasattr(self, "history_sorted_"):
             self.history_sorted_ = deque(maxlen=self.w)
 

@@ -129,7 +129,7 @@ class TestTypiClust(
         self.assertEqual(10, utilities_4.shape[1])
         self.assertEqual(1, utilities_4.shape[0])
 
-        # test case 5: duplicate instances
+        # test case 5: duplicate samples
         typi_clust_1 = TypiClust(random_state=0, k=3)
         X_dup = X[[1, 2, 0, 0, 0, 0, 0, 0, 0, 0]]
         y_dup = [0, 1] + [np.nan] * (len(X_dup) - 2)

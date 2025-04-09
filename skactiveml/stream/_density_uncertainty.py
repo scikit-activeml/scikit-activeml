@@ -29,66 +29,70 @@ from skactiveml.stream.budgetmanager import (
 class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
     """StreamDensityBasedAL
 
-    The StreamDensityBasedAL [1] query strategy is an extension to the
-    uncertainty based query strategies proposed by Žliobaitė et al. [2]. In
+    The StreamDensityBasedAL [1]_ query strategy is an extension to the
+    uncertainty based query strategies proposed by Žliobaitė et al. [2]_. In
     addition to the uncertainty assessment, StreamDensityBasedAL assesses the
     local density and only allows querying the label for a candidate if that
-    local density is sufficiently high. The local density is measured using a
-    sliding window. The local density is represented by the number of
-    instances, the new instance is the new nearest neighbor from.
+    local density is sufficiently high. The local density is represented by the
+    number of other samples, the new sample is the new nearest neighbor to
+    within a sliding window.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    budget_manager : BudgetManager, optional (default=None)
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        DensityBasedBudgetManager will be used by default. The
-        budget manager will be initialized based on the following conditions:
-            If only a budget is given the default budget manager is initialized
-            with the given budget.
-            If only a budget manager is given use the budget manager.
-            If both are not given the default budget manager with the
-            default budget.
-            If both are given and the budget differs from budgetmanager.budget
-            a warning is thrown.
-    window_size : int, optional (default=100)
-        Determines the sliding window size of the local density window.
-    random_state : int, RandomState instance, optional (default=None)
-        Controls the randomness of the estimator.
-    dist_func : callable, optional (default=None)
+    dist_func : callable, default=None
         The distance function used to calculate the distances within the local
         density window. If None, `sklearn.metrics.pairwise.pairwise_distances`
-        will be used by default
-    dist_func_dict : dict, optional (default=None)
+        will be used by default.
+    dist_func_dict : dict, default=None
         Additional parameters for `dist_func`.
+    window_size : int, default=100
+        The sliding window size for the local density estimation.
+    budget_manager : BudgetManager, default=None
+        The BudgetManager which models the budgeting constraint used in the
+        stream-based active learning setting. if set to `None`,
+        `DensityBasedBudgetManager` will be used by default. The budget manager
+        will be initialized based on the following conditions:
+
+        - If only a `budget` is given, the default budget manager is
+          initialized with the given budget.
+        - If only a budget manager is given, use the budget manager.
+        - If both are not given, the default budget manager with the default
+          budget.
+        - If both are given, and the budget differs from
+          `budgetmanager.budget`, throw a warning and the budget manager is
+          used as is.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
 
     References
     ----------
-    [1] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+    .. [1] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
-        BigMine 2014 (pp. 133-148).
-    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
-        Learning With Drifting Streaming Data. IEEE Transactions on Neural
-        Networks and Learning Systems, 25(1), 27-39.
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
     """
 
     def __init__(
         self,
+        dist_func=None,
+        dist_func_dict=None,
+        window_size=100,
         budget_manager=None,
         budget=None,
         random_state=None,
-        window_size=1000,
-        dist_func=None,
-        dist_func_dict=None,
     ):
         super().__init__(budget=budget, random_state=random_state)
-        self.budget_manager = budget_manager
-        self.window_size = window_size
         self.dist_func = dist_func
         self.dist_func_dict = dist_func_dict
+        self.window_size = window_size
+        self.budget_manager = budget_manager
 
     def query(
         self,
@@ -100,37 +104,43 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         fit_clf=False,
         return_utilities=False,
     ):
-        """Ask the query strategy which instances in candidates to acquire.
+        """Determines for which candidate samples labels are to be queried.
+
+        The query startegy determines the most useful samples in candidates,
+        which can be acquired within the budgeting constraint specified by
+        `budget`. Please note that, this method does not change the internal
+        state of the query strategy. To adapt the query strategy to the
+        selected candidates, use `update(...)`.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features), optional
-        (default=None)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples), optional (default=None)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,), optional
-            Sample weights for X, used to fit the clf.
-        fit_clf : bool, optional (default=False)
-            If true, refit the classifier also requires X and y to be given.
-        return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), default=None
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        fit_clf : bool, default=False
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        return_utilities : bool, default=False
+            If `True`, also return the `utilities` based on the query strategy.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances in candidates which should be queried,
-            with 0 <= n_queried_instances <= n_samples.
-        utilities: ndarray of shape (n_samples,), optional
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
-            return_utilities is True.
+            `return_utilities` is `True`.
         """
         (
             candidates,
@@ -185,25 +195,25 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         self, candidates, queried_indices, budget_manager_param_dict=None
     ):
         """Updates the budget manager and the count for seen and queried
-        instances
+        labels. This function should be used in conjunction with the `query`
+        function.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from candidates have been queried.
-
-        budget_manager_param_dict : kwargs, optional (default=None)
-            Optional kwargs for budget_manager.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        budget_manager_param_dict : dict, default=None
+            Optional kwargs for `budget_manager`.
 
         Returns
         -------
-        self : StreamDensityBasedAL
-            The StreamDensityBasedAL returns itself, after it is updated.
+        self : SingleAnnotatorStreamQueryStrategy
+            The query strategy returns itself, after it is updated.
         """
         # check if a budget_manager is set
         if not hasattr(self, "budget_manager_"):
@@ -261,19 +271,19 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _calculate_ldf(self, candidates):
-        """Calculate the number of new nearest neighbor for candidates in the
+        """Calculate the number of new nearest neighbors for candidates in the
         sliding window.
 
         Parameters
         ----------
         candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         Returns
         -------
-        ldf: array-like of shape (n_candiates)
-            Numbers of new nearest neighbor for candidates
+        ldf: np.ndarray of shape (n_candiates,)
+            Numbers of new nearest neighbor for `candidates`
         """
         ldf = 0
         if len(self.window_) >= 1:
@@ -304,44 +314,45 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,)
-            Sample weights for X, used to fit the clf.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        fit_clf : bool,
-            If true, refit the classifier also requires X and y to be given.
-        reset : bool, optional (default=True)
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), default=None
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        fit_clf : bool, default=False
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute. If False, the
+            input will be checked for consistency with data provided when reset
+            was last True.
         **check_candidates_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
         Returns
         -------
         candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+            Checked candidate samples.
         clf : SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
         X: np.ndarray, shape (n_samples, n_features)
-            Checked training samples
-        y: np.ndarray, shape (n_candidates)
-            Checked training labels
+            Checked training data set.
+        y: np.ndarray, shape (n_samples)
+            Checked training labels.
         sampling_weight: np.ndarray, shape (n_candidates)
-            Checked training sample weight
+            Checked training sample weight.
         fit_clf : bool,
-            Checked boolean value of `fit_clf`
-        candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+            Checked boolean value of `fit_clf`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -351,7 +362,6 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
             reset=reset,
             **check_candidates_params
         )
-        self._validate_random_state()
         X, y, sample_weight = self._validate_X_y_sample_weight(
             X=X, y=y, sample_weight=sample_weight
         )
@@ -398,24 +408,27 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
 
     def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if clf is a valid SkactivemlClassifier. If clf is
-        untrained, clf is trained using X, y and sample_weight.
+        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
+        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
+        sample_weight.
 
         Parameters
         ----------
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-        fit_clf : bool,
-            If true, refit the classifier also requires X and y to be given.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), default=None
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        fit_clf : bool, default=False
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         Returns
         -------
-        clf : SkactivemlClassifier
+        clf : skactiveml.base.SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
         """
         # Check if the classifier and its arguments are valid.
@@ -434,21 +447,19 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-
-        sample_weight : array-like of shape (n_samples,) (default=None)
-            Sample weights for X, used to fit the clf.
-
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,)
+            Weights of training samples in `X`.
         Returns
         -------
         X : array-like of shape (n_samples, n_features)
-            Checked Input samples.
+            Checked training data set.
         y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'. Converts y to a numpy
-            array
+            Checked labels of the input samples `X`. Converts `y` to a numpy
+            array.
         """
         if sample_weight is not None:
             sample_weight = np.array(sample_weight)
@@ -465,7 +476,7 @@ class StreamDensityBasedAL(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
+            The `BudgetManager` that should be used by default.
         """
         return DensityBasedSplitBudgetManager
 
@@ -474,89 +485,89 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
     """CognitiveDualQueryStrategy
 
     This class is the base for the CognitiveDualQueryStrategy query strategy
-    proposed in [1]. To use this strategy, refer to
+    proposed in [1]_. To use this strategy, refer to
     `CognitiveDualQueryStrategyRan`, `CognitiveDualQueryStrategyRanVarUn`,
     `CognitiveDualQueryStrategyVarUn` , and `CognitiveDualQueryStrategyFixUn`.
     The CognitiveDualQueryStrategy strategy is an extension to the uncertainty
-    based query strategies proposed by Žliobaitė et al. [2] and follows the
-    same idea as StreamDensityBasedAL [3] where queries for labels is only
-    allowed if the local density around the corresponding instance is
+    based query strategies proposed by Žliobaitė et al. [2]_ and follows the
+    same idea as StreamDensityBasedAL [3]_ where queries for labels is only
+    allowed if the local density around the corresponding sample is
     sufficiently high. The authors propose the use of a cognitive window that
     monitors the most representative samples within a data stream.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    budget_manager : BudgetManager, optional (default=None)
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        a default budget manager will be used that is defined in the class
-        inheriting from CognitiveDualQueryStrategy. The budget manager will be
-        initialized based on the following conditions:
-            If only a budget is given the default budget manager is initialized
-            with the given budget.
-            If only a budget manager is given use the budget manager.
-            If both are not given the default budget manager with the
-            default budget.
-            If both are given and the budget differs from budgetmanager.budget
-            a warning is thrown.
-    density_threshold : int, optional (default=1)
-        Determines the local density factor size that needs to be reached
-        in order to sample the candidate.
-    cognition_window_size : int, optional (default=10)
-        Determines the size of the cognition window
-    random_state : int, RandomState instance, optional (default=None)
-        Controls the randomness of the estimator.
-    dist_func : callable, optional (default=None)
+    force_full_budget : bool, default=False
+            If `True`, tries to utilize the full budget. The article does not
+            update the budget manager if the locale density factor is 0.
+    dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use
-        `sklearn.metrics.pairwise.pairwise_distances`
-    dist_func_dict : dict, optional (default=None)
+        density window. If it is `None`,
+        `sklearn.metrics.pairwise.pairwise_distances` will be used by default.
+    dist_func_dict : dict, default=None
         Additional parameters for `dist_func`.
-    force_full_budget : bool, optional (default=False)
-            If true, tries to utilize the full budget. The paper doesn't update
-            the budget manager if the locale density factor is 0
+    density_threshold : int, default=1
+        Determines the local density factor size that needs to be reached in
+        order to query the candidate's label.
+    cognition_window_size : int, default=10
+        Determines the size of the cognition window.
+    budget_manager : BudgetManager, default=None
+        The BudgetManager which models the budgeting constraint used in the
+        stream-based active learning setting. if set to `None`,
+        `DensityBasedBudgetManager` will be used by default. The budget manager
+        will be initialized based on the following conditions:
+
+        - If only a `budget` is given, the default budget manager is
+          initialized with the given budget.
+        - If only a budget manager is given, use the budget manager.
+        - If both are not given, the default budget manager with the default
+          budget.
+        - If both are given, and the budget differs from
+          `budgetmanager.budget`, throw a warning and the budget manager is
+          used as is.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
+
 
     See Also
     --------
-    .budgetmanager.EstimatedBudgetZliobaite : BudgetManager implementing the
-        base class for Zliobaite based budget managers
     CognitiveDualQueryStrategyRan : CognitiveDualQueryStrategy using the
-        RandomBudgetManager that is based on EstimatedBudgetZliobaite
+        RandomBudgetManager.
     CognitiveDualQueryStrategyFixUn : CognitiveDualQueryStrategy using the
-        FixedUncertaintyBudgetManager that is based on EstimatedBudgetZliobaite
+        FixedUncertaintyBudgetManager.
     CognitiveDualQueryStrategyVarUn : VariableUncertaintyBudgetManager using
-        the VariableUncertaintyBudgetManager that is based on
-        EstimatedBudgetZliobaite
+        the VariableUncertaintyBudgetManager.
     CognitiveDualQueryStrategyRanVarUn : CognitiveDualQueryStrategy using the
-        RandomVariableUncertaintyBudgetManager that is based on
-        EstimatedBudgetZliobaite
+        RandomVariableUncertaintyBudgetManager.
 
     References
     ----------
-    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
-        Online Active Learning for Drifting Data Streams. IEEE Transactions on
-        Neural Networks and Learning Systems, 1-15.
-    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
-        Learning With Drifting Streaming Data. IEEE Transactions on Neural
-        Networks and Learning Systems, 25(1), 27-39.
-    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+        Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
+        Learn. Syst., 34(1):186–200, 2023.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
-        BigMine 2014 (pp. 133-148).
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
     """
 
     def __init__(
         self,
-        budget_manager=None,
-        budget=None,
-        density_threshold=1,
-        cognition_window_size=10,
+        force_full_budget=False,
         dist_func=None,
         dist_func_dict=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        budget_manager=None,
+        budget=None,
         random_state=None,
-        force_full_budget=False,
     ):
         super().__init__(budget=budget, random_state=random_state)
         self.budget_manager = budget_manager
@@ -576,41 +587,43 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         fit_clf=False,
         return_utilities=False,
     ):
-        """Ask the query strategy which instances in candidates to acquire.
+        """Determines for which candidate samples labels are to be queried.
 
-        Please note that, when the decisions from this function may differ from
-        the final sampling, so the query strategy can be updated later with
-        update(...) with the final sampling.
+        The query startegy determines the most useful samples in candidates,
+        which can be acquired within the budgeting constraint specified by
+        `budget`. Please note that, this method does not change the internal
+        state of the query strategy. To adapt the query strategy to the
+        selected candidates, use `update(...)`.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features), optional
-        (default=None)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples), optional (default=None)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,), optional
-            Sample weights for X, used to fit the clf.
-        fit_clf : bool, optional (default=False)
-            If true, refit the classifier also requires X and y to be given.
-        return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), default=None
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        fit_clf : bool, default=False
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        return_utilities : bool, default=False
+            If `True`, also return the `utilities` based on the query strategy.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances in candidates which should be queried,
-            with 0 <= n_queried_instances <= n_samples.
-        utilities: ndarray of shape (n_samples,), optional
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
-            return_utilities is True.
+            `return_utilities` is `True`.
         """
         (
             candidates,
@@ -674,25 +687,25 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         self, candidates, queried_indices, budget_manager_param_dict=None
     ):
         """Updates the budget manager and the count for seen and queried
-        instances
+        labels. This function should be used in conjunction with the `query`
+        function.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from candidates have been queried.
-
-        budget_manager_param_dict : kwargs, optional (default=None)
-            Optional kwargs for budget_manager.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        budget_manager_param_dict : dict, default=None
+            Optional kwargs for `budget_manager`.
 
         Returns
         -------
         self : CognitiveDualQueryStrategy
-            The CognitiveDualQueryStrategy returns itself, after it is updated.
+            The query strategy returns itself, after it is updated.
         """
         self._validate_force_full_budget()
         # check if a budget_manager is set
@@ -705,11 +718,15 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 BudgetManager,
                 type(None),
             )
+            default_budget_manager_kwargs = (
+                self._get_default_budget_manager_kwargs()
+            )
+            default_budget_manager_kwargs["random_state"] = random_seed
             self.budget_manager_ = check_budget_manager(
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
-                {"random_state": random_seed},
+                default_budget_manager_kwargs,
             )
         # _init_members
         if self.dist_func is None:
@@ -761,20 +778,19 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         return self
 
     def _calculate_ldf(self, candidates):
-        """Calculate the number of new nearest neighbor for candiates in the
-        cognition_window.
+        """Calculate the number of new nearest neighbors for candidates in the
+        sliding window.
 
         Parameters
         ----------
         candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
 
         Returns
         -------
-        ldf: array-like of shape (n_candiates)
-            Numbers of new nearest neighbor for candidates
-
+        ldf: np.ndarray of shape (n_candiates,)
+            Numbers of new nearest neighbor for `candidates`
         """
         ldf = 0
         f = 1
@@ -831,44 +847,45 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         Parameters
         ----------
-        candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,)
-            Sample weights for X, used to fit the clf.
-        return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
-        fit_clf : bool,
-            If true, refit the classifier also requires X and y to be given.
-        reset : bool, (default=True)
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), default=None
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        fit_clf : bool, default=False
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
+        reset : bool, default=True
+            Whether to reset the `n_features_in_` attribute. If False, the
+            input will be checked for consistency with data provided when reset
+            was last True.
         **check_candidates_params : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
         Returns
         -------
         candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+            Checked candidate samples.
         clf : SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
         X: np.ndarray, shape (n_samples, n_features)
-            Checked training samples
-        y: np.ndarray, shape (n_candidates)
-            Checked training labels
+            Checked training data set.
+        y: np.ndarray, shape (n_samples)
+            Checked training labels.
         sampling_weight: np.ndarray, shape (n_candidates)
-            Checked training sample weight
+            Checked training sample weight.
         fit_clf : bool,
-            Checked boolean value of `fit_clf`
-        candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+            Checked boolean value of `fit_clf`.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
@@ -903,11 +920,15 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
                 BudgetManager,
                 type(None),
             )
+            default_budget_manager_kwargs = (
+                self._get_default_budget_manager_kwargs()
+            )
+            default_budget_manager_kwargs["random_state"] = random_seed
             self.budget_manager_ = check_budget_manager(
                 self.budget,
                 self.budget_manager,
                 self._get_default_budget_manager(),
-                {"random_state": random_seed},
+                default_budget_manager_kwargs,
             )
 
         if self.dist_func is None:
@@ -940,25 +961,39 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 
         return candidates, clf, X, y, sample_weight, fit_clf, return_utilities
 
+    def _get_default_budget_manager_kwargs(self):
+        """Provide the kwargs for the budget manager that will be used as
+        default.
+
+        Returns
+        -------
+        default_budget_manager_kwargs : dict
+            The arguments necessary to initialize the budget manager.
+        """
+        return {}
+
     def _validate_clf(self, clf, X, y, sample_weight, fit_clf):
-        """Validate if clf is a valid SkactivemlClassifier. If clf is
-        untrained, clf is trained using X, y and sample_weight.
+        """Validate if `clf` is a valid `SkactivemlClassifier`. If `clf` is
+        untrained and `fit_clf`=`True`, `clf` is trained using X, y and
+        sample_weight.
 
         Parameters
         ----------
-        clf : SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_freq`.
-        X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-        sample_weight : array-like of shape (n_samples,)
-            Sample weights for X, used to fit the clf.
-        fit_clf : bool,
-            If true, refit the classifier also requires X and y to be given.
+        clf : skactiveml.base.SkactivemlClassifier
+            Model implementing the methods `fit` and `predict_proba`.
+        X : array-like of shape (n_samples, n_features), default=None
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
+        sample_weight : array-like of shape (n_samples,), default=None
+            Weights of training samples in `X`.
+        fit_clf : bool, default=False
+            Defines whether the classifier should be fitted on `X`, `y`, and
+            `sample_weight`.
         Returns
         -------
-        clf : SkactivemlClassifier
+        clf : skactiveml.base.SkactivemlClassifier
             Checked model implementing the methods `fit` and `predict_freq`.
         """
         # Check if the classifier and its arguments are valid.
@@ -986,21 +1021,19 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Input samples used to fit the classifier.
-
-        y : array-like of shape (n_samples)
-            Labels of the input samples 'X'. There may be missing labels.
-
+            Training data set used to fit the classifier.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
         sample_weight : array-like of shape (n_samples,)
-            Sample weights for X, used to fit the clf.
-
+            Weights of training samples in `X`.
         Returns
         -------
         X : array-like of shape (n_samples, n_features)
-            Checked Input samples.
+            Checked training data set.
         y : array-like of shape (n_samples)
-            Checked Labels of the input samples 'X'. Converts y to a numpy
-            array
+            Checked labels of the input samples `X`. Converts `y` to a numpy
+            array.
         """
         if sample_weight is not None:
             sample_weight = np.array(sample_weight)
@@ -1017,7 +1050,7 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
         Returns
         -------
         budget_manager : BudgetManager
-            The BudgetManager that should be used by default.
+            The `BudgetManager` that should be used by default.
         """
         return RandomVariableUncertaintyBudgetManager
 
@@ -1025,77 +1058,80 @@ class CognitiveDualQueryStrategy(SingleAnnotatorStreamQueryStrategy):
 class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyRan
 
-    This class implements the CognitiveDualQueryStrategy strategy with Random
-    Sampling. The CognitiveDualQueryStrategy strategy is an extension to the
-    uncertainty based query strategies proposed by Žliobaitė et al. [2] and
-    follows the same idea as StreamDensityBasedAL [3] where queries for labels
-    is only allowed if the local density around the corresponding instance is
-    sufficiently high. The authors propose the use of a cognitive window that
-    monitors the most representative samples within a data stream.
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
+    Random Sampling. The CognitiveDualQueryStrategy strategy is an extension to
+    the uncertainty based query strategies proposed by Žliobaitė et al. [2]_
+    and follows the same idea as StreamDensityBasedAL [3]_ where queries for
+    labels is only allowed if the local density around the corresponding
+    sample is sufficiently high. The authors propose the use of a cognitive
+    window that monitors the most representative samples within a data stream.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    budget_manager : BudgetManager, optional (default=None)
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        RandomBudgetManager will be used by default. The
-        budget manager will be initialized based on the following conditions:
-            If only a budget is given the default budget manager is initialized
-            with the given budget.
-            If only a budget manager is given use the budget manager.
-            If both are not given the default budget manager with the
-            default budget.
-            If both are given and the budget differs from budgetmanager.budget
-            a warning is thrown.
-    density_threshold : int, optional (default=1)
-        Determines the local density factor size that needs to be reached
-        in order to sample the candidate.
-    cognition_window_size : int, optional (default=10)
-        Determines the size of the cognition window
-    random_state : int, RandomState instance, optional (default=None)
-        Controls the randomness of the estimator.
-    dist_func : callable, optional (default=None)
+    force_full_budget : bool, default=False
+            If `True`, tries to utilize the full budget. The article does not
+            update the budget manager if the locale density factor is 0.
+    dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use
-        `sklearn.metrics.pairwise.pairwise_distances`
-    dist_func_dict : dict, optional (default=None)
+        density window. If it is `None`,
+        `sklearn.metrics.pairwise.pairwise_distances` will be used by default.
+    dist_func_dict : dict, default=None
         Additional parameters for `dist_func`.
-    force_full_budget : bool, optional (default=False)
-            If true, tries to utilize the full budget. The paper doesn't update
-            the budget manager if the locale density factor is 0
+    density_threshold : int, default=1
+        Determines the local density factor size that needs to be reached in
+        order to query the candidate's label.
+    cognition_window_size : int, default=10
+        Determines the size of the cognition window.
+    budget_manager : BudgetManager, default=None
+        The BudgetManager which models the budgeting constraint used in the
+        stream-based active learning setting. if set to `None`,
+        `RandomBudgetManager` will be used by default. The budget manager
+        will be initialized based on the following conditions:
+
+        - If only a `budget` is given, the default budget manager is
+          initialized with the given budget.
+        - If only a budget manager is given, use the budget manager.
+        - If both are not given, the default budget manager with the default
+          budget.
+        - If both are given, and the budget differs from
+          `budgetmanager.budget`, throw a warning and the budget manager is
+          used as is.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.RandomBudgetManager : The default budget manager
-    .budgetmanager.EstimatedBudgetZliobaite : The base class for
-        RandomBudgetManager
+    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.CognitiveDualQueryStrategy : The base class for this
+        strategy.
 
     References
     ----------
-    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
-        Online Active Learning for Drifting Data Streams. IEEE Transactions on
-        Neural Networks and Learning Systems, 1-15.
-    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
-        Learning With Drifting Streaming Data. IEEE Transactions on Neural
-        Networks and Learning Systems, 25(1), 27-39.
-    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+        Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
+        Learn. Syst., 34(1):186–200, 2023.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
-        BigMine 2014 (pp. 133-148).
-
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
     """
 
     def __init__(
         self,
-        budget=None,
-        density_threshold=1,
-        cognition_window_size=10,
+        force_full_budget=False,
         dist_func=None,
         dist_func_dict=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        budget=None,
         random_state=None,
-        force_full_budget=False,
     ):
         super().__init__(
             budget=budget,
@@ -1122,76 +1158,83 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
 class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyFixUn
 
-    This class implements the CognitiveDualQueryStrategy strategy with
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     FixedUncertainty. The CognitiveDualQueryStrategy strategy is an extension
-    to the uncertainty based query strategies proposed by Žliobaitė et al. [2]
-    and follows the same idea as StreamDensityBasedAL [3] where queries for
+    to the uncertainty based query strategies proposed by Žliobaitė et al. [2]_
+    and follows the same idea as StreamDensityBasedAL [3]_ where queries for
     labels is only allowed if the local density around the corresponding
-    instance is sufficiently high. The authors propose the use of a cognitive
+    sample is sufficiently high. The authors propose the use of a cognitive
     window that monitors the most representative samples within a data stream.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    budget_manager : BudgetManager, optional (default=None)
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        FixedUncertaintyBudgetManager will be used by default. The
-        budget manager will be initialized based on the following conditions:
-            If only a budget is given the default budget manager is initialized
-            with the given budget.
-            If only a budget manager is given use the budget manager.
-            If both are not given the default budget manager with the
-            default budget.
-            If both are given and the budget differs from budgetmanager.budget
-            a warning is thrown.
-    density_threshold : int, optional (default=1)
-        Determines the local density factor size that needs to be reached
-        in order to sample the candidate.
-    cognition_window_size : int, optional (default=10)
-        Determines the size of the cognition window
-    random_state : int, RandomState instance, optional (default=None)
-        Controls the randomness of the estimator.
-    dist_func : callable, optional (default=None)
+    classes : array-like of shape (n_classes,)
+        Holds the label for each class.
+    force_full_budget : bool, default=False
+            If `True`, tries to utilize the full budget. The article does not
+            update the budget manager if the locale density factor is 0.
+    dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use
-        `sklearn.metrics.pairwise.pairwise_distances`
+        density window. If it is `None`,
+        `sklearn.metrics.pairwise.pairwise_distances` will be used by default.
+    dist_func_dict : dict, default=None
+        Additional parameters for `dist_func`.
+    density_threshold : int, default=1
+        Determines the local density factor size that needs to be reached in
+        order to query the candidate's label.
+    cognition_window_size : int, default=10
+        Determines the size of the cognition window.
+    budget_manager : BudgetManager, default=None
+        The BudgetManager which models the budgeting constraint used in the
+        stream-based active learning setting. if set to `None`,
+        `FixedUncertaintyBudgetManager` will be used by default. The budget
+        manager will be initialized based on the following conditions:
 
-    force_full_budget : bool, optional (default=False)
-            If true, tries to utilize the full budget. The paper doesn't update
-            the budget manager if the locale density factor is 0
+        - If only a `budget` is given, the default budget manager is
+          initialized with the given budget.
+        - If only a budget manager is given, use the budget manager.
+        - If both are not given, the default budget manager with the default
+          budget.
+        - If both are given, and the budget differs from
+          `budgetmanager.budget`, throw a warning and the budget manager is
+          used as is.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
 
     See Also
     --------
     .budgetmanager.FixedUncertaintyBudgetManager : The default budget manager
-    .budgetmanager.EstimatedBudgetZliobaite : The base class for
-        FixedUncertaintyBudgetManager
+    .budgetmanager.CognitiveDualQueryStrategy : The base class for this
+        strategy.
 
     References
     ----------
-    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
-        Online Active Learning for Drifting Data Streams. IEEE Transactions on
-        Neural Networks and Learning Systems, 1-15.
-    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
-        Learning With Drifting Streaming Data. IEEE Transactions on Neural
-        Networks and Learning Systems, 25(1), 27-39.
-    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+        Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
+        Learn. Syst., 34(1):186–200, 2023.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
-        BigMine 2014 (pp. 133-148).
-
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
     """
 
     def __init__(
         self,
-        budget=None,
-        density_threshold=1,
-        cognition_window_size=10,
+        classes,
+        force_full_budget=False,
         dist_func=None,
         dist_func_dict=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        budget=None,
         random_state=None,
-        force_full_budget=False,
     ):
         super().__init__(
             budget=budget,
@@ -1203,6 +1246,7 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
             cognition_window_size=cognition_window_size,
             force_full_budget=force_full_budget,
         )
+        self.classes = classes
 
     def _get_default_budget_manager(self):
         """Provide the budget manager that will be used as default.
@@ -1214,83 +1258,96 @@ class CognitiveDualQueryStrategyFixUn(CognitiveDualQueryStrategy):
         """
         return FixedUncertaintyBudgetManager
 
+    def _get_default_budget_manager_kwargs(self):
+        """Provide the kwargs for the budget manager that will be used as
+        default.
+
+        Returns
+        -------
+        default_budget_manager_kwargs : dict
+            The arguments necessary to initialize the budget manager.
+        """
+        return {"classes": self.classes}
+
 
 class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyVarUn
 
-    This class implements the CognitiveDualQueryStrategy strategy with
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     VariableUncertainty. The CognitiveDualQueryStrategy strategy is an
     extension to the uncertainty based query strategies proposed by Žliobaitė
-    et al. [2] and follows the same idea as StreamDensityBasedAL [3] where
+    et al. [2]_ and follows the same idea as StreamDensityBasedAL [3]_ where
     queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
+    corresponding sample is sufficiently high. The authors propose the use of
     a cognitive window that monitors the most representative samples within a
     data stream.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    budget_manager : BudgetManager, optional (default=None)
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        VariableUncertaintyBudgetManager will be used by default. The
-        budget manager will be initialized based on the following conditions:
-            If only a budget is given the default budget manager is initialized
-            with the given budget.
-            If only a budget manager is given use the budget manager.
-            If both are not given the default budget manager with the
-            default budget.
-            If both are given and the budget differs from budgetmanager.budget
-            a warning is thrown.
-    density_threshold : int, optional (default=1)
-        Determines the local density factor size that needs to be reached
-        in order to sample the candidate.
-    cognition_window_size : int, optional (default=10)
-        Determines the size of the cognition window
-    random_state : int, RandomState instance, optional (default=None)
-        Controls the randomness of the estimator.
-    dist_func : callable, optional (default=None)
+    force_full_budget : bool, default=False
+            If `True`, tries to utilize the full budget. The article does not
+            update the budget manager if the locale density factor is 0.
+    dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use
-        `sklearn.metrics.pairwise.pairwise_distances`
-    dist_func_dict : dict, optional (default=None)
+        density window. If it is `None`,
+        `sklearn.metrics.pairwise.pairwise_distances` will be used by default.
+    dist_func_dict : dict, default=None
         Additional parameters for `dist_func`.
-    force_full_budget : bool, optional (default=False)
-            If true, tries to utilize the full budget. The paper doesn't update
-            the budget manager if the locale density factor is 0
+    density_threshold : int, default=1
+        Determines the local density factor size that needs to be reached in
+        order to query the candidate's label.
+    cognition_window_size : int, default=10
+        Determines the size of the cognition window.
+    budget_manager : BudgetManager, default=None
+        The BudgetManager which models the budgeting constraint used in the
+        stream-based active learning setting. if set to `None`,
+        `VariableUncertaintyBudgetManager` will be used by default. The budget
+        manager will be initialized based on the following conditions:
+
+        - If only a `budget` is given, the default budget manager is
+          initialized with the given budget.
+        - If only a budget manager is given, use the budget manager.
+        - If both are not given, the default budget manager with the default
+          budget.
+        - If both are given, and the budget differs from
+          `budgetmanager.budget`, throw a warning and the budget manager is
+          used as is.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.VariableUncertaintyBudgetManager : The default budget
-        manager
-    .budgetmanager.EstimatedBudgetZliobaite : The base class for
-        VariableUncertaintyBudgetManager
+    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.CognitiveDualQueryStrategy : The base class for this
+        strategy.
 
     References
     ----------
-    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
-        Online Active Learning for Drifting Data Streams. IEEE Transactions on
-        Neural Networks and Learning Systems, 1-15.
-    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
-        Learning With Drifting Streaming Data. IEEE Transactions on Neural
-        Networks and Learning Systems, 25(1), 27-39.
-    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+        Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
+        Learn. Syst., 34(1):186–200, 2023.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
-        BigMine 2014 (pp. 133-148).
-
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
     """
 
     def __init__(
         self,
-        budget=None,
-        density_threshold=1,
-        cognition_window_size=10,
+        force_full_budget=False,
         dist_func=None,
         dist_func_dict=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        budget=None,
         random_state=None,
-        force_full_budget=False,
     ):
         super().__init__(
             budget=budget,
@@ -1317,79 +1374,81 @@ class CognitiveDualQueryStrategyVarUn(CognitiveDualQueryStrategy):
 class CognitiveDualQueryStrategyRanVarUn(CognitiveDualQueryStrategy):
     """CognitiveDualQueryStrategyRanVarUn
 
-    This class implements the CognitiveDualQueryStrategy strategy with
+    This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     RandomVariableUncertainty. The CognitiveDualQueryStrategy strategy is an
     extension to the uncertainty based query strategies proposed by Žliobaitė
-    et al. [2] and follows the same idea as StreamDensityBasedAL [3] where
+    et al. [2]_ and follows the same idea as StreamDensityBasedAL [3]_ where
     queries for labels is only allowed if the local density around the
-    corresponding instance is sufficiently high. The authors propose the use of
+    corresponding sample is sufficiently high. The authors propose the use of
     a cognitive window that monitors the most representative samples within a
     data stream.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    budget_manager : BudgetManager, optional (default=None)
-        The BudgetManager which models the budgeting constraint used in
-        the stream-based active learning setting. if set to None,
-        RandomVariableUncertaintyBudgetManager will be used by default. The
-        budget manager will be initialized based on the following conditions:
-            If only a budget is given the default budget manager is initialized
-            with the given budget.
-            If only a budget manager is given use the budget manager.
-            If both are not given the default budget manager with the
-            default budget.
-            If both are given and the budget differs from budgetmanager.budget
-            a warning is thrown.
-    density_threshold : int, optional (default=1)
-        Determines the local density factor size that needs to be reached
-        in order to sample the candidate.
-    cognition_window_size : int, optional (default=10)
-        Determines the size of the cognition window
-    random_state : int, RandomState instance, optional (default=None)
-        Controls the randomness of the estimator.
-    dist_func : callable, optional (default=None)
+    force_full_budget : bool, default=False
+            If `True`, tries to utilize the full budget. The article does not
+            update the budget manager if the locale density factor is 0.
+    dist_func : callable, default=None
         The distance function used to calculate the distances within the local
-        density window. If None use
-        `sklearn.metrics.pairwise.pairwise_distances`
-    dist_func_dict : dict, optional (default=None)
+        density window. If it is `None`,
+        `sklearn.metrics.pairwise.pairwise_distances` will be used by default.
+    dist_func_dict : dict, default=None
         Additional parameters for `dist_func`.
-    force_full_budget : bool, optional (default=False)
-            If true, tries to utilize the full budget. The paper doesn't update
-            the budget manager if the locale density factor is 0
+    density_threshold : int, default=1
+        Determines the local density factor size that needs to be reached in
+        order to query the candidate's label.
+    cognition_window_size : int, default=10
+        Determines the size of the cognition window.
+    budget_manager : BudgetManager, default=None
+        The BudgetManager which models the budgeting constraint used in the
+        stream-based active learning setting. if set to `None`,
+        `RandomBudgetManager` will be used by default.  The budget manager will
+        be initialized based on the following conditions:
+
+        - If only a `budget` is given, the default budget manager is
+          initialized with the given budget.
+        - If only a budget manager is given, use the budget manager.
+        - If both are not given, the default budget manager with the default
+          budget.
+        - If both are given, and the budget differs from
+          `budgetmanager.budget`, throw a warning and the budget manager is
+          used as is.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator.
 
     See Also
     --------
-    .budgetmanager.RandomVariableUncertaintyBudgetManager : The default budget
-        manager
-    .budgetmanager.EstimatedBudgetZliobaite : The base class for
-        RandomVariableUncertaintyBudgetManager
+    .budgetmanager.RandomBudgetManager : The default budget manager.
+    .budgetmanager.CognitiveDualQueryStrategy : The base class for this
+        strategy.
 
     References
     ----------
-    [1] Liu, S., Xue, S., Wu, J., Zhou, C., Yang, J., Li, Z., & Cao, J. (2021).
-        Online Active Learning for Drifting Data Streams. IEEE Transactions on
-        Neural Networks and Learning Systems, 1-15.
-    [2] Žliobaitė, I., Bifet, A., Pfahringer, B., & Holmes, G. (2014). Active
-        Learning With Drifting Streaming Data. IEEE Transactions on Neural
-        Networks and Learning Systems, 25(1), 27-39.
-    [3] Ienco, D., Pfahringer, B., & Zliobaitė, I. (2014). High density-focused
+    .. [1] S. Liu, S. Xue, J. Wu, C. Zhou, J. Yang, Z. Li, and J. Cao. Online
+        Active Learning for Drifting Data Streams. IEEE Trans. Neural Netw.
+        Learn. Syst., 34(1):186–200, 2023.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014.
+    .. [3] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
         uncertainty sampling for active learning over evolving stream data. In
-        BigMine 2014 (pp. 133-148).
-
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
     """
 
     def __init__(
         self,
-        budget=None,
-        density_threshold=1,
-        cognition_window_size=10,
+        force_full_budget=False,
         dist_func=None,
         dist_func_dict=None,
+        density_threshold=1,
+        cognition_window_size=10,
+        budget=None,
         random_state=None,
-        force_full_budget=False,
     ):
         super().__init__(
             budget=budget,

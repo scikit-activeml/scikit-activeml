@@ -36,7 +36,7 @@ from ..utils._validation import _check_callable
 class IndexClassifierWrapper:
     """
     Classifier to simplify retraining classifiers in an active learning
-    scenario. The idea is to pass all instances at once and use their indices
+    scenario. The idea is to pass all samples at once and use their indices
     to access them. Thereby, optimization is possible e.g. by pre-computing
     kernel-matrices. Moreover, this wrapper implements partial fit for all
     classifiers and includes a base classifier that can be used to simulate
@@ -49,24 +49,24 @@ class IndexClassifierWrapper:
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples)
+    y : array-like of shape (n_samples,)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by self.missing_label).
-    sample_weight : array-like of shape (n_samples), optional (default=None)
+        indicated by `self.missing_label`).
+    sample_weight : array-like of shape (n_samples,), default=None
         Weights of training samples in `X`.
     set_base_clf : bool, default=False
-        If True, the base classifier will be set to the newly fitted
-        classifier
-    ignore_partial_fit : bool, optional (default: True)
+        If `True`, the base classifier will be set to the newly fitted
+        classifier.
+    ignore_partial_fit : bool, default=True
         Specifies if the `partial_fit` function of `self.clf` should be used
         (if implemented).
-    enforce_unique_samples : bool, optional (default: False)
-        If True, `partial_fit` will not simply append additional samples but
-        replace the current labels by the new one. If False, instances might
+    enforce_unique_samples : bool, default=False
+        If `True`, `partial_fit` will not simply append additional samples but
+        replace the current labels by the new one. If `False`, samples might
         appear multiple times if their indices are repeated.
-    use_speed_up : bool, optional (default: True)
+    use_speed_up : bool, default=True
         Specifies if potentially available speed ups should be used. Currently
-        implemented for Parzen Window Classifier.
+        implemented for `skactiveml.classifier.ParzenWindowClassifier`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     """
@@ -100,7 +100,7 @@ class IndexClassifierWrapper:
         self.y = check_array(
             self.y,
             ensure_2d=False,
-            force_all_finite=False,
+            ensure_all_finite=False,
             dtype=None,
         )
         check_consistent_length(self.X, self.y)
@@ -179,15 +179,15 @@ class IndexClassifierWrapper:
 
         Parameters
         ----------
-        idx_fit : array-like of shape (n_fit_samples)
+        idx_fit : array-like of shape (n_fit_samples,)
             Indices of samples in `X` that will be used to fit the classifier.
-        idx_pred : array-like of shape (n_predict_samples)
+        idx_pred : array-like of shape (n_predict_samples,)
             Indices of samples in `X` that the classifier will predict for.
-        fit_params : string, optional (default='all')
+        fit_params : string, default='all'
             Parameter to specify if only a subset of the `idx_fit` indices
             will be used later. Can be of value 'all', 'labeled', or
             'unlabeled'.
-        pred_params : string, optional (default='all')
+        pred_params : string, default='all'
             Parameter to specify if only a subset of the `idx_predict` indices
             will be used later. Can be of value 'all', 'labeled', or
             'unlabeled'.
@@ -252,25 +252,23 @@ class IndexClassifierWrapper:
 
         Parameters
         ----------
-        idx : array-like of shape (n_sub_samples)
+        idx : array-like of shape (n_sub_samples,)
             Indices of samples in `X` that will be used to fit the classifier.
-        y : array-like of shape (n_sub_samples), optional (default=None)
+        y : array-like of shape (n_sub_samples,), default=None
             Class labels of the training samples corresponding to `X[idx]`.
             Missing labels are represented the attribute 'missing_label'.
-            If None, labels passed in the `init` will be used.
-        sample_weight: array-like of shape (n_sub_samples), optional
-            (default=None)
+            If `None`, labels passed in the `init` will be used.
+        sample_weight : array-like of shape (n_sub_samples,), default=None
             Weights of training samples in `X[idx]`.
-            If None, weights passed in the `init` will be used.
+            If `None`, weights passed in the `init` will be used.
         set_base_clf : bool, default=False
-            If True, the base classifier will be set to the newly fitted
-            classifier
+            If `True`, the base classifier will be set to the newly fitted
+            classifier.
 
         Returns
         -------
         self: IndexClassifierWrapper,
-            The fitted IndexClassifierWrapper.
-
+            The fitted `IndexClassifierWrapper`.
         """
         # check idx
         idx = check_array(idx, ensure_2d=False, dtype=int, input_name="`idx`")
@@ -290,7 +288,7 @@ class IndexClassifierWrapper:
             y = check_array(
                 y,
                 ensure_2d=False,
-                force_all_finite=False,
+                ensure_all_finite=False,
                 dtype=self.y.dtype,
                 input_name="`y`",
             )
@@ -340,31 +338,29 @@ class IndexClassifierWrapper:
         set_base_clf=False,
     ):
         """Update the fitted model using additional samples in `self.X[idx]`
-        and y as class labels.
+        and `y` as class labels.
 
         Parameters
         ----------
-        idx : array-like of shape (n_sub_samples)
+        idx : array-like of shape (n_sub_samples,)
             Indices of samples in `X` that will be used to fit the classifier.
-        y : array-like of shape (n_sub_samples), optional (default=None)
+        y : array-like of shape (n_sub_samples,), default=None
             Class labels of the training samples corresponding to `X[idx]`.
-            Missing labels are represented the attribute 'missing_label'.
-        sample_weight: array-like of shape (n_sub_samples), optional
-            (default=None)
+            Missing labels are represented by the attribute `missing_label`.
+        sample_weight : array-like of shape (n_sub_samples,), default=None
             Weights of training samples in `X[idx]`.
         use_base_clf : bool, default=False
-            If True, the base classifier will be used to update the fit instead
-            of the current classifier. Here, it is necessary that the base
-            classifier has been set once.
+            If `True`, the base classifier will be used to update the fit
+            instead of the current classifier. Here, it is necessary that the
+            base classifier has been set once.
         set_base_clf : bool, default=False
-            If True, the base classifier will be set to the newly fitted
+            If `True`, the base classifier will be set to the newly fitted
             classifier.
 
         Returns
         -------
         self: IndexClassifierWrapper,
-            The fitted IndexClassifierWrapper.
-
+            The fitted `IndexClassifierWrapper`.
         """
 
         # check idx
@@ -406,7 +402,7 @@ class IndexClassifierWrapper:
             add_y = check_array(
                 y,
                 ensure_2d=False,
-                force_all_finite=False,
+                ensure_all_finite=False,
                 dtype=self.y.dtype,
                 input_name="`y`",
             )
@@ -477,12 +473,12 @@ class IndexClassifierWrapper:
 
         Parameters
         ----------
-        idx : array-like of shape (n_sub_samples)
+        idx : array-like of shape (n_sub_samples,)
             Indices of samples in `X` that are to be predicted.
 
         Returns
         -------
-        y : array-like, shape (n_sub_samples)
+        y : array-like of shape (n_sub_samples,)
             Predicted class labels of the input samples.
         """
         if isinstance(self.clf, ParzenWindowClassifier) and self.use_speed_up:
@@ -510,12 +506,12 @@ class IndexClassifierWrapper:
 
         Parameters
         ----------
-        idx : array-like of shape (n_sub_samples)
+        idx : array-like of shape (n_sub_samples,)
             Indices of samples in `X` that are to be predicted.
 
         Returns
         -------
-        P : array-like, shape (n_sub_samples, classes)
+        P : array-like of shape (n_sub_samples, classes)
             The class probabilities of the input samples. Classes are ordered
             by lexicographic order.
         """
@@ -579,13 +575,13 @@ class IndexClassifierWrapper:
         Parameters
         ----------
         base_clf : bool, default=False
-            If True, the result will describe if the base classifier is
+            If `True`, the result will describe if the base classifier is
             fitted.
 
         Returns
         -------
-        is_fitted : boolean
-            Boolean describing if the classifier is fitted.
+        is_fitted : bool
+            Flag describing whether the classifier is fitted.
         """
         clf = "base_clf_" if base_clf else "clf_"
         if clf in self.__dict__:
@@ -636,7 +632,7 @@ def _cross_entropy(
     other_reg: ProbabilisticRegressor
         Evaluated distribution of the cross entropy.
     integration_dict: dict, optional default = None
-        Dictionary for integration arguments, i.e. `integration method` etc..
+        Dictionary for integration arguments, i.e. `integration method` etc.
         For details see method `conditional_expect`.
     random_state : int | np.random.RandomState, optional
         Random state for cross entropy calculation.
@@ -695,13 +691,13 @@ def _update_reg(
         Labels of the training data set.
     y_update : array-like of shape (n_updates) or numeric
         Updating labels or updating label.
-    sample_weight : array-like of shape (n_samples), optional (default = None)
+    sample_weight : array-like of shape (n_samples,), default=None
         Sample weight of the training data set. If
     idx_update : array-like of shape (n_updates) or int
         Index of the samples or sample to be updated.
-    X_update : array-like of shape (n_updates, n_features) or (n_features)
+    X_update : array-like of shape (n_updates, n_features) or (n_features,)
         Samples to be updated or sample to be updated.
-    mapping : array-like of shape (n_candidates), optional (default = None)
+    mapping : array-like of shape (n_candidates,), default=None
         The deciding mapping.
 
     Returns
@@ -742,14 +738,14 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     ----------
     X : array-like of shape (n_samples, n_features)
         Training data set.
-    y : array-like of shape (n_samples)
+    y : array-like of shape (n_samples,)
         Labels of the training data set.
-    idx_update : array-like of shape (n_updates) or int
+    idx_update : array-like of shape (n_updates,) or int
         Index of the samples or sample to be updated.
-    X_update : array-like of shape (n_updates, n_features) or (n_features)
+    X_update : array-like of shape (n_updates, n_features) or (n_features,)
         Samples to be updated or sample to be updated.
-    y_update : array-like of shape (n_updates) or numeric
-        Updating labels or updating label.
+    y_update : array-like of shape (n_updates,) or numeric
+        Updating label(s).
 
     Returns
     -------
@@ -762,7 +758,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     X = check_array(X, input_name="`X`")
     y = column_or_1d(
         check_array(
-            y, force_all_finite=False, ensure_2d=False, input_name="`y`"
+            y, ensure_all_finite=False, ensure_2d=False, input_name="`y`"
         )
     )
     check_consistent_length(X, y)
@@ -772,7 +768,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
     else:
         y_update = check_array(
             y_update,
-            force_all_finite=False,
+            ensure_all_finite=False,
             ensure_2d=False,
             ensure_min_samples=0,
             input_name="`y`",
@@ -804,7 +800,7 @@ def _update_X_y(X, y, y_update, idx_update=None, X_update=None):
 
 
 def _reshape_scipy_dist(dist, shape):
-    """Reshapes the parameters "loc", "scale", "df" of a distribution, if they
+    """Reshapes the parameters `loc`, `scale`, `df` of a distribution, if they
     exist.
 
     Parameters
@@ -834,9 +830,9 @@ def _reshape_scipy_dist(dist, shape):
 
 def expected_target_val(X, target_func, reg, **kwargs):
     """Calculates the conditional expectation of a function depending only on
-    the target value for each sample in `X`, i.e.
-    E[target_func(Y)|X=x], where Y | X=x ~ reg.predict_target_distribution,
-    for x in `X`.
+    the target value for each sample in `X`, i.e.,
+    `E[target_func(Y)|X=x]`, where `Y | X=x ~ reg.predict_target_distribution`,
+    for `x` in `X`.
 
     Parameters
     ----------
@@ -844,7 +840,7 @@ def expected_target_val(X, target_func, reg, **kwargs):
         The samples where the expectation should be evaluated.
     target_func : callable
         The function that transforms the random variable.
-    reg: ProbabilisticRegressor
+    reg : ProbabilisticRegressor
         Predicts the target distribution over which the expectation is
         calculated.
 
@@ -852,6 +848,7 @@ def expected_target_val(X, target_func, reg, **kwargs):
     ----------------
     method : string, optional, optional (default='gauss_hermite')
         The method by which the expectation is computed.
+
         - 'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval])
           and thereby only takes the function value at the expected y value.
         - 'monte_carlo' Basic monte carlo integration. Taking the average
@@ -868,9 +865,10 @@ def expected_target_val(X, target_func, reg, **kwargs):
           `rv_continuous` random variable of `reg`, which in turn uses a
           dynamic gaussian quadrature routine for calculating the integral.
           Performance is worse using a vector function.
-    quantile_method : string, optional (default='quadrature')
+    quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
+
         - 'trapezoid' Trapezoidal method for integration using evenly spaced
           samples.
         - 'simpson' Simpson method for integration using evenly spaced samples.
@@ -881,16 +879,16 @@ def expected_target_val(X, target_func, reg, **kwargs):
           samples used for integration is put to the smallest such number
           greater than `n_integration_samples`.
         - 'quadrature' Gaussian quadrature method for integration.
-    n_integration_samples : int, optional (default=10)
+    n_integration_samples : int, default=10
         The number of integration samples used in 'quantile', 'monte_carlo' and
         'gauss-hermite'.
-    quad_dict : dict, optional (default=None)
+    quad_dict : dict, default=None
         Further arguments for using `scipy's` `expect`
-    random_state : int | np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState or None, default=None
         Random state for fixing the number generation.
     target_func : bool
         If `True` only the target values will be passed to `func`.
-    vector_func : bool or str, optional (default=False)
+    vector_func : bool or str, default=False
         If `vector_func` is `True`, the integration values are passed as a
         whole to the function `func`. If `vector_func` is 'both', the
         integration values might or might not be passed as a whole. The
@@ -900,7 +898,7 @@ def expected_target_val(X, target_func, reg, **kwargs):
 
     Returns
     -------
-    expectation : numpy.ndarray of shape (n_samples)
+    expectation : numpy.ndarray of shape (n_samples,)
         The conditional expectation for each value applied.
     """
 
@@ -939,8 +937,9 @@ def _conditional_expect(
     reg: ProbabilisticRegressor
         Predicts the target distribution over which the expectation is
         calculated.
-    method: string, optional, optional (default='gauss_hermite')
+    method: string, optional, default='gauss_hermite'
         The method by which the expectation is computed.
+
         -'assume_linear' assumes E[func(Y)|X=x_eval] ~= func(E[Y|X=x_eval]) and
           thereby only takes the function value at the expected y value.
         -'monte_carlo' Basic monte carlo integration. Taking the average
@@ -957,36 +956,37 @@ def _conditional_expect(
           random variable of `reg`, which in turn uses a dynamic gaussian
           quadrature routine for calculating the integral. Performance is worse
           using a vector function.
-    quantile_method : string, optional (default='quadrature')
+    quantile_method : string, default='quadrature'
         Specifies the integration methods used after the quantile
         transformation.
-        - 'trapezoid' Trapezoidal method for integration using evenly spaced
+
+        - 'trapezoid': Trapezoidal method for integration using evenly spaced
           samples.
-        - 'simpson' Simpson method for integration using evenly spaced samples.
-        - 'average' Taking the average value for integration using evenly
+        - 'simpson': Simpson method for integration using evenly spaced
+          samples.
+        - 'average': Taking the average value for integration using evenly
           spaced samples.
-        - 'romberg' Romberg method for integration. If `n_integration_samples`
+        - 'romberg': Romberg method for integration. If `n_integration_samples`
           is not equal to `2**k + 1` for a natural number k, the number of
           samples used for integration is put to the smallest such number
           greater than `n_integration_samples`.
-        -'quadrature' Gaussian quadrature method for integration.
-    n_integration_samples : int, optional (default=10)
+        -'quadrature': Gaussian quadrature method for integration.
+    n_integration_samples : int, default=10
         The number of integration samples used in 'quantile', 'monte_carlo' and
         'gauss-hermite'.
-    quad_dict : dict, optional (default=None)
+    quad_dict : dict, default=None
         Further arguments for using `scipy's` `expect`
-    random_state : int | np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState or None,default=None
         Random state for fixing the number generation.
-    vector_func : bool or str, optional (default=False)
+    vector_func : bool or str, default=False
         If `vector_func` is `True`, the integration values are passes
         in vectorized form to `func`. If `vector_func` is 'both', the
         integration values might or might not be passed in vectorized form,
         depending what is more efficient. The integration values
         are passed in vectorized form, means that in a call like
-        `func(y, x, idx)` `y` is of the form (n_samples,
-        n_integration_samples), `x` equals `X` and `idx` is an index map of `X.
-
-
+        `func(y, x, idx)` `y` is of the form `(n_samples,
+        n_integration_samples)`, `x` equals `X` and `idx` is an index map of
+        `X`.
 
     Returns
     -------

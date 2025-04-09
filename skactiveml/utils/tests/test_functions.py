@@ -75,6 +75,11 @@ class TestFunctions(unittest.TestCase):
             def test_me_hidden(self, a, b=None, **kwargs):
                 return self.dummy_b.test_me_alt(a=a, **kwargs)
 
+            # test case with type hinting
+            @match_signature("dummy_b", "test_me_hint")
+            def test_me_hint(self, a, b=None, **kwargs):
+                return self.dummy_b.test_me_alt(a=a, **kwargs)
+
         class DummyB:
             def test_me(self, a, c, **kwargs):
                 output = {"a": a, "c": c}
@@ -82,6 +87,10 @@ class TestFunctions(unittest.TestCase):
                 return output
 
             def test_me_alt(self, a, c):
+                output = {"a": a, "c": c}
+                return output
+
+            def test_me_hint(self, a: int, c: str) -> dict:
                 output = {"a": a, "c": c}
                 return output
 
@@ -131,3 +140,21 @@ class TestFunctions(unittest.TestCase):
 
         # test for hiding methods that the wrapped object does not have
         self.assertFalse(hasattr(dummy_a, "test_me_hidden"))
+
+        sig_a_test_me_hint = inspect.signature(dummy_a.test_me_hint)
+        sig_b_test_me_hint = inspect.signature(dummy_b.test_me_hint)
+
+        self.assertEqual(
+            sig_a_test_me_hint.return_annotation,
+            sig_b_test_me_hint.return_annotation,
+        )
+
+        param_iterator = zip(
+            sig_a_test_me_hint.parameters.items(),
+            sig_b_test_me_hint.parameters.items(),
+        )
+        for (name_a, param_a), (name_b, param_b) in param_iterator:
+            self.assertEqual(name_a, name_b)
+            self.assertEqual(param_a.kind, param_b.kind)
+            self.assertEqual(param_a.annotation, param_a.annotation)
+            self.assertEqual(param_a.default, param_a.default)

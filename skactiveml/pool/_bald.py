@@ -1,10 +1,10 @@
 """
 Code is based on https://blackhc.github.io/batchbald_redux/ distributed under
-the Apache-2.0 license and the associated query strategy is presented in [1].
+the Apache-2.0 license and the associated query strategy is presented:
 
-[1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
-Efficient and Diverse Batch Acquisition for Deep Bayesian Active
-Learning." Advances in Neural Information Processing Systems 32 (2019).
+A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and Diverse
+Batch Acquisition for Deep Bayesian Active Learning. In Adv. Neural Inf.
+Process. Syst., 2019.
 """
 
 import numpy as np
@@ -25,12 +25,12 @@ from ..utils import (
 class _GeneralBALD(QueryByCommittee):
     """General Bayesian Active Learning by Disagreement (_GeneralBALD)
 
-    The Bayesian Active Learning by Disagreement (BatchBALD) [1] strategy
+    The Bayesian Active Learning by Disagreement (BatchBALD) [1]_ strategy
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
-    batch case, by default the advanced strategy BatchBALD [2] is used.
-    If desired a greedy (top-k) selection can be applied by setting
+    batch case, by default the advanced strategy BatchBALD [2]_ is used.
+    If desired, a greedy (top-k) selection can be applied by setting
     `greedy_selection=True`.
 
     Parameters
@@ -46,21 +46,23 @@ class _GeneralBALD(QueryByCommittee):
         Certain estimators may offer methods enabling to construct a committee
         by sampling predictions of committee members. This parameter is to
         indicate the name of such a method.
-            - If `sample_predictions_method_name=None` no sampling is
-              performed.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of classification, the method is expected to take samples of
-              the shape `(n_samples, *)` as input and to output probabilities
-              of the shape `(n_members, n_samples, n_classes)`, e.g.,
-              `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
+
+        - If `sample_predictions_method_name=None` no sampling is
+          performed.
+        - If `sample_predictions_method_name` is not `None` and in the
+          case of classification, the method is expected to take samples of
+          the shape `(n_samples, *)` as input and to output probabilities
+          of the shape `(n_members, n_samples, n_classes)`, e.g.,
+          `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-            - This parameter must be `None`, if
-              `sample_predictions_method_name` is `None`.
-            - Otherwise, it may be used to define the number of sampled
-              members, e.g., by defining `n_samples` as parameter to the method
-              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
+
+        - This parameter must be `None`, if
+          `sample_predictions_method_name` is `None`.
+        - Otherwise, it may be used to define the number of sampled
+          members, e.g., by defining `n_samples` as parameter to the method
+          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
@@ -68,12 +70,13 @@ class _GeneralBALD(QueryByCommittee):
 
     References
     ----------
-    .. [1] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
-       "Bayesian Active Learning for Classification and Preference
-       Learning." arXiv preprint arXiv:1112.5745 (2011).
-    .. [2] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
-       Efficient and Diverse Batch Acquisition for Deep Bayesian Active
-       Learning." Advances in Neural Information Processing Systems 32 (2019).
+    .. [1] N. Houlsby, F. Huszár, Z. Ghahramani, and M. Lengyel. Bayesian
+       Active Learning for Classification and Preference Learning.
+       arXiv:1112.5745, 2011.
+
+    .. [2] A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and
+       Diverse Batch Acquisition for Deep Bayesian Active Learning. In Adv.
+       Neural Inf. Process. Syst., 2019.
     """
 
     def __init__(
@@ -112,8 +115,8 @@ class _GeneralBALD(QueryByCommittee):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
@@ -150,26 +153,28 @@ class _GeneralBALD(QueryByCommittee):
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-                - If `candidates` is `None` or of shape
-                  `(n_candidates,)`, the indexing refers to the samples in
-                  `X`.
-                - If `candidates` is of shape `(n_candidates, n_features)`,
-                  the indexing refers to the samples in `candidates`.
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or \
                 numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-                - If `candidates` is `None` or of shape
-                  `(n_candidates,)`, the indexing refers to the samples in
-                  `X`.
-                - If `candidates` is of shape `(n_candidates, n_features)`,
-                  the indexing refers to the samples in `candidates`.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -241,7 +246,7 @@ class _GeneralBALD(QueryByCommittee):
 class BatchBALD(_GeneralBALD):
     """Batch Bayesian Active Learning by Disagreement (BatchBALD)
 
-    The Batch Bayesian Active Learning by Disagreement (BatchBALD) [1] strategy
+    Batch Bayesian Active Learning by Disagreement (BatchBALD) [1]_
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy.
@@ -256,21 +261,23 @@ class BatchBALD(_GeneralBALD):
         Certain estimators may offer methods enabling to construct a committee
         by sampling predictions of committee members. This parameter is to
         indicate the name of such a method.
-            - If `sample_predictions_method_name=None` no sampling is
-              performed.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of classification, the method is expected to take samples of
-              the shape `(n_samples, *)` as input and to output probabilities
-              of the shape `(n_members, n_samples, n_classes)`, e.g.,
-              `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
+
+        - If `sample_predictions_method_name=None` no sampling is
+          performed.
+        - If `sample_predictions_method_name` is not `None` and in the
+          case of classification, the method is expected to take samples of
+          the shape `(n_samples, *)` as input and to output probabilities
+          of the shape `(n_members, n_samples, n_classes)`, e.g.,
+          `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-            - This parameter must be `None`, if
-              `sample_predictions_method_name` is `None`.
-            - Otherwise, it may be used to define the number of sampled
-              members, e.g., by defining `n_samples` as parameter to the method
-              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
+
+        - This parameter must be `None`, if
+          `sample_predictions_method_name` is `None`.
+        - Otherwise, it may be used to define the number of sampled
+          members, e.g., by defining `n_samples` as parameter to the method
+          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
@@ -278,9 +285,9 @@ class BatchBALD(_GeneralBALD):
 
     References
     ----------
-    .. [1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
-       Efficient and Diverse Batch Acquisition for Deep Bayesian  Active
-       Learning." Advances in Neural Information Processing Systems 32 (2019).
+    .. [1] A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and
+       Diverse Batch Acquisition for Deep Bayesian Active Learning. In Adv.
+       Neural Inf. Process. Syst., 2019.
     """
 
     def __init__(
@@ -306,11 +313,11 @@ class BatchBALD(_GeneralBALD):
 class GreedyBALD(_GeneralBALD):
     """Greedy Bayesian Active Learning by Disagreement (GreedyBALD)
 
-    The Bayesian Active Learning by Disagreement (BALD) [1] strategy
+    The Bayesian Active Learning by Disagreement (BALD) [1]_ strategy
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
-    batch case, a greedy (top-k) selection is applied
+    batch case, a greedy (top-k) selection is applied.
 
     Parameters
     ----------
@@ -322,21 +329,23 @@ class GreedyBALD(_GeneralBALD):
         Certain estimators may offer methods enabling to construct a committee
         by sampling predictions of committee members. This parameter is to
         indicate the name of such a method.
-            - If `sample_predictions_method_name=None` no sampling is
-              performed.
-            - If `sample_predictions_method_name` is not `None` and in the
-              case of classification, the method is expected to take samples of
-              the shape `(n_samples, *)` as input and to output probabilities
-              of the shape `(n_members, n_samples, n_classes)`, e.g.,
-              `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
+
+        - If `sample_predictions_method_name=None` no sampling is
+          performed.
+        - If `sample_predictions_method_name` is not `None` and in the
+          case of classification, the method is expected to take samples of
+          the shape `(n_samples, *)` as input and to output probabilities
+          of the shape `(n_members, n_samples, n_classes)`, e.g.,
+          `sample_proba` in `skactiveml.base.ClassFrequencyEstimator`.
     sample_predictions_dict : dict, default=None
         Parameters (excluding the samples) that are passed to the method with
         the name `sample_predictions_method_name`.
-            - This parameter must be `None`, if
-              `sample_predictions_method_name` is `None`.
-            - Otherwise, it may be used to define the number of sampled
-              members, e.g., by defining `n_samples` as parameter to the method
-              `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
+
+        - This parameter must be `None`, if
+          `sample_predictions_method_name` is `None`.
+        - Otherwise, it may be used to define the number of sampled
+          members, e.g., by defining `n_samples` as parameter to the method
+          `sample_proba` of `skactiveml.base.ClassFrequencyEstimator`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or None or np.random.RandomState, default=None
@@ -344,9 +353,9 @@ class GreedyBALD(_GeneralBALD):
 
     References
     ----------
-    .. [1] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
-       "Bayesian Active Learning for Classification and Preference Learning."
-       arXiv preprint arXiv:1112.5745 (2011).
+    .. [1] N. Houlsby, F. Huszár, Z. Ghahramani, and M. Lengyel. Bayesian
+       Active Learning for Classification and Preference Learning.
+       arXiv:1112.5745, 2011.
     """
 
     def __init__(
@@ -379,7 +388,7 @@ def batch_bald(
     """BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian
     Active Learning
 
-    BatchBALD [1] is an extension of BALD  [2] (Bayesian Active Learning by
+    BatchBALD [1]_ is an extension of BALD  [2]_ (Bayesian Active Learning by
     Disagreement) whereby points are jointly scored by estimating the
     mutual information between a joint of multiple data points and the model
     parameters.
@@ -404,12 +413,12 @@ def batch_bald(
 
     References
     ----------
-    .. [1] Kirsch, Andreas, Joost Van Amersfoort, and Yarin Gal. "BatchBALD:
-       Efficient and Diverse Batch Acquisition for Deep Bayesian  Active
-       Learning." Advances in Neural Information Processing Systems 32 (2019).
-    .. [2] Houlsby, Neil, Ferenc Huszár, Zoubin Ghahramani, and Máté Lengyel.
-       "Bayesian Active Learning for Classification and Preference Learning."
-       arXiv preprint arXiv:1112.5745 (2011).
+    .. [1] N. Houlsby, F. Huszár, Z. Ghahramani, and M. Lengyel. Bayesian
+       Active Learning for Classification and Preference Learning.
+       arXiv:1112.5745, 2011.
+    .. [2] A. Kirsch, J. Van Amersfoort, and Y. Gal. BatchBALD: Efficient and
+       Diverse Batch Acquisition for Deep Bayesian Active Learning. In Adv.
+       Neural Inf. Process. Syst., 2019.
     """
     # Validate input parameters.
     if probas.ndim != 3:

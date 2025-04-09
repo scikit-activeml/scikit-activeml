@@ -2,30 +2,36 @@
 Classifier Ensemble for Multiple Annotators
 """
 
-# Author: Marek Herde <marek.herde@uni-kassel.de>
-
 from copy import deepcopy
 
 import numpy as np
 from sklearn.ensemble._base import _BaseHeterogeneousEnsemble
-from sklearn.utils.validation import check_array, check_is_fitted
+from sklearn.utils.validation import (
+    check_array,
+    check_is_fitted,
+)
 
 from ...base import SkactivemlClassifier
-from ...utils import MISSING_LABEL, is_labeled, compute_vote_vectors
+from ...utils import (
+    MISSING_LABEL,
+    is_labeled,
+    compute_vote_vectors,
+    check_n_features,
+)
 
 
 class AnnotatorEnsembleClassifier(
     _BaseHeterogeneousEnsemble, SkactivemlClassifier
 ):
-    """AnnotatorEnsembleClassifier
+    """Ensemble of Annotator-wise Classifier
 
     This strategy consists of fitting one classifier per annotator.
 
     Parameters
     ----------
-    estimators : list of (str, estimator) tuples
+    estimators : list of (str, SkactivemlClassifier) tuples
         The ensemble of estimators to use in the ensemble. Each element of the
-        list is defined as a tuple of string (i.e. name of the estimator) and
+        list is defined as a tuple of string (i.e., name of the estimator) and
         an estimator instance.
     voting : 'hard' or 'soft', default='hard'
         If 'hard', uses predicted class labels for majority rule voting.
@@ -42,7 +48,7 @@ class AnnotatorEnsembleClassifier(
         `classes[j]`  for a sample of class `classes[i]. Can be only set, if
         classes is not none.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
@@ -78,16 +84,16 @@ class AnnotatorEnsembleClassifier(
         self.voting = voting
 
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
+        """Fit the model using `X` as samples and `y` as class labels.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
+        X : array-like of shape (n_samples, *)
+            The feature matrix representing the samples.
         y : array-like of shape (n_samples, n_estimators)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute `missing_label`.
+            missing labels are represented the attribute `self.missing_label_`.
         sample_weight : array-like of shape (n_samples, n_estimators)
             It contains the weights of the training samples' class labels.
             It must have the same shape as `y`.
@@ -115,7 +121,6 @@ class AnnotatorEnsembleClassifier(
             check_X_dict=self.check_X_dict_,
             y_ensure_1d=False,
         )
-        self._check_n_features(X, reset=True)
 
         # Copy estimators
         self.estimators_ = deepcopy(self.estimators)
@@ -155,7 +160,7 @@ class AnnotatorEnsembleClassifier(
         return self
 
     def predict_proba(self, X):
-        """Return probability estimates for the test data X.
+        """Return probability estimates for the test data `X`.
 
         Parameters
         ----------
@@ -166,11 +171,12 @@ class AnnotatorEnsembleClassifier(
         -------
         P : np.ndarray of shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to `classes_`.
+            according to the attribute `self.classes_`.
         """
         check_is_fitted(self)
-        X = check_array(X, **self.check_X_dict_)
-        self._check_n_features(X, reset=False)
+        predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
+        X = check_array(X, **(self.check_X_dict_ | predict_dict))
+        check_n_features(self, X, reset=False)
         if self.n_features_in_ is None:
             return np.ones((len(X), len(self.classes_))) / len(self.classes_)
         elif self.voting == "hard":

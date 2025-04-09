@@ -1,5 +1,5 @@
 """
-Epistemic uncertainty query strategy
+Implementation of epistemic uncertainty sampling.
 """
 
 # Author: Pascal Mergard <Pascal.Mergard@student.uni-kassel.de>
@@ -26,28 +26,29 @@ from ..utils import (
 
 
 class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
-    """Epistemic Uncertainty Sampling.
+    """Epistemic Uncertainty Sampling (EpisUS)
 
-    Epistemic uncertainty sampling query strategy for two class problems.
-    Based on [1]. This strategy is only implemented for skactiveml parzen
-    window classifier and sklearn logistic regression classifier.
+    This class implements the Epistemic Uncertainty Sampling (EpisUS) query
+    strategy [1]_, which is only supported for binary classification tasks and
+    the following classifiers:
+
+    - `skactiveml.classifier.ParzenWindowClassifier` and
+    - `sklearn logistic regression classifier`.
 
     Parameters
     ----------
-    precompute : boolean, optional (default=False)
+    precompute : boolean, default=False
         Whether the epistemic uncertainty should be precomputed.
-        Only for ParzenWindowClassifier significant.
-    missing_label : scalar or string or np.nan or None, optional
-    (default=MISSING_LABEL)
+        Only for ParzenWindowClassifier relevant.
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or np.random.RandomState
+    random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     References
     ----------
-    [1] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
-        "Epistemic uncertainty sampling." International Conference on
-        Discovery Science. Springer, Cham, 2019.
+    .. [1] V.-L. Nguyen, S. Destercke, and E. Hüllermeier. Epistemic
+       Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
 
     def __init__(
@@ -74,55 +75,57 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         clf : skactiveml.classifier.ParzenWindowClassifier or
-                sklearn.linear_model.LogisticRegression
-            Only the skactiveml ParzenWindowClassifier and a wrapped sklearn
+                wrapped sklearn.linear_model.LogisticRegression
+            Only the Parzen Window Classifier and a wrapped sklearn
             logistic regression are supported as classifiers.
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples), default=None
-            Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
-            If true, also return the utilities based on the query strategy.
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -198,11 +201,11 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-# Epistemic uncertainty scores for pwc.
 def _epistemic_uncertainty_pwc(freq, precompute_array=None):
-    """
-    Computes the epistemic uncertainty score for a parzen window classifier
-    [1]. Only for two class problems.
+    """Computes the epistemic uncertainty score for a Parzen Window Classifier
+    (PWC) [1]_.
+
+    Only applicable to two class problems.
 
     Parameters
     ----------
@@ -218,13 +221,12 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
         The calculated epistemic uncertainty scores.
     precompute_array : np.nparray of quadratic shape with length
             int(np.max(freq) + 1)
-        The enlarged precompute_array. Will be None if the given is None.
+        The enlarged `precompute_array`. Will be None if the given is None.
 
     References
     ---------
-    [1] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
-        "Epistemic uncertainty sampling." International Conference on
-        Discovery Science. Springer, Cham, 2019.
+    .. [1] V.-L. Nguyen, S. Destercke, and E. Hüllermeier. Epistemic
+       Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     if freq.shape[1] != 2:
         raise ValueError(
@@ -297,9 +299,9 @@ def _epistemic_uncertainty_pwc(freq, precompute_array=None):
 
 
 def _interpolate(precompute_array, freq):
-    """
-    Linearly interpolation.
-    For further informations see scipy.interpolate.griddata.
+    """Linear interpolation.
+
+    For further information, see `scipy.interpolate.griddata`.
 
     Parameters
     ----------
@@ -322,22 +324,22 @@ def _interpolate(precompute_array, freq):
 
 
 def _pwc_ml_1(theta, n, p):
-    """
-    Calulates the maximum likelihood for class 1 of epistemic for pwc.
+    """Calculates the maximum likelihood for class 1 of epistemic for Parzen
+    Window Classifier (PWC).
 
     Parameters
     ----------
     theta : array-like
         The parameter vector.
     n : float
-        frequency estimate for the negative class.
+        Frequency estimate for the negative class.
     p : float
-        frequency estimate for the positive class.
+        Frequency estimate for the positive class.
 
     Returns
     -------
         float
-        The maximum likelihood for class 1 of epistemic for pwc.
+        The maximum likelihood for class 1 of epistemic for PWC.
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
@@ -349,21 +351,22 @@ def _pwc_ml_1(theta, n, p):
 
 def _pwc_ml_0(theta, n, p):
     """
-    Calulates the maximum likelihood for class 0 of epistemic for pwc.
+    Calculates the maximum likelihood for class 0 of epistemic for Parzen
+    Window Classifier (PWC).
 
     Parameters
     ----------
     theta : array-like
         The parameter vector.
     n : float
-        frequency estimate for the negative class.
+        Frequency estimate for the negative class.
     p : float
-        frequency estimate for the positive class.
+        Frequency estimate for the positive class.
 
     Returns
     -------
         float
-        The maximum likelihood for class 0 of epistemic for pwc.
+        The maximum likelihood for class 0 of epistemic for PWC.
     """
     if (n == 0.0) and (p == 0.0):
         return -1.0
@@ -375,9 +378,9 @@ def _pwc_ml_0(theta, n, p):
 
 # Epistemic uncertainty scores for logistic regression.
 def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
-    """
-    Calculates the epistemic uncertainty score for logistic regression [1].
-    Only for two class problems.
+    """Calculates the epistemic uncertainty score for logistic regression [1]_.
+
+    Only applicable to two class problems.
 
     Parameters
     ----------
@@ -389,8 +392,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
         The labels of the labeled pool X.
     clf : skactiveml.classifier.SklearnClassifier
         Only a wrapped logistic regression is supported as classifier.
-    sample_weight : array-like of shape (n_samples,) (default=None)
-        Sample weights for X, only used if clf is a logistic regression
+    sample_weight : array-like of shape (n_samples,), default=None
+        Sample weights for `X`, only used if `clf` is a logistic regression
         classifier.
 
     Returns
@@ -400,9 +403,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
 
     References
     ---------
-    [1] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
-        "Epistemic uncertainty sampling." International Conference on
-        Discovery Science. Springer, Cham, 2019.
+    .. [1] V.-L. Nguyen, S. Destercke, and E. Hüllermeier. Epistemic
+       Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     if not isinstance(clf, SklearnClassifier) or not isinstance(
         clf.estimator, LogisticRegression
@@ -512,8 +514,8 @@ def _epistemic_uncertainty_logreg(X_cand, X, y, clf, sample_weight=None):
 
 
 def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
-    """
-    Computes np.exp(-_loglike_logreg())/L_ml, the normalized likelihood.
+    """Computes np.exp(-_loglike_logreg())/L_ml as the normalized
+    likelihood [1]_.
 
     Parameters
     ----------
@@ -524,9 +526,9 @@ def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
         Use np.exp(-_loglike_logreg) to compute.
     X : np.ndarray
         The labeled pool used to fit the classifier.
-    y : np.array
+    y : np.ndarray
         The labels of the labeled pool X.
-    sample_weight : np.ndarray of shape (n_samples,) (default=None)
+    sample_weight : np.ndarray of shape (n_samples,), default=None
         Sample weights for X, only used if clf is a logistic regression
         classifier.
     gamma : float
@@ -539,10 +541,8 @@ def _pi_h(theta, L_ml, X, y, sample_weight=None, gamma=1):
 
     References
     ---------
-    [1] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
-        "Epistemic uncertainty sampling." International Conference on
-        Discovery Science. Springer, Cham, 2019.
-
+    .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
+       Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     check_scalar(L_ml, name="L_ml", target_type=(float, int))
 
@@ -561,19 +561,15 @@ def _loglike_logreg(w, X, y, sample_weight=None, gamma=1):
     ----------
     w : np.ndarray of shape (n_features + 1,)
         Coefficient vector.
-
-    X : {array-like, sparse matrix} of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, n_features)
         Training data.
-
     y : np.ndarray of shape (n_samples,)
         The labels of the training data X.
-
-    gamma : float
-        Regularization parameter. gamma is equal to 1 / C.
-
     sample_weight : array-like of shape (n_samples,) default=None
         Array of weights that are assigned to individual samples.
         If not provided, then each sample is given unit weight.
+    gamma : float
+        Regularization parameter. gamma is equal to 1 / C.
 
     Returns
     -------
@@ -588,33 +584,31 @@ def _loglike_logreg(w, X, y, sample_weight=None, gamma=1):
 
 
 def _theta(func, alpha, x0, A, args=()):
-    """
-    This function calculates the parameter vector as it is shown in equation 22
-     in [1].
-    Parameters
-    ----------
-    func : callable
-        The function to be optimized.
-    alpha : float
-        ln(alpha/(1-alpha)) will used as bound for the constraint.
-    x0 : np.ndarray of shape (n,)
-        Initial guess. Array of real elements of size (n,), where ‘n’ is the
-        number of independent variables.
-    A : np.ndarray
-        Matrix defining the constraint.
-    args : tuple
-        Will be pass to func.
+    """Calculates the parameter vector as it is shown in Eq. (22) in [1]_.
 
-    Returns
-    -------
-    x : np.ndarray
-        The optimized parameter vector.
+     Parameters
+     ----------
+     func : callable
+         The function to be optimized.
+     alpha : float
+         ln(alpha/(1-alpha)) will used as bound for the constraint.
+     x0 : np.ndarray of shape (n,)
+         Initial guess. Array of real elements of size (n,), where `n` is the
+         number of independent variables.
+     A : np.ndarray
+         Matrix defining the constraint.
+     args : tuple
+         Will be pass to func.
 
-    References
-    ---------
-    [1] Nguyen, Vu-Linh, Sébastien Destercke, and Eyke Hüllermeier.
-        "Epistemic uncertainty sampling." International Conference on
-        Discovery Science. Springer, Cham, 2019.
+     Returns
+     -------
+     x : np.ndarray
+         The optimized parameter vector.
+
+     References
+     ---------
+    .. [1] V.-L. Nguyen, S. Destercke, and E. H¨ullermeier. Epistemic
+        Uncertainty Sampling. In Int. Conf. Discov. Sci., pages 72–86, 2019.
     """
     bounds = np.log(alpha / (1 - alpha))
     constraints = LinearConstraint(A=A, lb=bounds, ub=bounds)
@@ -625,15 +619,23 @@ def _theta(func, alpha, x0, A, args=()):
 
 
 def _logistic_loss(w, X, y, alpha, sample_weight=None):
-    """Computes the logistic loss. This function is a copy taken from
-    https://github.com/scikit-learn/scikit-learn/blob/1.0.X/sklearn/
-    linear_model/_logistic.py.
+    """Computes the logistic loss.
+
+    This function is a modification from scikit-learn [1]_:
+
+    https://github.com/scikit-learn/scikit-learn/blob/1.0.X/sklearn/linear_model/_logistic.py
+
+    distributed under the BSD 3-Clause License.
+
+    Copyright (c) 2007-2021 The scikit-learn developers.
+
+    All rights reserved.
 
     Parameters
     ----------
     w : ndarray of shape (n_features,) or (n_features + 1,)
         Coefficient vector.
-    X : {array-like, sparse matrix} of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, n_features)
         Training data.
     y : ndarray of shape (n_samples,)
         Array of labels.
@@ -650,10 +652,11 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
 
     References
     ----------
-    [1] Pedregosa F, Varoquaux G, Gramfort A, Michel V, Thirion B,
-        Grisel O, Blondel M, Prettenhofer P, Weiss R, Dubourg V, Vanderplas J.
-        "Scikit-learn: Machine learning in Python." Journal of Machine
-        Learning Research. 2011.
+    .. [1] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel, B. Thirion, O.
+       Grisel, M. Blondel, P. Prettenhofer, R. Weiss, V. Dubourg, J.
+       Vanderplas, A. Passos, D. Cournapeau, M. Brucher, M. Perrot, and E.
+       Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
+       Res., 12:2825–2830, 2011.
     """
     w, c, yz = _intercept_dot(w, X, y)
 
@@ -668,17 +671,25 @@ def _logistic_loss(w, X, y, alpha, sample_weight=None):
 
 def _intercept_dot(w, X, y):
     """Computes y * np.dot(X, w). It takes into consideration if the intercept
-    should be fit or not. This function is a copy taken from
-    https://github.com/scikit-learn/scikit-learn/blob/1.0.X/sklearn/
-    linear_model/_logistic.py.
+    should be fit or not.
+
+    This function is a modification from scikit-learn [1]_:
+
+    https://github.com/scikit-learn/scikit-learn/blob/1.0.X/sklearn/linear_model/_logistic.py
+
+    distributed under the BSD 3-Clause License.
+
+    Copyright (c) 2007-2021 The scikit-learn developers.
+
+    All rights reserved.
 
     Parameters
     ----------
     w : ndarray of shape (n_features,) or (n_features + 1,)
         Coefficient vector.
-    X : {array-like, sparse matrix} of shape (n_samples, n_features)
+    X : array-like of shape (n_samples, n_features)
         Training data.
-    y : ndarray of shape (n_samples,)
+    y : np.ndarray of shape (n_samples,)
         Array of labels.
 
     Returns
@@ -693,10 +704,11 @@ def _intercept_dot(w, X, y):
 
     References
     ----------
-    [1] Pedregosa F, Varoquaux G, Gramfort A, Michel V, Thirion B,
-        Grisel O, Blondel M, Prettenhofer P, Weiss R, Dubourg V, Vanderplas J.
-        "Scikit-learn: Machine learning in Python." Journal of Machine
-        Learning Research. 2011.
+    .. [1] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel, B. Thirion, O.
+       Grisel, M. Blondel, P. Prettenhofer, R. Weiss, V. Dubourg, J.
+       Vanderplas, A. Passos, D. Cournapeau, M. Brucher, M. Perrot, and E.
+       Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
+       Res., 12:2825–2830, 2011.
     """
     c = 0.0
     if w.size == X.shape[1] + 1:

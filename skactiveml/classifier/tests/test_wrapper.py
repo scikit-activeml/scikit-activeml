@@ -239,6 +239,85 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         p = clf.predict_proba(X)
         np.testing.assert_array_equal(np.full_like(p, 0.5), p)
 
+    def test_pretrained_estimator(self):
+        random_state = np.random.RandomState(0)
+        X_full, y_full = make_blobs(150, centers=2, random_state=0)
+        X_train = X_full[:100]
+        y_train_true = y_full[:100]
+        X_test = X_full[100:]
+        # y_test_true = X_full[100:]
+        class_names = ["No", "Yes"]
+
+        cases = [([0, 1], np.nan), (class_names, "None")]
+
+        for class_mapping, missing_label in cases:
+            y_train = np.array([class_mapping[y] for y in y_train_true])
+
+            # pretrain classifier and test consistency of results after
+            # wrapping
+            pretrained_estimator = SGDClassifier(
+                loss="modified_huber",
+                random_state=0,
+            )
+            pretrained_estimator.fit(X_train, y_train)
+
+            pred_proba_orig_0 = pretrained_estimator.predict_proba(X_test)
+            pred_orig_0 = pretrained_estimator.predict(X_test)
+
+            clf = SklearnClassifier(
+                estimator=pretrained_estimator,
+                missing_label=missing_label,
+                classes=class_mapping,
+                random_state=0,
+            )
+
+            pred_proba_wrapped_0 = clf.predict_proba(X_test)
+            pred_wrapped_0 = clf.predict(X_test)
+
+            np.testing.assert_array_equal(
+                pred_proba_orig_0, pred_proba_wrapped_0
+            )
+            np.testing.assert_array_equal(pred_orig_0, pred_wrapped_0)
+
+            # update classifier and check results for consistency afterwards
+            y_train_random = random_state.permutation(y_train)
+
+            pretrained_estimator.partial_fit(X_train, y_train_random)
+            clf.partial_fit(X_train, y_train_random)
+
+            pred_proba_orig_1 = pretrained_estimator.predict_proba(X_test)
+            pred_orig_1 = pretrained_estimator.predict(X_test)
+            pred_proba_wrapped_1 = clf.predict_proba(X_test)
+            pred_wrapped_1 = clf.predict(X_test)
+
+            np.testing.assert_array_equal(
+                pred_proba_orig_1, pred_proba_wrapped_1
+            )
+            np.testing.assert_array_equal(pred_orig_1, pred_wrapped_1)
+
+            # check that it fails when classes of estimator was trained on
+            # different classes than profided to the `classes` parameter of
+            # SklearnClassifier
+            if not isinstance(missing_label, float):
+                self.assertRaises(TypeError, clf.fit, X_train, y_train_true)
+                self.assertRaises(TypeError, clf.fit, X_train, y_train_true)
+
+        pretrained_estimator = SGDClassifier(
+            loss="modified_huber",
+            random_state=0,
+        )
+        pretrained_estimator.fit(X_train, y_train_true)
+        clf = SklearnClassifier(
+            estimator=pretrained_estimator,
+            missing_label=np.nan,
+            random_state=0,
+            classes=[2, 3],
+        )
+
+        self.assertRaises(ValueError, clf.fit, X_train, y_train_true)
+
+        self.assertRaises(ValueError, clf.partial_fit, X_train, y_train_true)
+
 
 class TestSlidingWindowClassifier(
     TemplateSkactivemlClassifier, unittest.TestCase
@@ -420,7 +499,7 @@ class TestSlidingWindowClassifier(
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
-        test_cases = [([], TypeError)]
+        test_cases = [([], ValueError)]
         replace_init_params["classes"] = None
         replace_init_params["estimator"] = MixtureModelClassifier(
             missing_label=-1, classes=None

@@ -3,7 +3,7 @@
     "class" : "Clue",
     "package" : "pool",
     "method" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
-    "category" : "Uncertainty Sampling",
+    "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool", "classification", "single-annotator"],
     "title" : "Clustering Uncertainty-weighted Embeddings (CLUE)",

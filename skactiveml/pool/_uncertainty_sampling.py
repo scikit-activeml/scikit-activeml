@@ -21,20 +21,20 @@ from ..utils import (
 
 
 class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
-    """Uncertainty Sampling.
+    """Uncertainty Sampling (US)
 
     This class implement various uncertainty based query strategies, i.e., the
-    standard uncertainty measures [1], cost-sensitive ones [2], and one
-    optimizing expected average precision [3].
+    standard uncertainty measures [1]_, cost-sensitive ones [2]_, and one
+    optimizing expected average precision [3]_.
 
     Parameters
     ----------
-    method : string, default='least_confident'
-        The method to calculate the uncertainty, entropy, least_confident,
-        margin_sampling, and expected_average_precision  are possible.
+    method : 'least_confident' or 'margin' or 'entropy' or \
+            'expected_average_precision', default='least_confident'
+        The method to calculate the uncertainty.
     cost_matrix : array-like of shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] defining the cost of predicting class
-        j for a sample with the actual class i. Only supported for
+        Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
+        class `j` for a sample with the actual class `i`. Only supported for
         `least_confident` and `margin_sampling` variant.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
@@ -43,15 +43,16 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Settles, Burr. Active learning literature survey.
-        University of Wisconsin-Madison Department of Computer Sciences, 2009.
-    [2] Chen, Po-Lung, and Hsuan-Tien Lin. "Active learning for multiclass
-        cost-sensitive classification using probabilistic models." 2013
-        Conference on Technologies and Applications of Artificial Intelligence.
-        IEEE, 2013.
-    [3] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
-        via maximizing expected average precision."
-        IJCAI International Joint Conference on Artificial Intelligence. 2018.
+    .. [1] Settles, Burr. Active learning literature survey. University of
+       Wisconsin-Madison Department of Computer Sciences, 2009.
+
+    .. [2] P.-L. Chen and H.-T. Lin. Active Learning for Multiclass
+       Cost-Sensitive Classification Using Probabilistic Models. In Conf.
+       Technol. Appl. Artif. Intell., pages 13–18, 2013.
+
+    .. [3] H. Wang, X. Chang, L. Shi, Y. Yang, and Y.-D. Shen. Uncertainty
+       Sampling for Action Recognition via Maximizing Expected Average
+       Precision. In Int. Jt. Conf. Artif. Intell., pages 964–970, 2018.
     """
 
     def __init__(
@@ -84,34 +85,34 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`).
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
-        fit_clf : bool, optional (default=True)
+        fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        utility_weight: array-like, optional (default=None)
+        utility_weight : array-like, default=None
             Weight for each candidate (multiplied with utilities). Usually,
             this is to be the density of a candidate. The length of
-            `utility_weight` is usually n_samples, except for the case when
-            candidates contains samples (ndim >= 2). Then the length is
+            `utility_weight` is usually `n_samples`, except for the case when
+            `candidates` contains samples (ndim >= 2). Then the length is
             `n_candidates`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -120,23 +121,27 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
         """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -230,37 +235,29 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
-    and entropy based uncertainty ('entropy') [1]. For the least confident and
+    and entropy based uncertainty ('entropy') [1]_. For the least confident and
     margin sampling methods cost-sensitive variants are implemented in case of
-    a given cost matrix (see [2] for more information).
+    a given cost matrix (see [2]_ for more information).
 
     Parameters
     ----------
-    probas : array-like, shape (n_samples, n_classes)
+    probas : array-like of shape (n_samples, n_classes)
         Class membership probabilities for each sample.
-    cost_matrix : array-like, shape (n_classes, n_classes)
-        Cost matrix with C[i,j] defining the cost of predicting class j for a
-        sample with the actual class i. Only supported for least confident
-        variant.
-    method : {'least_confident', 'margin_sampling', 'entropy'},
-            optional (default='least_confident')
-        Least confidence (lc) queries the sample whose maximal posterior
-        probability is minimal. In case of a given cost matrix, the maximial
-        expected cost variant is used. Smallest margin (sm) queries the sample
-        whose posterior probability gap between the most and the second most
-        probable class label is minimal. In case of a given cost matrix, the
-        cost-weighted minimum margin is used. Entropy ('entropy') queries the
-        sample whose posterior's have the maximal entropy. There is no
-        cost-sensitive variant of entropy based uncertainty sampling.
+    cost_matrix : array-like pf shape (n_classes, n_classes)
+        Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
+        class `j` for a sample with the actual class `i`. Only supported for
+        'least_confident' or 'margin_sampling'.
+    method : 'least_confident' or 'margin_sampling' or 'entropy', \
+            default='least_confident'
+        The method to calculate the uncertainty.
 
     References
     ----------
-    [1] Settles, Burr. "Active learning literature survey".
-        University of Wisconsin-Madison Department of Computer Sciences, 2009.
-    [2] Chen, Po-Lung, and Hsuan-Tien Lin. "Active learning for multiclass
-        cost-sensitive classification using probabilistic models." 2013
-        Conference on Technologies and Applications of Artificial Intelligence.
-        IEEE, 2013.
+    .. [1] Settles, Burr. "Active learning literature survey".
+       University of Wisconsin-Madison Department of Computer Sciences, 2009.
+    .. [2] P.-L. Chen and H.-T. Lin. Active Learning for Multiclass
+       Cost-Sensitive Classification Using Probabilistic Models. In Conf.
+       Technol. Appl. Artif. Intell., pages 13–18, 2013.
     """
     # Check probabilities.
     probas = check_array(probas)
@@ -310,26 +307,25 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident"):
 
 def expected_average_precision(classes, probas):
     """
-    Calculate the expected average precision.
+    Calculate the expected average precision [1]_.
 
     Parameters
     ----------
-    classes : array-like, shape=(n_classes)
+    classes : array-like, shape=(n_classes,)
         Holds the label for each class.
-    probas : np.ndarray, shape=(n_X_cand, n_classes)
-        The probabilistic estimation for each classes and all instance in
-        candidates.
+    probas : array-like of shape (n_samples, n_classes)
+        Class membership probabilities for each sample.
 
     Returns
     -------
-    score : np.ndarray, shape=(n_X_cand)
-        The expected average precision score of all instances in candidates.
+    score : np.ndarray of shape=(n_samples,)
+        The expected average precision score of all samples in candidates.
 
     References
     ----------
-    [1] Wang, Hanmo, et al. "Uncertainty sampling for action recognition
-        via maximizing expected average precision."
-        IJCAI International Joint Conference on Artificial Intelligence. 2018.
+    .. [1] H. Wang, X. Chang, L. Shi, Y. Yang, and Y.-D. Shen. Uncertainty
+       Sampling for Action Recognition via Maximizing Expected Average
+       Precision. In Int. Jt. Conf. Artif. Intell., pages 964–970, 2018.
     """
     # Check if `probas` is valid.
     probas = check_array(
@@ -339,7 +335,7 @@ def expected_average_precision(classes, probas):
         dtype="numeric",
         order=None,
         copy=False,
-        force_all_finite=True,
+        ensure_all_finite=True,
         ensure_2d=True,
         allow_nd=False,
         ensure_min_samples=1,

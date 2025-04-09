@@ -90,7 +90,7 @@ def automodule(module, level=0):
         if isinstance(getattr(module, item), object) and item.isupper():
             constants.append(item)
 
-    title = f":mod:`{module.__name__}`:"
+    title = f":mod:`{module.__name__}`"
     rst_str += title + "\n"
     rst_str += "".ljust(len(title), "=") + "\n\n"
 
@@ -164,12 +164,25 @@ def generate_strategy_overview_rst(gen_path, json_data):
 
         file.write(
             f"This is an overview of all implemented active learning "
-            f"strategies.\n"
+            f"strategies, which are often divided into three main "
+            "categories based on the utilities they compute for sample "
+            "selection:\n\n"
+            "1. **Informativeness-based** strategies mostly select samples "
+            "for which the model is most uncertain (e.g., via "
+            "information-theoretic measures).\n\n"
+            "2. **Representativeness-based** strategies select samples that "
+            "capture the overall data distribution (e.g., via clustering or"
+            "density estimation).\n\n"
+            "3. **Hybrid** strategies combine both criteria to select "
+            "samples that are informative and representative.\n\n"
         )
         file.write("\n")
         file.write(
-            f"You can use the following checkboxes to filter the "
-            f"tables below.\n"
+            "Furthermore, we distinguish between **regression** and "
+            "**classification** as supervised learning tasks, where labels can"
+            "be provided by a **single annotator** or **multiple annotators**. "
+            "You can use the checkboxes below to filter the query strategies "
+            "based on these distinctions.\n"
         )
         file.write("\n")
         file.write(
@@ -297,7 +310,7 @@ def table_data_to_rst_table(
     Parameters
     ----------
     a : array-like, shape=(columns, rows)
-        Contains the data for the table..
+        Contains the data for the table.
     caption : str, optional (default='')
         The caption of the table.
     widths : str, optional (default=None)
@@ -306,7 +319,7 @@ def table_data_to_rst_table(
     header_lines : int, optional (default=0)
         The number of rows to use in the table header.
     indent : int, optional (default=0)
-        Number of spaces as indent in each line
+        Number of spaces as indent in each line.
 
     Returns
     -------
@@ -799,6 +812,10 @@ def generate_tutorials(src_path, dst_path, dst_path_colab):
         find them. This path is specially used to save the versions of the
         notebook that are linked to Google Colab.
     """
+    if os.path.exists(dst_path):
+        shutil.rmtree(dst_path)
+    if os.path.exists(dst_path_colab):
+        shutil.rmtree(dst_path_colab)
     shutil.copytree(src=src_path, dst=dst_path)
     shutil.copytree(src=src_path, dst=dst_path_colab)
     post_process_tutorials(
@@ -928,7 +945,7 @@ def check_google_colab_link(google_colab_link):
     output = google_colab_link
     if google_colab_link is None:
         colab_github = 'https://colab.research.google.com/github'
-        docs_repo_name = 'scikit-activeml/scikit-activeml-docs'
+        docs_repo_name = 'scikit-activeml/scikit-activeml.github.io'
         docs_branch_path = 'blob/gh-pages/latest'
         output = (
             f"{colab_github}/{docs_repo_name}/{docs_branch_path}"
@@ -1126,7 +1143,7 @@ def create_switcher_text(versions, docs_link=None):
     )
     versions_highest = np.array(versions)[unique_index + unique_counts - 1]
     if docs_link is None:
-        docs_link = "https://scikit-activeml.github.io/scikit-activeml-docs"
+        docs_link = "https://scikit-activeml.github.io"
     # Create an entry for every version
     content_list = []
     content_list.append("[\n")

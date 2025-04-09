@@ -17,21 +17,20 @@ def rand_argmin(a, random_state=None, **argmin_kwargs):
 
     Parameters
     ----------
-    a: array-like
+    a : array-like
         Indexable data-structure of whose minimum element's index is to be
         determined.
-    random_state: int, RandomState instance or None, optional (default=None)
+    random_state : int or RandomState instance or None, default=None
         Determines random number generation for shuffling the data. Pass an int
-         for reproducible results across multiple
-        function calls.
-    argmin_kwargs: dict-like
-        Keyword argument passed to numpy function argmin.
+        for reproducible results across multiple function calls.
+    argmin_kwargs : dict-like
+        Keyword argument passed to numpy function `argmin`.
 
     Returns
     -------
-    index_array: ndarray of ints
-        Array of indices into the array. It has the same shape as a.shape with
-        the dimension along axis removed.
+    index_array : ndarray of ints
+        Array of indices into the array. It has the same shape as `a.shape`
+        with the dimension along axis removed.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
@@ -52,20 +51,20 @@ def rand_argmax(a, random_state=None, **argmax_kwargs):
 
     Parameters
     ----------
-    a: array-like
+     : array-like
         Indexable data-structure of whose maximum element's index is to be
         determined.
-    random_state: int, RandomState instance or None, optional (default=None)
+    random_state : int, RandomState instance or None, default=None
         Determines random number generation for shuffling the data. Pass an int
         for reproducible results across multiple function calls.
-    argmax_kwargs: dict-like
-        Keyword argument passed to numpy function argmax.
+    argmax_kwargs : dict-like
+        Keyword argument passed to numpy function `argmax`.
 
     Returns
     -------
-    index_array: ndarray of ints
-        Array of indices into the array. It has the same shape as a.shape with
-        the dimension along axis removed.
+    index_array : ndarray of ints
+        Array of indices into the array. It has the same shape as `a.shape`
+        with the dimension along axis removed.
     """
     random_state = check_random_state(random_state)
     a = np.asarray(a)
@@ -87,18 +86,18 @@ def simple_batch(
     return_utilities=False,
     method="max",
 ):
-    """Generates a batch by selecting the highest values in the 'utilities'.
-    If utilities is an ND-array, the returned utilities will be an
-    (N+1)D-array, with the shape batch_size x utilities.shape, filled the given
-    utilities but set the n-th highest values in the n-th row to np.nan.
+    """Generates a batch by selecting the highest values in the `utilities`.
+    If `utilities` is an ND-array, the returned utilities will be an
+    (N+1)D-array, with the shape `batch_size` x `len(utilities)`, filled the
+    given `utilities` but set the n-th highest values in the n-th row to
+    `np.nan`.
 
     Parameters
     ----------
     utilities : np.ndarray
         The utilities to be used to create the batch.
-    random_state : int | np.random.RandomState (default=None)
-        The random state to use. If `random_state is None` random
-        `random_state` is used.
+    random_state : int, RandomState instance or None, default=None
+        The random state to use.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.
     return_utilities : bool, default=False
@@ -110,11 +109,11 @@ def simple_batch(
 
     Returns
     -------
-    best_indices : np.ndarray of shape (batch_size) if utilities.ndim == 1
-    else (batch_size, utilities.ndim)
-        The index of the batch instance.
+    best_indices : np.ndarray of shape (batch_size,) if utilities.ndim == 1 \
+            else (batch_size, utilities.ndim)
+        The indices of the batch samples.
     batch_utilities : np.ndarray of shape (batch_size, len(utilities))
-        The utilities of the batch (if return_utilities=True).
+        The `utilities` of the batch (if `return_utilities=True`).
 
     """
     # validation
@@ -122,7 +121,7 @@ def simple_batch(
         utilities,
         ensure_2d=False,
         dtype=float,
-        force_all_finite="allow-nan",
+        ensure_all_finite="allow-nan",
         allow_nd=True,
     )
     check_scalar(batch_size, target_type=int, name="batch_size", min_val=1)
@@ -178,11 +177,11 @@ def simple_batch(
 
 def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     """Combine different rankings hierarchically to one ranking assignment.
-    A ranking index i is ranked higher than index j iff ranking[i]>ranking[j].
-    For the combined ranking it will hold that the first ranking of
-    `iter_ranking` always determines the ranking position at an index, and only
-    when two ranking assignments are equal the second ranking will determine
-    the ranking position and so forth.
+    A ranking index `i` is ranked higher than index `j` iff
+    `ranking[i] > ranking[j]`. For the combined ranking it will hold that the
+    first ranking of `iter_ranking` always determines the ranking position at
+    an index, and only when two ranking assignments are equal the second
+    ranking will determine the ranking position and so forth.
 
     Parameters
     ----------
@@ -190,10 +189,10 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
         The different rankings. They must share a common shape in the sense
         that they have the same number of dimensions and are broadcastable by
         numpy.
-    rank_method : string, optional (default = None)
+    rank_method : string, default=None
         The method by which the utilities are ranked. See `scipy.rankdata`s
         argument `method` for details.
-    rank_per_batch : bool, optional (default = False)
+    rank_per_batch : bool, default=False
         Whether the first index determines the batch and is not used for
         ranking.
 
@@ -211,7 +210,7 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
     iter_ranking = list(iter_ranking)
     for idx, ranking in enumerate(iter_ranking):
         iter_ranking[idx] = check_array(
-            ranking, allow_nd=True, ensure_2d=False, force_all_finite=False
+            ranking, allow_nd=True, ensure_2d=False, ensure_all_finite=False
         ).astype(float)
         if idx != 0 and iter_ranking[idx - 1].ndim != ranking.ndim:
             raise ValueError(

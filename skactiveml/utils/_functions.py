@@ -6,25 +6,26 @@ from makefun import with_signature
 def call_func(
     f_callable, only_mandatory=False, ignore_var_keyword=False, **kwargs
 ):
-    """Calls a function with the given parameters given in kwargs if they
-    exist as parameters in f_callable.
+    """Calls a function with the given parameters given in `kwargs`, if they
+    exist as parameters in `f_callable`.
 
     Parameters
     ----------
     f_callable : callable
-        The function or object that is to be called
-    only_mandatory : boolean
-        If True only mandatory parameters are set.
-    ignore_var_keyword : boolean
-        If False all kwargs are passed when f_callable uses a parameter that is
-        of kind Parameter.VAR_KEYWORD, i.e., **kwargs. For further reference
-        see inspect package.
+        The function or object that is to be called.
+    only_mandatory : boolean, default=False
+        If `True`, only mandatory parameters are set.
+    ignore_var_keyword : boolean, default=False
+        If `False`, all kwargs are passed when `f_callable` uses a parameter
+        that is of kind `Parameter.VAR_KEYWORD`, i.e., `**kwargs`. For further
+        reference see the `inspect` package.
     kwargs : kwargs
         All parameters that could be used for calling f_callable.
 
     Returns
     -------
-    called object
+    f_callable_result : return type of `f_callable`
+        The return value of f_callable.
     """
     params = inspect.signature(f_callable).parameters
     param_keys = params.keys()
@@ -60,7 +61,8 @@ def match_signature(wrapped_obj_name, func_name):
 
     Returns
     -------
-    Wrapped function
+    wrapped_obj : callable
+        The wrapped function.
     """
 
     class _MatchSignatureDescriptor:
@@ -69,7 +71,7 @@ def match_signature(wrapped_obj_name, func_name):
         A descriptor that allows a wrapper to clone the signature of a
         method `func_name` from the wrapped object `wrapped_obj_name`.
         Furthermore, this extends upon the conditional property as implemented
-        in `available_if` from from `sklearn.utils.metaestimators`.
+        in `available_if` from `sklearn.utils.metaestimators`.
 
         Parameters
         ----------
@@ -94,10 +96,10 @@ def match_signature(wrapped_obj_name, func_name):
 
             Parameters
             ----------
-            obj: object
+            obj : object
                 The wrapper object. This parameter will be None, if the method
                 is accessed via the class and not an instantiated object.
-            owner: class, default=None
+            owner : class, default=None
                 The wrapper class.
 
             Returns
@@ -111,14 +113,37 @@ def match_signature(wrapped_obj_name, func_name):
                         f"This {reference_object} has"
                         f" no method {self.func_name}."
                     )
-
                 reference_function = getattr(reference_object, self.func_name)
-                reference_signature = inspect.signature(reference_function)
-                new_fn_name = self.fn.__name__
-                sig_str = (
-                    f"{new_fn_name}(self, {str(reference_signature)[1:-1]})"
+
+                # Check if the refrenced function is a method of that object.
+                # If it is, use `__func__` to copy the name of the `self`
+                # parameter
+                # If it is not, (i.e. it has been added as a lambda function),
+                # add a provisory self argument in the first position
+                if hasattr(reference_function, "__func__"):
+                    new_sig = inspect.signature(reference_function.__func__)
+                else:
+                    reference_sig = inspect.signature(reference_function)
+                    new_parameters = list(reference_sig.parameters.values())
+                    new_parameters.insert(
+                        0,
+                        inspect.Parameter(
+                            "self",
+                            kind=inspect._ParameterKind.POSITIONAL_OR_KEYWORD,
+                        ),
+                    )
+                    new_sig = inspect.Signature(
+                        new_parameters,
+                        return_annotation=reference_sig.return_annotation,
+                    )
+
+                # create a wrapper with the new signature and the correct
+                # function name
+                function_decorator = with_signature(
+                    func_signature=new_sig,
+                    func_name=self.fn.__name__,
                 )
-                fn = with_signature(sig_str)(self.fn)
+                fn = function_decorator(self.fn)
                 out = MethodType(fn, obj)
             else:
                 out = self.fn

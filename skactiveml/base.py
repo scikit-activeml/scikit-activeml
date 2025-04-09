@@ -32,6 +32,7 @@ from .utils import (
     check_class_prior,
     check_missing_label,
     check_indices,
+    check_n_features,
 )
 
 # '__all__' is necessary to create the sphinx docs.
@@ -75,10 +76,9 @@ class PoolQueryStrategy(QueryStrategy):
 
     Parameters
     ----------
-    missing_label : scalar or string or np.nan or None, optional
-    (default=np.nan)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or RandomState instance, optional (default=None)
+    random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
 
@@ -107,16 +107,17 @@ class PoolQueryStrategy(QueryStrategy):
         y : array-like of shape (n_samples, *)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
         batch_size : int
             The number of samples to be selected in one AL cycle.
         return_utilities : bool
@@ -134,12 +135,12 @@ class PoolQueryStrategy(QueryStrategy):
             Checked training data set.
         y : np.ndarray of shape (n_samples, *)
             Checked labels of the training data set.
-        candidates : None or np.ndarray of shape (n_candidates), dtype=int or
-            np.ndarray of shape (n_candidates, n_features)
+        candidates : None or np.ndarray of shape (n_candidates), dtype=int or\
+                np.ndarray of shape (n_candidates, n_features)
             Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
+        return_utilities : bool
             Checked boolean value of `return_utilities`.
         """
         # Check samples.
@@ -148,11 +149,11 @@ class PoolQueryStrategy(QueryStrategy):
         X = check_array(X, **check_X_dict)
 
         # Check number of features.
-        self._check_n_features(X, reset=reset)
+        check_n_features(self, X, reset=reset)
 
         # Check labels
         y = check_array(
-            y, ensure_2d=False, force_all_finite="allow-nan", dtype=None
+            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
         )
         check_consistent_length(X, y)
 
@@ -170,7 +171,7 @@ class PoolQueryStrategy(QueryStrategy):
                 check_candidates_dict = deepcopy(check_X_dict)
                 check_candidates_dict["ensure_2d"] = False
                 candidates = check_array(candidates, **check_candidates_dict)
-                self._check_n_features(candidates, reset=False)
+                check_n_features(self, candidates, reset=False)
 
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
@@ -207,44 +208,49 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
+            indicated by self.missing_label).
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         raise NotImplementedError
 
@@ -269,16 +275,17 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y : array-like of shape (n_samples)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL.
-        candidates : None or array-like of shape (n_candidates,), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates,) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
         batch_size : int
             The number of samples to be selected in one AL cycle.
         return_utilities : bool
@@ -294,14 +301,14 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         -------
         X : np.ndarray of shape (n_samples, n_features)
             Checked training data set.
-        y : np.ndarray of shape (n_samples)
+        y : np.ndarray of shape (n_samples,)
             Checked labels of the training data set.
         candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
             np.ndarray of shape (n_candidates, n_features)
             Checked candidate samples.
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
-        return_utilities : bool,
+        return_utilities : bool
             Checked boolean value of `return_utilities`.
         """
 
@@ -340,26 +347,25 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         enforce_mapping=False,
         allow_only_unlabeled=False,
     ):
-        """
-        Transforms the `candidates` parameter into a sample array and the
+        """Transforms the `candidates` parameter into a sample array and the
         corresponding index array `mapping` such that
         `candidates = X[mapping]`.
 
         Parameters
         ----------
-        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
-            np.ndarray of shape (n_candidates, n_features)
-            Checked candidate samples.
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
         X : np.ndarray of shape (n_samples, n_features)
             Checked training data set.
-        y : np.ndarray of shape (n_samples)
+        y : np.ndarray of shape (n_samples,)
             Checked labels of the training data set.
         enforce_mapping : bool, default=False
             If True, an exception is raised when no exact mapping can be
@@ -404,10 +410,9 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
     Parameters
     ----------
-    missing_label : scalar or string or np.nan or None, optional
-    (default=np.nan)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or RandomState instance, optional (default=None)
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
@@ -436,66 +441,68 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
             that `y[i, j]` contains the label annotated by annotator `i` for
             sample `j`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
+        candidates : None or array-like of shape (n_candidates), dtype=int or\
+                array-like of shape (n_candidates, n_features), default=None
             See parameter `annotators`.
-        annotators : None or array-like of shape (n_avl_annotators), dtype=int
-            or array-like of shape (n_candidates, n_annotators), optional
-        (default=None)
-            If candidate samples and annotators are not specified, i.e.,
-            `candidates=None`, `annotators=None` the unlabeled target values,
-            `y`, are the candidates annotator-sample-pairs.
-            If candidate samples and available annotators are specified:
-            The annotator-sample-pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered
-            as candidate annotator-sample-pairs.
-            If `candidates` is None, all samples of `X` are considered as
-            candidate samples. In this case `n_candidates` equals `len(X)`.
-            If `candidates` is of shape `(n_candidates,)` and of type int,
-            `candidates` is considered as the indices of the sample candidates
-            in `(X, y)`.
-            If `candidates` is of shape (n_candidates, n_features), the
-            sample candidates are directly given in `candidates` (not
-            necessarily contained in `X`). This is not supported by all query
-            strategies.
-            If `annotators` is `None`, all annotators are considered as
-            available annotators.
-            If `annotators` is of shape (n_avl_annotators), and of type int,
-            `annotators` is considered as the indices of the available
-            annotators.
-            If `annotators` is a boolean array of shape (n_candidates,
-            n_annotators) the annotator-sample-pairs, for which the sample
-            is a candidate sample and the boolean matrix has entry `True` are
-            considered as candidate annotator-sample pairs.
-        batch_size : int, optional (default=1)
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int\
+                or array-like of shape (n_candidates, n_annotators),\
+                default=None
+            - If candidate samples and annotators are not specified, i.e.,
+              `candidates=None`, `annotators=None` the unlabeled target values,
+              `y`, are the candidates annotator-sample-pairs.
+            - If candidate samples and available annotators are specified:
+              The annotator-sample-pairs, for which the sample is a candidate
+              sample and the annotator is an available annotator are considered
+              as candidate annotator-sample-pairs.
+            - If `candidates` is None, all samples of `X` are considered as
+              candidate samples. In this case `n_candidates` equals `len(X)`.
+            - If `candidates` is of shape `(n_candidates,)` and of type int,
+              `candidates` is considered as the indices of the sample
+              candidates in `(X, y)`.
+            - If `candidates` is of shape (n_candidates, n_features), the
+              sample candidates are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all query
+              strategies.
+            - If `annotators` is `None`, all annotators are considered as
+              available annotators.
+            - If `annotators` is of shape (n_avl_annotators), and of type int,
+              `annotators` is considered as the indices of the available
+              annotators.
+            - If `annotators` is a boolean array of shape `(n_candidates,
+              n_annotators)` the annotator-sample-pairs, for which the sample
+              is a candidate sample and the boolean matrix has entry `True` are
+              considered as candidate annotator-sample pairs.
+        batch_size : int or str, default=1
             The number of annotators-sample pairs to be selected in one AL
-            cycle.
-        return_utilities : bool, optional (default=False)
+            cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
+        return_utilities : bool, default=False
             If True, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : np.ndarray of shape (batchsize, 2)
-            The query_indices indicate which candidate sample pairs are to be
+        query_indices : np.ndarray of shape (batch_size, 2)
+            The `query_indices` indicate which candidate sample pairs are to be
             queried is, i.e., which candidate sample is to be annotated by
             which annotator, e.g., `query_indices[:, 0]` indicates the selected
             candidate samples and `query_indices[:, 1]` indicates the
             respectively selected annotators.
-            If candidates is None or of shape (n_candidates), the indexing
-            of refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities: numpy.ndarray of shape (batch_size, n_samples, n_annotators)
-         or numpy.ndarray of shape (batch_size, n_candidates, n_annotators)
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing of refers to samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to samples in `candidates`.
+        utilities: numpy.ndarray of shape (batch_size, n_samples,\
+                n_annotators) or numpy.ndarray of shape (batch_size,\
+                n_candidates, n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator-pair (with indices `query_indices[0]`).
-            If `candidates is None` or of shape (n_candidates), the indexing
-            refers to samples in `X`.
-            If `candidates` is of shape (n_candidates, n_features), the
-            indexing refers to samples in `candidates`.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to samples in `candidates`.
         """
         raise NotImplementedError
 
@@ -520,41 +527,40 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples, n_annotators)
             Labels of the training data set for each annotator (possibly
-            including unlabeled ones indicated by self.MISSING_LABEL), meaning
-            that `y[i, j]` contains the label annotated by annotator `i` for
-            sample `j`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-        array-like of shape (n_candidates, n_features), optional (default=None)
+            including unlabeled ones indicated by `self.missing_label`),
+            meaning that `y[i, j]` contains the label annotated by annotator
+            `i` for sample `j`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or\
+                array-like of shape (n_candidates, n_features),
             See annotators.
-        annotators : None or array-like of shape (n_avl_annotators), dtype=int
-        or array-like of shape (n_candidates, n_annotators), optional
-        (default=None)
-            If candidate samples and annotators are not specified, i.e.,
-            `candidates=None`, `annotators=None` the unlabeled target values,
-            `y`, are the candidates annotator-sample-pairs.
-            If candidate samples and available annotators are specified:
-            The annotator-sample-pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered
-            as candidate annotator-sample-pairs.
-            If `candidates` is None, all samples of `X` are considered as
-            candidate samples. In this case `n_candidates` equals `len(X)`.
-            If `candidates` is of shape `(n_candidates,)` and of type int,
-            `candidates` is considered as the indices of the sample candidates
-            in `(X, y)`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            sample candidates are directly given in `candidates` (not
-            necessarily contained in `X`). This is not supported by all query
-            strategies.
-            If `annotators` is `None`, all annotators are considered as
-            available annotators.
-            If `annotators` is of shape `(n_avl_annotators)`, and of type int,
-            `annotators` is considered as the indices of the available
-            annotators.
-            If `annotators` is a boolean array of shape `(n_candidates,
-            n_annotators)` the annotator-sample-pairs, for which the sample
-            is a candidate sample and the boolean matrix has entry `True` are
-            considered as candidate annotator-sample-pairs.
-        batch_size : int or string, optional (default=1)
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int\
+                or array-like of shape (n_candidates, n_annotators),
+            - If candidate samples and annotators are not specified, i.e.,
+              `candidates=None`, `annotators=None` the unlabeled target values,
+              `y`, are the candidates annotator-sample-pairs.
+            - If candidate samples and available annotators are specified:
+              The annotator-sample-pairs, for which the sample is a candidate
+              sample and the annotator is an available annotator are considered
+              as candidate annotator-sample-pairs.
+            - If `candidates` is None, all samples of `X` are considered as
+              candidate samples. In this case `n_candidates` equals `len(X)`.
+            - If `candidates` is of shape `(n_candidates,)` and of type int,
+              `candidates` is considered as the indices of the sample
+              candidates in `(X, y)`.
+            - If `candidates` is of shape (n_candidates, n_features), the
+              sample candidates are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all query
+              strategies.
+            - If `annotators` is `None`, all annotators are considered as
+              available annotators.
+            - If `annotators` is of shape (n_avl_annotators), and of type int,
+              `annotators` is considered as the indices of the available
+              annotators.
+            - If `annotators` is a boolean array of shape `(n_candidates,
+              n_annotators)` the annotator-sample-pairs, for which the sample
+              is a candidate sample and the boolean matrix has entry `True` are
+              considered as candidate annotator-sample pairs.
+        batch_size : int or string,
             The number of annotators sample pairs to be selected in one AL
             cycle. If `adaptive=True`, `batch_size='adaptive'` is allowed.
         return_utilities : bool
@@ -572,11 +578,11 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Checked training data set.
         y : np.ndarray of shape (n_samples, n_annotators)
             Checked labels of the training data set.
-        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or
-            np.ndarray of shape (n_candidates, n_features)
+        candidates :  None or np.ndarray of shape (n_candidates), dtype=int or\
+                np.ndarray of shape (n_candidates, n_features)
             Checked candidate samples.
-        annotators : None or np.ndarray of shape (n_avl_annotators), dtype=int
-            or np.ndarray of shape (n_candidates, n_annotators)
+        annotators : None or np.ndarray of shape (n_avl_annotators), dtype=int\
+                or np.ndarray of shape (n_candidates, n_annotators)
             Checked annotator boolean array
         batch_size : int
             Checked number of samples to be selected in one AL cycle.
@@ -594,7 +600,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        check_array(y, ensure_2d=True, force_all_finite="allow-nan")
+        check_array(y, ensure_2d=True, ensure_all_finite="allow-nan")
         unlabeled_pairs = is_unlabeled(y, missing_label=self.missing_label_)
 
         if annotators is not None:
@@ -651,43 +657,41 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
         Parameters
         ----------
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
+        candidates : None or array-like of shape (n_candidates), dtype=int or\
+                array-like of shape (n_candidates, n_features),
             See annotators.
-        annotators : None or array-like of shape (n_avl_annotators), dtype=int
-        or array-like of shape (n_candidates, n_annotators), optional
-        (default=None)
-            If candidate samples and annotators are not specified, i.e.,
-            `candidates=None`, `annotators=None` the unlabeled target values,
-            `y`, are the candidates annotator-sample-pairs.
-            If candidate samples and available annotators are specified:
-            The annotator-sample-pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered
-            as candidate annotator-sample-pairs.
-            If `candidates` is `None`, all samples of `X` are considered as
-            candidate samples. In this case `n_candidates` equals `len(X)`.
-            If `candidates` is of shape (n_candidates,) and of type int,
-            `candidates` is considered as the indices of the sample candidates
-            in `(X, y)`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            sample candidates are directly given in `candidates` (not
-            necessarily contained in `X`). This is not supported by all query
-            strategies.
-            If `annotators` is `None`, all annotators are considered as
-            available annotators.
-            If `annotators` is of shape (n_avl_annotators), and of type int,
-            `annotators` is considered as the indices of the available
-            annotators.
-            If `annotators` is a boolean array of shape `(n_candidates,
-            n_annotators)` the annotator-sample-pairs, for which the sample
-            is a candidate sample and the boolean matrix has entry `True` are
-            considered as candidate annotator-sample-pairs.
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int\
+                or array-like of shape (n_candidates, n_annotators),
+            - If candidate samples and annotators are not specified, i.e.,
+              `candidates=None`, `annotators=None` the unlabeled target values,
+              `y`, are the candidates annotator-sample-pairs.
+            - If candidate samples and available annotators are specified:
+              The annotator-sample-pairs, for which the sample is a candidate
+              sample and the annotator is an available annotator are considered
+              as candidate annotator-sample-pairs.
+            - If `candidates` is None, all samples of `X` are considered as
+              candidate samples. In this case `n_candidates` equals `len(X)`.
+            - If `candidates` is of shape `(n_candidates,)` and of type int,
+              `candidates` is considered as the indices of the sample
+              candidates in `(X, y)`.
+            - If `candidates` is of shape (n_candidates, n_features), the
+              sample candidates are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all query
+              strategies.
+            - If `annotators` is `None`, all annotators are considered as
+              available annotators.
+            - If `annotators` is of shape (n_avl_annotators), and of type int,
+              `annotators` is considered as the indices of the available
+              annotators.
+            - If `annotators` is a boolean array of shape `(n_candidates,
+              n_annotators)` the annotator-sample-pairs, for which the sample
+              is a candidate sample and the boolean matrix has entry `True` are
+              considered as candidate annotator-sample pairs.
         X : np.ndarray of shape (n_samples, n_features)
             Checked training data set.
         y : np.ndarray of shape (n_samples,)
             Checked labels of the training data set.
-        enforce_mapping : bool, optional (default=False)
+        enforce_mapping : bool, default=False
             If `True`, an exception is raised when no exact mapping can be
             determined (i.e., `mapping` is `None`).
 
@@ -752,14 +756,14 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
 class BudgetManager(ABC, BaseEstimator):
     """Base class for all budget managers for stream-based active learning
-    in scikit-activeml to model budgeting constraints.
+    to model budgeting constraints.
 
     Parameters
     ----------
-    budget : float (default=None)
-        Specifies the ratio of instances which are allowed to be sampled, with
-        0 <= budget <= 1. If budget is None, it is replaced with the default
-        budget 0.1.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
     """
 
     def __init__(self, budget=None):
@@ -767,47 +771,48 @@ class BudgetManager(ABC, BaseEstimator):
 
     @abstractmethod
     def query_by_utility(self, utilities, *args, **kwargs):
-        """Ask the budget manager which utilities are sufficient to query the
-        corresponding instance.
+        """Ask the budget manager which `utilities` are sufficient to query the
+        corresponding labels.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
+        utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
+            strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances represented by utilities which should be
-            queried, with 0 <= n_queried_instances <= n_samples.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         raise NotImplementedError
 
     @abstractmethod
     def update(self, candidates, queried_indices, *args, **kwargs):
-        """Updates the BudgetManager.
+        """Updates the budget manager.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-        queried_indices : array-like
-            Indicates which instances from candidates have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
         self : BudgetManager
-            The BudgetManager returns itself, after it is updated.
+            The budget manager returns itself, after it is updated.
         """
         raise NotImplementedError
 
     def _validate_budget(self):
-        """check the assigned budget and set the default value 0.1 if budget is
-        set to None.
+        """check the assigned `budget` and set the default value 0.1 if
+        `budget` is set to `None`.
         """
         if self.budget is not None:
             self.budget_ = self.budget
@@ -827,14 +832,14 @@ class BudgetManager(ABC, BaseEstimator):
 
         Parameters
         ----------
-        utilities: ndarray of shape (n_samples,)
-            The utilities provided by the stream-based active learning
+        utilities: array-like of shape (n_samples,)
+            The `utilities` provided by the stream-based active learning
             strategy.
 
         Returns
         -------
         utilities: ndarray of shape (n_samples,)
-            Checked utilities
+            Checked `utilities`.
         """
         # Check if utilities is set
         if not isinstance(utilities, np.ndarray):
@@ -847,15 +852,14 @@ class BudgetManager(ABC, BaseEstimator):
 
 
 class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
-    """Base class for all stream-based active learning query strategies in
-    scikit-activeml.
+    """Base class for all stream-based active learning query strategies.
 
     Parameters
     ----------
-    budget : float, default=None
-        The budget which models the budgeting constraint used in
-        the stream-based active learning setting.
-    random_state : int, RandomState instance, default=None
+    budget : float
+        Specifies the ratio of labels which are allowed to be queried, with
+        `0 <= budget <= 1`.
+    random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
     """
 
@@ -865,35 +869,31 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
 
     @abstractmethod
     def query(self, candidates, *args, return_utilities=False, **kwargs):
-        """Ask the query strategy which instances in candidates to acquire.
+        """Determines for which candidate samples labels are to be queried.
 
-        The query startegy determines the most useful instances in candidates,
-        which can be acquired within the budgeting constraint specified by the
-        budgetmanager.
-        Please note that, this method does not alter the internal state of the
-        query strategy. To adapt the query strategy to the selected candidates,
-        use update(...) with the selected candidates.
+        The query startegy determines the most useful samples in candidates,
+        which can be acquired within the budgeting constraint specified by
+        `budget`. Please note that, this method does not change the internal
+        state of the query strategy. To adapt the query strategy to the
+        selected candidates, use `update(...)`.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        return_utilities : bool, optional
-            If true, also return the utilities based on the query strategy.
-            The default is False.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_sampled_instances,)
-            The indices of instances in candidates which should be sampled,
-            with 0 <= n_sampled_instances <= n_samples.
-
-        utilities: ndarray of shape (n_samples,), optional
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        utilities: np.ndarray of shape (n_candidates,),
             The utilities based on the query strategy. Only provided if
-            return_utilities is True.
+            `return_utilities` is `True`.
         """
         raise NotImplementedError
 
@@ -906,30 +906,26 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         budget_manager_param_dict=None,
         **kwargs,
     ):
-        """Update the query strategy with the decisions taken.
-
-        This function should be used in conjunction with the query function,
-        when the instances queried from query(...) may differ from the
-        instances queried in the end. In this case use query(...) with
-        simulate=true and provide the final decisions via update(...).
-        This is especially helpful, when developing wrapper query strategies.
+        """Updates the budget manager and the count for seen and queried
+        labels. This function should be used in conjunction with the `query`
+        function.
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_candidates, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
+        budget_manager_param_dict : dict, default=None
+            Optional kwargs for budget_manager.
 
-        queried_indices : array-like
-            Indicates which instances from candidates have been queried.
-
-        budget_manager_param_dict : kwargs, optional
-            Optional kwargs for budgetmanager.
         Returns
         -------
-        self : StreamBasedQueryStrategy
-            The StreamBasedQueryStrategy returns itself, after it is updated.
+        self : SingleAnnotatorStreamQueryStrategy
+            The query strategy returns itself, after it is updated.
         """
         raise NotImplementedError
 
@@ -943,6 +939,9 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         self.random_state_ = check_random_state(self.random_state_)
 
     def _validate_budget(self):
+        """Creates a copy "budget_" if budget is a float between 0 and 1. If it
+        is `None`, `budget_` is set to 0.1.
+        """
         if self.budget is not None:
             self.budget_ = self.budget
         else:
@@ -969,10 +968,10 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Parameters
         ----------
         candidates: array-like of shape (n_candidates, n_features)
-            The instances which may be queried. Sparse matrices are accepted
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
         return_utilities : bool,
-            If true, also return the utilities based on the query strategy.
+            If `True`, also return the utilities based on the query strategy.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
@@ -983,15 +982,15 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         Returns
         -------
         candidates: np.ndarray, shape (n_candidates, n_features)
-            Checked candidate samples
+            Checked candidate samples.
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        # Check candidate instances.
+        # Check candidate samples.
         candidates = check_array(candidates, **check_candidates_params)
 
         # Check number of features.
-        self._check_n_features(candidates, reset=reset)
+        check_n_features(self, candidates, reset=reset)
 
         # Check return_utilities.
         check_scalar(return_utilities, "return_utilities", bool)
@@ -1005,31 +1004,31 @@ class SingleAnnotatorStreamQueryStrategy(QueryStrategy):
         return candidates, return_utilities
 
 
-class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
-    """SkactivemlClassifier
+class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
+    """Skactiveml Classifier
 
-    Base class for scikit-activeml classifiers such that missing labels,
+    Base class for `scikit-activeml` classifiers such that missing labels,
     user-defined classes, and cost-sensitive classification (i.e., cost matrix)
     can be handled.
 
     Parameters
     ----------
     classes : array-like of shape (n_classes), default=None
-        Holds the label for each class. If none, the classes are determined
+        Holds the label for each class. If `None`, the classes are determined
         during the fit.
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        classes is not none.
+        `classes` is not `None`.
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_ : array-like, shape (n_classes)
+    classes_ : array-like of shape (n_classes,)
         Holds the label for each class after fitting.
     cost_matrix_ : array-like,of shape (classes, classes)
         Cost matrix after fitting with `cost_matrix_[i,j]` indicating cost of
@@ -1055,14 +1054,15 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         Parameters
         ----------
         X : matrix-like, shape (n_samples, n_features)
-            The sample matrix X is the feature matrix representing the samples.
+            The sample matrix `X` is the feature matrix representing the
+            samples.
         y : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the class labels of the training samples.
             The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute 'missing_label'.
+            missing labels are represented the attribute `missing_label`.
         sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
             It contains the weights of the training samples' class labels.
-            It must have the same shape as y.
+            It must have the same shape as `y`.
 
         Returns
         -------
@@ -1077,14 +1077,14 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X : array-like of shape (n_samples, n_features)
             Test samples.
 
         Returns
         -------
-        P : numpy.ndarray, shape (n_samples, classes)
+        P : numpy.ndarray of shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to 'classes_'.
+            according to `self.classes_`.
         """
         raise NotImplementedError
 
@@ -1098,9 +1098,8 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         Returns
         -------
-        y : numpy.ndarray of shape (n_samples)
-            Predicted class labels of the test samples `X`. Classes are ordered
-            according to `classes_`.
+        y : numpy.ndarray of shape (n_samples,)
+            Predicted class labels of the test samples `X`.
         """
         P = self.predict_proba(X)
         costs = np.dot(P, self.cost_matrix_)
@@ -1140,6 +1139,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
         check_X_dict=None,
         check_y_dict=None,
         y_ensure_1d=True,
+        reset=True,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1148,7 +1148,7 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
                 "ensure_min_samples": 0,
                 "ensure_min_features": 0,
                 "ensure_2d": False,
-                "force_all_finite": False,
+                "ensure_all_finite": False,
                 "dtype": None,
             }
 
@@ -1167,6 +1167,11 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
+        error_msg = (
+            "No class label is known because 'y' contains no actual "
+            "class labels and 'classes' is not defined. Change at "
+            "least on of both to overcome this error."
+        )
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
             y = self._le.fit_transform(y)
@@ -1174,16 +1179,15 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
             if len(y[is_lbdl]) > 0:
                 check_classification_targets(y[is_lbdl])
             if len(self._le.classes_) == 0:
-                raise ValueError(
-                    "No class label is known because 'y' contains no actual "
-                    "class labels and 'classes' is not defined. Change at "
-                    "least on of both to overcome this error."
-                )
+                raise ValueError(error_msg)
         else:
+            if self.classes is None:
+                raise ValueError(error_msg)
             self._le.fit(self.classes)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
+        check_n_features(self, X, reset=reset)
 
         # Update detected classes.
         self.classes_ = self._le.classes_
@@ -1214,31 +1218,24 @@ class SkactivemlClassifier(BaseEstimator, ClassifierMixin, ABC):
 
         return X, y, sample_weight
 
-    def _check_n_features(self, X, reset):
-        if reset:
-            self.n_features_in_ = X.shape[1] if len(X) > 0 else None
-        elif not reset:
-            if self.n_features_in_ is not None:
-                super()._check_n_features(X, reset=reset)
-
 
 class ClassFrequencyEstimator(SkactivemlClassifier):
-    """ClassFrequencyEstimator
+    """Class Frequency Estimator
 
-    Extends scikit-activeml classifiers to estimators that are able to estimate
-    class frequencies for given samples (by calling 'predict_freq').
+    Extends `scikit-activeml` classifiers to estimators that are able to
+    estimate class frequencies for given samples (by calling `predict_freq`).
 
     Parameters
     ----------
     classes : array-like, shape (n_classes), default=None
-        Holds the label for each class. If none, the classes are determined
+        Holds the label for each class. If `None`, the classes are determined
         during the fit.
     missing_label : scalar or str or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        classes is not none.
+        classes is not `None`.
     class_prior : float or array-like, shape (n_classes), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -1246,7 +1243,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
     random_state : int or np.RandomState or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
@@ -1290,8 +1287,8 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         Returns
         -------
         F: array-like of shape (n_samples, classes)
-            The class frequency estimates of the test samples 'X'. Classes are
-            ordered according to attribute 'classes_'.
+            The class frequency estimates of the test samples `X`. Classes are
+            ordered according to attribute `classes_`.
         """
         raise NotImplementedError
 
@@ -1300,15 +1297,14 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features) or
-        shape (n_samples, m_samples) if metric == 'precomputed'
+        X : array-like of shape (n_samples, n_features)
             Input samples.
 
         Returns
         -------
         P : array-like of shape (n_samples, classes)
             The class probabilities of the test samples. Classes are ordered
-            according to classes_.
+            according to `self.classes_`.
         """
         # Normalize probabilities of each sample.
         P = self.predict_freq(X) + self.class_prior_
@@ -1337,7 +1333,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         -------
         P : array-like of shape (n_samples, n_test_samples, n_classes)
             There are `n_samples` class probability vectors for each test
-            sample in `X`. Classes are ordered according to classes_.
+            sample in `X`. Classes are ordered according to `self.classes_`.
         """
         random_state = check_random_state(random_state)
         alphas = self.predict_freq(X) + self.class_prior_
@@ -1384,18 +1380,17 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         return X, y, sample_weight
 
 
-class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
-    """SkactivemlRegressor
+class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
+    """Skactiveml Regressor
 
-    Base class for scikit-activeml regressors.
+    Base class for `scikit-activeml` regressors.
 
     Parameters
     __________
-    missing_label : scalar, string, np.nan, or None, optional
-    (default=skactiveml.utils.MISSING_LABEL)
+    missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
-    random_state : int, RandomState or None, optional (default=None)
-        Determines random number for 'fit' and 'predict' method. Pass an int
+    random_state : int, RandomState or None, default=None
+        Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
     """
 
@@ -1405,16 +1400,16 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as numerical labels.
+        """Fit the model using `X` as training data and y as numerical labels.
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
+        X : matrix-like of shape (n_samples, n_features)
             The sample matrix X is the feature matrix representing the samples.
         y : array-like, shape (n_samples) or (n_samples, n_targets)
             It contains the labels of the training samples.
             The number of numerical labels may be variable for the samples,
-            where missing labels are represented the attribute 'missing_label'.
+            where missing labels are represented as `missing_label_`.
         sample_weight : array-like, shape (n_samples)
             It contains the weights of the training samples' values.
 
@@ -1428,16 +1423,16 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 
     @abstractmethod
     def predict(self, X):
-        """Return value predictions for the test samples X.
+        """Return value predictions for the test samples `X`.
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features)
+        X :  array-like of shape (n_samples, n_features)
             Input samples.
         Returns
         -------
-        y : numpy.ndarray, shape (n_samples)
-            Predicted values of the test samples 'X'.
+        y : numpy.ndarray of shape (n_samples,)
+            Predicted values of the test samples `X`.
         """
         raise NotImplementedError
 
@@ -1449,6 +1444,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         check_X_dict=None,
         check_y_dict=None,
         y_ensure_1d=True,
+        reset=True,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1457,7 +1453,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
                 "ensure_min_samples": 0,
                 "ensure_min_features": 0,
                 "ensure_2d": False,
-                "force_all_finite": False,
+                "ensure_all_finite": False,
                 "dtype": None,
             }
 
@@ -1467,10 +1463,11 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
 
-        X = check_array(X, **check_X_dict)
         y = check_array(y, **check_y_dict)
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
+        else:
+            check_X_dict["ensure_2d"] = False
 
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
@@ -1480,6 +1477,9 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
                     f"shape {sample_weight.shape}. Both need to have "
                     f"identical shapes."
                 )
+        X = check_array(X, **check_X_dict)
+        check_consistent_length(X, y)
+        check_n_features(self, X, reset=reset)
 
         return X, y, sample_weight
 
@@ -1487,7 +1487,7 @@ class SkactivemlRegressor(BaseEstimator, RegressorMixin, ABC):
 class ProbabilisticRegressor(SkactivemlRegressor):
     """ProbabilisticRegressor
 
-    Base class for scikit-activeml probabilistic regressors.
+    Base class for `scikit-activeml` probabilistic regressors.
 
     """
 
@@ -1516,20 +1516,20 @@ class ProbabilisticRegressor(SkactivemlRegressor):
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples, n_features)
+        X :  array-like of shape (n_samples, n_features)
             Input samples.
-        return_std : bool, optional (default=False)
+        return_std : bool, default=False
             Whether to return the standard deviation.
-        return_entropy : bool, optional (default=False)
+        return_entropy : bool, default=False
             Whether to return the differential entropy.
 
         Returns
         -------
-        mu : numpy.ndarray, shape (n_samples)
+        mu : numpy.ndarray, shape (n_samples,)
             Predicted mean conditioned on `X`.
-        std : numpy.ndarray, shape (n_samples), optional
+        std : numpy.ndarray, shape (n_samples,), optional
             Predicted standard deviation conditioned on `X`.
-        entropy : numpy..ndarray, optional
+        entropy : numpy.ndarray, optional
             Predicted differential entropy conditioned on `X`.
         """
         check_scalar(return_std, "return_std", bool)
@@ -1550,18 +1550,17 @@ class ProbabilisticRegressor(SkactivemlRegressor):
 
         Parameters
         ----------
-        X :  array-like, shape (n_samples_X, n_features)
+        X :  array-like of shape (n_samples_X, n_features)
             Input samples, where the target values are drawn from.
-        n_samples: int, optional (default=1)
+        n_samples: int, default=1
             Number of random samples to be drawn.
-        random_state : int, RandomState instance or None, optional
-        (default=None)
+        random_state : int or RandomState instance or None, default=None
             Determines random number generation to randomly draw samples. Pass
             an int for reproducible results across multiple method calls.
 
         Returns
         -------
-        y_samples : numpy.ndarray, shape (n_samples_X, n_samples)
+        y_samples : numpy.ndarray of shape (n_samples_X, n_samples)
             Drawn random target samples.
         """
         rv = self.predict_target_distribution(X)
@@ -1572,7 +1571,7 @@ class ProbabilisticRegressor(SkactivemlRegressor):
 
 
 class AnnotatorModelMixin(ABC):
-    """AnnotatorModelMixin
+    """Annotator Model
 
     Base class of all annotator models estimating the performances of
     annotators for given samples.

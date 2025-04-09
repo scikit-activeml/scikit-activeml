@@ -19,29 +19,28 @@ from ...utils import (
 
 
 class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
-    """SingleAnnotatorWrapper
+    """Single Annotator Wrapper
 
     Implementation of a wrapper class for pool-based active
     learning query strategies with a single annotator such that it transforms
     the query strategy for the single annotator into a query strategy for
     multiple annotators by choosing an annotator randomly or according to the
-    parameter `A_pef` and setting the labeled matrix to a labeled vector by an
+    parameter `A_perf` and setting the labeled matrix to a labeled vector by an
     aggregation function, e.g., majority voting.
 
     Parameters
     ----------
     strategy : SingleAnnotatorPoolQueryStrategy
         An active learning strategy for a single annotator.
-    y_aggregate : callable, optional (default=None)
+    y_aggregate : callable, default=None
         `y_aggregate` is used to transform `y` as a matrix of shape
-        (n_samples, n_annotators) into a vector of shape (n_samples) during
-        the querying process and is then passed to the given `strategy`.
-        If `y_aggregate is None` and `y` is used in the strategy,
-        majority_vote is used as `y_aggregate`.
-    missing_label : scalar or string or np.nan or None, optional
-    (default=np.nan)
+        `(n_samples, n_annotators)` into a vector of shape `(n_samples,)`
+        during the querying process and is then passed to the given
+        `strategy`. If `y_aggregate is None` and `y` is used in the strategy,
+        `majority_vote` is used as `y_aggregate`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or RandomState instance, optional (default=None)
+    random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
     """
 
@@ -86,96 +85,102 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             including unlabeled ones indicated by self.MISSING_LABEL), meaning
             that `y[i, j]` contains the label annotated by annotator `i` for
             sample `j`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            See annotators.
-        annotators : None or array-like of shape (n_avl_annotators), dtype=int
-        or array-like of shape (n_candidates, n_annotators), optional
-        (default=None)
-            If candidate samples and annotators are not specified, i.e.,
-            `candidates=None`, `annotators=None` the unlabeled target values,
-            `y`, are the candidates annotator-sample-pairs.
-            If candidate samples and available annotators are specified:
-            The annotator-sample-pairs, for which the sample is a candidate
-            sample and the annotator is an available annotator are considered
-            as candidate annotator-sample-pairs.
-            If `candidates` is None, all samples of `X` are considered as
-            candidate samples. In this case `n_candidates` equals `len(X)`.
-            If `candidates` is of shape `(n_candidates,)` and of type int,
-            `candidates` is considered as the indices of the sample candidates
-            in `(X, y)`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            sample candidates are directly given in `candidates` (not
-            necessarily contained in `X`). This is not supported by all query
-            strategies.
-            If `annotators` is `None`, all annotators are considered as
-            available annotators.
-            If `annotators` is of shape `(n_avl_annotators)`, and of type int,
-            `annotators` is considered as the indices of the available
-            annotators.
-            If `annotators` is a boolean array of shape `(n_candidates,
-            n_annotators)` the annotator-sample-pairs, for which the sample
-            is a candidate sample and the boolean matrix has entry `True` are
-            considered as candidate annotator-sample-pairs.
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates), dtype=int or\
+                array-like of shape (n_candidates, n_features), default=None
+            See parameter `annotators`.
+        annotators : None or array-like of shape (n_avl_annotators), dtype=int\
+                or array-like of shape (n_candidates, n_annotators),\
+                default=None
+            - If candidate samples and annotators are not specified, i.e.,
+              `candidates=None`, `annotators=None` the unlabeled target values,
+              `y`, are the candidates annotator-sample-pairs.
+            - If candidate samples and available annotators are specified:
+              The annotator-sample-pairs, for which the sample is a candidate
+              sample and the annotator is an available annotator are considered
+              as candidate annotator-sample-pairs.
+            - If `candidates` is None, all samples of `X` are considered as
+              candidate samples. In this case `n_candidates` equals `len(X)`.
+            - If `candidates` is of shape `(n_candidates,)` and of type int,
+              `candidates` is considered as the indices of the sample
+              candidates in `(X, y)`.
+            - If `candidates` is of shape (n_candidates, n_features), the
+              sample candidates are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all query
+              strategies.
+            - If `annotators` is `None`, all annotators are considered as
+              available annotators.
+            - If `annotators` is of shape (n_avl_annotators), and of type int,
+              `annotators` is considered as the indices of the available
+              annotators.
+            - If `annotators` is a boolean array of shape `(n_candidates,
+              n_annotators)` the annotator-sample-pairs, for which the sample
+              is a candidate sample and the boolean matrix has entry `True` are
+              considered as candidate annotator-sample pairs.
+        batch_size : int, default=1
             The number of annotators sample pairs to be selected in one AL
             cycle.
-        A_perf : array-like, shape (n_annotators,) or
-        (n_candidates, n_annotators), optional (default=None)
+        A_perf : array-like, shape (n_annotators,) or\
+        (n_candidates, n_annotators), default=None
             The performance based ranking of each annotator.
-            1.) If `A_perf` is of shape (n_candidates, n_annotators) for each
-            sample `i` the value-annotators pair `(i, j)` is chosen
-            over the pair `(i, k)` if `A_perf[i, j]` is greater or
-            equal to `A_perf[i, k]`.
-            2.) If `A_perf` is of shape (n_annotators,) for each sample
-            `i` the value-annotators pair `(i, j)` is chosen over
-            the pair `(i, k)` if `A_perf[j]` is greater or
-            equal to `A_perf[k]`.
-            3.) If `A_perf` is None, the annotators are chosen at random, with
-            a different distribution for each sample.
-        return_utilities : bool, optional (default=False)
-            If true, also returns the utilities based on the query strategy.
-        n_annotators_per_sample : int, array-like, optional (default=1)
-        array-like of shape (k,), k <= n_samples
-            If `n_annotators_per_sample` is an int, the value indicates
-            the number of annotators that are preferably assigned to a
-            candidate sample, selected by the query_strategy.
-            `Preferably` in this case means depending on how many annotators
-            can be assigned to a given candidate sample and how many
-            annotator-sample-pairs should be assigned considering the
-            `batch_size`.
-            If `n_annotators_per_sample` is an int array, the values of the
-            array are interpreted as follows. The value at the i-th index
-            determines the preferred number of annotators for the candidate
-            sample at the i-th index in the ranking of the batch.
-            The ranking of the batch is given by the `strategy`
-            (SingleAnnotatorPoolQueryStrategy). The last index
-            of the n_annotators_per_sample array (k-1) indicates the
-            preferred number of annotators for all candidate sample at an index
-            greater of equal to k-1.
+
+            - 1.) If `A_perf` is of shape (n_candidates, n_annotators) for each
+              sample `i` the value-annotators pair `(i, j)` is chosen
+              over the pair `(i, k)` if `A_perf[i, j]` is greater or
+              equal to `A_perf[i, k]`.
+            - 2.) If `A_perf` is of shape (n_annotators,) for each sample
+              `i` the value-annotators pair `(i, j)` is chosen over
+              the pair `(i, k)` if `A_perf[j]` is greater or
+              equal to `A_perf[k]`.
+            - 3.) If `A_perf` is None, the annotators are chosen at random,
+              with a different distribution for each sample.
+        return_utilities : bool, default=False
+            If `True`, also returns the utilities based on the query strategy.
+        n_annotators_per_sample : int or array-like, default=1
+            - If `n_annotators_per_sample` is an int, the value indicates
+              the number of annotators that are preferably assigned to a
+              candidate sample, selected by the query_strategy.
+              `Preferably` in this case means depending on how many annotators
+              can be assigned to a given candidate sample and how many
+              annotator-sample-pairs should be assigned considering the
+              `batch_size`.
+            - If `n_annotators_per_sample` is an int array, the values of the
+              array are interpreted as follows. The value at the i-th index
+              determines the preferred number of annotators for the candidate
+              sample at the i-th index in the ranking of the batch.
+              The ranking of the batch is given by the `strategy`
+              (`SingleAnnotatorPoolQueryStrategy`). The last index
+              of the n_annotators_per_sample array (k-1) indicates the
+              preferred number of annotators for all candidate sample at an
+              index greater of equal to k-1.
         query_kwargs : dict, optional
             Dictionary for the parameters of the query method besides `X` and
             the transformed `y`.
 
         Returns
         -------
-        query_indices : np.ndarray of shape (batchsize, 2)
-            The query_indices indicate which candidate sample pairs are to be
+        query_indices : np.ndarray of shape (batch_size, 2)
+            The `query_indices` indicate which candidate sample pairs are to be
             queried is, i.e., which candidate sample is to be annotated by
             which annotator, e.g., `query_indices[:, 0]` indicates the selected
             candidate samples and `query_indices[:, 1]` indicates the
             respectively selected annotators.
-        utilities: np.ndarray of shape (batch_size, n_samples, n_annotators) or
-            np.ndarray of shape (batch_size, n_candidates, n_annotators)
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing of refers to samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to samples in `candidates`.
+        utilities: numpy.ndarray of shape (batch_size, n_samples,\
+                n_annotators) or numpy.ndarray of shape (batch_size,\
+                n_candidates, n_annotators)
             The utilities of all candidate samples w.r.t. to the available
             annotators after each selected sample of the batch, e.g.,
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator-pair (with indices `query_indices[0]`).
-            If `candidates` is None or of shape (n_candidates,), the indexing
-            refers to samples in `X`.
-            If `candidates` is of shape (n_candidates, n_features), the
-            indexing refers to samples in candidates.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to samples in `candidates`.
         """
 
         (

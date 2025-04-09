@@ -42,42 +42,43 @@ def plot_utilities(qs, X, y, candidates=None, **kwargs):
     qs : skactiveml.base.SingleAnnotatorPoolQueryStrategy
         The query strategy for which the utility is plotted.
     X : array-like of shape (n_samples, n_features)
-        Training data set, usually complete, i.e. including the labeled and
+        Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples, ) or (n_samples, n_annotators)
+    y : array-like of shape (n_samples,) or (n_samples, n_annotators)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by self.MISSING_LABEL).
-    candidates : None or array-like of shape (n_candidates,), dtype=int or
-    array-like of shape (n_candidates, n_features),
-    optional (default=None)
-        If `candidates` is None, the unlabeled samples from (X,y) are
-        considered as candidates.
-        If `candidates` is of shape (n_candidates,) and of type int,
-        candidates is considered as the indices of the samples in (X,y).
-        If `candidates` is of shape (n_candidates, n_features), the
-        candidates are directly given in candidates (not necessarily
-        contained in X). This is not supported by all query strategies.
+        indicated by `qs.missing_label`).
+    candidates : None or array-like of shape (n_candidates), dtype=int or \
+            array-like of shape (n_candidates, n_features), default=None
+        - If `candidates` is `None`, the unlabeled samples from
+          `(X,y)` are considered as `candidates`.
+        - If `candidates` is of shape `(n_candidates,)` and of type
+          `int`, `candidates` is considered as the indices of the
+          samples in `(X,y)`.
+        - If `candidates` is of shape `(n_candidates, *)`, the
+          candidate samples are directly given in `candidates` (not
+          necessarily contained in `X`). This is not supported by all
+          query strategies.
 
     Other Parameters
     ----------------
-    replace_nan : numeric or None, optional (default=0.0)
-        Only used if plotting with mesh instances is not possible.
-        If numeric, the utility of labeled instances will be plotted with
+    replace_nan : numeric or None, default=0.0
+        Only used if plotting with mesh samples is not possible.
+        If numeric, the utility of labeled samples will be plotted with
         value `replace_nan`. If None, these samples will be ignored.
-    ignore_undefined_query_params : bool, optional (default=False)
+    ignore_undefined_query_params : bool, default=False
         If True, query parameters that are not defined in the query function
         are ignored and will not raise an exception.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]], optional
-    (default=None)
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
+            default=None
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
-    ax : matplotlib.axes.Axes, optional (default=None)
+    ax : matplotlib.axes.Axes, default=None
         The axis on which the utility is plotted. Only if y.ndim = 1 (single
         annotator).
-    res : int, optional (default=21)
+    res : int, default=21
         The resolution of the plot.
-    contour_dict : dict, optional (default=None)
+    contour_dict : dict, default=None
         Additional parameters for the utility contour.
     **kwargs
         Remaining keyword arguments are passed the query function of the query
@@ -99,51 +100,53 @@ def plot_annotator_utilities(qs, X, y, candidates=None, **kwargs):
 
     Parameters
     ----------
-    qs : skactiveml.base.QueryStrategy
+    qs : skactiveml.base.MultiAnnotatorPoolQueryStrategy
         The query strategy for which the utility is plotted.
     X : array-like of shape (n_samples, n_features)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples, ) or (n_samples, n_annotators)
+    y : array-like of shape (n_samples,) or (n_samples, n_annotators)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by self.MISSING_LABEL).
-    candidates : None or array-like of shape (n_candidates,), dtype=int or
-        array-like of shape (n_candidates, n_features),
-        optional (default=None)
-        If `candidates` is None, the unlabeled samples from (X,y) are
-        considered as candidates.
-        If `candidates` is of shape (n_candidates,) and of type int,
-        candidates is considered as the indices of the samples in (X,y).
-        If `candidates` is of shape (n_candidates, n_features), the
-        candidates are directly given in candidates (not necessarily
-        contained in X). This is not supported by all query strategies.
+        indicated by `qs.missing_label`).
+    candidates : None or array-like of shape (n_candidates), dtype=int or \
+            array-like of shape (n_candidates, n_features), default=None
+        - If `candidates` is `None`, the unlabeled samples from
+          `(X,y)` are considered as `candidates`.
+        - If `candidates` is of shape `(n_candidates,)` and of type
+          `int`, `candidates` is considered as the indices of the
+          samples in `(X,y)`.
+        - If `candidates` is of shape `(n_candidates, *)`, the
+          candidate samples are directly given in `candidates` (not
+          necessarily contained in `X`). This is not supported by all
+          query strategies.
 
     Other Parameters
     ----------------
-    replace_nan : numeric or None, optional (default=0.0)
-        Only used if plotting with mesh instances is not possible.
-        If numeric, the utility of labeled instances will be plotted with
+    replace_nan : numeric or None, default=0.0
+        Only used if plotting with mesh samples is not possible.
+        If numeric, the utility of labeled samples will be plotted with
         value `replace_nan`. If None, these samples will be ignored.
-    ignore_undefined_query_params : bool, optional (default=False)
+    ignore_undefined_query_params : bool, default=False
         If True, query parameters that are not defined in the query function
         are ignored and will not raise an exception.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]], optional
-    (default=None)
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
+            default=None
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
-    axes : array-like of matplotlib.axes.Axes, optional (default=None)
+    axes : array-like of matplotlib.axes.Axes, default=None
         The axes on which the utilities for the annotators are plotted. Only
-        supported for y.ndim = 2 (multi annotator).
-    res : int, optional (default=21)
+        supported for y.ndim = 2 corresponding to a setting with multiple
+        annotators.
+    res : int, default=21
         The resolution of the plot.
-    contour_dict : dict, optional (default=None)
+    contour_dict : dict, default=None
         Additional parameters for the utility contour.
-    plot_annotators : None or array-like of shape (n_annotators_to_plot,),
-    optional (default=None)
+    plot_annotators : None or array-like of shape (n_annotators_to_plot,),\
+            default=None
         Contains the indices of the annotators to be plotted. If it is None,
-        all annotators are plotted. Only supported for y.ndim = 2
-         (multi annotator).
+        all annotators are plotted. Only supported for y.ndim = 2 corresponding
+        to a setting with multiple annotators.
     **kwargs
         Remaining keyword arguments are passed the query function of the query
         strategy.
@@ -173,31 +176,31 @@ def plot_decision_boundary(
 
     Parameters
     ----------
-    clf: Sklearn classifier
+    clf : sklearn.base.ClassifierMixin
         The fitted classifier whose decision boundary is plotted. If confidence
         is not None, the classifier must implement the predict_proba function.
-    feature_bound: array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted.
-    ax: matplotlib.axes.Axes or List, optional (default=None)
+    ax : matplotlib.axes.Axes or List, default=None
         The axis on which the decision boundary is plotted. If ax is a List,
         each entry has to be an `matplotlib.axes.Axes`.
-    res: int, optional (default=21)
+    res : int, default=21
         The resolution of the plot.
-    boundary_dict: dict, optional (default=None)
+    boundary_dict : dict, default=None
         Additional parameters for the boundary contour.
-    confidence: scalar | None, optional (default=0.75)
+    confidence : scalar or None, default=0.75
         The confidence interval plotted with dashed lines. It is not plotted if
         confidence is None. Must be in the open interval (0.5, 1). The value
         stands for the ratio best class / second best class.
-    cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
+    cmap : str or matplotlib.colors.Colormap, default='coolwarm_r'
         The colormap for the confidence levels.
-    confidence_dict: dict, optional (default=None)
+    confidence_dict : dict, default=None
         Additional parameters for the confidence contour. Must not contain a
         colormap because cmap is used.
 
     Returns
     -------
-    ax: matplotlib.axes.Axes or List
+    ax : matplotlib.axes.Axes or List
         The axis on which the boundary was plotted or the list of axis if ax
         was a list.
     """
@@ -227,11 +230,11 @@ def plot_decision_boundary(
     confidence_args = _get_confidence_args(confidence_dict)
 
     # Create mesh for plotting
-    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+    X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
     # Calculate predictions
     if hasattr(clf, "predict_proba"):
-        predictions = clf.predict_proba(mesh_instances)
+        predictions = clf.predict_proba(mesh_samples)
         classes = np.arange(predictions.shape[1])
     elif hasattr(clf, "predict"):
         if confidence is not None:
@@ -241,7 +244,7 @@ def plot_decision_boundary(
                 "plotted."
             )
             confidence = None
-        predicted_classes = clf.predict(mesh_instances)
+        predicted_classes = clf.predict(mesh_samples)
         classes = np.arange(len(np.unique(predicted_classes)))
         predictions = np.zeros((len(predicted_classes), len(classes)))
         for idx, y in enumerate(predicted_classes):
@@ -295,39 +298,40 @@ def plot_contour_for_samples(
     Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
-        Training data set, usually complete, i.e. including the labeled and
+        Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
-    values : array-like of shape (n_samples)
+    values : array-like of shape (n_samples,)
         Values to plot for samples `X` (may contain np.nan, can be replaced
         or ignored, see `replace_nan`).
-    replace_nan : numeric or None, optional (default=0.0)
+    replace_nan : numeric or None, default=0.0
         If numeric, nan-values in `values` will be replaced by this number.
         If None, these samples will be ignored.
-    feature_bound : array-like, [[xmin, ymin], [xmax, ymax]]
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
-    ax : matplotlib.axes.Axes, optional (default=None)
-        The axis on which the utility is plotted.  If no axis is given, the
+    ax : matplotlib.axes.Axes, default=None
+        The axis on which the utility is plotted. If no axis is given, the
         current axis (`plt.gca()`) will be used instead.
-    res : int, optional (default=21)
+    res : int, default=21
         The resolution of the plot.
-    contour_dict : dict, optional (default=None)
+    contour_dict : dict, default=None
         Additional parameters for the utility contour.
 
     Returns
     -------
-    matplotlib.axes.Axes: The axis on which the utility was plotted.
+    ax : matplotlib.axes.Axes
+        The axis on which the utility was plotted.
     """
     check_array(X, ensure_2d=True)
     values = check_array(
-        values, ensure_2d=False, force_all_finite=False, copy=True
+        values, ensure_2d=False, ensure_all_finite=False, copy=True
     )
     values[np.isinf(values)] = np.nan
 
     feature_bound = check_bound(bound=feature_bound, X=X)
 
-    X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+    X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
     if ax is None:
         ax = plt.gca()
@@ -344,7 +348,7 @@ def plot_contour_for_samples(
     neighbors = KNeighborsRegressor(n_neighbors=1)
     neighbors.fit(X, values)
 
-    scores = neighbors.predict(mesh_instances).reshape(X_mesh.shape)
+    scores = neighbors.predict(mesh_samples).reshape(X_mesh.shape)
     ax.contourf(X_mesh, Y_mesh, scores, **contour_args)
     return ax
 
@@ -370,30 +374,28 @@ def plot_stream_training_data(
         The axis on which the utility is plotted. Only if y.ndim = 1 (single
         annotator).
     X : array-like of shape (n_samples, 1)
-        Training data set, usually complete, i.e. including the labeled and
+        Training data set, usually complete, i.e., including the labeled and
         unlabeled samples.
-    y : array-like of shape (n_samples, )
-        Labels of the training data set (possibly including unlabeled ones
-        indicated by self.MISSING_LABEL).
+    y : array-like of shape (n_samples,)
+        Labels of the training data set (possibly including unlabeled ones).
     queried_indices : array-like of shape (n_samples,)
-        Indicates which instances from candidates have been queried.
-    classes : array-like of shape (n_classes)
+        Indicates which samples in `X` have been queried.
+    classes : array-like of shape (n_classes,)
         Holds the label for each class.
     feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]]
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
-    unlabeled_color: str | matplotlib.colors.Colormap, optional
-    (default='grey')
-        The color for the unlabled samples.
-    cmap: str | matplotlib.colors.Colormap, optional (default='coolwarm_r')
+    unlabeled_color : str or matplotlib.colors.Colormap, default='grey'
+        The color for the unlabeled samples.
+    cmap : str or matplotlib.colors.Colormap, default='coolwarm_r'
         The colormap for the confidence levels.
-    alpha: scalar
+    alpha : scalar, default=0.2
         Set the alpha value used for blending - not supported on all backends.
-    linewidth: float
+    linewidth : float, default=3
         Set the line width in points.
-    plot_cand_highlight: bool
-        The indicator to higlight the current candidate.
+    plot_cand_highlight : bool, default=True
+        The indicator to highlight the current candidate.
 
     Returns
     -------
@@ -401,7 +403,7 @@ def plot_stream_training_data(
          The axes on which the utilities were plotted.
     """
     column_or_1d(X)
-    check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
     check_consistent_length(X, y)
     check_array(queried_indices, ensure_2d=False)
     check_array(classes, ensure_2d=False)
@@ -461,31 +463,31 @@ def plot_stream_decision_boundary(
 
     Parameters
     ----------
-    ax: matplotlib.axes.Axes or List
+    ax : matplotlib.axes.Axes or List
         The axis on which the decision boundary is plotted. If ax is a List,
         each entry has to be an `matplotlib.axes.Axes`.
-    t_x: int
+    t_x : int
         The position of the newest instance for the x axies.
-    plot_step: int
+    plot_step : int
         The interval in which the clf should predict new samples.
-    clf: Sklearn classifier
+    clf : sklearn.base.ClassifierMixin
         The fitted classifier whose decision boundary is plotted.
     X : array-like of shape (n_samples, 1)
         Training data set, usually complete, i.e. including the labeled and
         unlabeled samples.
-    pred_list: array-like of shape (n_samples, )
+    pred_list : array-like of shape (n_samples,)
         The list containing classifier prediction for the last steps.
-    color: str | matplotlib.colors.Colormap, optional (default='k')
+    color : str or matplotlib.colors.Colormap, default='k'
         The color for the decision boundary.
-    res : int, optional (default=25)
+    res : int, default=25
         The resolution of the plot.
 
     Returns
     -------
-    ax: matplotlib.axes.Axes or List
+    ax : matplotlib.axes.Axes or List
         The axis on which the boundary was plotted or the list of axis if ax
         was a list.
-    pred_list: array-like of shape (n_samples, )
+    pred_list : array-like of shape (n_samples,)
         The list containing classifier prediction for the last steps.
     """
     X = column_or_1d(X)
@@ -524,46 +526,47 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
     y : array-like of shape (n_samples, ) or (n_samples, n_annotators)
         Labels of the training data set (possibly including unlabeled ones
         indicated by self.MISSING_LABEL).
-    candidates : None or array-like of shape (n_candidates,), dtype=int or
-        array-like of shape (n_candidates, n_features),
-        optional (default=None)
-        If `candidates` is None, a mesh with the specified resolution is
-        generated and considered as candidates.
-        If `candidates` is of shape (n_candidates,) and of type int,
-        candidates is considered as the indices of the samples in (X,y).
-        If `candidates` is of shape (n_candidates, n_features), the
-        candidates are directly given in candidates (not necessarily
-        contained in X). This is not supported by all query strategies.
+    candidates : None or array-like of shape (n_candidates), dtype=int or \
+            array-like of shape (n_candidates, n_features), default=None
+        - If `candidates` is `None`, the unlabeled samples from
+          `(X,y)` are considered as `candidates`.
+        - If `candidates` is of shape `(n_candidates,)` and of type
+          `int`, `candidates` is considered as the indices of the
+          samples in `(X,y)`.
+        - If `candidates` is of shape `(n_candidates, *)`, the
+          candidate samples are directly given in `candidates` (not
+          necessarily contained in `X`). This is not supported by all
+          query strategies.
 
     Other Parameters
     ----------------
-    replace_nan : numeric or None, optional (default=0.0)
-        Only used if plotting with mesh instances is not possible.
-        If numeric, the utility of labeled instances will be plotted with
+    replace_nan : numeric or None, default=0.0
+        Only used if plotting with mesh samples is not possible.
+        If numeric, the utility of labeled samples will be plotted with
         value `replace_nan`. If None, these samples will be ignored.
-    ignore_undefined_query_params : bool, optional (default=False)
+    ignore_undefined_query_params : bool, default=False
         If True, query parameters that are not defined in the query function
         are ignored and will not raise an exception.
-    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]], optional
-    (default=None)
+    feature_bound : array-like of shape [[xmin, ymin], [xmax, ymax]],\
+            default=None
         Determines the area in which the boundary is plotted. If candidates is
         not given, bound must not be None. Otherwise, the bound is determined
         based on the data.
-    ax : matplotlib.axes.Axes, optional (default=None)
+    ax : matplotlib.axes.Axes, default=None
         The axis on which the utility is plotted. Only if y.ndim = 1 (single
         annotator).
-    axes : array-like of matplotlib.axes.Axes, optional (default=None)
+    axes : array-like of matplotlib.axes.Axes, default=None
         The axes on which the utilities for the annotators are plotted. Only
         supported for y.ndim = 2 (multi annotator).
-    res : int, optional (default=21)
+    res : int, default=21
         The resolution of the plot.
-    contour_dict : dict, optional (default=None)
+    contour_dict : dict, default=None
         Additional parameters for the utility contour.
-    plot_annotators : None or array-like of shape (n_annotators_to_plot,),
-    optional (default=None)
+    plot_annotators : None or array-like of shape (n_annotators_to_plot,),\
+            default=None
         Contains the indices of the annotators to be plotted. If it is None,
         all annotators are plotted. Only supported for y.ndim = 2
-         (multi annotator).
+        (multi annotator).
     **kwargs
         Remaining keyword arguments are passed the query function of the query
         strategy.
@@ -590,7 +593,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         raise ValueError("Samples in `X` must have 2 features.")
 
     # Check labels
-    y = check_array(y, ensure_2d=False, force_all_finite="allow-nan")
+    y = check_array(y, ensure_2d=False, ensure_all_finite="allow-nan")
     check_consistent_length(X, y)
 
     if y.ndim == 2:
@@ -647,17 +650,17 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
             check_scalar(res, "res", int, min_val=1)
             feature_bound = check_bound(bound=feature_bound, X=X)
 
-            X_mesh, Y_mesh, mesh_instances = mesh(feature_bound, res)
+            X_mesh, Y_mesh, mesh_samples = mesh(feature_bound, res)
 
             contour_args = _get_contour_args(contour_dict)
 
             if ignore_undefined_query_params:
                 _, utilities = call_func(
-                    qs.query, X=X, y=y, candidates=mesh_instances, **kwargs
+                    qs.query, X=X, y=y, candidates=mesh_samples, **kwargs
                 )
             else:
                 _, utilities = qs.query(
-                    X=X, y=y, candidates=mesh_instances, **kwargs
+                    X=X, y=y, candidates=mesh_samples, **kwargs
                 )
 
             for a_idx, ax_ in zip(plot_annotators, axes):
@@ -687,7 +690,7 @@ def _general_plot_utilities(qs, X, y, candidates=None, **kwargs):
         candidates,
         allow_nd=False,
         ensure_2d=False,
-        force_all_finite="allow-nan",
+        ensure_all_finite="allow-nan",
     )
     if candidates.ndim == 1:
         X_utils = X

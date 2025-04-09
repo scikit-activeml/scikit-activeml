@@ -2,7 +2,7 @@
   {
     "class" : "KLDivergenceMaximization",
     "package" : "pool",
-    "category" : "Expected Error Reduction",
+    "category" : "Informativeness",
     "method" : "Regression based Kullback Leibler Divergence Maximization",
     "template" : "examples/template_pool_regression.py",
     "tags" : ["pool",  "regression", "single-annotator"],

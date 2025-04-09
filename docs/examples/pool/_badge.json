@@ -3,7 +3,7 @@
     "class" : "Badge",
     "package" : "pool",
     "method" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
-    "category" : "Others",
+    "category" : "Hybrid",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",

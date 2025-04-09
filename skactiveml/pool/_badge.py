@@ -18,32 +18,32 @@ from ..utils import (
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
-    """
-    Batch Active Learning by Diverse Gradient Embedding (BADGE)
+    """Batch Active Learning by Diverse Gradient Embedding (BADGE)
 
-    This class implements the BADGE algorithm [1]. This query strategy is
-    designed to incorporate both predictive uncertainty and
-    sample diversity into every selected batch.
+    This class implements the BADGE algorithm [1]_, which is designed to
+    incorporate both predictive uncertainty and sample diversity into every
+    selected batch.
 
     Parameters
     ----------
+    clf_embedding_flag_name : str or None, default=None
+        Name of the flag, which is passed to the `predict_proba` method for
+        getting the (learned) sample representations.
+
+        - If `clf_embedding_flag_name=None` and `predict_proba` returns
+          only one output, the input samples `X` are used.
+        - If `predict_proba` returns two outputs or `clf_embedding_name` is
+          not `None`, `(proba, embeddings)` are expected as outputs.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    clf_embedding_flag_name : str or None, default=None
-        Name of the flag, which is passed to the `predict_proba` method for
-        getting the (learned) sample representations. If
-        `clf_embedding_flag_name=None` and `predict_proba` returns only one
-        output, the input samples `X` are used. If `predict_proba` returns
-        two outputs or `clf_embedding_name` is not `None`,
-        `(proba, embeddings)` are expected as outputs.
 
     References
     ----------
-    .. [1] J. Ash, Jordan T., Chicheng Zhang, Akshay Krishnamurthy, John
-       Langford, and Alekh Agarwal, "Deep Batch Active Learning by Diverse,
-       Uncertain Gradient Lower Bounds." ICLR, 2019.
+    .. [1] J. T. Ash, C. Zhang, A. Krishnamurthy, J. Langford, and A. Agarwal.
+       Deep Batch Active Learning by Diverse, Uncertain Gradient Lower Bounds.
+       In Int. Conf. Learn. Represent., 2020.
     """
 
     def __init__(
@@ -68,62 +68,62 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled.
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples, )
-            Labels of the training data set (possibly including unlabeled
-            samples, indicated by self.missing_label).
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
+            Labels of the training data set (possibly including unlabeled ones
+            indicated by `self.missing_label`).
         clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
-        fit_clf : bool, optional (default=True)
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+            Classifier implementing the methods `fit` and `predict_proba`.
+        fit_clf : bool, default=True
+            Defines whether the classifier `clf` should be fitted on `X`, `y`,
+            and `sample_weight`.
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates,), dtype=int or\
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
-            If true, also return the utilities based on the query strategy.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            being queried for a label, e.g., `query_indices[0]` indicates the
-            first selected sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
-            The utilities of samples before each selected sample of the batch,
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            For the case where the samples are uniformly randomly selected from
-            the set, the sum of all utility of samples will be 1.
-            The utilities represent here the probabilities of samples being
-            chosen.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -237,16 +237,16 @@ def _d_2(g_x, query_indices, d_latest=None):
     ----------
     g_x : np.ndarray of shape (n_unlabeled_samples, n_features)
         The results after gradient embedding
-    query_indices : numpy.ndarray of shape (n_query_indices)
+    query_indices : numpy.ndarray of shape (n_query_indices,)
         the query indications that correspond to the unlabeled samples.
-    d_latest : np.ndarray of shape (n_unlabeled_samples) default=None
+    d_latest : np.ndarray of shape (n_unlabeled_samples,) default=None
         The distance between each data point and its nearest centre.
         This is used to simplify the calculation of the later distances for the
         next selected sample.
 
     Returns
     -------
-    D2 : numpy.ndarray of shape (n_unlabeled_samples)
+    D2 : numpy.ndarray of shape (n_unlabeled_samples,)
         The D^2 value, for the first sample, is the value inf.
     """
     if len(query_indices) == 0:

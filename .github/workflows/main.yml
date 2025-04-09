@@ -52,10 +52,17 @@ jobs:
       run: |
         pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true
+        flags: ${{ matrix.python-version }}
+    - name: 'Upload Coverage Artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        name: cov_${{ matrix.python-version }}
+        path: coverage.xml
+        retention-days: 5
 
   check_formatting_and_linting:
     runs-on: ubuntu-latest
@@ -113,7 +120,7 @@ jobs:
       run: |
         sphinx-build -b html docs docs/_build
         zip -r docs.zip docs
-    - name: 'Upload Artifact'
+    - name: 'Upload Docs Artifact'
       uses: actions/upload-artifact@v4
       with:
         name: docs_${{ matrix.python-version }}.zip
@@ -123,15 +130,15 @@ jobs:
   trigger_scikit-activeml-docs:
     runs-on: ubuntu-latest
     steps:
-    - name: Trigger latest documentation for scikit-activeml-docs
+    - name: Trigger latest documentation for scikit-activeml.github.io
       if: github.ref == 'refs/heads/master'
       run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_latest\"}"
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml.github.io/dispatches -d "{\"event_type\":\"build_docs_latest\"}"
 
   trigger_scikit-activeml-docs-dev:
     runs-on: ubuntu-latest
     steps:
-    - name: Trigger development documentation for scikit-activeml-docs
+    - name: Trigger development documentation for scikit-activeml.github.io
       if: github.ref == 'refs/heads/development'
       run: |
-        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml-docs/dispatches -d "{\"event_type\":\"build_docs_development\"}"
+        curl -H "Authorization: token ${{ secrets.DOCS_PAT }}" --request POST https://api.github.com/repos/scikit-activeml/scikit-activeml.github.io/dispatches -d "{\"event_type\":\"build_docs_development\"}"

@@ -1,0 +1,18 @@
+[
+{
+    "class" : "DropQuery",
+    "package" : "pool",
+    "method" : "Dropout Query (DropQuery)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool", "classification", "single-annotator"],
+    "title" : "Dropout Query (DropQuery)",
+    "refs" : ["gupte2024revisiting"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import DropQuery",
+    "init_qs" : "DropQuery()",
+    "query_params" : "X=X, y=y, clf=clf"
+}
+]
+

@@ -23,7 +23,7 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
     """Contrastive Active Learning (ContrastiveAL)
 
     This class implements the Contrastive Active Learning (ContrastiveAL) query
-    strategy [1], which  selects samples similar in the (classifier's learned)
+    strategy [1]_, which  selects samples similar in the (classifier's learned)
     feature space, while the classifier predicts maximally different
     class-membership probabilities.
 
@@ -34,11 +34,12 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
         `sklearn.neighbors.NearestNeighbors`.
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
-        getting the (learned) sample representations. If
-        `clf_embedding_flag_name=None` and `predict_proba` returns only one
-        output, the input samples `X` are used. If `predict_proba` returns
-        two outputs or `clf_embedding_name` is not `None`,
-        `(proba, embeddings)` are expected as outputs.
+        getting the (learned) sample representations.
+
+        - If `clf_embedding_flag_name=None` and `predict_proba` returns
+          only one output, the input samples `X` are used.
+        - If `predict_proba` returns two outputs or `clf_embedding_name` is
+          not `None`, `(proba, embeddings)` are expected as outputs.
     eps : float  > 0, default=1e-7
         Minimum probability threshold to compute log-probabilities.
     missing_label : scalar or string or np.nan or None, default=np.nan
@@ -48,9 +49,9 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] Margatina, Katerina, Giorgos Vernikos, Loïc Barrault, and Nikolaos
-       Aletras. "Active Learning by Acquiring Contrastive Examples." In EMNLP,
-       pp. 650-663. 2021.
+    .. [1] K. Margatina, G. Vernikos, L. Barrault, and N. Aletras. Active
+       Learning by Acquiring Contrastive Examples. In Conf. Empir. Methods Nat.
+       Lang. Process., pages 650–663, 2021.
     """
 
     def __init__(
@@ -79,53 +80,63 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled.
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.missing_label).
+            indicated by `self.missing_label`).
         clf : skactiveml.base.SkactivemlClassifier
-            Model implementing the methods `fit` and `predict_proba`.
+            Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
-            Defines whether the classifier should be fitted on `X`, `y`, and
-            `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
+            Defines whether the classifier `clf` should be fitted on `X`, `y`,
+            and `sample_weight`.
+        sample_weight: array-like of shape (n_samples), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates) with \
-                dtype=int or array-like of shape (n_candidates, n_features), \
-                default=None
-            If `candidates` is `None`, the unlabeled samples from `(X, y)`
-            are considered as candidates.
-            If `candidates` is of shape `(n_candidates)` and of type `int`,
-            `candidates` is considered as a list of the indices of the samples
-            in `(X, y)`.
-            If `candidates` is of shape `(n_candidates, n_features)`, the
-            candidate samples are directly given in `candidates` (not
-            necessarily contained in `X`).
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
             If `True`, also return the utilities based on the query strategy.
 
         Returns
-        ----------
+        -------
         query_indices : numpy.ndarray of shape (batch_size,)
-            The `query_indices` indicate for which candidate sample a label is
+            The query indices indicate for which candidate sample a label is
             to be queried, e.g., `query_indices[0]` indicates the first
             selected sample.
-            If `candidates` is `None` or of shape `(n_candidates,)`, the
-            indexing refers to samples in X.
-        utilities : numpy.ndarray of shape (batch_size, n_samples)
-            The utilities of samples for selecting each sample of the batch.
-            Here, utilities refers to the Kullback-Leibler divergence between
-            the sample's own and its labeled nearest neighbors' predicted
-            class-membership probabilities. If `candidates` is `None` or of
-            shape `(n_candidates,)`, the indexing refers to the samples in `X`.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

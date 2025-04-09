@@ -10,20 +10,19 @@ from ._validation import check_classifier_params
 
 class ExtLabelEncoder(BaseEstimator):
     """Encode class labels with value between 0 and classes-1 and uses -1 for
-    unlabeled samples.
-    This transformer should be used to encode class labels, *i.e.* `y`, and
-    not the input `X`.
+    unlabeled samples. This transformer should be used to encode class labels,
+    i.e. `y`, and not the input `X`.
 
     Parameters
     ----------
-    classes: array-like, shape (n_classes), default=None
+    classes : array-like of shape (n_classes,), default=None
         Holds the label for each class.
-    missing_label: scalar|string|np.nan|None, default=np.nan
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
 
     Attributes
     ----------
-    classes_: array-like, shape (n_classes)
+    classes_ : np.ndarray of shape (n_classes,)
         Holds the label for each class.
     """
 
@@ -36,17 +35,24 @@ class ExtLabelEncoder(BaseEstimator):
 
         Parameters
         ----------
-        y: array-like, shape (n_samples) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Class labels.
 
         Returns
         -------
-        self: returns an instance of self.
+        self : ExtLabelEncoder
+            Returns an instance of `ExtLabelEncoder`.
         """
         check_classifier_params(
             classes=self.classes, missing_label=self.missing_label
         )
-        y = check_array(y, ensure_2d=False, force_all_finite=False, dtype=None)
+        y = check_array(
+            y,
+            ensure_2d=False,
+            ensure_all_finite=False,
+            ensure_min_samples=0,
+            dtype=None,
+        )
         check_missing_label(
             missing_label=self.missing_label, target_type=y.dtype
         )
@@ -69,33 +75,34 @@ class ExtLabelEncoder(BaseEstimator):
 
         Parameters
         ----------
-        y: array-like, shape (n_samples) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Class labels.
 
         Returns
         -------
-        y: array-like, shape (n_samples) or (n_samples, n_outputs)
+        y : np.ndarray shape (n_samples,) or (n_samples, n_outputs)
             Class labels.
         """
         return self.fit(y).transform(y)
 
     def transform(self, y):
-        """Transform labels to normalized encoding.
+        """Transform labels to new class encoding.
 
         Parameters
         ----------
-        y : array-like of shape (n_samples)
-            Target values.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            Original class labels.
 
         Returns
         -------
-        y_enc : array-like of shape (n_samples
+        y_enc : array-like of shape (n_samples) or (n_samples, n_outputs)
+            Encoded class labels.
         """
         check_is_fitted(self, attributes=["classes_"])
         y = check_array(
             y,
             ensure_2d=False,
-            force_all_finite=False,
+            ensure_all_finite=False,
             ensure_min_samples=0,
             dtype=None,
         )
@@ -111,18 +118,19 @@ class ExtLabelEncoder(BaseEstimator):
 
         Parameters
         ----------
-        y : numpy array of shape [n_samples]
-            Target values.
+        y : numpy array of shape (n_samples,) or (n_samples, n_outputs)
+            Encoded class labels.
 
         Returns
         -------
-        y_dec : numpy array of shape [n_samples]
+        y_dec : np.ndarray of shape (n_samples,) or (n_samples, n_outputs)
+            Decoded (original) class labels.
         """
         check_is_fitted(self, attributes=["classes_"])
         y = check_array(
             y,
             ensure_2d=False,
-            force_all_finite=False,
+            ensure_all_finite=False,
             ensure_min_samples=0,
             dtype=None,
         )

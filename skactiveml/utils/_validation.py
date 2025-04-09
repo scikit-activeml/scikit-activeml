@@ -10,6 +10,7 @@ from sklearn.utils.validation import (
     assert_all_finite,
     check_consistent_length,
     check_random_state as check_random_state_sklearn,
+    _check_n_features as sklearn_check_n_features,
 )
 
 from ._label import MISSING_LABEL, check_missing_label, is_unlabeled
@@ -34,19 +35,19 @@ def check_scalar(
         The name of the parameter to be printed in error messages.
     target_type : type or tuple
         Acceptable data types for the parameter.
-    min_val : float or int, optional (default=None)
-        The minimum valid value the parameter can take. If None (default) it
+    min_inclusive : bool, default=True
+        If `True`, the minimum valid value is inclusive, otherwise exclusive.
+    max_inclusive : bool, default=True
+        If `True`, the maximum valid value is inclusive, otherwise exclusive.
+    min_val : float or int, default=None
+        The minimum valid value the parameter can take. If `None` (default), it
         is implied that the parameter does not have a lower bound.
-    min_inclusive : bool, optional (default=True)
-        If true, the minimum valid value is inclusive, otherwise exclusive.
-    max_val : float or int, optional (default=None)
-        The maximum valid value the parameter can take. If None (default) it
+    max_val : float or int, default=None
+        The maximum valid value the parameter can take. If `None` (default), it
         is implied that the parameter does not have an upper bound.
-    max_inclusive : bool, optional (default=True)
-        If true, the maximum valid value is inclusive, otherwise exclusive.
 
     Raises
-    -------
+    ------
     TypeError
         If the parameter's type does not match the desired type.
     ValueError
@@ -87,12 +88,12 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
 
     Parameters
     ----------
-    classes : array-like, shape (n_classes)
+    classes : array-like of shape (n_classes,)
         Array of class labels.
-    missing_label : {number, str, None, np.nan}
-        Symbol to represent a missing label.
-    cost_matrix : array-like, shape (n_classes, n_classes), default=None
-        Cost matrix. If None, cost matrix will be not checked.
+    missing_label : scalar or string or np.nan or None
+        Value to represent a missing label.
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
+        Cost matrix. If `None`, cost matrix will be not checked.
     """
     check_missing_label(missing_label)
     if classes is not None:
@@ -120,7 +121,7 @@ def check_classes(classes):
 
     Parameters
     ----------
-    classes : array-like, shape (n_classes)
+    classes : array-like of shape (n_classes,)
         Array of class labels.
     """
     if not isinstance(classes, Iterable):
@@ -141,18 +142,18 @@ def check_classes(classes):
 
 
 def check_class_prior(class_prior, n_classes):
-    """Check if the class_prior is a valid prior.
+    """Check if the `class_prior` is a valid prior.
 
     Parameters
     ----------
-    class_prior : numeric | array_like, shape (n_classes)
+    class_prior : numeric or array_like of shape (n_classes,)
         A class prior.
     n_classes : int
         The number of classes.
 
     Returns
     -------
-    class_prior : np.ndarray, shape (n_classes)
+    class_prior : np.ndarray of shape (n_classes,)
         Numpy array as prior.
     """
     if class_prior is None:
@@ -189,23 +190,23 @@ def check_cost_matrix(
 
     Parameters
     ----------
-    cost_matrix : array-like, shape (n_classes, n_classes)
+    cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix.
     n_classes : int
         Number of classes.
-    only_non_negative : bool, optional (default=True)
-        This parameter determines whether the matrix must contain only non
-        negative cost entries.
-    contains_non_zero : bool, optional (default=True)
+    only_non_negative : bool, default=False
+        This parameter determines whether the matrix must contain only
+        non-negative cost entries.
+    contains_non_zero : bool, default=False
         This parameter determines whether the matrix must contain at least on
         non-zero cost entry.
-    diagonal_is_zero : bool, optional (default=True)
+    diagonal_is_zero : bool, default=False
         This parameter determines whether the diagonal cost entries must be
         zero.
 
     Returns
     -------
-    cost_matrix_new : np.ndarray, shape (n_classes, n_classes)
+    cost_matrix_new : np.ndarray of shape (n_classes, n_classes)
         Numpy array as cost matrix.
     """
     check_scalar(n_classes, target_type=int, name="n_classes", min_val=1)
@@ -259,7 +260,7 @@ def check_X_y(
     dtype="numeric",
     order=None,
     copy=False,
-    force_all_finite=True,
+    ensure_all_finite=True,
     ensure_2d=True,
     allow_nd=False,
     multi_output=False,
@@ -270,60 +271,49 @@ def check_X_y(
     estimator=None,
     missing_label=MISSING_LABEL,
 ):
-    """Input validation for standard estimators.
+    """Input validation for standard estimators. Adjusted from `sklearn` [1]_.
 
-    Checks X and y for consistent length, enforces X to be 2D and y 1D. By
-    default, X is checked to be non-empty and containing only finite values.
-    Standard input checks are also applied to y, such as checking that y
-    does not have np.nan or np.inf targets. For multi-label y, set
-    multi_output=True to allow 2D and sparse y. If the dtype of X is
-    object, attempt converting to float, raising on failure.
+    Checks X and y for consistent length, enforces `X` to be at least 2D and
+    `y` 1D. By default, `X` is checked to be non-empty and containing only
+    finite values. Standard input checks are also applied to `y`, such as
+    checking that `y` does not have `np.nan` or `np.inf` targets.
+    For multi-label `y`, set multi_output=True to allow 2D and sparse `y`.
+    If the dtype of `X` is object, attempt converting to float, raising on
+    failure.
 
     Parameters
     ----------
-    X : nd-array, list or sparse matrix
+    X : nd-array or list or sparse matrix, default=None
         Labeled input data.
-
-    y : nd-array, list or sparse matrix
+    y : nd-array or list or sparse matrix, default=None
         Labels for X.
-
-    X_cand : nd-array, list or sparse matrix (default=None)
+    X_cand : nd-array or list or sparse matrix, default=None
         Unlabeled input data
-
-    sample_weight : array-like of shape (n_samples,) (default=None)
+    sample_weight : array-like of shape (n_samples,), default=None
             Sample weights.
-
-    sample_weight_cand : array-like of shape (n_candidates,) (default=None)
+    sample_weight_cand : array-like of shape (n_candidates,), default=None
             Sample weights of the candidates.
-
-    accept_sparse : string, boolean or list of string (default=False)
+    accept_sparse : string or boolean or list of string, default=False
         String[s] representing allowed sparse matrix formats, such as 'csc',
         'csr', etc. If the input is sparse but not in the allowed format,
         it will be converted to the first listed format. True allows the input
         to be any format. False means that a sparse matrix input will
         raise an error.
-
-    accept_large_sparse : bool (default=True)
+    accept_large_sparse : bool, default=True
         If a CSR, CSC, COO or BSR sparse matrix is supplied and accepted by
         accept_sparse, accept_large_sparse will cause it to be accepted only
         if its indices are stored with a 32-bit dtype.
-
-        .. versionadded:: 0.20
-
     dtype : string, type, list of types or None (default="numeric")
         Data type of result. If None, the dtype of the input is preserved.
         If "numeric", dtype is preserved unless array.dtype is object.
         If dtype is a list of types, conversion on the first type is only
         performed if the dtype of the input is not in the list.
-
-    order : 'F', 'C' or None (default=None)
+    order : 'F', or 'C' or None, default=None
         Whether an array will be forced to be fortran or c-style.
-
-    copy : boolean (default=False)
+    copy : boolean, default=False
         Whether a forced copy will be triggered. If copy=False, a copy might
         be triggered by a conversion.
-
-    force_all_finite : boolean or 'allow-nan', (default=True)
+    ensure_all_finite : boolean or 'allow-nan', default=True
         Whether to raise an error on np.inf, np.nan, pd.NA in X. This parameter
         does not influence whether y can have np.inf, np.nan, pd.NA values.
         The possibilities are:
@@ -332,47 +322,32 @@ def check_X_y(
         - False: accepts np.inf, np.nan, pd.NA in X.
         - 'allow-nan': accepts only np.nan or pd.NA values in X. Values cannot
           be infinite.
-
-        .. versionadded:: 0.20
-           `force_all_finite` accepts the string `'allow-nan'`.
-
-        .. versionchanged:: 0.23
-           Accepts `pd.NA` and converts it into `np.nan`
-
-    ensure_2d : boolean (default=True)
+    ensure_2d : boolean, default=True
         Whether to raise a value error if X is not 2D.
-
-    allow_nd : boolean (default=False)
+    allow_nd : boolean, default=False
         Whether to allow X.ndim > 2.
-
-    multi_output : boolean (default=False)
+    multi_output : boolean, default=False
         Whether to allow 2D y (array or sparse matrix). If false, y will be
         validated as a vector. y cannot have np.nan or np.inf values if
         multi_output=True.
-
-    allow_nan : boolean (default=None)
+    allow_nan : boolean, default=None
         Whether to allow np.nan in y.
-
-    ensure_min_samples : int (default=1)
+    ensure_min_samples : int, default=1
         Make sure that X has a minimum number of samples in its first
         axis (rows for a 2D array).
-
-    ensure_min_features : int (default=1)
+    ensure_min_features : int, default=1
         Make sure that the 2D array has some minimum number of features
         (columns). The default value of 1 rejects empty datasets.
         This check is only enforced when X has effectively 2 dimensions or
         is originally 1D and `ensure_2d` is True. Setting to 0 disables
         this check.
-
-    y_numeric : boolean (default=False)
+    y_numeric : boolean, default=False
         Whether to ensure that y has a numeric type. If dtype of y is object,
         it is converted to float64. Should only be used for regression
         algorithms.
-
-    estimator : str or estimator instance (default=None)
+    estimator : str or estimator instance, default=None
         If passed, include the name of the estimator in warning messages.
-
-    missing_label : {scalar, string, np.nan, None}, (default=np.nan)
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
 
     Returns
@@ -393,6 +368,14 @@ def check_X_y(
     sample_weight_cand : np.ndarray
         The converted and validated sample_weight_cand.
         Only returned if candidates is not None.
+
+    References
+    ----------
+    .. [1] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel, B. Thirion, O.
+       Grisel, M. Blondel, P. Prettenhofer, R. Weiss, V. Dubourg,
+       J. Vanderplas, A. Passos, D. Cournapeau, M. Brucher, M. Perrot, and E.
+       Duchesnay. Scikit-learn: Machine Learning in Python. J. Mach. Learn.
+       Res., 12:2825–2830, 2011.
     """
     if allow_nan is None:
         allow_nan = (
@@ -408,7 +391,7 @@ def check_X_y(
             dtype=dtype,
             order=order,
             copy=copy,
-            force_all_finite=force_all_finite,
+            ensure_all_finite=ensure_all_finite,
             ensure_2d=ensure_2d,
             allow_nd=allow_nd,
             ensure_min_samples=ensure_min_samples,
@@ -420,7 +403,7 @@ def check_X_y(
             y = check_array(
                 y,
                 accept_sparse="csr",
-                force_all_finite=True,
+                ensure_all_finite=True,
                 ensure_2d=False,
                 dtype=None,
             )
@@ -451,7 +434,7 @@ def check_X_y(
             dtype=dtype,
             order=order,
             copy=copy,
-            force_all_finite=force_all_finite,
+            ensure_all_finite=ensure_all_finite,
             ensure_2d=ensure_2d,
             allow_nd=allow_nd,
             ensure_min_samples=ensure_min_samples,
@@ -480,20 +463,20 @@ def check_random_state(random_state, seed_multiplier=None):
 
     Parameters
     ----------
-    random_state : None | int | instance of RandomState
-        If random_state is None, return the RandomState singleton used by
-        np.random.
-        If random_state is an int, return a new RandomState.
-        If random_state is already a RandomState instance, return it.
-        Otherwise raise ValueError.
-    seed_multiplier : None | int, optional (default=None)
-        If the random_state and seed_multiplier are not None, draw a new int
-        from the random state, multiply it with the multiplier, and use the
+    random_state : None or int or instance of RandomState
+        - If `random_state` is None, return the `RandomState` singleton used by
+          `np.random`.
+        - If `random_state` is an int, return a new `RandomState`.
+        - If random_state is already a `RandomState` instance, return it.
+        - Otherwise raise `ValueError`.
+    seed_multiplier : None or int, default=None
+        If the `random_state` and `seed_multiplier` are not `None`, draw a new
+        int from the random state, multiply it with the multiplier, and use the
         product as the seed of a new random state.
 
     Returns
     -------
-    random_state: instance of RandomState
+    random_state : instance of RandomState
         The validated random state.
     """
     if random_state is None or seed_multiplier is None:
@@ -519,23 +502,23 @@ def check_indices(indices, A, dim="adaptive", unique=True):
         `indices[i]` is interpreted as an index to the array `A`.
     A : array-like
         The array that is indexed.
-    dim : int or tuple of ints
+    dim : int or tuple of ints or 'adaptive', default='adaptive'
         The dimensions of the array that are indexed.
         If `dim` equals `'adaptive'`, `dim` is set to first indices
         corresponding to the shape of `indices`. E.g., if `indices` is of
         shape (n_indices,), `dim` is set `0`.
-    unique: bool or `check_unique`
+    unique : bool or 'check_unique', default=True
         If `unique` is `True` unique indices are returned. If `unique` is
         `'check_unique'` an exception is raised if the indices are not unique.
 
     Returns
     -------
-    indices: tuple of np.ndarrays or np.ndarray
+    indices : tuple of np.ndarray or np.ndarray
         The validated indices.
     """
     indices = check_array(indices, dtype=int, ensure_2d=False)
     A = check_array(
-        A, allow_nd=True, force_all_finite=False, ensure_2d=False, dtype=None
+        A, allow_nd=True, ensure_all_finite=False, ensure_2d=False, dtype=None
     )
     if unique == "check_unique":
         if indices.ndim == 1:
@@ -599,27 +582,25 @@ def check_indices(indices, A, dim="adaptive", unique=True):
 def check_type(
     obj, name, *target_types, target_vals=None, indicator_funcs=None
 ):
-    """Check if obj is one of the given types. It is also possible to allow
+    """Check if `obj` is one of the given types. It is also possible to allow
     specific values. Further it is possible to pass indicator functions
-    that can also accept obj. Thereby obj must either have a correct type
+    that can also accept `obj`. Thereby, `obj` must either have a correct type
     a correct value or be accepted by an indicator function.
 
     Parameters
     ----------
-    obj: object
+    obj : object
         The object to be checked.
-    name: str
+    name : str
         The variable name of the object.
     target_types : iterable
         The possible types.
-    target_vals : iterable, optional (default=None)
+    target_vals : iterable, default=None
         Possible further values that the object is allowed to equal.
-    indicator_funcs : iterable, optional (default=None)
+    indicator_funcs : iterable, default=None
         Possible further custom indicator (boolean) functions that accept
         the object by returning `True` if the object is passed as a parameter.
-
     """
-
     target_vals = target_vals if target_vals is not None else []
     indicator_funcs = indicator_funcs if indicator_funcs is not None else []
 
@@ -671,20 +652,19 @@ def check_type(
 
 
 def _check_callable(func, name, n_positional_parameters=None):
-    """Checks if function is a callable and if the number of free parameters is
+    """Checks if `func` is a callable and if the number of free parameters is
     correct.
 
     Parameters
     ----------
-    func: callable
+    func : callable
         The functions to be validated.
-    name: str
+    name : str
         The name of the function
-    n_positional_parameters: int, optional (default=None)
+    n_positional_parameters : int, default=None
         The number of free parameters. If `n_free_parameters` is `None`,
         `n_free_parameters` is set to `1`.
     """
-
     if n_positional_parameters is None:
         n_positional_parameters = 1
 
@@ -715,29 +695,29 @@ def _check_callable(func, name, n_positional_parameters=None):
 def check_bound(
     bound=None, X=None, ndim=2, epsilon=0, bound_must_be_given=False
 ):
-    """Validates bound and returns the bound of X if bound is None.
+    """Validates `bound` and returns the `bound` of `X` if `bound` is `None`.
     `bound` or `X` must not be None.
 
     Parameters
     ----------
-    bound: array-like, shape (2, ndim), optional (default=None)
+    bound: array-like of shape (2, ndim), default=None
         The given bound of shape
         [[x1_min, x2_min, ..., xndim_min], [x1_max, x2_max, ..., xndim_max]]
-    X: matrix-like, shape (n_samples, ndim), optional (default=None)
-        The sample matrix X is the feature matrix representing samples.
-    ndim: int, optional (default=2)
+    X: matrix-like of shape (n_samples, ndim), default=None
+        `X` is the feature matrix representing samples.
+    ndim: int, default=2
         The number of dimensions.
-    epsilon: float, optional (default=0)
+    epsilon: float, default=0
         The minimal distance between the returned bound and the values of `X`,
         if `bound` is not specified.
-    bound_must_be_given: bool, optional (default=False)
-        Whether it is allowed for the bound to be `None` and to be inferred by
-        `X`.
+    bound_must_be_given: bool, default=False
+        Whether it is allowed for the `bound` to be `None` and to be inferred
+        by `X`.
 
     Returns
     -------
-    bound: array-like, shape (2, ndim), optional (default=None)
-        The given bound or bound of X.
+    bound : array-like of shape (2, ndim), default=None
+        The given `bound` or bound of `X`.
     """
 
     if X is not None:
@@ -778,8 +758,29 @@ def check_budget_manager(
     default_budget_manager_class,
     default_budget_manager_dict=None,
 ):
-    """Validate if budget manager is a budgetmanager class and create a
-    copy 'budget_manager_'.
+    """Validate if `budget_manager` is a budget manager class and create a
+    copy `budget_manager_`.
+
+    Parameters
+    ----------
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be queried, with
+        0 <= budget <= 1. See Also :class:`BudgetManager`.
+    budget_manager : BudgetManager, default=None
+        Budget manager to be checked. If `budget_manager` is `None`, a new
+        budget manager using the class `default_budget_manager_class` is
+        created using the `default_budget_manager_dict` as parameters.
+    default_budget_manager_class : BudgetManager.__class__
+        Fallback class for creation of a budget manger (cf. description of
+        `budget_manager`).
+    default_budget_manager_dict : dict, default=None
+        Fallback parameters for the creation of a budget manger (cf.
+        description of `budget_manager`).
+
+    Returns
+    -------
+    budget_manager_ : BudgetManager
+        Checked or newly created budget manager object.
     """
     uses_rand = (
         "random_state" in signature(default_budget_manager_class).parameters
@@ -802,3 +803,37 @@ def check_budget_manager(
             )
         budget_manager_ = copy.deepcopy(budget_manager)
     return budget_manager_
+
+
+def check_n_features(obj, X, reset):
+    """
+    Validate and update the number of features for an estimator based on the
+    input data.
+
+    This function either sets or verifies the estimator's expected number of
+    features using the provided data array. When `reset` is True, it updates
+    the estimator's attribute `n_features_in_` with the number of features in
+    `X` (i.e., `X.shape[1]`). If `X` is empty (has zero rows), the attribute is
+    set to `None`. When `reset` is False and `n_features_in_` is already
+    defined, the function delegates the verification process to
+    `sklearn_check_n_features`.
+
+    Parameters
+    ----------
+    obj : object
+        An estimator or any object that is expected to have an attribute
+        `n_features_in_` indicating the number of features it was fitted on.
+    X : array-like of shape (n_samples, n_features)
+        The input data to check. The number of columns in X represents the
+        number of features.
+    reset : bool
+        If True, the function will set `obj.n_features_in_` to the number of
+        features in X. If False, and if `obj.n_features_in_` is already set,
+        the function will check that X has the expected number of features
+        using `sklearn_check_n_features`.
+    """
+    if reset:
+        obj.n_features_in_ = X.shape[1] if len(X) > 0 else None
+    elif not reset:
+        if obj.n_features_in_ is not None:
+            sklearn_check_n_features(obj, X, reset=reset)

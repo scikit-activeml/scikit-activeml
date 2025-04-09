@@ -7,50 +7,51 @@ from skactiveml.utils import check_scalar, check_random_state
 
 
 class DensityBasedSplitBudgetManager(BudgetManager):
-    """Budget manager which checks, whether the specified budget has been
-    exhausted already. If not, an instance is queried, when the utility is
-    higher than the specified budget and when the probability of
-    the most likely class exceeds a time-dependent threshold calculated based
-    on the budget, the number of classes and the number of observed and
-    acquired samples. This class`s logic is the same as compared to
-    SplitBudgetManager except for how available budget is calculated.
+    """Budget Manager for DBALStream
 
-    This budget manager calculates the fixed budget spent and compares that to
-    the budget. If the ratio is smaller
-    than the specified budget, i.e., budget - u / t > 0 , the budget
-    manager samples an instance when its utility is higher than the budget.
-    u is the number of queried instances within t observed instances.
+    This budget manager is an adaptation of
+    :class:`.RandomVariableUncertaintyBudgetManager` for DBALStream [1]_. It
+    mainly differs in how the available budget ist estimated. Instead of the
+    estimated budget proposed by Žliobaitė et. al. [2]_, this budget manager
+    counts the number of queried and seen instance, such that the number of
+    available queries is given as `n_seen_samples-n_queried_samples*budget`.
 
     Parameters
     ----------
-    budget : float, optional (default=None)
-        Specifies the ratio of instances which are allowed to be queried, with
-        0 <= budget <= 1. See Also :class:`BudgetManager`.
-    theta : float, optional (default=1.0)
-        Specifies the starting threshold in wich instances are purchased. This
-        value of theta will recalculated after each instance. Default = 1
-    s : float, optional (default=0.01)
-        Specifies the value in wich theta is decresed or increased based on the
-        purchase of the given label. Default = 0.01
-    delta : float, optional (default=1.0)
-        Specifies the standart deviation of the distribution. Default 1.0
-    random_state : int | np.random.RandomState, optional (default=None)
-        Random state for candidate selection.
+    theta : float, default=1.0
+        Specifies the initial value for `theta_` that is used for calculating
+        the threshold.
+    s : float, default=0.1
+        Specifies the relative increase or decrease of the threshold if an
+        sample is queried or not, respectively.
+    delta : float, default=1.0
+        Specifies the standart deviation of the normal distribution used for
+        randomization of the threshold.
+    random_state : int or RandomState instance or None, default=None
+        Controls the randomness of the budget manager.
+    budget : float, default=None
+        Specifies the ratio of samples which are allowed to be sampled, with
+        `0 <= budget <= 1`. If `budget` is `None`, it is replaced with the
+        default budget 0.1.
 
-    See Also
-    --------
-    EstimatedBudgetZliobaite : BudgetManager implementing the base class for
-        Zliobaite based budget managers
-    SplitBudgetManager : BudgetManager that is using EstimatedBudgetZliobaite.
+    References
+    ----------
+    .. [1] D. Ienco, I. Žliobaitė, and B. Pfahringer. High density-focused
+        uncertainty sampling for active learning over evolving stream data. In
+        Int. Workshop Big Data Streams Heterog. Source Min. Algorithms Syst.
+        Program. Models Appl., pages 133–148, 2014.
+    .. [2] I. Žliobaitė, A. Bifet, B. Pfahringer, and G. Holmes. Active
+        Learning With Drifting Streaming Data. IEEE Trans. Neural Netw. Learn.
+        Syst., 25(1):27–39, 2014
     """
 
     def __init__(
         self,
-        budget=None,
         theta=1.0,
         s=0.01,
         delta=1.0,
         random_state=None,
+        budget=None,
     ):
         super().__init__(budget)
         self.theta = theta
@@ -59,21 +60,21 @@ class DensityBasedSplitBudgetManager(BudgetManager):
         self.random_state = random_state
 
     def query_by_utility(self, utilities):
-        """Ask the budget manager which utilities are sufficient to query the
-        corresponding instance.
+        """Ask the budget manager which `utilities` are sufficient to query the
+        corresponding labels.
 
         Parameters
         ----------
-        utilities : ndarray of shape (n_samples,)
+        utilities : array-like of shape (n_samples,)
             The utilities provided by the stream-based active learning
-            strategy, which are used to determine whether sampling an instance
+            strategy, which are used to determine whether querying a sample
             is worth it given the budgeting constraint.
 
         Returns
         -------
-        queried_indices : ndarray of shape (n_queried_instances,)
-            The indices of instances represented by utilities which should be
-            queried, with 0 <= n_queried_instances <= n_samples.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
         """
         utilities = self._validate_data(utilities)
         confidence = 1 - utilities
@@ -96,7 +97,7 @@ class DensityBasedSplitBudgetManager(BudgetManager):
                 eta = self.random_state_.normal(1, self.delta)
                 theta_random = tmp_theta * eta
                 sample = u < theta_random
-                # get the indices instances that should be queried
+                # get the indices samples that should be queried
                 if sample:
                     tmp_theta *= 1 - self.s
                     queried_indices.append(i)
@@ -113,19 +114,18 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
-        candidates : {array-like, sparse matrix} of shape
-        (n_samples, n_features)
-            The instances which could be queried. Sparse matrices are accepted
+        candidates : {array-like, sparse matrix} of shape\
+                (n_samples, n_features)
+            The samples which may be queried. Sparse matrices are accepted
             only if they are supported by the base query strategy.
-
-        queried_indices : array-like of shape (n_samples,)
-            Indicates which instances from candidates have been queried.
+        queried_indices : np.ndarray of shape (n_queried_indices,)
+            The indices of samples in candidates whose labels are queried,
+            with `0 <= queried_indices <= n_candidates`.
 
         Returns
         -------
-        self : DensityBasedBudgetManager
-            The DensityBasedBudgetManager returns itself, after it is
-            updated.
+        self : RandomVariableUncertaintyBudgetManager
+            The budget manager returns itself, after it is updated.
         """
         self._validate_data(np.array([]))
 
@@ -148,17 +148,15 @@ class DensityBasedSplitBudgetManager(BudgetManager):
 
         Parameters
         ----------
-        utilities: ndarray of shape (n_samples,)
-            The utilities provided by the stream-based active learning
+        utilities: array-like of shape (n_samples,)
+            The `utilities` provided by the stream-based active learning
             strategy.
-
 
         Returns
         -------
-        utilities : ndarray of shape (n_samples,)
-            Checked utilities.
+        utilities: ndarray of shape (n_samples,)
+            Checked `utilities`.
         """
-
         utilities = super()._validate_data(utilities)
         # Check theta
         self._validate_theta()

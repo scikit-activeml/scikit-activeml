@@ -8,33 +8,35 @@ import numpy as np
 import warnings
 from sklearn.metrics.pairwise import pairwise_kernels, KERNEL_PARAMS
 from sklearn.utils import check_array
-from sklearn.utils.validation import (
-    check_is_fitted,
-    check_scalar,
-)
+from sklearn.utils.validation import check_is_fitted, check_scalar
 
 from ..base import ClassFrequencyEstimator
-from ..utils import MISSING_LABEL, compute_vote_vectors, is_labeled
+from ..utils import (
+    MISSING_LABEL,
+    compute_vote_vectors,
+    is_labeled,
+    check_n_features,
+)
 
 
 class ParzenWindowClassifier(ClassFrequencyEstimator):
-    """ParzenWindowClassifier
+    """Parzen Window Classifier (PWC)
 
-    The Parzen window classifier (PWC) is a simple and
+    The "Parzen Window Classifier" (PWC) [1]_ is a simple and
     probabilistic classifier. This classifier is based on a non-parametric
     density estimation obtained by applying a kernel function.
 
     Parameters
     ----------
     classes : array-like of shape (n_classes), default=None
-        Holds the label for each class. If none, the classes are determined
+        Holds the label for each class. If `None`, the classes are determined
         during the fit.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes), default=None
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
+        `classes` is not `None`.
     class_prior : float or array-like of shape (n_classes,), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
@@ -45,22 +47,21 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         The metric must be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
     n_neighbors : int or None, default=None
-        Number of nearest neighbours. Default is None, which means all
+        Number of nearest neighbours. Default is `None`, which means all
         available samples are considered.
     metric_dict : dict, default=None
         Any further parameters are passed directly to the kernel function.
-        For the kernel 'rbf' we allow the use of mean kernel [2] and use
-        it when gamma is set to 'mean' (i.e., {'gamma': 'mean'}). While N is
-        defined as the labeled data the variance is calculated over all X.
+        For the kernel 'rbf' we allow the use of mean bandwidth criterion [2]_
+        and use it when gamma is set to 'mean' (i.e., {'gamma': 'mean'})..
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_ : array-like of shape (n_classes,)
+    classes_ : numpy.ndarray of shape (n_classes,)
         Holds the label for each class after fitting.
-    class_prior : np.ndarray of shape (n_classes)
+    class_prior : np.ndarray of shape (n_classes,)
         Prior observations of the class frequency estimates. The entry
         `class_prior_[i]` indicates the non-negative prior number of samples
         belonging to class `classes_[i]`.
@@ -110,14 +111,13 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         self.metric_dict = metric_dict
 
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
+        """Fit the model using `X` as samples and `y` as class labels.
 
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            The sample matrix `X` is the feature matrix representing the
-            samples.
-        y : array-like of shape (n_samples)
+            The feature matrix representing the samples.
+        y : array-like of shape (n_samples,)
             It contains the class labels of the training samples.
         sample_weight : array-like of shape (n_samples), default=None
             It contains the weights of the training samples' class labels.
@@ -125,8 +125,8 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         Returns
         -------
-        self: ParzenWindowClassifier,
-            The ParzenWindowClassifier is fitted on the training data.
+        self : ParzenWindowClassifier,
+            The `ParzenWindowClassifier` is fitted on the training data.
         """
         # Check input parameters.
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
@@ -169,8 +169,6 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         if not isinstance(self.metric_dict_, dict):
             raise TypeError("'metric_dict' must be a Python dictionary.")
 
-        self._check_n_features(X, reset=True)
-
         # Store train samples.
         self.X_ = X.copy()
 
@@ -188,22 +186,22 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         return self
 
     def predict_freq(self, X):
-        """Return class frequency estimates for the input samples 'X'.
+        """Return class frequency estimates for the input samples `X`.
 
         Parameters
         ----------
-        X: array-like or shape (n_samples, n_features) or shape \
+        X : array-like or shape (n_samples, n_features) or shape \
                 (n_samples, m_samples) if metric == 'precomputed'
             Input samples.
 
         Returns
         -------
-        F: array-like of shape (n_samples, classes)
+        F : np.ndarray of shape (n_samples, classes)
             The class frequency estimates of the input samples. Classes are
-            ordered according to `classes_`.
+            ordered according to the attribute `classes_`.
         """
         check_is_fitted(self)
-        X = check_array(X, force_all_finite=(self.metric != "precomputed"))
+        X = check_array(X, ensure_all_finite=(self.metric != "precomputed"))
 
         # Predict zeros because of missing training data.
         if self.n_features_in_ is None:
@@ -220,7 +218,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
                     "(n_test_samples, n_train_samples)."
                 )
         else:
-            self._check_n_features(X, reset=False)
+            check_n_features(self, X, reset=False)
             K = pairwise_kernels(
                 X, self.X_, metric=self.metric, **self.metric_dict_
             )

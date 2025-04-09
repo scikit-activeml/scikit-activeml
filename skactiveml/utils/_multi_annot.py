@@ -13,35 +13,36 @@ from ._label_encoder import ExtLabelEncoder
 def ext_confusion_matrix(
     y_true, y_pred, classes=None, missing_label=MISSING_LABEL, normalize=None
 ):
-    """Compute confusion matrix to evaluate the accuracy of a classification.
+    """Compute confusion matrix [1]_ to evaluate the accuracy of a
+    classification.
 
-    This is an extension of the `sklearn.metric.confusion_matrix` function by
-    allowing missing labels and labels predicted by multiple annotators.
+    This is an extension of the `sklearn.metric.confusion_matrix` [2]_ function
+    by allowing missing labels and labels predicted by multiple annotators.
 
     By definition a confusion matrix :math:`C` is such that :math:`C_{i, j}`
     is equal to the number of observations known to be in group :math:`i` and
     predicted to be in group :math:`j`.
 
-    Thus in binary classification, the count of true negatives is
+    Thus, in binary classification, the count of true negatives is
     :math:`C_{0,0}`, false negatives is :math:`C_{1,0}`, true positives is
     :math:`C_{1,1}` and false positives is :math:`C_{0,1}`.
 
     Parameters
     ----------
-    y_true: array-like, shape (n_samples)
+    y_true : array-like of shape (n_samples)
         Array of true labels. Is not allowed to contain any missing labels.
-    y_pred: array-like, shape (n_samples) or (n_samples, n_annotators)
-            Estimated targets as returned by multiple annotators.
-    classes : array-like of shape (n_classes), default=None
+    y_pred : array-like of shape (n_samples) or (n_samples, n_annotators)
+        Estimated targets as returned by multiple annotators.
+    classes : array-like of shape (n_classes,), default=None
         List of class labels to index the matrix. This may be used to reorder
         or select a subset of labels. If `None` is given, those that appear
         at least once in `y_true` or `y_pred` are used in sorted order.
-    missing_label : {scalar, string, np.nan, None}, default=np.nan
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    normalize : {'true', 'pred', 'all'}, default=None
+    normalize : 'true' or 'pred' or 'all', default=None
         Normalizes confusion matrix over the true (rows), predicted (columns)
-        conditions or all the population. If None, confusion matrix will not be
-        normalized.
+        conditions or all the population. If `None`, confusion matrix will not
+        be normalized.
 
     Returns
     -------
@@ -52,18 +53,18 @@ def ext_confusion_matrix(
 
     References
     ----------
-    [1] `Wikipedia entry for the Confusion matrix
-        <https://en.wikipedia.org/wiki/Confusion_matrix>`_
-        (Wikipedia and other references may use a different convention for
-        axes)
-    [2] `Scikit-learn Confusion Matrix
-        <https://scikit-learn.org/stable/modules/generated/sklearn.metrics.
-        confusion_matrix.html>`_
+    .. [1] `Wikipedia entry for the Confusion matrix
+       <https://en.wikipedia.org/wiki/Confusion_matrix>`_
+       (Wikipedia and other references may use a different convention for
+       axes)
+    .. [2] `Scikit-learn Confusion Matrix
+       <https://scikit-learn.org/stable/modules/generated/sklearn.metrics.
+       confusion_matrix.html>`_
     """
     # Check input.
     y_true = column_or_1d(y_true)
     y_pred = check_array(
-        y_pred, force_all_finite=False, ensure_2d=False, dtype=None
+        y_pred, ensure_all_finite=False, ensure_2d=False, dtype=None
     )
     if y_pred.ndim == 1:
         y_pred = y_pred.reshape(-1, 1)

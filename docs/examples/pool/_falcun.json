@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "Falcun",
+    "package" : "pool",
+    "method" : "Fast Active Learning by Contrastive UNcertainty (FALCUN)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool",  "classification", "single-annotator"],
+    "title" : "Fast Active Learning by Contrastive UNcertainty (FALCUN)",
+    "refs" : ["gilhuber2024falcun"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "",
+    "import_misc" : "from skactiveml.pool import Falcun",
+    "init_qs" : "Falcun(random_state=42)",
+    "query_params" : "X=X, y=y, clf=clf"
+  }
+]

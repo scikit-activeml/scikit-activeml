@@ -16,53 +16,53 @@ from sklearn.utils.validation import (
 )
 
 from ..base import ClassFrequencyEstimator
-from ..utils import MISSING_LABEL, compute_vote_vectors
+from ..utils import MISSING_LABEL, compute_vote_vectors, check_n_features
 
 
 class MixtureModelClassifier(ClassFrequencyEstimator):
-    """MixtureModelClassifier
+    """Classifier based on a Mixture Model (CMM)
 
-    The classifier based on a mixture model (MixtureModelClassifier) is a
-    generative classifier based on a (Bayesian) Gaussian mixture model (GMM).
+    The classifier based on a mixture model (CMM) is a generative classifier
+    based on a (Bayesian) Gaussian mixture model (GMM).
 
     Parameters
     ----------
-    mixture_model : sklearn.mixture.GaussianMixture or
+    mixture_model : sklearn.mixture.GaussianMixture or\
     sklearn.mixture.BayesianGaussianMixture or None, default=None
         (Bayesian) Gaussian Mixture model that is trained with unsupervised
         algorithm on train data. If the initial mixture model is not fitted, it
-        will be refitted in each call of the 'fit' method. If None,
-        mixture_model=BayesianMixtureModel(n_components=n_classes) will be
+        will be refitted in each call of the `fit` method. If `None`,
+        `mixture_model=BayesianMixtureModel(n_components=n_classes)` will be
         used.
-    weight_mode : {'responsibilities', 'similarities'},
-        default='responsibilities'
+    weight_mode : 'responsibilities' or 'similarities',\
+            default='responsibilities'
         Determines whether the responsibilities outputted by the
-        `mixture_model` or the exponentials of the Mahalanobis distances as
+        `mixture_model` or the exponential of the Mahalanobis distances as
         similarities are used to compute the class frequency estimates.
-    classes : array-like, shape (n_classes), default=None
-        Holds the label for each class. If none, the classes are determined
+    classes : array-like of shape (n_classes,), default=None
+        Holds the label for each class. If `None`, the classes are determined
         during the fit.
     missing_label : scalar or str or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like, shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not none.
-    class_prior : float or array-like of shape (n_classes), default=0
+        `classes` is not `None`.
+    class_prior : float or array-like of shape (n_classes,), default=0
         Prior observations of the class frequency estimates. If `class_prior`
         is an array, the entry `class_prior[i]` indicates the non-negative
         prior number of samples belonging to class `classes_[i]`. If
         `class_prior` is a float, `class_prior` indicates the non-negative
         prior number of samples per class.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
 
     Attributes
     ----------
-    classes_ : array-like, shape (n_classes)
+    classes_ : np.ndarray shape (n_classes,)
         Holds the label for each class after fitting.
-    class_prior : np.ndarray, shape (n_classes)
+    class_prior : np.ndarray, shape (n_classes,)
         Prior observations of the class frequency estimates. The entry
         `class_prior_[i]` indicates the non-negative prior number of samples
         belonging to class `classes_[i]`.
@@ -72,8 +72,8 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
     F_components_ : numpy.ndarray, shape (n_components, n_classes)
         `F[j,c]` is a proxy for the number of sample of class c belonging to
         component j.
-    mixture_model_ : sklearn.mixture.GaussianMixture or
-    sklearn.mixture.BayesianGaussianMixture
+    mixture_model_ : sklearn.mixture.GaussianMixture or\
+            sklearn.mixture.BayesianGaussianMixture
         (Bayesian) Gaussian Mixture model that is trained with unsupervised
         algorithm on train data.
     """
@@ -99,13 +99,12 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
         self.weight_mode = weight_mode
 
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using `X` as training samples and `y` as class labels.
+        """Fit the model using `X` as samples and `y` as class labels.
 
         Parameters
         ----------
-        X : matrix-like of shape (n_samples, n_features)
-            The samples matrix `X` is the feature matrix representing the
-            samples.
+        X : array-like of shape (n_samples, n_features)
+            The feature matrix representing the samples.
         y : array-like of shape (n_samples,)
             It contains the class labels of the training samples.
         sample_weight : array-like, shape (n_samples,)
@@ -114,13 +113,11 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
 
         Returns
         -------
-        self: skactiveml.classifier.MixtureModelClassifier,
-            `skactiveml.classifier.MixtureModelClassifier` object fitted on the
-             training data.
+        self: skactiveml.classifier.MixtureModelClassifier
+            The `MixtureModelClassifier` fitted on the training data.
         """
         # Check input parameters.
         X, y, sample_weight = self._validate_data(X, y, sample_weight)
-        self._check_n_features(X, reset=True)
 
         # Check mixture model.
         if self.mixture_model is None:
@@ -183,13 +180,13 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
 
         Returns
         -------
-        F : array-like of shape (n_samples, classes)
+        F : np.ndarray of shape (n_samples, classes)
             The class frequency estimates of the input samples. Classes are
-            ordered according to `classes_`.
+            ordered according to the attribute `classes_`.
         """
         check_is_fitted(self)
         X = check_array(X)
-        self._check_n_features(X, reset=False)
+        check_n_features(self, X, reset=False)
         if np.sum(self.F_components_) > 0:
             if self.weight_mode == "similarities":
                 S = np.exp(

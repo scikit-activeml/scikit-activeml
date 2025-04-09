@@ -1,8 +1,9 @@
 """
-Active Learning with Cost Embedding (CostEmbeddingAL)
-This module is modified from
+Implementation of Active Learning with Cost Embedding (CostEmbeddingAL), which
+is modified of:
+
 https://github.com/ntucllab/libact/blob/master/libact.
-Copyright (c) 2014, National Taiwan University
+Copyright (c) 2014, National Taiwan University All rights reserved.
 """
 
 import warnings
@@ -31,40 +32,43 @@ from ..utils import (
 
 
 class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
-    """Active Learning with Cost Embedding (ALCE).
+    """Active Learning with Cost Embedding (ALCE)
 
-    Cost sensitive multi-class algorithm.
-    Assume each class has at least one sample in the labeled pool.
-    This implementation is based on libact.
+    The Active Learning with Cost Embeddings (ALCE) [1]_ query strategy uses
+    a cost-sensitive uncertainty measure based on a distance measure
+    embedding space reflecting a given cost matrix.
+
+    This implementation is based on libact [2]_.
 
     Parameters
     ----------
-    classes: array-like of shape(n_classes,)
-    base_regressor : sklearn regressor, optional (default=None)
-    cost_matrix: array-like of shape (n_classes, n_classes),
-    optional (default=None)
+    classes: array-like of shape (n_classes,)
+        List of all classes that can occur.
+    base_regressor : sklearn.base.RegressorMixin, default=None
+        An sklearn regression model implementing the methods `fit` and
+        `predict`.
+    cost_matrix: array-like of shape (n_classes, n_classes), default=None
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
-        class j for a sample with the actual class i. Only supported for least
-        confident variant.
-    missing_label: str or numeric, optional (default=MISSING_LABEL)
-        Specifies the symbol that represents a missing label.
-    random_state : int or np.random.RandomState, optional
-    (default=None)
-        Random state for annotator selection.
+        class `j` for a sample with the actual class `i`.
     embed_dim : int, optional (default=None)
-        If is None, `embed_dim = n_classes`.
-    mds_params : dict, optional (default=None)
-        For further information, see
-        https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
-    nn_params : dict, optional (default=None)
-        For further information, see
-        https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
+        If it is `None`, `embed_dim=n_classes` is used.
+    mds_params : dict, default=None
+        Parameters passed to `sklearn.manifold.MDS`.
+    nn_params : dict, default=None
+        Parameters passed to `sklearn.neighbors.NearestNeighbors`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or np.random.RandomState, default=None
+        Random state for annotator selection.
 
     References
     ----------
-    [1] Kuan-Hao, and Hsuan-Tien Lin. "A Novel Uncertainty Sampling Algorithm
-        for Cost-sensitive Multiclass Active Learning", In Proceedings of the
-        IEEE International Conference on Data Mining (ICDM), 2016
+    .. [1] K.-H. Huang and H.-T. Lin. A Novel Uncertainty Sampling Algorithm
+       for Cost-Sensitive Multiclass Active Learning. In IEEE Int. Conf. Data
+       Min., pages 925–930, 2016.
+    .. [2] Y.-Y. Yang, S.-C. Lee, Y.-A. Chung, T.-E. Wu, S.-A. Chen, and H.-T.
+       Lin. libact: Pool-based Active Learning in Python. arXiv:1710.00379,
+       2017.
     """
 
     def __init__(
@@ -99,7 +103,7 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next instance to be labeled.
+        """Determines for which candidate samples labels are to be queried.
 
         Parameters
         ----------
@@ -108,45 +112,49 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
-        sample_weight: array-like of shape (n_samples,), optional
-        (default=None)
+            indicated by `self.missing_label`).
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
-            If True, also return the utilities based on the query strategy.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size,)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
         """
         # Check standard parameters.
         (
@@ -210,42 +218,43 @@ def _alce(
     mds_params,
     nn_params,
 ):
-    """Compute the alce score for the candidate instances.
+    """Compute the ALCE score for the candidate samples.
 
     Parameters
     ----------
-    X_cand: array-like, shape (n_candidates, n_features)
+    X_cand : array-like of shape (n_candidates, n_features)
         Unlabeled candidate samples.
-    X: array-like, shape (n_samples, n_features)
+    X : array-like of shape (n_samples, n_features)
         Complete data set.
-    y: array-like, shape (n_samples)
+    y : array-like of shape (n_samples)
         Labels of the data set.
-    base_regressor: RegressorMixin
+    base_regressor : RegressorMixin
         Regressor used for the embedding.
-    cost_matrix: array-like, shape (n_classes, n_classes)
-        Cost matrix with cost_matrix[i,j] defining the cost of predicting class
-        j for a sample with the true class i.
-    classes: array-like, shape (n_classes)
-        Array of class labels.
-    embed_dim: int
-        Dimension of the embedding.
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
+        Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
+        class `j` for a sample with the actual class `i`.
+    classes : array-like of shape (n_classes,)
+        List of all classes that can occur.
     sample_weight : array-like, shape (n_samples)
         Weights for uncertain annotators.
-    missing_label : scalar | string | np.nan | None
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int | np.random.RandomState
+    random_state : int or np.random.RandomState, default=None
         Random state for annotator selection.
-    mds_params : dict
-        For further information, see
-        https://scikit-learn.org/stable/modules/generated/sklearn.manifold.MDS.html
-    nn_params : dict
-        For further information, see
-        https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.NearestNeighbors.html
+    base_regressor : sklearn.base.RegressorMixin, default=None
+        An sklearn regression model implementing the methods `fit` and
+        `predict`.
+    embed_dim : int, optional (default=None)
+        If it is `None`, `embed_dim=n_classes` is used.
+    mds_params : dict, default=None
+        Parameters passed to `sklearn.manifold.MDS`.
+    nn_params : dict, default=None
+        Parameters passed to `sklearn.neighbors.NearestNeighbors`.
 
     Returns
     -------
-    utilities: np.ndarray, shape (n_candidates)
-        The utilities of all candidate instances.
+    utilities : np.ndarray of shape (n_candidates,)
+        The utilities of all candidate samples.
     """
     # Check base regressor
     if base_regressor is None:
@@ -267,7 +276,7 @@ def _alce(
         y,
         X_cand,
         sample_weight,
-        force_all_finite=False,
+        ensure_all_finite=False,
         missing_label=missing_label,
     )
 
@@ -277,11 +286,11 @@ def _alce(
     y = y[labeled].astype(int)
     sample_weight = sample_weight[labeled]
 
-    # If all samples are unlabeled, the strategy randomly selects an instance
+    # If all samples are unlabeled, the strategy randomly selects a sample
     if len(X) == 0:
         warnings.warn(
-            "There are no labeled instances. The strategy selects "
-            "one random instance."
+            "There are no labeled samples. The strategy selects "
+            "one random sample."
         )
         return np.ones(len(X_cand))
 
@@ -342,14 +351,19 @@ def _alce(
 
 
 """
-Multi-dimensional Scaling Partial (MDSP)
-This module is modified from
-https://github.com/scikit-learn/scikit-learn/blob/14031f6/sklearn/manifold/mds.py
-by Kuan-Hao Huang.
-"""
+Implementation of Multi-dimensional Scaling Partial (MDSP), which
+is a modification of:
 
-# author: Nelle Varoquaux <nelle.varoquaux@gmail.com>
-# Licence: BSD
+https://github.com/ntucllab/libact/blob/master/libact/query_strategies/multiclass/mdsp.py
+written by Kuan-Hao Huang (BSD license. Copyright (c) 2014, National Taiwan
+University All rights reserved.)
+
+and
+
+https://github.com/scikit-learn/scikit-learn/blob/14031f6/sklearn/manifold/mds.py.
+written by Nelle Varoquaux <nelle.varoquaux@gmail.com> (BSD license.
+Copyright (c) 2007–2016 The scikit-learn developers. All rights reserved.).
+"""
 
 
 def _smacof_single_p(
@@ -363,41 +377,41 @@ def _smacof_single_p(
     eps=1e-3,
     random_state=None,
 ):
-    """
-    Computes multidimensional scaling using SMACOF algorithm.
+    """Computes multidimensional scaling using the SMACOF algorithm.
 
     Parameters
     ----------
-    n_uq
-    similarities: symmetric ndarray, shape [n * n]
-        similarities between the points
-    metric: boolean, optional, default: True
-        compute metric or nonmetric SMACOF algorithm
-    n_components: int, optional, default: 2
-        number of dimension in which to immerse the similarities
-        overwritten if initial array is provided.
-    init: {None or ndarray}, optional
-        if None, randomly chooses the initial configuration
-        if ndarray, initialize the SMACOF algorithm with this array
-    max_iter: int, optional, default: 300
-        Maximum number of iterations of the SMACOF algorithm for a single run
-    verbose: int, optional, default: 0
-        level of verbosity
-    eps: float, optional, default: 1e-6
-        relative tolerance w.r.t stress to declare converge
-    random_state: integer or numpy.RandomState, optional
+    similarities : symmetric np.ndarray of shape (n * n,)
+        Similarities between the points.
+    n_uq : int
+        Number of unique values.
+    metric : boolean, default=True
+        Compute metric or nonmetric SMACOF algorithm.
+    n_components : int default=2
+        Number of dimension in which to immerse the similarities overwritten
+        if initial array is provided.
+    init : None or np.ndarray, default=None
+        - If `init=None`, randomly chooses the initial configuration.
+        - if `init` is np.ndarray, initialize SMACOF algorithm with this array.
+    max_iter : int, default=300
+        Maximum number of iterations of the SMACOF algorithm for a single run.
+    verbose : int, default=0
+        Level of verbosity.
+    eps : float, default=1e-6
+        Relative tolerance w.r.t stress to declare converge.
+    random_state : integer or np.RandomState, default=None
         The generator used to initialize the centers. If an integer is
         given, it fixes the seed. Defaults to the global numpy random
         number generator.
 
     Returns
     -------
-    X: ndarray (n_samples, n_components), float
-               coordinates of the n_samples points in a n_components-space
-    stress_: float
+    X : np.ndarray of (n_samples, n_components)
+        Coordinates of the n_samples points in a n_components-space.
+    _stress : float
         The final value of the stress (sum of squared distance of the
-        disparities and the distances for all constrained points)
-    n_iter : int
+        disparities and the distances for all constrained points).
+    it : int
         Number of iterations run.
     """
     similarities = check_symmetric(similarities, raise_exception=True)
@@ -421,11 +435,11 @@ def _smacof_single_p(
     sim_flat = similarities.ravel()
     sim_flat_w = sim_flat[sim_flat != 0]
     if init is None:
-        # Randomly choose initial configuration
+        # Randomly choose initial configuration.
         X = random_state.rand(n_samples * n_components)
         X = X.reshape((n_samples, n_components))
     else:
-        # overrides the parameter p
+        # Overrides the parameter `p`.
         n_components = init.shape[1]
         if n_samples != init.shape[0]:
             raise ValueError(
@@ -437,17 +451,17 @@ def _smacof_single_p(
     old_stress = None
     ir = IsotonicRegression()
     for it in range(max_iter):
-        # Compute distance and monotonic regression
+        # Compute distance and monotonic regression.
         dis = euclidean_distances(X)
 
         if metric:
             disparities = similarities
         else:
             dis_flat = dis.ravel()
-            # similarities with 0 are considered as missing values
+            # Similarities with 0 are considered as missing values.
             dis_flat_w = dis_flat[sim_flat != 0]
 
-            # Compute the disparities using a monotonic regression
+            # Compute the disparities using a monotonic regression.
             disparities_flat = ir.fit_transform(sim_flat_w, dis_flat_w)
             disparities = dis_flat.copy()
             disparities[sim_flat != 0] = disparities_flat
@@ -457,13 +471,13 @@ def _smacof_single_p(
             )
             disparities[similarities == 0] = 0
 
-        # Compute stress
+        # Compute stress.
         _stress = (
             W.ravel() * ((dis.ravel() - disparities.ravel()) ** 2)
         ).sum()
         _stress /= 2
 
-        # Update X using the Guttman transform
+        # Update X using the Guttman transform.
         dis[dis == 0] = 1e-5
         ratio = disparities / dis
         _B = -W * ratio
@@ -499,53 +513,60 @@ def smacof_p(
     random_state=None,
     return_n_iter=False,
 ):
-    """
-    Computes multidimensional scaling using SMACOF (Scaling by Majorizing a
-    Complicated Function) algorithm
+    """Computes multidimensional scaling using SMACOF (Scaling by Majorizing a
+    Complicated Function) algorithm.
+
     The SMACOF algorithm is a multidimensional scaling algorithm: it minimizes
     a objective function, the *stress*, using a majorization technique. The
     Stress Majorization, also known as the Guttman Transform, guarantees a
     monotone convergence of Stress, and is more powerful than traditional
     techniques such as gradient descent.
+
     The SMACOF algorithm for metric MDS can summarized by the following steps:
+
     1. Set an initial start configuration, randomly or not.
     2. Compute the stress
     3. Compute the Guttman Transform
     4. Iterate 2 and 3 until convergence.
+
     The nonmetric algorithm adds a monotonic regression steps before computing
     the stress.
 
     Parameters
     ----------
-    similarities : symmetric ndarray, shape (n_samples, n_samples)
-        similarities between the points
-    metric : boolean, optional, default: True
-        compute metric or nonmetric SMACOF algorithm
-    n_components : int, optional, default: 2
-        number of dimension in which to immerse the similarities
-        overridden if initial array is provided.
-    init : {None or ndarray of shape (n_samples, n_components)}, optional
-        if None, randomly chooses the initial configuration
-        if ndarray, initialize the SMACOF algorithm with this array
-    n_init : int, optional, default: 8
-        Number of time the smacof_p algorithm will be run with different
-        initialisation. The final results will be the best output of the
+    similarities : symmetric np.ndarray of shape (n_samples, n_samples)
+        Similarities between the points.
+    n_uq : int
+        Number of unique values.
+    metric : boolean, default=True
+        Compute metric or nonmetric SMACOF algorithm.
+    n_components : int, default=2
+        Number of dimension in which to immerse the similarities overridden if
+        initial array is provided.
+    init : None or ndarray of shape (n_samples, n_components), default=None
+        - If `init=None`, randomly chooses the initial configuration.
+        - if `init` is np.ndarray, initialize SMACOF algorithm with this array.
+    n_init : int, default=8
+        Number of times the smacof_p algorithm will be run with different
+        initialisations. The final results will be the best output of the
         n_init consecutive runs in terms of stress.
-    n_jobs : int, optional, default: 1
+    n_jobs : int, default=1
         The number of jobs to use for the computation. This works by breaking
         down the pairwise matrix into n_jobs even slices and computing them in
         parallel.
-        If -1 all CPUs are used. If 1 is given, no parallel computing code is
-        used at all, which is useful for debugging. For n_jobs below -1,
-        (n_cpus + 1 + n_jobs) are used. Thus for n_jobs = -2, all CPUs but one
-        are used.
-    max_iter : int, optional, default: 300
-        Maximum number of iterations of the SMACOF algorithm for a single run
-    verbose : int, optional, default: 0
-        level of verbosity
-    eps : float, optional, default: 1e-6
-        relative tolerance w.r.t stress to declare converge
-    random_state : integer or numpy.RandomState, optional
+
+        - If -1 all CPUs are used.
+        - If 1 is given, no parallel computing code is used at all, which is
+        useful for debugging.
+        - For `n_jobs` below -1, `(n_cpus + 1 + n_jobs)` are used. Thus, for
+        `n_jobs=-2, all CPUs but one are used.
+    max_iter : int, default=300
+        Maximum number of iterations of the SMACOF algorithm for a single run.
+    verbose : int, default=0
+        Level of verbosity.
+    eps : float, default=1e-6
+        Relative tolerance w.r.t stress to declare converge.
+    random_state : integer or numpy.RandomState, default=None
         The generator used to initialize the centers. If an integer is
         given, it fixes the seed. Defaults to the global numpy random
         number generator.
@@ -554,23 +575,23 @@ def smacof_p(
 
     Returns
     -------
-    X : ndarray (n_samples,n_components)
-        Coordinates of the n_samples points in a n_components-space
+    X : np.ndarray of shape (n_samples, n_components)
+        Coordinates of the n_samples points in a n_components-space.
     stress : float
         The final value of the stress (sum of squared distance of the
-        disparities and the distances for all constrained points)
+        disparities and the distances for all constrained points).
     n_iter : int
         The number of iterations corresponding to the best stress.
         Returned only if `return_n_iter` is set to True.
 
-    Notes
-    -----
-    "Modern Multidimensional Scaling - Theory and Applications" Borg, I.;
-    Groenen P. Springer Series in Statistics (1997)
-    "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
-    Psychometrika, 29 (1964)
-    "Multidimensional scaling by optimizing goodness of fit to a nonmetric
-    hypothesis" Kruskal, J. Psychometrika, 29, (1964)
+    References
+    ----------
+    .. [1] "Modern Multidimensional Scaling - Theory and Applications" Borg,
+       I.; Groenen P. Springer Series in Statistics (1997)
+    .. [2] "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
+       Psychometrika, 29 (1964)
+    .. [3] "Multidimensional scaling by optimizing goodness of fit to a
+       nonmetric hypothesis" Kruskal, J. Psychometrika, 29, (1964)
     """
 
     similarities = check_array(similarities)
@@ -633,58 +654,62 @@ def smacof_p(
 
 
 class MDSP(BaseEstimator):
-    """Multidimensional scaling
+    """Multidimensional Scaling Partial (MDSP)
 
     Parameters
     ----------
-    metric : boolean, optional, default: True
+    metric : boolean, default=True
         compute metric or nonmetric SMACOF (Scaling by Majorizing a
-        Complicated Function) algorithm
-    n_components : int, optional, default: 2
-        number of dimension in which to immerse the similarities
+        Complicated Function) algorithm.
+    n_uq : int, default=1
+        Number of unique values.
+    n_components : int, default=2
+        Number of dimension in which to immerse the similarities
         overridden if initial array is provided.
-    n_init : int, optional, default: 4
+    n_init : int, default=4
         Number of time the smacof_p algorithm will be run with different
         initialisation. The final results will be the best output of the
         n_init consecutive runs in terms of stress.
-    max_iter : int, optional, default: 300
-        Maximum number of iterations of the SMACOF algorithm for a single run
-    verbose : int, optional, default: 0
-        level of verbosity
-    eps : float, optional, default: 1e-6
-        relative tolerance w.r.t stress to declare converge
-    n_jobs : int, optional, default: 1
+    max_iter : int, default=300
+        Maximum number of iterations of the SMACOF algorithm for a single run.
+    verbose : int, default=0
+        Level of verbosity.
+    eps : float, default=1e-6
+        Relative tolerance w.r.t stress to declare converge.
+    n_jobs : int, default=1
         The number of jobs to use for the computation. This works by breaking
         down the pairwise matrix into n_jobs even slices and computing them in
         parallel.
-        If -1 all CPUs are used. If 1 is given, no parallel computing code is
-        used at all, which is useful for debugging. For n_jobs below -1,
-        (n_cpus + 1 + n_jobs) are used. Thus for n_jobs = -2, all CPUs but one
-        are used.
-    random_state : integer or numpy.RandomState, optional
+
+        - If -1 all CPUs are used.
+        - If 1 is given, no parallel computing code is used at all, which is
+        useful for debugging.
+        - For `n_jobs` below -1, `(n_cpus + 1 + n_jobs)` are used. Thus, for
+        `n_jobs=-2, all CPUs but one are used.
+    random_state : integer or numpy.RandomState, default=None
         The generator used to initialize the centers. If an integer is
         given, it fixes the seed. Defaults to the global numpy random
         number generator.
     dissimilarity : string
-        Which dissimilarity measure to use.
-        Supported are 'euclidean' and 'precomputed'.
+        Which dissimilarity measure to use. Supported are 'euclidean' and
+        'precomputed'.
 
     Attributes
     ----------
-    embedding_ : array-like, shape [n_components, n_samples]
+    embedding_ : array-like of shape (n_components, n_samples)
         Stores the position of the dataset in the embedding space
     stress_ : float
         The final value of the stress (sum of squared distance of the
-        disparities and the distances for all constrained points)
+        disparities and the distances for all constrained points).
 
     References
     ----------
-    "Modern Multidimensional Scaling - Theory and Applications" Borg, I.;
-    Groenen P. Springer Series in Statistics (1997)
-    "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
-    Psychometrika, 29 (1964)
-    "Multidimensional scaling by optimizing goodness of fit to a nonmetric
-    hypothesis" Kruskal, J. Psychometrika, 29, (1964)
+    .. [1] "Modern Multidimensional Scaling - Theory and Applications" Borg,
+       I.; Groenen P. Springer Series in Statistics (1997)
+    .. [2] "Nonmetric multidimensional scaling: a numerical method" Kruskal, J.
+       Psychometrika, 29 (1964)
+    .. [3] "Multidimensional scaling by optimizing goodness of fit to a
+       nonmetric hypothesis" Kruskal, J. Psychometrika, 29, (1964)
     """
 
     def __init__(
@@ -712,31 +737,31 @@ class MDSP(BaseEstimator):
         self.random_state = random_state
 
     def fit(self, X, y=None, init=None):
-        """ Compute the position of the points in the embedding space.
+        """Compute the position of the points in the embedding space.
 
         Parameters
         ----------
-        X : array, shape=[n_samples, n_features], or [n_samples, n_samples] \
-                if dissimilarity='precomputed'
+        X : array-like of shape (n_samples, n_features), or \
+                (n_samples, n_samples) if dissimilarity='precomputed'
             Input data.
-        init : {None or ndarray, shape (n_samples,)}, optional
-            If None, randomly chooses the initial configuration
-            if ndarray, initialize the SMACOF algorithm with this array.
+        init : None or ndarray of shape (n_samples,), default=None
+            - If `None`, randomly chooses the initial configuration.
+            - If `np.ndarray`, initialize the SMACOF algorithm with this array.
         """
         self.fit_transform(X, init=init)
         return self
 
     def fit_transform(self, X, y=None, init=None):
-        """ Fit the data from X, and returns the embedded coordinates.
+        """Fit the data from X, and returns the embedded coordinates.
 
         Parameters
         ----------
-        X : array, shape=[n_samples, n_features], or [n_samples, n_samples] \
-                if dissimilarity='precomputed'
+        X : array-like of shape (n_samples, n_features), or \
+                        (n_samples, n_samples) if dissimilarity='precomputed'
             Input data.
-        init : {None or ndarray, shape (n_samples,)}, optional
-            If None, randomly chooses the initial configuration
-            if ndarray, initialize the SMACOF algorithm with this array.
+        init : None or ndarray of shape (n_samples,), default=None
+            - If `None`, randomly chooses the initial configuration.
+            - If `np.ndarray`, initialize the SMACOF algorithm with this array.
         """
         X = check_array(X)
         if X.shape[0] == X.shape[1] and self.dissimilarity != "precomputed":

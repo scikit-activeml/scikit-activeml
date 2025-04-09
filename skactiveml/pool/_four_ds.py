@@ -21,29 +21,27 @@ from ..utils import (
 
 
 class FourDs(SingleAnnotatorPoolQueryStrategy):
-    """FourDs
+    """4DS
 
     Implementation of the pool-based query strategy 4DS for training a
-    MixtureModelClassifier [1].
+    MixtureModelClassifier [1]_.
 
     Parameters
     ----------
-    lmbda : float between 0 and 1, optional
-    (default=min((batch_size-1)*0.05, 0.5))
+    lmbda : float between 0 and 1, default=min((batch_size-1)*0.05, 0.5)
         For the selection of more than one sample within each query round, 4DS
         uses a diversity measure to avoid the selection of redundant samples
-        whose influence is regulated by the weighting factor 'lmbda'.
-    missing_label : scalar or string or np.nan or None, optional
-    (default=MISSING_LABEL)
+        whose influence is regulated by the weighting factor `lmbda`.
+    missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
-    random_state : int or np.random.RandomState, optional (default=None)
+    random_state : int or np.random.RandomState, default=None
         The random state to use.
 
     References
-    ---------
-    [1] Reitmaier, T., & Sick, B. (2013). Let us know your decision: Pool-based
-        active training of a generative classifier with the selection strategy
-        4DS. Information Sciences, 230, 106-131.
+    ----------
+    .. [1] T. Reitmaier and B. Sick. Let us know your decision: Pool-based
+       active training of a generative classifier with the selection strategy
+       4DS. Inf. Sci., 230:106–131, 2013.
     """
 
     def __init__(
@@ -65,58 +63,59 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         return_utilities=False,
         batch_size=1,
     ):
-        """Determines for which candidate samples labels are to be queried.
+        """Query the next samples to be labeled.
 
-        Parameters
-        ----------
-        X: array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y: array-like of shape (n_samples)
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL.
+            indicated by `self.missing_label`.)
         clf : skactiveml.classifier.MixtureModelClassifier
             GMM-based classifier to be trained.
         fit_clf : bool, optional (default=True)
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight: array-like of shape (n_samples), optional (default=None)
+        sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X). This is not supported by all query strategies.
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates, ) of type \
+                int, default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, `candidates` is
+              considered as the candidate samples in `(X,y)`.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
-        return_utilities : bool, optional (default=False)
-            If True, also return the utilities based on the query strategy.
+        return_utilities : bool, default=False
+            If true, also return the utilities based on the query strategy.
 
         Returns
         -------
         query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
+            The query indices indicate for which candidate sample a label is to
+            be queried, e.g., `query_indices[0]` indicates the first selected
             sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
+
+            - If `candidates` is `None`, the indexing refers to the samples
+              in `X`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `utilities` refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, *)`, `utilities`
+              refers to the indexing in `candidates`.
         """
         # Check standard parameters.
         (

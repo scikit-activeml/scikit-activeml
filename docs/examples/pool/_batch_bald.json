@@ -3,7 +3,7 @@
     "class" : "BatchBALD",
     "package" : "pool",
     "method" : "Batch Bayesian Active Learning by Disagreement (BatchBALD)",
-    "category" :  "Query-by-Committee",
+    "category" :  "Informativeness",
     "template" : "examples/template_pool_batch.py",
     "tags" : ["pool",  "classification", "single-annotator"],
     "title" : "Batch Bayesian Active Learning by Disagreement (BatchBALD)",

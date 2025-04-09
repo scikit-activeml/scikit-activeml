@@ -3,7 +3,7 @@
     "class" : "RandomSampling",
     "package" : "pool",
     "method" : "Random Sampling",
-    "category" : "Random Sampling",
+    "category" : "Baseline",
     "template" : "examples/template_pool.py",
     "tags" : ["pool", "regression", "classification", "single-annotator"],
     "title" : "Random Sampling",

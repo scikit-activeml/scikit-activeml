@@ -67,3 +67,22 @@ class TestLabelEncoder(unittest.TestCase):
             [-1, 1, 2, 3, -1],
             ExtLabelEncoder(classes=cls).fit_transform(self.y1),
         )
+
+        # cases with empty y arrays
+        np.testing.assert_array_equal(
+            [], ExtLabelEncoder(classes=[0, 1]).fit([]).transform([])
+        )
+        np.testing.assert_array_equal(
+            [0, 1], ExtLabelEncoder(classes=[0, 1]).fit([]).transform([0, 1])
+        )
+        np.testing.assert_array_equal(
+            [], ExtLabelEncoder().fit([]).transform([])
+        )
+        self.assertRaises(
+            ValueError,
+            ExtLabelEncoder(classes=[0, 1]).fit([]).transform,
+            [1, 3],
+        )
+        self.assertRaises(
+            ValueError, ExtLabelEncoder().fit([]).transform, [1, 3]
+        )

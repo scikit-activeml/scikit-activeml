@@ -25,12 +25,13 @@ from skactiveml.utils import (
 
 
 class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
-    """Regression Tree-based Active Learning
+    """Regression Tree-based Active Learning (RT-AL)
 
-    This strategy is based on a regression tree and selects the number `n_k` of
-    samples to be selected from each leaf `k` given a certain `batch size`. It
-    than uses one of the three methods 'random', 'diversity', or
-    'representativity' to select `n_k` samples from each leaf `k`.
+    This class implements the query strategy Regression Tree-based Active
+    Learning (RT-AL) [1]_, which is based on a regression tree and selects the
+    number `n_k` of samples to be selected from each leaf `k` given a certain
+    `batch size`. It than uses one of the three methods 'random', 'diversity',
+    or 'representativity' to select `n_k` samples from each leaf `k`.
 
     Parameters
     ----------
@@ -40,16 +41,16 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
       default=skactiveml.utils.MISSING_LABEL
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
-        Random state for candidate selection. Ensure that
+        The random state to use.
     max_iter_representativity : int, default=5
         Maximum number of optimisation iterations.
         Only used if `method='representativity'`.
 
     References
     ----------
-    [1] Jose, Ashna, João Paulo Almeida de Mendonça, Emilie Devijver,
-        Noël Jakse, Valérie Monbet, and Roberta Poloni. "Regression tree-based
-        active learning." Data Mining and Knowledge Discovery (2023): 420-460.
+    .. [1] A. Jose, J. P. A. de Mendonça, E. Devijver, N. Jakse, V. Monbet,
+       and R. Poloni. Regression Tree-based Active Learning. Data Min. Knowl.
+       Discov., pages 420–460, 2023.
     """
 
     def __init__(
@@ -81,9 +82,9 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         Parameters
         ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
-        y : array-like of shape (n_samples)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL).
         reg : SkactivemlRegressor
@@ -91,49 +92,53 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             predict the data. Ensure that the number of samples in the leaf is
             greater than 1. For example, by setting `min_samples_leaf >= 2` or
             by restricting the tree's depth.
-        fit_reg : bool, optional (default=True)
+        fit_reg : bool, default=True
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
         sample_weight : array-like of shape (n_samples), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features),
-            optional (default=None)
-            If candidates is None, the unlabeled samples from (X,y) are
-            considered as candidates.
-            If candidates is of shape (n_candidates) and of type int,
-            candidates is considered as the indices of the samples in (X,y).
-            If candidates is of shape (n_candidates, n_features), the
-            candidates are directly given in candidates (not necessarily
-            contained in X).
-        batch_size : int, optional (default=1)
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from
+              `(X,y)` are considered as `candidates`.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of the
+              samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, *)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`). This is not supported by all
+              query strategies.
+        batch_size : int, default=1
             The number of samples to be selected in one AL cycle. Originally,
             this query strategy is developed for `batch_sizes > 1`.
-        return_utilities : bool, optional (default=False)
+        return_utilities : bool, default=False
             If true, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        utilities : numpy.ndarray of shape (batch_size, n_samples) or
-            numpy.ndarray of shape (batch_size, n_candidates)
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
             Utilities for labeled samples will be set to np.nan.
-            If candidates is None or of shape (n_candidates), the indexing
-            refers to samples in X.
-            If candidates is of shape (n_candidates, n_features), the indexing
-            refers to samples in candidates.
-        """
 
+            - If `candidates` is `None` or of shape
+              `(n_candidates,)`, the indexing refers to the samples in
+              `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the indexing refers to the samples in `candidates`.
+        """
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
@@ -330,8 +335,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
 
 def _discretize_acquisitions_per_leaf(n_k, batch_size, random_state):
-    """
-    Discretizes a given array of non-negative floats corresponding to the
+    """Discretizes a given array of non-negative floats corresponding to the
     number of acquisitions per leaf of the regression tree. Guarantees that we
     acquire a minimum number (i.e., floored floats) per leaf.
 
@@ -367,9 +371,7 @@ def _discretize_acquisitions_per_leaf(n_k, batch_size, random_state):
 
 
 def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
-    """Regression Tree-based Active Learning
-
-    Computes the number of samples to be selected from each leaf of the
+    """Computes the number of samples to be selected from each leaf of the
     regression tree.
 
     Parameters
@@ -390,6 +392,7 @@ def _calc_acquisitions_per_leaf(X, y, reg, missing_label, batch_size=1):
     Returns
     -------
     n_samples_per_leaf : numpy.ndarray of shape (n_leafs)
+        Number of samples per leaf.
     """
     is_lbld = is_labeled(y, missing_label=missing_label)
 

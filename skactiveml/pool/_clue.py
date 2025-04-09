@@ -28,10 +28,6 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label.
-    random_state : None or int or np.random.RandomState, default=None
-        The random state to use.
     cluster_algo : ClusterMixin.__class__, default=KMeans
         The cluster algorithm to be used. It must implement a `fit_transform`
         method, which takes samples `X` and `sample_weight` as inputs, e.g.,
@@ -53,16 +49,21 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
     clf_embedding_flag_name : str or None, default=None
         Name of the flag, which is passed to the `predict_proba` method for
         getting the (learned) sample representations.
-            - If `clf_embedding_flag_name=None` and `predict_proba` returns
-              only one output, the input samples `X` are used.
-            - If `predict_proba` returns two outputs or `clf_embedding_name` is
-              not `None`, `(proba, embeddings)` are expected as outputs.
+
+        - If `clf_embedding_flag_name=None` and `predict_proba` returns
+          only one output, the input samples `X` are used.
+        - If `predict_proba` returns two outputs or `clf_embedding_name` is
+          not `None`, `(proba, embeddings)` are expected as outputs.
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : None or int or np.random.RandomState, default=None
+        The random state to use.
 
     References
     ----------
-    .. [1] Prabhu, Viraj, Arjun Chandrasekaran, Kate Saenko, and Judy Hoffman,
-       "Active Domain Adaptation via Clustering Uncertainty-weighted
-       Embeddings", ICCV, 2022.
+    .. [1] V. Prabhu, A. Chandrasekaran, K. Saenko, and J. Hoffman. Active
+       domain adaptation via clustering uncertainty-weighted embeddings. In
+       IEEE/CVF Int. Conf. Comput. Vis., pages 8505–8514, 2021.
     """
 
     def __init__(
@@ -95,14 +96,16 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-        """Query the next samples to be labeled
+        """Determines for which candidate samples labels are to be queried.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
-            Training data set, usually complete, i.e. including the labeled and
-            unlabeled samples.
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`.)
+            indicated by `self.missing_label`).
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -110,8 +113,8 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
-        candidates : None or array-like of shape (n_candidates, ) of type \
-                int, default=None
+        candidates : None or array-like of shape (n_candidates,), dtype=int or\
+                array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
@@ -120,15 +123,16 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
-            If true, also return the utilities based on the query strategy.
+            If `True`, also return the utilities based on the query strategy.
 
         Returns
         -------
-        query_indices : numpy.ndarray of shape (batch_size)
-            The query_indices indicate for which candidate sample a label is
-            to queried, e.g., `query_indices[0]` indicates the first selected
-            sample. The indexing refers to the samples in `X`.
-        utilities : numpy.ndarray of shape (batch_size, n_samples)
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample. The indexing refers to the samples in `X`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.

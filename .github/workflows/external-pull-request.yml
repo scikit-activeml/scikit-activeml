@@ -1,0 +1,128 @@
+name: skactiveml
+
+on:
+    pull_request:
+        types: [opened, reopened, synchronize]
+
+jobs:
+  test_oldest_dependencies:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install oldest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        sed 's/[>~]=/==/g' requirements.txt > requirements_old.txt
+        pip install -r requirements_old.txt
+        pip install -r requirements_extra.txt
+    - name: Test with pytest and oldest dependencies
+      run: |
+        pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
+
+  test_newest_dependencies:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
+    - name: Test with pytest and newest dependencies
+      run: |
+        pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
+    - name: 'Upload Coverage Artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        name: cov_${{ matrix.python-version }}
+        path: coverage.xml
+        retention-days: 5
+
+  check_formatting_and_linting:
+    if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
+    - name: Black
+      uses: psf/black@stable
+      with:
+        options: "--check --line-length 79"
+        src: "./skactiveml"
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 skactiveml/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 skactiveml/ --ignore=E203,W503 --count --exit-zero --statistics
+
+  create_documentation:
+    if: ${{github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install -r requirements_extra.txt
+    - name: Create documentation with sphinx
+      run: |
+        sphinx-build -b html docs docs/_build
+        zip -r docs.zip docs
+    - name: 'Upload Docs Artifact'
+      uses: actions/upload-artifact@v4
+      with:
+        name: docs_${{ matrix.python-version }}.zip
+        path: docs
+        retention-days: 5

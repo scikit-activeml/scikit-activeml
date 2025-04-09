@@ -67,25 +67,30 @@ class TestFixedUncertaintyBudgetManager(
     TemplateEstimatedBudgetManager, unittest.TestCase
 ):
     def setUp(self):
+        init_default_params = {
+            "classes": np.array([0, 1]),
+        }
         query_by_utility_params = {
             "utilities": np.array([[0.5]]),
         }
         super().setUp(
             bm_class=FixedUncertaintyBudgetManager,
-            init_default_params={},
+            init_default_params=init_default_params,
             query_by_utility_params=query_by_utility_params,
         )
 
-    def test_init_param_num_classes(self):
-        # num_classes must be defined as an int and greater than 0
+    def test_init_param_classes(self):
+        # classes must be defined
         test_cases = []
         test_cases += [
-            (2, None),
-            ("string", TypeError),
-            (-1, ValueError),
-            (0, ValueError),
+            ([0, 1], None),
+            (["False", "True"], None),
+            (2, TypeError),
+            ("string", None),
+            (-1, TypeError),
+            (0, TypeError),
         ]
-        self._test_param("init", "num_classes", test_cases)
+        self._test_param("init", "classes", test_cases)
 
     def test_query_by_utility(
         self,
