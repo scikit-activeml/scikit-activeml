@@ -47,6 +47,7 @@ setuptools.setup(
     python_requires=">=3.9",
     author_email="marek.herde@uni-kassel.de",
     license="BSD 3-Clause License",
+    license_file='LICENSE',
     packages=setuptools.find_packages(),
     install_requires=requirements(),
     setup_requires=["pytest-runner"],
