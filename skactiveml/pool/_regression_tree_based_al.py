@@ -1,6 +1,8 @@
 import warnings
 
 import numpy as np
+
+from copy import copy
 from sklearn import clone
 from sklearn.cluster import KMeans
 from sklearn.metrics import (
@@ -287,7 +289,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
             batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             for i in range(self.max_iter_representativity):
-                prev_best_indices = query_indices
+                prev_best_indices = copy(query_indices)
                 for l_idx in range(batch_size):
                     # Update DELTA using the current centroids.
                     X_M = X[labeled_idxs]

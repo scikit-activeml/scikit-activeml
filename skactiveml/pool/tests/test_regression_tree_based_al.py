@@ -2,6 +2,7 @@ import unittest
 
 import numpy as np
 from sklearn.metrics import pairwise_distances_argmin
+from sklearn.datasets import make_regression
 
 from skactiveml.pool import RegressionTreeBasedAL
 from skactiveml.pool._regression_tree_based_al import (
@@ -174,6 +175,24 @@ class TestRegressionTreeBasedAL(
                     candidates=candidates,
                 )
                 self.assertTrue((np.isnan(utilities) + (utilities == 1)).all())
+
+        # reg = SklearnRegressor(DecisionTreeRegressor(), missing_label=np.nan)
+        X, y = make_regression(n_samples=500, n_features=100, random_state=0)
+        y[100:] = np.nan
+        query_indices = []
+        for i in [1, 10]:
+            qs = RegressionTreeBasedAL(
+                method="representativity",
+                max_iter_representativity=i,
+                random_state=0,
+            )
+            query_indices.append(qs.query(X, y, reg=self.reg, batch_size=5))
+        np.testing.assert_raises(
+            AssertionError,
+            np.testing.assert_array_equal,
+            query_indices[0],
+            query_indices[1],
+        )
 
 
 class _DummyRegressor(DecisionTreeRegressor):
