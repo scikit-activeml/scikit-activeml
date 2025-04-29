@@ -18,6 +18,8 @@ from ..utils import (
     check_n_features,
 )
 
+from copy import deepcopy
+
 
 class ParzenWindowClassifier(ClassFrequencyEstimator):
     """Parzen Window Classifier (PWC)
@@ -151,7 +153,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
 
         # Ensure that metric_dict is a Python dictionary.
         self.metric_dict_ = (
-            self.metric_dict if self.metric_dict is not None else {}
+            deepcopy(self.metric_dict) if self.metric_dict is not None else {}
         )
         if (
             "gamma" in self.metric_dict_

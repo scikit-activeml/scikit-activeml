@@ -5,6 +5,7 @@ from sklearn.utils.validation import NotFittedError
 from skactiveml.tests.template_estimator import TemplateClassFrequencyEstimator
 
 from skactiveml.classifier import ParzenWindowClassifier
+from copy import deepcopy
 
 
 class TestParzenWindowClassifier(
@@ -80,6 +81,17 @@ class TestParzenWindowClassifier(
         np.testing.assert_array_equal(
             [[0, 0, 2], [0, 0, 0], [0, 1, 0]], pwc.V_
         )
+        # check that metric_dict is not changed after fit
+        pwc = ParzenWindowClassifier(
+            classes=["tokyo", "paris", "new york"],
+            missing_label="nan",
+            metric="rbf",
+            metric_dict={"gamma": "mean"},
+        )
+        before_metric_dict = deepcopy(pwc.metric_dict)
+        pwc.fit(X=self.fit_default_params["X"], y=self.y_nan)
+        after_metric_dict = deepcopy(pwc.metric_dict)
+        self.assertEqual(before_metric_dict, after_metric_dict)
 
     def test_predict_freq(self):
         pwc = ParzenWindowClassifier(
