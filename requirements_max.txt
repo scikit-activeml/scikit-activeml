@@ -1,4 +1,4 @@
-joblib<=1.4.2
+joblib<=1.5.0
 numpy<=2.2.3
 scipy<=1.15.2
 scikit-learn<=1.6.1
