@@ -37,7 +37,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
     """
 
@@ -64,7 +64,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             It contains the weights of the training samples´ labels. It
             must have the same shape as y.
         fit_kwargs : dict-like
-            Further parameters are passed as input to the 'fit' method of the
+            Further parameters are passed as input to the `fit` method of the
             'estimator'.
 
         Returns
@@ -169,8 +169,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         X :  array-like of shape (n_samples, n_features)
             Input samples.
         predict_kwargs : dict-like
-            Further parameters are passed as input to the 'predict' method of
-            the 'estimator'. If the estimator could not be fitted, only
+            Further parameters are passed as input to the `predict` method of
+            the `estimator`. If the estimator could not be fitted, only
             `return_std` is supported as keyword argument.
 
         Returns
@@ -338,7 +338,7 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
-        Determines random number for 'predict' method. Pass an int for
+        Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
     """
 

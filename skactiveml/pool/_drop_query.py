@@ -31,7 +31,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     dropout_rate : float, default=0.75
         Dropout rate used to generate samples.
     n_dropout_samples : int, default=3
-        Number of dropout samples
+        Number of dropout samples.
     cluster_algo : ClusterMixin.__class__, default=KMeans
         The cluster algorithm to be used. It must implement a `fit_transform`
         method, which takes samples `X` as inputs, e.g.,

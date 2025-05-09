@@ -177,7 +177,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             `utilities[0, :, j]` indicates the utilities used for selecting
             the first sample-annotator-pair (with indices `query_indices[0]`).
 
-            - If `candidates` is `None` or of shape `(n_candidates,), the
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to samples in `X`.
             - If `candidates` is of shape `(n_candidates, n_features)`, the
               indexing refers to samples in `candidates`.

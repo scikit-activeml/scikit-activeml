@@ -1,6 +1,8 @@
 import warnings
 
 import numpy as np
+
+from copy import copy
 from sklearn import clone
 from sklearn.cluster import KMeans
 from sklearn.metrics import (
@@ -41,14 +43,14 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
       default=skactiveml.utils.MISSING_LABEL
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
-        Random state for candidate selection. Ensure that
+        The random state to use.
     max_iter_representativity : int, default=5
         Maximum number of optimisation iterations.
         Only used if `method='representativity'`.
 
     References
     ----------
-    .. [1] A. Jose, J. P. A. de Mendon¸ca, E. Devijver, N. Jakse, V. Monbet,
+    .. [1] A. Jose, J. P. A. de Mendonça, E. Devijver, N. Jakse, V. Monbet,
        and R. Poloni. Regression Tree-based Active Learning. Data Min. Knowl.
        Discov., pages 420–460, 2023.
     """
@@ -287,7 +289,7 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
 
             batch_utilities_cand = np.full((batch_size, len(X_cand)), -np.inf)
             for i in range(self.max_iter_representativity):
-                prev_best_indices = query_indices
+                prev_best_indices = copy(query_indices)
                 for l_idx in range(batch_size):
                     # Update DELTA using the current centroids.
                     X_M = X[labeled_idxs]

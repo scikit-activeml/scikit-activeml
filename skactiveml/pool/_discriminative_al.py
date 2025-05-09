@@ -31,7 +31,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         This parameter is only relevant for `batch_size>1`.
 
         - If `greedy_selection=False`, the classifying discriminator is
-        refitted after each sample selection within a batch.
+          refitted after each sample selection within a batch.
         - If `greedy_selection=True`, the discriminator is kept fixed.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.

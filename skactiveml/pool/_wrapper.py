@@ -81,8 +81,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features), default=None
-            - If `candidates` is `None`, the unlabeled samples from
-              `(X,y)` are considered as `candidates`.
+
+            - If `candidates` is `None`, the unlabeled samples from `(X,y)` are
+              considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
@@ -304,7 +305,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         Determines the number of maximum number of parallel utility
         computations. If `n_jobs` is set to -1 (default), the number of
         parallel computations is set to the number of available CPU cores are.
-        For further details refer to `n_jobs` in `joblib.Parallel`
+        For further details refer to `n_jobs` in `joblib.Parallel`.
     parallel_dict : dict-like, default=None
         Further arguments that will be passed to `joblib.Parallel`. Note that,
         `n_jobs` should not be set in `parallel_dict`.
@@ -352,8 +353,9 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             indicated by self.MISSING_LABEL).
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features), (default=None)
-            - If `candidates` is `None`, the unlabeled samples from
-              `(X,y)` are considered as `candidates`.
+
+            - If `candidates` is `None`, the unlabeled samples from `(X,y)` are
+              considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.

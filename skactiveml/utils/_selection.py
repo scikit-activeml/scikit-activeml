@@ -109,7 +109,7 @@ def simple_batch(
 
     Returns
     -------
-    best_indices : np.ndarray of shape (batch_size,) if utilities.ndim == 1 \\
+    best_indices : np.ndarray of shape (batch_size,) if utilities.ndim == 1 \
             else (batch_size, utilities.ndim)
         The indices of the batch samples.
     batch_utilities : np.ndarray of shape (batch_size, len(utilities))

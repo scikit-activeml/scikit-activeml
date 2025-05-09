@@ -346,7 +346,7 @@ class IndexClassifierWrapper:
             Indices of samples in `X` that will be used to fit the classifier.
         y : array-like of shape (n_sub_samples,), default=None
             Class labels of the training samples corresponding to `X[idx]`.
-            Missing labels are represented the attribute 'missing_label'.
+            Missing labels are represented by the attribute `missing_label`.
         sample_weight : array-like of shape (n_sub_samples,), default=None
             Weights of training samples in `X[idx]`.
         use_base_clf : bool, default=False
@@ -632,7 +632,7 @@ def _cross_entropy(
     other_reg: ProbabilisticRegressor
         Evaluated distribution of the cross entropy.
     integration_dict: dict, optional default = None
-        Dictionary for integration arguments, i.e. `integration method` etc..
+        Dictionary for integration arguments, i.e. `integration method` etc.
         For details see method `conditional_expect`.
     random_state : int | np.random.RandomState, optional
         Random state for cross entropy calculation.

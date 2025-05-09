@@ -101,7 +101,7 @@ class FixedUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     queried, when the utility is higher than the specified `budget` and the
     probability of the most likely class exceeds a threshold calculated based
     on the `budget` and the number of `classes`. See also
-    :class:`.EstimatedBudgetZliobaite`
+    :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
@@ -223,7 +223,7 @@ class VariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     utility is higher than `theta_`, which is a time-dependent threshold that
     increases or decreases when samples are queried or not queried,
     respectively. The rate for that change is controlled via `s`. See also
-    :class:`.EstimatedBudgetZliobaite`
+    :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
@@ -375,7 +375,7 @@ class RandomVariableUncertaintyBudgetManager(EstimatedBudgetZliobaite):
     normal distribution with mean 1 and standard deviation `mu`. Similarly, to
     :class:`.VariableUncertaintyBudgetManager`, `theta_` increases or decreases
     when samples are queried or not queried, respectively. The rate for that
-    change is controlled via `s`. See also :class:`.EstimatedBudgetZliobaite`
+    change is controlled via `s`. See also :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
@@ -564,7 +564,7 @@ class SplitBudgetManager(EstimatedBudgetZliobaite):
     change is controlled via `s`. Additionally, samples are queried randomly
     with a probability of `v`. See also
     :class:`.VariableUncertaintyBudgetManager` and
-    :class:`.EstimatedBudgetZliobaite`
+    :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------
@@ -756,8 +756,8 @@ class RandomBudgetManager(EstimatedBudgetZliobaite):
     Budget manager which checks, whether the specified budget has been
     exhausted already. If not, a sample is queried, when the utility is
     higher than the specified budget. If budget is available, samples are
-    queried randomly with a probability of `budget`%. See also
-    :class:`.EstimatedBudgetZliobaite`
+    queried randomly with a probability of `budget` %. See also
+    :class:`.EstimatedBudgetZliobaite`.
 
     Parameters
     ----------

@@ -317,7 +317,7 @@ class GreedyBALD(_GeneralBALD):
     reduces the number of possible hypotheses maximally fast to minimize the
     uncertainty about the parameters using Shannon's entropy. It seeks the data
     point that maximises the decrease in expected posterior entropy. For the
-    batch case, a greedy (top-k) selection is applied
+    batch case, a greedy (top-k) selection is applied.
 
     Parameters
     ----------

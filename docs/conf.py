@@ -151,7 +151,7 @@ html_logo = "logos/scikit-activeml-logo.png"
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-docs_address = "https://scikit-activeml.github.io/scikit-activeml-docs/latest"
+docs_address = "https://scikit-activeml.github.io/latest"
 switcher_json_path = f"{docs_address}/_static/switcher.json"
 
 html_theme_options = {
