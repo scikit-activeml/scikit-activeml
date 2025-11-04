@@ -83,7 +83,9 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
 
     def test_pipeline(self):
         base_estimator = SklearnRegressor(GaussianProcessRegressor())
-        estimator = Pipeline([('scaler', StandardScaler()), ('reg', base_estimator)])
+        estimator = Pipeline(
+            [("scaler", StandardScaler()), ("reg", base_estimator)]
+        )
         reg = SklearnRegressor(estimator=estimator)
         y = np.full(3, MISSING_LABEL)
         reg.fit(self.X, y)
