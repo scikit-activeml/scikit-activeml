@@ -9,7 +9,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import LinearRegression, ARDRegression, SGDRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.svm import SVC
-from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.utils.validation import check_is_fitted
 from sklearn.datasets import make_regression
@@ -80,6 +80,17 @@ class TestWrapper(TemplateSkactivemlRegressor, unittest.TestCase):
         reg_1.fit(X, y, sample_weight=sample_weight)
         reg_2.fit(X, y)
         self.assertTrue(np.any(reg_1.predict(X) != reg_2.predict(X)))
+
+    def test_pipeline(self):
+        base_estimator = SklearnRegressor(GaussianProcessRegressor())
+        estimator = Pipeline([('scaler', StandardScaler()), ('reg', base_estimator)])
+        reg = SklearnRegressor(estimator=estimator)
+        y = np.full(3, MISSING_LABEL)
+        reg.fit(self.X, y)
+        self.assertRaises(NotFittedError, check_is_fitted, reg.estimator_)
+        y = np.zeros(3)
+        reg.fit(self.X, y)
+        check_is_fitted(reg.estimator_)
 
     def test_fit(self):
         class DummyRegressor(SkactivemlRegressor):
