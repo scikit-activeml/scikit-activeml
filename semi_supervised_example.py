@@ -16,6 +16,7 @@ y_true = y_true % 4
 
 plt.scatter(X_all[:, 0], X_all[:, 1], c=y_true)
 plt.show()
+
 X, X_test = X_all[:len(X_all)//2], X_all[len(X_all)//2:]
 y_true, y_true_test = y_true[:len(X_all)//2], y_true[len(X_all)//2:]
 
