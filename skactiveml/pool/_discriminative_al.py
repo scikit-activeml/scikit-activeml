@@ -119,18 +119,16 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-
-        is_multilabel = np.array(y).ndim == 2  # here changes
-
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
         )
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
 
         # Retransform candidates and create a potential mapping to the samples
         # in `X`.
+        is_multilabel = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
         )
@@ -144,9 +142,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         if self.greedy_selection:
             # Return the top samples with the highest probabilities of
             # being unlabeled, which correspond to their utilities.
-            y_discriminator = is_unlabeled(y, missing_label=self.missing_label)
-            if is_multilabel: # here changes
-                y_discriminator = np.sum(np.all(y_discriminator, axis=1))
+            y_discriminator = is_unlabeled(y, missing_label=self.missing_label, is_multilabel=is_multilabel)
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
             utilities_cand = discriminator.predict_proba(X_cand)[:, 1]
@@ -171,12 +167,10 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             for i in range(batch_size):
                 # Determine unlabeled vs. labeled samples.
                 y_discriminator = is_unlabeled(
-                    y, missing_label=self.missing_label
+                    y,
+                    missing_label=self.missing_label,
+                    is_multilabel=is_multilabel
                 )
-
-                if is_multilabel: # here changes
-                    y_discriminator = np.all(y_discriminator, axis=1)
-
                 y_discriminator = y_discriminator.astype(int)
 
                 # Mark already selected samples as labeled.

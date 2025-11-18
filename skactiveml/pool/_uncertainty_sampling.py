@@ -40,6 +40,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState
         The random state to use.
+    multilabel_aggregation_fn: callable, default=np.average
+        Callable that takes axis as kwarg and reduces along that axis. Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while `np.sum` is not allowed.
 
     References
     ----------
@@ -61,14 +63,14 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        ml_agg:callable=np.max
+        multilabel_aggregation_fn=np.average,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
         self.method = method
         self.cost_matrix = cost_matrix
-        self.ml_agg = ml_agg
+        self.multilabel_aggregation_fn = multilabel_aggregation_fn
 
     def query(
         self,
@@ -150,10 +152,10 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         is_multilabel = np.array(y).ndim == 2
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel,
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel,)
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         # Validate classifier type.
         check_type(clf, "clf", SkactivemlClassifier)
@@ -212,7 +214,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                     method=self.method,
                     cost_matrix=self.cost_matrix,
                     is_multilabel=is_multilabel,
-                    ml_agg=self.ml_agg
+                    multilabel_aggregation_fn=self.multilabel_aggregation_fn
                 )
             elif self.method == "expected_average_precision":
                 classes = clf.classes_
@@ -239,7 +241,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         )
 
 
-def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_multilabel=False, ml_agg: callable=np.max):
+def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_multilabel=False, multilabel_aggregation_fn=np.max):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]_. For the least confident and
@@ -259,8 +261,8 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_mu
         The method to calculate the uncertainty.
     is_multilabel: bool, default=False
         indicates if provided probas should be multilabel
-    ml_agg: callable, default=np.max
-        Aggregation function used to aggregate uncertainty of multilabel predictions
+    multilabel_aggregation_fn: callable, default=np.average
+        Callable that takes axis as kwarg and reduces along that axis. Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while `np.sum` is not allowed.
 
 
     References
@@ -296,7 +298,7 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_mu
     if method == "least_confident":
         if cost_matrix is None:
             if is_multilabel:
-                return ml_agg(-np.abs(.5 - probas), axis=1)
+                return multilabel_aggregation_fn(-np.abs(.5 - probas), axis=1)
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
@@ -314,7 +316,7 @@ def uncertainty_scores(probas, cost_matrix=None, method="least_confident", is_mu
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
                 if is_multilabel:
-                    return ml_agg(-probas * np.log(probas + 1e-10), axis=1)
+                    return multilabel_aggregation_fn(-probas * np.log(probas + 1e-10), axis=1)
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(

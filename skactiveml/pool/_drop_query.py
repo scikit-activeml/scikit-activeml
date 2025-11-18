@@ -54,7 +54,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn: callable, default=np.average
-        Callable that takes axis as kwarg and reduces along that axis
+        Callable that takes axis as kwarg and reduces along that axis. Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while `np.sum` is not allowed.
 
 
     References
@@ -138,13 +138,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-
-        is_multilabel = np.array(y).ndim == 2
-
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
         )
+        is_multilabel = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
         )
@@ -224,7 +222,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             y_pred_dropout[:, i] = y_pred_dropout_current
 
         # Filter candidates for clustering based on disagreement.
-        n_disagrees = (y_pred[:, None] != y_pred_dropout).sum(axis=-1)
+        n_disagrees = (y_pred[:, None, :] != y_pred_dropout).sum(axis=1)
         if is_multilabel:
             n_disagrees = self.multilabel_aggregation_fn(n_disagrees, axis=-1)
         disagree_rate = n_disagrees.astype(float) / self.n_dropout_samples

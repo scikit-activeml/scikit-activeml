@@ -134,12 +134,10 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             refers to the samples in `X`.
         """
         # Check parameters.
-
-        is_multilabel = np.array(y).ndim == 2  # here changes
-
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
         )
+        is_multilabel = np.array(y).ndim == 2
         _, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel)
 
         is_candidate = np.full(len(X), fill_value=False)

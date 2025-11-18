@@ -44,7 +44,7 @@ from ._prob_cover import ProbCover
 from ._contrastive_al import ContrastiveAL
 from ._clue import Clue
 from ._drop_query import DropQuery
-from ._mmc import MMC
+from ._mmc import MaxLossReductionMaxConfidence
 from ._label_cardinality_inconsistency import LabelCardinalityInconsistency
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 from ._falcun import Falcun
@@ -80,7 +80,7 @@ __all__ = [
     "Clue",
     "DropQuery",
     "LabelCardinalityInconsistency",
-    "MMC"
+    "MaxLossReductionMaxConfidence",
     "batch_bald",
     "CoreSet",
     "k_greedy_center",

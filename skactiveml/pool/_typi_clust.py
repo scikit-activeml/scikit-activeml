@@ -108,13 +108,11 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-
-        is_multilabel = np.array(y).ndim == 2 # here chagnes
-
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel,
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True,
         )
 
+        is_multilabel = np.array(y).ndim == 2
         _, mapping = self._transform_candidates(
             candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel,
         )
@@ -140,11 +138,10 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             raise TypeError("`n_cluster_param_name` supports only string.")
 
         labeled_sample_indices = labeled_indices(
-            y, missing_label=self.missing_label
+            y,
+            missing_label=self.missing_label,
+            is_multilabel=is_multilabel
         )
-
-        if is_multilabel: # here changes, process labeled indices to not have shape [500, 2]
-            labeled_sample_indices = np.unique(labeled_sample_indices[:,0])
 
         # Set number of clusters.
         n_clusters = len(labeled_sample_indices) + batch_size

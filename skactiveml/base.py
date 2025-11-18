@@ -264,7 +264,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
-        is_multilabel=False,
+        allow_multilabel=False,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -298,8 +298,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             provided when reset was last True.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        is_multilabel : bool, default=False
-            Weather provided data is in multi-label format or not.
+        allow_multilabel : bool, default=False
+            Whether provided data is allowed to be in multi-label format or not.
 
         Returns
         -------
@@ -326,21 +326,19 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        y = column_or_1d(y, warn=True) if not is_multilabel else check_array(y, ensure_2d=True, force_all_finite="allow-nan")
-        # here check
-        if is_multilabel and not np.all(np.isin(y, [0, 1]) | np.isnan(y)): # possible 0,1-encoded check
-            raise ValueError("All elements in y must be either 0 or 1 for multilabel classification.")
+        if allow_multilabel:
+            y = check_array(y, ensure_2d=True, force_all_finite="allow-nan")
+            unlabeled_mask = is_unlabeled(y, missing_label=self.missing_label_, is_multilabel=True)
+
+            if not np.all(np.isin(y[~unlabeled_mask], [0, 1])):
+                raise ValueError("Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`.")
+        else:
+            y = column_or_1d(y, warn=True)
 
         if candidates is None:
-            if not is_multilabel:
-                n_candidates = int(
-                    np.sum(is_unlabeled(y, missing_label=self.missing_label_))
-                )
-            else:
-                # here
-                n_candidates = int(
-                    np.sum(np.all(is_unlabeled(y, missing_label=self.missing_label_), axis=1))
-                )
+            n_candidates = int(
+                np.sum(is_unlabeled(y, missing_label=self.missing_label_, is_multilabel=allow_multilabel))
+            )
         else:
             n_candidates = len(candidates)
 
@@ -389,7 +387,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             If True, an exception is raised when indices of candidates contain
             labeled samples.
         is_multilabel : bool, default=False
-            Weather provided data is in multi-label format or not.
+            Whether provided data is in multi-label format or not.
 
         Returns
         -------
@@ -401,11 +399,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         """
 
         if candidates is None:
-            if not is_multilabel:
-                ulbd_idx = unlabeled_indices(y, self.missing_label_)
-            else:
-                # a label is unlabeled as long as there is at least one MISSING_LABEL
-                ulbd_idx = np.unique(np.argwhere(is_unlabeled(y, MISSING_LABEL)[:, 0]))
+            ulbd_idx = unlabeled_indices(y, self.missing_label_, is_multilabel=is_multilabel)
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
             if allow_only_unlabeled:

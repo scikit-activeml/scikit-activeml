@@ -17,9 +17,9 @@ from ..utils import (
 class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
     """Label Cardinality Inconsistency (LCI)
 
-    This class implements the query strategy Label Cardinality Inconsistency (LCI) [1]
-    that selects samples base on the difference in label cardinality of the
-    label pool and predicted number of classes in the unlabeled pool.
+    This class implements the query strategy Label Cardinality Inconsistency (LCI) [1]_
+    that selects samples based on the difference in label cardinality between the
+    labeled pool and predicted number of classes in the unlabeled pool.
 
     Parameters
     ----------
@@ -30,8 +30,8 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] Zhang, C., & Chaudhuri, K. (2015). Active learning from weak and strong labelers.
-        Advances in Neural Information Processing Systems, 28.
+    .. [1] R. Wang and S. Ye (2019). Multi-Label Active Learning Driven by Uncertainty and Inconsistency.
+        In 2019 International Conference on Machine Learning and Cybernetics.
     """
 
     def __init__(
@@ -52,14 +52,14 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
-
-        is_multilabel = np.array(y).ndim == 2
-
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
         )
 
+        is_multilabel = np.array(y).ndim == 2
+        if not is_multilabel:
+            raise ValueError("`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only.")
         X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         # Validate classifier type
@@ -72,18 +72,17 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             if sample_weight is None:
                 clf = clone(clf).fit(X, y)
             else:
-                clf = clone(clf).fit(X, y, sample_weight)
+                clf = clone(clf).fit(X, y, sample_weight=sample_weight)
 
         # find the unlabeled dataset
         if candidates is None:
             X_unlbld = X_cand
         elif mapping is not None:
-            if not is_multilabel:
-                unlbld_mapping = unlabeled_indices(
-                    y[mapping], missing_label=self.missing_label
-                )
-            else:
-                unlbld_mapping = np.unique(np.argwhere(is_unlabeled(y[mapping], MISSING_LABEL)[:, 0]))
+            unlbld_mapping = unlabeled_indices(
+                y[mapping],
+                missing_label=self.missing_label,
+                is_multilabel=True
+            )
             X_unlbld = X_cand[unlbld_mapping]
 
         else:

@@ -16,7 +16,7 @@ from ..utils import (
 )
 
 
-class MMC(SingleAnnotatorPoolQueryStrategy):
+class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
     """Maximum Loss Reduction with Maximal Confidence (MMC)
 
     This class implements the query strategy Maximum Loss Reduction with Maximal Confidence (MMC) [1]
@@ -32,8 +32,8 @@ class MMC(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    [1] B. Yang, J. Sun, T. Wang, and Z. Chen. Effective multi-label active learning for text classification.
-       In Proc. of ACM SIGKDD Inter. Conference on Knowledge; Discovery and Data Mining, 2009.
+    .. [1] Li, X., & Guo, Y. (2013). Active Learning with Multi-Label SVM Classification.
+       In IjCAI (Vol. 13, pp. 1479-1485).
     """
     def __init__(
         self,
@@ -103,14 +103,14 @@ class MMC(SingleAnnotatorPoolQueryStrategy):
             If `candidates` is of shape `(n_candidates, n_features)`, the
             indexing refers to samples in `candidates`.
         """
-
-        is_multilabel = np.array(y).ndim == 2
-
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, is_multilabel=is_multilabel
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
         )
 
+        is_multilabel = True
+        if not is_multilabel:
+            raise ValueError("`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only.")
         X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         check_type(discriminator, "discriminator", SkactivemlClassifier)
@@ -131,18 +131,16 @@ class MMC(SingleAnnotatorPoolQueryStrategy):
         f = unlbld_probas * 2 - 1
 
         lbld_probas = np.flip(np.sort(lbld_probas, axis=1), axis=-1)
-        lbld_probas /= np.tile(lbld_probas.sum(axis=1, keepdims=True), (1, lbld_probas.shape[1]))
+        lbld_probas /= lbld_probas.sum(axis=1, keepdims=True)
 
         unlbld_probas_idx = np.flip(np.argsort(unlbld_probas, axis=1), axis=-1)
         unlbld_probas = np.flip(np.sort(unlbld_probas, axis=1), axis=-1)
-        unlbld_probas /= np.tile(unlbld_probas.sum(axis=1, keepdims=True), (1, unlbld_probas.shape[1]))
+        unlbld_probas /= unlbld_probas.sum(axis=1, keepdims=True)
 
-        X_discriminator = lbld_probas
         y_discriminator = y[lbld_mask].sum(axis=1)
-        discriminator.fit(X_discriminator, y_discriminator)
+        discriminator.fit(lbld_probas, y_discriminator)
 
-        X_discriminator_pred = unlbld_probas
-        unlbld_pred = discriminator.predict(X_discriminator_pred)
+        unlbld_pred = discriminator.predict(unlbld_probas)
 
         yhat = -1 * np.ones((len(unlbld_pred), y.shape[1]), dtype=int)
         for i, p in enumerate(unlbld_pred):
