@@ -15,7 +15,7 @@ from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
-    get_tags
+    get_tags,
 )
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
@@ -191,7 +191,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     y_pred = y_pred_full
             else:
                 if is_multilabel:
-                    raise NotImplemented("Cost Matrix for Multilabel classification not yet implemented")
+                    raise NotImplemented(
+                        "Cost Matrix for Multilabel classification not yet implemented"
+                    )
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
@@ -257,11 +259,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 if P.shape[1] != len(self.classes_):
                     P_ext = np.zeros((len(X), len(self.classes_)))
                     est_classes = self.estimator_.classes_
-                    indices_est = np.where(np.isin(est_classes, self.classes_))[0]
+                    indices_est = np.where(
+                        np.isin(est_classes, self.classes_)
+                    )[0]
                     class_indices = np.searchsorted(
                         self.classes_, est_classes[indices_est]
                     )
-                    P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
+                    P_ext[:, class_indices] = (
+                        1 if len(class_indices) == 1 else P
+                    )
                     P = P_ext
             if not np.any(np.isnan(P)):
                 return P

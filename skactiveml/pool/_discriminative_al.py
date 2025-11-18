@@ -121,7 +121,13 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
@@ -142,7 +148,11 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         if self.greedy_selection:
             # Return the top samples with the highest probabilities of
             # being unlabeled, which correspond to their utilities.
-            y_discriminator = is_unlabeled(y, missing_label=self.missing_label, is_multilabel=is_multilabel)
+            y_discriminator = is_unlabeled(
+                y,
+                missing_label=self.missing_label,
+                is_multilabel=is_multilabel,
+            )
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
             utilities_cand = discriminator.predict_proba(X_cand)[:, 1]
@@ -169,7 +179,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
                 y_discriminator = is_unlabeled(
                     y,
                     missing_label=self.missing_label,
-                    is_multilabel=is_multilabel
+                    is_multilabel=is_multilabel,
                 )
                 y_discriminator = y_discriminator.astype(int)
 

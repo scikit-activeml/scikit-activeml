@@ -14,7 +14,7 @@ from ..utils import (
     check_equal_missing_label,
     unlabeled_indices,
     check_scalar,
-    is_unlabeled
+    is_unlabeled,
 )
 
 
@@ -128,11 +128,19 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
 
         is_multilabel = np.array(y).ndim == 2
-        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, is_multilabel=is_multilabel
+        )
 
         # Validate classifier type
         check_type(clf, "clf", SkactivemlClassifier)
@@ -156,7 +164,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = mapping
         elif mapping is not None:
             unlbld_mapping = unlabeled_indices(
-                y[mapping], missing_label=self.missing_label, is_multilabel=is_multilabel
+                y[mapping],
+                missing_label=self.missing_label,
+                is_multilabel=is_multilabel,
             )
             X_unlbld = X_cand[unlbld_mapping]
             unlbld_mapping = mapping[unlbld_mapping]

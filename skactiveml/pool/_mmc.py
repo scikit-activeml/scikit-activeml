@@ -35,12 +35,15 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
     .. [1] Li, X., & Guo, Y. (2013). Active Learning with Multi-Label SVM Classification.
        In IjCAI (Vol. 13, pp. 1479-1485).
     """
+
     def __init__(
         self,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(missing_label=missing_label, random_state=random_state)
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
 
     def query(
         self,
@@ -105,16 +108,25 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
 
         is_multilabel = True
         if not is_multilabel:
-            raise ValueError("`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only.")
-        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
+            raise ValueError(
+                "`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only."
+            )
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, is_multilabel=is_multilabel
+        )
 
         check_type(discriminator, "discriminator", SkactivemlClassifier)
-
 
         discriminator = clone(discriminator)
         discriminator.classes = list(range(y.shape[1] + 1))
@@ -160,5 +172,3 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
-
-

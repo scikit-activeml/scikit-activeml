@@ -39,7 +39,9 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
-        super().__init__(missing_label=missing_label, random_state=random_state)
+        super().__init__(
+            missing_label=missing_label, random_state=random_state
+        )
 
     def query(
         self,
@@ -54,13 +56,23 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
     ):
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
 
         is_multilabel = np.array(y).ndim == 2
         if not is_multilabel:
-            raise ValueError("`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only.")
-        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
+            raise ValueError(
+                "`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only."
+            )
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, is_multilabel=is_multilabel
+        )
 
         # Validate classifier type
         check_type(clf, "clf", SkactivemlClassifier)
@@ -81,7 +93,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = unlabeled_indices(
                 y[mapping],
                 missing_label=self.missing_label,
-                is_multilabel=True
+                is_multilabel=True,
             )
             X_unlbld = X_cand[unlbld_mapping]
 
@@ -111,6 +123,3 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
         )
-
-
-

@@ -328,16 +328,26 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
         if allow_multilabel:
             y = check_array(y, ensure_2d=True, force_all_finite="allow-nan")
-            unlabeled_mask = is_unlabeled(y, missing_label=self.missing_label_, is_multilabel=True)
+            unlabeled_mask = is_unlabeled(
+                y, missing_label=self.missing_label_, is_multilabel=True
+            )
 
             if not np.all(np.isin(y[~unlabeled_mask], [0, 1])):
-                raise ValueError("Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`.")
+                raise ValueError(
+                    "Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`."
+                )
         else:
             y = column_or_1d(y, warn=True)
 
         if candidates is None:
             n_candidates = int(
-                np.sum(is_unlabeled(y, missing_label=self.missing_label_, is_multilabel=allow_multilabel))
+                np.sum(
+                    is_unlabeled(
+                        y,
+                        missing_label=self.missing_label_,
+                        is_multilabel=allow_multilabel,
+                    )
+                )
             )
         else:
             n_candidates = len(candidates)
@@ -399,7 +409,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         """
 
         if candidates is None:
-            ulbd_idx = unlabeled_indices(y, self.missing_label_, is_multilabel=is_multilabel)
+            ulbd_idx = unlabeled_indices(
+                y, self.missing_label_, is_multilabel=is_multilabel
+            )
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
             if allow_only_unlabeled:

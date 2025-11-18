@@ -146,12 +146,22 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
 
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
 
         is_multilabel = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel,
+            candidates,
+            X,
+            y,
+            enforce_mapping=True,
+            is_multilabel=is_multilabel,
         )
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
@@ -184,7 +194,12 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
                 probas, X_cand = probas
 
         # Compute uncertainties according to given `method`.
-        uncertainties = uncertainty_scores(probas=probas, method=self.method, is_multilabel=is_multilabel, multilabel_aggregation_fn=self.multilabel_aggregation_fn)
+        uncertainties = uncertainty_scores(
+            probas=probas,
+            method=self.method,
+            is_multilabel=is_multilabel,
+            multilabel_aggregation_fn=self.multilabel_aggregation_fn,
+        )
 
         # Implement a fallback, if all uncertainties are zero.
         if np.sum(uncertainties) == 0:
