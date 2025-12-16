@@ -14,6 +14,7 @@ from ..utils import (
     labeled_indices,
     unlabeled_indices,
     rand_argmax,
+    is_unlabeled
 )
 from sklearn.utils.validation import (
     check_array,
@@ -106,11 +107,13 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        is_multilabel = np.array(y).ndim == 2
+        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
 
         if mapping is not None:
             query_indices, utilities = k_greedy_center(
@@ -123,8 +126,9 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             )
         else:
             selected_samples = labeled_indices(
-                y=y, missing_label=self.missing_label_
+                y=y, missing_label=self.missing_label_, is_multilabel=is_multilabel
             )
+
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
             y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
@@ -140,6 +144,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 self.missing_label_,
                 mapping,
                 n_new_cand,
+                is_multilabel
             )
 
         if return_utilities:
@@ -156,6 +161,7 @@ def k_greedy_center(
     missing_label=MISSING_LABEL,
     mapping=None,
     n_new_cand=None,
+    is_multilabel=False
 ):
     """
     An active learning method that greedily forms a batch to minimize the
@@ -181,6 +187,8 @@ def k_greedy_center(
        The number of new candidates that are additionally added to `X`.
        Only used for the case, that in the query function with the shape of
        `candidates` is `(n_candidates, n_feature)`.
+    is_multilabel : bool, default=False
+        Whether provided data is in multi-label format or not.
 
     Returns
     -------
@@ -209,19 +217,28 @@ def k_greedy_center(
     """
 
     # valid the input shape whether is valid or not.
+
     X = check_array(X, allow_nd=True)
-    y = check_array(
-        y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
-    )
-    y = column_or_1d(y, warn=True)
+    if not is_multilabel:
+        y = check_array(
+            y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
+        )
+        y = column_or_1d(y, warn=True)
+    else:
+        y = check_array(y, ensure_2d=True, force_all_finite="allow-nan", dtype=None)
+        unlabeled_mask = is_unlabeled(y, missing_label=missing_label, is_multilabel=is_multilabel)
+
+        if not np.all(np.isin(y[~unlabeled_mask], [0, 1])):
+            raise ValueError("Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`.")
+
     check_consistent_length(X, y)
 
-    selected_samples = labeled_indices(y, missing_label=missing_label)
+    selected_samples = labeled_indices(y, missing_label=missing_label, is_multilabel=is_multilabel)
 
     random_state_ = check_random_state(random_state)
 
     if mapping is None:
-        mapping = unlabeled_indices(y, missing_label=missing_label)
+        mapping = unlabeled_indices(y, missing_label=missing_label, is_multilabel=is_multilabel)
     else:
         mapping = column_or_1d(mapping, dtype=int, warn=True)
 

@@ -107,13 +107,24 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
               refers to the indexing in `candidates`.
         """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        is_multilabel = np.array(y).ndim == 2
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, is_multilabel=is_multilabel
+        )
 
         sample_indices = np.arange(len(X), dtype=int)
-        selected_indices = labeled_indices(y, missing_label=self.missing_label)
+        selected_indices = labeled_indices(
+            y, missing_label=self.missing_label, is_multilabel=is_multilabel
+        )
 
         if mapping is None:
             X_all = np.append(X, X_cand, axis=0)

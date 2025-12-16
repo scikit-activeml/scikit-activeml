@@ -6,7 +6,7 @@ from iteration_utilities import deepflatten
 MISSING_LABEL = np.nan
 
 
-def is_unlabeled(y, missing_label=MISSING_LABEL):
+def is_unlabeled(y, missing_label=MISSING_LABEL, is_multilabel=False):
     """Creates a boolean mask indicating missing labels.
 
     Parameters
@@ -15,6 +15,8 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
         Class labels to be checked w.r.t. to missing labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
+    is_multilabel : bool, default=False
+        Indicating if `y` is multi-label.
 
     Returns
     -------
@@ -52,15 +54,21 @@ def is_unlabeled(y, missing_label=MISSING_LABEL):
             "'n_features > 0'."
         )
     if isinstance(missing_label, float) and np.isnan(missing_label):
-        return np.isnan(y)
+        if not is_multilabel:
+            return np.isnan(y)
+        else:
+            return np.all(np.isnan(y), axis=1)
     else:
         # Todo check if solution is appropriate (see line 46)
         # y = np.hstack([[1.1, 2.1], np.full(8, np.nan)])
         # is_unlabeled(y, 'sdhu')  # Fails
-        return y.astype(target_type) == missing_label
+        if not is_multilabel:
+            return y.astype(target_type) == missing_label
+        else:
+            return np.all(y.astype(target_type) == missing_label, axis=1)
 
 
-def is_labeled(y, missing_label=MISSING_LABEL):
+def is_labeled(y, missing_label=MISSING_LABEL, is_multilabel=False):
     """Creates a boolean mask indicating present labels.
 
     Parameters
@@ -69,16 +77,18 @@ def is_labeled(y, missing_label=MISSING_LABEL):
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
+    is_multilabel : bool, default=False
+        Indicating if `y` is multi-label.
 
     Returns
     -------
     is_unlabeled : np.ndarray of shape (n_samples,) or (n_samples, n_outputs)
         Boolean mask indicating present labels in `y`.
     """
-    return ~is_unlabeled(y, missing_label)
+    return ~is_unlabeled(y, missing_label, is_multilabel)
 
 
-def unlabeled_indices(y, missing_label=MISSING_LABEL):
+def unlabeled_indices(y, missing_label=MISSING_LABEL, is_multilabel=False):
     """Return an array of indices indicating missing labels.
 
     Parameters
@@ -87,6 +97,8 @@ def unlabeled_indices(y, missing_label=MISSING_LABEL):
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
+    is_multilabel : bool, default=False
+        Indicating if `y` is multi-label.
 
     Returns
     -------
@@ -94,12 +106,12 @@ def unlabeled_indices(y, missing_label=MISSING_LABEL):
         Index array of missing labels. If `y` is a 2D-array, the indices
         have shape `(n_samples, 2), otherwise it has the shape `(n_samples)`.
     """
-    is_unlbld = is_unlabeled(y, missing_label)
+    is_unlbld = is_unlabeled(y, missing_label, is_multilabel)
     unlbld_indices = np.argwhere(is_unlbld)
     return unlbld_indices[:, 0] if is_unlbld.ndim == 1 else unlbld_indices
 
 
-def labeled_indices(y, missing_label=MISSING_LABEL):
+def labeled_indices(y, missing_label=MISSING_LABEL, is_multilabel=False):
     """Return an array of indices indicating present labels.
 
     Parameters
@@ -108,6 +120,8 @@ def labeled_indices(y, missing_label=MISSING_LABEL):
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
+    is_multilabel : bool, default=False
+        Indicating if `y` is multi-label.
 
     Returns
     -------
@@ -115,7 +129,7 @@ def labeled_indices(y, missing_label=MISSING_LABEL):
         Index array of present labels. If y is a 2D-array, the indices
         have shape `(n_samples, 2), otherwise it has the shape `(n_samples)`.
     """
-    is_lbld = is_labeled(y, missing_label)
+    is_lbld = is_labeled(y, missing_label, is_multilabel)
     lbld_indices = np.argwhere(is_lbld)
     return lbld_indices[:, 0] if is_lbld.ndim == 1 else lbld_indices
 

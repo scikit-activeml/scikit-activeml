@@ -264,6 +264,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
+        allow_multilabel=False,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -297,6 +298,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             provided when reset was last True.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
+        allow_multilabel : bool, default=False
+            Whether provided data is allowed to be in multi-label format or not.
 
         Returns
         -------
@@ -322,11 +325,29 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         ) = super()._validate_data(
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
-        y = column_or_1d(y, warn=True)
+
+        if allow_multilabel:
+            y = check_array(y, ensure_2d=True, force_all_finite="allow-nan")
+            unlabeled_mask = is_unlabeled(
+                y, missing_label=self.missing_label_, is_multilabel=True
+            )
+
+            if not np.all(np.isin(y[~unlabeled_mask], [0, 1])):
+                raise ValueError(
+                    "Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`."
+                )
+        else:
+            y = column_or_1d(y, warn=True)
 
         if candidates is None:
             n_candidates = int(
-                np.sum(is_unlabeled(y, missing_label=self.missing_label_))
+                np.sum(
+                    is_unlabeled(
+                        y,
+                        missing_label=self.missing_label_,
+                        is_multilabel=allow_multilabel,
+                    )
+                )
             )
         else:
             n_candidates = len(candidates)
@@ -347,6 +368,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y,
         enforce_mapping=False,
         allow_only_unlabeled=False,
+        is_multilabel=False,
     ):
         """Transforms the `candidates` parameter into a sample array and the
         corresponding index array `mapping` such that
@@ -374,6 +396,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         allow_only_unlabeled : bool, default=False
             If True, an exception is raised when indices of candidates contain
             labeled samples.
+        is_multilabel : bool, default=False
+            Whether provided data is in multi-label format or not.
 
         Returns
         -------
@@ -385,7 +409,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         """
 
         if candidates is None:
-            ulbd_idx = unlabeled_indices(y, self.missing_label_)
+            ulbd_idx = unlabeled_indices(
+                y, self.missing_label_, is_multilabel=is_multilabel
+            )
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
             if allow_only_unlabeled:

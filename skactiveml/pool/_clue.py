@@ -58,6 +58,8 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    multilabel_aggregation_fn: callable, default=np.average
+        Callable that takes axis as kwarg and reduces along that axis. Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while `np.sum` is not allowed.
 
     References
     ----------
@@ -75,6 +77,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         n_cluster_param_name="n_clusters",
         method="entropy",
         clf_embedding_flag_name=None,
+        multilabel_aggregation_fn=np.average,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -84,6 +87,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         self.n_cluster_param_name = n_cluster_param_name
         self.method = method
         self.clf_embedding_flag_name = clf_embedding_flag_name
+        self.multilabel_aggregation_fn = multilabel_aggregation_fn
 
     def query(
         self,
@@ -139,12 +143,25 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
+
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
+
+        is_multilabel = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates,
+            X,
+            y,
+            enforce_mapping=True,
+            is_multilabel=is_multilabel,
         )
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
@@ -177,7 +194,12 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
                 probas, X_cand = probas
 
         # Compute uncertainties according to given `method`.
-        uncertainties = uncertainty_scores(probas=probas, method=self.method)
+        uncertainties = uncertainty_scores(
+            probas=probas,
+            method=self.method,
+            is_multilabel=is_multilabel,
+            multilabel_aggregation_fn=self.multilabel_aggregation_fn,
+        )
 
         # Implement a fallback, if all uncertainties are zero.
         if np.sum(uncertainties) == 0:

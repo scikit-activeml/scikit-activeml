@@ -109,11 +109,12 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             refers to the samples in `X`.
         """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True,
         )
 
+        is_multilabel = np.array(y).ndim == 2
         _, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True
+            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel,
         )
 
         # Validate init parameter
@@ -137,7 +138,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             raise TypeError("`n_cluster_param_name` supports only string.")
 
         labeled_sample_indices = labeled_indices(
-            y, missing_label=self.missing_label
+            y,
+            missing_label=self.missing_label,
+            is_multilabel=is_multilabel
         )
 
         # Set number of clusters.

@@ -78,10 +78,19 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
               the indexing refers to the samples in `candidates`.
         """
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        is_multilabel = np.array(y).ndim == 2
+        X_cand, mapping = self._transform_candidates(
+            candidates, X, y, is_multilabel=is_multilabel
+        )
 
         if mapping is None:
             utilities = np.ones(len(X_cand))

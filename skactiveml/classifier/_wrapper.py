@@ -15,6 +15,7 @@ from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
+    get_tags,
 )
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
@@ -29,6 +30,8 @@ from ..utils import (
     check_classifier_params,
     check_type,
     check_scalar,
+    match_signature,
+    is_unlabeled,
     match_signature,
     check_n_features,
 )
@@ -86,7 +89,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator = estimator
 
     @match_signature("estimator", "fit")
-    def fit(self, X, y, sample_weight=None, **fit_kwargs):
+    def fit(self, X, y=None, sample_weight=None, **fit_kwargs):
         """Fit the model using `X` as training data and `y` as class labels.
 
         Parameters
@@ -110,6 +113,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self: SklearnClassifier,
             The `SklearnClassifier` fitted on the training data.
         """
+        y = y if y is not None else fit_kwargs.pop("Y", None)
         return self._fit(
             fit_function="fit",
             X=X,
@@ -119,7 +123,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
     @match_signature("estimator", "partial_fit")
-    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+    def partial_fit(self, X, y=None, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using `X` as training data and `y` as
         class labels.
 
@@ -145,6 +149,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self : SklearnClassifier,
             The `SklearnClassifier` is fitted on the training data.
         """
+        y = y if y is not None else fit_kwargs.pop("Y", None)
         return self._fit(
             fit_function="partial_fit",
             X=X,
@@ -174,21 +179,46 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
+
+        is_multilabel = get_tags(self.estimator).target_tags.multi_output
+
         if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
+                if is_multilabel:
+                    y_pred_full = np.zeros((len(X), len(self.classes_)))
+                    y_pred_full[:, self._label_counts != 0] = y_pred
+                    y_pred = y_pred_full
             else:
+                if is_multilabel:
+                    raise NotImplemented(
+                        "Cost Matrix for Multilabel classification not yet implemented"
+                    )
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
                     costs, random_state=self.random_state_, axis=1
                 )
         else:
-            p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state_.choice(
-                np.arange(len(self.classes_)), len(X), replace=True, p=p
-            )
-            y_pred = self._le.inverse_transform(y_pred)
+            if is_multilabel:
+                n_samples, n_classes = len(X), len(self.classes_)
+                y_pred = np.zeros((n_samples, n_classes), dtype=int)
+
+                # Predict probabilities for a single instance (simulating a fallback behavior)
+                p = self.predict_proba([X[0]])[0]
+                for i in range(n_samples):
+                    # Generate binary predictions (0 or 1) based on fallback probas
+                    y_pred[i, :] = [
+                        self.random_state_.choice([0, 1], p=[1 - prob, prob])
+                        for prob in p
+                    ]
+            else:
+                p = self.predict_proba([X[0]])[0]
+                y_pred = self.random_state_.choice(
+                    np.arange(len(self.classes_)), len(X), replace=True, p=p
+                )
+                y_pred = self._le.inverse_transform(y_pred)
+
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
@@ -214,18 +244,31 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
+        is_multilabel = get_tags(self.estimator).target_tags.multi_output
+
         if self.is_fitted_:
-            P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-            # map the predicted classes to self.classes
-            if P.shape[1] != len(self.classes_):
-                P_ext = np.zeros((len(X), len(self.classes_)))
-                est_classes = self.estimator_.classes_
-                indices_est = np.where(np.isin(est_classes, self.classes_))[0]
-                class_indices = np.searchsorted(
-                    self.classes_, est_classes[indices_est]
-                )
-                P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
-                P = P_ext
+            if is_multilabel:
+                P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
+
+                P_pos = np.column_stack([probs[:, 1] for probs in P])
+                P = np.full((len(X), len(self.classes_)), 0.5)
+                P[:, self._label_counts != 0] = P_pos
+            else:
+                P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
+                # map the predicted classes to self.classes
+                if P.shape[1] != len(self.classes_):
+                    P_ext = np.zeros((len(X), len(self.classes_)))
+                    est_classes = self.estimator_.classes_
+                    indices_est = np.where(
+                        np.isin(est_classes, self.classes_)
+                    )[0]
+                    class_indices = np.searchsorted(
+                        self.classes_, est_classes[indices_est]
+                    )
+                    P_ext[:, class_indices] = (
+                        1 if len(class_indices) == 1 else P
+                    )
+                    P = P_ext
             if not np.any(np.isnan(P)):
                 return P
 
@@ -235,6 +278,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             f"distribution`_label_counts={self._label_counts}` is used to "
             f"make the predictions."
         )
+        if is_multilabel:
+            return np.full((len(X), len(self.classes_)), 0.5)
         if sum(self._label_counts) == 0:
             return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
         else:
@@ -244,10 +289,18 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
+        is_multilabel = get_tags(self.estimator).target_tags.multi_output
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "allow_nd": True,
+            "dtype": None,
+        }
+        self.check_y_dict_ = {
+            "ensure_min_samples": 0,
+            "ensure_min_features": 0,
+            "ensure_2d": is_multilabel,
+            "ensure_all_finite": False,
             "dtype": None,
         }
         X, y, sample_weight = self._validate_data(
@@ -255,6 +308,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
+            check_y_dict=self.check_y_dict_,
+            y_ensure_1d=False,
             reset=fit_function == "fit" or not hasattr(self, "n_features_in_"),
         )
 
@@ -278,15 +333,24 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
+
         # count labels per class
-        is_lbld = is_labeled(y, missing_label=-1)
-        self._label_counts = [
-            np.sum(y[is_lbld] == c) for c in range(len(self._le.classes_))
-        ]
+        is_lbld = is_labeled(y, missing_label=-1, is_multilabel=is_multilabel)
+        if is_multilabel:
+            self._label_counts = np.sum(y[is_lbld], axis=0)
+        else:
+            self._label_counts = [
+                np.sum(y[is_lbld] == c) for c in range(len(self._le.classes_))
+            ]
         try:
             X_lbld = X[is_lbld]
             y_lbld = y[is_lbld].astype(np.int64)
             y_lbld_inv = self._le.inverse_transform(y_lbld)
+            if is_multilabel:
+                columns_to_keep = np.where(y_lbld_inv.sum(axis=0) > 0)[0]
+                y_lbld_inv = y_lbld_inv[:, columns_to_keep]
+
+            fit_kwargs["y" if not is_multilabel else "Y"] = y_lbld_inv
             if np.sum(is_lbld) == 0:
                 raise ValueError("There is no labeled data.")
             elif (
@@ -295,25 +359,21 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             ):
                 if fit_function == "partial_fit":
                     fit_kwargs["classes"] = self.classes_
-                    self.estimator_.partial_fit(
-                        X=X_lbld, y=y_lbld_inv, **fit_kwargs
-                    )
+                    self.estimator_.partial_fit(X=X_lbld, **fit_kwargs)
                 elif fit_function == "fit":
-                    self.estimator_.fit(X=X_lbld, y=y_lbld_inv, **fit_kwargs)
+                    self.estimator_.fit(X=X_lbld, **fit_kwargs)
             else:
                 if fit_function == "partial_fit":
                     fit_kwargs["classes"] = self.classes_
                     fit_kwargs["sample_weight"] = sample_weight[is_lbld]
                     self.estimator_.partial_fit(
                         X=X_lbld,
-                        y=y_lbld_inv,
                         **fit_kwargs,
                     )
                 elif fit_function == "fit":
                     fit_kwargs["sample_weight"] = sample_weight[is_lbld]
                     self.estimator_.fit(
                         X=X_lbld,
-                        y=y_lbld_inv,
                         **fit_kwargs,
                     )
             self.is_fitted_ = True
