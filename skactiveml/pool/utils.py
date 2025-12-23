@@ -1121,16 +1121,26 @@ def conditional_expect(
             * np.sum(weights[np.newaxis, :] * output, axis=1)
         )
     else:  # method equals "dynamic_quad"
+
+        def squeeze_data(data):
+            return np.asarray(data).squeeze()
+
         for idx, x in enumerate(X):
             cond_dist = reg.predict_target_distribution([x])
+            if "loc" in cond_dist.kwds:
+                cond_dist.kwds["loc"] = squeeze_data(cond_dist.kwds["loc"])
+            if "scale" in cond_dist.kwds:
+                cond_dist.kwds["scale"] = squeeze_data(cond_dist.kwds["scale"])
 
             def quad_function_wrapper(y):
                 if is_optional or not vector_func:
-                    return func(idx, x, y)
+                    func_out = func(idx, x, y)
                 else:
-                    return func(np.arange(len(X)), X, np.full((len(X), 1), y))[
-                        idx
-                    ]
+                    func_out = func(
+                        np.arange(len(X)), X, np.full((len(X), 1), y)
+                    )
+                    func_out = func_out[idx]
+                return squeeze_data(func_out)
 
             expectation[idx] = cond_dist.expect(
                 quad_function_wrapper,
