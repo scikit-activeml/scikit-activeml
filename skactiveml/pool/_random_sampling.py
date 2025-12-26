@@ -9,7 +9,9 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
 
     This class implements random sampling as a lower baseline for other query
     strategies. It randomly selects `batch_size` unlabeled samples whose
-    utility scores are also randomly generated.
+    utility scores are also randomly generated. This implementation is
+    task-agnostic such that it can handle class, numerical, and
+    multioutput labels.
 
     Parameters
     ----------
@@ -78,19 +80,24 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X,
-            y,
-            candidates,
-            batch_size,
-            return_utilities,
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
 
-        is_multilabel = np.array(y).ndim == 2
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multilabel=is_multilabel
+            candidates=candidates,
+            X=X,
+            y=y,
+            is_multioutput=is_multioutput,
         )
 
         if mapping is None:
