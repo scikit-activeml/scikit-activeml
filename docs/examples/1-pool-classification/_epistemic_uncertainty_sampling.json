@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "EpistemicUncertaintySampling",
+    "package" : "pool",
+    "method" : "Epistemic Uncertainty Sampling (EpisUS)",
+    "category" : "Informativeness",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "title" : "Epistemic Uncertainty Sampling (EpisUS)",
+    "refs" : ["nguyen2019epistemic"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** distinguishes epistemic from aleatoric uncertainty and queries samples with maximal epistemic uncertainty, meaning predictions vary most across models that are well-supported by the current data. It implements this via relative-likelihood based degrees of support and provides instantiations for Parzen windows, decision trees, and logistic regression. The current implementation only supports binary classification tasks and the following classifiers:\n\n- `skactiveml.classifier.ParzenWindowClassifier`,\n- `sklearn.linear_model.LogisticRegression`.",
+    "import_misc" : "from skactiveml.pool import EpistemicUncertaintySampling",
+    "init_qs" : "EpistemicUncertaintySampling()",
+    "query_params" : "X=X, y=y, clf=clf"
+  }
+]

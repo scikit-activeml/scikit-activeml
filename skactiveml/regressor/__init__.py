@@ -17,3 +17,10 @@ __all__ = [
     "SklearnRegressor",
     "SklearnNormalRegressor",
 ]
+
+try:
+    from ._wrapper import SkorchRegressor  # noqa: F401
+
+    __all__ += ["SkorchRegressor"]
+except ImportError:  # pragma: no cover
+    pass

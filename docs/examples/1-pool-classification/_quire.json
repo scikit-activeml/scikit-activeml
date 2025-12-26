@@ -1,0 +1,18 @@
+[
+  {
+    "class" : "Quire",
+    "package" : "pool",
+    "method" : "Querying Informative and Representative Examples (QUIRE)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "title" : "Querying Informative and Representative Examples (QUIRE)",
+    "refs" : ["huang2010active", "huang2014active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** QUIRE uses the min–max view of active learning with a regularized least-squares classifier in a reproducing kernel Hilbert space (RKHS) under quadratic loss. It assigns each unlabeled sample a single score derived from the kernel ridge regression objective that jointly reflects informativeness with respect to the labeled set and representativeness with respect to the unlabeled set.",
+    "import_misc" : "from skactiveml.pool import Quire",
+    "init_qs" : "Quire(classes=[0, 1], lmbda=1.0, metric='rbf', metric_dict={'gamma': 0.1})",
+    "query_params" : "X=X, y=y",
+    "plot_utility_params" : "replace_nan=None"
+  }
+]

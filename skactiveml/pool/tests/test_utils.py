@@ -15,7 +15,7 @@ from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool.utils import _cross_entropy
 from skactiveml.pool.utils import (
     IndexClassifierWrapper,
-    _conditional_expect,
+    conditional_expect,
     _reshape_scipy_dist,
     _update_X_y,
     _update_reg,
@@ -709,7 +709,7 @@ class TestApproximation(unittest.TestCase):
                 )
                 param_dict[parameter] = illegal_argument
                 self.assertRaises(
-                    (TypeError, ValueError), _conditional_expect, **param_dict
+                    (TypeError, ValueError), conditional_expect, **param_dict
                 )
 
     def test_conditional_expectation(self):
@@ -772,7 +772,7 @@ class TestApproximation(unittest.TestCase):
                     self.assertEqual(x.shape, (3,))
                     return 0
 
-            res = _conditional_expect(
+            res = conditional_expect(
                 X=X, func=dummy_func, reg=reg, **parameter
             )
 

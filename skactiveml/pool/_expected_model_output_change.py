@@ -7,7 +7,7 @@ from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
 )
-from skactiveml.pool.utils import _update_reg, _conditional_expect
+from skactiveml.pool.utils import _update_reg, conditional_expect
 from skactiveml.utils import (
     check_type,
     simple_batch,
@@ -22,14 +22,15 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
     This class implements an "Expected Model Output Change" (EMOC) based
     approach for regression [1]_, where samples are queried that change the
-    output of the regression model the most.
+    output of the regression model the most. The difference in the output is
+    measured by the loss function `self.loss`.
 
     Parameters
     ----------
     integration_dict : dict, default=None
         Dictionary for integration arguments, i.e. `integration_method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `skactiveml.pool.utils._conditional_expect`.
+        For details see method `skactiveml.pool.utils.conditional_expect`.
         The default `integration_method` is `assume_linear`.
     loss : callable, default=None
         The loss for predicting a target value instead of the true value.
@@ -186,7 +187,7 @@ class ExpectedModelOutputChange(SingleAnnotatorPoolQueryStrategy):
 
             return self.loss(y_pred, y_pred_new)
 
-        change = _conditional_expect(
+        change = conditional_expect(
             X_cand,
             _model_output_change,
             reg,

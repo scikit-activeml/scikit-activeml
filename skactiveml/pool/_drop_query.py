@@ -21,10 +21,10 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
 
     This class implements  the query strategy Dropout Query (DropQuery) [1]_
     that incorporates both uncertainty and sample diversity into every selected
-    batch. For this purpose, samples are filtered according to a
-    disagreement-based measure via dropout such that only the samples with a
-    disagreement above a threshold are clustered for selecting the samples
-    nearest to the respective clusters.
+    batch. For this purpose, unlabeled samples are filtered according to a
+    disagreement-based measure via dropout such that only the unlabeled samples
+    with a disagreement above a threshold are clustered for selecting the
+    unlabeled samples nearest to the respective clusters.
 
     Parameters
     ----------
@@ -41,20 +41,32 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         excluding the parameter for the number of clusters.
     n_cluster_param_name : string, default="n_clusters"
         The name of the parameter for the number of clusters.
-    clf_embedding_flag_name : str or None, default=None
-        Name of the flag, which is passed to the `predict` method for
+    clf_embedding_flag_name : dict or str or None, default=None
+        Flag, which is passed to the `predict` method for
         getting the (learned) sample representations.
 
-        - If `clf_embedding_flag_name=None` and `predict` returns
+        - If `clf_embedding_flag_name is None` and `predict` returns
           only one output, the input samples `X` are used.
-        - If `predict` returns two outputs or `clf_embedding_name` is
-          not `None`, `(proba, embeddings)` are expected as outputs.
+        - If `clf_embedding_flag_name is None` and `predict` returns
+          two outputs, `(y_pred, embeddings)` are expected as outputs.
+        - If `isinstance(clf_embedding_name, str)`, we call::
+
+            clf.predict(X, **{clf_embedding_flag_name: True})
+
+          and expect `(y_pred, embeddings)` as output.
+        - If `isinstance(clf_embedding_name, dict)`, we call::
+
+            clf.predict(X, **clf_embedding_flag_name)
+
+          and expect `(y_pred, embeddings)` as output.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn: callable, default=np.average
-        Callable that takes axis as kwarg and reduces along that axis. Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while `np.sum` is not allowed.
+        Callable that takes axis as kwarg and reduces along that axis. Common
+        choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while
+        `np.sum` is not allowed.
 
 
     References
@@ -140,7 +152,13 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         """
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multilabel=True,
         )
         is_multilabel = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
@@ -174,6 +192,18 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         check_type(clf, "clf", SkactivemlClassifier)
         check_type(fit_clf, "fit_clf", bool)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
+        predict_proba_kwargs = {}
+        if self.clf_embedding_flag_name is not None:
+            check_type(
+                self.clf_embedding_flag_name,
+                "clf_embedding_flag_name",
+                dict,
+                str,
+            )
+            if isinstance(self.clf_embedding_flag_name, str):
+                predict_proba_kwargs = {self.clf_embedding_flag_name: True}
+            else:
+                predict_proba_kwargs = self.clf_embedding_flag_name
 
         # Fit the classifier, if requested.
         if fit_clf:
@@ -183,14 +213,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
                 clf = clone(clf).fit(X, y)
 
         # Compute predictions and optionally embeddings for original samples.
-        if self.clf_embedding_flag_name is not None:
-            y_pred, X_cand = clf.predict(
-                X_cand, **{self.clf_embedding_flag_name: True}
-            )
+        y_pred = clf.predict(X_cand, **predict_proba_kwargs)
+        if isinstance(y_pred, tuple):
+            y_pred, X_embed = y_pred
         else:
-            y_pred = clf.predict(X_cand)
-            if isinstance(y_pred, tuple):
-                y_pred, X_cand = y_pred
+            X_embed = X_cand
 
         # Number of candidate samples.
         n_candidates = len(X_cand)
@@ -232,7 +259,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         # Perform clustering to get centroids.
         cluster_algo_dict[self.n_cluster_param_name] = batch_size
         cluster_obj = self.cluster_algo(**cluster_algo_dict)
-        dist = cluster_obj.fit_transform(X_cand[prefiltered_indices], y=None)
+        dist = cluster_obj.fit_transform(X_embed[prefiltered_indices], y=None)
 
         # Determine `query_indices` of the samples being closest to the
         # respective centroids.

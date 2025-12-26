@@ -837,3 +837,53 @@ def check_n_features(obj, X, reset):
     elif not reset:
         if obj.n_features_in_ is not None:
             sklearn_check_n_features(obj, X, reset=reset)
+
+
+def _check_forward_outputs(forward_outputs):
+    """Check forward outputs required by `SkorchMixin`
+    and `make_criterion_tuple_aware`.
+
+    Parameters
+    ----------
+    forward_outputs : dict[str, tuple[int, Callable | None]]
+        `dict` that describes how to obtain and post-process the
+        outputs of `module.forward` for prediction.
+
+        Given `raw_outputs = module.forward(X)`, each entry
+        `name -> (idx, transform)` is interpreted as:
+
+        - `idx`: integer index of `raw_outputs` (0-based).
+        - `transform`: callable `f(tensor) -> tensor` or `None`.
+          If `transform` is not `None`, it is applied to the selected
+          raw tensor; otherwise the raw tensor is used.
+    """
+
+    # Check forward_outputs configured.
+    check_type(forward_outputs, "forward_outputs", dict)
+    if len(forward_outputs) == 0:
+        raise ValueError("`forward_outputs` must contain at least one entry.")
+
+    # Validate and normalize specs into a dict:
+    # name -> (idx, transform)
+    for name, spec in forward_outputs.items():
+        if (
+            not isinstance(spec, tuple)
+            or len(spec) != 2
+            or not isinstance(spec[0], int)
+        ):
+            raise TypeError(
+                "Each value in forward_outputs must be a tuple "
+                "`(idx: int, transform: Callable | None)`. "
+                f"Got {spec!r} for key {name!r}."
+            )
+        idx, transform = spec
+        if idx < 0:
+            raise ValueError(
+                f"Index `idx={idx}` for key {name!r} must be " f"non-negative."
+            )
+        if transform is not None and not callable(transform):
+            raise TypeError(
+                "The second element of each forward_outputs tuple "
+                f"must be a `Callable` or `None`. Got {transform!r} "
+                f"for key {name!r}."
+            )

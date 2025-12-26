@@ -7,7 +7,7 @@ from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
-from skactiveml.pool.utils import _update_reg, _conditional_expect
+from skactiveml.pool.utils import _update_reg, conditional_expect
 
 
 class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
@@ -15,14 +15,15 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the active learning strategy "Expected Model Variance
     Reduction" (EMVR) [1]_, which tries to select the sample that minimizes the
-    expected model variance.
+    expected model variance. The model variance refers to the predicted
+    variance of the distribution conditioned on a point x.
 
     Parameters
     ----------
     integration_dict : dict, default=None
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `skactiveml.pool.utils._conditional_expect`.
+        For details see method `skactiveml.pool.utils.conditional_expect`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
@@ -156,7 +157,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
             return np.average(new_model_std**2)
 
-        ex_model_variance = _conditional_expect(
+        ex_model_variance = conditional_expect(
             X_cand,
             new_model_variance,
             reg,

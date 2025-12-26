@@ -21,9 +21,10 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     """Fast Active Learning by Contrastive UNcertainty (FALCUN)
 
     This class implements the "Fast Active Learning by Contrastive UNcertainty"
-    (FALCUN) query strategy [1]_, which is a hybrid pool-based strategy that
-    jointly selects uncertain samples via margin sampling while considering
-    batch diversity within the class probability space.
+    (FALCUN) query strategy [1]_, which selects a batch directly in probability
+    space using a self-adjusting mix of uncertainty and diversity. By operating
+    only on low-dimensional softmax outputs rather than deep embeddings,
+    it achieves fast acquisitions while retaining strong label efficiency.
 
     Parameters
     ----------

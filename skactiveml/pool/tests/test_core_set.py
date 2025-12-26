@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+
 from skactiveml.pool._core_set import CoreSet, k_greedy_center
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
@@ -19,6 +20,26 @@ class TestCoreSet(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             init_default_params={},
             query_default_params_clf=query_default_params,
         )
+
+    def test_init_param_metric(self):
+        test_cases = [
+            ("cosine", None),
+            ("canberra", None),
+            (lambda x, y: 0, None),
+            ("hello", ValueError),
+            (0, TypeError),
+            (None, TypeError),
+        ]
+        self._test_param("init", "metric", test_cases)
+
+    def test_init_param_metric_dict(self):
+        test_cases = [
+            ({}, None),
+            ({"test": 0}, None),
+            (None, None),
+            ("Hello", TypeError),
+        ]
+        self._test_param("init", "metric_dict", test_cases)
 
     def test_query(self):
         # test case 1: with the same random state the init pick up
@@ -155,6 +176,54 @@ class TestKGreedyCenter(unittest.TestCase):
             y=self.y,
             mapping=np.arange(4),
             n_new_cand=5,
+        )
+
+    def test_parameter_metric(self):
+        self.assertRaises(
+            ValueError, k_greedy_center, X=self.X, y=self.y, metric="string"
+        )
+        query_idx_1, _ = k_greedy_center(
+            X=self.X, y=self.y, random_state=0, metric=lambda x, y: 0
+        )
+        query_idx_2, _ = k_greedy_center(X=self.X, y=self.y, random_state=0)
+        query_idx_3, _ = k_greedy_center(
+            X=self.X,
+            y=self.y,
+            random_state=0,
+            metric=lambda x, y: ((np.subtract(x, y) ** 2).sum()),
+        )
+        self.assertRaises(
+            AssertionError,
+            np.testing.assert_array_equal,
+            query_idx_1,
+            query_idx_2,
+        )
+        np.testing.assert_array_equal(query_idx_2, query_idx_3)
+
+    def test_parameter_metric_dict(self):
+        self.assertRaises(
+            TypeError,
+            k_greedy_center,
+            X=self.X,
+            y=self.y,
+            metric_dict="string",
+        )
+        _, u_1 = k_greedy_center(
+            X=self.X,
+            y=self.y,
+            random_state=0,
+            metric="mahalanobis",
+            metric_dict={"VI": np.eye(2) * 2},
+        )
+        _, u_2 = k_greedy_center(
+            X=self.X,
+            y=self.y,
+            random_state=0,
+            metric="mahalanobis",
+            metric_dict={"VI": np.eye(2)},
+        )
+        self.assertRaises(
+            AssertionError, np.testing.assert_array_equal, u_1, u_2
         )
 
     def test_k_greedy_center(self):

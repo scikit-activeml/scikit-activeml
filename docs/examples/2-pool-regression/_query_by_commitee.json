@@ -1,0 +1,22 @@
+[
+  {
+    "class" : "QueryByCommittee",
+    "package" : "pool",
+    "method" : "Query-by-Committee (QBC) with Empirical Variance",
+    "category" : "Informativeness",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator"],
+    "title" : "Query-by-Committee (QBC) with Empirical Variance",
+    "refs" : ["seung1992query","burbidge2007active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** QBC maintains a committee of models and selects unlabeled samples where the committee most disagrees, targeting epistemic uncertainty. In batch mode, it ranks points by a disagreement score and takes the top `batch_size` samples. Empirical variance (regression) means that the variance of the committee's real-valued predictions quantifies disagreement, and higher variance is preferred.",
+    "import_misc" : [
+      "from skactiveml.pool import QueryByCommittee",
+      "from skactiveml.regressor import SklearnRegressor"
+    ],
+    "import_reg" : "from sklearn.gaussian_process import GaussianProcessRegressor",
+    "init_reg" : "SklearnRegressor(GaussianProcessRegressor())",
+    "init_qs" : "QueryByCommittee(sample_predictions_method_name='sample_y', sample_predictions_dict={'n_samples': 100})",
+    "query_params" : "X=X, y=y, ensemble=reg"
+  }
+]

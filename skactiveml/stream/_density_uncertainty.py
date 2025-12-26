@@ -1061,8 +1061,8 @@ class CognitiveDualQueryStrategyRan(CognitiveDualQueryStrategy):
     This class implements the CognitiveDualQueryStrategy [1]_ strategy with
     Random Sampling. The CognitiveDualQueryStrategy strategy is an extension to
     the uncertainty based query strategies proposed by Žliobaitė et al. [2]_
-    and follows the same idea as StreamDensityBasedAL [3]_ where queries for
-    labels is only allowed if the local density around the corresponding
+    and follows the same idea as StreamDensityBasedAL [3]_ where querying a
+    label is only allowed if the local density around the corresponding
     sample is sufficiently high. The authors propose the use of a cognitive
     window that monitors the most representative samples within a data stream.
 

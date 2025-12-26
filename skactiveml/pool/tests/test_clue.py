@@ -5,8 +5,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
 from sklearn.cluster import SpectralClustering, KMeans, MiniBatchKMeans
+from sklearn.exceptions import NotFittedError
 from skactiveml.pool import Clue
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
+from skactiveml.regressor import NadarayaWatsonRegressor
 from skactiveml.utils import MISSING_LABEL
 from skactiveml.tests.template_query_strategy import (
     TemplateSingleAnnotatorPoolQueryStrategy,
@@ -14,6 +16,8 @@ from skactiveml.tests.template_query_strategy import (
 from skactiveml.tests.utils import (
     ParzenWindowClassifierEmbedding,
     ParzenWindowClassifierTuple,
+    ParzenWindowClassifierEmbeddingUncertainty,
+    ParzenWindowClassifierTriplet,
 )
 
 
@@ -25,22 +29,28 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.query_default_params_clf = {
             "X": X,
             "y": y,
-            "clf": ParzenWindowClassifier(
+            "estimator": ParzenWindowClassifier(
                 classes=self.classes, random_state=42
             ),
         }
         self.query_default_params_clf_embedding = {
             "X": X,
             "y": y,
-            "clf": ParzenWindowClassifierEmbedding(
+            "estimator": ParzenWindowClassifierEmbeddingUncertainty(
                 classes=self.classes,
             ),
+        }
+        self.query_default_params_reg = {
+            "X": X,
+            "y": y,
+            "estimator": NadarayaWatsonRegressorUncertainty(),
         }
         cluster_dict = {"random_state": 0, "n_init": 1}
         super().setUp(
             qs_class=Clue,
             init_default_params={"cluster_algo_dict": cluster_dict},
             query_default_params_clf=self.query_default_params_clf,
+            query_default_params_reg=self.query_default_params_reg,
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):
@@ -93,23 +103,31 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         ]
         self._test_param("init", "method", test_cases)
 
-    def test_init_param_clf_embedding_flag_name(self, test_cases=None):
+    def test_init_param_predict_dict(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (1, TypeError),
             (None, None),
             (False, TypeError),
             (True, TypeError),
-            ("return_embeddings", None),
+            ({"return_embeddings": True}, None),
+            ({"return_uncertainties": True}, ValueError),
+            ({"return_embeddings": True, "return_uncertainties": False}, None),
+            ({"return_embeddings": True, "return_uncertainties": "1d"}, None),
+            (
+                {"return_embeddings": True, "return_uncertainties": "2d"},
+                ValueError,
+            ),
+            ({"test": True}, TypeError),
         ]
         self._test_param(
             "init",
-            "clf_embedding_flag_name",
+            "predict_dict",
             replace_query_params=self.query_default_params_clf_embedding,
             test_cases=test_cases,
         )
 
-    def test_query_param_clf(self, test_cases=None):
+    def test_query_param_estimator(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (SVC(), TypeError),
@@ -119,8 +137,27 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 SklearnClassifier(LogisticRegression(), classes=self.classes),
                 None,
             ),
+            (NadarayaWatsonRegressor(), ValueError),
         ]
-        super().test_query_param_clf(test_cases=test_cases)
+        self._test_param(
+            "query",
+            "estimator",
+            test_cases=test_cases,
+        )
+
+    def test_query_param_fit_estimator(self, test_cases=None):
+        test_cases = [
+            (1, TypeError),
+            (0, TypeError),
+            (None, TypeError),
+            (True, None),
+            (False, NotFittedError),
+        ]
+        self._test_param(
+            "query",
+            "fit_estimator",
+            test_cases=test_cases,
+        )
 
     def test_query(self):
         X, y_true = make_blobs(n_samples=100, centers=4, random_state=0)
@@ -128,9 +165,19 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         clf_orig = ParzenWindowClassifier(classes=np.unique(y_true))
         clf_emb = ParzenWindowClassifierEmbedding(classes=np.unique(y_true))
         clf_tuple = ParzenWindowClassifierTuple(classes=np.unique(y_true))
+        clf_emb_unc = ParzenWindowClassifierEmbeddingUncertainty(
+            classes=np.unique(y_true)
+        )
+        clf_triplet = ParzenWindowClassifierTriplet(classes=np.unique(y_true))
         for candidates in [None, np.arange(10, 30)]:
             prev_clf_utilities = None
-            for clf in [clf_orig, clf_emb, clf_tuple]:
+            for clf in [
+                clf_orig,
+                clf_emb,
+                clf_tuple,
+                clf_emb_unc,
+                clf_triplet,
+            ]:
                 qs_plus = Clue(
                     cluster_algo_dict={"init": "k-means++", "random_state": 0},
                     random_state=42,
@@ -144,10 +191,18 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 # even for different clustering initializations.
                 y = np.full(len(y_true), MISSING_LABEL)
                 query_indices_plus, utilities_plus = qs_plus.query(
-                    X, y, clf=clf, candidates=candidates, return_utilities=True
+                    X,
+                    y,
+                    estimator=clf,
+                    candidates=candidates,
+                    return_utilities=True,
                 )
                 query_indices_random, utilities_random = qs_random.query(
-                    X, y, clf=clf, candidates=candidates, return_utilities=True
+                    X,
+                    y,
+                    estimator=clf,
+                    candidates=candidates,
+                    return_utilities=True,
                 )
                 np.testing.assert_array_equal(
                     query_indices_plus, query_indices_random
@@ -173,7 +228,7 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                     query_indices, utilities = qs.query(
                         X,
                         y,
-                        clf=clf,
+                        estimator=clf,
                         candidates=candidates,
                         batch_size=2,
                         return_utilities=True,
@@ -200,3 +255,9 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                         prev_clf_utilities = utilities
 
                     prev_utilities = utilities
+
+
+class NadarayaWatsonRegressorUncertainty(NadarayaWatsonRegressor):
+
+    def predict(self, X):
+        return super().predict(X, return_std=True, return_entropy=False)

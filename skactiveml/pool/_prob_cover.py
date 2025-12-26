@@ -1,8 +1,3 @@
-"""
-Module implementing `ProbCover`, which is a deep active learning strategy
-suited for low budgets.
-"""
-
 import numpy as np
 import warnings
 
@@ -25,8 +20,15 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     """Probability Coverage (ProbCover)
 
     This class implements the Probability Coverage (ProbCover) query strategy
-    [1]_, which aims at maximizing the probability coverage in a meaningful
-    sample embedding space.
+    [1]_, which selects `batch_size` unlabeled points to maximize empirical
+    coverage under a fixed radius `delta` in the embedding space, treating
+    points within `delta` of any labeled sample as already covered and
+    greedily adding the candidate samples that covers the most new samples at
+    each step. It chooses `delta` via a purity criterion estimated from
+    unlabeled data, prioritizes dense regions, and does not use predictive
+    uncertainty. Originally, this query strategy was only proposed for
+    classification tasks. Nevertheless, this implementation is can handle
+    class and multioutput labels.
 
     Parameters
     ----------
@@ -104,9 +106,11 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must be either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -133,13 +137,28 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-        # Check parameters.
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            allow_multioutput=True,
         )
-        is_multilabel = np.array(y).ndim == 2
-        _, mapping = self._transform_candidates(candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel)
 
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
+        _, mapping = self._transform_candidates(
+            candidates=candidates,
+            X=X,
+            y=y,
+            enforce_mapping=True,
+            is_multioutput=is_multioutput,
+        )
+
+        # Infer number of classes, which must have a minimum of 2.
         is_candidate = np.full(len(X), fill_value=False)
         is_candidate[mapping] = True
         n_classes = self.n_classes
@@ -152,6 +171,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             min_inclusive=True,
             target_type=int,
         )
+
+        # Check parameters for determining the ball radius delta.
         if self.deltas is None:
             deltas = np.arange(0.2, 2.2, 0.2)
         else:
@@ -177,13 +198,13 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
                 "values according to the `init` function of `cluster_algo`."
             )
         check_scalar(update, name="update", target_type=bool)
+
+        # Set up clustering algorithm.
         cluster_algo_dict = (
             {}
             if self.cluster_algo_dict is None
             else self.cluster_algo_dict.copy()
         )
-
-        # Optionally, set random state.
         cluster_algo_sig = signature(self.cluster_algo.__init__).parameters
         algo_has_seed = "random_state" in cluster_algo_sig
         dict_lacks_seed = "random_state" not in cluster_algo_dict

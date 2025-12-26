@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "Badge",
+    "package" : "pool",
+    "method" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool",  "classification", "single-annotator", "diverse-batch"],
+    "title" : "Batch Active Learning by Diverse Gradient Embedding (BADGE)",
+    "refs" : ["ash2020deep"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea**: BADGE selects a batch by running k-means++ on per-sample gradient embeddings, which combine uncertainty and diversity. For each unlabeled sample, it forms the gradient of the cross-entropy loss with respect to the last linear layer using the model’s pseudo-label. Large gradient norms indicate uncertainty, while k-means++ spreads selections to avoid redundancy.",
+    "import_misc" : "from skactiveml.pool import Badge",
+    "init_qs" : "Badge()",
+    "query_params" : "X=X, y=y, clf=clf"
+  }
+]

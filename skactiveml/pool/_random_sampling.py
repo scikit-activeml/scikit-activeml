@@ -8,7 +8,8 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
     """Random Sampling (RS)
 
     This class implements random sampling as a lower baseline for other query
-    strategies.
+    strategies. It randomly selects `batch_size` unlabeled samples whose
+    utility scores are also randomly generated.
 
     Parameters
     ----------

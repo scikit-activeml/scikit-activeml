@@ -20,7 +20,14 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
     This class implements a wrapper for single-annotator pool-based strategies
     that randomly sub-samples a set of candidates before computing their
-    utilities.
+    utilities. This is useful when the number of available candidates is too
+    large and a small subset of candidates is sufficient to select a good batch
+    for labeling. The number of candidates can be controlled using
+    `max_candidates` which supports an absolute number or a fraction of the
+    available candidates. Additionally, `exclude_non_subsample` provides an
+    option to mask all candidates that were not included in the subsample. This
+    can further improve the runtime for query strategies that utilize all
+    available unlabeled data in their selection.
 
     Parameters
     ----------
@@ -38,6 +45,10 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
           shape `(n_candidates, n_features)`, all unlabeled data will be
           removed from `X` and `y`.
         - If `False`, `X` and `y` stay the same.
+    embed_samples_func : Callable or None, default=None
+        - If `embed_samples_func` is a `Callable`, it must accept the samples
+          `X` as input and return the sample-wise embeddings.
+        - If `embed_samples_func` is None, no action is performed.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
@@ -49,6 +60,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         query_strategy=None,
         max_candidates=0.1,
         exclude_non_subsample=False,
+        embed_samples_func=None,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -58,6 +70,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         self.query_strategy = query_strategy
         self.max_candidates = max_candidates
         self.exclude_non_subsample = exclude_non_subsample
+        self.embed_samples_func = embed_samples_func
 
     @match_signature("query_strategy", "query")
     def query(
@@ -76,12 +89,11 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by self.MISSING_LABEL).
-        candidates : None or array-like of shape (n_candidates), dtype=int or
-            array-like of shape (n_candidates, n_features), default=None
-
+        candidates : None or array-like of shape (n_candidates), dtype=int or\
+                array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X,y)` are
               considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
@@ -163,6 +175,12 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"`max_candidates` is of type `{type(self.max_candidates)}`"
                 f" but must be in `[int, float]`."
             )
+        if self.embed_samples_func is not None and not callable(
+            self.embed_samples_func
+        ):
+            raise TypeError(
+                "`embed_samples_func` must be either a `Callable` or `None`."
+            )
         random_state = check_random_state(self.random_state, seed_multiplier)
 
         # subsampling with no explicit provided candidates
@@ -180,7 +198,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             new_candidates = random_state.choice(
                 a=candidate_indices, size=max_candidates, replace=False
             )
-        # subsampling with privided explicit candidates
+        # subsampling with provided explicit candidates
         else:
             # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
@@ -208,22 +226,26 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             if candidates is not None and candidates.ndim > 1:
                 subset_and_labeled_indices = all_labeled
             else:
+                # ignore labeled candidates to avoid duplicate samples
+                all_labeled = np.setdiff1d(all_labeled, new_candidates)
                 subset_and_labeled_indices = np.concatenate(
                     [all_labeled, new_candidates]
                 )
-            subset_and_labeled_indices = np.sort(subset_and_labeled_indices)
+            sorted_idx = np.argsort(subset_and_labeled_indices)
+            subset_and_labeled_indices = subset_and_labeled_indices[sorted_idx]
 
             new_X = X[subset_and_labeled_indices]
             new_y = y[subset_and_labeled_indices]
-            # for explicitely provided candidates recalculate candidate indices
+            # for explicitly provided candidates recalculate candidate indices
             # that are passed to the wrapped query strategy
             if candidates is None or candidates.ndim == 1:
-                new_candidates = unlabeled_indices(
-                    y=new_y, missing_label=self.missing_label_
-                )
+                new_candidates = np.flatnonzero(sorted_idx >= len(all_labeled))
         else:
             new_X = X
             new_y = y
+
+        if self.embed_samples_func:
+            new_X = self.embed_samples_func(new_X)
 
         qs_output = self.query_strategy.query(
             X=new_X,

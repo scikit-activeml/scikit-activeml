@@ -1,0 +1,36 @@
+[
+  {
+    "class" : "StreamRandomSampling",
+    "package" : "stream",
+    "method" : "Stream Random Sampling",
+    "category" : "Baseline",
+    "template" : "examples/template_stream.py",
+    "tags" : ["stream",  "classification", "single-annotator", "top-k-batch"],
+    "title" : "Stream Random Sampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** The Stream Random Sampling strategy queries labels completely randomly. The probability to query a sample is dependent on the budget specified in the budget manager. Given a budget of 10%, the utility exceeds 0.9 (1-0.1) with a probability of 10%. samples are queried regardless of their position in the feature space and disregards any information about the sample. Thus, it should only be used as a baseline strategy. The `allow_exceeding_budget` parameter allows to configure the strategy to strictly adhere to a given budget.",
+    "import_misc" : "from skactiveml.stream import StreamRandomSampling",
+    "init_qs" : "StreamRandomSampling(budget=0.2)",
+    "query_params" : "candidates=X_cand",
+    "update_params" : "candidates=X_cand, queried_indices=sampled_indices",
+    "plot_possible_queries": "X=X_train, y=y_train"
+  },
+  {
+    "class" : "PeriodicSampling",
+    "package" : "stream",
+    "method" : "Periodic Sampling",
+    "category" : "Baseline",
+    "template" : "examples/template_stream.py",
+    "tags" : ["stream",  "classification", "single-annotator", "top-k-batch"],
+    "title" : "Periodic Sampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** The PeriodicSampling strategy samples labels periodically. The length of that period is determined by the `budget`. For instance, a `budget` of 0.25 would result in querying every fourth sample. The main idea behind this query strategy is to exhaust a given budget as soon as it is available. samples are queried regardless of their position in the feature space and disregards any information about the sample. Thus, it should only be used as a baseline strategy.",
+    "import_misc" : "from skactiveml.stream import PeriodicSampling",
+    "init_qs" : "PeriodicSampling(budget=0.2)",
+    "query_params" : "candidates=X_cand",
+    "update_params" : "candidates=X_cand, queried_indices=sampled_indices",
+    "plot_possible_queries": "X=X_train, y=y_train"
+  }
+]

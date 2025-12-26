@@ -1,0 +1,19 @@
+[
+  {
+    "class" : "ProbabilisticAL",
+    "package" : "pool",
+    "method" : "Multi-class Probabilistic Active Learning (McPAL)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "title" : "Multi-class Probabilistic Active Learning (McPAL)",
+    "refs" : ["kottke2016multi"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** McPAL scores each unlabeled sample by the density-weighted expected gain in a target performance metric (e.g., accuracy), integrating a sample's impact, its class posterior, and the posterior's reliability via a closed-form expectation over all possible labelings. This yields a non-myopic selector for multi-class problems. Its effectiveness hinges on calibrated posteriors and sensible density estimates.",
+    "import_misc" : "from skactiveml.pool import ProbabilisticAL",
+    "init_qs" : "ProbabilisticAL()",
+    "query_params" : "X=X, y=y, clf=clf, utility_weight=dens",
+    "preproc" : ["dens_est = clf.fit(X, np.zeros(len(X)))",
+                 "dens = clf.predict_freq(X)[:, 0]"]
+  }
+]

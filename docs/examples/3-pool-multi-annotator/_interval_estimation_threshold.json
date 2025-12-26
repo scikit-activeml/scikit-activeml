@@ -1,0 +1,18 @@
+[
+  {
+    "class" : "IntervalEstimationThreshold",
+    "package" : "pool.multiannotator",
+    "method" : "Interval Estimation Threshold",
+    "category" : "Baseline",
+    "template" : "examples/template_pool_multi_annotator.py",
+    "tags" : ["pool", "classification", "multi-annotator"],
+    "title" : "Interval Estimation Threshold",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** Interval Estimation Threshold (IEThresh) selects samples based on 'Uncertainty Sampling'. The selected samples are labeled by the annotators whose estimated annotation performances are equal or greater than an adaptive threshold. The strategy assumes all annotators to be available and is not defined otherwise. To deal with this case nonetheless value-annotator pairs are first ranked according to the amount of annotators available for the given value in `candidates` and are than ranked according to `IntervalEstimationThreshold`.",
+    "import_misc" : ["from skactiveml.pool.multiannotator import IntervalEstimationThreshold",
+      "from skactiveml.pool.multiannotator import IntervalEstimationAnnotModel"],
+    "init_qs" : "IntervalEstimationThreshold(random_state=random_state)",
+    "query_params" : "X=X, y=y, clf=clf, fit_clf=False, batch_size=3"
+  }
+]

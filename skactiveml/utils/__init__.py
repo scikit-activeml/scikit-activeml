@@ -30,6 +30,7 @@ from ._validation import (
     check_indices,
     check_n_features,
     _check_callable,
+    _check_forward_outputs,
 )
 
 __all__ = [
@@ -62,4 +63,12 @@ __all__ = [
     "simple_batch",
     "check_n_features",
     "_check_callable",
+    "_check_forward_outputs",
 ]
+
+try:
+    from ._functions import make_criterion_tuple_aware  # noqa: F401
+
+    __all__ += ["make_criterion_tuple_aware"]
+except ImportError:  # pragma: no cover
+    pass

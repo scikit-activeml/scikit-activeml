@@ -1,0 +1,17 @@
+repos:
+  - repo: local
+    hooks:
+      - id: black-local
+        name: black (system)
+        entry: black
+        language: system
+        types: [python]
+        files: ^skactiveml/.*\.py$
+        args: [--check]
+      - id: flake8-local
+        name: flake8 (system)
+        entry: flake8
+        language: system
+        types: [python]
+        files: ^skactiveml/.*\.py$
+        args: ["--ignore=E203,W503", --max-line-length=79]

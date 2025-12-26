@@ -1,0 +1,18 @@
+[
+{
+    "class" : "ProbCover",
+    "package" : "pool",
+    "method" : "Probability Coverage (ProbCover)",
+    "category" : "Representativeness",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "classification", "single-annotator", "diverse-batch"],
+    "title" : "Probability Coverage (ProbCover)",
+    "refs" : ["yehuda2022active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** selects `batch_size` unlabeled points to maximize empirical coverage under a fixed radius `delta` in the embedding space, treating points within `delta` of any labeled sample as already covered and greedily adding the candidate samples that covers the most new samples at each step. It chooses `delta` via a purity criterion estimated from unlabeled data, prioritizes dense regions, and does not use predictive uncertainty.",
+    "import_misc" : "from skactiveml.pool import ProbCover",
+    "init_qs" : "ProbCover(n_classes=2, random_state=0, cluster_algo_dict={\"random_state\": 0})",
+    "query_params" : "X=X, y=y"
+}
+]
+

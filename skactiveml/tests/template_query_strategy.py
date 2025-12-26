@@ -344,6 +344,13 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                     ensemble.missing_label = ml
                     ensemble.classes = classes
                     replace_query_params["ensemble"] = ensemble
+                if "estimator" in self.query_default_params_clf:
+                    estimator = clone(
+                        self.query_default_params_clf["estimator"]
+                    )
+                    estimator.missing_label = ml
+                    estimator.classes = classes
+                    replace_query_params["estimator"] = estimator
                 replace_y = np.full_like(y, ml, dtype=t)
                 replace_y[0] = classes[0]
                 replace_y[1] = classes[1]

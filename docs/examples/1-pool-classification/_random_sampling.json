@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "RandomSampling",
+    "package" : "pool",
+    "method" : "Random Sampling",
+    "category" : "Baseline",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "regression", "classification", "single-annotator", "diverse-batch"],
+    "title" : "Random Sampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** Random sampling is a lower baseline for other query strategies. It randomly selects `batch_size` unlabeled samples whose utility scores are also randomly generated.",
+    "import_misc" : "from skactiveml.pool import RandomSampling",
+    "init_qs" : "RandomSampling()",
+    "query_params" : "X=X, y=y"
+  }
+]

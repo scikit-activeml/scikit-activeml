@@ -246,10 +246,11 @@ class _GeneralBALD(QueryByCommittee):
 class BatchBALD(_GeneralBALD):
     """Batch Bayesian Active Learning by Disagreement (BatchBALD)
 
-    Batch Bayesian Active Learning by Disagreement (BatchBALD) [1]_
-    reduces the number of possible hypotheses maximally fast to minimize the
-    uncertainty about the parameters using Shannon's entropy. It seeks the data
-    point that maximises the decrease in expected posterior entropy.
+    Batch Bayesian Active Learning by Disagreement (BatchBALD) [1]_ selects a
+    batch that maximizes the joint mutual information between the labels of the
+    selected points and the model parameters, typically estimated with MC
+    dropout or any other ensemble. This captures uncertainty and inter-sample
+    diversity in one objective, optimized greedily.
 
     Parameters
     ----------

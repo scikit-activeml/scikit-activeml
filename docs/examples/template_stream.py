@@ -1,7 +1,4 @@
 # %%
-# .. note::
-#    The generated animation can be found at the bottom of the page.
-#
 # | **Google Colab Note**: If the notebook fails to run after installing the
 #   needed packages, try to restart the runtime (Ctrl + M) under
 #   Runtime -> Restart session.
@@ -14,9 +11,6 @@
 #   tutorial.
 
 "$install_dependencies|# !pip install scikit-activeml"
-
-# %%
-# ---
 
 # %%
 import numpy as np
@@ -62,30 +56,36 @@ qs = "$init_qs"
 plot_step = "$init_plot_step|5"
 "$preproc"
 # Initialize training data with initial examples.
-X_train = list(X_init)
-y_train = list(y_init)
+X = list(X_init)
+y = list(y_init)
 classes = np.unique(y_true)
 
 # Preparation for plotting.
 fig, ax = plt.subplots()
-feature_bound = [[0, len(X)], [min(X), max(X)]]
-ax.set_xlim(0, len(X))
-ax.set_ylim(bottom=min(X), top=max(X))
+fig.subplots_adjust(top=0.825)
+feature_bound = [[0, len(X_stream)], [min(X_stream), max(X_stream)]]
+ax.set_xlim(0, len(X_stream))
+ax.set_ylim(bottom=min(X_stream), top=max(X_stream))
 artists = []  # List to store frames for the animation
 
 # List to track whether each sample was queried (True) or not (False).
 queried_indices = [True] * len(y_init)
 # List to store decision boundary predictions over time.
 predictions_list = []
+# List to store if the current samples were classified correctly.
+correct_classification_list = []
 
 # Process each streaming sample.
 for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
 
     X_cand = x_t.reshape([1, -1])
-    y_cand = y_t
+    y_cand = [y_t]
+
+    # get prediction of current sample
+
 
     # Fit the classifier with current training data.
-    clf.fit(X_train, y_train)
+    clf.fit(X, y)
 
     # Check whether to query the current sample or not.
     sampled_indices, utilities = qs.query(
@@ -96,8 +96,8 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
     qs.update("$update_params")
 
     # Label the sample based on whether it was queried.
-    X_train.append(x_t)
-    y_train.append(y_t if len(sampled_indices) else MISSING_LABEL)
+    X.append(x_t)
+    y.append(y_t if len(sampled_indices) else MISSING_LABEL)
 
     queried_indices.append(len(sampled_indices) > 0)
 
@@ -106,16 +106,21 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
         # Save current plot elements to determine what is new.
         coll_old = list(ax.collections)
         ax, predictions_list = plot_stream_decision_boundary(
-            ax, t_x, plot_step, clf, X, predictions_list, res="$res|25"
+            ax, t_x, plot_step, clf, X_stream, predictions_list, res="$res|25"
         )
         data_lines = plot_stream_training_data(
-            ax, X_train, y_train, queried_indices, classes, feature_bound
+            ax, X, y, queried_indices, classes, feature_bound
         )
+
+        correct_classification_list.append(clf.score(X_cand, y_cand))
+
+        mean_accuracy = np.mean(correct_classification_list)
 
         title_string = (
             f"Decision boundary after {t_x} new samples\n"
             f"Utility: {utilities[0]:.4f} | "
-            f"Budget: {sum(queried_indices) / (t_x + 1):.4f}"
+            f"Budget: {sum(queried_indices) / (t_x + 1):.4f}\n"
+            f"Prequential Evaluation Accuracy: {mean_accuracy:.4f}"
         )
         title = ax.text(
             x=0.5,
@@ -125,6 +130,8 @@ for t_x, (x_t, y_t) in enumerate(zip(X_stream, y_stream)):
             ha="center",
             transform=ax.transAxes,
         )
+        ax.set_xlabel('Number of Observed Samples')
+        ax.set_ylabel('Feature')
         coll_new = list(ax.collections)
         coll_new.append(title)
 

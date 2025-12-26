@@ -907,10 +907,10 @@ def expected_target_val(X, target_func, reg, **kwargs):
     def arg_filtered_func(idx_y, x_y, y):
         return target_func(y)
 
-    return _conditional_expect(X, arg_filtered_func, reg, **kwargs)
+    return conditional_expect(X, arg_filtered_func, reg, **kwargs)
 
 
-def _conditional_expect(
+def conditional_expect(
     X,
     func,
     reg,
@@ -946,7 +946,7 @@ def _conditional_expect(
           of randomly drawn samples. `n_integration_samples` specifies the
           number of monte carlo samples.
         -'quantile' Uses the quantile function to transform the integration
-          space into the interval from 0 to 1 and than uses the method from
+          space into the interval from 0 to 1 and then uses the method from
           'quantile_method' to calculate the integral. The number of
           integration points is specified by `n_integration_samples`.
         -'gauss_hermite' Uses Gauss-Hermite quadrature. This assumes Y | X
@@ -982,7 +982,7 @@ def _conditional_expect(
         If `vector_func` is `True`, the integration values are passes
         in vectorized form to `func`. If `vector_func` is 'both', the
         integration values might or might not be passed in vectorized form,
-        depending what is more efficient. The integration values
+        depending on what is more efficient. The integration values
         are passed in vectorized form, means that in a call like
         `func(y, x, idx)` `y` is of the form `(n_samples,
         n_integration_samples)`, `x` equals `X` and `idx` is an index map of

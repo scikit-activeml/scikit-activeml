@@ -23,8 +23,13 @@ from ..utils import (
 class FourDs(SingleAnnotatorPoolQueryStrategy):
     """4DS
 
-    Implementation of the pool-based query strategy 4DS for training a
-    MixtureModelClassifier [1]_.
+    Implementation of the pool-based query strategy 4DS, which combines four
+    criteria computed from a generative mixture-model classifier: distance to
+    the decision boundary (uncertainty), density of the sample's region
+    (representativeness), diversity within the batch (non-redundancy), and
+    class-distribution balancing. It selects a batch by greedily maximizing a
+    weighted sum of these scores with automatically adapted weights, yielding
+    uncertain, representative, and non-redundant queries.
 
     Parameters
     ----------

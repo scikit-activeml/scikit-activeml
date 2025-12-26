@@ -17,12 +17,17 @@ from skactiveml.utils import (
 class Quire(SingleAnnotatorPoolQueryStrategy):
     """QUerying Informative and Representative Examples (QUIRE)
 
-    Implementation of the AL strategy "QUerying Informative and Representative
-    Examples" (QUIRE) [1]_.
+    This class implements "QUerying Informative and Representative
+    Examples" (QUIRE) [1]_, which uses the min–max view of active learning with
+    a regularized least-squares classifier in a reproducing kernel Hilbert
+    space (RKHS) under quadratic loss. It assigns each unlabeled sample a
+    single score derived from the kernel ridge regression objective that
+    jointly reflects informativeness with respect to the labeled set and
+    representativeness with respect to the unlabeled set.
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes)
+    classes : array-like of shape (n_classes,)
         Array of class labels.
     lmbda : float, default=1.0
         Controls informativeness (high) and representativeness (low). Values

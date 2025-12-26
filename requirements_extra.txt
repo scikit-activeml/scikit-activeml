@@ -1,4 +1,3 @@
-flake8
 pytest
 pytest-cov
 pytest-xdist
@@ -9,7 +8,11 @@ numpydoc~=1.9
 nbsphinx~=0.9
 nbformat~=5.10
 sphinx-gallery~=0.19
+sphinx-copybutton
+sphinx-sitemap
 pybtex~=0.25
 pydata_sphinx_theme~=0.16
 gitpython
 black
+flake8
+pre-commit

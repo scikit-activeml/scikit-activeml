@@ -21,9 +21,13 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
     """Discriminative Active Learning (DAL)
 
     This class implements the "Discriminative Active Learning" (DAL) [1]_
-    strategy. Its idea is to solve a binary classification task to choose
-    samples for labeling such that the labeled set and the unlabeled pool are
-    indistinguishable.
+    strategy, which selects samples that make the labeled set better match the
+    unlabeled distribution. It trains a binary discriminator to distinguish
+    labeled vs unlabeled (typically in feature space) and queries the unlabeled
+    points the discriminator rates most unlabeled-like, thus covering
+    underrepresented regions. It does not use predictive uncertainty
+    such that effectiveness hinges on the representation and discriminator
+    calibration.
 
     Parameters
     ----------

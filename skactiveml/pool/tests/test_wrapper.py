@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.datasets import load_breast_cancer
 from sklearn.preprocessing import StandardScaler
 
-from skactiveml.classifier import SklearnClassifier
+from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
 from skactiveml.regressor import SklearnRegressor
 from skactiveml.pool import (
     SubSamplingWrapper,
@@ -117,6 +117,25 @@ class TestSubSamplingWrapper(
         ]
         self._test_param("init", "exclude_non_subsample", test_cases)
 
+    def test_init_param_embed_samples_func(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+
+        def func_valid(x):
+            return x
+
+        def func_invalid(x, y):
+            return x
+
+        test_cases += [
+            (None, None),
+            (False, TypeError),
+            (1, TypeError),
+            ("1.2", TypeError),
+            (func_valid, None),
+            (func_invalid, TypeError),
+        ]
+        self._test_param("init", "embed_samples_func", test_cases)
+
     def test_query_param_query_kwargs(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(2, TypeError), (True, None), ("Hello", TypeError)]
@@ -194,10 +213,19 @@ class TestSubSamplingWrapper(
                         )
 
         us = UncertaintySampling()
-        qs_us = SubSamplingWrapper(us)
-        sig_qs_us = inspect.signature(qs_us.query).parameters
-        sig_us = inspect.signature(us.query).parameters
-        self.assertEqual(sig_qs_us, sig_us)
+        for max_candidates in [0.2, len(self.X)]:
+            qs_us = SubSamplingWrapper(
+                us, max_candidates=max_candidates, exclude_non_subsample=True
+            )
+            qs_us.query(
+                X=self.X,
+                y=np.ones(len(self.X)),
+                candidates=np.arange(len(self.X)),
+                clf=ParzenWindowClassifier(),
+            )
+            sig_qs_us = inspect.signature(qs_us.query).parameters
+            sig_us = inspect.signature(us.query).parameters
+            self.assertEqual(sig_qs_us, sig_us)
 
     def test_query_batch_variation(self):
         init_params = deepcopy(self.init_default_params)

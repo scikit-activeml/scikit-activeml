@@ -1,0 +1,19 @@
+[
+  {
+    "class" : "DiscriminativeAL",
+    "package" : "pool",
+    "method" : "Discriminative Active Learning (DAL)",
+    "category" : "Representativeness",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "regression", "single-annotator", "diverse-batch"],
+    "title" : "Discriminative Active Learning (DAL)",
+    "refs" : ["gissin2019discriminative"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** DAL selects samples that make the labeled set better match the unlabeled distribution. It trains a binary discriminator to distinguish labeled vs unlabeled (typically in feature space) and queries the unlabeled points the discriminator rates most unlabeled-like, thus covering underrepresented regions. It does not use predictive uncertainty such that effectiveness hinges on the representation and discriminator calibration.",
+    "import_misc" : ["from skactiveml.pool import DiscriminativeAL",
+                     "from sklearn import clone"],
+    "init_qs" : "DiscriminativeAL()",
+    "query_params" : "X=X, y=y, discriminator=discriminator",
+    "preproc" : ["discriminator=clone(clf)"]
+  }
+]

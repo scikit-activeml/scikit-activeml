@@ -59,8 +59,9 @@ class TemplateEstimator:
         replace_fit_params=None,
     ):
         test_cases = [] if test_cases is None else test_cases
-        ml = self.init_default_params["missing_label"]
-        test_cases += [(ml, None), (Dummy, TypeError)]
+        if replace_fit_params is None or "y" not in replace_fit_params:
+            ml = self.init_default_params["missing_label"]
+            test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param(
             "init",
             "missing_label",
@@ -79,7 +80,7 @@ class TemplateEstimator:
         test_cases += [
             (np.nan, ValueError),
             ([1], ValueError),
-            (np.zeros((len(self.fit_default_params["y"]), 1)), None),
+            (np.full_like(self.fit_default_params["X"], 0), None),
         ]
         self._test_param("fit", "X", test_cases)
 
@@ -130,7 +131,7 @@ class TemplateEstimator:
             test_cases += [
                 (np.nan, ValueError),
                 ([1], ValueError),
-                (np.zeros((len(self.fit_default_params["y"]), 1)), None),
+                (np.full_like(self.fit_default_params["X"], 0), None),
             ]
             self._test_param(
                 "partial_fit",
@@ -185,10 +186,17 @@ class TemplateEstimator:
 
     def test_predict_param_X(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
+        dtype = None
+        if hasattr(self.predict_default_params["X"], "dtype"):
+            dtype = self.predict_default_params["X"].dtype
+        dummy_zeros = np.zeros(
+            np.array(self.predict_default_params["X"]).shape,
+            dtype=dtype,
+        )
         test_cases += [
             (np.nan, ValueError),
             ("state", ValueError),
-            (np.zeros(np.array(self.predict_default_params["X"]).shape), None),
+            (dummy_zeros, None),
         ]
         self._test_param(
             "predict",
@@ -245,6 +253,7 @@ class TemplateEstimator:
         replace_fit_params=None,
         extras_params=None,
         exclude_fit=False,
+        id_offset=0,
     ):
         if replace_init_params is None:
             replace_init_params = {}
@@ -254,7 +263,11 @@ class TemplateEstimator:
             extras_params = {}
 
         for i, (test_val, err) in enumerate(test_cases):
-            with self.subTest(msg="Param", id=i, val=test_val):
+            with self.subTest(
+                msg=f"Param: {test_param}, expected: {err}",
+                id=i + id_offset,
+                val=test_val,
+            ):
                 init_params = deepcopy(self.init_default_params)
                 init_params.update(replace_init_params)
 
@@ -328,6 +341,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
+            id_offset=3,
         )
 
         test_cases = [("state", TypeError), (None, None)]
@@ -339,6 +353,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
+            id_offset=5,
         )
 
         test_cases = [("state", TypeError), (0.0, None)]
@@ -350,6 +365,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
+            id_offset=7,
         )
 
         test_cases = [("state", TypeError), (None, ValueError), (np.nan, None)]
@@ -361,6 +377,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
+            id_offset=9,
         )
 
     def test_init_param_classes(self, test_cases=None):
@@ -403,11 +420,12 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             "y": ["tokyo", "tokyo", "paris"],
             "X": np.zeros((3, 1)),
         }
+        test_cost_matrix = 1 - np.eye(len(np.unique(replace_fit_params["y"])))
         test_cases += [
             (None, None),
             (-1, ValueError),
             ([], ValueError),
-            (1 - np.eye(len(np.unique(replace_fit_params["y"]))), None),
+            (test_cost_matrix, None),
         ]
         self._test_param(
             "init",
@@ -416,7 +434,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
-        test_cases = [(self.predict_default_params["X"], None)]
+        test_cases = [(replace_fit_params["X"], None)]
         replace_init_params["cost_matrix"] = 1 - np.eye(
             len(np.unique(replace_fit_params["y"]))
         )
@@ -426,6 +444,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
+            id_offset=4,
         )
 
     def test_fit_param_X(self, test_cases=None):
@@ -467,10 +486,10 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             replace_fit_params=replace_fit_params,
         )
         test_cases = [
-            ([0, 1, 2], None),
+            ([0, 1, 1], None),
             (["tokyo", "nan", "paris"], TypeError),
         ]
-        replace_init_params = {"classes": [0, 1, 2], "missing_label": -1}
+        replace_init_params = {"classes": [0, 1], "missing_label": -1}
         replace_fit_params = {"X": np.zeros((3, 1))}
         self._test_param(
             "fit",
@@ -694,12 +713,14 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
-            ([np.nan, np.nan, np.nan], None),
-            ("state", TypeError),
-            (np.nan, TypeError),
-            ([1.0, 1.1, 0.9], None),
+            ([np.nan] * len(self.fit_default_params["X"]), None),
+            ([np.nan] + [1.0] * (len(self.fit_default_params["X"]) - 1), None),
         ]
-        super().test_fit_param_y(test_cases)
+        replace_init_params = {"missing_label": np.nan}
+        super().test_fit_param_y(
+            test_cases,
+            replace_init_params=replace_init_params,
+        )
         # TODO: Test schould throw a TypeError
         # Wrapper classes are failing because of
         # "numpy.core._exceptions._UFuncNoLoopError: ufunc 'add' did not
@@ -709,7 +730,10 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
         # test_cases = [([1.0, "nan", 0.9], None)]
         replace_init_params = {"missing_label": "nan"}
         self._test_param(
-            "fit", "y", test_cases, replace_init_params=replace_init_params
+            "fit",
+            "y",
+            test_cases,
+            replace_init_params=replace_init_params,
         )
 
 

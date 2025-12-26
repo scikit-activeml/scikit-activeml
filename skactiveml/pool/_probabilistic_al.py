@@ -21,8 +21,13 @@ class ProbabilisticAL(SingleAnnotatorPoolQueryStrategy):
     """Multi-class Probabilistic Active Learning (McPAL)
 
     This class implements the query strategy Multi-class Probabilistic Active
-    Learning (McPAL) [1]_, which estimates the performance gain when labeling
-    samples.
+    Learning (McPAL) [1]_, which scores each unlabeled sample by the
+    density-weighted expected gain in a target performance metric
+    (e.g., accuracy), integrating a sample's impact, its class posterior,
+    and the posterior's reliability via a closed-form expectation over all
+    possible labelings. This yields a non-myopic selector for
+    multi-class problems. Its effectiveness hinges on calibrated posteriors and
+    sensible density estimates.
 
     Parameters
     ----------

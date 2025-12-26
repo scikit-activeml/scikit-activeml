@@ -7,7 +7,11 @@ uncertainties as sample weights.
 
 import numpy as np
 
-from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
+from ..base import (
+    SingleAnnotatorPoolQueryStrategy,
+    SkactivemlClassifier,
+    SkactivemlRegressor,
+)
 from ..pool import uncertainty_scores
 from ..utils import (
     MISSING_LABEL,
@@ -23,22 +27,44 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
     """Clustering Uncertainty-weighted Embeddings (CLUE)
 
     This class implements the Clustering Uncertainty-weighted Embeddings (CLUE)
-    query strategy [1]_, which considers both diversity and uncertainty of the
-    samples.
+    query strategy [1]_ clusters latent embeddings while weighting samples by
+    predictive uncertainty, then picks samples near the cluster centers. The
+    result is a diverse set biased toward uncertain regions of representation
+    space.
+
+    The original `Clue` query strategy was proposed for classification tasks
+    only and did not include a regression variant. Support for regression in
+    this implementation is therefore an extension of the original formulation
+    and relies on user-provided sample-wise uncertainty estimates.
 
     Parameters
     ----------
-    cluster_algo : ClusterMixin.__class__, default=KMeans
-        The cluster algorithm to be used. It must implement a `fit_transform`
-        method, which takes samples `X` and `sample_weight` as inputs, e.g.,
-        sklearn.clustering.KMeans and sklearn.clustering.MiniBatchKMeans.
-    cluster_algo_dict : dict, default=None
-        The parameters passed to the clustering algorithm `cluster_algo`,
-        excluding the parameter for the number of clusters.
-    n_cluster_param_name : string, default="n_clusters"
-        The name of the parameter for the number of clusters.
+    predict_dict : dict or None, default=None
+        Optional keyword arguments passed to the estimator's prediction
+        method in order to obtain sample embeddings and/or uncertainties as
+        additional outputs.
+
+        * For classification, `Clue` calls::
+
+            out = estimator.predict_proba(X, **predict_dict)
+
+        * For regression, `Clue` calls::
+
+            out = estimator.predict(X, **predict_dict)
+
+        If `out` is a tuple, its additional elements are inferred by shape:
+        sample-wise uncertainties must be a 1D `numpy.ndarray`, and
+        sample embeddings must be a 2D `numpy.ndarray`.
+
+        In the classification case, returning uncertainties is optional,
+        because they can be derived from the predicted class probabilities
+        (see the documentation of the `method` parameter). In the regression
+        case, providing uncertainties as an additional output is mandatory.
     method : 'least_confident' or 'margin_sampling' or 'entropy', \
             default="entropy"
+        Fallback uncertainty measure used in the classification case when
+        the classifier does not provide explicit uncertainties.
+
         - `method='least_confident'` queries the sample whose maximal posterior
           probability is minimal.
         - `method='margin_sampling'` queries the sample whose posterior
@@ -46,20 +72,23 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
           label is minimal.
         - `method='entropy'` queries the sample whose posterior's have the
           maximal entropy.
-    clf_embedding_flag_name : str or None, default=None
-        Name of the flag, which is passed to the `predict_proba` method for
-        getting the (learned) sample representations.
-
-        - If `clf_embedding_flag_name=None` and `predict_proba` returns
-          only one output, the input samples `X` are used.
-        - If `predict_proba` returns two outputs or `clf_embedding_name` is
-          not `None`, `(proba, embeddings)` are expected as outputs.
+    cluster_algo : ClusterMixin.__class__, default=KMeans
+        The cluster algorithm to be used. It must implement a `fit_transform`
+        method, which takes samples `X` and `sample_weight` as inputs, e.g.,
+        `sklearn.clustering.KMeans` and `sklearn.clustering.MiniBatchKMeans`.
+    cluster_algo_dict : dict, default=None
+        The parameters passed to the clustering algorithm `cluster_algo`,
+        excluding the parameter for the number of clusters.
+    n_cluster_param_name : string, default="n_clusters"
+        The name of the parameter for the number of clusters.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn: callable, default=np.average
-        Callable that takes axis as kwarg and reduces along that axis. Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while `np.sum` is not allowed.
+        Callable that takes axis as kwarg and reduces along that axis. Common
+        choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while
+        `np.sum` is not allowed.
 
     References
     ----------
@@ -70,13 +99,13 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
 
     def __init__(
         self,
-        missing_label=MISSING_LABEL,
-        random_state=None,
+        predict_dict=None,
+        method="entropy",
         cluster_algo=KMeans,
         cluster_algo_dict=None,
         n_cluster_param_name="n_clusters",
-        method="entropy",
-        clf_embedding_flag_name=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
         multilabel_aggregation_fn=np.average,
     ):
         super().__init__(
@@ -86,15 +115,15 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         self.cluster_algo_dict = cluster_algo_dict
         self.n_cluster_param_name = n_cluster_param_name
         self.method = method
-        self.clf_embedding_flag_name = clf_embedding_flag_name
+        self.predict_dict = predict_dict
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
 
     def query(
         self,
         X,
         y,
-        clf,
-        fit_clf=True,
+        estimator,
+        fit_estimator=True,
         sample_weight=None,
         candidates=None,
         batch_size=1,
@@ -110,11 +139,13 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
-        clf : skactiveml.base.SkactivemlClassifier
-            Classifier implementing the methods `fit` and `predict_proba`.
-        fit_clf : bool, default=True
-            Defines whether the classifier `clf` should be fitted on `X`, `y`,
-            and `sample_weight`.
+        estimator : skactiveml.base.SkactivemlClassifier\
+                or skactiveml.base.SkactivemlRegressor
+            Estimator implementing the methods `fit` and
+            `predict_proba` (classification) or `predict` (regression).
+        fit_estimator : bool, default=True
+            Defines whether the `estimator` should be fitted on
+            `X`, `y`, and `sample_weight`.
         sample_weight: array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\
@@ -143,23 +174,21 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
-
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X,
-            y,
-            candidates,
-            batch_size,
-            return_utilities,
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
             reset=True,
             allow_multilabel=True,
         )
-
         is_multilabel = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates,
-            X,
-            y,
+            candidates=candidates,
+            X=X,
+            y=y,
             enforce_mapping=True,
             is_multilabel=is_multilabel,
         )
@@ -172,37 +201,72 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             else self.cluster_algo_dict.copy()
         )
         check_type(self.n_cluster_param_name, "n_cluster_param_name", str)
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-
-        # Fit the classifier.
-        if fit_clf:
-            if sample_weight is not None:
-                clf = clone(clf).fit(X, y, sample_weight)
-            else:
-                clf = clone(clf).fit(X, y)
-
-        # Compute class-membership predictions and optionally embeddings.
-        if self.clf_embedding_flag_name is not None:
-            probas, X_cand = clf.predict_proba(
-                X_cand, **{self.clf_embedding_flag_name: True}
-            )
-        else:
-            probas = clf.predict_proba(X_cand)
-            if isinstance(probas, tuple):
-                probas, X_cand = probas
-
-        # Compute uncertainties according to given `method`.
-        uncertainties = uncertainty_scores(
-            probas=probas,
-            method=self.method,
-            is_multilabel=is_multilabel,
-            multilabel_aggregation_fn=self.multilabel_aggregation_fn,
+        check_type(
+            estimator, "estimator", SkactivemlClassifier, SkactivemlRegressor
         )
+        check_type(fit_estimator, "fit_estimator", bool)
+        check_equal_missing_label(estimator.missing_label, self.missing_label_)
+        predict_dict = {} if self.predict_dict is None else self.predict_dict
+        check_type(predict_dict, "predict_dict", dict)
+        if self.method not in [
+            "least_confident",
+            "margin_sampling",
+            "entropy",
+        ]:
+            raise ValueError(
+                f"`method` must be 'least_confident' or 'margin_sampling'"
+                f"or 'entropy'. Got {self.method} instead."
+            )
+
+        # Fit the estimator.
+        if fit_estimator:
+            if sample_weight is not None:
+                estimator = clone(estimator).fit(X, y, sample_weight)
+            else:
+                estimator = clone(estimator).fit(X, y)
+
+        # Compute predictions plus optional embeddings and/or uncertainties.
+        is_clf = isinstance(estimator, SkactivemlClassifier)
+        if is_clf:
+            out = estimator.predict_proba(X_cand, **predict_dict)
+        else:
+            out = estimator.predict(X_cand, **predict_dict)
+        if not isinstance(out, tuple):
+            out = (out,)
+        main = out[0]
+        emb = None
+        uncertainties = None
+        for out_element in out[1:]:
+            if out_element.ndim == 1 and uncertainties is None:
+                uncertainties = out_element
+            elif out_element.ndim == 2 and emb is None:
+                emb = out_element
+            else:
+                raise ValueError(
+                    "The optional outputs when calling `predict_proba` or"
+                    "`predict` must either be a 1D `np.ndarray` for the "
+                    "uncertainties or a 2D `np.ndarray` for the sample "
+                    "embeddings."
+                )
+
+        # Use original samples as a fallback.
+        X_cand = X_cand if emb is None else emb
+
+        if is_clf and uncertainties is None:
+            # Compute uncertainties as a fallback in the classification case.
+            uncertainties = uncertainty_scores(
+                probas=main,
+                method=self.method,
+                is_multilabel=is_multilabel,
+                multilabel_aggregation_fn=self.multilabel_aggregation_fn,
+            )
+        elif not is_clf and uncertainties is None:
+            raise ValueError(
+                "For regression, `predict` must return uncertainties."
+            )
 
         # Implement a fallback, if all uncertainties are zero.
-        if np.sum(uncertainties) == 0:
+        if np.nansum(uncertainties) == 0:
             uncertainties = np.ones_like(uncertainties)
 
         # Perform clustering to get centroids.

@@ -1,3 +1,4 @@
+import random
 import unittest
 import warnings
 
@@ -18,6 +19,7 @@ from sklearn.linear_model import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
+from sklearn.semi_supervised import SelfTrainingClassifier
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 
 from skactiveml.classifier import (
@@ -27,6 +29,18 @@ from skactiveml.classifier import (
     MixtureModelClassifier,
 )
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
+from skactiveml.utils import MISSING_LABEL
+
+successful_skorch_torch_import = False
+try:
+    import torch
+    from torch import nn
+    from skactiveml.classifier import SkorchClassifier
+    from skorch.utils import to_numpy
+
+    successful_skorch_torch_import = True
+except ImportError:
+    pass  # pragma: no cover
 
 
 class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
@@ -52,14 +66,22 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.y_nan = ["nan", "nan", "nan", "nan"]
 
     def test_init_param_estimator(self):
-        test_cases = []
-        test_cases += [
+        test_cases = [
             (Perceptron(), None),
             ("Test", AttributeError),
             (GaussianNB(), None),
             (LinearRegression(), TypeError),
         ]
         self._test_param("init", "estimator", test_cases)
+
+    def test_init_param_include_unlabeled_samples(self):
+        test_cases = [
+            (GaussianNB(), TypeError),
+            (True, None),
+            (False, None),
+            ("String", TypeError),
+        ]
+        self._test_param("init", "include_unlabeled_samples", test_cases)
 
     def test_fit(self):
         clf = SklearnClassifier(
@@ -149,6 +171,30 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             missing_label="nan",
         )
         self.assertFalse(hasattr(clf, "partial_fit"))
+
+        # Test semi-supervised learning.
+        X, y = make_blobs(
+            centers=10, n_samples=200, random_state=0, shuffle=True
+        )
+        y_partial = np.full_like(y, -1)
+        y_partial[:50] = y[:50]
+        clf = SklearnClassifier(
+            estimator=SelfTrainingClassifier(
+                LogisticRegression(random_state=0),
+                threshold=0,
+                max_iter=10,
+                verbose=True,
+            ),
+            include_unlabeled_samples=True,
+            missing_label=-1,
+            classes=np.unique(y),
+            random_state=0,
+        )
+        clf.fit(X, y_partial)
+        self.assertEqual((clf.labeled_iter_ > 0).sum(), 150)
+        clf.set_params(include_unlabeled_samples=False)
+        clf.fit(X, y_partial)
+        self.assertEqual((clf.labeled_iter_ > 0).sum(), 0)
 
     def test_predict_proba(self):
         clf = SklearnClassifier(
@@ -296,7 +342,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             np.testing.assert_array_equal(pred_orig_1, pred_wrapped_1)
 
             # check that it fails when classes of estimator was trained on
-            # different classes than profided to the `classes` parameter of
+            # different classes than provided to the `classes` parameter of
             # SklearnClassifier
             if not isinstance(missing_label, float):
                 self.assertRaises(TypeError, clf.fit, X_train, y_train_true)
@@ -515,7 +561,7 @@ class TestSlidingWindowClassifier(
     def test_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
-            ([0, 1, 2], TypeError),
+            ([0, 1, 0], TypeError),
             (["tokyo", "nan", "paris"], None),
         ]
         replace_init_params = {
@@ -534,11 +580,11 @@ class TestSlidingWindowClassifier(
             replace_fit_params=replace_fit_params,
         )
         test_cases = [
-            ([0, 1, 2], None),
+            ([0, 1, 1], None),
             (["tokyo", "nan", "paris"], TypeError),
         ]
         replace_init_params = {
-            "classes": [0, 1, 2],
+            "classes": [0, 1],
             "missing_label": -1,
             "estimator": SklearnClassifier(
                 GaussianProcessClassifier(), missing_label=-1
@@ -581,7 +627,7 @@ class TestSlidingWindowClassifier(
             (["nan", "nan", "nan", "nan"], TypeError),
         ]
         replace_init_params = {
-            "classes": [0, 1, 2],
+            "classes": [0, 1],
             "missing_label": -1,
             "estimator": SklearnClassifier(GaussianNB(), missing_label=-1),
         }
@@ -916,3 +962,425 @@ class TestSlidingWindowClassifier(
         freq_est = est.predict_freq(X=self.fit_default_params["X"])
         np.testing.assert_array_equal(freq, freq_est)
         np.testing.assert_array_equal(clf.classes_, est.classes_)
+
+
+if successful_skorch_torch_import:
+
+    class TestSkorchClassifier(
+        TemplateSkactivemlClassifier, unittest.TestCase
+    ):
+        def setUp(self):
+            # Set global seeds.
+            torch.manual_seed(0)
+            np.random.seed(0)
+            random.seed(0)
+            self.X, self.y_true = make_blobs(
+                n_samples=200, n_features=1, centers=2, random_state=0
+            )
+            self.X = self.X.astype(np.float32)
+            self.y = np.copy(self.y_true).astype(np.float32)
+            self.y[:100] = MISSING_LABEL
+            self.y_ulbld = np.full_like(self.y, fill_value=MISSING_LABEL)
+            self.classes = np.unique(self.y_true)
+
+            estimator_class = SkorchClassifier
+            self.neural_net_param_dict = {
+                "train_split": None,
+                "verbose": False,
+                "optimizer": torch.optim.RAdam,
+                "device": "cpu",
+                "lr": 0.01,
+                "max_epochs": 30,
+                "batch_size": 2,
+            }
+            init_default_params = {
+                "module": TestNeuralNet,
+                "classes": None,
+                "missing_label": MISSING_LABEL,
+                "random_state": 1,
+                "neural_net_param_dict": self.neural_net_param_dict,
+            }
+            fit_default_params = {
+                "X": self.X,
+                "y": self.y,
+            }
+            predict_default_params = {"X": self.X}
+            super().setUp(
+                estimator_class=estimator_class,
+                init_default_params=init_default_params,
+                fit_default_params=fit_default_params,
+                predict_default_params=predict_default_params,
+            )
+
+        def test_init_param_module(self, test_cases=None):
+            clf = SkorchClassifier(module="Test")
+            self.assertEqual(clf.module, "Test")
+
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [
+                ("Test", TypeError),
+                (None, TypeError),
+                ([("nn.Module", TestNeuralNet)], TypeError),
+            ]
+            self._test_param("init", "module", test_cases)
+
+        def test_init_param_criterion(self, test_cases=None):
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [
+                ("Test", TypeError),
+                (None, TypeError),
+                (nn.NLLLoss, None),
+                (nn.CrossEntropyLoss, None),
+                (nn.NLLLoss(), None),
+                (nn.CrossEntropyLoss(), None),
+            ]
+            self._test_param("init", "criterion", test_cases)
+
+        def test_init_param_include_unlabeled_samples(self, test_cases=None):
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [
+                (GaussianNB(), TypeError),
+                (True, IndexError),
+                (False, None),
+                ("String", TypeError),
+            ]
+            self._test_param("init", "include_unlabeled_samples", test_cases)
+            neural_net_param_dict = self.neural_net_param_dict.copy()
+            test_cases = [(True, None)]
+            neural_net_param_dict["criterion__ignore_index"] = -1
+            self._test_param(
+                "init",
+                "include_unlabeled_samples",
+                test_cases,
+                replace_init_params={
+                    "neural_net_param_dict": neural_net_param_dict
+                },
+            )
+
+        def test_initialize(self):
+            # Check prediction w/o initialization and w/o given classes.
+            clf = SkorchClassifier(**self.init_default_params)
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+            y_pred = clf.predict(self.X)
+            self.assertTrue((np.isin(y_pred, self.classes)).all())
+
+            # Check prediction with initialization and w/o given classes.
+            clf = SkorchClassifier(**self.init_default_params)
+            clf.initialize()
+            y_pred = clf.predict(self.X)
+            self.assertTrue((np.isin(y_pred, self.classes)).all())
+
+        def test_fit(self):
+            # Check standard fitting cases.
+            clf = SkorchClassifier(**self.init_default_params)
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+            self.assertRaises(ValueError, clf.fit, self.X, self.y_ulbld)
+            clf.fit(self.X, self.y)
+            check_is_fitted(clf)
+
+            # Check fitting without `warm_restart`.
+            init_default_params1 = self.init_default_params.copy()
+            init_default_params1["classes"] = [0, 1]
+            init_default_params1["neural_net_param_dict"]["warm_start"] = False
+            clf = SkorchClassifier(**init_default_params1)
+            clf.fit(self.X, self.y_ulbld)
+            init_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            clf.fit(self.X, self.y_ulbld)
+            new_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            self.assertRaises(
+                AssertionError,
+                np.testing.assert_array_equal,
+                init_weights,
+                new_weights,
+            )
+
+            # Check fitting with `warm_restart`.
+            init_default_params2 = self.init_default_params.copy()
+            init_default_params2["classes"] = [0, 1]
+            init_default_params2["neural_net_param_dict"]["warm_start"] = True
+            init_default_params2["neural_net_param_dict"]["verbose"] = 1
+            clf = SkorchClassifier(**init_default_params2)
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+            clf.fit(self.X, self.y_ulbld)
+            check_is_fitted(clf)
+            init_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            clf.fit(self.X, self.y_ulbld)
+            new_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            np.testing.assert_array_equal(init_weights, new_weights)
+            clf.fit(self.X, self.y)
+            new_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            self.assertRaises(
+                AssertionError,
+                np.testing.assert_array_equal,
+                init_weights,
+                new_weights,
+            )
+
+            # Setup for initialized Pytorch module as input.
+            init_default_params3 = self.init_default_params.copy()
+            init_default_params3["classes"] = [0, 1]
+            clf_module = TestNeuralNet()
+            init_weights = to_numpy(
+                deepcopy(clf_module.input_to_hidden.weight)
+            )
+            init_default_params3["module"] = clf_module
+            clf = SkorchClassifier(**init_default_params3)
+
+            # Fitting with only unlabeled data must preserve weights.
+            clf.fit(self.X, self.y_ulbld)
+            new_weights = to_numpy(deepcopy(clf_module.input_to_hidden.weight))
+            np.testing.assert_array_equal(init_weights, new_weights)
+
+            # Fitting with partially label data must change weights.
+            clf.fit(self.X, self.y)
+            new_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+            self.assertRaises(
+                AssertionError,
+                np.testing.assert_array_equal,
+                init_weights,
+                new_weights,
+            )
+
+        def test_partial_fit(self):
+            clf = SkorchClassifier(**self.init_default_params)
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+            self.assertRaises(
+                ValueError, clf.partial_fit, self.X, self.y_ulbld
+            )
+            clf.partial_fit(self.X, self.y)
+            check_is_fitted(clf)
+
+            init_default_params2 = self.init_default_params.copy()
+            init_default_params2["classes"] = [0, 1]
+            clf = SkorchClassifier(**init_default_params2)
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+            clf.partial_fit(self.X, self.y_ulbld)
+            clf.partial_fit(self.X, self.y)
+            check_is_fitted(clf)
+
+            predict_proba_0 = clf.predict_proba(self.X)
+            clf.partial_fit(self.X, self.y_ulbld)
+            predict_proba_1 = clf.predict_proba(self.X)
+            np.testing.assert_almost_equal(predict_proba_0, predict_proba_1)
+
+        def test_predict(self):
+            clf = SkorchClassifier(**self.init_default_params)
+            clf.fit(**self.fit_default_params)
+            y_pred = clf.predict(self.fit_default_params["X"])
+            self.assertEqual(len(y_pred), len(self.X))
+
+        def test_predict_proba(self):
+            init_default_params = self.init_default_params.copy()
+            init_default_params["forward_outputs"] = {
+                "probas": (0, nn.Softmax(dim=-1)),
+                "logits": (0, None),
+                "emb": (1, None),
+            }
+            clf = SkorchClassifier(**init_default_params)
+            clf.fit(self.X, self.y_true)
+            P_class, L_class, X_embed = clf.predict_proba(
+                self.X, extra_outputs=["logits", "emb"]
+            )
+            self.assertTrue((P_class.sum(axis=-1).round(3) == 1).all())
+            self.assertTrue((P_class > 0).all())
+            np.testing.assert_array_equal(L_class.shape, (len(self.X), 2))
+            self.assertTrue((L_class < 0).any())
+            self.assertTrue(X_embed.shape[1], 1)
+            init_default_params = self.init_default_params.copy()
+            init_default_params["classes"] = [0, 1]
+            clf = SkorchClassifier(**init_default_params)
+            P_class_0 = clf.predict_proba(self.X)
+            clf.partial_fit(self.X, self.y_ulbld)
+            P_class_1 = clf.predict_proba(self.X)
+            np.testing.assert_almost_equal(P_class_0, P_class_1)
+            clf.fit(self.X, self.y)
+            P_class_2 = clf.predict_proba(self.X)
+            self.assertEqual(len(P_class_2), len(self.X))
+            self.assertEqual(P_class_2.shape[1], 2)
+
+        def test_init_param_sample_dtype(self):
+            test_cases = [
+                (None, None),
+                (np.float32, None),
+                (np.int32, RuntimeError),
+            ]
+            self._test_param("init", "sample_dtype", test_cases)
+
+        def test_init_param_neural_net_param_dict(self):
+            default_dict = self.init_default_params["neural_net_param_dict"]
+            test_cases = [
+                (None, None),
+                (default_dict, None),
+                (default_dict, None),
+                (np.int32, TypeError),
+                ("a", TypeError),
+                ({"abcdefg": 0}, ValueError),
+                ({"predict_nonlinearity": nn.Identity()}, ValueError),
+                ({"module": TestNeuralNet}, ValueError),
+                ({"criterion": nn.CrossEntropyLoss}, ValueError),
+            ]
+            self._test_param("init", "neural_net_param_dict", test_cases)
+
+        def test_init_param_forward_outputs(self):
+            test_cases = [
+                (None, None),
+                ({"proba": (0, None)}, None),
+                ({"proba": (0, None), "emb": (1, None)}, None),
+                (
+                    {
+                        "proba": (0, nn.Softmax(dim=-1)),
+                        "logits": (0, None),
+                        "emb": (1, None),
+                    },
+                    None,
+                ),
+                ({"proba": (0,)}, TypeError),
+                ({"proba": (-1, None)}, ValueError),
+                ({"proba": ("str", None)}, TypeError),
+                ({"proba": (2, None)}, ValueError),
+            ]
+            self._test_param("init", "forward_outputs", test_cases)
+
+            test_cases = [
+                (None, None),
+                ({"proba": (0, torch.exp)}, None),
+            ]
+            self._test_param(
+                "init",
+                "forward_outputs",
+                test_cases,
+                replace_init_params={"criterion": nn.NLLLoss},
+            )
+
+        def test_init_param_criterion_output_keys(self):
+            test_cases = [
+                (None, None),
+                ("proba", None),
+                (["proba"], None),
+                ("test", ValueError),
+                (["test"], ValueError),
+                (False, TypeError),
+            ]
+            self._test_param("init", "criterion_output_keys", test_cases)
+
+            replace_init_params = {
+                "forward_outputs": {
+                    "proba": (0, nn.Softmax(dim=-1)),
+                    "logits": (0, None),
+                    "emb": (1, None),
+                }
+            }
+            test_cases += [
+                ("proba", None),
+                (["proba"], None),
+                ("emb", IndexError),
+                (["emb"], IndexError),
+                (["proba", "logits"], ValueError),
+                (["logits", "emb"], TypeError),
+            ]
+            self._test_param(
+                "init",
+                "criterion_output_keys",
+                test_cases,
+                replace_init_params=replace_init_params,
+            )
+            nn_rep = self.init_default_params["neural_net_param_dict"].copy()
+            nn_rep["module__return_embeddings"] = False
+            test_cases = [
+                (None, None),
+                ("proba", None),
+                (["proba"], None),
+                ("test", ValueError),
+                (["test"], ValueError),
+                (False, TypeError),
+            ]
+            self._test_param(
+                "init",
+                "criterion_output_keys",
+                test_cases,
+                replace_init_params={"neural_net_param_dict": nn_rep},
+            )
+
+        def test_predict_param_extra_outputs(self):
+            self._test_extra_outputs("predict_proba")
+
+        def test_predict_proba_param_extra_outputs(self):
+            self._test_extra_outputs("predict_proba")
+
+        def _test_extra_outputs(self, predict_method):
+            test_cases = [
+                (None, None),
+                ([], None),
+                ("proba", ValueError),
+                (["proba"], ValueError),
+                ("emb", ValueError),
+                (["emb"], ValueError),
+                ("logits", ValueError),
+                (["logits", "emb"], ValueError),
+                (["emb", "logits"], ValueError),
+                (False, TypeError),
+            ]
+            self._test_param(
+                predict_method,
+                "extra_outputs",
+                test_cases,
+                extras_params={"X": self.X},
+            )
+            test_cases = [
+                (None, None),
+                ([], None),
+                ("proba", ValueError),
+                (["proba"], ValueError),
+                ("emb", None),
+                (["emb"], None),
+                ("logits", None),
+                (["logits", "emb"], None),
+                (["emb", "logits"], None),
+                (False, TypeError),
+            ]
+            replace_init_params = {
+                "forward_outputs": {
+                    "proba": (0, nn.Softmax(dim=-1)),
+                    "logits": (0, None),
+                    "emb": (1, None),
+                }
+            }
+            self._test_param(
+                predict_method,
+                "extra_outputs",
+                test_cases,
+                extras_params={"X": self.X},
+                replace_init_params=replace_init_params,
+            )
+
+    class TestNeuralNet(nn.Module):
+        def __init__(self, return_embeddings=True):
+            super().__init__()
+            self.return_embeddings = return_embeddings
+            self.input_to_hidden = nn.Linear(
+                in_features=1, out_features=1, bias=True, dtype=torch.float32
+            )
+            self.hidden_to_output = nn.Linear(
+                in_features=1, out_features=2, bias=True, dtype=torch.float32
+            )
+
+        def forward(self, X):
+            hidden = self.input_to_hidden(X)
+            hidden = torch.sigmoid(hidden)
+            output_values = self.hidden_to_output(hidden)
+            if self.return_embeddings:
+                return output_values, hidden
+            else:
+                return output_values

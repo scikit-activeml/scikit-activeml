@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "CostEmbeddingAL",
+    "package" : "pool",
+    "method" : "Active Learning with Cost Embedding (ALCE)",
+    "category" : "Informativeness",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool",  "classification", "single-annotator", "top-k-batch"],
+    "title" : "Active Learning with Cost Embedding (ALCE)",
+    "refs" : ["huang2016novel"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** ALCE embeds the misclassification cost matrix into a hidden space via non-metric multidimensional scaling (with a mirroring trick for asymmetric costs) and trains a multi-target regressor to predict each sample's hidden point. It then defines cost-sensitive uncertainty as the distance from the predicted hidden point to the nearest class point and selects the unlabeled instance with the largest distance, directly prioritizing high-cost confusions.",
+    "import_misc" : "from skactiveml.pool import CostEmbeddingAL",
+    "init_qs" : "CostEmbeddingAL(classes=[0, 1])",
+    "query_params" : "X=X, y=y"
+  }
+]

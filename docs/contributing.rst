@@ -1,5 +1,5 @@
-Contributing Guide
-==================
+Contributing
+============
 
 **scikit-activeml** is a library that implements the most important query
 strategies for active learning. It is built upon the well-known machine
@@ -100,14 +100,23 @@ Now, install the required project dependencies, which are defined in the
    pip install -e .[dev]
 
 After the pip installation is successful, you must install ``pandoc`` and
-``ghostscript`` if they are not already installed.
-
-Example with macOS (Homebrew)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``ghostscript``, and ``ffmpeg`` if they are not already installed. For example,
+via ``conda`` you can do this as follows:
 
 .. code:: bash
 
-   brew install pandoc ghostscript
+   conda install -c conda-forge pandoc ghostscript ffmpeg
+
+
+We also provide a `pre-commit <https://https://pre-commit.com/>`__
+configuration that offers automatic linting checks using
+`black <https://black.readthedocs.io/en/stable/>`__ and
+`flake8 <https://flake8.pycqa.org/en/latest/>`__. To use these pre-commit
+hooks, you need to install them:
+
+.. code:: bash
+
+  pre-commit install
 
 Contributing Code
 -----------------
@@ -127,6 +136,7 @@ code using the following commands:
 .. code:: bash
 
    black skactiveml
+   flake8 skactiveml/ --ignore=E203,W503
 
 Example for Code Contribution Cycle (C3) and Pull Requests
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1088,48 +1098,6 @@ As a requirement, one needs to specify the parameters of ``estimator_class``,
 of the ``__init__`` accordingly. Once, the parameters are set, the developer
 needs to adjust the test until all errors are resolved. We refer to the test
 template for more detailed information.
-
-
-Annotator Models
-----------------
-
-Annotator models implement the interface
-``skactiveml.base.AnnotatorModelMixin``. These models can estimate the
-performance of annotators for given samples. Each annotator model must implement
-the ``predict_annotator_perf`` method, which estimates the performance per
-sample for each annotator as a proxy for the quality of the provided annotations.
-
-.. _predict-annotator-perf-1:
-
-``predict_annotator_perf``
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Required Parameters:
-
-+-------------+-----------------------------------------------------------+
-| Parameter   | Description                                               |
-+=============+===========================================================+
-| ``X``       | Matrix of feature values representing the samples.        |
-+-------------+-----------------------------------------------------------+
-
-Returns:
-
-+-------------+-----------------------------------------------------------+
-| Parameter   | Description                                               |
-+=============+===========================================================+
-| ``P_annot`` | The estimated performance per sample-annotator pair.      |
-+-------------+-----------------------------------------------------------+
-
-.. _general-advice-14:
-
-General advice
-^^^^^^^^^^^^^^
-
-Check parameter ``X`` regarding its shape and check that the annotator
-model has been fitted. If no samples or class labels were provided
-during the previous call of the ``fit`` method, the maximum value of
-annotator performance should be outputted for each sample-annotator
-pair.
 
 
 Examples

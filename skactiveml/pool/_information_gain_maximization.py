@@ -8,7 +8,7 @@ from skactiveml.base import (
 
 from skactiveml.pool.utils import (
     _update_reg,
-    _conditional_expect,
+    conditional_expect,
     _cross_entropy,
 )
 from skactiveml.utils import (
@@ -22,21 +22,23 @@ from skactiveml.utils import (
 class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
     """Regression based Kullback-Leibler Divergence Maximization
 
-    This class implements a query  [1]_, which selects those samples
-    that maximize the expected Kullback-Leibler divergence, where it is assumed
-    that the target probabilities for different samples are independent.
+    This class implements a query strategy [1]_, which selects those samples
+    that maximize the expected Kullback-Leibler divergence from the
+    new model to the old model, where the new model is the model
+    that results from adding the samples to the training set and
+    the expectation is performed over the model parameters.
 
     Parameters
     ----------
     integration_dict_target_val : dict, default=None
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the expected `y` value for the candidate samples.
-        For details see method `skactiveml.pool.utils._conditional_expect`.
+        For details see method `skactiveml.pool.utils.conditional_expect`.
     integration_dict_cross_entropy : dict, default=None
         Dictionary for integration arguments, i.e. `integration method` etc.,
         used for calculating the cross entropy between the updated conditional
         estimator by the `X_cand` value and the old conditional estimator.
-        For details see method `conditional_expect`.
+        For details see method `skactiveml.pool.utils.conditional_expect`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
@@ -241,7 +243,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
             )
             return cross_ent - entropy_post
 
-        kl_div = _conditional_expect(
+        kl_div = conditional_expect(
             X_cand,
             new_kl_divergence,
             reg,

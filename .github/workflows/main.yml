@@ -3,16 +3,16 @@ name: skactiveml
 on: [push]
 
 jobs:
-  test_oldest_dependencies:
+  test_oldest_base_dependencies:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
       matrix:
         python-version: [ '3.10', '3.11', '3.12', '3.13' ]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install oldest dependencies
@@ -26,18 +26,18 @@ jobs:
         pip install -r requirements_extra.txt
     - name: Test with pytest and oldest dependencies
       run: |
-        pytest -n auto --cov=./skactiveml --cov-report=xml --cov-fail-under=100
+        pytest
 
-  test_newest_dependencies:
+  test_newest_base_dependencies:
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
       matrix:
         python-version: [ '3.10', '3.11', '3.12', '3.13']
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install newest dependencies
@@ -47,11 +47,67 @@ jobs:
         sudo apt-get install ghostscript
         sudo apt-get install ffmpeg
         python -m pip install --upgrade pip
-        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install --upgrade -r requirements.txt
         pip install -r requirements_extra.txt
     - name: Test with pytest and newest dependencies
       run: |
-        pytest -n auto --cov=./skactiveml --cov-report=xml
+        pytest
+
+  test_oldest_optional_dependencies:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install oldest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        sudo apt-get install ffmpeg
+        python -m pip install --upgrade pip
+        sed 's/[>~]=/==/g' requirements.txt > requirements_old.txt
+        sed 's/[>~]=/==/g' requirements_opt.txt > requirements_opt_old.txt
+        pip install -r requirements_old.txt
+        pip install -r requirements_opt_old.txt
+        pip install -r requirements_extra.txt
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    - name: Test with pytest and oldest dependencies
+      run: |
+        pytest --cov-fail-under=100
+
+  test_newest_optional_dependencies:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12', '3.13']
+    steps:
+    - uses: actions/checkout@v6
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install newest dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get install pandoc
+        sudo apt-get install ghostscript
+        sudo apt-get install ffmpeg
+        python -m pip install --upgrade pip
+        pip install --upgrade -r requirements.txt
+        pip install --upgrade -r requirements_opt.txt
+        pip install -r requirements_extra.txt
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    - name: Test with pytest and newest dependencies
+      run: |
+        pytest
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
@@ -59,7 +115,7 @@ jobs:
         fail_ci_if_error: true
         flags: ${{ matrix.python-version }}
     - name: 'Upload Coverage Artifact'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: cov_${{ matrix.python-version }}
         path: coverage.xml
@@ -68,13 +124,12 @@ jobs:
   check_formatting_and_linting:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: ['3.13']
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install newest dependencies
@@ -84,7 +139,7 @@ jobs:
         sudo apt-get install ghostscript
         sudo apt-get install ffmpeg
         python -m pip install --upgrade pip
-        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install --upgrade -r requirements.txt
         pip install -r requirements_extra.txt
     - name: Black
       uses: psf/black@stable
@@ -101,13 +156,12 @@ jobs:
   create_documentation:
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: ['3.13']
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install newest dependencies
@@ -117,14 +171,16 @@ jobs:
         sudo apt-get install ghostscript
         sudo apt-get install ffmpeg
         python -m pip install --upgrade pip
-        pip install --upgrade -r requirements.txt -r requirements_max.txt
+        pip install --upgrade -r requirements.txt
+        pip install --upgrade -r requirements_opt.txt -r requirements_opt_max.txt
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
         pip install -r requirements_extra.txt
     - name: Create documentation with sphinx
       run: |
         sphinx-build -b html docs docs/_build
         zip -r docs.zip docs
     - name: 'Upload Docs Artifact'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: docs_${{ matrix.python-version }}.zip
         path: docs

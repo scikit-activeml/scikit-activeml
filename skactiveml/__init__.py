@@ -3,9 +3,10 @@ __all__ = [
     "pool",
     "stream",
     "classifier",
+    "regressor",
     "visualization",
     "utils",
     "exceptions",
 ]
 
-__version__ = "0.6.2"
+__version__ = "1.0.0"

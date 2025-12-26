@@ -403,7 +403,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         n_samples = A_cand.shape[0]
 
         s_indices, s_utilities = self._get_order_preserving_s_query(
-            A_cand, sample_utilities, annotator_utilities, qs_indices
+            A_cand,
+            sample_utilities,
+            annotator_utilities,
+            qs_indices,
+            self.random_state_,
         )
 
         n_as_annotators = self._n_to_assign_annotators(
@@ -438,7 +442,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
 
     @staticmethod
     def _get_order_preserving_s_query(
-        A, candidate_utilities, annotator_utilities, sample_indices
+        A,
+        candidate_utilities,
+        annotator_utilities,
+        sample_indices,
+        random_state,
     ):
         nan_indices = np.argwhere(np.isnan(candidate_utilities))
 
@@ -450,8 +458,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             candidate_utilities[i, sample_indices[i]] = max_utility_i
 
         # prepare candidate_utilities
-        candidate_utilities = rankdata(
-            candidate_utilities, method="ordinal", axis=1
+        rand_permutation = random_state.permutation(
+            candidate_utilities.shape[1]
+        )
+        candidate_utilities[:, rand_permutation] = rankdata(
+            candidate_utilities[:, rand_permutation], method="ordinal", axis=1
         ).astype(float)
 
         candidate_utilities[nan_indices[:, 0], nan_indices[:, 1]] = np.nan

@@ -1,11 +1,3 @@
-"""
-Module implementing the core-set query strategy.
-
-Core-set selection problem aims to find a small subset given a large labeled
-dataset such that a model learned over the small subset is competitive over the
-whole dataset.
-"""
-
 import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy
@@ -14,7 +6,6 @@ from ..utils import (
     labeled_indices,
     unlabeled_indices,
     rand_argmax,
-    is_unlabeled
 )
 from sklearn.utils.validation import (
     check_array,
@@ -28,11 +19,24 @@ from sklearn.metrics import pairwise_distances_argmin_min
 class CoreSet(SingleAnnotatorPoolQueryStrategy):
     """Core Set
 
-    This class implement a core-set based query strategies, i.e., the
-    standard greedy algorithm for the k-center problem [1]_.
+    This class implements the core-set based query strategy, i.e., the
+    standard greedy algorithm for the k-center problem [1]_. CoreSet
+    applies a k-center (farthest-first) selection in a feature space,
+    seeded by the labeled set, to minimize the maximum distance of unlabeled
+    samples to the labeled/selected samples. It is a pure diversity criterion
+    without explicit consideration of prediction uncertainty. Originally,
+    this query strategy was only proposed for classification. Nevertheless, it
+    is task-agnostic such that it can handle class, numerical, and multioutput
+    labels.
 
     Parameters
     ----------
+    metric : str or callable, default="euclidean"
+        The metric must comply with the function
+        `sklearn.metrics.pairwise_distances_argmin_min`.
+    metric_dict : dict, default=None
+        Any further parameters are passed directly to the function
+        `sklearn.metrics.pairwise_distances_argmin_min` as `metric_kwargs`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -44,10 +48,18 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
        Networks: A Core-Set Approach. In Int. Conf. Learn. Represent., 2018.
     """
 
-    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(
+        self,
+        metric="euclidean",
+        metric_dict=None,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+    ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
+        self.metric = metric
+        self.metric_dict = metric_dict
 
     def query(
         self,
@@ -64,9 +76,11 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must be either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -107,28 +121,42 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True, allow_multilabel=True,
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
+            reset=True,
+            allow_multioutput=True,
         )
 
-        is_multilabel = np.array(y).ndim == 2
-        X_cand, mapping = self._transform_candidates(candidates, X, y, is_multilabel=is_multilabel)
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+        )
 
+        # Perform selection depending on whether the candidate samples are part
+        # of `X` or not.
         if mapping is not None:
             query_indices, utilities = k_greedy_center(
-                X,
-                y,
-                batch_size,
-                self.random_state_,
-                self.missing_label_,
-                mapping,
+                X=X,
+                y=y,
+                batch_size=batch_size,
+                random_state=self.random_state_,
+                missing_label=self.missing_label_,
+                mapping=mapping,
+                metric=self.metric,
+                metric_dict=self.metric_dict,
             )
         else:
             selected_samples = labeled_indices(
-                y=y, missing_label=self.missing_label_, is_multilabel=is_multilabel
+                y=y,
+                missing_label=self.missing_label_,
+                is_multioutput=is_multioutput,
             )
-
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
             y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
@@ -137,16 +165,17 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             )
             mapping = np.arange(n_new_cand)
             query_indices, utilities = k_greedy_center(
-                X_with_cand,
-                y_with_cand,
-                batch_size,
-                self.random_state_,
-                self.missing_label_,
-                mapping,
-                n_new_cand,
-                is_multilabel
+                X=X_with_cand,
+                y=y_with_cand,
+                batch_size=batch_size,
+                random_state=self.random_state_,
+                missing_label=self.missing_label_,
+                mapping=mapping,
+                n_new_cand=n_new_cand,
+                metric=self.metric,
+                metric_dict=self.metric_dict,
+                is_multioutput=is_multioutput,
             )
-
         if return_utilities:
             return query_indices, utilities
         else:
@@ -161,34 +190,43 @@ def k_greedy_center(
     missing_label=MISSING_LABEL,
     mapping=None,
     n_new_cand=None,
-    is_multilabel=False
+    metric="euclidean",
+    metric_dict=None,
+    is_multioutput=False,
 ):
-    """
-    An active learning method that greedily forms a batch to minimize the
+    """An active learning method that greedily forms a batch to minimize the
     maximum distance to a cluster center among all unlabeled datapoints.
 
     Parameters
     ----------
     X : array-like of shape (n_samples, n_features)
-       Training data set, usually complete, i.e., including the labeled and
-       unlabeled samples.
-    y : np.ndarray of shape (n_samples,)
+        Training data set, usually complete, i.e., including the labeled and
+        unlabeled samples.
+    y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Labels of the training data set (possibly including unlabeled ones
-        indicated by `self.missing_label`).
+        indicated by `self.missing_label`). If `y` is two-dimensional, a
+        row `y[i]` must be either contain only observed labels or only
+        `missing_label` values, i.e., no mixing within a row.
     batch_size : int, default=1
-       The number of samples to be selected in one AL cycle.
+        The number of samples to be selected in one AL cycle.
     random_state : None or int or np.random.RandomState, default=None
-       Random state for candidate selection.
+        Random state for candidate selection.
     missing_label : scalar or string or np.nan or None, default=np.nan
-       Value to represent a missing label.
+        Value to represent a missing label.
     mapping : None or np.ndarray of shape (n_candidates,), default=None
-       Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
+        Index array that maps `candidates` to `X` (`candidates = X[mapping]`).
     n_new_cand : int or None, default=None
-       The number of new candidates that are additionally added to `X`.
-       Only used for the case, that in the query function with the shape of
-       `candidates` is `(n_candidates, n_feature)`.
-    is_multilabel : bool, default=False
-        Whether provided data is in multi-label format or not.
+        The number of new candidates that are additionally added to `X`.
+        Only used for the case, that in the query function with the shape of
+        `candidates` is `(n_candidates, n_feature)`.
+    metric : str or callable, default='euclidean'
+        The metric must comply with the function
+        `sklearn.metrics.pairwise_distances_argmin_min`.
+    metric_dict : dict, default=None
+        Any further parameters are passed directly to the function
+        `sklearn.metrics.pairwise_distances_argmin_min` as `metric_kwargs`.
+    is_multioutput : bool, default=False
+        Whether provided data is in multioutput format or not.
 
     Returns
     -------
@@ -215,37 +253,31 @@ def k_greedy_center(
         - If `candidates` is of shape `(n_candidates, n_features)`,
           the indexing refers to the samples in `candidates`.
     """
-
-    # valid the input shape whether is valid or not.
-
+    # Validate input parameters.
     X = check_array(X, allow_nd=True)
-    if not is_multilabel:
+    if not is_multioutput:
         y = check_array(
             y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
         )
         y = column_or_1d(y, warn=True)
     else:
-        y = check_array(y, ensure_2d=True, force_all_finite="allow-nan", dtype=None)
-        unlabeled_mask = is_unlabeled(y, missing_label=missing_label, is_multilabel=is_multilabel)
-
-        if not np.all(np.isin(y[~unlabeled_mask], [0, 1])):
-            raise ValueError("Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`.")
-
+        y = check_array(
+            y, ensure_2d=True, ensure_all_finite="allow-nan", dtype=None
+        )
     check_consistent_length(X, y)
-
-    selected_samples = labeled_indices(y, missing_label=missing_label, is_multilabel=is_multilabel)
-
     random_state_ = check_random_state(random_state)
 
     if mapping is None:
-        mapping = unlabeled_indices(y, missing_label=missing_label, is_multilabel=is_multilabel)
+        mapping = unlabeled_indices(
+            y=y, missing_label=missing_label, is_multioutput=is_multioutput
+        )
     else:
         mapping = column_or_1d(mapping, dtype=int, warn=True)
 
     if not isinstance(batch_size, int):
-        raise TypeError("batch_size must be a integer")
+        raise TypeError("`batch_size` must be an `integer`.")
 
-    # initialize the utilities matrix with
+    # Initialize the utility matrix.
     if n_new_cand is None:
         utilities = np.zeros(shape=(batch_size, X.shape[0]))
     elif isinstance(n_new_cand, int):
@@ -258,11 +290,19 @@ def k_greedy_center(
     else:
         raise TypeError("Only n_new_cand with type int is supported.")
 
+    selected_samples = labeled_indices(
+        y=y, missing_label=missing_label, is_multioutput=is_multioutput
+    )
     query_indices = np.zeros(batch_size, dtype=int)
-
     for i in range(batch_size):
         if i == 0:
-            update_dist = _update_distances(X, selected_samples, mapping)
+            update_dist = _update_distances(
+                X=X,
+                cluster_centers=selected_samples,
+                mapping=mapping,
+                metric=metric,
+                metric_dict=metric_dict,
+            )
         else:
             latest_dist = utilities[i - 1]
             update_dist = _update_distances(
@@ -270,6 +310,8 @@ def k_greedy_center(
                 cluster_centers=[query_indices[i - 1]],
                 mapping=mapping,
                 latest_distance=latest_dist,
+                metric=metric,
+                metric_dict=metric_dict,
             )
 
         if n_new_cand is None:
@@ -280,12 +322,19 @@ def k_greedy_center(
         # select index
         query_indices[i] = rand_argmax(
             utilities[i], random_state=random_state_
-        )[0]
+        ).item()
 
     return query_indices, utilities
 
 
-def _update_distances(X, cluster_centers, mapping, latest_distance=None):
+def _update_distances(
+    X,
+    cluster_centers,
+    mapping,
+    latest_distance=None,
+    metric="euclidean",
+    metric_dict=None,
+):
     """
     Update minimum distances by given cluster centers.
 
@@ -301,6 +350,12 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
     latest_distance : array-like of shape (n_samples) default None
         The distance between each sample and its nearest center. Used to
         speed up the computation of distances for the next selected sample.
+    metric : str or callable, default='euclidean'
+        The metric must comply with the function
+        `sklearn.metrics.pairwise_distances_argmin_min`.
+    metric_dict : dict, default=None
+        Any further parameters are passed directly to the function
+        `sklearn.metrics.pairwise_distances_argmin_min` as `metric_kwargs`.
 
     Returns
     -------
@@ -315,10 +370,14 @@ def _update_distances(X, cluster_centers, mapping, latest_distance=None):
         value in `result-dist` will be also `np.nan`.
     """
     dist = np.zeros(shape=X.shape[0])
+    if metric_dict is None:
+        metric_dict = {}
 
     if len(cluster_centers) > 0:
         cluster_center_feature = X[cluster_centers]
-        _, dist = pairwise_distances_argmin_min(X, cluster_center_feature)
+        _, dist = pairwise_distances_argmin_min(
+            X, cluster_center_feature, metric=metric, metric_kwargs=metric_dict
+        )
 
     if latest_distance is not None:
         sum_dist = np.nansum(latest_distance)

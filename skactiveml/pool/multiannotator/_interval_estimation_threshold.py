@@ -6,7 +6,6 @@ from sklearn.utils.validation import check_array, check_is_fitted
 from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
-    AnnotatorModelMixin,
 )
 from ...pool._uncertainty_sampling import uncertainty_scores
 from ...utils import (
@@ -19,7 +18,7 @@ from ...utils import (
 )
 
 
-class IntervalEstimationAnnotModel(BaseEstimator, AnnotatorModelMixin):
+class IntervalEstimationAnnotModel(BaseEstimator):
     """IELearning
 
     This annotator model relies on 'Interval Estimation Learning' (IELearning)
@@ -178,6 +177,8 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
     selected based on 'Uncertainty Sampling' (US). The selected samples are
     labeled by the annotators whose estimated annotation performances are equal
     or greater than an adaptive threshold.
+    The features to be labeled are chosen by using uncertainty sampling with
+    a least confidence score.
     The strategy assumes all annotators to be available and is not defined
     otherwise. To deal with this case nonetheless value-annotator pairs are
     first ranked according to the amount of annotators available for the given
@@ -384,7 +385,11 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         A_perf = A_perf[:, 2] + 1
         A_perf = A_perf[np.newaxis]
         max_range = np.max(A_perf) + 1
-        uncertainties = rankdata(uncertainties, method="ordinal") * max_range
+        rand_permutation = self.random_state_.permutation(len(uncertainties))
+        uncertainties[rand_permutation] = (
+            rankdata(uncertainties[rand_permutation], method="ordinal")
+            * max_range
+        )
         uncertainties = np.tile(uncertainties, (n_annotators, 1)).T
         utilities = uncertainties + A_perf
 

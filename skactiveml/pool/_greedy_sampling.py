@@ -21,7 +21,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the query strategy Greedy Sampling in the Feature
     Space (GSx) [1]_ that tries to select those samples that increase the
-    diversity of the feature space the most.
+    diversity of the feature space the most. It does this by selecting those
+    features that are the furthest away from all previously labeled samples.
 
     Parameters
     ----------
@@ -164,9 +165,14 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
 
     This class implements the query strategy Greedy Sampling in the Target
     Space (GSi or GSy) [1]_ that at first selects samples to maximize the
-    diversity in the feature space and than selects samples to maximize the
+    diversity in the feature space and then selects samples to maximize the
     diversity in the feature and the target space (GSi), optionally only the
     diversity in the target space can be maximized (GSy).
+    The diversity is maximized by selecting those samples that are the
+    furthest away from all previously labeled samples. To measure the distance
+    in the target space the strategy predicts the label corresponding to each
+    sample. For GSi this distances is measured as the product of the distance
+    in the feature space and the target space.
 
     Parameters
     ----------

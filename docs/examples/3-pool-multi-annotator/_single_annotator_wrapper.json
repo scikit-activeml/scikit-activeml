@@ -1,0 +1,32 @@
+[
+  {
+    "class" : "SingleAnnotatorWrapper",
+    "package" : "pool.multiannotator",
+    "method" : "Random Sampling",
+    "category" : "Baseline",
+    "template" : "examples/template_pool_multi_annotator.py",
+    "tags" : ["pool", "classification", "multi-annotator"],
+    "title" : "Random Sampling",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** Implementation of a wrapper class for pool-based active learning query strategies with a single annotator such that it transforms the query strategy for the single annotator into a query strategy for multiple annotators by choosing an annotator randomly or according to the parameter `A_perf` and setting the labeled matrix to a labeled vector by an aggregation function, e.g., majority voting. Here the single-annotator strategy is 'RandomSampling' and for the chosen sample 3 annotators are chosen at random to provide a label.",
+    "import_misc" : ["from skactiveml.pool.multiannotator import SingleAnnotatorWrapper", "from skactiveml.pool import RandomSampling"],
+    "init_qs" : "SingleAnnotatorWrapper(strategy=RandomSampling(random_state=random_state), random_state=random_state)",
+    "query_params" : "X=X, y=y, batch_size=3, n_annotators_per_sample=3"
+  },
+  {
+    "class" : "SingleAnnotatorWrapper",
+    "package" : "pool.multiannotator",
+    "method" : "Core Set + Greedy Selection",
+    "category" : "Baseline",
+    "template" : "examples/template_pool_multi_annotator.py",
+    "tags" : ["pool", "classification", "multi-annotator"],
+    "title" : "Core Set + Greedy Selection",
+    "refs" : [],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** Implementation of a wrapper class for pool-based active learning query strategies with a single annotator such that it transforms the query strategy for the single annotator into a query strategy for multiple annotators by choosing an annotator randomly or according to the parameter `A_perf` and setting the labeled matrix to a labeled vector by an aggregation function, e.g., majority voting. Here the single-annotator strategy is 'Core Set' and for the chosen sample the current 3 annotators with best estimated performance are chosen to provide a label.",
+    "import_misc" : ["from skactiveml.pool.multiannotator import SingleAnnotatorWrapper", "from skactiveml.pool import CoreSet"],
+    "init_qs" : "SingleAnnotatorWrapper(strategy=CoreSet(random_state=random_state), random_state=random_state)",
+    "query_params" : "X=X, y=y, batch_size=3, n_annotators_per_sample=3, A_perf=A_perf_clf"
+  }
+]

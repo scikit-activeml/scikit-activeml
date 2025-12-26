@@ -23,7 +23,10 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
     """Expected Model Change (EMC)
 
     This class implements "Expected Model Change" (EMC) [1]_, an active
-    learning query strategy for linear regression.
+    learning query strategy designed for linear regression. It chooses those
+    samples that have a maximal expected gradient length with respect to the
+    model parameters. While designed for a linear regressor the formulas
+    obtained from the linear case can be applied to arbitrary regressors.
 
     Parameters
     ----------
@@ -37,7 +40,8 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         The norm to measure the gradient length. Argument will be passed to
         `np.linalg.norm`.
     feature_map : callable, default=None
-        The feature map of the linear regressor. Takes in the feature data.
+        A feature map used to calculate the gradient of the regressor under the
+        assumption that the regressor is linear. Takes in the feature data.
         Must output a np.array of dimension 2. The default value is the
         identity function. An example feature map is
         `sklearn.preprocessing.PolynomialFeatures().fit_transform`.
@@ -92,8 +96,9 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`).
         reg : SkactivemlRegressor
-            Regressor to predict the data. Assumes a linear regressor with
-            respect to the parameters.
+            Regressor to predict the data. The query strategy is designed for
+            linear regressors, but the formulas are applicable to any
+            regressor.
         fit_reg : bool, default=True
             Defines whether the regressor should be fitted on `X`, `y`, and
             `sample_weight`.
@@ -259,6 +264,8 @@ def _bootstrap_estimators(
             est_b.fit(X_for_learner, y_for_learner)
         else:
             weight_for_learner = sample_weight[subset_indices]
-            est_b.fit(X_for_learner, y_for_learner, weight_for_learner)
+            est_b.fit(
+                X_for_learner, y_for_learner, sample_weight=weight_for_learner
+            )
 
     return bootstrap_est

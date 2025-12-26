@@ -217,7 +217,7 @@ def combine_ranking(*iter_ranking, rank_method=None, rank_per_batch=False):
                 f"The number of dimensions of the `ranking` in "
                 f"`iter_ranking` must be the same, but "
                 f"`iter_ranking[{idx}].ndim == {ranking.ndim}"
-                f" and `iter_ranking[{idx-1}].ndim == "
+                f" and `iter_ranking[{idx - 1}].ndim == "
                 f"{iter_ranking[idx - 1].ndim}`."
             )
     np.broadcast_shapes(*(u.shape for u in iter_ranking))

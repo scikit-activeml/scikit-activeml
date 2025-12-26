@@ -34,9 +34,13 @@ from ..utils import (
 class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
     """Active Learning with Cost Embedding (ALCE)
 
-    The Active Learning with Cost Embeddings (ALCE) [1]_ query strategy uses
-    a cost-sensitive uncertainty measure based on a distance measure
-    embedding space reflecting a given cost matrix.
+    The Active Learning with Cost Embeddings (ALCE) [1]_ embeds the
+    misclassification cost matrix into a hidden space via non-metric
+    multidimensional scaling (with a mirroring trick for asymmetric costs) and
+    trains a multi-target regressor to predict each sample's hidden point. It
+    then defines cost-sensitive uncertainty as the distance from the predicted
+    hidden point to the nearest class point and selects the unlabeled instance
+    with the largest distance, directly prioritizing high-cost confusions.
 
     This implementation is based on libact [2]_.
 

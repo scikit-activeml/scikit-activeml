@@ -1,0 +1,18 @@
+[
+{
+    "class" : "Clue",
+    "package" : "pool",
+    "method" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool", "classification", "regression", "single-annotator", "diverse-batch"],
+    "title" : "Clustering Uncertainty-weighted Embeddings (CLUE)",
+    "refs" : ["prabhu2021active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** CLUE clusters latent embeddings while weighting samples by predictive uncertainty, then picks samples near the cluster centers. The result is a diverse set biased toward uncertain regions of representation space.",
+    "import_misc" : "from skactiveml.pool import Clue",
+    "init_qs" : "Clue()",
+    "query_params" : "X=X, y=y, estimator=clf"
+}
+]
+

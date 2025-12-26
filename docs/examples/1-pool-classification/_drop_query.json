@@ -1,0 +1,18 @@
+[
+{
+    "class" : "DropQuery",
+    "package" : "pool",
+    "method" : "Dropout Query (DropQuery)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool", "classification", "single-annotator", "diverse-batch"],
+    "title" : "Dropout Query (DropQuery)",
+    "refs" : ["gupte2024revisiting"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** DropQuery incorporates both uncertainty and sample diversity into every selected batch. For this purpose, unlabeled samples are filtered according to a disagreement-based measure via dropout such that only the unlabeled samples with a disagreement above a threshold are clustered for selecting the unlabeled samples nearest to the respective clusters.",
+    "import_misc" : "from skactiveml.pool import DropQuery",
+    "init_qs" : "DropQuery()",
+    "query_params" : "X=X, y=y, clf=clf"
+}
+]
+

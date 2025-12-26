@@ -29,11 +29,16 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     """Epistemic Uncertainty Sampling (EpisUS)
 
     This class implements the Epistemic Uncertainty Sampling (EpisUS) query
-    strategy [1]_, which is only supported for binary classification tasks and
-    the following classifiers:
+    strategy [1]_, which distinguishes epistemic from aleatoric uncertainty and
+    queries samples with maximal epistemic uncertainty, meaning predictions
+    vary most across models that are well-supported by the current data. It
+    implements this via relative-likelihood based degrees of support and
+    provides instantiations for Parzen windows, decision trees, and logistic
+    regression. The current implementation only supports binary
+    classification tasks and the following classifiers:
 
     - `skactiveml.classifier.ParzenWindowClassifier` and
-    - `sklearn logistic regression classifier`.
+    - `sklearn.linear_model.LogisticRegression`.
 
     Parameters
     ----------

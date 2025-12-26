@@ -1,0 +1,19 @@
+[
+{
+    "class" : "CoreSet",
+    "package" : "pool",
+    "method" : "Core Set",
+    "category" : "Representativeness",
+    "template" : "examples/template_pool.py",
+    "tags" : ["pool", "regression", "classification", "single-annotator", "diverse-batch"],
+    "title" : "Core Set",
+    "refs" : ["sener2018active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** CoreSet applies a k-center (farthest-first) selection in an embedding space, seeded by the labeled set, to minimize the maximum distance of unlabeled samples to the labeled/selected samples. It is a pure diversity criterion without explicit consideration of prediction uncertainty.",
+    "import_misc" : "from skactiveml.pool import CoreSet",
+    "init_qs" : "CoreSet()",
+    "query_params" : "X=X, y=y"
+}
+]
+  
+  

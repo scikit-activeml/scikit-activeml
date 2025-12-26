@@ -5,18 +5,17 @@ from multiple annotators.
 
 # Author: Marek Herde <marek.herde@uni-kassel.de>
 import warnings
-import numpy as np
-
-from copy import deepcopy
 from collections import deque
+from copy import deepcopy
 
+import numpy as np
 from sklearn.base import MetaEstimatorMixin, is_classifier
 from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
-    get_tags,
 )
+
 from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
@@ -24,6 +23,7 @@ from ..base import SkactivemlClassifier
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
+    ExtLabelEncoder,
     is_labeled,
     check_random_state,
     check_equal_missing_label,
@@ -31,23 +31,41 @@ from ..utils import (
     check_type,
     check_scalar,
     match_signature,
-    is_unlabeled,
-    match_signature,
     check_n_features,
 )
+
+successful_skorch_torch_import = False
+try:
+    import torch
+    from torch import nn
+    from skactiveml.base import SkorchMixin
+    from skactiveml.utils import make_criterion_tuple_aware
+
+    successful_skorch_torch_import = True
+except ImportError:  # pragma: no cover
+    pass
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """Sklearn Classifier
 
     Implementation of a wrapper class for `scikit-learn` classifiers such that
-    missing labels can be handled. Therefor, samples with missing labels are
+    missing labels can be handled. Therefore, samples with missing labels are
     filtered.
 
     Parameters
     ----------
     estimator : sklearn.base.ClassifierMixin with predict_proba method
         The `scikit-learn` classifier to be wrapped.
+    include_unlabeled_samples : bool, default=False
+        - If `False`, only labeled samples are passed to the `fit` method of
+          the `estimator`.
+        - If `True`, all samples including the unlabeled ones are passed to
+          the `fit` method of the `estimator`. Ensure that your `estimator`
+          is able to handle unlabeled samples marked by `missing_label`.
+          Otherwise, `missing_label` is interpreted as a regular class label.
+          Note that semi-supervised classifiers of `sklearn` expect
+          `missing_label=-1`.
     classes : array-like of shape (n_classes,), default=None
         Holds the label for each class. If `None`, the classes are determined
         during `fit`.
@@ -75,6 +93,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     def __init__(
         self,
         estimator,
+        include_unlabeled_samples=False,
         classes=None,
         missing_label=MISSING_LABEL,
         cost_matrix=None,
@@ -87,9 +106,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             random_state=random_state,
         )
         self.estimator = estimator
+        self.include_unlabeled_samples = include_unlabeled_samples
 
     @match_signature("estimator", "fit")
-    def fit(self, X, y=None, sample_weight=None, **fit_kwargs):
+    def fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Fit the model using `X` as training data and `y` as class labels.
 
         Parameters
@@ -113,7 +133,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self: SklearnClassifier,
             The `SklearnClassifier` fitted on the training data.
         """
-        y = y if y is not None else fit_kwargs.pop("Y", None)
         return self._fit(
             fit_function="fit",
             X=X,
@@ -123,7 +142,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
     @match_signature("estimator", "partial_fit")
-    def partial_fit(self, X, y=None, sample_weight=None, **fit_kwargs):
+    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using `X` as training data and `y` as
         class labels.
 
@@ -149,7 +168,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self : SklearnClassifier,
             The `SklearnClassifier` is fitted on the training data.
         """
-        y = y if y is not None else fit_kwargs.pop("Y", None)
         return self._fit(
             fit_function="partial_fit",
             X=X,
@@ -179,46 +197,21 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-
-        is_multilabel = get_tags(self.estimator).target_tags.multi_output
-
         if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
-                if is_multilabel:
-                    y_pred_full = np.zeros((len(X), len(self.classes_)))
-                    y_pred_full[:, self._label_counts != 0] = y_pred
-                    y_pred = y_pred_full
             else:
-                if is_multilabel:
-                    raise NotImplemented(
-                        "Cost Matrix for Multilabel classification not yet implemented"
-                    )
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
                     costs, random_state=self.random_state_, axis=1
                 )
         else:
-            if is_multilabel:
-                n_samples, n_classes = len(X), len(self.classes_)
-                y_pred = np.zeros((n_samples, n_classes), dtype=int)
-
-                # Predict probabilities for a single instance (simulating a fallback behavior)
-                p = self.predict_proba([X[0]])[0]
-                for i in range(n_samples):
-                    # Generate binary predictions (0 or 1) based on fallback probas
-                    y_pred[i, :] = [
-                        self.random_state_.choice([0, 1], p=[1 - prob, prob])
-                        for prob in p
-                    ]
-            else:
-                p = self.predict_proba([X[0]])[0]
-                y_pred = self.random_state_.choice(
-                    np.arange(len(self.classes_)), len(X), replace=True, p=p
-                )
-                y_pred = self._le.inverse_transform(y_pred)
-
+            p = self.predict_proba([X[0]])[0]
+            y_pred = self.random_state_.choice(
+                np.arange(len(self.classes_)), len(X), replace=True, p=p
+            )
+            y_pred = self._le.inverse_transform(y_pred)
         y_pred = y_pred.astype(self.classes_.dtype)
         return y_pred
 
@@ -244,31 +237,18 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        is_multilabel = get_tags(self.estimator).target_tags.multi_output
-
         if self.is_fitted_:
-            if is_multilabel:
-                P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-
-                P_pos = np.column_stack([probs[:, 1] for probs in P])
-                P = np.full((len(X), len(self.classes_)), 0.5)
-                P[:, self._label_counts != 0] = P_pos
-            else:
-                P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-                # map the predicted classes to self.classes
-                if P.shape[1] != len(self.classes_):
-                    P_ext = np.zeros((len(X), len(self.classes_)))
-                    est_classes = self.estimator_.classes_
-                    indices_est = np.where(
-                        np.isin(est_classes, self.classes_)
-                    )[0]
-                    class_indices = np.searchsorted(
-                        self.classes_, est_classes[indices_est]
-                    )
-                    P_ext[:, class_indices] = (
-                        1 if len(class_indices) == 1 else P
-                    )
-                    P = P_ext
+            P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
+            # map the predicted classes to self.classes
+            if P.shape[1] != len(self.classes_):
+                P_ext = np.zeros((len(X), len(self.classes_)))
+                est_classes = self.estimator_.classes_
+                indices_est = np.where(np.isin(est_classes, self.classes_))[0]
+                class_indices = np.searchsorted(
+                    self.classes_, est_classes[indices_est]
+                )
+                P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
+                P = P_ext
             if not np.any(np.isnan(P)):
                 return P
 
@@ -278,8 +258,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             f"distribution`_label_counts={self._label_counts}` is used to "
             f"make the predictions."
         )
-        if is_multilabel:
-            return np.full((len(X), len(self.classes_)), 0.5)
         if sum(self._label_counts) == 0:
             return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
         else:
@@ -289,18 +267,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
-        is_multilabel = get_tags(self.estimator).target_tags.multi_output
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
             "ensure_min_features": 0,
             "allow_nd": True,
-            "dtype": None,
-        }
-        self.check_y_dict_ = {
-            "ensure_min_samples": 0,
-            "ensure_min_features": 0,
-            "ensure_2d": is_multilabel,
-            "ensure_all_finite": False,
             "dtype": None,
         }
         X, y, sample_weight = self._validate_data(
@@ -308,8 +278,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
-            check_y_dict=self.check_y_dict_,
-            y_ensure_1d=False,
             reset=fit_function == "fit" or not hasattr(self, "n_features_in_"),
         )
 
@@ -319,6 +287,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 "'{}' must be a scikit-learn "
                 "classifier.".format(self.estimator)
             )
+
+        # Check boolean flag.
+        check_type(
+            self.include_unlabeled_samples,
+            "include_unlabeled_samples",
+            bool,
+        )
 
         # Check whether estimator can deal with cost matrix.
         if self.cost_matrix is not None and not hasattr(
@@ -333,25 +308,19 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
-
         # count labels per class
-        is_lbld = is_labeled(y, missing_label=-1, is_multilabel=is_multilabel)
-        if is_multilabel:
-            self._label_counts = np.sum(y[is_lbld], axis=0)
+        if self.include_unlabeled_samples:
+            is_included = np.full_like(y, fill_value=True, dtype=bool)
         else:
-            self._label_counts = [
-                np.sum(y[is_lbld] == c) for c in range(len(self._le.classes_))
-            ]
+            is_included = is_labeled(y, missing_label=-1)
+        self._label_counts = [
+            np.sum(y[is_included] == c) for c in range(len(self._le.classes_))
+        ]
         try:
-            X_lbld = X[is_lbld]
-            y_lbld = y[is_lbld].astype(np.int64)
-            y_lbld_inv = self._le.inverse_transform(y_lbld)
-            if is_multilabel:
-                columns_to_keep = np.where(y_lbld_inv.sum(axis=0) > 0)[0]
-                y_lbld_inv = y_lbld_inv[:, columns_to_keep]
-
-            fit_kwargs["y" if not is_multilabel else "Y"] = y_lbld_inv
-            if np.sum(is_lbld) == 0:
+            X_train = X[is_included]
+            y_train = y[is_included].astype(np.int64)
+            y_train_inv = self._le.inverse_transform(y_train)
+            if np.sum(is_included) == 0:
                 raise ValueError("There is no labeled data.")
             elif (
                 not has_fit_parameter(self.estimator, "sample_weight")
@@ -359,23 +328,23 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             ):
                 if fit_function == "partial_fit":
                     fit_kwargs["classes"] = self.classes_
-                    self.estimator_.partial_fit(X=X_lbld, **fit_kwargs)
+                    self.estimator_.partial_fit(
+                        X=X_train, y=y_train_inv, **fit_kwargs
+                    )
                 elif fit_function == "fit":
-                    self.estimator_.fit(X=X_lbld, **fit_kwargs)
+                    self.estimator_.fit(X=X_train, y=y_train_inv, **fit_kwargs)
             else:
                 if fit_function == "partial_fit":
                     fit_kwargs["classes"] = self.classes_
-                    fit_kwargs["sample_weight"] = sample_weight[is_lbld]
+                    fit_kwargs["sample_weight"] = sample_weight[is_included]
                     self.estimator_.partial_fit(
-                        X=X_lbld,
+                        X=X_train,
+                        y=y_train_inv,
                         **fit_kwargs,
                     )
                 elif fit_function == "fit":
-                    fit_kwargs["sample_weight"] = sample_weight[is_lbld]
-                    self.estimator_.fit(
-                        X=X_lbld,
-                        **fit_kwargs,
-                    )
+                    fit_kwargs["sample_weight"] = sample_weight[is_included]
+                    self.estimator_.fit(X=X_train, y=y_train_inv, **fit_kwargs)
             self.is_fitted_ = True
         except Exception as e:
             self.is_fitted_ = False
@@ -790,3 +759,526 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             return getattr(self.estimator_, item)
         else:
             raise AttributeError(f"{item} does not exist")
+
+
+if successful_skorch_torch_import:
+
+    class SkorchClassifier(SkactivemlClassifier, SkorchMixin):
+        """SkorchClassifier
+
+        Implement a classification wrapper class to make it possible to use
+        `torch` with `skactiveml`. This is achieved by providing a wrapper
+        around `torch` that has a `skactiveml` interface and can handle
+        missing labels. This wrapper is based on the open-source library
+        `skorch` [1]_.
+
+        Notes
+        -----
+        Adjust your `criterion` and `module.forward` outputs consistently.
+        See the documentation of the parameters `forward_outputs` and
+        `criterion_output_keys` for further details.
+
+        Parameters
+        ----------
+        module : torch.nn.Module.__class__ or torch.nn.Module
+            A PyTorch `torch.nn.Module`. In general, the uninstantiated class
+            should be passed, although instantiated modules will also work.
+        criterion : torch.nn.Module or torch.nn.Module.__class__, \
+                default=torch.nn.CrossEntropyLoss
+            The loss (criterion) used to optimize the module.
+
+            - If a class (subclass of `torch.nn.Module`) is passed
+              (e.g. `torch.nn.CrossEntropyLoss`), it is instantiated
+              internally.
+            - If an instance is passed (e.g. `torch.nn.CrossEntropyLoss()`),
+              that instance (or a wrapped copy of it) is used.
+
+            By default, `torch.nn.CrossEntropyLoss` is used as criterion.
+        forward_outputs : dict[str, tuple[int, Callable | None]] or None,\
+                default=None
+            Dictionary that describes how to get and post-process the outputs
+            of `module.forward` for prediction. This parameter replaces the
+            functionality of `predict_nonlinearity` in a `skorch.net.NeuralNet`
+            (see documentation of `neural_net_param_dict`).
+
+            Given `raw_outputs = module.forward(x)`, each entry
+            `name -> (idx, transform)` in `forward_outputs` is interpreted as:
+
+            - `idx` : int
+              Index into `raw_outputs` (0-based).
+            - `transform` : callable or `None`
+              If not `None`, it is applied to the selected raw tensor
+              `raw_outputs[idx]`. Otherwise, the raw tensor is used.
+
+            This allows multiple named outputs to reference the same raw tensor
+            with different transforms, for example::
+
+                forward_outputs = {
+                    "proba":  (0, torch.nn.Softmax(dim=-1)),  # probabilities
+                    "logits": (0, None),                      # raw scores
+                    "emb":    (1, None),                      # embeddings
+                }
+
+            The first entry in `forward_outputs` defines the primary
+            scores used for prediction:
+
+            - In `predict_proba`, the transformed first output is
+              interpreted as class probabilities `P`.
+            - In `predict`, the class probabilities `P` returned by
+              `predict_proba` are used to infer class label predictions.
+
+            If `forward_outputs` is `None`, a sensible default is chosen
+            for common single-output classifiers based on the `criterion`:
+
+            - If `criterion` is `torch.nn.CrossEntropyLoss`, it is
+              assumed that `module.forward` returns logits and the
+              effective mapping is::
+
+                  {"proba": (0, torch.nn.Softmax(dim=-1))}
+
+            - If `criterion` is `torch.nn.NLLLoss`, it is assumed that
+              `module.forward` returns log-probabilities and the effective
+              mapping is::
+
+                  {"proba": (0, torch.exp)}
+
+            - For all other criteria, a single-output module is assumed to
+              already produce values in probability space, and the effective
+              mapping is::
+
+                  {"proba": (0, None)}
+
+        criterion_output_keys : str or sequence of str or None, default=None
+            Name or names of the forward outputs that are passed to the
+            loss / criterion during training. Use this when
+            `module.forward` returns multiple outputs
+            (e.g. `(logits, embeddings, ...)`), but the criterion expects
+            a single tensor input or a specific tuple of inputs.
+
+            The names must refer to keys of the effective `forward_outputs`
+            mapping. If `criterion_output_keys` is not `None` and
+            `forward_outputs` is `None`, a `ValueError` is raised
+            because the names cannot be resolved.
+
+            - If a `str`, the corresponding named output of
+              `module.forward` (i.e., the raw tensor selected via its
+              index in `forward_outputs` before applying the transform)
+              is passed to the criterion (e.g. `"logits"` to use only the
+              class scores).
+            - If a sequence of `str`, the selected named outputs are passed to
+              the criterion in that order. Each raw forward output index may
+              appear at most once: using multiple names that resolve to the
+              same underlying index (e.g. `"proba"` and `"logits"` both
+              pointing to index 0) is not allowed and results in a
+              `ValueError`.
+            - If `None`, the first output defined by the effective
+              `forward_outputs` mapping is used as criterion input.
+
+            To pass all distinct forward outputs to the criterion in the
+            same order as `forward_outputs`, choose one representative name
+            per raw output index and set, for example::
+
+                # assuming that each key refers to a different raw index
+                criterion_output_keys = tuple(forward_outputs.keys())
+
+            If `forward_outputs` contains multiple names that refer to the
+            same raw output index (aliases such as `"proba"` and `"logits"`
+            both mapping to index 0), you must select at most one name per
+            raw index in `criterion_output_keys`.
+        neural_net_param_dict : dict, default=None
+            Additional arguments for `skorch.net.NeuralNet`. If
+            `neural_net_param_dict` is `None`, no additional arguments are
+            added. `module`, `criterion`, and `predict_nonlinearity` are not
+            allowed in this dictionary.
+        sample_dtype : str or type, default=np.float32
+            Dtype to which input samples are cast inside the estimator. If set
+            to `None`, the input dtype is preserved. The encoded label data
+            type is always  `np.int64`.
+        include_unlabeled_samples : bool, default=False
+            - If `False`, only labeled samples are passed to the `fit` method
+              of the estimator.
+            - If `True`, all samples including the unlabeled ones are passed to
+              the `fit` method of the estimator. Ensure that the `criterion`
+              is able to handle unlabeled samples marked by `missing_label`.
+              Otherwise, `missing_label` is interpreted as a regular class
+              label.
+        classes : array-like of shape (n_classes,), default=None
+            Holds the label for each class. If `None`, the classes are
+            determined during the fit.
+        missing_label : scalar or str or np.nan or None, default=np.nan
+            Value to represent a missing label.
+        cost_matrix : array-like of shape (n_classes, n_classes)
+            Cost matrix with `cost_matrix[i, j]` indicating the cost of
+            predicting class `classes[j]` for a sample of class
+            `classes[i]`. Can only be set if `classes` is not `None`.
+        random_state : int or RandomState instance or None, default=None
+            Determines random number generation for methods that rely on
+            randomness (e.g. `predict` for stochastic models). Pass an int for
+            reproducible results across multiple method calls.
+
+        References
+        ----------
+        .. [1] Marian Tietz, Thomas J. Fan, Daniel Nouri, Benjamin Bossan, and
+           skorch Developers. skorch: A scikit-learn compatible neural network
+           library that wraps PyTorch, July 2017.
+        """
+
+        def __init__(
+            self,
+            module,
+            criterion=nn.CrossEntropyLoss,
+            forward_outputs=None,
+            criterion_output_keys=None,
+            neural_net_param_dict=None,
+            sample_dtype=np.float32,
+            include_unlabeled_samples=False,
+            classes=None,
+            cost_matrix=None,
+            missing_label=MISSING_LABEL,
+            random_state=None,
+        ):
+            super(SkorchClassifier, self).__init__(
+                classes=classes,
+                missing_label=missing_label,
+                cost_matrix=cost_matrix,
+                random_state=random_state,
+            )
+            self.module = module
+            self.criterion = criterion
+            self.forward_outputs = forward_outputs
+            self.criterion_output_keys = criterion_output_keys
+            self.neural_net_param_dict = neural_net_param_dict
+            self.sample_dtype = sample_dtype
+            self.include_unlabeled_samples = include_unlabeled_samples
+
+        def fit(self, X, y, **fit_params):
+            """Initialize and fit the module.
+
+            If the module was already initialized, by calling fit, the module
+            will be re-initialized (unless `warm_start` is True).
+
+            Parameters
+            ----------
+            X : matrix-like, shape (n_samples, n_features)
+                Training data set, usually complete, i.e. including the labeled
+                and unlabeled samples
+            y : array-like of shape (n_samples, )
+                Labels of the training data set (possibly including unlabeled
+                ones indicated by self.missing_label)
+            fit_params : dict-like
+                Further parameters as input to the 'fit' method of the
+                `skorch.net.NeuralNet`.
+
+            Returns
+            -------
+            self: SkorchClassifier,
+                `SkorchClassifier` object fitted on the training data.
+            """
+            return self._fit("fit", X, y, **fit_params)
+
+        def partial_fit(self, X, y, **fit_params):
+            """Fit the module without re-initialization.
+
+            If the module was already initialized, by calling `partial_fit`,
+            the module will not be re-initialized again.
+
+            Parameters
+            ----------
+            X : matrix-like, shape (n_samples, n_features)
+                Training data set, usually complete, i.e. including the labeled
+                and unlabeled samples
+            y : array-like of shape (n_samples, )
+                Labels of the training data set (possibly including unlabeled
+                ones indicated by `self.missing_label`)
+            fit_params : dict-like
+                Further parameters as input to the 'partial_fit' method of the
+                `skorch.net.NeuralNet`.
+
+            Returns
+            -------
+            self: SkorchClassifier
+                `SkorchClassifier` object fitted on the training data.
+            """
+            return self._fit("partial_fit", X, y, **fit_params)
+
+        def predict(self, X, extra_outputs=None):
+            """Return class predictions for the test samples `X`.
+
+            By default, this method returns only the predicted classes
+            `y_pred`. The predictions are obtained via the class probabilities
+            `P` outputted by `predict_proba`. If `extra_outputs` is provided,
+            a tuple is returned whose first element is `y_pred` and whose
+            remaining elements are the requested additional forward outputs,
+            in the order specified by `extra_outputs`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Test samples.
+            extra_outputs : None or str or or sequence of str, default=None
+                Names of additional outputs to return next to `y_pred`. The
+                names must be a subset of the keys of the effective
+                `forward_outputs` mapping.
+
+                For example, if::
+
+                    self.forward_outputs = {
+                        "proba":  (0, torch.nn.Softmax(dim=-1)),
+                        "logits": (0, None),
+                        "emb":    (1, None),
+                    }
+
+                then valid values for `extra_outputs` include `"emb"` or
+                `["emb", "logits"]`.
+
+                - If `extra_outputs is None`, only `y_pred` is returned.
+                - If `extra_outputs` is a string, e.g. `"emb"`, the
+                  return value is `(y_pred, emb)`.
+                - If `extra_outputs` is a sequence of strings, the return
+                  value is `(y_pred, out_1, out_2, ...)`, where `out_i`
+                  corresponds to the i-th name in `extra_outputs`.
+
+            Returns
+            -------
+            y_pred : numpy.ndarray of shape (n_samples,)
+                Predicted class labels of the test samples.
+            *extras : numpy.ndarray, optional
+                Additional outputs. Only present if `extra_outputs` is not
+                `None`. In that case, the method returns a single tuple whose
+                first element is `y_pred` and whose remaining elements
+                (`extras`) correspond to the requested forward outputs in the
+                order given by `extra_outputs`.
+            """
+            return super().predict(
+                X=X,
+                extra_outputs=extra_outputs,
+            )
+
+        def predict_proba(self, X, extra_outputs=None):
+            """Return class probability estimates for the test samples `X`.
+
+            By default, this method returns only the predicted class
+            probabilities `P`. If `extra_outputs` is provided, a tuple is
+            returned whose first element is `y_pred` and whose remaining
+            elements are the requested additional forward outputs, in the
+            order specified by `extra_outputs`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Test samples.
+            extra_outputs : None or str or sequence of str, default=None
+                Names of additional outputs to return next to `P`. The names
+                must be a subset of the keys of the effective `forward_outputs`
+                mapping.
+
+                For example, if::
+
+                    self.forward_outputs = {
+                        "proba":  (0, torch.nn.Softmax(dim=-1)),
+                        "logits": (0, None),
+                        "emb":    (1, None),
+                    }
+
+                then valid values for `extra_outputs` include `"emb"` or
+                `["emb", "logits"]`.
+
+                - If `extra_outputs is None`, only `P` is returned.
+                - If `extra_outputs` is a string, e.g. `"logits"`, the
+                  return value is `(P, logits)`.
+                - If `extra_outputs` is a sequence of strings, the return
+                  value is `(P, out_1, out_2, ...)`, where `out_i`
+                  corresponds to the i-th name in `extra_outputs`.
+
+            Returns
+            -------
+            P : numpy.ndarray of shape (n_samples, n_classes)
+                Class probabilities of the test samples. Classes are ordered
+                according to `self.classes_`.
+            *extras : numpy.ndarray, optional
+                Additional outputs. Only present if `extra_outputs` is not
+                `None`. In that case, the method returns a single tuple whose
+                first element is `P` and whose remaining elements
+                (`extras`) correspond to the requested forward outputs in the
+                order given by `extra_outputs`.
+            """
+            # Initialize module, if not done yet.
+            if not hasattr(self, "neural_net_"):
+                self.initialize()
+
+            # Check input parameters.
+            X = check_array(X, **self.check_X_dict_)
+            check_n_features(
+                self, X, reset=not hasattr(self, "n_features_in_")
+            )
+
+            # Resolve effective forward_outputs (either user-provided or
+            # defaulted based on the criterion).
+            forward_outputs = self._effective_forward_outputs()
+
+            # Forward propagation whose return values depends on the request
+            # ones.
+            fw_out = self._forward_with_named_outputs(
+                X, forward_outputs=forward_outputs, extra_outputs=extra_outputs
+            )
+
+            # First element is expected to be the class probabilities.
+            P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
+            self._initialize_fallbacks(P)
+            return fw_out
+
+        def _effective_forward_outputs(self):
+            """Return the effective `forward_outputs` mapping.
+
+            If the user did not specify `forward_outputs`, choose a reasonable
+            default for common criteria (e.g., `nn.CrossEntropyLoss`) and a
+            simple single-output module.
+
+            The returned mapping has the form::
+
+                {name: (idx, transform)}
+
+            where `idx` is the index into the tuple returned by
+            `module.forward` (0-based) and `transform` is a callable or
+            `None`. For the defaults below, a single-output module is assumed,
+            i.e., `idx == 0`.
+            """
+            # User explicitly provided a mapping: trust it.
+            if self.forward_outputs is not None:
+                return self.forward_outputs
+
+            # No explicit mapping: handle common single-output cases.
+            crit_cls = (
+                self.criterion
+                if isinstance(self.criterion, type)
+                else self.criterion.__class__
+            )
+
+            if crit_cls is nn.CrossEntropyLoss:
+                # Single-output network returning logits.
+                return {"proba": (0, nn.Softmax(dim=-1))}
+
+            if crit_cls is nn.NLLLoss:
+                # Module returns log-probabilities.
+                return {"proba": (0, torch.exp)}
+
+            # Fallback: treat the single forward output as already in
+            # probability space. Caller is responsible for making this true.
+            return {"proba": (0, None)}
+
+        def _net_parts(self, X=None, y=None):
+            """Assemble and validate network components.
+
+            Implementations should perform any optional checks or normalization
+            of constructor/init parameters (e.g., shape consistency, dtype
+            checks, wrapping criteria), then return the ready-to-use pieces for
+            `skorch.NeuralNet`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...), default=None
+                Input samples for optional validation.
+            y : array-like of shape (n_samples, ...), default=None
+                Target values for optional validation.
+
+            Returns
+            -------
+            module : torch.nn.Module.__class__ or torch.nn.Module
+                A PyTorch `torch.nn.Module`. In general, the uninstantiated
+                class should be passed, although instantiated modules will also
+                work.
+            criterion : torch.nn.Module.__class__
+                The uninitialized criterion (loss) used to optimize the module.
+            params : dict
+                Keyword arguments (excluding `predict_non_linearity`) for
+                `skorch.NeuralNet` construction. Must be a mapping and may be
+                empty.
+            """
+            criterion = self.criterion
+            criterion = make_criterion_tuple_aware(
+                criterion=criterion,
+                criterion_output_keys=self.criterion_output_keys,
+                forward_outputs=self._effective_forward_outputs(),
+            )
+            return (
+                self.module,
+                criterion,
+                self.neural_net_param_dict or {},
+            )
+
+        def _validate_data_kwargs(self):
+            """Return kwargs forwarded to `_validate_data`.
+
+            Returns
+            -------
+            kwargs : dict or None
+                Keyword arguments consumed by `_validate_data`.
+            """
+            self.check_X_dict_ = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "allow_nd": True,
+                "dtype": self.sample_dtype,
+            }
+            check_type(
+                self.include_unlabeled_samples,
+                "include_unlabeled_samples",
+                bool,
+            )
+            return {"check_X_dict": self.check_X_dict_}
+
+        def _return_training_data(self, X, y):
+            """Return only samples and labels required for training.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+            y : array-like of shape (n_samples, ...)
+                Targets with unlabeled entries following the subclass'
+                convention.
+
+            Returns
+            -------
+            X_train : ndarray or None
+                Training samples or `None` if none exist.
+            y_train : ndarray or None
+                Training labels or `None` if none exist.
+            """
+            X_train, y_train = None, None
+            if self.include_unlabeled_samples:
+                is_included = np.full_like(y, fill_value=True, dtype=bool)
+            else:
+                is_included = is_labeled(y, missing_label=-1)
+            if np.sum(is_included) > 0:
+                X_train = X[is_included]
+                y_train = y[is_included].astype(np.int64)
+            return X_train, y_train
+
+        def _initialize_fallbacks(self, P):
+            """Initialize label/cost fallbacks if the classifier was not fitted
+            before.
+
+            Parameters
+            ----------
+            P : array-like of shape (n_samples, n_classes)
+                Class-probability array used only to infer `n_classes` when
+                `self.classes` is `None`.
+            """
+            self.random_state_ = check_random_state(self.random_state)
+            if not hasattr(self, "_le"):
+                self._le = ExtLabelEncoder(
+                    classes=self.classes, missing_label=self.missing_label
+                )
+                if self.classes is not None:
+                    y_dummy = self.classes
+                else:
+                    y_dummy = np.arange(P.shape[-1], dtype=int)
+                self._le.fit(y_dummy)
+                self.classes_ = self._le.classes_
+            if not hasattr(self, "cost_matrix_"):
+                self.cost_matrix_ = (
+                    1 - np.eye(len(self.classes_))
+                    if self.cost_matrix is None
+                    else self.cost_matrix
+                )

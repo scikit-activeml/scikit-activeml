@@ -9,7 +9,7 @@ import copy
 import numpy as np
 from sklearn import clone
 from sklearn.utils.validation import check_array, check_is_fitted
-from iteration_utilities import flatten
+from itertools import chain
 
 from ..base import (
     SingleAnnotatorPoolQueryStrategy,
@@ -29,9 +29,25 @@ from ..utils import (
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
     """Query-by-Committee (QBC)
 
-    The Query-by-Committee (QBC) [1]_, [2]_, [3]_, [4]_, [5]_ strategy uses an
-    ensemble of estimators to identify on which samples many estimators
-    disagree.
+    The Query-by-Committee (QBC) [1]_, [2]_, [3]_, [4]_, [5]_ strategy
+    maintains a committee of models and selects unlabeled samples where the
+    committee most disagrees, targeting epistemic uncertainty. In batch mode,
+    it ranks points by a disagreement score and takes the top `batch_size`
+    samples. There are multiple variants to measure the disagreement:
+
+    - KL-divergence disagreement (classification). For each model, compute the
+      Kullback–Leibler divergence between its predictive distribution and the
+      committee average and average across models. Larger values indicate
+      stronger distributional disagreement.
+    - Vote entropy (classification). Each model votes for a class, the entropy
+      of the vote histogram measures disagreement, and higher entropy is
+      preferred.
+    - Variation ratios (classification). One minus the fraction of votes for
+      the modal class measures lack of consensus, and higher values are
+      preferred.
+    - Empirical variance (regression). The variance of the committee's
+      real-valued predictions quantifies disagreement, and higher variance is
+      preferred.
 
     Parameters
     ----------
@@ -293,7 +309,7 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             ensemble_classes = ensemble.classes_
         else:
             ensemble_classes = np.unique(
-                list(flatten([est.classes_ for est in est_arr]))
+                list(chain.from_iterable([est.classes_ for est in est_arr]))
             )
         probas = np.zeros((len(est_arr), len(X_cand), len(ensemble_classes)))
         for i, est in enumerate(est_arr):

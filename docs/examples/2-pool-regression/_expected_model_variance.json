@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "ExpectedModelVarianceReduction",
+    "package" : "pool",
+    "category" : "Informativeness",
+    "method" : "Expected Model Variance Reduction",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator", "top-k-batch"],
+    "title" : "Expected Model Variance Reduction",
+    "refs" : ["cohn1996active"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** Expected Model Variance Reduction selects those samples that minimizes the expected model variance. The model variance refers to the predicted variance of the target distribution conditioned on a point x.",
+    "import_misc" : ["from skactiveml.pool import ExpectedModelVarianceReduction"],
+    "init_qs" : "ExpectedModelVarianceReduction()",
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

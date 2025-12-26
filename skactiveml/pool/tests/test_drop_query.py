@@ -120,6 +120,8 @@ class TestDropQuery(
             (False, TypeError),
             (True, TypeError),
             ("return_embeddings", None),
+            ({"return_embeddings": True}, None),
+            ({"test": True}, TypeError),
         ]
         self._test_param(
             "init",

@@ -29,20 +29,24 @@ from docs.generate import (
 # -- Project information -----------------------------------------------------
 
 project = "scikit-activeml"
-copyright = "2020"
-author = "Daniel Kottke, " \
-         "Marek Herde, " \
-         "Pham Minh Tuan, " \
-         "Pascal Mergard, " \
-         "Christoph Sandrock, " \
+copyright = "2025"
+author = "Marek Herde, " \
+         "Minh Tuan Pham, " \
+         "Daniel Kottke, " \
          "Alexander Benz, " \
          "Lukas Lührs, " \
+         "Pascal Mergard, " \
+         "Christoph Sandrock, " \
          "Jiaying Cheng, "\
+         "Atal Roghman," \
          "Mehmet Mjüde, " \
-         "Atal Roghman"
+         "Lukas Rauch, " \
+         "Bernhard Sick "
 
 # The short X.Y version
 version = skactiveml.__version__
+if '.' in version:
+    version = '.'.join(version.split('.')[:-1])
 # The full version, including alpha/beta/rc tags
 release = skactiveml.__version__
 
@@ -70,12 +74,15 @@ extensions = [
     "sphinxcontrib.bibtex",
     "nbsphinx",
     "numpydoc",
-    "copy_sphinx_gallery_notebooks"
+    "sphinx_copybutton",
+    "sphinx_sitemap",
+    "copy_sphinx_gallery_notebooks",
 ]
 
 nitpicky = True
 nitpick_ignore = [
-    ("py:class", "skactiveml.pool._bald._GeneralBALD")
+    ("py:class", "skactiveml.pool._bald._GeneralBALD"),
+    ("py:class", "skactiveml.classifier.multiannotator._utils._SkorchMultiAnnotatorClassifier"),
 ]
 
 # nbsphinx_execute = 'always'
@@ -181,10 +188,11 @@ html_theme_options = {
     "icon_links_label": "Quick Links",
     "switcher": {
         "json_url": switcher_json_path,
-        "version_match": version,
+        "version_match": release,
     },
     "check_switcher": False,
-    "navbar_start": ["navbar-logo", "version-switcher"]
+    "navbar_start": ["navbar-logo", "version-switcher"],
+    "header_links_before_dropdown": 7,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -205,7 +213,12 @@ html_js_files = [
 # default: ``['localtoc.html', 'relations.html', 'sourcelink.html',
 # 'searchbox.html']``.
 #
-# html_sidebars = {}
+html_sidebars = {
+    "tutorials": [], # no primary sidebar for this page
+    "contributing": [], # no primary sidebar for this page
+    "generated/strategy_overview": [], # no primary sidebar for this page
+    "generated/sphinx_gallery_examples/index": [],  # no primary sidebar for this page
+}
 
 
 # -- Options for HTMLHelp output ---------------------------------------------
@@ -243,10 +256,7 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "joblib": ("https://joblib.readthedocs.io/en/latest/", None),
-    "iteration-utilities": (
-        "https://iteration-utilities.readthedocs.io/en/latest/",
-        None,
-    ),
+    "skorch": ("https://skorch.readthedocs.io/en/stable/", None),
 }
 
 # -- Options for todo extension ----------------------------------------------
@@ -278,7 +288,8 @@ generate_api_reference_rst(gen_path=os.path.abspath("generated"))
 json_data = generate_examples(
     gen_path="generated/examples/",
     json_path="examples/",
-    example_notebook_directory=copy_gallery_notebooks_dst_path
+    example_notebook_directory=copy_gallery_notebooks_dst_path,
+    version=version
 )
 
 generate_strategy_overview_rst(
@@ -289,6 +300,7 @@ generate_tutorials(
     src_path=os.path.abspath("../tutorials/"),
     dst_path="generated/tutorials/",
     dst_path_colab="generated/tutorials_colab/",
+    version=version
 )
 
 blacklisted_versions = ['0.0.0', '0.1.0', '0.1.1', '0.1.2']
@@ -297,3 +309,6 @@ generate_switcher(
     switcher_location="_static/switcher.json",
     blacklisted_versions=blacklisted_versions
 )
+
+html_baseurl = f'https://scikit-activeml.github.io/{version}/'
+sitemap_url_scheme = "{link}"

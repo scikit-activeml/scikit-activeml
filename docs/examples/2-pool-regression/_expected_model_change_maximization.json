@@ -1,0 +1,17 @@
+[
+  {
+    "class" : "ExpectedModelChangeMaximization",
+    "package" : "pool",
+    "category" : "Informativeness",
+    "method" : "Expected Model Change",
+    "template" : "examples/template_pool_regression.py",
+    "tags" : ["pool",  "regression", "single-annotator", "top-k-batch"],
+    "title" : "Expected Model Change Maximization",
+    "refs" : ["cai2013maximizing"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** Expected Model Change chooses those samples that have a maximal expected gradient length with respect to the model parameters. While designed for a linear regressor the formulas obtained from the linear case can be applied to arbitrary regressors.",
+    "import_misc" : ["from skactiveml.pool import ExpectedModelChangeMaximization"],
+    "init_qs" : "ExpectedModelChangeMaximization()",
+    "query_params" : "X=X, y=y, reg=reg"
+  }
+]

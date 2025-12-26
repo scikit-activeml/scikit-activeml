@@ -142,16 +142,14 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-/TestResults
-/scikit-activeml.sln
-/scikit-activeml.pyproj
-/skactiveml/pool/UC_test.py
-/skactiveml/pool/Untitled.ipynb
-/examples/pool/al_cycle_random_test.ipynb
-/examples/pool/al_cycle_random_test.ipynb
-/examples/pool/Exercise_AL_EntityRecognizer.ipynb
-/examples/pool/Exercise_AL_SelectivSupervision.ipynb
-/examples/pool/Exercise_AL_StabilityBased.ipynb
-/examples/pool/al_cycle_own.ipynb
+
+# ignore testing artifacts
+skactiveml/visualization/tests/images/*.pdf
+skactiveml/visualization/tests/images/*.png
+
+# ignore sphinx artifacts
 /docs/generated/
 /_build/
+docs/_static/switcher.json
+docs/sg_execution_times.rst
+tutorials/huggingface_cache/

@@ -1,8 +1,8 @@
-{{ fullname | escape | underline}}
+{{ objname | escape | underline }}
 
 .. currentmodule:: {{ module }}
 
-.. autoclass:: {{ objname }}
+.. autoclass:: {{ fullname }}
 
    {% block methods %}
    {% if methods %}
@@ -32,4 +32,3 @@
 
 .. minigallery:: {{fullname}}
    :add-heading:
-

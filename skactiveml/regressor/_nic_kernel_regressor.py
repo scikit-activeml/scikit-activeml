@@ -22,7 +22,7 @@ class NICKernelRegressor(ProbabilisticRegressor):
     samples by a kernel.
 
     Parameters
-    __________
+    ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.
@@ -205,7 +205,7 @@ class NadarayaWatsonRegressor(NICKernelRegressor):
     `NICKernelRegressor` with different prior values.
 
     Parameters
-    __________
+    ----------
     metric : str or callable, default='rbf'
         The metric must a be a valid kernel defined by the function
         `sklearn.metrics.pairwise.pairwise_kernels`.

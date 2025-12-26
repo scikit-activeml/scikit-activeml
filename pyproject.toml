@@ -8,8 +8,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name            = "scikit-activeml"
 description     = "scikit-activeml is a Python library for active learning on top of SciPy and scikit-learn."
-readme          = { file = "README.rst", content-type = "text/x-rst" }
-requires-python = ">=3.9"
+readme          = { file = "README-pypi.rst", content-type = "text/x-rst" }
+requires-python = ">=3.10"
 license-files   = ["LICENSE.txt"]
 maintainers     = [
   { name = "Marek Herde", email = "marek.herde@uni-kassel.de" },
@@ -26,10 +26,10 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Operating System :: OS Independent",
 ]
 
@@ -46,6 +46,8 @@ dependencies = { file = ["requirements.txt"] }
 [tool.setuptools.dynamic.optional-dependencies]
 dev = { file = ["requirements_extra.txt"] }
 max = { file = ["requirements_max.txt"] }
+opt = { file = ["requirements_opt.txt"] }
+opt_max = { file = ["requirements_opt_max.txt"] }
 
 [tool.setuptools.packages.find]
 include = ["skactiveml", "skactiveml.*"]
@@ -59,7 +61,14 @@ exclude = [
 Homepage       = "https://scikit-activeml.github.io"
 Source         = "https://github.com/scikit-activeml/scikit-activeml"
 
+[tool.pytest]
+addopts = [
+  "--cov=./skactiveml",
+  "--cov-report=xml",
+]
+testpaths = ["./skactiveml"]
+
 [tool.black]
 line-length = 79
-target-version = ['py311']
+target-version = ['py313']
 include = '\.pyi?$'

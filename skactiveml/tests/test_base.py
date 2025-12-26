@@ -10,7 +10,6 @@ from skactiveml.base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
     ClassFrequencyEstimator,
-    AnnotatorModelMixin,
     BudgetManager,
     SingleAnnotatorStreamQueryStrategy,
     SkactivemlRegressor,
@@ -18,6 +17,15 @@ from skactiveml.base import (
 )
 from skactiveml.exceptions import MappingError
 from skactiveml.utils import MISSING_LABEL, is_unlabeled
+
+successful_skorch_torch_import = False
+try:
+    import torch
+    from skactiveml.base import SkorchMixin
+
+    successful_skorch_torch_import = True
+except ImportError:  # pragma: no cover
+    pass
 
 
 class QueryStrategyTest(unittest.TestCase):
@@ -319,17 +327,6 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
         self.assertRaises(NotImplementedError, self.clf.predict_freq, X=None)
 
 
-class AnnotatorModelMixinTest(unittest.TestCase):
-    @patch.multiple(AnnotatorModelMixin, __abstractmethods__=set())
-    def setUp(self):
-        self.clf = AnnotatorModelMixin()
-
-    def test_predict_annotator_perf(self):
-        self.assertRaises(
-            NotImplementedError, self.clf.predict_annotator_perf, X=None
-        )
-
-
 class TestBudgetManager(unittest.TestCase):
     @patch.multiple(BudgetManager, __abstractmethods__=set())
     def setUp(self):
@@ -400,3 +397,165 @@ class TargetDistributionEstimatorTest(unittest.TestCase):
         self.assertRaises(
             NotImplementedError, self.reg.predict_target_distribution, X=None
         )
+
+
+if successful_skorch_torch_import:
+
+    class NeuralNetDummy:
+        def forward(self, X):
+            return X
+
+    class TestSkorchMixin(unittest.TestCase):
+        @patch.multiple(SkorchMixin, __abstractmethods__=set())
+        def setUp(self):
+            self.sk = SkorchMixin()
+            self.sk.neural_net_ = NeuralNetDummy()
+
+        def test__net_parts(self):
+            self.assertRaises(
+                NotImplementedError, self.sk._net_parts, X=None, y=None
+            )
+
+        def test__validate_data_kwargs(self):
+            self.assertRaises(
+                NotImplementedError, self.sk._validate_data_kwargs
+            )
+
+        def test__validate_data(self):
+            self.assertRaises(
+                NotImplementedError, self.sk._validate_data, X=None, y=None
+            )
+
+        def test__return_training_data(self):
+            self.assertRaises(
+                NotImplementedError,
+                self.sk._return_training_data,
+                X=None,
+                y=None,
+            )
+
+        def test___forward_with_named_outputs(self):
+            # Single-output tests.
+            X = torch.ones((5, 10))
+            self.assertRaises(
+                TypeError,
+                self.sk._forward_with_named_outputs,
+                X=X,
+                forward_outputs=None,
+            )
+            self.assertRaises(
+                ValueError,
+                self.sk._forward_with_named_outputs,
+                X=X,
+                forward_outputs={},
+            )
+            self.assertRaises(
+                TypeError,
+                self.sk._forward_with_named_outputs,
+                X=X,
+                forward_outputs={"samples": (0,)},
+            )
+            self.assertRaises(
+                ValueError,
+                self.sk._forward_with_named_outputs,
+                X=X,
+                forward_outputs={"samples": (1, None)},
+            )
+            self.assertRaises(
+                ValueError,
+                self.sk._forward_with_named_outputs,
+                X=X,
+                forward_outputs={"samples": (-1, None)},
+            )
+            self.assertRaises(
+                TypeError,
+                self.sk._forward_with_named_outputs,
+                X=X,
+                forward_outputs={"samples": (0, "no callable or None")},
+            )
+            fw_out = self.sk._forward_with_named_outputs(
+                X, forward_outputs={"samples": (0, None)}
+            )
+            self.assertIsInstance(fw_out, np.ndarray)
+            np.testing.assert_array_equal(np.ones_like(X), fw_out)
+            fw_out = self.sk._forward_with_named_outputs(
+                X, forward_outputs={"samples": (0, lambda x: x + 2)}
+            )
+            self.assertIsInstance(fw_out, np.ndarray)
+            np.testing.assert_array_equal(np.ones_like(X) + 2, fw_out)
+
+            # Tuple-output tests.
+            X_tuple = (X, X, X)
+            for i in range(3):
+                fw_out = self.sk._forward_with_named_outputs(
+                    X_tuple, forward_outputs={"samples": (i, lambda x: x + 2)}
+                )
+                self.assertIsInstance(fw_out, np.ndarray)
+                np.testing.assert_array_equal(np.ones_like(X) + 2, fw_out)
+            forward_outputs = {
+                "out_0": (0, None),
+                "out_1": (1, lambda x: x + 1),
+                "out_2": (2, lambda x: x + 2),
+            }
+            fw_out = self.sk._forward_with_named_outputs(
+                X_tuple,
+                forward_outputs=forward_outputs,
+            )
+            self.assertIsInstance(fw_out, np.ndarray)
+            np.testing.assert_array_equal(np.ones_like(X), fw_out)
+            fw_out = self.sk._forward_with_named_outputs(
+                X_tuple,
+                forward_outputs=forward_outputs,
+                extra_outputs=["out_2", "out_1"],
+            )
+            self.assertEqual(len(fw_out), 3)
+            np.testing.assert_array_equal(np.ones_like(X), fw_out[0])
+            np.testing.assert_array_equal(np.ones_like(X) + 2, fw_out[1])
+            np.testing.assert_array_equal(np.ones_like(X) + 1, fw_out[2])
+
+        def test__normalize_extra_outputs(self):
+            norm = self.sk._normalize_extra_outputs
+
+            allowed = ["a", "b", "c"]
+
+            # extra_outputs is None -> returns []
+            self.assertEqual(norm(None, allowed_names=allowed), [])
+
+            # extra_outputs is str -> single name list
+            self.assertEqual(
+                norm("a", allowed_names=allowed, primary_name=None),
+                ["a"],
+            )
+
+            # extra_outputs is sequence of str (list)
+            self.assertEqual(
+                norm(["a", "c"], allowed_names=allowed, primary_name="b"),
+                ["a", "c"],
+            )
+
+            # extra_outputs is sequence of str (tuple)
+            self.assertEqual(
+                norm(("a",), allowed_names=allowed, primary_name=None),
+                ["a"],
+            )
+
+            # extra_outputs of invalid type ->
+            # TypeError (non-str / non-sequence)
+            with self.assertRaises(TypeError):
+                norm(123, allowed_names=allowed)
+
+            # extra_outputs sequence with non-str element -> TypeError
+            with self.assertRaises(TypeError):
+                norm(["a", 1], allowed_names=allowed)
+
+            # duplicate names -> ValueError
+            with self.assertRaises(ValueError):
+                norm(["a", "a"], allowed_names=allowed)
+
+            # unknown names -> ValueError
+            with self.assertRaises(ValueError):
+                norm(["a", "z"], allowed_names=allowed)
+
+            # primary_name included in extras -> ValueError
+            with self.assertRaises(ValueError):
+                norm(["a", "b"], allowed_names=allowed, primary_name="b")

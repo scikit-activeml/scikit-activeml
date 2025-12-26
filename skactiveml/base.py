@@ -3,11 +3,11 @@ The :mod:`skactiveml.base` package implements the base classes for
 :mod:`skactiveml`.
 """
 
+import numpy as np
 import warnings
+
 from abc import ABC, abstractmethod
 from copy import deepcopy
-
-import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.metrics import accuracy_score
 from sklearn.utils.multiclass import check_classification_targets
@@ -33,9 +33,9 @@ from .utils import (
     check_missing_label,
     check_indices,
     check_n_features,
+    check_type,
 )
 
-# '__all__' is necessary to create the sphinx docs.
 __all__ = [
     "QueryStrategy",
     "PoolQueryStrategy",
@@ -45,10 +45,20 @@ __all__ = [
     "SingleAnnotatorStreamQueryStrategy",
     "SkactivemlClassifier",
     "ClassFrequencyEstimator",
-    "AnnotatorModelMixin",
     "SkactivemlRegressor",
     "ProbabilisticRegressor",
 ]
+
+successful_skorch_torch_import = False
+try:
+    from collections.abc import Sequence
+    from skorch import NeuralNet
+    from skorch.utils import to_numpy
+    from .utils import _check_forward_outputs
+
+    successful_skorch_torch_import = True
+except ImportError:  # pragma: no cover
+    pass
 
 
 class QueryStrategy(ABC, BaseEstimator):
@@ -264,7 +274,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
-        allow_multilabel=False,
+        allow_multioutput=False,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -298,8 +308,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             provided when reset was last True.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        allow_multilabel : bool, default=False
-            Whether provided data is allowed to be in multi-label format or not.
+        allow_multioutput : bool, default=False
+            Whether provided labels are allowed to be in multioutput format or
+            not.
 
         Returns
         -------
@@ -326,29 +337,22 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             X, y, candidates, batch_size, return_utilities, reset, check_X_dict
         )
 
-        if allow_multilabel:
-            y = check_array(y, ensure_2d=True, force_all_finite="allow-nan")
-            unlabeled_mask = is_unlabeled(
-                y, missing_label=self.missing_label_, is_multilabel=True
+        if allow_multioutput:
+            y = check_array(
+                y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
             )
-
-            if not np.all(np.isin(y[~unlabeled_mask], [0, 1])):
-                raise ValueError(
-                    "Labeled instances must be fully annotated with 0 or 1, not mixed with `missing_label`."
-                )
+            is_multioutput = y.ndim == 2
         else:
             y = column_or_1d(y, warn=True)
+            is_multioutput = False
 
         if candidates is None:
-            n_candidates = int(
-                np.sum(
-                    is_unlabeled(
-                        y,
-                        missing_label=self.missing_label_,
-                        is_multilabel=allow_multilabel,
-                    )
-                )
+            is_ulbld = is_unlabeled(
+                y,
+                missing_label=self.missing_label_,
+                is_multioutput=is_multioutput,
             )
+            n_candidates = int(is_ulbld.sum())
         else:
             n_candidates = len(candidates)
 
@@ -368,7 +372,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y,
         enforce_mapping=False,
         allow_only_unlabeled=False,
-        is_multilabel=False,
+        is_multioutput=False,
     ):
         """Transforms the `candidates` parameter into a sample array and the
         corresponding index array `mapping` such that
@@ -396,8 +400,8 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         allow_only_unlabeled : bool, default=False
             If True, an exception is raised when indices of candidates contain
             labeled samples.
-        is_multilabel : bool, default=False
-            Whether provided data is in multi-label format or not.
+        is_multioutput : bool, default=False
+            Whether provided data is in multioutput format or not.
 
         Returns
         -------
@@ -410,7 +414,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
         if candidates is None:
             ulbd_idx = unlabeled_indices(
-                y, self.missing_label_, is_multilabel=is_multilabel
+                y, self.missing_label_, is_multioutput=is_multioutput
             )
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
@@ -434,13 +438,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with
     multiple annotators in scikit-activeml.
-
-    Parameters
-    ----------
-    missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label.
-    random_state : int or RandomState instance, default=None
-        Controls the randomness of the estimator.
     """
 
     @abstractmethod
@@ -616,7 +613,6 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-
         (
             X,
             y,
@@ -1099,7 +1095,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         """
         raise NotImplementedError
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, **kwargs):
         """Return probability estimates for the test data X.
 
         Parameters
@@ -1115,7 +1111,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         """
         raise NotImplementedError
 
-    def predict(self, X):
+    def predict(self, X, **kwargs):
         """Return class label predictions for the test samples `X`.
 
         Parameters
@@ -1128,12 +1124,16 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         y : numpy.ndarray of shape (n_samples,)
             Predicted class labels of the test samples `X`.
         """
-        P = self.predict_proba(X)
+        out = self.predict_proba(X, **kwargs)
+        P = out[0] if isinstance(out, tuple) else out
         costs = np.dot(P, self.cost_matrix_)
         y_pred = rand_argmin(costs, random_state=self.random_state_, axis=1)
         y_pred = self._le.inverse_transform(y_pred)
         y_pred = np.asarray(y_pred, dtype=self.classes_.dtype)
-        return y_pred
+        if isinstance(out, tuple):
+            return (y_pred,) + out[1:]
+        else:
+            return y_pred
 
     def score(self, X, y, sample_weight=None):
         """Return the mean accuracy on the given test data and labels.
@@ -1142,10 +1142,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         ----------
         X : array-like of shape (n_samples, n_features)
             Test samples.
-
         y : array-like of shape (n_samples,)
             True labels for `X`.
-
         sample_weight : array-like of shape (n_samples,), default=None
             Sample weights.
 
@@ -1154,8 +1152,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         score : float
             Mean accuracy of `self.predict(X)` regarding `y`.
         """
+        y_pred = self.predict(X)
+        y_pred = self._le.transform(y_pred)
         y = self._le.transform(y)
-        y_pred = self._le.transform(self.predict(X))
         return accuracy_score(y, y_pred, sample_weight=sample_weight)
 
     def _validate_data(
@@ -1303,7 +1302,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         self.class_prior = class_prior
 
     @abstractmethod
-    def predict_freq(self, X):
+    def predict_freq(self, X, **kwargs):
         """Return class frequency estimates for the test samples `X`.
 
         Parameters
@@ -1319,7 +1318,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         """
         raise NotImplementedError
 
-    def predict_proba(self, X):
+    def predict_proba(self, X, **kwargs):
         """Return probability estimates for the test data `X`.
 
         Parameters
@@ -1389,6 +1388,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         check_X_dict=None,
         check_y_dict=None,
         y_ensure_1d=True,
+        reset=True,
     ):
         X, y, sample_weight = super()._validate_data(
             X=X,
@@ -1397,6 +1397,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             check_X_dict=check_X_dict,
             check_y_dict=check_y_dict,
             y_ensure_1d=y_ensure_1d,
+            reset=reset,
         )
 
         # Check class prior.
@@ -1597,27 +1598,364 @@ class ProbabilisticRegressor(SkactivemlRegressor):
         return rv_samples.T
 
 
-class AnnotatorModelMixin(ABC):
-    """Annotator Model
+if successful_skorch_torch_import:
 
-    Base class of all annotator models estimating the performances of
-    annotators for given samples.
-    """
+    __all__ += ["SkorchMixin"]
 
-    @abstractmethod
-    def predict_annotator_perf(self, X):
-        """Calculates the performance of an annotator to provide the true label
-        for a given sample.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Test samples.
-
-        Returns
-        -------
-        P_annot : numpy.ndarray of shape (n_samples, n_annotators)
-            `P_annot[i,l]` is the performance of annotator `l` regarding the
-             annotation of sample `X[i]`.
+    class SkorchMixin(ABC):
         """
-        raise NotImplementedError
+        Minimal mixin to build and train a `skorch.NeuralNet`.
+
+        Subclasses must implement the abstract methods to provide the module,
+        criterion, validation kwargs, and training data. This mixin always
+        rebuilds and initializes `self.neural_net_` on `initialize` and
+        fits only on training data in `_fit`.
+        """
+
+        def initialize(self, X=None, y=None, enforce_check_X_y=False):
+            """
+            Initialize the wrapper and (optionally) validate inputs.
+
+            If any data is provided or `enforce_check_X_y` is True, inputs
+            are validated via `_validate_data`. A new `skorch.NeuralNet`
+            is then created and assigned to `self.neural_net_`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...), default=None
+                Input samples for optional validation.
+            y : array-like of shape (n_samples, ...), default=None
+                Target values for optional validation.
+            enforce_check_X_y : bool, default=False
+                Whether to validate even if both `X` and `y` are `None`.
+
+            Returns
+            -------
+            self : SkorchMixin
+                Returned when no input data was supplied
+                (both `X` and `y` are `None`).
+            X_out, y_out : tuple of nd.array, optional
+                Validated `X` and `y` as a tuple, returned when
+                `enforce_check_X_y=True`.
+            """
+            has_data = (X is not None) or (y is not None)
+            vd_kwargs = self._validate_data_kwargs()
+            if enforce_check_X_y or has_data:
+                X, y, _ = self._validate_data(X=X, y=y, **vd_kwargs)
+
+            module, criterion, nn_params = self._net_parts(X=X, y=y)
+            check_type(nn_params, "neural_net_param_dict", dict)
+            nn_params = dict(nn_params)
+            invalid_keys = ["module", "criterion", "predict_nonlinearity"]
+            for k in invalid_keys:
+                if k in nn_params:
+                    raise ValueError(
+                        f"{k} must not be a key in `neural_net_param_dict`."
+                    )
+            self.neural_net_ = NeuralNet(
+                module=module,
+                criterion=criterion,
+                predict_nonlinearity=None,
+                **nn_params,
+            ).initialize()
+
+            return (self, X, y) if enforce_check_X_y else self
+
+        def _fit(self, fit_function, X, y, **fit_params):
+            """
+            Initialize and fit the internal `skorch` model on training
+            data.
+
+            If the model is uninitialized, or `fit_function == 'fit'` and
+            `self.neural_net_.warm_start` is `False`, the network is
+            re-initialized.
+
+            Parameters
+            ----------
+            fit_function : {'fit', 'partial_fit'}
+                Name of the caller, used to decide whether to reinitialize when
+                warm start is off.
+            X : array-like of shape (n_samples, ...)
+                Training inputs (may include unlabeled samples).
+            y : array-like of shape (n_samples, ...)
+                Training targets; unlabeled entries must follow the subclass'
+                convention (e.g., `self.missing_label`).
+            **fit_params : dict
+                Extra keyword arguments forwarded to
+                `self.neural_net_.partial_fit`.
+
+            Returns
+            -------
+            self : SkorchMixin
+                The fitted estimator.
+            """
+            need_reinit = (not hasattr(self, "neural_net_")) or (
+                fit_function == "fit"
+                and not getattr(self.neural_net_, "warm_start", False)
+            )
+            if need_reinit:
+                _, X, y = self.initialize(X=X, y=y, enforce_check_X_y=True)
+            else:
+                vd_kwargs = self._validate_data_kwargs()
+                X, y, _ = self._validate_data(X=X, y=y, **vd_kwargs)
+
+            X_train, y_train = self._return_training_data(X=X, y=y)
+            if X_train is not None and y_train is not None:
+                self.neural_net_.partial_fit(X_train, y_train, **fit_params)
+            return self
+
+        def _forward_with_named_outputs(
+            self,
+            X,
+            forward_outputs,
+            extra_outputs=None,
+        ):
+            """Run `module.forward(X)` once and return the primary output plus
+            optionally requested extra outputs as NumPy arrays.
+
+            The primary output is defined as the first entry of
+            `forward_outputs` (after applying its transform, if any), or the
+            sole output of `module.forward` if `forward_outputs` is `None`.
+            Primary and extra outputs are always returned after applying their
+            configured transforms.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples. It is assumed that `X` has already been
+                validated and that `self.neural_net_` is initialized.
+            forward_outputs : dict[str, tuple[int, Callable | None]]
+                `dict` that describes how to obtain and post-process the
+                outputs of `module.forward` for prediction.
+
+                Given `raw_outputs = module.forward(X)`, each entry
+                `name -> (idx, transform)` is interpreted as:
+
+                - `idx`: integer index of `raw_outputs` (0-based).
+                - `transform`: callable `f(tensor) -> tensor` or `None`.
+                  If `transform` is not `None`, it is applied to the selected
+                  raw tensor; otherwise the raw tensor is used.
+            extra_outputs : None or str or sequence of str, default=None
+                Names of additional outputs to return next to the primary
+                output. Must be a subset of `forward_outputs.keys()` if
+                `forward_outputs` is not `None`. The first key in
+                `forward_outputs` (the primary output) is not allowed here.
+                Duplicate entries are not allowed.
+
+            Returns
+            -------
+            output : numpy.ndarray or tuple of numpy.ndarray
+                If `extra_outputs is None`, returns the primary output as a
+                single NumPy array. Otherwise, returns a tuple whose first
+                element is the primary output and whose remaining elements are
+                the requested extra outputs in the order specified by
+                `extra_outputs`.
+            """
+            # Check forward_outputs configured.
+            _check_forward_outputs(forward_outputs=forward_outputs)
+
+            # Primary output = first configured output
+            # (dicts preserve insertion order).
+            primary_name = next(iter(forward_outputs))
+
+            # Normalize and validate extra_outputs:
+            # - None / str / sequence of str,
+            # - subset of forward_outputs.keys(),
+            # - no duplicates,
+            # - no primary_name.
+            extra_names = self._normalize_extra_outputs(
+                extra_outputs,
+                allowed_names=forward_outputs.keys(),
+                primary_name=primary_name,
+            )
+
+            # Run module forward once.
+            fw_out = self.neural_net_.forward(X)
+
+            # Normalize to tuple of raw outputs.
+            if isinstance(fw_out, tuple):
+                raw_outputs = fw_out
+            else:
+                raw_outputs = (fw_out,)
+
+            # Check that all indices are within range of raw_outputs.
+            if forward_outputs:
+                max_idx = max(idx for idx, _ in forward_outputs.values())
+                if max_idx >= len(raw_outputs):
+                    raise ValueError(
+                        f"`forward_outputs` references raw output index "
+                        f"{max_idx}, but module.forward returned only "
+                        f"{len(raw_outputs)} object(s)."
+                    )
+
+            # Helper to extract and transform a single named output lazily.
+            def _get_named(name: str):
+                idx, transform = forward_outputs[name]
+                value = raw_outputs[idx]
+                if transform is not None:
+                    value = transform(value)
+                return to_numpy(value)
+
+            # Primary output (transform applied here).
+            primary_np = _get_named(primary_name)
+
+            # No extra outputs.
+            if not extra_names:
+                return primary_np
+
+            extras_np = tuple(_get_named(name) for name in extra_names)
+            return (primary_np,) + extras_np
+
+        @staticmethod
+        def _normalize_extra_outputs(
+            extra_outputs, allowed_names, primary_name=None
+        ):
+            """Validate `extra_outputs` and return a list of names.
+
+            Parameters
+            ----------
+            extra_outputs : None or str or sequence of str
+                User-specified extra outputs.
+            allowed_names : Collection[str]
+                Set or iterable of allowed names, e.g.,
+                `forward_outputs.keys()`.
+            primary_name : str or None, default=None
+                Name of the primary output which must not be requested
+                as extra.
+
+            Returns
+            -------
+            list[str]
+                Validated list of extra output names.
+            """
+            if extra_outputs is None:
+                return []
+
+            # Normalize to list of strings
+            if isinstance(extra_outputs, str):
+                names = [extra_outputs]
+            elif isinstance(extra_outputs, Sequence) and not isinstance(
+                extra_outputs, bytes
+            ):
+                names = list(extra_outputs)
+            else:
+                raise TypeError(
+                    "`extra_outputs` must be None, a string, or a sequence "
+                    f"of strings, got {type(extra_outputs)}."
+                )
+
+            if not all(isinstance(n, str) for n in names):
+                raise TypeError(
+                    "All entries in `extra_outputs` must be strings."
+                )
+
+            # No duplicates
+            if len(set(names)) != len(names):
+                raise ValueError(
+                    "`extra_outputs` must not contain duplicate names."
+                )
+
+            allowed_names = set(allowed_names)
+            unknown = [n for n in names if n not in allowed_names]
+            if unknown:
+                raise ValueError(
+                    f"Requested extra output(s) {unknown!r} are not defined; "
+                    f"allowed names are {sorted(allowed_names)!r}."
+                )
+
+            if primary_name is not None and primary_name in names:
+                raise ValueError(
+                    f"Primary output {primary_name!r} (first key in "
+                    f"`forward_outputs`) cannot be requested again as an "
+                    f"`extra_output`."
+                )
+
+            return names
+
+        @abstractmethod
+        def _net_parts(self, X=None, y=None):
+            """Assemble and validate network components.
+
+            Implementations should perform any optional checks or normalization
+            of constructor/init parameters (e.g., shape consistency, dtype
+            checks, wrapping criteria), then return the ready-to-use pieces for
+            `skorch.NeuralNet`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...), default=None
+                Input samples for optional validation.
+            y : array-like of shape (n_samples, ...), default=None
+                Target values for optional validation.
+
+            Returns
+            -------
+            module : torch.nn.Module.__class__ or torch.nn.Module
+                A PyTorch `torch.nn.Module`. In general, the uninstantiated
+                class should be passed, although instantiated modules will also
+                work.
+            criterion : torch.nn.Module.__class__
+                The criterion (loss) used to optimize the module.
+            params : dict
+                Keyword arguments (excluding `predict_non_linearity`) for
+                `skorch.NeuralNet` construction. Must be a mapping and may be
+                empty.
+            """
+            raise NotImplementedError
+
+        @abstractmethod
+        def _validate_data_kwargs(self):
+            """Return kwargs forwarded to `_validate_data`.
+
+            Returns
+            -------
+            kwargs : dict or None
+                Keyword arguments consumed by `_validate_data`.
+            """
+            raise NotImplementedError
+
+        @abstractmethod
+        def _validate_data(self, X, y, **kwargs):
+            """Validate inputs and return cleaned arrays.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+            y : array-like of shape (n_samples, ...)
+                Target values.
+            **kwargs
+                Additional arguments controlling validation.
+
+            Returns
+            -------
+            X_out : np.ndarray
+                Validated `X`.
+            y_out : np.ndarray
+                Validated `y`.
+            sample_weight_or_dummy : Any
+                Third return to maintain compatibility with callers expecting
+                sample weights.
+            """
+            raise NotImplementedError
+
+        @abstractmethod
+        def _return_training_data(self, X, y):
+            """Return only samples and labels required for training.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+            y : array-like of shape (n_samples, ...)
+                Targets with unlabeled entries following the subclass'
+                convention.
+
+            Returns
+            -------
+            X_train : np.ndarray or None
+                Training samples or `None` if none exist.
+            y_train : np.ndarray or None
+                Training labels or `None` if none exist.
+            """
+            raise NotImplementedError

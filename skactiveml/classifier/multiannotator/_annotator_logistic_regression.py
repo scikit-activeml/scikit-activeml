@@ -6,8 +6,9 @@ Logistic Regression for Multiple Annotators
 #         Timo Sturm <timo.sturm@student.uni-kassel.de>
 
 import warnings
-
 import numpy as np
+
+from collections.abc import Sequence
 from scipy.optimize import minimize
 from scipy.special import softmax
 from sklearn.utils.validation import (
@@ -16,7 +17,7 @@ from sklearn.utils.validation import (
     column_or_1d,
 )
 
-from ...base import SkactivemlClassifier, AnnotatorModelMixin
+from ...base import SkactivemlClassifier
 from ...utils import (
     MISSING_LABEL,
     compute_vote_vectors,
@@ -26,7 +27,7 @@ from ...utils import (
 )
 
 
-class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
+class AnnotatorLogisticRegression(SkactivemlClassifier):
     """Logistic Regression for Crowds
 
     Logistic Regression based on Raykar [1]_ is a classification algorithm
@@ -46,7 +47,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
     Parameters
     ----------
     tol : float, default=0.0001
-        Threshold for stopping the EM-Algorithm and the optimization of the
+        Threshold for stopping the EM-Algorithm and the optimization of
         the logistic regression weights. If the change of the respective value
         between two steps is smaller than `tol`, the respective algorithm
         stops.
@@ -120,6 +121,12 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
        11(4):1297–1322, 2010.
     """
 
+    _ALLOWED_EXTRA_OUTPUTS = {
+        "logits",
+        "annotator_perf",
+        "annotator_class",
+    }
+
     def __init__(
         self,
         n_annotators=None,
@@ -159,12 +166,12 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         ----------
         X : array-like of shape (n_samples, n_features)
             Feature matrix representing the samples.
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute `missing_label`.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
+        y : array-like of shape (n_samples, n_annotators)
+            It contains the class labels of the training samples, where
+            missing labels are represented via `missing_label`.
+            Specifically, label `y[n, m]` refers to the label of sample
+            `X[n]` from annotator `m`.
+        sample_weight : array-like of shape (n_samples, n_annotators)
             It contains the weights of the training samples' class labels.
             It must have the same shape as `y`. Accordingly, the sample
             weights are only used for the initialization of the majority vote
@@ -524,20 +531,147 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
 
         return self
 
-    def predict_proba(self, X):
-        """Return probability estimates for the test data `X`.
+    def predict(
+        self,
+        X,
+        extra_outputs=None,
+    ):
+        """Return class predictions for the test samples `X`.
+
+        By default, this method returns only the class predictions
+        `y_pred`. If `extra_outputs` is provided, a tuple is returned whose
+        first element is `y_pred` and whose remaining elements are the
+        requested additional forward outputs, in the order specified by
+        `extra_outputs`.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, ...)
             Test samples.
+        extra_outputs : None or str or sequence of str, default=None
+            Names of additional outputs to return next to `y_pred`. The names
+            must be a subset of the following keys:
+
+            - "logits" : Additionally return the class-membership logits
+              `L_class` for the samples in `X`.
+            - "annotator_perf" : additionally return the estimated
+              annotator performance probabilities `P_perf` for each
+              sample–annotator pair.
+            - "annotator_class" : Additionally return the annotator–class
+              probability estimates `P_annot` for each sample, class, and
+              annotator.
 
         Returns
         -------
-        P : numpy.ndarray of shape (n_samples, classes)
-            The class probabilities of the test samples. Classes are ordered
-            according to the attribute `self.classes_`.
+        y_pred : numpy.ndarray of shape (n_samples,)
+            Class predictions of the test samples.
+        *extras : numpy.ndarray, optional
+            Only returned if `extra_outputs` is not `None`. In that
+            case, the method returns a tuple whose first element is `P`
+            and whose remaining elements correspond to the requested
+            forward outputs in the order given by `extra_outputs`.
+            Potential outputs are:
+
+            - `L_class` : `np.ndarray` of shape `(n_samples, n_classes)`,
+              where `L_class[n, c]` is the logit for the class
+              `classes_[c]` of sample `X[n]`.
+            - `P_perf` : `np.ndarray` of shape `(n_samples, n_annotators)`,
+              where `P_perf[n, m]` refers to the estimated label
+              correctness probability (performance) of annotator `m` when
+              labeling sample `X[n]`.
+            - `P_annot` : `np.ndarray` of shape
+              `(n_samples, n_annotators, n_classes)`, where
+              `P_annot[n, m, c]` refers to the probability that annotator
+              `m` provides the class label `c` for sample `X[n]`.
         """
+        return SkactivemlClassifier.predict(
+            self,
+            X=X,
+            extra_outputs=extra_outputs,
+        )
+
+    def predict_proba(
+        self,
+        X,
+        extra_outputs=None,
+    ):
+        """Return class probability estimates for the test samples `X`.
+
+        By default, this method returns only the class probabilities `P`.
+        If `extra_outputs` is provided, a tuple is returned whose first
+        element is `P` and whose remaining elements are the requested
+        additional forward outputs, in the order specified by
+        `extra_outputs`.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, ...)
+            Test samples.
+        extra_outputs : None or str or sequence of str, default=None
+            Names of additional outputs to return next to `P`. The names
+            must be a subset of the following keys:
+
+            - "logits" : Additionally return the class-membership logits
+              `L_class` for the samples in `X`.
+            - "annotator_perf" : additionally return the estimated
+              annotator performance probabilities `P_perf` for each
+              sample–annotator pair.
+            - "annotator_class" : Additionally return the annotator–class
+              probability estimates `P_annot` for each sample, class, and
+              annotator.
+
+        Returns
+        -------
+        P : numpy.ndarray of shape (n_samples, n_classes)
+            Class probabilities of the test samples. Classes are ordered
+            according to `self.classes_`.
+        *extras : numpy.ndarray, optional
+            Only returned if `extra_outputs` is not `None`. In that
+            case, the method returns a tuple whose first element is `P`
+            and whose remaining elements correspond to the requested
+            forward outputs in the order given by `extra_outputs`.
+            Potential outputs are:
+
+            - `L_class` : `np.ndarray` of shape `(n_samples, n_classes)`,
+              where `L_class[n, c]` is the logit for the class
+              `classes_[c]` of sample `X[n]`.
+            - `P_perf` : `np.ndarray` of shape `(n_samples, n_annotators)`,
+              where `P_perf[n, m]` refers to the estimated label
+              correctness probability (performance) of annotator `m` when
+              labeling sample `X[n]`.
+            - `P_annot` : `np.ndarray` of shape
+              `(n_samples, n_annotators, n_classes)`, where
+              `P_annot[n, m, c]` refers to the probability that annotator
+              `m` provides the class label `c` for sample `X[n]`.
+              Only returned, if `return_annotator_class=True`.
+        """
+        # Check extra outputs format.
+        if extra_outputs is None:
+            extra_outputs = []
+        elif isinstance(extra_outputs, str):
+            extra_outputs = [extra_outputs]
+        elif isinstance(extra_outputs, Sequence) and not isinstance(
+            extra_outputs, bytes
+        ):
+            extra_outputs = list(extra_outputs)
+        else:
+            raise TypeError(
+                "`extra_outputs` must be None, a string, or a sequence "
+                f"of strings, got {type(extra_outputs)}."
+            )
+        if len(set(extra_outputs)) != len(extra_outputs):
+            raise ValueError(
+                "`extra_outputs` must not contain duplicate names."
+            )
+        unknown = [
+            n for n in extra_outputs if n not in self._ALLOWED_EXTRA_OUTPUTS
+        ]
+        if unknown:
+            raise ValueError(
+                f"Requested extra output(s) {unknown!r} are not defined; "
+                f"allowed names are {sorted(self._ALLOWED_EXTRA_OUTPUTS)!r}."
+            )
+
         # Check test samples.
         check_is_fitted(self)
         X = check_array(X)
@@ -547,40 +681,27 @@ class AnnotatorLogisticRegression(SkactivemlClassifier, AnnotatorModelMixin):
         if self.fit_intercept:
             X = np.insert(X, 0, values=1, axis=1)
 
-        # Compute and normalize probabilities.
-        if self.W_ is not None:
-            P = softmax(X @ self.W_, axis=1)
+        # Compute logits and normalize to probabilities.
+        if self.W_ is None:
+            L_class = np.zeros((len(X), len(self.classes_)))
         else:
-            return np.full(
-                (len(X), len(self.classes_)), fill_value=1 / len(self.classes_)
-            )
-        return P
+            L_class = X @ self.W_
+        P_class = softmax(L_class, axis=1)
 
-    def predict_annotator_perf(self, X):
-        """Calculates the probability that an annotator provides the true label
-        for a given sample. The true label is hereby provided by the
-        classification model. The label provided by an annotator `l` is based
-        on their confusion matrix (i.e., attribute `self.Alpha_[l]`).
+        # Return only class probabilities as primary output.
+        if not extra_outputs:
+            return P_class
 
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Test samples.
-
-        Returns
-        -------
-        P_annot : numpy.ndarray of shape (n_samples, classes)
-            `P_annot[i,l]` is the probability, that annotator l provides the
-            correct class label for sample `X[i]`.
-        """
-        # Compute class probabilities.
-        P = self.predict_proba(X)
-
-        # Get correctness probabilities for each annotator per class.
-        diag_Alpha = np.array(
-            [np.diagonal(self.Alpha_[j]) for j in range(self.Alpha_.shape[0])]
-        )
-
-        # Compute correctness probabilities for each annotator per sample.
-        P_annot = P @ diag_Alpha.T
-        return P_annot
+        # Return request extra outputs next to the class probabilities.
+        out = [P_class]
+        for extra in extra_outputs:
+            if extra == "logits":
+                out.append(L_class)
+            if extra == "annotator_perf":
+                diag_alpha = np.diagonal(self.Alpha_, axis1=1, axis2=2)
+                P_perf = np.einsum("ik,lk->il", P_class, diag_alpha)
+                out.append(P_perf)
+            if extra == "annotator_class":
+                P_annot = np.einsum("ik,lkc->ilc", P_class, self.Alpha_)
+                out.append(P_annot)
+        return tuple(out)
