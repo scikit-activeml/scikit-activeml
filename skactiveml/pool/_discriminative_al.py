@@ -27,7 +27,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
     points the discriminator rates most unlabeled-like, thus covering
     underrepresented regions. It does not use predictive uncertainty
     such that effectiveness hinges on the representation and discriminator
-    calibration.
+    calibration. This implementation is task-agnostic such that it can handle
+    class, numerical, and multioutput labels.
 
     Parameters
     ----------
@@ -125,22 +126,26 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X,
-            y,
-            candidates,
-            batch_size,
-            return_utilities,
+            X=X,
+            y=y,
+            candidates=candidates,
+            batch_size=batch_size,
+            return_utilities=return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
 
         # Retransform candidates and create a potential mapping to the samples
         # in `X`.
-        is_multilabel = np.array(y).ndim == 2
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
+            candidates=candidates,
+            X=X,
+            y=y,
+            enforce_mapping=True,
+            is_multioutput=is_multioutput,
         )
 
         # Re-define discriminator to fit the setting of classifying
@@ -153,9 +158,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             # Return the top samples with the highest probabilities of
             # being unlabeled, which correspond to their utilities.
             y_discriminator = is_unlabeled(
-                y,
+                y=y,
                 missing_label=self.missing_label,
-                is_multilabel=is_multilabel,
+                is_multioutput=is_multioutput,
             )
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
@@ -181,9 +186,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             for i in range(batch_size):
                 # Determine unlabeled vs. labeled samples.
                 y_discriminator = is_unlabeled(
-                    y,
+                    y=y,
                     missing_label=self.missing_label,
-                    is_multilabel=is_multilabel,
+                    is_multioutput=is_multioutput,
                 )
                 y_discriminator = y_discriminator.astype(int)
 
