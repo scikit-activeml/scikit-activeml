@@ -185,8 +185,11 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
         # subsampling with no explicit provided candidates
         if candidates is None:
+            is_multioutput = y.ndim == 2
             candidate_indices = unlabeled_indices(
-                y=y, missing_label=self.missing_label_
+                y=y,
+                missing_label=self.missing_label_,
+                is_multioutput=is_multioutput,
             )
             # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
@@ -220,8 +223,11 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
         # check if to exclude unlabeled non-candidate training data
         if self.exclude_non_subsample:
+            is_multioutput = y.ndim == 2
             all_labeled = labeled_indices(
-                y=y, missing_label=self.missing_label_
+                y=y,
+                missing_label=self.missing_label_,
+                is_multioutput=is_multioutput,
             )
             if candidates is not None and candidates.ndim > 1:
                 subset_and_labeled_indices = all_labeled
