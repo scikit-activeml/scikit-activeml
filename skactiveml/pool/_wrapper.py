@@ -425,14 +425,12 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X, y, candidates, batch_size, return_utilities, reset=True
         )
-
         if batch_size != 1:
             raise ValueError("`batch_size` must be set to 1.")
-
         if not isinstance(
             self.query_strategy, SingleAnnotatorPoolQueryStrategy
         ):
@@ -441,8 +439,13 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
             )
 
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+        )
 
+        # Determine number of parallel jobs.
         if self.parallel_dict is None:
             parallel_dict = {}
         elif isinstance(self.parallel_dict, dict):
@@ -458,7 +461,6 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"`parallel_dict` is of type `{type(self.parallel_dict)}` "
                 f"but must be a dictionary or None."
             )
-
         parallel_dict["n_jobs"] = min(self.n_jobs, len(X_cand))
         parallel_pool = Parallel(**parallel_dict)
 
