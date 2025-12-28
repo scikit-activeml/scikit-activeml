@@ -1,9 +1,9 @@
 import copy
 import warnings
-from collections.abc import Iterable
-from inspect import Parameter, signature
-
+import numbers
 import numpy as np
+
+from inspect import Parameter, signature
 from sklearn.utils.validation import (
     check_array,
     column_or_1d,
@@ -82,38 +82,80 @@ def check_scalar(
             )
 
 
-def check_classifier_params(classes, missing_label, cost_matrix=None):
-    """Check whether the parameters are compatible to each other (only if
-    `classes` is not None).
+def _is_nonstring_iterable(obj):
+    """True if `obj` is iterable but not a string/bytes."""
+    if isinstance(obj, (str, bytes, np.str_)):
+        return False
+    try:
+        iter(obj)
+        return True
+    except TypeError:
+        return False
 
-    Parameters
-    ----------
-    classes : array-like of shape (n_classes,)
-        Array of class labels.
-    missing_label : scalar or string or np.nan or None
-        Value to represent a missing label.
-    cost_matrix : array-like of shape (n_classes, n_classes), default=None
-        Cost matrix. If `None`, cost matrix will be not checked.
+
+def _is_multioutput_classes(classes):
+    """Rule: nested structure corresponds to multioutput.
+
+    - single output: one-dimensional iterable of scalars (strings/numbers)
+    - multioutput: outer iterable whose elements are themselves iterables
+      of scalars (strings/numbers)
     """
-    check_missing_label(missing_label)
-    if classes is not None:
-        check_classes(classes)
-        dtype = np.array(classes).dtype
-        check_missing_label(missing_label, target_type=dtype, name="classes")
-        n_labeled = is_unlabeled(y=classes, missing_label=missing_label).sum()
-        if n_labeled > 0:
-            raise ValueError(
-                f"`classes={classes}` contains "
-                f"`missing_label={missing_label}.`"
+    if classes is None:
+        return False
+    if not _is_nonstring_iterable(classes):
+        return False
+
+    # Materialize once (handles generators).
+    outer = list(classes)
+    if len(outer) == 0:
+        raise ValueError("`classes` must not be empty.")
+
+    return _is_nonstring_iterable(outer[0])
+
+
+def _check_1d_class_list(c, name="classes"):
+    """Validate one output's class list: one-dimensional, non-empty, unique,
+    all strings or all numbers."""
+    if not _is_nonstring_iterable(c):
+        raise TypeError(f"`{name}` must be iterable. Got {type(c)}.")
+
+    arr = np.asarray(list(c), dtype=object)
+
+    if arr.ndim != 1:
+        raise ValueError(
+            f"`{name}` must be one-dimensional. Got shape {arr.shape}."
+        )
+    if arr.size == 0:
+        raise ValueError(f"`{name}` must be non-empty.")
+
+    # Ensure scalars are hashable and unique.
+    try:
+        if len(set(arr.tolist())) != arr.size:
+            raise ValueError(f"Duplicate entries in `{name}`.")
+    except TypeError as e:
+        raise TypeError(
+            f"`{name}` must contain hashable scalar labels "
+            f"(strings or numbers)."
+        ) from e
+
+    # Enforce "uniformly strings or numbers"
+    kinds = set()
+    for v in arr.tolist():
+        if isinstance(v, (str, np.str_)):
+            kinds.add("str")
+        elif isinstance(v, (numbers.Number, np.number)):
+            kinds.add("num")
+        else:
+            raise TypeError(
+                f"`{name}` must contain only strings or numbers. "
+                f"Got element {v!r} of type {type(v)}."
             )
-        if cost_matrix is not None:
-            check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(classes))
-    else:
-        if cost_matrix is not None:
-            raise ValueError(
-                "You cannot specify 'cost_matrix' without "
-                "specifying 'classes'."
-            )
+
+    if len(kinds) != 1:
+        raise TypeError(
+            f"`{name}` must be uniformly strings or numbers. "
+            f"Got mixture: {sorted(kinds)}."
+        )
 
 
 def check_classes(classes):
@@ -121,24 +163,103 @@ def check_classes(classes):
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes,)
-        Array of class labels.
+    classes : array-like of shape (n_classes,) or a list of such array-likes, \
+            default=None
+        The classes labels (single output setting), or a list of arrays of
+        class labels (multioutput setting).
     """
-    if not isinstance(classes, Iterable):
-        raise TypeError(
-            "'classes' is not iterable. Got {}".format(type(classes))
-        )
-    try:
-        classes_sorted = np.array(sorted(set(classes)))
-        if len(classes) != len(classes_sorted):
-            raise ValueError("Duplicate entries in 'classes'.")
-    except TypeError:
-        types = sorted(t.__qualname__ for t in set(type(v) for v in classes))
-        raise TypeError(
-            "'classes' must be uniformly strings or numbers. Got {}".format(
-                types
+    if classes is None:
+        return
+
+    if not _is_nonstring_iterable(classes):
+        raise TypeError(f"`classes` is not iterable. Got {type(classes)}.")
+
+    if _is_multioutput_classes(classes):
+        outer = list(classes)
+        for i, c in enumerate(outer):
+            _check_1d_class_list(c, name=f"classes[{i}]")
+    else:
+        # Enforce single-output multiclass to be strictly one-dimensional.
+        arr = np.asarray(list(classes), dtype=object)
+        if arr.ndim != 1:
+            raise ValueError(
+                "`classes` must be one dimensional for single output "
+                "multiclass classification. For multioutput, pass a nested "
+                "structure like `classes=[['a','b'], ['x','y']]`."
             )
+        _check_1d_class_list(arr, name="classes")
+
+
+def check_classifier_params(classes, missing_label, cost_matrix=None):
+    """Check whether the general classifier are compatible with each other.
+
+    Parameters
+    ----------
+    classes : array-like of shape (n_classes,) or a list of such array-likes, \
+            default=None
+        The classes labels (single output setting), or a list of arrays of
+        class labels (multioutput setting).
+    missing_label : scalar or string or np.nan or None, default=np.nan
+        Value to represent a missing label. In the case of a multioutput
+        setting, we expect that the missing label is identical across all
+        tasks.
+    cost_matrix : array-like of shape (n_classes, n_classes), default=None
+        Cost matrix to quantify costs of misclassifications.
+
+        - Checked only for single output.
+        - Must be `None` for multioutput.
+    """
+    check_missing_label(missing_label)
+
+    if classes is None:
+        if cost_matrix is not None:
+            raise ValueError(
+                "You cannot specify `cost_matrix` without specifying "
+                "`classes`."
+            )
+        return
+
+    # Validates structure + duplicates + type-uniformity.
+    check_classes(classes)
+
+    # Check whether `classes` is nested corresponding to multioutput.
+    multioutput = _is_multioutput_classes(classes)
+
+    # Enforce cost_matrix semantics.
+    if multioutput:
+        if cost_matrix is not None:
+            raise ValueError(
+                "`cost_matrix` must be `None` for multioutput classification."
+            )
+        outer = list(classes)
+        # Missing_label type check and ensure missing_label not in any task's
+        # classes.
+        for i, c in enumerate(outer):
+            c_arr = np.asarray(list(c))
+            check_missing_label(
+                missing_label, target_type=c_arr.dtype, name=f"classes[{i}]"
+            )
+            n_unlabeled = is_unlabeled(
+                y=c_arr, missing_label=missing_label
+            ).sum()
+            if n_unlabeled > 0:
+                raise ValueError(
+                    f"`classes[{i}]={list(c)}` contains "
+                    f"`missing_label={missing_label}`."
+                )
+    else:
+        c_arr = np.asarray(list(classes))
+        check_missing_label(
+            missing_label, target_type=c_arr.dtype, name="classes"
         )
+        n_unlabeled = is_unlabeled(y=c_arr, missing_label=missing_label).sum()
+        if n_unlabeled > 0:
+            raise ValueError(
+                f"`classes={list(classes)}` contains "
+                f"`missing_label={missing_label}`."
+            )
+        if cost_matrix is not None:
+            check_cost_matrix(cost_matrix=cost_matrix, n_classes=len(c_arr))
 
 
 def check_class_prior(class_prior, n_classes):
