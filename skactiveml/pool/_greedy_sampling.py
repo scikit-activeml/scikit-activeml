@@ -23,6 +23,9 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     Space (GSx) [1]_ that tries to select those samples that increase the
     diversity of the feature space the most. It does this by selecting those
     features that are the furthest away from all previously labeled samples.
+    Originally, this query strategy was only proposed for regression.
+    Nevertheless, it is task-agnostic such that it can handle class, numerical,
+    and multioutput labels.
 
     Parameters
     ----------
@@ -65,9 +68,11 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`.)
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must be either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates, ) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -107,6 +112,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
             y,
@@ -114,17 +120,21 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
 
-        is_multilabel = np.array(y).ndim == 2
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multilabel=is_multilabel
+            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
         )
 
+        # Determine already labeled samples.
         sample_indices = np.arange(len(X), dtype=int)
         selected_indices = labeled_indices(
-            y, missing_label=self.missing_label, is_multilabel=is_multilabel
+            y=y,
+            missing_label=self.missing_label,
+            is_multioutput=is_multioutput,
         )
 
         if mapping is None:
