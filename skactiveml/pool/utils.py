@@ -1122,25 +1122,27 @@ def conditional_expect(
         )
     else:  # method equals "dynamic_quad"
 
-        def squeeze_data(data):
-            return np.asarray(data).squeeze()
+        def to_scalar_if_singleton(a):
+            a = np.asarray(a)
+            return a.item() if a.size == 1 else a
+
+        def refreeze_scalar_params(frozen):
+            new_args = tuple(to_scalar_if_singleton(v) for v in frozen.args)
+            new_kwds = {
+                k: to_scalar_if_singleton(v) for k, v in frozen.kwds.items()
+            }
+            return frozen.dist(*new_args, **new_kwds)
 
         for idx, x in enumerate(X):
             cond_dist = reg.predict_target_distribution([x])
-            if "loc" in cond_dist.kwds:
-                cond_dist.kwds["loc"] = squeeze_data(cond_dist.kwds["loc"])
-            if "scale" in cond_dist.kwds:
-                cond_dist.kwds["scale"] = squeeze_data(cond_dist.kwds["scale"])
+            cond_dist = refreeze_scalar_params(cond_dist)
 
             def quad_function_wrapper(y):
+                y = to_scalar_if_singleton(y)
                 if is_optional or not vector_func:
-                    func_out = func(idx, x, y)
-                else:
-                    func_out = func(
-                        np.arange(len(X)), X, np.full((len(X), 1), y)
-                    )
-                    func_out = func_out[idx]
-                return squeeze_data(func_out)
+                    return float(to_scalar_if_singleton(func(idx, x, y)))
+                func_out = func(np.arange(len(X)), X, np.full((len(X), 1), y))
+                return float(to_scalar_if_singleton(func_out[idx]))
 
             expectation[idx] = cond_dist.expect(
                 quad_function_wrapper,
