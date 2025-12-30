@@ -150,6 +150,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 mapping=mapping,
                 metric=self.metric,
                 metric_dict=self.metric_dict,
+                is_multioutput=is_multioutput,
             )
         else:
             selected_samples = labeled_indices(

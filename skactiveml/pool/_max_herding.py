@@ -133,7 +133,11 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
             X_cand = normalize(X_cand, copy=True)
         K_cand = pairwise_kernels(X_cand, metric=self.metric, **metric_dict)
         k_max = None
-        is_lbld = is_labeled(y=y, missing_label=self.missing_label_)
+        is_lbld = is_labeled(
+            y=y,
+            missing_label=self.missing_label_,
+            is_multioutput=is_multioutput,
+        )
         if is_lbld.sum() > 0:
             X_lbld = X[is_lbld]
             if self.normalize_samples:
