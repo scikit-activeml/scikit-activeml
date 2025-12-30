@@ -383,7 +383,7 @@ def expected_average_precision(classes, probas):
     probas_sorted = np.take_along_axis(
         probas, probas_sort_idx_per_class, axis=0
     )
-    print("exp2")
+    
     g_arr_mask = np.arange(probas.shape[0] - 1) > 0
     f_arr_mask = np.arange(probas.shape[0]) > 0
     for i in range(len(classes)):
