@@ -89,7 +89,7 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
                     "'NoneType' is allowed. Got {}".format(types)
                 )
         y = np.asarray(y)
-    target_type = np.append(y.ravel(), missing_label).dtype
+    target_type = np.result_type(y, np.asarray(missing_label))
     check_missing_label(missing_label, target_type=target_type, name="y")
 
     # Check requirements for labels `y`.

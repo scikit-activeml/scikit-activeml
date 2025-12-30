@@ -86,3 +86,10 @@ class TestLabelEncoder(unittest.TestCase):
         self.assertRaises(
             ValueError, ExtLabelEncoder().fit([]).transform, [1, 3]
         )
+
+        classes = [["a", "b"], ["c", "d"]]
+        missing_label = "nan"
+        y = [["a", "c"], ["b", "d"], ["nan", "nan"]]
+        ext_le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
+        y_enc = ext_le.fit_transform(y)
+        np.testing.assert_array_equal([[0, 0], [1, 1], [-1, -1]], y_enc)

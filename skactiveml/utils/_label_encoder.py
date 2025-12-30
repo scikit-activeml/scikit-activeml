@@ -5,25 +5,34 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from ._label import MISSING_LABEL, is_labeled, check_missing_label
-from ._validation import check_classifier_params
+from ._validation import check_classifier_params, _is_multioutput_classes
 
 
 class ExtLabelEncoder(BaseEstimator):
-    """Encode class labels with value between 0 and classes-1 and uses -1 for
-    unlabeled samples. This transformer should be used to encode class labels,
-    i.e. `y`, and not the input `X`.
+    """Encode class labels with integers in `[0, ..., n_classes-1]` and use
+    `-1` for unlabeled.
+
+    Mode is determined by `classes`:
+
+    - If `classes` is  not nested (`None` or one-dimensional), a single task
+      problem is assumed such that  `y` can be shape `(n_samples,)` or
+      `(n_samples, n_annotators)`. Same encoder is applied to all entries.
+
+    - If `classes` is nested (list of array-like objects), a multioutput
+      (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
+      `n_tasks == len(classes)`. Each column is encoded with its task-specific
+      encoder.
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes,), default=None
-        Holds the label for each class.
+    classes : array-like of shape (n_classes,) or a list of such array-likes, \
+            default=None
+        The classes labels (single output setting), or a list of arrays of
+        class labels (multioutput setting).
     missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label.
-
-    Attributes
-    ----------
-    classes_ : np.ndarray of shape (n_classes,)
-        Holds the label for each class.
+        Value to represent a missing label. In the case of a multioutput
+        setting, we expect that the missing label is identical across all
+        tasks.
     """
 
     def __init__(self, classes=None, missing_label=MISSING_LABEL):
@@ -56,6 +65,29 @@ class ExtLabelEncoder(BaseEstimator):
         check_missing_label(
             missing_label=self.missing_label, target_type=y.dtype
         )
+        self.multioutput_ = _is_multioutput_classes(classes=self.classes)
+
+        if self.multioutput_:
+            classes_outer = list(self.classes)
+            self.n_outputs_ = len(classes_outer)
+            if y.ndim != 2 or y.shape[1] != self.n_outputs_:
+                raise ValueError(
+                    f"Expected y with shape `(n_samples, {self.n_outputs_})` "
+                    f"in multioutput mode, got {y.shape}."
+                )
+            self._le = []
+            self.classes_ = []
+            self._dtype = []
+            for t, cls_t in enumerate(classes_outer):
+                cls_arr = np.asarray(list(cls_t))
+                le = LabelEncoder()
+                le.fit(cls_arr)
+                self._le.append(le)
+                self.classes_.append(le.classes_)
+                self._dtype.append(le.classes_.dtype)
+            self._dtype.append(np.asarray(self.missing_label).dtype)
+            self._dtype = np.result_type(*self._dtype)
+            return self
 
         self._le = LabelEncoder()
         if self.classes is None:
@@ -66,6 +98,12 @@ class ExtLabelEncoder(BaseEstimator):
             self._dtype = np.append(self.classes, self.missing_label).dtype
             self._le.fit(self.classes)
             self.classes_ = self._le.classes_
+        if len(self._le.classes_) == 0:
+            raise ValueError(
+                "No class label is known because 'y' contains no actual "
+                "class labels and 'classes' is not defined. Change at "
+                "least on of both to overcome this error."
+            )
         self.classes_ = self._le.classes_
 
         return self
@@ -107,10 +145,23 @@ class ExtLabelEncoder(BaseEstimator):
             dtype=None,
         )
         is_lbld = is_labeled(y, missing_label=self.missing_label)
-        y = np.asarray(y)
-        y_enc = np.empty_like(y, dtype=int)
-        y_enc[is_lbld] = self._le.transform(y[is_lbld].ravel())
-        y_enc[~is_lbld] = -1
+        y_enc = np.full_like(y, -1, dtype=int)
+
+        if self.multioutput_:
+            if y.ndim != 2 or y.shape[1] != self.n_outputs_:
+                raise ValueError(
+                    f"Expected y with shape `(n_samples, {self.n_outputs_})` "
+                    f"in multioutput mode, got {y.shape}."
+                )
+            for t in range(self.n_outputs_):
+                y_t = y[:, t]
+                is_lbld_t = is_lbld[:, t]
+                if is_lbld_t.any():
+                    y_enc[is_lbld_t, t] = self._le[t].transform(y_t[is_lbld_t])
+            return y_enc
+
+        if is_lbld.any():
+            y_enc[is_lbld] = self._le.transform(y[is_lbld].ravel())
         return y_enc
 
     def inverse_transform(self, y):
@@ -132,13 +183,28 @@ class ExtLabelEncoder(BaseEstimator):
             ensure_2d=False,
             ensure_all_finite=False,
             ensure_min_samples=0,
-            dtype=None,
+            dtype=int,
         )
         is_lbld = is_labeled(y, missing_label=-1)
-        y = np.asarray(y)
-        y_dec = np.empty_like(y, dtype=self._dtype)
-        y_dec[is_lbld] = self._le.inverse_transform(
-            np.array(y[is_lbld].ravel())
+        y_dec = np.full_like(
+            y, dtype=self._dtype, fill_value=self.missing_label
         )
-        y_dec[~is_lbld] = self.missing_label
+
+        if self.multioutput_:
+            if y.ndim != 2 or y.shape[1] != self.n_outputs_:
+                raise ValueError(
+                    f"Expected y with shape `(n_samples, {self.n_outputs_})` "
+                    f"in multioutput mode, got {y.shape}."
+                )
+            for t in range(self.n_outputs_):
+                y_t = y[:, t]
+                is_lbld_t = [t]
+                if is_lbld_t.any():
+                    y_dec[is_lbld_t, t] = self._le[t].inverse_transform(
+                        y_t[is_lbld_t]
+                    )
+            return y_dec
+
+        if is_lbld.any():
+            y_dec[is_lbld] = self._le.inverse_transform(y[is_lbld].ravel())
         return y_dec
