@@ -379,50 +379,45 @@ def expected_average_precision(classes, probas):
         )
 
     score = np.zeros(len(probas))
+    probas_sort_idx_per_class = np.argsort(-probas, axis=0)
+    probas_sorted = np.take_along_axis(
+        probas, probas_sort_idx_per_class, axis=0
+    )
+
+    g_arr_mask = np.arange(probas.shape[0] - 1) > 0
+    f_arr_mask = np.arange(probas.shape[0]) > 0
     for i in range(len(classes)):
         for j in range(len(probas)):
             # The i-th column of p without p[j,i]
-            p = probas[:, i]
-            p = np.delete(p, [j])
-            # Sort p in descending order
-            p = np.flipud(np.sort(p, axis=0))
-
+            p = np.delete(probas_sorted[:, i], [j])
             # calculate g_arr
             g_arr = np.zeros((len(p), len(p)))
-            for n in range(len(p)):
-                for h in range(n + 1):
-                    g_arr[n, h] = _g(n, h, p, g_arr)
+            if len(p) > 0:
+                g_arr[0, 0] = 1
+            for n in range(1, len(p)):
+                # p_n*g(n-1,t-1)
+                g_term_0 = p[n - 1] * np.pad(g_arr[n - 1], (1, 0))[:-1]
+                # (1-p_n)*g(n-1,t)
+                g_term_1 = (1 - p[n - 1]) * g_arr[n - 1]
+                g_arr[n] = (g_term_0 + g_term_1) * (g_arr_mask)
 
             # calculate f_arr
             f_arr = np.zeros((len(p) + 1, len(p) + 1))
-            for a in range(len(p) + 1):
-                for b in range(a + 1):
-                    f_arr[a, b] = _f(a, b, p, f_arr, g_arr)
+            f_arr[0, 0] = 1
+            for n in range(1, len(p) + 1):
+                # p_n*f(n-1,t-1)
+                f_term_0 = p[n - 1] * np.pad(f_arr[n - 1], (1, 0))[:-1]
+                # p_n*t/n*g(n-1,t-1)
+                f_term_1 = p[n - 1] * np.pad(g_arr[n - 1], (1, 0))
+                f_term_1 *= np.arange(len(p) + 1) / n
+                # (1-p_n)*f(n-1,t)
+                f_term_2 = (1 - p[n - 1]) * f_arr[n - 1]
+                f_arr[n] = (f_term_0 + f_term_1 + f_term_2) * f_arr_mask
 
             # calculate score
-            for t in range(len(p)):
-                score[j] += f_arr[len(p), t + 1] / (t + 1)
+            sample_index = probas_sort_idx_per_class[j, i]
+            score[sample_index] += np.sum(
+                f_arr[len(p), 1:] / np.arange(1, len(p) + 1)
+            )
 
     return score
-
-
-# g-function for expected_average_precision
-def _g(n, t, p, g_arr):
-    if t > n or (t == 0 and n > 0):
-        return 0
-    if t == 0 and n == 0:
-        return 1
-    return p[n - 1] * g_arr[n - 1, t - 1] + (1 - p[n - 1]) * g_arr[n - 1, t]
-
-
-# f-function for expected_average_precision
-def _f(n, t, p, f_arr, g_arr):
-    if t > n or (t == 0 and n > 0):
-        return 0
-    if t == 0 and n == 0:
-        return 1
-    return (
-        p[n - 1] * f_arr[n - 1, t - 1]
-        + p[n - 1] * t * g_arr[n - 1, t - 1] / n
-        + (1 - p[n - 1]) * f_arr[n - 1, t]
-    )

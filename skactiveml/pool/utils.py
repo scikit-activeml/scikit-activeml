@@ -1121,16 +1121,28 @@ def conditional_expect(
             * np.sum(weights[np.newaxis, :] * output, axis=1)
         )
     else:  # method equals "dynamic_quad"
+
+        def to_scalar_if_singleton(a):
+            a = np.asarray(a)
+            return a.item() if a.size == 1 else a
+
+        def refreeze_scalar_params(frozen):
+            new_args = tuple(to_scalar_if_singleton(v) for v in frozen.args)
+            new_kwds = {
+                k: to_scalar_if_singleton(v) for k, v in frozen.kwds.items()
+            }
+            return frozen.dist(*new_args, **new_kwds)
+
         for idx, x in enumerate(X):
             cond_dist = reg.predict_target_distribution([x])
+            cond_dist = refreeze_scalar_params(cond_dist)
 
             def quad_function_wrapper(y):
+                y = to_scalar_if_singleton(y)
                 if is_optional or not vector_func:
-                    return func(idx, x, y)
-                else:
-                    return func(np.arange(len(X)), X, np.full((len(X), 1), y))[
-                        idx
-                    ]
+                    return float(to_scalar_if_singleton(func(idx, x, y)))
+                func_out = func(np.arange(len(X)), X, np.full((len(X), 1), y))
+                return float(to_scalar_if_singleton(func_out[idx]))
 
             expectation[idx] = cond_dist.expect(
                 quad_function_wrapper,
