@@ -93,3 +93,5 @@ class TestLabelEncoder(unittest.TestCase):
         ext_le = ExtLabelEncoder(classes=classes, missing_label=missing_label)
         y_enc = ext_le.fit_transform(y)
         np.testing.assert_array_equal([[0, 0], [1, 1], [-1, -1]], y_enc)
+        y_dec = ext_le.inverse_transform(y_enc)
+        np.testing.assert_array_equal(y, y_dec)

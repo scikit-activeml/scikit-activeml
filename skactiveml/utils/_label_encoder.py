@@ -98,12 +98,6 @@ class ExtLabelEncoder(BaseEstimator):
             self._dtype = np.append(self.classes, self.missing_label).dtype
             self._le.fit(self.classes)
             self.classes_ = self._le.classes_
-        if len(self._le.classes_) == 0:
-            raise ValueError(
-                "No class label is known because 'y' contains no actual "
-                "class labels and 'classes' is not defined. Change at "
-                "least on of both to overcome this error."
-            )
         self.classes_ = self._le.classes_
 
         return self
@@ -198,7 +192,7 @@ class ExtLabelEncoder(BaseEstimator):
                 )
             for t in range(self.n_outputs_):
                 y_t = y[:, t]
-                is_lbld_t = [t]
+                is_lbld_t = is_lbld[:, t]
                 if is_lbld_t.any():
                     y_dec[is_lbld_t, t] = self._le[t].inverse_transform(
                         y_t[is_lbld_t]
