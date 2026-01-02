@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.metrics import accuracy_score
-from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import (
     check_array,
     check_consistent_length,
@@ -25,6 +24,7 @@ from .utils import (
     unlabeled_indices,
     ExtLabelEncoder,
     rand_argmin,
+    rand_argmax,
     check_classifier_params,
     check_random_state,
     check_cost_matrix,
@@ -1036,9 +1036,15 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
     Parameters
     ----------
-    classes : array-like of shape (n_classes), default=None
-        Holds the label for each class. If `None`, the classes are determined
-        during the fit.
+    classes : array-like of shape (n_classes,) or a list of such array-likes, \
+            default=None
+        - If `classes` is not nested (`None` or one-dimensional), a single task
+          problem is assumed such that `y` can be shape `(n_samples,)` or
+          `(n_samples, n_annotators)`. Same encoder is applied to all entries.
+        - If `classes` is nested (list of array-like objects), a multioutput
+          (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
+          `n_tasks == len(classes)`. Each column is encoded with its
+          task-specific encoder.
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -1048,14 +1054,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-
-    Attributes
-    ----------
-    classes_ : array-like of shape (n_classes,)
-        Holds the label for each class after fitting.
-    cost_matrix_ : array-like,of shape (classes, classes)
-        Cost matrix after fitting with `cost_matrix_[i,j]` indicating cost of
-        predicting class `classes_[j]`  for a sample of class `classes_[i]`.
     """
 
     def __init__(
@@ -1124,12 +1122,31 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         y : numpy.ndarray of shape (n_samples,)
             Predicted class labels of the test samples `X`.
         """
+        # Extract primary output.
         out = self.predict_proba(X, **kwargs)
         P = out[0] if isinstance(out, tuple) else out
-        costs = np.dot(P, self.cost_matrix_)
-        y_pred = rand_argmin(costs, random_state=self.random_state_, axis=1)
+
+        # Obtain predictions for single output problem.
+        if not getattr(self, "multioutput_", False):
+            costs = np.dot(P, self.cost_matrix_)
+            y_pred = rand_argmin(
+                costs, random_state=self.random_state_, axis=1
+            )
+        elif isinstance(P, np.ndarray) and P.ndim == 2:
+            # Obtain predictions for multilabel problem.
+            y_pred = (P >= 0.5).astype(int, copy=False)
+        else:
+            # Obtain predictions for multioutput problem.
+            n_samples = np.asarray(P[0]).shape[0]
+            n_outputs = len(P)
+            y_pred = np.empty((n_samples, n_outputs), dtype=int)
+            for t in range(n_outputs):
+                y_pred[:, t] = rand_argmax(
+                    P[t], random_state=self.random_state_, axis=1
+                )
+
+        # Transform labels and append extra outputs.
         y_pred = self._le.inverse_transform(y_pred)
-        y_pred = np.asarray(y_pred, dtype=self.classes_.dtype)
         if isinstance(out, tuple):
             return (y_pred,) + out[1:]
         else:
@@ -1140,7 +1157,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X : array-like of shape (..., n_features)
             Test samples.
         y : array-like of shape (n_samples,)
             True labels for `X`.
@@ -1153,9 +1170,14 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             Mean accuracy of `self.predict(X)` regarding `y`.
         """
         y_pred = self.predict(X)
-        y_pred = self._le.transform(y_pred)
-        y = self._le.transform(y)
-        return accuracy_score(y, y_pred, sample_weight=sample_weight)
+        y_pred = self._le.transform(y_pred).ravel()
+        y_true = self._le.transform(y).ravel()
+        sample_weight = (
+            None if sample_weight is None else sample_weight.ravel()
+        )
+        return accuracy_score(
+            y_pred=y_pred, y_true=y_true, sample_weight=sample_weight
+        )
 
     def _validate_data(
         self,
@@ -1193,22 +1215,16 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
-        error_msg = (
-            "No class label is known because 'y' contains no actual "
-            "class labels and 'classes' is not defined. Change at "
-            "least on of both to overcome this error."
-        )
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
             y = self._le.fit_transform(y)
-            is_lbdl = is_labeled(y, missing_label=-1)
-            if len(y[is_lbdl]) > 0:
-                check_classification_targets(y[is_lbdl])
-            if len(self._le.classes_) == 0:
-                raise ValueError(error_msg)
         else:
             if self.classes is None:
-                raise ValueError(error_msg)
+                raise ValueError(
+                    "No class label is known because 'y' contains no actual "
+                    "class labels and 'classes' is not defined. Change at "
+                    "least on of both to overcome this error."
+                )
             self._le.fit(self.classes)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
@@ -1217,6 +1233,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         # Update detected classes.
         self.classes_ = self._le.classes_
+
+        # Save task type.
+        self.multioutput_ = self._le.multioutput_
 
         # Check classes.
         if sample_weight is not None:
@@ -1229,18 +1248,21 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 )
 
         # Update cost matrix.
-        self.cost_matrix_ = (
-            1 - np.eye(len(self.classes_))
-            if self.cost_matrix is None
-            else self.cost_matrix
-        )
-        self.cost_matrix_ = check_cost_matrix(
-            self.cost_matrix_, len(self.classes_)
-        )
-        if self.classes is not None:
-            class_indices = np.argsort(self.classes)
-            self.cost_matrix_ = self.cost_matrix_[class_indices]
-            self.cost_matrix_ = self.cost_matrix_[:, class_indices]
+        if self.multioutput_:
+            self.cost_matrix_ = None
+        else:
+            self.cost_matrix_ = (
+                1 - np.eye(len(self.classes_))
+                if self.cost_matrix is None
+                else self.cost_matrix
+            )
+            self.cost_matrix_ = check_cost_matrix(
+                self.cost_matrix_, len(self.classes_)
+            )
+            if self.classes is not None:
+                class_indices = np.argsort(self.classes)
+                self.cost_matrix_ = self.cost_matrix_[class_indices]
+                self.cost_matrix_ = self.cost_matrix_[:, class_indices]
 
         return X, y, sample_weight
 
@@ -1271,18 +1293,6 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     random_state : int or np.RandomState or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
-
-    Attributes
-    ----------
-    classes_ : np.ndarray of shape (n_classes)
-        Holds the label for each class after fitting.
-    class_prior_ : np.ndarray of shape (n_classes)
-        Prior observations of the class frequency estimates. The entry
-        `class_prior_[i]` indicates the non-negative prior number of samples
-        belonging to class `classes_[i]`.
-    cost_matrix_ : np.ndarray of shape (classes, classes)
-        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
-        class `classes_[j]` for a sample of class `classes_[i]`.
     """
 
     def __init__(
@@ -1332,12 +1342,22 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             The class probabilities of the test samples. Classes are ordered
             according to `self.classes_`.
         """
-        # Normalize probabilities of each sample.
-        P = self.predict_freq(X) + self.class_prior_
-        normalizer = np.sum(P, axis=1)
-        P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
-        P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
-        return P
+        out = self.predict_freq(X, **kwargs)
+        F = out[0] if isinstance(out, tuple) else out
+        if not getattr(self, "multioutput_", False):
+            # Normalize probabilities of each sample.
+            P = F + self.class_prior_
+            normalizer = np.sum(P, axis=1)
+            P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
+            P[normalizer == 0, :] = [1 / len(self.classes_)] * len(
+                self.classes_
+            )
+            return P
+        else:
+            raise NotImplementedError(
+                "`predict_proba` must be explicitly implemented for "
+                "multioutput classification."
+            )
 
     def sample_proba(self, X, n_samples=10, random_state=None):
         """Samples probability vectors from Dirichlet distributions whose

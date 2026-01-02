@@ -158,7 +158,7 @@ class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
             (None, None),
             (self.classes, None),
             (np.arange(1, self.n_classes + 1), TypeError),
-            ("abc", ValueError),
+            ("abc", TypeError),
         ]
         self._test_param("init", "classes", test_cases)
 

@@ -12,23 +12,17 @@ class ExtLabelEncoder(BaseEstimator):
     """Encode class labels with integers in `[0, ..., n_classes-1]` and use
     `-1` for unlabeled.
 
-    Mode is determined by `classes`:
-
-    - If `classes` is  not nested (`None` or one-dimensional), a single task
-      problem is assumed such that  `y` can be shape `(n_samples,)` or
-      `(n_samples, n_annotators)`. Same encoder is applied to all entries.
-
-    - If `classes` is nested (list of array-like objects), a multioutput
-      (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
-      `n_tasks == len(classes)`. Each column is encoded with its task-specific
-      encoder.
-
     Parameters
     ----------
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
-        The classes labels (single output setting), or a list of arrays of
-        class labels (multioutput setting).
+        - If `classes` is not nested (`None` or one-dimensional), a single task
+          problem is assumed such that `y` can be shape `(n_samples,)` or
+          `(n_samples, n_annotators)`. Same encoder is applied to all entries.
+        - If `classes` is nested (list of array-like objects), a multioutput
+          (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
+          `n_tasks == len(classes)`. Each column is encoded with its
+          task-specific encoder.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label. In the case of a multioutput
         setting, we expect that the missing label is identical across all

@@ -32,6 +32,7 @@ from ..utils import (
     check_scalar,
     match_signature,
     check_n_features,
+    _is_multioutput_classes,
 )
 
 successful_skorch_torch_import = False
@@ -784,16 +785,19 @@ if successful_skorch_torch_import:
             A PyTorch `torch.nn.Module`. In general, the uninstantiated class
             should be passed, although instantiated modules will also work.
         criterion : torch.nn.Module or torch.nn.Module.__class__, \
-                default=torch.nn.CrossEntropyLoss
+                default=None
             The loss (criterion) used to optimize the module.
 
+            - If `None`, the torch.nn.Module is set to
+              `torch.nn.CrossEntropyLoss` in the case of a single output
+              classification problem and `torch.nn.BCEWithLogitsLoss` in the
+              case of a multioutput classification problem.
             - If a class (subclass of `torch.nn.Module`) is passed
               (e.g. `torch.nn.CrossEntropyLoss`), it is instantiated
               internally.
             - If an instance is passed (e.g. `torch.nn.CrossEntropyLoss()`),
               that instance (or a wrapped copy of it) is used.
 
-            By default, `torch.nn.CrossEntropyLoss` is used as criterion.
         forward_outputs : dict[str, tuple[int, Callable | None]] or None,\
                 default=None
             Dictionary that describes how to get and post-process the outputs
@@ -891,9 +895,17 @@ if successful_skorch_torch_import:
             added. `module`, `criterion`, and `predict_nonlinearity` are not
             allowed in this dictionary.
         sample_dtype : str or type, default=np.float32
-            Dtype to which input samples are cast inside the estimator. If set
-            to `None`, the input dtype is preserved. The encoded label data
-            type is always  `np.int64`.
+            Data type to which input samples are cast inside the estimator. If
+            set to `None`, the input dtype is preserved.
+        target_dtype : str or type, default=None
+            Data type used to cast the internally encoded targets `y_enc`.
+            These encoded targets are integers in the range
+            `[0, n_classes - 1]`. Missing labels are encoded as `-1`.
+
+            - If `None`, infer a suitable dtype from the loss criterion; if
+              inference fails, default to `np.int64`.
+            - Otherwise, cast targets via
+              `y_enc.astype(target_dtype, copy=False)`.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
               of the estimator.
@@ -902,9 +914,14 @@ if successful_skorch_torch_import:
               is able to handle unlabeled samples marked by `missing_label`.
               Otherwise, `missing_label` is interpreted as a regular class
               label.
-        classes : array-like of shape (n_classes,), default=None
-            Holds the label for each class. If `None`, the classes are
-            determined during the fit.
+        classes : array-like of shape (n_classes,) or a list of such \
+            array-likes, default=None
+        - If `classes` is not nested (`None` or one-dimensional), a single task
+          problem is assumed such that `y` can be shape `(n_samples,)` or
+          `(n_samples, n_annotators)`.
+        - If `classes` is nested (list of array-like objects), a multioutput
+          (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
+          `n_tasks == len(classes)`.
         missing_label : scalar or str or np.nan or None, default=np.nan
             Value to represent a missing label.
         cost_matrix : array-like of shape (n_classes, n_classes)
@@ -926,11 +943,12 @@ if successful_skorch_torch_import:
         def __init__(
             self,
             module,
-            criterion=nn.CrossEntropyLoss,
+            criterion=None,
             forward_outputs=None,
             criterion_output_keys=None,
             neural_net_param_dict=None,
             sample_dtype=np.float32,
+            target_dtype=None,
             include_unlabeled_samples=False,
             classes=None,
             cost_matrix=None,
@@ -949,6 +967,7 @@ if successful_skorch_torch_import:
             self.criterion_output_keys = criterion_output_keys
             self.neural_net_param_dict = neural_net_param_dict
             self.sample_dtype = sample_dtype
+            self.target_dtype = target_dtype
             self.include_unlabeled_samples = include_unlabeled_samples
 
         def fit(self, X, y, **fit_params):
@@ -959,12 +978,12 @@ if successful_skorch_torch_import:
 
             Parameters
             ----------
-            X : matrix-like, shape (n_samples, n_features)
+            X : matrix-like, shape (n_samples, ...)
                 Training data set, usually complete, i.e. including the labeled
                 and unlabeled samples
-            y : array-like of shape (n_samples, )
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by self.missing_label)
+                ones indicated by self.missing_label).
             fit_params : dict-like
                 Further parameters as input to the 'fit' method of the
                 `skorch.net.NeuralNet`.
@@ -984,12 +1003,12 @@ if successful_skorch_torch_import:
 
             Parameters
             ----------
-            X : matrix-like, shape (n_samples, n_features)
+            X : matrix-like, shape (n_samples, ...)
                 Training data set, usually complete, i.e. including the labeled
                 and unlabeled samples
-            y : array-like of shape (n_samples, )
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by `self.missing_label`)
+                ones indicated by self.missing_label).
             fit_params : dict-like
                 Further parameters as input to the 'partial_fit' method of the
                 `skorch.net.NeuralNet`.
@@ -1162,6 +1181,11 @@ if successful_skorch_torch_import:
                 # Module returns log-probabilities.
                 return {"proba": (0, torch.exp)}
 
+            if crit_cls is nn.BCEWithLogitsLoss:
+                # Multilabel (or multioutput-binary): module returns
+                # logits per label.
+                return {"proba": (0, torch.sigmoid)}
+
             # Fallback: treat the single forward output as already in
             # probability space. Caller is responsible for making this true.
             return {"proba": (0, None)}
@@ -1194,7 +1218,13 @@ if successful_skorch_torch_import:
                 `skorch.NeuralNet` construction. Must be a mapping and may be
                 empty.
             """
-            criterion = self.criterion
+            if self.criterion is None:
+                if _is_multioutput_classes(classes=self.classes):
+                    criterion = nn.BCEWithLogitsLoss
+                else:
+                    criterion = nn.CrossEntropyLoss
+            else:
+                criterion = self.criterion
             criterion = make_criterion_tuple_aware(
                 criterion=criterion,
                 criterion_output_keys=self.criterion_output_keys,
@@ -1225,7 +1255,7 @@ if successful_skorch_torch_import:
                 "include_unlabeled_samples",
                 bool,
             )
-            return {"check_X_dict": self.check_X_dict_}
+            return {"check_X_dict": self.check_X_dict_, "y_ensure_1d": False}
 
         def _return_training_data(self, X, y):
             """Return only samples and labels required for training.
@@ -1249,10 +1279,19 @@ if successful_skorch_torch_import:
             if self.include_unlabeled_samples:
                 is_included = np.full_like(y, fill_value=True, dtype=bool)
             else:
-                is_included = is_labeled(y, missing_label=-1)
+                is_multioutput = y.ndim == 2
+                is_included = is_labeled(
+                    y=y, missing_label=-1, is_multioutput=is_multioutput
+                )
             if np.sum(is_included) > 0:
                 X_train = X[is_included]
-                y_train = y[is_included].astype(np.int64)
+                if self.target_dtype is None:
+                    y_dtype = self._infer_target_numpy_dtype(
+                        self.neural_net_.criterion
+                    )
+                else:
+                    y_dtype = self.target_dtype
+                y_train = y[is_included].astype(y_dtype)
             return X_train, y_train
 
         def _initialize_fallbacks(self, P):
@@ -1276,9 +1315,44 @@ if successful_skorch_torch_import:
                     y_dummy = np.arange(P.shape[-1], dtype=int)
                 self._le.fit(y_dummy)
                 self.classes_ = self._le.classes_
+                self.multioutput_ = self._le.multioutput_
             if not hasattr(self, "cost_matrix_"):
-                self.cost_matrix_ = (
-                    1 - np.eye(len(self.classes_))
-                    if self.cost_matrix is None
-                    else self.cost_matrix
-                )
+                if self.cost_matrix is None and not self.multioutput_:
+                    self.cost_matrix_ = 1 - np.eye(len(self.classes_))
+                else:
+                    self.cost_matrix_ = self.cost_matrix
+            check_classifier_params(
+                self.classes_, self.missing_label, self.cost_matrix_
+            )
+
+        def _infer_target_numpy_dtype(self, criterion, *, default=np.int64):
+            """Infer the NumPy dtype to use for encoded targets based on a
+            PyTorch loss.
+
+            Parameters
+            ----------
+            criterion : type or torch.nn.modules.loss._Loss
+                Loss class or instance. Only a small set of common
+                classification losses is handled explicitly.
+
+                - nn.CrossEntropyLoss, nn.NLLLoss -> np.int64 (class indices)
+                - nn.BCEWithLogitsLoss, nn.BCELoss -> np.float32
+                  (binary/multi-label targets)
+
+            default : np.dtype, default=np.int64
+                Fallback dtype if the criterion is not recognized.
+
+            Returns
+            -------
+            dtype : np.dtype
+                Inferred NumPy data type for casting targets before converting
+                to torch.
+            """
+            crit_cls = (
+                criterion if isinstance(criterion, type) else type(criterion)
+            )
+            if issubclass(crit_cls, (nn.BCEWithLogitsLoss, nn.BCELoss)):
+                return np.float32
+            if issubclass(crit_cls, (nn.CrossEntropyLoss, nn.NLLLoss)):
+                return np.int64
+            return default
