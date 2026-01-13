@@ -1050,7 +1050,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]`  for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not `None`.
+        `classes` is not `None` and one-dimensional, which corresponds to
+        single output classification.
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
@@ -1070,35 +1071,40 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
-        """Fit the model using X as training data and y as class labels.
+        """Fit the model using `X` as training data and `y` as class labels.
 
         Parameters
         ----------
-        X : matrix-like, shape (n_samples, n_features)
-            The sample matrix `X` is the feature matrix representing the
-            samples.
-        y : array-like, shape (n_samples) or (n_samples, n_outputs)
-            It contains the class labels of the training samples.
-            The number of class labels may be variable for the samples, where
-            missing labels are represented the attribute `missing_label`.
-        sample_weight : array-like, shape (n_samples) or (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels.
-            It must have the same shape as `y`.
+        X : array-like of shape (n_samples, ...)
+            The samples `X` whose shape depends on the respective classifier.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs) or \
+                (n_samples, n_annotators)
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `missing_label`). For multioutput
+            problems, a row `y[i]` must either contain only observed
+            labels or only `missing_label` values, i.e., no mixing
+            within a row. For multi-annotator classification, a row can contain
+            labeled and unlabeled entries, where `y[i, j]` indicates the
+            potential class label for sample `X[i]` from annotator `j`.
+        sample_weight : array-like of shape (n_samples) or \
+                (n_samples, n_outputs), default=None
+            It contains the weights of the training samples' class labels and
+            must have the same shape as `y`.
 
         Returns
         -------
-        self: skactiveml.base.SkactivemlClassifier,
+        self: skactiveml.base.SkactivemlClassifier
             The `skactiveml.base.SkactivemlClassifier` object fitted on the
             training data.
         """
         raise NotImplementedError
 
     def predict_proba(self, X, **kwargs):
-        """Return probability estimates for the test data X.
+        """Return probability estimates for the test data `X`.
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, ...)
             Test samples.
 
         Returns
@@ -1114,7 +1120,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Parameters
         ----------
-        X :  array-like of shape (n_samples, n_features)
+        X :  array-like of shape (n_samples, ...)
             Input samples.
 
         Returns
@@ -1137,7 +1143,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             y_pred = (P >= 0.5).astype(int, copy=False)
         else:
             # Obtain predictions for multioutput problem.
-            n_samples = np.asarray(P[0]).shape[0]
+            n_samples = P[0].shape[0]
             n_outputs = len(P)
             y_pred = np.empty((n_samples, n_outputs), dtype=int)
             for t in range(n_outputs):
@@ -1157,12 +1163,12 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         Parameters
         ----------
-        X : array-like of shape (..., n_features)
+        X : array-like of shape (n_samples, ...)
             Test samples.
         y : array-like of shape (n_samples,)
-            True labels for `X`.
+            True class labels of the test samples `X`.
         sample_weight : array-like of shape (n_samples,), default=None
-            Sample weights.
+            Sample weights of the test sample `X`.
 
         Returns
         -------
@@ -1188,6 +1194,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         check_y_dict=None,
         y_ensure_1d=True,
         reset=True,
+        multioutput_ensure_multilabel=False,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1201,6 +1208,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             }
 
         # Check common classifier parameters.
+        # TODO: Move after label encoder.
         check_classifier_params(
             self.classes, self.missing_label, self.cost_matrix
         )
@@ -1221,9 +1229,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         else:
             if self.classes is None:
                 raise ValueError(
-                    "No class label is known because 'y' contains no actual "
-                    "class labels and 'classes' is not defined. Change at "
-                    "least on of both to overcome this error."
+                    "No class label is known because `y` contains no actual "
+                    "class labels and `classes` is not defined. Change at "
+                    "least on of both parameters to overcome this error."
                 )
             self._le.fit(self.classes)
             check_X_dict["ensure_2d"] = False
@@ -1240,16 +1248,25 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
-            if not np.array_equal(y.shape, sample_weight.shape):
+            if len(y) != len(sample_weight):
                 raise ValueError(
-                    f"`y` has the shape {y.shape} and `sample_weight` has the "
-                    f"shape {sample_weight.shape}. Both need to have "
-                    f"identical shapes."
+                    f"`y` has the length {len(y)} and `sample_weight` has the "
+                    f"shape {len(sample_weight)}. Both need to have "
+                    f"the same length."
                 )
 
         # Update cost matrix.
         if self.multioutput_:
             self.cost_matrix_ = None
+            if multioutput_ensure_multilabel:
+                for classes_task in self.classes_:
+                    if len(classes_task) != 2:
+                        raise ValueError(
+                            "Only multilabel classification problems, i.e., "
+                            "multiple binary classification problems, are "
+                            "supported but `classes` contains at least one "
+                            "non-binary classification task."
+                        )
         else:
             self.cost_matrix_ = (
                 1 - np.eye(len(self.classes_))
@@ -1409,6 +1426,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         check_y_dict=None,
         y_ensure_1d=True,
         reset=True,
+        multioutput_ensure_multilabel=False,
     ):
         X, y, sample_weight = super()._validate_data(
             X=X,
@@ -1418,6 +1436,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             check_y_dict=check_y_dict,
             y_ensure_1d=y_ensure_1d,
             reset=reset,
+            multioutput_ensure_multilabel=multioutput_ensure_multilabel,
         )
 
         # Check class prior.

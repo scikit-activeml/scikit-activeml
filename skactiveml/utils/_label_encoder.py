@@ -16,6 +16,8 @@ class ExtLabelEncoder(BaseEstimator):
     ----------
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
+        TODO: Allow `classes=None` for multioutput.
+        TODO: Add `interpret_y_columns_as_separate_tasks=False`.
         - If `classes` is not nested (`None` or one-dimensional), a single task
           problem is assumed such that `y` can be shape `(n_samples,)` or
           `(n_samples, n_annotators)`. Same encoder is applied to all entries.
@@ -27,6 +29,7 @@ class ExtLabelEncoder(BaseEstimator):
         Value to represent a missing label. In the case of a multioutput
         setting, we expect that the missing label is identical across all
         tasks.
+
     """
 
     def __init__(self, classes=None, missing_label=MISSING_LABEL):
@@ -46,9 +49,6 @@ class ExtLabelEncoder(BaseEstimator):
         self : ExtLabelEncoder
             Returns an instance of `ExtLabelEncoder`.
         """
-        check_classifier_params(
-            classes=self.classes, missing_label=self.missing_label
-        )
         y = check_array(
             y,
             ensure_2d=False,
@@ -60,7 +60,9 @@ class ExtLabelEncoder(BaseEstimator):
             missing_label=self.missing_label, target_type=y.dtype
         )
         self.multioutput_ = _is_multioutput_classes(classes=self.classes)
-
+        check_classifier_params(
+            classes=self.classes, missing_label=self.missing_label
+        )
         if self.multioutput_:
             classes_outer = list(self.classes)
             self.n_outputs_ = len(classes_outer)

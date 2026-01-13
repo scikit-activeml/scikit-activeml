@@ -50,9 +50,15 @@ except ImportError:  # pragma: no cover
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """Sklearn Classifier
 
-    Implementation of a wrapper class for `scikit-learn` classifiers such that
-    missing labels can be handled. Therefore, samples with missing labels are
-    filtered.
+    Implementation of a wrapper class for `scikit-learn` [1]_ classifiers such
+    that
+
+    - missing labels can be handled, e.g., by filtering them,
+    - classes can be fixed at initialization, e.g., to have consistent
+      probabilistic outputs even when there are no observed labels for each
+      class,
+    - cost-sensitive decisions can be made, e.g., to consider different types
+      of misclassification costs.
 
     Parameters
     ----------
@@ -68,27 +74,40 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
           Note that semi-supervised classifiers of `sklearn` expect
           `missing_label=-1`.
     classes : array-like of shape (n_classes,), default=None
-        Holds the label for each class. If `None`, the classes are determined
-        during `fit`.
+        - If `classes` is not nested (`None` or one-dimensional), a single task
+          problem is assumed such that `y` can be shape `(n_samples,)` or
+          `(n_samples, n_annotators)`.
+        - If `classes` is nested (list of array-like objects), a multioutput
+          (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
+          `n_tasks == len(classes)`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` indicating cost of predicting class
         `classes[j]` for a sample of class `classes[i]`. Can be only set, if
-        `classes` is not `None`.
+        `classes` is not `None` and in the case of single output problems.
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    proba_format : "auto" or "list" or "array", default="auto"
+    Output format of ``predict_proba``.
 
-    Attributes
+    - Single-output: always returns an array of shape `(n_samples, n_classes)`.
+    - Multioutput, non-multilabel: returns a list of arrays, one per output.
+      Setting `proba_format="array"` raises an error.
+    - Multioutput, multilabel (binary per output):
+        * 'list'  -> list of `(n_samples, 2)` arrays
+        * 'array' -> array of shape `(n_samples, n_outputs)` with
+          `P(y=pos_label)`
+
+    References
     ----------
-    classes_ : numpy.ndarray of shape (n_classes,)
-        Holds the label for each class after fitting.
-    cost_matrix_ : numpy.ndarray of shape (classes, classes)
-        Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
-        class `classes_[j]` for a sample of class `classes_[i]`.
-    estimator_ : sklearn.base.ClassifierMixin with predict_proba method
-        The scikit-learn classifier after calling the `fit` method.
+    .. [1] Fabian Pedregosa, Gaël Varoquaux, Alexandre Gramfort, Vincent
+       Michel, Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter
+       Prettenhofer, Ron Weiss, Vincent Dubourg, Jake Vanderplas, Alexandre
+       Passos, David Cournapeau, Matthieu Brucher, Matthieu Perrot, and Édouard
+       Duchesnay. 2011. Scikit-learn: Machine Learning in Python. J. Mach.
+       Learn. Res. 12, 2011, 2825–2830.
     """
 
     def __init__(
@@ -99,6 +118,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
+        proba_format="auto",
     ):
         super().__init__(
             classes=classes,
@@ -108,9 +128,10 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
+        self.proba_format = proba_format
 
     @match_signature("estimator", "fit")
-    def fit(self, X, y, sample_weight=None, **fit_kwargs):
+    def fit(self, X, y=None, sample_weight=None, **fit_kwargs):
         """Fit the model using `X` as training data and `y` as class labels.
 
         Parameters
@@ -118,22 +139,25 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `missing_label`). For multioutput
+            problems, a row `y[i]` must either contain only observed
+            labels or only `missing_label` values, i.e., no mixing
+            within a row. Note that `Y` (capitalized) is also supported as
+            input parameter for `sklearn` classifiers using this variable.
+        sample_weight : array-like of shape (n_samples,)
+            It contains the weights of the training samples' class labels.
+            Only supported if the wrapped `sklearn` classifier can handle
+            sample weights.
         fit_kwargs : dict-like
             Further parameters as input to the `fit` method of the `estimator`.
 
         Returns
         -------
         self: SklearnClassifier,
-            The `SklearnClassifier` fitted on the training data.
+            The `SklearnClassifier` object fitted on the training data.
         """
+        y = y if y is not None else fit_kwargs.pop("Y", None)
         return self._fit(
             fit_function="fit",
             X=X,
@@ -143,7 +167,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
     @match_signature("estimator", "partial_fit")
-    def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+    def partial_fit(self, X, y=None, sample_weight=None, **fit_kwargs):
         """Partially fitting the model using `X` as training data and `y` as
         class labels.
 
@@ -152,14 +176,16 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
-            It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            Labels of the training data set (possibly including unlabeled
+            ones indicated by `missing_label`). For multioutput
+            problems, a row `y[i]` must either contain only observed
+            labels or only `missing_label` values, i.e., no mixing
+            within a row. Note that `Y` (capitalized) is also supported as
+            input parameter for `sklearn` classifiers using this variable.
+        sample_weight : array-like of shape (n_samples,)
+            It contains the weights of the training samples' class labels.
+            Only supported if the wrapped `sklearn` classifier can handle
+            sample weights.
         fit_kwargs : dict-like
             Further parameters as input to the `partial_fit` method of the
             `estimator`.
@@ -167,8 +193,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         Returns
         -------
         self : SklearnClassifier,
-            The `SklearnClassifier` is fitted on the training data.
+            The `SklearnClassifier` object fitted on the training data.
         """
+        y = y if y is not None else fit_kwargs.pop("Y", None)
         return self._fit(
             fit_function="partial_fit",
             X=X,
@@ -191,7 +218,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        y_pred :  numpy.ndarray of shape (n_samples,)
+        y_pred : numpy.ndarray of shape (n_samples,) or (n_samples, n_outputs)
             Predicted class labels of the input samples.
         """
         check_is_fitted(self)
@@ -201,19 +228,34 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
+                y_pred = y_pred.astype(self.classes_.dtype)
             else:
                 P = self.predict_proba(X)
                 costs = np.dot(P, self.cost_matrix_)
                 y_pred = rand_argmin(
                     costs, random_state=self.random_state_, axis=1
                 )
+                y_pred = self._le.inverse_transform(y_pred)
         else:
-            p = self.predict_proba([X[0]])[0]
-            y_pred = self.random_state_.choice(
-                np.arange(len(self.classes_)), len(X), replace=True, p=p
-            )
-            y_pred = self._le.inverse_transform(y_pred)
-        y_pred = y_pred.astype(self.classes_.dtype)
+            p = self.predict_proba([X[0]])
+            if self.multioutput_:
+                if isinstance(p, np.ndarray) and p.ndim == 2:
+                    # Uniform sampling in (0, 1).
+                    rand_p = self.random_state.random((len(X), len(p[0])))
+                    y_enc_pred = (rand_p < p).astype(np.int64)
+                else:
+                    y_enc_pred = [
+                        self.random_state.choice(
+                            len(p_[0]), size=len(X), p=p_[0]
+                        )
+                        for p_ in p
+                    ]
+                    y_enc_pred = np.column_stack(y_enc_pred)
+            else:
+                y_enc_pred = self.random_state_.choice(
+                    np.arange(p[0]), len(X), replace=True, p=p[0]
+                )
+            y_pred = self._le.inverse_transform(y_enc_pred)
         return y_pred
 
     @match_signature("estimator", "predict_proba")
@@ -230,41 +272,124 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         Returns
         -------
-        P : array-like of shape (n_samples, classes)
+        P : numpy.ndarray of shape (n_samples, classes) or a list of such \
+                arrays if n_outputs > 1.
             The class probabilities of the input samples. Classes are ordered
-            according to the attribute `self.classes_`.
+            according to the attribute `self.classes_`. Note that the actual
+            output shape
         """
+        # Input parameter checks.
         check_is_fitted(self)
         predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
-        if self.is_fitted_:
-            P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
-            # map the predicted classes to self.classes
-            if P.shape[1] != len(self.classes_):
-                P_ext = np.zeros((len(X), len(self.classes_)))
-                est_classes = self.estimator_.classes_
-                indices_est = np.where(np.isin(est_classes, self.classes_))[0]
-                class_indices = np.searchsorted(
-                    self.classes_, est_classes[indices_est]
-                )
-                P_ext[:, class_indices] = 1 if len(class_indices) == 1 else P
-                P = P_ext
-            if not np.any(np.isnan(P)):
-                return P
+        n_samples = len(X)
 
+        if self.is_fitted_:
+            # Obtain class probabilities if wrapped classifier was successfully
+            # fitted.
+            P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
+
+            if not self.multioutput_:
+                # Single output classification.
+                if P.shape[1] != len(self.classes_):
+                    # Map the predicted classes to self.classes.
+                    P_ext = np.zeros(
+                        (n_samples, len(self.classes_)), dtype=float
+                    )
+                    est_classes = self.estimator_.classes_
+                    indices_est = np.flatnonzero(
+                        np.isin(est_classes, self.classes_)
+                    )
+                    class_indices = np.searchsorted(
+                        self.classes_, est_classes[indices_est]
+                    )
+                    P_ext[:, class_indices] = (
+                        1 if len(class_indices) == 1 else P
+                    )
+                    P = P_ext
+                if not np.any(np.isnan(P)):
+                    return P
+
+            # Multioutput corresponds to list of class arrays.
+            n_outputs = len(self.classes_)
+
+            if self.proba_format == "multilabel":
+                # Binary per task: return (n_samples, n_outputs) with P(y=1).
+
+                if isinstance(P, list):
+                    # Wrapped classifier returns list of probability matrices.
+                    if len(P) != n_outputs:
+                        raise ValueError(
+                            f"Expected {n_outputs} outputs from "
+                            f"`predict_proba`, got {len(P)}."
+                        )
+
+                    P_ml = np.empty((n_samples, n_outputs), dtype=float)
+                    for j in range(n_outputs):
+                        P_j = np.asarray(P[j], dtype=float)
+                        if P_j.ndim != 2 or P_j.shape[1] != 2:
+                            raise ValueError(
+                                f"Expected P[{j}] to be of shape "
+                                f"(n_samples, n_classes), got {P_j.shape}."
+                            )
+                        # target_classes_j = self.classes_[j]
+                        # estimator_classes_j = self.estimator_.classes_[j]
+
+                # Wrapped classifier returns desired format.
+                P_ml = np.asarray(P, dtype=float)
+                if P_ml.ndim != 2 or P_ml.shape[1] != n_outputs:
+                    raise ValueError(
+                        f"Expected predict_proba to return shape "
+                        f"`(n_samples, {n_outputs})` for multilabel format, "
+                        f"got {P_ml.shape}."
+                    )
+                if not np.any(np.isnan(P_ml)):
+                    return P_ml
+
+            # General multioutput format: return one probability matrix
+            # (n_samples, n_classes) per task.
+            pass
+
+        # Fallback, if fitting of the underlying estimator failed.
         warnings.warn(
             f"Since the 'base_estimator' could not be fitted when"
             f" calling the `fit` method, the class label "
             f"distribution`_label_counts={self._label_counts}` is used to "
             f"make the predictions."
         )
-        if sum(self._label_counts) == 0:
-            return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
-        else:
-            return np.tile(
-                self._label_counts / np.sum(self._label_counts), [len(X), 1]
+
+        # Helper functions to normalize label counts.
+        def prior_matrix_from_counts(counts):
+            counts = np.asarray(counts, dtype=float)
+            total = counts.sum()
+            k = counts.size
+
+            if total == 0:
+                return np.full((len(X), k), 1.0 / k, dtype=float)
+
+            row = counts / total
+            return np.tile(row, (len(X), 1))
+
+        # Fallback for single output.
+        if not self.multioutput_:
+            return prior_matrix_from_counts(self._label_counts)
+
+        if self.proba_format == "multilabel":
+            # Binary per task: return (n_samples, n_outputs) with P(y=1).
+            return np.column_stack(
+                [
+                    prior_matrix_from_counts(counts_j)[:, 1]
+                    for counts_j in self._label_counts
+                ]
             )
+
+        # General multioutput format: return one probability matrix
+        # (n_samples, n_classes) per task.
+        return [
+            prior_matrix_from_counts(counts_j)
+            for counts_j in self._label_counts
+        ]
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         # Check input parameters.
@@ -309,14 +434,31 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 self.estimator_ = deepcopy(self.estimator)
         else:
             self.estimator_ = deepcopy(self.estimator)
-        # count labels per class
+
+        # Include unlabeled samples, if requested, e.g., when wrapping
+        # semi-supervised classifiers from sklearn.
         if self.include_unlabeled_samples:
             is_included = np.full_like(y, fill_value=True, dtype=bool)
         else:
-            is_included = is_labeled(y, missing_label=-1)
-        self._label_counts = [
-            np.sum(y[is_included] == c) for c in range(len(self._le.classes_))
-        ]
+            is_included = is_labeled(
+                y=y, missing_label=-1, is_multioutput=self.multioutput_
+            )
+
+        # Count labels per class.
+        if self.is_multioutput_:
+            self._label_counts = [
+                np.array(
+                    [np.sum(y[is_included, j] == c) for c in classes_j],
+                    dtype=int,
+                )
+                for j, classes_j in enumerate(self._le.classes_)
+            ]
+        else:
+            self._label_counts = [
+                np.sum(y[is_included] == c)
+                for c in range(len(self._le.classes_))
+            ]
+
         try:
             X_train = X[is_included]
             y_train = y[is_included].astype(np.int64)
@@ -775,9 +917,11 @@ if successful_skorch_torch_import:
 
         Notes
         -----
-        Adjust your `criterion` and `module.forward` outputs consistently.
-        See the documentation of the parameters `forward_outputs` and
-        `criterion_output_keys` for further details.
+        - Adjust your `criterion` and `module.forward` outputs consistently.
+          See the documentation of the parameters `forward_outputs` and
+          `criterion_output_keys` for further details.
+        - Beyond multiclass classification, only multilabel classification is
+          supported, which corresponds to multiple binary classification tasks.
 
         Parameters
         ----------
@@ -924,10 +1068,11 @@ if successful_skorch_torch_import:
           `n_tasks == len(classes)`.
         missing_label : scalar or str or np.nan or None, default=np.nan
             Value to represent a missing label.
-        cost_matrix : array-like of shape (n_classes, n_classes)
+        cost_matrix : array-like of shape (n_classes, n_classes), default=None
             Cost matrix with `cost_matrix[i, j]` indicating the cost of
             predicting class `classes[j]` for a sample of class
-            `classes[i]`. Can only be set if `classes` is not `None`.
+            `classes[i]`. Can only be set if `classes` is not `None` and for
+            single output problems.
         random_state : int or RandomState instance or None, default=None
             Determines random number generation for methods that rely on
             randomness (e.g. `predict` for stochastic models). Pass an int for
@@ -948,12 +1093,13 @@ if successful_skorch_torch_import:
             criterion_output_keys=None,
             neural_net_param_dict=None,
             sample_dtype=np.float32,
-            target_dtype=None,
             include_unlabeled_samples=False,
             classes=None,
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
+            target_dtype=None,
+            module_returns_multioutput=None,
         ):
             super(SkorchClassifier, self).__init__(
                 classes=classes,
@@ -983,7 +1129,10 @@ if successful_skorch_torch_import:
                 and unlabeled samples
             y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by self.missing_label).
+                ones indicated by self.missing_label). For multioutput
+                problems, a row `y[i]` must be either contain only observed
+                labels or only `missing_label` values, i.e., no mixing
+                within a row.
             fit_params : dict-like
                 Further parameters as input to the 'fit' method of the
                 `skorch.net.NeuralNet`.
@@ -1008,7 +1157,10 @@ if successful_skorch_torch_import:
                 and unlabeled samples
             y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 Labels of the training data set (possibly including unlabeled
-                ones indicated by self.missing_label).
+                ones indicated by self.missing_label). For multioutput
+                problems, a row `y[i]` must either contain only observed
+                labels or only `missing_label` values, i.e., no mixing
+                within a row.
             fit_params : dict-like
                 Further parameters as input to the 'partial_fit' method of the
                 `skorch.net.NeuralNet`.
@@ -1059,7 +1211,8 @@ if successful_skorch_torch_import:
 
             Returns
             -------
-            y_pred : numpy.ndarray of shape (n_samples,)
+            y_pred : numpy.ndarray of shape (n_samples,) \
+                    or (n_samples, n_outputs)
                 Predicted class labels of the test samples.
             *extras : numpy.ndarray, optional
                 Additional outputs. Only present if `extra_outputs` is not
@@ -1255,7 +1408,11 @@ if successful_skorch_torch_import:
                 "include_unlabeled_samples",
                 bool,
             )
-            return {"check_X_dict": self.check_X_dict_, "y_ensure_1d": False}
+            return {
+                "check_X_dict": self.check_X_dict_,
+                "y_ensure_1d": False,
+                "multioutput_ensure_multilabel": True,
+            }
 
         def _return_training_data(self, X, y):
             """Return only samples and labels required for training.
