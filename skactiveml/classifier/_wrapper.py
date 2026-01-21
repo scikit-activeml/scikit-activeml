@@ -45,6 +45,17 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
+successful_river_import = False
+try:
+    from inspect import signature
+    import river
+    import river.base
+    from ..utils import rand_argmax
+
+    successful_river_import = True
+except ImportError:  # pragma: no cover
+    pass
+
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     """Sklearn Classifier
@@ -1282,3 +1293,347 @@ if successful_skorch_torch_import:
                     if self.cost_matrix is None
                     else self.cost_matrix
                 )
+
+
+if successful_river_import:
+
+    class RiverClassifier(SkactivemlClassifier, MetaEstimatorMixin):
+        """River Classifier
+
+        Implementation of a wrapper class for `river` classifiers such that
+        they implement the SkactivemlClassifier interfaces for
+        classifiers. Additionally, filters the samples with missing labels if
+        needed.
+
+        Parameters
+        ----------
+        estimator : river.base.Classifier
+            The `river` classifier to be wrapped.
+        classes : array-like of shape (n_classes,), default=None
+            Holds the label for each class. If `None`, the classes are
+            determined during `fit`.
+        missing_label : scalar or string or np.nan or None, default=np.nan
+            Value to represent a missing label.
+        cost_matrix : array-like of shape (n_classes, n_classes)
+            Cost matrix with `cost_matrix[i,j]` indicating cost of predicting
+            class `classes[j]` for a sample of class `classes[i]`. Can be only
+            set, if `classes` is not `None`.
+        random_state : int or RandomState instance or None, default=None
+            Determines random number for `predict` method. Pass an int for
+            reproducible results across multiple method calls.
+
+        Attributes
+        ----------
+        classes_ : numpy.ndarray of shape (n_classes,)
+            Holds the label for each class after fitting.
+        cost_matrix_ : numpy.ndarray of shape (classes, classes)
+            Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+            class `classes_[j]` for a sample of class `classes_[i]`.
+        estimator_ : river.base.Classifier
+            The `river` classifier after calling the `fit` method.
+        """
+
+        def __init__(
+            self,
+            estimator,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            random_state=None,
+        ):
+            super().__init__(
+                classes=classes,
+                missing_label=missing_label,
+                cost_matrix=cost_matrix,
+                random_state=random_state,
+            )
+            self.estimator = estimator
+
+        def fit(self, X, y, sample_weight=None, **fit_kwargs):
+            """Fit the model using `X` as training data and `y` as class
+            labels.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+                It contains the class labels of the training samples. Missing
+                labels are represented the attribute `self.missing_label_`. In
+                case of multiple labels per sample (i.e., n_outputs > 1), the
+                samples are duplicated.
+            sample_weight : array-like of shape (n_samples,) or\
+                    (n_samples, n_outputs)
+                It contains the weights of the training samples' class labels.
+                It must have the same shape as `y`.
+            fit_kwargs : dict-like
+                Further parameters as input to the `fit` method of the
+                `estimator`.
+
+            Returns
+            -------
+            self: SklearnClassifier,
+                The `SklearnClassifier` fitted on the training data.
+            """
+            return self._fit(
+                fit_function="fit",
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                **fit_kwargs,
+            )
+
+        def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+            """Partially fitting the model using `X` as training data and `y`
+            as class labels.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+                It contains the class labels of the training samples. Missing
+                labels are represented the attribute `self.missing_label_`. In
+                case of multiple labels per sample (i.e., n_outputs > 1), the
+                samples are duplicated.
+            sample_weight : array-like of shape (n_samples,) or\
+                    (n_samples, n_outputs)
+                It contains the weights of the training samples' class labels.
+                It must have the same shape as `y`.
+            fit_kwargs : dict-like
+                Further parameters as input to the `partial_fit` method of the
+                `estimator`.
+
+            Returns
+            -------
+            self : SklearnClassifier,
+                The `SklearnClassifier` is fitted on the training data.
+            """
+            return self._fit(
+                fit_function="partial_fit",
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                **fit_kwargs,
+            )
+
+        def predict(self, X, **predict_kwargs):
+            """Return class label predictions for the input data `X`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+            predict_kwargs : dict-like
+                Further parameters as input to the `predict` method of the
+                `estimator`.
+
+            Returns
+            -------
+            y_pred :  numpy.ndarray of shape (n_samples,)
+                Predicted class labels of the input samples.
+            """
+            check_is_fitted(self)
+            predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
+            X = check_array(X, **(self.check_X_dict_ | predict_dict))
+            check_n_features(self, X, reset=False)
+            if self.is_fitted_:
+                if self.cost_matrix is None:
+                    P = self.predict_proba(X)
+                    y_pred = rand_argmax(
+                        P, random_state=self.random_state_, axis=1
+                    )
+
+                else:
+                    P = self.predict_proba(X)
+                    costs = np.dot(P, self.cost_matrix_)
+                    y_pred = rand_argmin(
+                        costs, random_state=self.random_state_, axis=1
+                    )
+            else:
+                p = self.predict_proba([X[0]])[0]
+                y_pred = self.random_state_.choice(
+                    np.arange(len(self.classes_)), len(X), replace=True, p=p
+                )
+                y_pred = self._le.inverse_transform(y_pred)
+            y_pred = y_pred.astype(self.classes_.dtype)
+            return y_pred
+
+        def predict_proba(self, X, **predict_proba_kwargs):
+            """Return probability estimates for the input data `X`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+            predict_proba_kwargs : dict-like
+                Further parameters as input to the `predict_proba` method of
+                the `estimator`.
+
+            Returns
+            -------
+            P : array-like of shape (n_samples, classes)
+                The class probabilities of the input samples. Classes are
+                ordered according to the attribute `self.classes_`.
+            """
+            check_is_fitted(self)
+            predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
+            X = check_array(X, **(self.check_X_dict_ | predict_dict))
+            check_n_features(self, X, reset=False)
+            if self.is_fitted_:
+                P_list = []
+                for x in X:
+                    x_dict = self.transform_data_to_dict(x)
+                    P_i_dict = self.estimator_.predict_proba_one(
+                        x_dict, **predict_proba_kwargs
+                    )
+                    P_i = []
+                    for c in self.estimator_.classes:
+                        P_i.append(P_i_dict[c])
+                    P_list.append(P_i)
+                P = np.array(P_list)
+                # map the predicted classes to self.classes
+                if P.shape[1] != len(self.classes_):
+                    P_ext = np.zeros((len(X), len(self.classes_)))
+                    est_classes = self.estimator_.classes
+                    indices_est = np.where(
+                        np.isin(est_classes, self.classes_)
+                    )[0]
+                    class_indices = np.searchsorted(
+                        self.classes_, est_classes[indices_est]
+                    )
+                    P_ext[:, class_indices] = (
+                        1 if len(class_indices) == 1 else P
+                    )
+                    P = P_ext
+                if not np.any(np.isnan(P)):
+                    return P
+
+            warnings.warn(
+                f"Since the 'base_estimator' could not be fitted when"
+                f" calling the `fit` method, the class label "
+                f"distribution`_label_counts={self._label_counts}` is used to "
+                f"make the predictions."
+            )
+            if sum(self._label_counts) == 0:
+                return np.ones([len(X), len(self.classes_)]) / len(
+                    self.classes_
+                )
+            else:
+                return np.tile(
+                    self._label_counts / np.sum(self._label_counts),
+                    [len(X), 1],
+                )
+
+        def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+            # Check input parameters.
+            self.check_X_dict_ = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "allow_nd": True,
+                "dtype": None,
+            }
+            X, y, sample_weight = self._validate_data(
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                check_X_dict=self.check_X_dict_,
+                reset=fit_function == "fit"
+                or not hasattr(self, "n_features_in_"),
+            )
+
+            # Check whether estimator is a valid classifier.
+            if not isinstance(self.estimator, river.base.Classifier):
+                raise TypeError(
+                    "'{}' must be a river classifier.".format(self.estimator)
+                )
+
+            if hasattr(self, "estimator_"):
+                if fit_function != "partial_fit":
+                    self.estimator_ = deepcopy(self.estimator)
+            else:
+                self.estimator_ = deepcopy(self.estimator)
+            # count labels per class
+            is_included = is_labeled(y, missing_label=-1)
+            self._label_counts = [
+                np.sum(y[is_included] == c)
+                for c in range(len(self._le.classes_))
+            ]
+            if np.sum(is_included) == 0:
+                raise ValueError("There is no labeled data.")
+            try:
+                X_train = X[is_included]
+                y_train = y[is_included].astype(np.int64)
+                y_train_inv = self._le.inverse_transform(y_train)
+
+                supports_learn_many = hasattr(self.estimator_, "learn_many")
+                if supports_learn_many:
+                    supports_sample_weight = (
+                        "w" in signature(self.estimator_.learn_many).parameters
+                    )
+                else:
+                    supports_sample_weight = (
+                        "w" in signature(self.estimator_.learn_one).parameters
+                    )
+
+                sample_weight_train = None
+                if supports_sample_weight and sample_weight is not None:
+                    sample_weight_train = sample_weight[is_included]
+                if supports_learn_many:
+                    fit_args = {}
+                    fit_args["X"] = self.transform_data_to_dict(X_train)
+                    fit_args["y"] = y_train_inv
+                    if sample_weight_train is not None:
+                        fit_args["w"] = sample_weight_train
+                    self.estimator_.learn_many(**fit_args)
+                else:
+                    for idx in range(len(X_train)):
+                        fit_args = {}
+                        fit_args["x"] = self.transform_data_to_dict(
+                            X_train[idx]
+                        )
+                        fit_args["y"] = y_train_inv[idx]
+                        if sample_weight_train is not None:
+                            fit_args["w"] = sample_weight_train[idx]
+                        self.estimator_.learn_one(**fit_args)
+                self.is_fitted_ = True
+            except Exception as e:
+                self.is_fitted_ = False
+                warnings.warn(
+                    "The 'base_estimator' could not be fitted because of"
+                    " '{}'. Therefore, the class labels of the samples "
+                    "are counted and will be used to make predictions. "
+                    "The class label distribution is"
+                    "`_label_counts={}`.".format(e, self._label_counts)
+                )
+            return self
+
+        def transform_data_to_dict(self, data):
+            return {str(i): x for i, x in enumerate(data.T)}
+
+        def __sklearn_is_fitted__(self):
+            if hasattr(self, "is_fitted_"):
+                return True
+
+            try:
+                check_is_fitted(self.estimator)
+            except NotFittedError:
+                return False
+
+            # set attributes that would be set by the fit function
+            self.is_fitted_ = True
+            self.estimator_ = deepcopy(self.estimator)
+            self.check_X_dict_ = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "allow_nd": True,
+                "dtype": None,
+            }
+
+            return True
+
+        def __getattr__(self, item):
+            if "estimator_" in self.__dict__:
+                return getattr(self.estimator_, item)
+            else:
+                return getattr(self.estimator, item)
