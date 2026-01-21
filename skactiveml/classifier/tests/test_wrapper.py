@@ -46,6 +46,12 @@ successful_river_import = False
 try:
     from skactiveml.classifier import RiverClassifier
     import river.tree
+    import river.neighbors
+    import river.naive_bayes
+    import river.multiclass
+    import river.forest
+    import river.linear_model
+    import river.imblearn
 
     successful_river_import = True
 except ImportError:
@@ -1431,3 +1437,99 @@ if successful_river_import:
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
             )
+
+        def test_init_param_estimator(self):
+            test_cases = [
+                (Perceptron(), TypeError),
+                ("Test", TypeError),
+                (GaussianNB(), TypeError),
+                (LinearRegression(), TypeError),
+                (river.tree.HoeffdingAdaptiveTreeClassifier, TypeError),
+                (river.tree.HoeffdingAdaptiveTreeClassifier(), None),
+                (river.tree.ExtremelyFastDecisionTreeClassifier(), None),
+                (river.tree.LASTClassifier(), None),
+                (river.tree.SGTClassifier(), None),
+                (river.neighbors.KNNClassifier(), None),
+                (river.naive_bayes.MultinomialNB(), None),
+                (
+                    river.multiclass.OneVsOneClassifier(
+                        river.neighbors.KNNClassifier()
+                    ),
+                    None,
+                ),
+                (river.forest.AMFClassifier(), None),
+                (river.linear_model.LogisticRegression(), None),
+            ]
+            self._test_param("init", "estimator", test_cases)
+
+        def _test_fit(self, fit_function):
+            river_clf = river.multiclass.OneVsRestClassifier(
+                river.linear_model.LogisticRegression(),
+            )
+            for classes_type in ["int", "str"]:
+                for provide_classes in [True, False]:
+                    subtest_msg = (
+                        f"classes_type: {classes_type}, "
+                        f"provide_classes: {provide_classes}"
+                    )
+                    with self.subTest(msg=subtest_msg):
+                        if classes_type == "int":
+                            classes = [0, 1, 2]
+                            missing_label = MISSING_LABEL
+                        else:
+                            classes = ["0", "1", "2"]
+                            missing_label = "unlabeled"
+                        if not provide_classes:
+                            classes = None
+                        clf = RiverClassifier(
+                            river_clf,
+                            random_state=0,
+                            missing_label=missing_label,
+                            classes=classes,
+                        )
+                        fit_func = clf.fit
+                        if fit_function == "partial_fit":
+                            fit_func = clf.partial_fit
+                        X, y_centers = make_blobs(centers=5, random_state=1)
+                        y_true = y_centers % 3
+                        if classes_type == "str":
+                            y_true = y_true.astype(str)
+                        y_all_missing = np.full(y_true.shape, missing_label)
+                        # check if regular fit was succesful with
+                        # is_fitted_=True
+                        fit_func(X, y_true)
+                        self.assertTrue(clf.is_fitted_)
+                        # check that training with empty arrays works with
+                        # is_fitted_=False if classes is provided, else a
+                        # ValueError is expected
+                        if provide_classes:
+                            fit_func(X[:0], y_true[:0])
+                            self.assertFalse(clf.is_fitted_)
+                        else:
+                            self.assertRaises(
+                                ValueError, fit_func, X[:0], y_true[:0]
+                            )
+                        # check that training with fully unlabeled data works
+                        # with is_fitted_=False if classes is provided, else a
+                        # ValueError is expected
+                        if provide_classes:
+                            fit_func(X, y_all_missing)
+                            self.assertFalse(clf.is_fitted_)
+                        else:
+                            self.assertRaises(
+                                ValueError, fit_func, X, y_all_missing
+                            )
+
+        def test_fit(self):
+            self._test_fit("fit")
+
+        def test_partial_fit(self):
+            self._test_fit("partial_fit")
+
+        def test_predict(self):
+            # TODO
+            pass
+
+        def test_predict_proba(self):
+            # TODO
+            pass

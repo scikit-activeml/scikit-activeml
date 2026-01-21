@@ -62,6 +62,7 @@ try:
     import river
     import river.base
     from ..utils import rand_argmax
+    import pandas as pd
 
     successful_river_import = True
 except ImportError:  # pragma: no cover
@@ -1848,11 +1849,11 @@ if successful_river_import:
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
-            if np.sum(is_included) == 0:
-                raise ValueError("There is no labeled data.")
             try:
                 X_train = X[is_included]
                 y_train = y[is_included].astype(np.int64)
+                if np.sum(is_included) == 0:
+                    raise ValueError("There is no labeled data.")
                 y_train_inv = self._le.inverse_transform(y_train)
 
                 supports_learn_many = hasattr(self.estimator_, "learn_many")
@@ -1870,10 +1871,12 @@ if successful_river_import:
                     sample_weight_train = sample_weight[is_included]
                 if supports_learn_many:
                     fit_args = {}
-                    fit_args["X"] = self.transform_data_to_dict(X_train)
-                    fit_args["y"] = y_train_inv
+                    fit_args["X"] = pd.DataFrame(
+                        self.transform_data_to_dict(X_train)
+                    )
+                    fit_args["y"] = pd.Series(y_train_inv)
                     if sample_weight_train is not None:
-                        fit_args["w"] = sample_weight_train
+                        fit_args["w"] = pd.Series(sample_weight_train)
                     self.estimator_.learn_many(**fit_args)
                 else:
                     for idx in range(len(X_train)):
