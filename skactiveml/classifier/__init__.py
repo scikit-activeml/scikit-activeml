@@ -27,3 +27,10 @@ try:
     __all__ += ["RiverClassifier"]
 except ImportError:  # pragma: no cover
     pass
+
+try:
+    from ._wrapper import CapymoaClassifier  # noqa: F401
+
+    __all__ += ["CapymoaClassifier"]
+except ImportError:  # pragma: no cover
+    pass

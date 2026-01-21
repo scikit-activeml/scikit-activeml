@@ -42,6 +42,15 @@ try:
 except ImportError:
     pass  # pragma: no cover
 
+successful_river_import = False
+try:
+    from skactiveml.classifier import RiverClassifier
+    import river.tree
+
+    successful_river_import = True
+except ImportError:
+    pass  # pragma: no cover
+
 
 class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
     def setUp(self):
@@ -1384,3 +1393,41 @@ if successful_skorch_torch_import:
                 return output_values, hidden
             else:
                 return output_values
+
+
+if successful_river_import:
+
+    class TestRiverClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
+        def setUp(self):
+            # Set global seeds.
+            random.seed(0)
+            self.X, self.y_true = make_blobs(
+                n_samples=200, n_features=1, centers=2, random_state=0
+            )
+            self.X = self.X.astype(np.float32)
+            self.y = np.copy(self.y_true).astype(np.float32)
+            self.y[:100] = MISSING_LABEL
+            self.y_ulbld = np.full_like(self.y, fill_value=MISSING_LABEL)
+            self.classes = np.unique(self.y_true)
+
+            estimator_class = RiverClassifier
+            init_default_params = {
+                "estimator": river.tree.HoeffdingAdaptiveTreeClassifier(
+                    seed=0
+                ),
+                "classes": None,
+                "missing_label": MISSING_LABEL,
+                "cost_matrix": None,
+                "random_state": 0,
+            }
+            fit_default_params = {
+                "X": self.X,
+                "y": self.y,
+            }
+            predict_default_params = {"X": self.X}
+            super().setUp(
+                estimator_class=estimator_class,
+                init_default_params=init_default_params,
+                fit_default_params=fit_default_params,
+                predict_default_params=predict_default_params,
+            )
