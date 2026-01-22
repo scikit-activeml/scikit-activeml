@@ -1802,15 +1802,8 @@ if successful_river_import:
                 f"distribution`_label_counts={self._label_counts}` is used to "
                 f"make the predictions."
             )
-            if sum(self._label_counts) == 0:
-                return np.ones([len(X), len(self.classes_)]) / len(
-                    self.classes_
-                )
-            else:
-                return np.tile(
-                    self._label_counts / np.sum(self._label_counts),
-                    [len(X), 1],
-                )
+            # fallback if clf could not be fitted (i.e., no labeled data)
+            return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
 
         def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
             # Check input parameters.
@@ -1854,12 +1847,17 @@ if successful_river_import:
 
                 supports_learn_many = hasattr(self.estimator_, "learn_many")
                 if supports_learn_many:
-                    supports_sample_weight = (
-                        "w" in signature(self.estimator_.learn_many).parameters
-                    )
+                    params = signature(self.estimator_.learn_many).parameters
                 else:
-                    supports_sample_weight = (
-                        "w" in signature(self.estimator_.learn_one).parameters
+                    params = signature(self.estimator_.learn_one).parameters
+                supports_sample_weight = "w" in params or np.any(
+                    [p.kind == p.VAR_KEYWORD for p_name, p in params.items()]
+                )
+
+                if not supports_sample_weight and sample_weight is not None:
+                    raise ValueError(
+                        "The estimator does not support training "
+                        "with sample_weight."
                     )
 
                 sample_weight_train = None
@@ -1886,14 +1884,21 @@ if successful_river_import:
                         self.estimator_.learn_one(**fit_args)
                 self.is_fitted_ = True
             except Exception as e:
-                self.is_fitted_ = False
-                warnings.warn(
-                    "The 'base_estimator' could not be fitted because of"
-                    " '{}'. Therefore, the class labels of the samples "
-                    "are counted and will be used to make predictions. "
-                    "The class label distribution is"
-                    "`_label_counts={}`.".format(e, self._label_counts)
-                )
+                if (
+                    "supports_sample_weight" in locals()
+                    and not supports_sample_weight
+                    and sample_weight is not None
+                ):
+                    raise e
+                else:
+                    self.is_fitted_ = False
+                    warnings.warn(
+                        "The 'estimator' could not be fitted because of"
+                        " '{}'. Therefore, the number of classes  are counted"
+                        "and will be used to make predictions. The class"
+                        "labels are assumed to be uniformly "
+                        "distributed.".format(e)
+                    )
             return self
 
         def transform_data_to_dict(self, data):
@@ -1902,26 +1907,3 @@ if successful_river_import:
         def __sklearn_is_fitted__(self):
             if hasattr(self, "is_fitted_"):
                 return True
-
-            try:
-                check_is_fitted(self.estimator)
-            except NotFittedError:
-                return False
-
-            # set attributes that would be set by the fit function
-            self.is_fitted_ = True
-            self.estimator_ = deepcopy(self.estimator)
-            self.check_X_dict_ = {
-                "ensure_min_samples": 0,
-                "ensure_min_features": 0,
-                "allow_nd": True,
-                "dtype": None,
-            }
-
-            return True
-
-        def __getattr__(self, item):
-            if "estimator_" in self.__dict__:
-                return getattr(self.estimator_, item)
-            else:
-                return getattr(self.estimator, item)

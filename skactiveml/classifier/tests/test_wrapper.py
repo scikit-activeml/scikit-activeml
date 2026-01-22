@@ -1537,7 +1537,7 @@ if successful_river_import:
                     fit_results = {}
                     n_classes = 5
                     # shift classes by 1 to check correct assignment
-                    classes = [c + 1 for c in range(n_classes)]
+                    classes = list(range(n_classes + 1))
                     X, y = make_blobs(
                         n_samples=200,
                         centers=n_classes,
@@ -1586,10 +1586,10 @@ if successful_river_import:
 
         def test_predict(self):
             clfs = {
-                "learn_one clf": river.tree.HoeffdingAdaptiveTreeClassifier(
-                    seed=0
+                "HoeffdingAdaptiveTreeClassifier": (
+                    river.tree.HoeffdingAdaptiveTreeClassifier(seed=0)
                 ),
-                "learn_many clf": river.naive_bayes.GaussianNB(),
+                "GaussianNB": river.naive_bayes.GaussianNB(),
             }
             for clf_name, river_clf in clfs.items():
                 n_classes = 10
@@ -1629,12 +1629,72 @@ if successful_river_import:
                         accuracy = np.mean(pred == y)
                         self.assertGreaterEqual(accuracy, 0.80)
 
+                clf = RiverClassifier(**init_default_params)
+                clf.fit(X_train, np.full(y_train.shape, MISSING_LABEL))
+
+                for X_str in ["X_train", "X_test"]:
+                    X = X_train
+                    if X_str == "X_test":
+                        X = X_test
+                    with self.subTest(f"no labels, clf:{clf_name}, X:{X_str}"):
+                        pred = clf.predict(X)
+                        self.assertEqual(len(pred), len(X))
+                        self.assertGreater(np.sum(pred == 0), 0)
+
+                clf = RiverClassifier(**init_default_params)
+                sample_weight = np.full(y_train.shape, 1.0)
+                sample_weight[y_train == 5] = 0
+                if clf_name == "HoeffdingAdaptiveTreeClassifier":
+                    clf.fit(X_train, y_train, sample_weight)
+
+                    for X_str in ["X_train", "X_test"]:
+                        X = X_train
+                        if X_str == "X_test":
+                            X = X_test
+                        with self.subTest(
+                            f"sample_weight, clf:{clf_name}, X:{X_str}"
+                        ):
+                            pred = clf.predict(X)
+                            self.assertEqual(len(pred), len(X))
+                            self.assertEqual(np.sum(pred == 5), 0)
+                else:
+                    # GaussianNB does not support sample weight
+                    self.assertRaises(
+                        ValueError, clf.fit, X_train, y_train, sample_weight
+                    )
+
+            init_default_params = {
+                "estimator": river.linear_model.LogisticRegression(),
+                "classes": [0, 1],
+                "missing_label": MISSING_LABEL,
+                "cost_matrix": None,
+                "random_state": 0,
+            }
+            clf = RiverClassifier(**init_default_params)
+
+            X, y = make_blobs(
+                n_samples=200,
+                centers=2,
+                shuffle=True,
+                random_state=0,
+                cluster_std=1.0,
+            )
+            sample_weight = np.full(y.shape, 1.0)
+            sample_weight[y == 1] = 0
+            clf.fit(X, y, sample_weight)
+            pred1 = clf.predict(X)
+            clf.fit(X, y)
+            pred2 = clf.predict(X)
+            self.assertEqual(len(pred1), len(X))
+            # check that the number of y=1 predictions decreases
+            self.assertGreater(np.sum(pred2 == 1), np.sum(pred1 == 1))
+
         def test_predict_proba(self):
             clfs = {
-                "learn_one clf": river.tree.HoeffdingAdaptiveTreeClassifier(
-                    seed=0
+                "HoeffdingAdaptiveTreeClassifier": (
+                    river.tree.HoeffdingAdaptiveTreeClassifier(seed=0)
                 ),
-                "learn_many clf": river.naive_bayes.GaussianNB(),
+                "GaussianNB": river.naive_bayes.GaussianNB(),
             }
             for clf_name, river_clf in clfs.items():
                 n_classes = 5
@@ -1667,3 +1727,31 @@ if successful_river_import:
                         pred_proba = clf.predict_proba(X)
                         self.assertEqual(pred_proba.shape[0], len(X))
                         self.assertEqual(pred_proba.shape[1], n_classes)
+
+                clf = RiverClassifier(**init_default_params)
+                clf.fit(X_train, np.full(y_train.shape, MISSING_LABEL))
+
+                for X_str in ["X_train", "X_test"]:
+                    X = X_train
+                    if X_str == "X_test":
+                        X = X_test
+                    with self.subTest(f"no labels, clf:{clf_name}, X:{X_str}"):
+                        pred_proba = clf.predict_proba(X)
+                        self.assertEqual(pred_proba.shape[0], len(X))
+                        self.assertEqual(pred_proba.shape[1], n_classes)
+                        np.testing.assert_almost_equal(
+                            pred_proba,
+                            np.full(pred_proba.shape, 1.0 / n_classes),
+                        )
+
+        def test_is_fitted(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["classes"] = [0, 1]
+            clf = RiverClassifier(**init_params)
+            self.assertRaises(NotFittedError, check_is_fitted, clf)
+            clf = RiverClassifier(**init_params)
+            clf.fit(**self.fit_default_params)
+            check_is_fitted(clf)
+            clf = RiverClassifier(**init_params)
+            clf.fit(self.X, self.y_ulbld)
+            check_is_fitted(clf)
