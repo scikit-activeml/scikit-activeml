@@ -1772,26 +1772,23 @@ if successful_river_import:
             check_n_features(self, X, reset=False)
             if self.is_fitted_:
                 P_list = []
+                est_classes = None
                 for x in X:
                     x_dict = self.transform_data_to_dict(x)
                     P_i_dict = self.estimator_.predict_proba_one(
                         x_dict, **predict_proba_kwargs
                     )
                     P_i = []
-                    for c in self.estimator_.classes:
+                    if est_classes is None:
+                        est_classes = np.sort(list(P_i_dict.keys()))
+                    for c in est_classes:
                         P_i.append(P_i_dict[c])
                     P_list.append(P_i)
                 P = np.array(P_list)
                 # map the predicted classes to self.classes
-                if P.shape[1] != len(self.classes_):
+                if len(est_classes) != len(self.classes_):
                     P_ext = np.zeros((len(X), len(self.classes_)))
-                    est_classes = self.estimator_.classes
-                    indices_est = np.where(
-                        np.isin(est_classes, self.classes_)
-                    )[0]
-                    class_indices = np.searchsorted(
-                        self.classes_, est_classes[indices_est]
-                    )
+                    class_indices = est_classes
                     P_ext[:, class_indices] = (
                         1 if len(class_indices) == 1 else P
                     )
@@ -1854,7 +1851,6 @@ if successful_river_import:
                 y_train = y[is_included].astype(np.int64)
                 if np.sum(is_included) == 0:
                     raise ValueError("There is no labeled data.")
-                y_train_inv = self._le.inverse_transform(y_train)
 
                 supports_learn_many = hasattr(self.estimator_, "learn_many")
                 if supports_learn_many:
@@ -1874,7 +1870,7 @@ if successful_river_import:
                     fit_args["X"] = pd.DataFrame(
                         self.transform_data_to_dict(X_train)
                     )
-                    fit_args["y"] = pd.Series(y_train_inv)
+                    fit_args["y"] = pd.Series(y_train)
                     if sample_weight_train is not None:
                         fit_args["w"] = pd.Series(sample_weight_train)
                     self.estimator_.learn_many(**fit_args)
@@ -1884,7 +1880,7 @@ if successful_river_import:
                         fit_args["x"] = self.transform_data_to_dict(
                             X_train[idx]
                         )
-                        fit_args["y"] = y_train_inv[idx]
+                        fit_args["y"] = y_train[idx]
                         if sample_weight_train is not None:
                             fit_args["w"] = sample_weight_train[idx]
                         self.estimator_.learn_one(**fit_args)

@@ -52,6 +52,7 @@ try:
     import river.forest
     import river.linear_model
     import river.imblearn
+    from sklearn.model_selection import train_test_split
 
     successful_river_import = True
 except ImportError:
@@ -1525,11 +1526,144 @@ if successful_river_import:
 
         def test_partial_fit(self):
             self._test_fit("partial_fit")
+            clfs = {
+                "learn_one clf": river.tree.HoeffdingAdaptiveTreeClassifier(
+                    seed=0
+                ),
+                "learn_many clf": river.naive_bayes.GaussianNB(),
+            }
+            for clf_name, river_clf in clfs.items():
+                with self.subTest(clf_name):
+                    fit_results = {}
+                    n_classes = 5
+                    # shift classes by 1 to check correct assignment
+                    classes = [c + 1 for c in range(n_classes)]
+                    X, y = make_blobs(
+                        n_samples=200,
+                        centers=n_classes,
+                        shuffle=True,
+                        random_state=0,
+                        cluster_std=1.0,
+                    )
+                    X_train, X_test, y_train, y_test = train_test_split(
+                        X, y, random_state=0
+                    )
+                    # check case where not all classes exist
+                    # 1-5 exist while there is no instance with y=0
+                    # at least predictions should be similar or the same while
+                    # predict_proba may differ when learn_many is used
+                    y_train += 1
+                    y_test += 1
+                    for fit_func in ["fit", "partial_fit"]:
+                        init_default_params = {
+                            "estimator": deepcopy(river_clf),
+                            "classes": classes,
+                            "missing_label": MISSING_LABEL,
+                            "cost_matrix": None,
+                            "random_state": 0,
+                        }
+                        clf = RiverClassifier(**init_default_params)
+                        if fit_func == "fit":
+                            clf.fit(X_train, y_train)
+                        elif fit_func == "partial_fit":
+                            for x_inst, y_inst in zip(X_train, y_train):
+                                clf.partial_fit([x_inst], [y_inst])
+                        pred_result = clf.predict(X_test)
+                        pred_proba_result = clf.predict_proba(X_test)
+                        results = {}
+                        results["predict"] = pred_result
+                        results["predict_proba"] = pred_proba_result
+                        fit_results[fit_func] = results
+                    if clf_name == "learn_one clf":
+                        np.testing.assert_equal(
+                            fit_results["fit"]["predict"],
+                            fit_results["partial_fit"]["predict"],
+                        )
+                    np.testing.assert_almost_equal(
+                        fit_results["fit"]["predict_proba"],
+                        fit_results["partial_fit"]["predict_proba"],
+                    )
 
         def test_predict(self):
-            # TODO
-            pass
+            clfs = {
+                "learn_one clf": river.tree.HoeffdingAdaptiveTreeClassifier(
+                    seed=0
+                ),
+                "learn_many clf": river.naive_bayes.GaussianNB(),
+            }
+            for clf_name, river_clf in clfs.items():
+                n_classes = 10
+                classes = list(range(n_classes))
+                X, y = make_blobs(
+                    n_samples=200,
+                    centers=n_classes,
+                    shuffle=True,
+                    random_state=0,
+                    cluster_std=1.0,
+                )
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, random_state=0
+                )
+                init_default_params = {
+                    "estimator": deepcopy(river_clf),
+                    "classes": classes,
+                    "missing_label": MISSING_LABEL,
+                    "cost_matrix": None,
+                    "random_state": 0,
+                }
+                clf = RiverClassifier(**init_default_params)
+                clf.fit(X_train, y_train)
+
+                for X_str in ["X_train", "X_test"]:
+                    X = X_train
+                    y = y_train
+                    if X_str == "X_test":
+                        X = X_test
+                        y = y_test
+                    with self.subTest(f"clf:{clf_name}, X:{X_str}"):
+                        pred = clf.predict(X)
+                        self.assertEqual(len(pred), len(X))
+                        np.testing.assert_equal(np.unique(pred), classes)
+                        # Check that the model learns the classification even
+                        # though it might not be perfect
+                        accuracy = np.mean(pred == y)
+                        self.assertGreaterEqual(accuracy, 0.80)
 
         def test_predict_proba(self):
-            # TODO
-            pass
+            clfs = {
+                "learn_one clf": river.tree.HoeffdingAdaptiveTreeClassifier(
+                    seed=0
+                ),
+                "learn_many clf": river.naive_bayes.GaussianNB(),
+            }
+            for clf_name, river_clf in clfs.items():
+                n_classes = 5
+                classes = list(range(n_classes))
+                X, y = make_blobs(
+                    n_samples=200,
+                    centers=5,
+                    shuffle=True,
+                    random_state=0,
+                    cluster_std=1.0,
+                )
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, random_state=0
+                )
+                init_default_params = {
+                    "estimator": deepcopy(river_clf),
+                    "classes": classes,
+                    "missing_label": MISSING_LABEL,
+                    "cost_matrix": None,
+                    "random_state": 0,
+                }
+                clf = RiverClassifier(**init_default_params)
+                clf.fit(X_train, y_train)
+
+                for X_str in ["X_train", "X_test"]:
+                    X = X_train
+                    if X_str == "X_test":
+                        X = X_test
+                    with self.subTest(f"clf:{clf_name}, X:{X_str}"):
+                        pred_proba = clf.predict_proba(X)
+                        self.assertEqual(pred_proba.shape[0], len(X))
+                        self.assertEqual(pred_proba.shape[1], n_classes)

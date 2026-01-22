@@ -424,7 +424,7 @@ class TestExpectedErrorReduction(unittest.TestCase):
         ]
 
         for args in params:
-            with self.subTest(msg=args):
+            with self.subTest(msg=str(args)):
                 a = risk_estimation_slow(*args)
                 b = qs._risk_estimation(*args)
                 np.testing.assert_allclose(a, b)
@@ -625,7 +625,11 @@ class TestMonteCarloEER(TemplateTestExpectedErrorReduction, unittest.TestCase):
             expected_utils,
         ) in params_list:
             with self.subTest(
-                msg=method, subtract_cur=subtract_cur, cand=cand, eval=X_eval
+                msg=method,
+                cost_matrix=str(cost_matrix),
+                subtract_cur=subtract_cur,
+                cand=str(cand),
+                eval=str(X_eval),
             ):
                 qs = MonteCarloEER(
                     method=method,
