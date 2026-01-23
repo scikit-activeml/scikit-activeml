@@ -1309,10 +1309,10 @@ if successful_skorch_torch_import:
 
 if successful_capymoa_import:
 
-    class CapymoaClassifier(SkactivemlClassifier):
-        """Capymoa Classifier
+    class CapyMOAClassifier(SkactivemlClassifier):
+        """CapyMOA Classifier
 
-        Implementation of a wrapper class for `capymoa` classifiers such that
+        Implementation of a wrapper class for `CapyMOA` classifiers such that
         missing labels can be handled and the interfaces are compatible with
         `scikit-learn`.
         Therefore, samples with missing labels are filtered.
@@ -1348,7 +1348,6 @@ if successful_capymoa_import:
         def __init__(
             self,
             estimator_class,
-            schema,
             estimator_param_dict=None,
             classes=None,
             missing_label=MISSING_LABEL,
@@ -1362,7 +1361,6 @@ if successful_capymoa_import:
                 random_state=random_state,
             )
             self.estimator_class = estimator_class
-            self.schema = schema
             self.estimator_param_dict = estimator_param_dict
 
         def fit(self, X, y):
@@ -1435,7 +1433,10 @@ if successful_capymoa_import:
             check_n_features(self, X, reset=False)
             if self.is_fitted_:
                 if self.cost_matrix is None:
-                    y_pred = self.estimator_.predict(X)
+                    P = self.predict_proba(X)
+                    y_pred = rand_argmin(
+                        P, random_state=self.random_state_, axis=1
+                    )
                 else:
                     P = self.predict_proba(X)
                     costs = np.dot(P, self.cost_matrix_)
@@ -1470,21 +1471,23 @@ if successful_capymoa_import:
             X = check_array(X, **(self.check_X_dict_ | predict_dict))
             check_n_features(self, X, reset=False)
             if self.is_fitted_:
-                P = self.estimator_.predict_proba(X)
-                # map the predicted classes to self.classes
-                if P.shape[1] != len(self.classes_):
-                    P_ext = np.zeros((len(X), len(self.classes_)))
-                    est_classes = self.estimator_.classes_
-                    indices_est = np.where(
-                        np.isin(est_classes, self.classes_)
-                    )[0]
-                    class_indices = np.searchsorted(
-                        self.classes_, est_classes[indices_est]
+                P_list = []
+                for x in X:
+                    x_instance = capymoa.instance.Instance(
+                        schema=self.schema_, instance=x
                     )
-                    P_ext[:, class_indices] = (
-                        1 if len(class_indices) == 1 else P
-                    )
-                    P = P_ext
+                    P_i = self.estimator_.predict_proba(x_instance)
+                    P_list.append(P_i)
+                    print(P_i)
+                P = np.array(P_list)
+                # # map the predicted classes to self.classes
+                # if len(est_classes) != len(self.classes_):
+                #     P_ext = np.zeros((len(X), len(self.classes_)))
+                #     class_indices = est_classes
+                #     P_ext[:, class_indices] = (
+                #         1 if len(class_indices) == 1 else P
+                #     )
+                #     P = P_ext
                 if not np.any(np.isnan(P)):
                     return P
 
@@ -1494,15 +1497,8 @@ if successful_capymoa_import:
                 f"distribution`_label_counts={self._label_counts}` is used to "
                 f"make the predictions."
             )
-            if sum(self._label_counts) == 0:
-                return np.ones([len(X), len(self.classes_)]) / len(
-                    self.classes_
-                )
-            else:
-                return np.tile(
-                    self._label_counts / np.sum(self._label_counts),
-                    [len(X), 1],
-                )
+            # fallback if clf could not be fitted (i.e., no labeled data)
+            return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
 
         def _fit(self, fit_function, X, y, sample_weight=None):
             # Check input parameters.
@@ -1540,9 +1536,9 @@ if successful_capymoa_import:
                 )
             if hasattr(self, "estimator_"):
                 if fit_function != "partial_fit":
-                    self.estimator_ = self._create_estimator()
+                    self.estimator_ = self._create_estimator(X)
             else:
-                self.estimator_ = self._create_estimator()
+                self.estimator_ = self._create_estimator(X)
             is_included = is_labeled(y, missing_label=-1)
             self._label_counts = [
                 np.sum(y[is_included] == c)
@@ -1555,13 +1551,13 @@ if successful_capymoa_import:
                     raise ValueError("There is no labeled data.")
 
                 column_list = [(str(i) for i in range(X.shape[1]))]
-                column_list += ["target"]
+                column_list += ["label"]
 
                 for i in range(len(y_train)):
                     x_inst = X_train[i]
                     y_inst = y_train[i].item()
                     instance = capymoa.instance.LabeledInstance.from_array(
-                        self.schema,
+                        self.schema_,
                         x=x_inst,
                         y_index=y_inst,
                     )
@@ -1578,11 +1574,20 @@ if successful_capymoa_import:
                 )
             return self
 
-        def _create_estimator(self):
+        def _create_estimator(self, X):
             estimator_kwargs = {}
             if self.estimator_param_dict is not None:
                 estimator_kwargs = self.estimator_param_dict
-            return self.estimator_class(self.schema, **estimator_kwargs)
+            # features here means all attributes of an instance including their
+            # class label
+            features = [f"f{f}" for f in range(X.shape[1])]
+            features.append("label")
+            categories = {"label": [str(c) for c in range(len(self.classes_))]}
+            self.schema_ = capymoa.stream.Schema.from_custom(
+                features=features, target="label", categories=categories
+            )
+            print(self.schema_)
+            return self.estimator_class(self.schema_, **estimator_kwargs)
 
 
 if successful_river_import:

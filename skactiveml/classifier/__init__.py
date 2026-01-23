@@ -29,8 +29,8 @@ except ImportError:  # pragma: no cover
     pass
 
 try:
-    from ._wrapper import CapymoaClassifier  # noqa: F401
+    from ._wrapper import CapyMOAClassifier  # noqa: F401
 
-    __all__ += ["CapymoaClassifier"]
+    __all__ += ["CapyMOAClassifier"]
 except ImportError:  # pragma: no cover
     pass
