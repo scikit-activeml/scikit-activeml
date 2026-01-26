@@ -45,16 +45,10 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-successful_capymoa_import = False
-try:
-    import capymoa
-    import capymoa.base
-    import capymoa.stream
-    import capymoa.instance
-
-    successful_capymoa_import = True
-except ImportError:  # pragma: no cover
-    pass
+# defer import of capymoa as it may result in an error with pytest
+import importlib
+spec = importlib.util.find_spec("capymoa")
+successful_capymoa_import = spec is not None
 
 successful_river_import = False
 try:
@@ -1434,7 +1428,7 @@ if successful_capymoa_import:
             if self.is_fitted_:
                 if self.cost_matrix is None:
                     P = self.predict_proba(X)
-                    y_pred = rand_argmin(
+                    y_pred = rand_argmax(
                         P, random_state=self.random_state_, axis=1
                     )
                 else:
@@ -1443,6 +1437,7 @@ if successful_capymoa_import:
                     y_pred = rand_argmin(
                         costs, random_state=self.random_state_, axis=1
                     )
+                y_pred = self._le.inverse_transform(y_pred)
             else:
                 p = self.predict_proba([X[0]])[0]
                 y_pred = self.random_state_.choice(
@@ -1466,10 +1461,13 @@ if successful_capymoa_import:
                 The class probabilities of the input samples. Classes are
                 ordered according to the attribute `self.classes_`.
             """
+            import capymoa
+            import capymoa.instance
             check_is_fitted(self)
             predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
             X = check_array(X, **(self.check_X_dict_ | predict_dict))
             check_n_features(self, X, reset=False)
+            n_classes = len(self.classes_)
             if self.is_fitted_:
                 P_list = []
                 for x in X:
@@ -1477,17 +1475,19 @@ if successful_capymoa_import:
                         schema=self.schema_, instance=x
                     )
                     P_i = self.estimator_.predict_proba(x_instance)
+                    # if estimator_ fails, it returns None. In this case, we 
+                    # use a uniform distribution as fallback
+                    if P_i is None:
+                        P_i = np.ones(n_classes)/n_classes
+                        print(P_i)
+                    pad_length = n_classes-len(P_i)
+                    if pad_length > 0:
+                        P_i = np.pad(P_i, (0, pad_length))
                     P_list.append(P_i)
-                    print(P_i)
                 P = np.array(P_list)
-                # # map the predicted classes to self.classes
-                # if len(est_classes) != len(self.classes_):
-                #     P_ext = np.zeros((len(X), len(self.classes_)))
-                #     class_indices = est_classes
-                #     P_ext[:, class_indices] = (
-                #         1 if len(class_indices) == 1 else P
-                #     )
-                #     P = P_ext
+                # resize array as capymoa removes columns for unseen classes
+                # whose index are higher than all observed classes so far
+                # P = np.pad(P, ((0,0), (0, len(self.classes_)-P.shape[1])))
                 if not np.any(np.isnan(P)):
                     return P
 
@@ -1501,6 +1501,9 @@ if successful_capymoa_import:
             return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
 
         def _fit(self, fit_function, X, y, sample_weight=None):
+            import capymoa
+            import capymoa.base
+            import capymoa.instance
             # Check input parameters.
             self.check_X_dict_ = {
                 "ensure_min_samples": 0,
@@ -1518,32 +1521,37 @@ if successful_capymoa_import:
             )
 
             # Check whether estimator is a valid classifier.
-            if not issubclass(
-                self.estimator_class, capymoa.base.MOAClassifier
+            if ( 
+                isinstance(self.estimator_class, type) and
+                not issubclass(
+                    self.estimator_class, capymoa.base.MOAClassifier
+                )
             ):
                 raise TypeError(
                     "'{}' must be a capymoa "
                     "classifier.".format(self.estimator)
                 )
-
-            # Check whether estimator can deal with cost matrix.
-            if self.cost_matrix is not None and not hasattr(
-                self.estimator, "predict_proba"
-            ):
-                raise ValueError(
-                    "'cost_matrix' can be only set, if 'estimator'"
-                    "implements 'predict_proba'."
-                )
-            if hasattr(self, "estimator_"):
-                if fit_function != "partial_fit":
-                    self.estimator_ = self._create_estimator(X)
-            else:
-                self.estimator_ = self._create_estimator(X)
             is_included = is_labeled(y, missing_label=-1)
             self._label_counts = [
                 np.sum(y[is_included] == c)
                 for c in range(len(self._le.classes_))
             ]
+            if hasattr(self, "estimator_"):
+                if fit_function != "partial_fit":
+                    self.estimator_ = self._create_estimator(X)
+            else:
+                self.estimator_ = self._create_estimator(X)
+            if self.estimator_ is None:
+                self.is_fitted_ = False
+                return self
+            # Check whether estimator can deal with cost matrix.
+            if self.cost_matrix is not None and not hasattr(
+                self.estimator_, "predict_proba"
+            ):
+                raise ValueError(
+                    "'cost_matrix' can be only set, if 'estimator'"
+                    "implements 'predict_proba'."
+                )
             try:
                 X_train = X[is_included]
                 y_train = y[is_included].astype(np.int64)
@@ -1575,18 +1583,22 @@ if successful_capymoa_import:
             return self
 
         def _create_estimator(self, X):
+            import capymoa
+            import capymoa.stream
             estimator_kwargs = {}
             if self.estimator_param_dict is not None:
                 estimator_kwargs = self.estimator_param_dict
             # features here means all attributes of an instance including their
             # class label
+            X_shape = X.shape
+            if len(X_shape) != 2:
+                return None
             features = [f"f{f}" for f in range(X.shape[1])]
             features.append("label")
             categories = {"label": [str(c) for c in range(len(self.classes_))]}
             self.schema_ = capymoa.stream.Schema.from_custom(
                 features=features, target="label", categories=categories
             )
-            print(self.schema_)
             return self.estimator_class(self.schema_, **estimator_kwargs)
 
 
