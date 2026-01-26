@@ -63,6 +63,7 @@ import importlib.util
 spec = importlib.util.find_spec("capymoa")
 successful_capymoa_import = spec is not None
 
+
 class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
     def setUp(self):
         estimator_class = SklearnClassifier
@@ -1762,13 +1763,14 @@ if successful_river_import:
 
 
 if successful_capymoa_import:
+
     class TestCapyMOAClassifier(
-        TemplateSkactivemlClassifier,
-        unittest.TestCase
+        TemplateSkactivemlClassifier, unittest.TestCase
     ):
         def setUp(self):
             from capymoa.classifier import AdaptiveRandomForestClassifier
             from skactiveml.classifier import CapyMOAClassifier
+
             # Set global seeds.
             random.seed(0)
             self.X, self.y_true = make_blobs(
@@ -1803,13 +1805,12 @@ if successful_capymoa_import:
         def test_init_param_estimator_class(self):
             from capymoa.classifier import AdaptiveRandomForestClassifier
             from capymoa.stream import Schema
+
             schema = Schema.from_custom(
-                ['f0', 'target', 'f1'],
-                target='target',
-                categories={
-                    'target': ['0','1','2','3']
-                },
-                name='test_ds'
+                ["f0", "target", "f1"],
+                target="target",
+                categories={"target": ["0", "1", "2", "3"]},
+                name="test_ds",
             )
             test_cases = [
                 (Perceptron(), TypeError),
@@ -1817,7 +1818,7 @@ if successful_capymoa_import:
                 (GaussianNB(), TypeError),
                 (LinearRegression(), TypeError),
                 (AdaptiveRandomForestClassifier(schema=schema), TypeError),
-                (AdaptiveRandomForestClassifier, None)
+                (AdaptiveRandomForestClassifier, None),
             ]
             self._test_param("init", "estimator_class", test_cases)
 

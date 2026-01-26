@@ -47,6 +47,7 @@ except ImportError:  # pragma: no cover
 
 # defer import of capymoa as it may result in an error with pytest
 import importlib
+
 spec = importlib.util.find_spec("capymoa")
 successful_capymoa_import = spec is not None
 
@@ -1463,6 +1464,7 @@ if successful_capymoa_import:
             """
             import capymoa
             import capymoa.instance
+
             check_is_fitted(self)
             predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
             X = check_array(X, **(self.check_X_dict_ | predict_dict))
@@ -1475,12 +1477,12 @@ if successful_capymoa_import:
                         schema=self.schema_, instance=x
                     )
                     P_i = self.estimator_.predict_proba(x_instance)
-                    # if estimator_ fails, it returns None. In this case, we 
+                    # if estimator_ fails, it returns None. In this case, we
                     # use a uniform distribution as fallback
                     if P_i is None:
-                        P_i = np.ones(n_classes)/n_classes
+                        P_i = np.ones(n_classes) / n_classes
                         print(P_i)
-                    pad_length = n_classes-len(P_i)
+                    pad_length = n_classes - len(P_i)
                     if pad_length > 0:
                         P_i = np.pad(P_i, (0, pad_length))
                     P_list.append(P_i)
@@ -1504,6 +1506,7 @@ if successful_capymoa_import:
             import capymoa
             import capymoa.base
             import capymoa.instance
+
             # Check input parameters.
             self.check_X_dict_ = {
                 "ensure_min_samples": 0,
@@ -1521,11 +1524,8 @@ if successful_capymoa_import:
             )
 
             # Check whether estimator is a valid classifier.
-            if ( 
-                isinstance(self.estimator_class, type) and
-                not issubclass(
-                    self.estimator_class, capymoa.base.MOAClassifier
-                )
+            if isinstance(self.estimator_class, type) and not issubclass(
+                self.estimator_class, capymoa.base.MOAClassifier
             ):
                 raise TypeError(
                     "'{}' must be a capymoa "
@@ -1585,6 +1585,7 @@ if successful_capymoa_import:
         def _create_estimator(self, X):
             import capymoa
             import capymoa.stream
+
             estimator_kwargs = {}
             if self.estimator_param_dict is not None:
                 estimator_kwargs = self.estimator_param_dict
