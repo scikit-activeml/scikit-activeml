@@ -1822,6 +1822,26 @@ if successful_capymoa_import:
             ]
             self._test_param("init", "estimator_class", test_cases)
 
+        def test_init_param_estimator_param_dict(self):
+            from capymoa.stream import Schema
+
+            schema = Schema.from_custom(
+                ["f0", "target", "f1"],
+                target="target",
+                categories={"target": ["0", "1", "2", "3"]},
+                name="test_ds",
+            )
+            test_cases = [
+                ("Test", TypeError),
+                ([("disable_drift_detection", True)], TypeError),
+                (
+                    [{"disable_drift_detection": True, "schema": schema}],
+                    TypeError,
+                ),
+                ([{"disable_drift_detection": True}], TypeError),
+            ]
+            self._test_param("init", "estimator_class", test_cases)
+
         def _test_fit(self, fit_function):
             from capymoa.classifier import AdaptiveRandomForestClassifier
 

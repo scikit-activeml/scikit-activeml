@@ -34,6 +34,9 @@ from ..utils import (
     check_n_features,
 )
 
+# used to defer import of capymoa as it may result in an error with pytest
+import importlib
+
 successful_skorch_torch_import = False
 try:
     import torch
@@ -44,9 +47,6 @@ try:
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover
     pass
-
-# defer import of capymoa as it may result in an error with pytest
-import importlib
 
 spec = importlib.util.find_spec("capymoa")
 successful_capymoa_import = spec is not None
@@ -1481,7 +1481,6 @@ if successful_capymoa_import:
                     # use a uniform distribution as fallback
                     if P_i is None:
                         P_i = np.ones(n_classes) / n_classes
-                        print(P_i)
                     pad_length = n_classes - len(P_i)
                     if pad_length > 0:
                         P_i = np.pad(P_i, (0, pad_length))
@@ -1524,12 +1523,12 @@ if successful_capymoa_import:
             )
 
             # Check whether estimator is a valid classifier.
-            if isinstance(self.estimator_class, type) and not issubclass(
+            if not isinstance(self.estimator_class, type) or not issubclass(
                 self.estimator_class, capymoa.base.MOAClassifier
             ):
                 raise TypeError(
                     "'{}' must be a capymoa "
-                    "classifier.".format(self.estimator)
+                    "classifier.".format(self.estimator_class)
                 )
             is_included = is_labeled(y, missing_label=-1)
             self._label_counts = [
@@ -1545,13 +1544,6 @@ if successful_capymoa_import:
                 self.is_fitted_ = False
                 return self
             # Check whether estimator can deal with cost matrix.
-            if self.cost_matrix is not None and not hasattr(
-                self.estimator_, "predict_proba"
-            ):
-                raise ValueError(
-                    "'cost_matrix' can be only set, if 'estimator'"
-                    "implements 'predict_proba'."
-                )
             try:
                 X_train = X[is_included]
                 y_train = y[is_included].astype(np.int64)
@@ -1588,6 +1580,17 @@ if successful_capymoa_import:
 
             estimator_kwargs = {}
             if self.estimator_param_dict is not None:
+                if not isinstance(self.estimator_param_dict, dict):
+                    raise TypeError(
+                        "The 'estimator_param_dict=' must be a dictionary but"
+                        f"is {self.estimator_param_dict}."
+                    )
+                if "schema" in self.estimator_param_dict:
+                    raise AttributeError(
+                        "The schema must not be set in "
+                        "'self.estimator_param_dict' and must only be set"
+                        "with 'self.schema'."
+                    )
                 estimator_kwargs = self.estimator_param_dict
             # features here means all attributes of an instance including their
             # class label
