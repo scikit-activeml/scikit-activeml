@@ -1513,10 +1513,10 @@ if successful_capymoa_import:
                 "allow_nd": True,
                 "dtype": None,
             }
-            X, y, sample_weight = self._validate_data(
+            X, y, _ = self._validate_data(
                 X=X,
                 y=y,
-                sample_weight=sample_weight,
+                sample_weight=None,
                 check_X_dict=self.check_X_dict_,
                 reset=fit_function == "fit"
                 or not hasattr(self, "n_features_in_"),
