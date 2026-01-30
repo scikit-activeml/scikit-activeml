@@ -1309,13 +1309,18 @@ if successful_capymoa_import:
 
         Implementation of a wrapper class for `CapyMOA` classifiers such that
         missing labels can be handled and the interfaces are compatible with
-        `scikit-learn`.
-        Therefore, samples with missing labels are filtered.
+        `scikit-learn`. Therefore, samples with missing labels are filtered.
 
         Parameters
         ----------
-        estimator : sklearn.base.ClassifierMixin with predict_proba method
-            The `scikit-learn` classifier to be wrapped.
+        estimator_class : capymoa.base.MOAClassifier.__class__
+            The `capymoa` classifier class that is used to initialize the
+            `capymoa` classifier.
+        estimator_param_dict : dict, default=None
+            Additional arguments for `capymoa.base.MOAClassifier`. If
+            `estimator_param_dict` is `None`, no additional arguments are
+            added. `schema` is not allowed in this dictionary and will be
+            created internally.
         classes : array-like of shape (n_classes,), default=None
             Holds the label for each class. If `None`, the classes are
             determined during `fit`.
@@ -1336,8 +1341,9 @@ if successful_capymoa_import:
         cost_matrix_ : numpy.ndarray of shape (classes, classes)
             Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
             class `classes_[j]` for a sample of class `classes_[i]`.
-        estimator_ : sklearn.base.ClassifierMixin with predict_proba method
-            The scikit-learn classifier after calling the `fit` method.
+        estimator_ : capymoa.base.MOAClassifier
+            initialized MOAClassifier whose predictions and training are
+            wrapped.
         """
 
         def __init__(
@@ -1359,10 +1365,9 @@ if successful_capymoa_import:
             self.estimator_param_dict = estimator_param_dict
 
         def fit(self, X, y):
-            """Initialize and fit the module.
-
-            If the module was already initialized, by calling fit, the module
-            will be re-initialized (unless `warm_start` is True).
+            """Fit the module with (re-)initialization using `X` as training
+            data and `y` as class labels. The model is reinitialized from
+            scratch when using `fit`
 
             Parameters
             ----------
@@ -1375,16 +1380,15 @@ if successful_capymoa_import:
 
             Returns
             -------
-            self: SkorchClassifier,
-                `SkorchClassifier` object fitted on the training data.
+            self: CapyMOAClassifier,
+                `CapyMOAClassifier` object fitted on the training data.
             """
             return self._fit("fit", X, y)
 
         def partial_fit(self, X, y):
-            """Fit the module without re-initialization.
-
-            If the module was already initialized, by calling `partial_fit`,
-            the module will not be re-initialized again.
+            """Fit the module without re-initialization. If the module was
+            already initialized, by calling `partial_fit` or `fit`, the module
+            will not be re-initialized again.
 
             Parameters
             ----------
@@ -1397,20 +1401,13 @@ if successful_capymoa_import:
 
             Returns
             -------
-            self: SkorchClassifier
-                `SkorchClassifier` object fitted on the training data.
+            self: CapyMOAClassifier
+                `CapyMOAClassifier` object fitted on the training data.
             """
             return self._fit("partial_fit", X, y)
 
         def predict(self, X):
             """Return class predictions for the test samples `X`.
-
-            By default, this method returns only the predicted classes
-            `y_pred`. The predictions are obtained via the class probabilities
-            `P` outputted by `predict_proba`. If `extra_outputs` is provided,
-            a tuple is returned whose first element is `y_pred` and whose
-            remaining elements are the requested additional forward outputs,
-            in the order specified by `extra_outputs`.
 
             Parameters
             ----------
@@ -1486,9 +1483,6 @@ if successful_capymoa_import:
                         P_i = np.pad(P_i, (0, pad_length))
                     P_list.append(P_i)
                 P = np.array(P_list)
-                # resize array as capymoa removes columns for unseen classes
-                # whose index are higher than all observed classes so far
-                # P = np.pad(P, ((0,0), (0, len(self.classes_)-P.shape[1])))
                 if not np.any(np.isnan(P)):
                     return P
 
@@ -1575,6 +1569,20 @@ if successful_capymoa_import:
             return self
 
         def _create_estimator(self, X):
+            """Initialize the estimator according so `self.classes_` and `X`.
+            This function assumes that self.validate_data has been used to
+            guarantee that `self.classes_` exists.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+
+            Returns
+            -------
+            estimator: CapyMOAClassifier,
+                The initialized but untrained `CapyMOAClassifier`.
+            """
             import capymoa
             import capymoa.stream
 
@@ -1612,8 +1620,8 @@ if successful_river_import:
         """River Classifier
 
         Implementation of a wrapper class for `river` classifiers such that
-        they implement the SkactivemlClassifier interfaces for
-        classifiers. Additionally, filters the samples with missing labels if
+        they implement the SkactivemlClassifier interfaces for classifiers.
+        Additionally, filters the samples with missing labels if
         needed.
 
         Parameters
@@ -1683,8 +1691,8 @@ if successful_river_import:
 
             Returns
             -------
-            self: SklearnClassifier,
-                The `SklearnClassifier` fitted on the training data.
+            self: Riverclassifier,
+                The `Riverclassifier` fitted on the training data.
             """
             return self._fit(
                 fit_function="fit",
@@ -1717,8 +1725,8 @@ if successful_river_import:
 
             Returns
             -------
-            self : SklearnClassifier,
-                The `SklearnClassifier` is fitted on the training data.
+            self : Riverclassifier,
+                The `Riverclassifier` is fitted on the training data.
             """
             return self._fit(
                 fit_function="partial_fit",
