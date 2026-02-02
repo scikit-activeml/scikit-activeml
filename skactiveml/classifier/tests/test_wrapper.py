@@ -1749,6 +1749,25 @@ if successful_river_import:
                             np.full(pred_proba.shape, 1.0 / n_classes),
                         )
 
+                clf = RiverClassifier(**init_default_params)
+                clf.fit(X_train[:, :, None], np.full(y_train.shape, 0))
+
+                # fail training but provide valid labels
+                if clf_name == "HoeffdingAdaptiveTreeClassifier":
+                    for X_str in ["X_train", "X_test"]:
+                        X = X_train
+                        if X_str == "X_test":
+                            X = X_test
+                        with self.subTest(
+                            f"no labels, clf:{clf_name}, X:{X_str}"
+                        ):
+                            pred_proba = clf.predict_proba(X)
+                            self.assertEqual(pred_proba.shape[0], len(X))
+                            self.assertEqual(pred_proba.shape[1], n_classes)
+                            # every predictions should be the same
+                            self.assertEqual(pred_proba[:, 0].sum(), len(X))
+                            self.assertFalse(clf.is_fitted_)
+
         def test_is_fitted(self):
             init_params = deepcopy(self.init_default_params)
             init_params["classes"] = [0, 1]
@@ -2029,6 +2048,22 @@ if successful_capymoa_import:
                             pred_proba,
                             np.full(pred_proba.shape, 1.0 / n_classes),
                         )
+
+                clf = CapyMOAClassifier(**init_default_params)
+                clf.fit(X_train[:, :, None], np.full(y_train.shape, 0))
+
+                # fail training but provide valid labels
+                for X_str in ["X_train", "X_test"]:
+                    X = X_train
+                    if X_str == "X_test":
+                        X = X_test
+                    with self.subTest(f"no labels, clf:{est_name}, X:{X_str}"):
+                        pred_proba = clf.predict_proba(X)
+                        self.assertEqual(pred_proba.shape[0], len(X))
+                        self.assertEqual(pred_proba.shape[1], n_classes)
+                        # every predictions should be the same
+                        self.assertEqual(pred_proba[:, 0].sum(), len(X))
+                        self.assertFalse(clf.is_fitted_)
 
         def test_is_fitted(self):
             init_params = deepcopy(self.init_default_params)
