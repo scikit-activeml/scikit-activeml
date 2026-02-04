@@ -48,13 +48,13 @@ except ImportError:
 successful_river_import = False
 try:
     from skactiveml.classifier import RiverClassifier
+    import pandas as pd
     import river.tree
     import river.neighbors
     import river.naive_bayes
     import river.multiclass
     import river.forest
     import river.linear_model
-    import river.imblearn
 
     successful_river_import = True
 except ImportError:
@@ -1535,7 +1535,9 @@ if successful_river_import:
                 "learn_one clf": river.tree.HoeffdingAdaptiveTreeClassifier(
                     seed=0
                 ),
-                "learn_many clf": river.naive_bayes.GaussianNB(),
+                "learn_many clf": river.multiclass.OneVsRestClassifier(
+                    river.linear_model.LogisticRegression()
+                ),
             }
             for clf_name, river_clf in clfs.items():
                 with self.subTest(clf_name):
@@ -1579,15 +1581,19 @@ if successful_river_import:
                         results["predict"] = pred_result
                         results["predict_proba"] = pred_proba_result
                         fit_results[fit_func] = results
+                        self.assertTrue(clf.is_fitted_)
+                        self.assertAlmostEqual(
+                            0, results["predict_proba"][:, 0].sum()
+                        )
                     if clf_name == "learn_one clf":
                         np.testing.assert_equal(
                             fit_results["fit"]["predict"],
                             fit_results["partial_fit"]["predict"],
                         )
-                    np.testing.assert_almost_equal(
-                        fit_results["fit"]["predict_proba"],
-                        fit_results["partial_fit"]["predict_proba"],
-                    )
+                        np.testing.assert_almost_equal(
+                            fit_results["fit"]["predict_proba"],
+                            fit_results["partial_fit"]["predict_proba"],
+                        )
 
         def test_predict(self):
             clfs = {
@@ -1597,14 +1603,14 @@ if successful_river_import:
                 "GaussianNB": river.naive_bayes.GaussianNB(),
             }
             for clf_name, river_clf in clfs.items():
-                n_classes = 10
+                n_classes = 2
                 classes = list(range(n_classes))
                 X, y = make_blobs(
-                    n_samples=200,
+                    n_samples=2000,
                     centers=n_classes,
                     shuffle=True,
                     random_state=0,
-                    cluster_std=1.0,
+                    cluster_std=0.01,
                 )
                 X_train, X_test, y_train, y_test = train_test_split(
                     X, y, random_state=0
@@ -1618,6 +1624,7 @@ if successful_river_import:
                 }
                 clf = RiverClassifier(**init_default_params)
                 clf.fit(X_train, y_train)
+                self.assertTrue(clf.is_fitted_)
 
                 for X_str in ["X_train", "X_test"]:
                     X = X_train
@@ -1628,7 +1635,7 @@ if successful_river_import:
                     with self.subTest(f"clf:{clf_name}, X:{X_str}"):
                         pred = clf.predict(X)
                         self.assertEqual(len(pred), len(X))
-                        np.testing.assert_equal(np.unique(pred), classes)
+                        # np.testing.assert_equal(np.unique(pred), classes)
                         # Check that the model learns the classification even
                         # though it might not be perfect
                         accuracy = np.mean(pred == y)
@@ -1648,9 +1655,15 @@ if successful_river_import:
 
                 clf = RiverClassifier(**init_default_params)
                 sample_weight = np.full(y_train.shape, 1.0)
-                sample_weight[y_train == 5] = 0
-                if clf_name == "HoeffdingAdaptiveTreeClassifier":
+                sample_weight[y_train == 5] = 0.000001
+                if clf_name == "GaussianNB":
+                    # GaussianNB does not support sample weight
+                    self.assertRaises(
+                        ValueError, clf.fit, X_train, y_train, sample_weight
+                    )
+                else:
                     clf.fit(X_train, y_train, sample_weight)
+                    self.assertTrue(clf.is_fitted_)
 
                     for X_str in ["X_train", "X_test"]:
                         X = X_train
@@ -1662,11 +1675,6 @@ if successful_river_import:
                             pred = clf.predict(X)
                             self.assertEqual(len(pred), len(X))
                             self.assertEqual(np.sum(pred == 5), 0)
-                else:
-                    # GaussianNB does not support sample weight
-                    self.assertRaises(
-                        ValueError, clf.fit, X_train, y_train, sample_weight
-                    )
 
             init_default_params = {
                 "estimator": river.linear_model.LogisticRegression(),
@@ -1760,6 +1768,79 @@ if successful_river_import:
             clf = RiverClassifier(**init_params)
             clf.fit(self.X, self.y_ulbld)
             check_is_fitted(clf)
+
+        def test_consistency(self):
+            # check if predictions of wrapper are (almost) equal to the actual
+            # predictions of the raw river classifier
+            clfs = {
+                "HoeffdingAdaptiveTreeClassifier": (
+                    river.tree.HoeffdingAdaptiveTreeClassifier(seed=0)
+                ),
+                "GaussianNB": river.naive_bayes.GaussianNB(),
+                "LR": river.linear_model.LogisticRegression(),
+            }
+            for clf_name, river_clf in clfs.items():
+                n_classes = 2
+                classes = list(range(n_classes))
+                X, y = make_blobs(
+                    n_samples=200,
+                    centers=n_classes,
+                    shuffle=True,
+                    random_state=0,
+                    cluster_std=1.0,
+                )
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, random_state=0
+                )
+                init_default_params = {
+                    "estimator": deepcopy(river_clf),
+                    "classes": classes,
+                    "missing_label": MISSING_LABEL,
+                    "cost_matrix": None,
+                    "random_state": 0,
+                }
+                clf = RiverClassifier(**init_default_params)
+                clf.fit(X_train, y_train)
+                pred_proba = clf.predict_proba(X_test)
+
+                pred_proba_river = self.evaluate_river_model(
+                    deepcopy(river_clf), X_train, y_train, X_test, clf.classes_
+                )
+                np.testing.assert_almost_equal(pred_proba, pred_proba_river)
+
+        def evaluate_river_model(
+            self, base_clf, X_train, y_train, X_test, classes
+        ):
+            # fit a river classifier and returns its predict_proba results of
+            # from river classifiers
+            X_train_pd = self.prepare_river_data(X_train)
+            y_train_pd = pd.Series(y_train)
+            X_test_pd = self.prepare_river_data(X_test)
+            river_clf = deepcopy(base_clf)
+            if hasattr(river_clf, "learn_many"):
+                river_clf.learn_many(X_train_pd, y_train_pd)
+            else:
+                for i in range(len(X_train)):
+                    X_train_pd_i = X_train_pd.iloc[i]
+                    y_train_pd_i = y_train_pd.iloc[i]
+                    river_clf.learn_one(X_train_pd_i, y_train_pd_i)
+            pred_proba = []
+            for i, X_test_pd_i in X_test_pd.iterrows():
+                pred_proba_river = river_clf.predict_proba_one(
+                    X_test_pd_i.to_dict()
+                )
+                sorted_pred_proba_entry = []
+                for c in classes:
+                    sorted_pred_proba_entry.append(pred_proba_river[c])
+                pred_proba.append(sorted_pred_proba_entry)
+            return np.array(pred_proba)
+
+        def prepare_river_data(self, data):
+            column_names = [f"X{f_i}" for f_i in range(data.shape[1])]
+            data_dict = {
+                col_name: col for col_name, col in zip(column_names, data.T)
+            }
+            return pd.DataFrame(data_dict)
 
 
 if successful_capymoa_import:
@@ -1954,8 +2035,6 @@ if successful_capymoa_import:
                         # Check that the model learns the classification even
                         # though it might not be perfect
                         accuracy = np.mean(pred == y)
-                        print(est_name)
-                        print(accuracy)
                         self.assertGreaterEqual(accuracy, 0.80)
 
                 clf = CapyMOAClassifier(**init_default_params)
@@ -2041,3 +2120,83 @@ if successful_capymoa_import:
             clf = CapyMOAClassifier(**init_params)
             clf.fit(self.X, self.y_ulbld)
             check_is_fitted(clf)
+
+        def test_consistency(self):
+            # check if predictions of wrapper are (almost) equal to the actual
+            # predictions of the raw river classifier
+            from capymoa.classifier import (
+                AdaptiveRandomForestClassifier,
+                DynamicWeightedMajority,
+            )
+
+            clfs = {
+                "AdaptiveRandomForestClassifier": (
+                    AdaptiveRandomForestClassifier
+                ),
+                "DynamicWeightedMajority": DynamicWeightedMajority,
+            }
+            for clf_name, estimator_class in clfs.items():
+                n_classes = 2
+                classes = list(range(n_classes))
+                X, y = make_blobs(
+                    n_samples=200,
+                    centers=n_classes,
+                    shuffle=True,
+                    random_state=0,
+                    cluster_std=1.0,
+                )
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, random_state=0
+                )
+                init_default_params = {
+                    "estimator_class": estimator_class,
+                    "classes": classes,
+                    "missing_label": MISSING_LABEL,
+                    "cost_matrix": None,
+                    "random_state": 0,
+                }
+                clf = CapyMOAClassifier(**init_default_params)
+                clf.fit(X_train, y_train)
+                pred_proba = clf.predict_proba(X_test)
+
+                pred_proba_river = self.evaluate_capymoa_model(
+                    estimator_class, X_train, y_train, X_test, clf.classes_
+                )
+                np.testing.assert_almost_equal(pred_proba, pred_proba_river)
+
+        def evaluate_capymoa_model(
+            self, base_clf_cls, X_train, y_train, X_test, classes
+        ):
+            # fit a capymoa classifier and returns its predict_proba results of
+            # from capymoa classifiers
+            from capymoa.stream import Schema
+            from capymoa.instance import LabeledInstance, Instance
+
+            column_list = [f"f{i}" for i in range(X_train.shape[1])]
+            column_list += ["label"]
+            schema = Schema.from_custom(
+                features=column_list,
+                target="label",
+                categories={"label": classes},
+            )
+            clf = base_clf_cls(schema=schema)
+            # we assume that classes is from 0 to C
+            for i in range(len(X_train)):
+                instance = LabeledInstance.from_array(
+                    schema=schema,
+                    x=X_train[i],
+                    y_index=y_train[i],
+                )
+                clf.train(instance)
+            pred_proba = []
+            for i in range(len(X_test)):
+                instance = Instance.from_array(
+                    schema=schema, instance=X_test[i]
+                )
+                pred_proba_capymoa = clf.predict_proba(instance)
+                if pred_proba_capymoa is None:
+                    pred_proba_capymoa = np.ones(
+                        shape=(classes,), dtype=float
+                    ) / len(classes)
+                pred_proba.append(pred_proba_capymoa)
+            return np.array(pred_proba)

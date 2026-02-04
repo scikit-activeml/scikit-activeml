@@ -1810,18 +1810,10 @@ if successful_river_import:
                     P_i = []
                     if est_classes is None:
                         est_classes = np.sort(list(P_i_dict.keys()))
-                    for c in est_classes:
-                        P_i.append(P_i_dict[c])
+                    for c in self.classes_:
+                        P_i.append(P_i_dict.get(c, 0.0))
                     P_list.append(P_i)
                 P = np.array(P_list)
-                # map the predicted classes to self.classes
-                if len(est_classes) != len(self.classes_):
-                    P_ext = np.zeros((len(X), len(self.classes_)))
-                    class_indices = est_classes
-                    P_ext[:, class_indices] = (
-                        1 if len(class_indices) == 1 else P
-                    )
-                    P = P_ext
                 if not np.any(np.isnan(P)):
                     return P
 
