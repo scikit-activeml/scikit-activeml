@@ -1493,7 +1493,14 @@ if successful_capymoa_import:
                 f"make the predictions."
             )
             # fallback if clf could not be fitted (i.e., no labeled data)
-            return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
+            if sum(self._label_counts) == 0:
+                n_classes = len(self.classes_)
+                return np.ones([len(X), n_classes]) / n_classes
+            else:
+                return np.tile(
+                    self._label_counts / np.sum(self._label_counts),
+                    [len(X), 1],
+                )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
             import capymoa
@@ -1824,7 +1831,14 @@ if successful_river_import:
                 f"make the predictions."
             )
             # fallback if clf could not be fitted (i.e., no labeled data)
-            return np.ones([len(X), len(self.classes_)]) / len(self.classes_)
+            if sum(self._label_counts) == 0:
+                n_classes = len(self.classes_)
+                return np.ones([len(X), n_classes]) / n_classes
+            else:
+                return np.tile(
+                    self._label_counts / np.sum(self._label_counts),
+                    [len(X), 1],
+                )
 
         def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
             # Check input parameters.
