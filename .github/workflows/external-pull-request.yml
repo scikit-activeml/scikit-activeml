@@ -183,7 +183,7 @@ jobs:
         sphinx-build -b html docs docs/_build
         zip -r docs.zip docs
     - name: 'Upload Docs Artifact'
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: docs_${{ matrix.python-version }}.zip
         path: docs
