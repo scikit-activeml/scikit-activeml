@@ -63,8 +63,7 @@ Source         = "https://github.com/scikit-activeml/scikit-activeml"
 [tool.pytest]
 addopts = [
   "--cov=./skactiveml",
-  "--cov-report=xml",
-  "--numprocesses=auto",
+  "--cov-report=xml"
 ]
 testpaths = ["./skactiveml"]
 
