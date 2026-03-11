@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 name            = "scikit-activeml"
 description     = "scikit-activeml is a Python library for active learning on top of SciPy and scikit-learn."
 readme          = { file = "README-pypi.rst", content-type = "text/x-rst" }
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license-files   = ["LICENSE.txt"]
 maintainers     = [
   { name = "Marek Herde", email = "marek.herde@uni-kassel.de" },
@@ -26,7 +26,6 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -65,6 +64,7 @@ Source         = "https://github.com/scikit-activeml/scikit-activeml"
 addopts = [
   "--cov=./skactiveml",
   "--cov-report=xml",
+  "--numprocesses=auto",
 ]
 testpaths = ["./skactiveml"]
 
