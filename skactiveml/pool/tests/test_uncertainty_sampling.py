@@ -231,6 +231,7 @@ class TestExpectedAveragePrecision(unittest.TestCase):
 class TestUncertaintyScores(unittest.TestCase):
     def setUp(self):
         self.probas = np.array([[0.2, 0.5, 0.3], [0.1, 0.7, 0.2]])
+        self.multilabel_probas = np.array([[0.1, 0.5, 0.9], [0.2, 0.4, 0.6]])
         self.classes = np.array([0, 1, 2])
         self.cost_matrix = np.ones((3, 3))
 
@@ -241,6 +242,18 @@ class TestUncertaintyScores(unittest.TestCase):
             ValueError, uncertainty_scores, probas=[[0.6, 0.1, 0.2]]
         )
         self.assertRaises(ValueError, uncertainty_scores, probas="string")
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=[[1.1, 0.2], [0.4, 0.6]],
+            is_multilabel=True,
+        )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=[[-0.1, 0.2], [0.4, 0.6]],
+            is_multilabel=True,
+        )
 
     def test_init_param_method(self):
         self.assertRaises(
@@ -248,13 +261,6 @@ class TestUncertaintyScores(unittest.TestCase):
         )
         self.assertRaises(
             ValueError, uncertainty_scores, self.probas, method=1
-        )
-        self.assertRaises(
-            ValueError,
-            uncertainty_scores,
-            self.probas,
-            method="margin_sampling",
-            is_multilabel=True,
         )
 
     def test_param_cost_matrix(self):
@@ -289,11 +295,51 @@ class TestUncertaintyScores(unittest.TestCase):
         np.testing.assert_allclose(val_scores, scores)
 
         # multilabel methods
+        val_scores = np.array([0.2333333333, 0.3333333333])
         scores = uncertainty_scores(
-            self.probas, method="least_confident", is_multilabel=True
+            self.multilabel_probas,
+            method="least_confident",
+            is_multilabel=True,
         )
-        self.assertEqual(scores.shape, (len(self.probas),))
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.5, 0.4])
         scores = uncertainty_scores(
-            self.probas, method="entropy", is_multilabel=True
+            self.multilabel_probas,
+            method="least_confident",
+            is_multilabel=True,
+            multilabel_aggregation_fn=np.max,
         )
-        self.assertEqual(scores.shape, (len(self.probas),))
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.4477710424, 0.6154752525])
+        scores = uncertainty_scores(
+            self.multilabel_probas, method="entropy", is_multilabel=True
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.6931471804, 0.6730116670])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="entropy",
+            is_multilabel=True,
+            multilabel_aggregation_fn=np.max,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([0.4666666667, 0.6666666667])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="margin_sampling",
+            is_multilabel=True,
+        )
+        np.testing.assert_allclose(val_scores, scores)
+
+        val_scores = np.array([1.0, 0.8])
+        scores = uncertainty_scores(
+            self.multilabel_probas,
+            method="margin_sampling",
+            is_multilabel=True,
+            multilabel_aggregation_fn=np.max,
+        )
+        np.testing.assert_allclose(val_scores, scores)

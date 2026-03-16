@@ -49,8 +49,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     method : 'least_confident' or 'margin_sampling' or 'entropy' or \
             'expected_average_precision', default='least_confident'
         The method to calculate the uncertainty. For multilabel targets
-        (`y.ndim == 2`), only `'least_confident'` and `'entropy'` are
-        supported.
+        (`y.ndim == 2`), only `'least_confident'`, `'margin_sampling'`,
+        and `'entropy'` are supported.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for
@@ -63,8 +63,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Callable that takes axis as kwarg and reduces along that axis.
         Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles,
         while `np.sum` is not allowed. This is only used when
-        `method in ['least_confident', 'entropy']` and multilabel targets are
-        provided.
+        `method in ['least_confident', 'margin_sampling', 'entropy']` and
+        multilabel targets are provided.
 
     References
     ----------
@@ -278,14 +278,15 @@ def uncertainty_scores(
     cost_matrix=None,
     method="least_confident",
     is_multilabel=False,
-    multilabel_aggregation_fn=np.max,
+    multilabel_aggregation_fn=np.average,
 ):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]_. For the least confident and
     margin sampling methods cost-sensitive variants are implemented in case of
     a given cost matrix (see [2]_ for more information). For multilabel data,
-    only `'least_confident'` and `'entropy'` are supported.
+    only `'least_confident'`, `'margin_sampling'`, and `'entropy'` are
+    supported.
 
     Parameters
     ----------
@@ -298,7 +299,8 @@ def uncertainty_scores(
     method : 'least_confident' or 'margin_sampling' or 'entropy', \
             default='least_confident'
         The method to calculate the uncertainty. For multilabel data, only
-        `'least_confident'` and `'entropy'` are supported.
+        `'least_confident'`, `'margin_sampling'`, and `'entropy'` are
+        supported.
     is_multilabel: bool, default=False
         indicates if provided probas should be multilabel
     multilabel_aggregation_fn: callable, default=np.average
@@ -318,8 +320,8 @@ def uncertainty_scores(
     # Check probabilities.
     probas = check_array(probas)
 
-    if is_multilabel and not np.all(probas <= 1) and not np.all(0 <= probas):
-        raise ValueError("'probas' are invalid. They need to be wihtin [0,1].")
+    if is_multilabel and (not np.all(probas <= 1) or not np.all(0 <= probas)):
+        raise ValueError("'probas' are invalid. They need to be within [0,1].")
 
     if not is_multilabel and not np.allclose(
         np.sum(probas, axis=1), 1, rtol=0, atol=1.0e-3
@@ -330,12 +332,15 @@ def uncertainty_scores(
 
     n_classes = probas.shape[1]
 
-    if is_multilabel and method not in ["least_confident", "entropy"]:
+    if is_multilabel and method not in [
+        "least_confident",
+        "margin_sampling",
+        "entropy",
+    ]:
         raise ValueError(
             "For multilabel data, supported methods are "
-            "['least_confident', 'entropy'], the given one is: {}.".format(
-                method
-            )
+            "['least_confident', 'margin_sampling', 'entropy'], the given "
+            "one is: {}.".format(method)
         )
 
     # Check cost matrix.
@@ -347,7 +352,8 @@ def uncertainty_scores(
     if method == "least_confident":
         if cost_matrix is None:
             if is_multilabel:
-                return multilabel_aggregation_fn(-np.abs(0.5 - probas), axis=1)
+                per_label_uncertainty = np.minimum(probas, 1 - probas)
+                return multilabel_aggregation_fn(per_label_uncertainty, axis=1)
             return 1 - np.max(probas, axis=1)
         else:
             costs = probas @ cost_matrix
@@ -355,6 +361,9 @@ def uncertainty_scores(
             return costs[:, 0]
     elif method == "margin_sampling":
         if cost_matrix is None:
+            if is_multilabel:
+                per_label_margin = 1 - np.abs(2 * probas - 1)
+                return multilabel_aggregation_fn(per_label_margin, axis=1)
             probas = -(np.partition(-probas, 1, axis=1)[:, :2])
             return 1 - np.abs(probas[:, 0] - probas[:, 1])
         else:
@@ -365,9 +374,11 @@ def uncertainty_scores(
         if cost_matrix is None:
             with np.errstate(divide="ignore", invalid="ignore"):
                 if is_multilabel:
-                    return multilabel_aggregation_fn(
-                        -probas * np.log(probas + 1e-10), axis=1
+                    per_label_entropy = -(
+                        probas * np.log(probas + 1e-10)
+                        + (1 - probas) * np.log(1 - probas + 1e-10)
                     )
+                    return multilabel_aggregation_fn(per_label_entropy, axis=1)
                 return np.nansum(-probas * np.log(probas), axis=1)
         else:
             raise ValueError(

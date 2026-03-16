@@ -36,6 +36,11 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    multilabel_aggregation_fn: callable, default=np.average
+        Callable that takes `axis` as keyword argument and reduces the
+        per-label uncertainty scores for multilabel classification. This is
+        only used when `y` is two-dimensional, corresponding to a multilabel
+        classification problem.
 
     References
     ----------
@@ -49,11 +54,13 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         gamma=10,
         missing_label=MISSING_LABEL,
         random_state=None,
+        multilabel_aggregation_fn=np.average,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
         self.gamma = gamma
+        self.multilabel_aggregation_fn = multilabel_aggregation_fn
 
     def query(
         self,
@@ -71,9 +78,11 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`.)
+            indicated by `self.missing_label`). If `y` is two-dimensional,
+            only multilabel classification problems, i.e. multiple binary
+            classification tasks, are supported.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -123,9 +132,21 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         """
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multioutput=True,
         )
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
+
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
+        X_cand, mapping = self._transform_candidates(
+            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+        )
+
         check_scalar(
             self.gamma,
             "gamma",
@@ -146,7 +167,12 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
 
         # Compute uncertainties via margin sampling (cf. Eq. (1) in [1]).
         probas_cand = clf.predict_proba(X_cand)
-        unc_cand = uncertainty_scores(probas_cand, method="margin_sampling")
+        unc_cand = uncertainty_scores(
+            probas=probas_cand,
+            method="margin_sampling",
+            is_multilabel=is_multioutput,
+            multilabel_aggregation_fn=self.multilabel_aggregation_fn,
+        )
 
         # Initialize distances in probability space (cf. Eq. (3) in [1]).
         dist_cand = unc_cand.copy()
