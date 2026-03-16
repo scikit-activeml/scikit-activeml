@@ -249,6 +249,13 @@ class TestUncertaintyScores(unittest.TestCase):
         self.assertRaises(
             ValueError, uncertainty_scores, self.probas, method=1
         )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            self.probas,
+            method="margin_sampling",
+            is_multilabel=True,
+        )
 
     def test_param_cost_matrix(self):
         self.assertRaises(
@@ -280,3 +287,13 @@ class TestUncertaintyScores(unittest.TestCase):
         val_scores = np.array([0.8, 0.5])
         scores = uncertainty_scores(self.probas, method="margin_sampling")
         np.testing.assert_allclose(val_scores, scores)
+
+        # multilabel methods
+        scores = uncertainty_scores(
+            self.probas, method="least_confident", is_multilabel=True
+        )
+        self.assertEqual(scores.shape, (len(self.probas),))
+        scores = uncertainty_scores(
+            self.probas, method="entropy", is_multilabel=True
+        )
+        self.assertEqual(scores.shape, (len(self.probas),))

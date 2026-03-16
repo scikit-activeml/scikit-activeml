@@ -31,7 +31,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     - least confident [1]_ selecting samples whose predicted top
       class has the lowest confidence,
     - margin sampling [1]_ selecting samples where the gap between the two most
-      probable classes is smallest,
+      probable classes is smallest (single-label only),
     - entropy-based uncertainty [1]_ selecting samples with the highest overall
       predictive uncertainty across classes,
     - and expected average precision [3] selecting samples with the highest
@@ -46,9 +46,11 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
 
     Parameters
     ----------
-    method : 'least_confident' or 'margin' or 'entropy' or \
+    method : 'least_confident' or 'margin_sampling' or 'entropy' or \
             'expected_average_precision', default='least_confident'
-        The method to calculate the uncertainty.
+        The method to calculate the uncertainty. For multilabel targets
+        (`y.ndim == 2`), only `'least_confident'` and `'entropy'` are
+        supported.
     cost_matrix : array-like of shape (n_classes, n_classes)
         Cost matrix with `cost_matrix[i,j]` defining the cost of predicting
         class `j` for a sample with the actual class `i`. Only supported for
@@ -60,7 +62,9 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     multilabel_aggregation_fn: callable, default=np.average
         Callable that takes axis as kwarg and reduces along that axis.
         Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles,
-        while `np.sum` is not allowed.
+        while `np.sum` is not allowed. This is only used when
+        `method in ['least_confident', 'entropy']` and multilabel targets are
+        provided.
 
     References
     ----------
@@ -171,9 +175,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
               refers to the indexing in `candidates`.
         """
         # Validate input parameters.
-
-        is_multilabel = np.array(y).ndim == 2
-
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
             y,
@@ -181,11 +182,13 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
 
+        # Determine candidate samples for selection.
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multilabel=is_multilabel
+            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
         )
 
         # Validate classifier type.
@@ -221,8 +224,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 "expected".format(type(self.method), str)
             )
 
-        # sample_weight is checked by clf when fitted
-
         # Fit the classifier.
         if fit_clf:
             if sample_weight is not None:
@@ -244,7 +245,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                     probas=probas,
                     method=self.method,
                     cost_matrix=self.cost_matrix,
-                    is_multilabel=is_multilabel,
+                    is_multilabel=is_multioutput,
                     multilabel_aggregation_fn=self.multilabel_aggregation_fn,
                 )
             elif self.method == "expected_average_precision":
@@ -283,7 +284,8 @@ def uncertainty_scores(
     confident ('least_confident'), margin sampling ('margin_sampling'),
     and entropy based uncertainty ('entropy') [1]_. For the least confident and
     margin sampling methods cost-sensitive variants are implemented in case of
-    a given cost matrix (see [2]_ for more information).
+    a given cost matrix (see [2]_ for more information). For multilabel data,
+    only `'least_confident'` and `'entropy'` are supported.
 
     Parameters
     ----------
@@ -295,7 +297,8 @@ def uncertainty_scores(
         'least_confident' or 'margin_sampling'.
     method : 'least_confident' or 'margin_sampling' or 'entropy', \
             default='least_confident'
-        The method to calculate the uncertainty.
+        The method to calculate the uncertainty. For multilabel data, only
+        `'least_confident'` and `'entropy'` are supported.
     is_multilabel: bool, default=False
         indicates if provided probas should be multilabel
     multilabel_aggregation_fn: callable, default=np.average
@@ -326,6 +329,14 @@ def uncertainty_scores(
         )
 
     n_classes = probas.shape[1]
+
+    if is_multilabel and method not in ["least_confident", "entropy"]:
+        raise ValueError(
+            "For multilabel data, supported methods are "
+            "['least_confident', 'entropy'], the given one is: {}.".format(
+                method
+            )
+        )
 
     # Check cost matrix.
     if cost_matrix is not None:

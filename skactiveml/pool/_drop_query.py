@@ -115,9 +115,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`.)
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must be either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict`.
         fit_clf : bool, default=True
@@ -158,11 +160,15 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
-        is_multilabel = np.array(y).ndim == 2
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, enforce_mapping=True, is_multilabel=is_multilabel
+            candidates=candidates,
+            X=X,
+            y=y,
+            enforce_mapping=True,
+            is_multioutput=is_multioutput,
         )
         check_scalar(
             self.dropout_rate,
@@ -224,7 +230,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
 
         # Prepare an array to hold the dropout predictions.
         shape = (n_candidates, self.n_dropout_samples)
-        if is_multilabel:
+        if is_multioutput:
             shape = shape + (y.shape[1],)
 
         y_pred_dropout = np.empty(shape, dtype=object)
@@ -250,7 +256,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
 
         # Filter candidates for clustering based on disagreement.
         n_disagrees = (y_pred[:, None, :] != y_pred_dropout).sum(axis=1)
-        if is_multilabel:
+        if is_multioutput:
             n_disagrees = self.multilabel_aggregation_fn(n_disagrees, axis=-1)
         disagree_rate = n_disagrees.astype(float) / self.n_dropout_samples
         n_threshold_samples = max(((disagree_rate > 0.5).sum(), batch_size))
