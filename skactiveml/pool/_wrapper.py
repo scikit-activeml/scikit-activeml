@@ -89,9 +89,11 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X,y)` are
@@ -136,10 +138,17 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multioutput=True,
         )
+        is_multioutput = y.ndim == 2
+
         if not isinstance(
             self.query_strategy, SingleAnnotatorPoolQueryStrategy
         ):
@@ -149,7 +158,14 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             )
         check_scalar(self.exclude_non_subsample, "exclude_non_subsample", bool)
         seed_multiplier = (
-            int(is_labeled(y, missing_label=self.missing_label_).sum()) + 1
+            int(
+                is_labeled(
+                    y,
+                    missing_label=self.missing_label_,
+                    is_multioutput=is_multioutput,
+                ).sum()
+            )
+            + 1
         )
         max_candidates = self.max_candidates
         if isinstance(self.max_candidates, int):
@@ -185,7 +201,6 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
         # subsampling with no explicit provided candidates
         if candidates is None:
-            is_multioutput = y.ndim == 2
             candidate_indices = unlabeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
@@ -223,7 +238,6 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
 
         # check if to exclude unlabeled non-candidate training data
         if self.exclude_non_subsample:
-            is_multioutput = y.ndim == 2
             all_labeled = labeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
@@ -376,9 +390,11 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by self.MISSING_LABEL).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features), (default=None)
 
@@ -427,7 +443,13 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            allow_multioutput=True,
         )
         if batch_size != 1:
             raise ValueError("`batch_size` must be set to 1.")
