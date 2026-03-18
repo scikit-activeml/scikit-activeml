@@ -1,0 +1,20 @@
+[
+{
+    "class" : "UHerding",
+    "package" : "pool",
+    "method" : "Uncertainty Herding (UHerding)",
+    "category" : "Hybrid",
+    "template" : "examples/template_pool_batch.py",
+    "tags" : ["pool", "classification", "single-annotator", "diverse-batch"],
+    "title" : "Uncertainty Herding (UHerding)",
+    "refs" : ["bae2025uncertainty"],
+    "sequence" : ["title", "text_0", "plot", "refs"],
+    "text_0" : "**Idea:** UHerding greedily selects a batch by maximizing uncertainty-weighted coverage in feature space. It combines predictive uncertainty from a classifier with a kernel-based coverage objective and adapts the temperature scaling and kernel radius from the currently labeled data. The classifier should either provide logits directly or implement `decision_function` so that logits can be recovered.",
+    "import_clf" : ["from sklearn.linear_model import LogisticRegression",
+                    "from skactiveml.classifier import SklearnClassifier"],
+    "import_misc" : "from skactiveml.pool import UHerding",
+    "init_clf" : "SklearnClassifier(LogisticRegression(), classes=[0, 1], random_state=random_state)",
+    "init_qs" : "UHerding(random_state=42)",
+    "query_params" : "X=X, y=y, clf=clf"
+}
+]
