@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from skactiveml.pool import Falcun
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
@@ -31,10 +33,31 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 classes=self.classes,
             ),
         }
+        self.params_clf_multilabel = {
+            "X": X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=42,
+            ),
+        }
         super().setUp(
             qs_class=Falcun,
             init_default_params={"gamma": 1},
             query_default_params_clf=self.query_default_params_clf,
+            query_default_params_clf_multilabel=self.params_clf_multilabel,
         )
 
     def test_init_param_gamma(self):
@@ -47,6 +70,11 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             (-0.5, ValueError),
         ]
         self._test_param("init", "gamma", test_cases)
+
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

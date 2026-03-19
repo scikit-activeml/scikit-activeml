@@ -18,6 +18,23 @@ class TestRandomSampling(
             "X": np.linspace(0, 1, 20).reshape(10, 2),
             "y": np.hstack([[0, 1], np.full(8, MISSING_LABEL)]),
         }
+        qs_params_clf_multilabel = {
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                    np.full(2, MISSING_LABEL, dtype=float),
+                ]
+            ),
+        }
         query_default_params_reg = {
             "X": np.linspace(0, 1, 20).reshape(10, 2),
             "y": np.hstack([[1.1, 2.1], np.full(8, MISSING_LABEL)]),
@@ -27,6 +44,7 @@ class TestRandomSampling(
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel=qs_params_clf_multilabel,
         )
 
     def test_query(self):

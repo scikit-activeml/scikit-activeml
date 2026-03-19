@@ -34,11 +34,16 @@ class TemplateQueryStrategy:
         self,
         qs_class,
         init_default_params,
+        init_default_params_multilabel=None,
         query_default_params_clf=None,
         query_default_params_reg=None,
+        query_default_params_clf_multilabel=None,
     ):
         self.super_setUp_has_been_executed = True
         self.qs_class = qs_class
+        self.supports_multilabel_batch_variation = getattr(
+            self, "supports_multilabel_batch_variation", True
+        )
 
         self.init_default_params = {"random_state": 42}
         self.init_default_params.update(deepcopy(init_default_params))
@@ -51,6 +56,12 @@ class TemplateQueryStrategy:
 
         self.query_default_params_clf = query_default_params_clf
         self.query_default_params_reg = query_default_params_reg
+        self.init_default_params_multilabel = deepcopy(
+            init_default_params_multilabel
+        )
+        self.query_default_params_clf_multilabel = (
+            query_default_params_clf_multilabel
+        )
 
         if (
             self.query_default_params_clf is None
@@ -76,6 +87,13 @@ class TemplateQueryStrategy:
                 "query",
                 self.query_default_params_reg,
                 kwargs_name="query_default_kwargs_reg",
+            )
+        if self.query_default_params_clf_multilabel is not None:
+            check_positional_args(
+                self.qs_class.query,
+                "query",
+                self.query_default_params_clf_multilabel,
+                kwargs_name="query_default_kwargs_clf_multilabel",
             )
 
     def test_init_param_random_state(self, test_cases=None):
@@ -261,16 +279,20 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         self,
         qs_class,
         init_default_params,
+        init_default_params_multilabel=None,
         query_default_params_clf=None,
         query_default_params_reg=None,
+        query_default_params_clf_multilabel=None,
     ):
         if "missing_label" not in init_default_params:
             init_default_params["missing_label"] = MISSING_LABEL
         super().setUp(
             qs_class,
             init_default_params,
+            init_default_params_multilabel,
             query_default_params_clf,
             query_default_params_reg,
+            query_default_params_clf_multilabel,
         )
         self.y_shape = list(
             self.query_default_params_clf["y"].shape
@@ -540,6 +562,23 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
                 np.testing.assert_array_equal(id1, id2)
                 np.testing.assert_allclose(u1, u2)
 
+    def test_query_multilabel_invalid_rows(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        y = np.array(query_params["y"], copy=True)
+        y[1, 0] = self.init_default_params["missing_label"]
+        query_params["y"] = y
+        qs = self.qs_class(**self._multilabel_init_params())
+        self.assertRaises(ValueError, qs.query, **query_params)
+
+    def _multilabel_init_params(self):
+        init_params = deepcopy(self.init_default_params)
+        if self.init_default_params_multilabel is not None:
+            init_params.update(deepcopy(self.init_default_params_multilabel))
+        return init_params
+
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
     def test_query_al_cycles(self):
@@ -606,6 +645,52 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                     ids, utilities = qs.query(**query_params)
                     self.assertEqual(len(ids), max_batch_size)
 
+    def test_query_multilabel_batch_variation(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+        if not self.supports_multilabel_batch_variation:
+            return
+
+        init_params = self._multilabel_init_params()
+        qs = self.qs_class(**init_params)
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        missing_label = self.init_default_params["missing_label"]
+        max_batch_size = int(
+            sum(
+                is_unlabeled(
+                    query_params["y"],
+                    missing_label,
+                    is_multioutput=True,
+                )
+            )
+        )
+        batch_size = min(5, max_batch_size)
+        self.assertTrue(batch_size > 1, msg="Too few unlabeled")
+
+        query_params["batch_size"] = batch_size
+        query_params["return_utilities"] = True
+        query_ids, utils = qs.query(**query_params)
+
+        self.assertEqual(len(query_ids), batch_size)
+        self.assertEqual(len(utils), batch_size)
+        self.assertEqual(len(utils[0]), len(query_params["X"]))
+        n_labeled = sum(
+            is_labeled(
+                query_params["y"],
+                missing_label,
+                is_multioutput=True,
+            )
+        )
+        self.assertEqual(sum(np.isnan(utils[0])), n_labeled)
+
+        query_params["batch_size"] = max_batch_size + 1
+        self.assertWarns(Warning, qs.query, **query_params)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            ids, utilities = qs.query(**query_params)
+            self.assertEqual(len(ids), max_batch_size)
+
     def test_query_candidate_variation(self):
         init_params = deepcopy(self.init_default_params)
         qs = self.qs_class(**init_params)
@@ -643,6 +728,44 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 except MappingError:
                     pass
 
+    def test_query_multilabel_candidate_variation(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        init_params = self._multilabel_init_params()
+        qs = self.qs_class(**init_params)
+        missing_label = self.init_default_params["missing_label"]
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params["candidates"] = None
+        query_params["return_utilities"] = True
+
+        query_idx1, utils1 = qs.query(**query_params)
+
+        unld_idx = unlabeled_indices(
+            query_params["y"],
+            missing_label,
+            is_multioutput=True,
+        )
+        query_params["candidates"] = unld_idx
+        query_idx2, utils2 = qs.query(**query_params)
+
+        unld_idx2 = unld_idx[0:1]
+        query_params["candidates"] = unld_idx2
+        query_idx3, utils3 = qs.query(**query_params)
+
+        np.testing.assert_allclose(utils1, utils2)
+        utils3_copy = np.full_like(utils1, fill_value=np.nan)
+        utils3_copy[0, unld_idx2] = utils3[0, unld_idx2]
+        np.testing.assert_allclose(utils3, utils3_copy)
+
+        try:
+            query_params["candidates"] = query_params["X"][unld_idx]
+            query_idx4, utils4 = qs.query(**query_params)
+            self.assertEqual(query_idx4.shape, (1,))
+            self.assertEqual(utils4.shape, (1, len(unld_idx)))
+        except MappingError:
+            pass
+
 
 class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
     def setUp(
@@ -653,10 +776,10 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
         query_default_params_reg=None,
     ):
         super().setUp(
-            qs_class,
-            init_default_params,
-            query_default_params_clf,
-            query_default_params_reg,
+            qs_class=qs_class,
+            init_default_params=init_default_params,
+            query_default_params_clf=query_default_params_clf,
+            query_default_params_reg=query_default_params_reg,
         )
         self.update_params = {
             "candidates": [[]],

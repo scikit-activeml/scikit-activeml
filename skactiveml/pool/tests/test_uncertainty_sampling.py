@@ -3,6 +3,8 @@ from copy import deepcopy
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -26,10 +28,22 @@ class TestUncertaintySampling(
             ),
             "y": np.array([0, 0, MISSING_LABEL, MISSING_LABEL]),
         }
+        params_clf_multilabel = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                proba_format="array",
+            ),
+            "y": np.array(
+                [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+            ),
+        }
         super().setUp(
             qs_class=UncertaintySampling,
             init_default_params={},
             query_default_params_clf=query_default_params_clf,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_method(self, test_cases=None):
@@ -51,6 +65,11 @@ class TestUncertaintySampling(
             [(np.ones([2, 2]) - np.eye(2), ValueError)],
             replace_init_params={"method": "entropy"},
         )
+
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.max, None), (np.average, None)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self):
         add_test_cases = [

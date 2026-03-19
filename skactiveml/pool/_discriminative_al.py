@@ -28,7 +28,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
     underrepresented regions. It does not use predictive uncertainty
     such that effectiveness hinges on the representation and discriminator
     calibration. This implementation is task-agnostic such that it can handle
-    class, numerical, and multioutput labels.
+    class labels, numerical targets, and multilabel targets represented by a
+    two-dimensional `y`.
 
     Parameters
     ----------
@@ -76,9 +77,11 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         discriminator : skactiveml.base.SkactivemlClassifier
             Classification model implementing the methods `fit` and
             `predict_proba`. It will be used to solve the binary classification
@@ -93,7 +96,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
               samples in `(X,y)`.
             - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
-              necessarily contained in `X`).
+              necessarily contained in `X`). Direct candidate samples are not
+              supported because DAL requires a mapping to samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False

@@ -24,7 +24,9 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     batch. For this purpose, unlabeled samples are filtered according to a
     disagreement-based measure via dropout such that only the unlabeled samples
     with a disagreement above a threshold are clustered for selecting the
-    unlabeled samples nearest to the respective clusters.
+    unlabeled samples nearest to the respective clusters. If `y` is
+    two-dimensional, it is interpreted as multilabel data and the per-label
+    disagreement scores are reduced by `multilabel_aggregation_fn`.
 
     Parameters
     ----------
@@ -63,10 +65,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    multilabel_aggregation_fn: callable, default=np.average
-        Callable that takes axis as kwarg and reduces along that axis. Common
-        choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while
-        `np.sum` is not allowed.
+    multilabel_aggregation_fn : callable, default=np.average
+        Callable used only for two-dimensional `y` (multilabel classification).
+        It must accept `axis` as a keyword argument and reduce the per-label
+        disagreement counts along that axis. Common choices are `np.mean`,
+        `np.min`, `np.max`, or quantiles.
 
 
     References
@@ -112,21 +115,25 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e. including the labeled and
             unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must be either contain only observed labels or only
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict`.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`,
+            `sample_weight` must have the same shape as `y`.
         candidates : None or array-like of shape (n_candidates,) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -186,6 +193,8 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             min_inclusive=True,
             target_type=int,
         )
+        if not callable(self.multilabel_aggregation_fn):
+            raise TypeError("`multilabel_aggregation_fn` must be callable.")
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
         )
@@ -224,6 +233,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             y_pred, X_embed = y_pred
         else:
             X_embed = X_cand
+        y_pred = np.asarray(y_pred)
 
         # Number of candidate samples.
         n_candidates = len(X_cand)
@@ -252,10 +262,14 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             y_pred_dropout_current = clf.predict(X_dropout)
             if isinstance(y_pred_dropout_current, tuple):
                 y_pred_dropout_current, _ = y_pred_dropout_current
+            y_pred_dropout_current = np.asarray(y_pred_dropout_current)
             y_pred_dropout[:, i] = y_pred_dropout_current
 
         # Filter candidates for clustering based on disagreement.
-        n_disagrees = (y_pred[:, None, :] != y_pred_dropout).sum(axis=1)
+        if is_multioutput:
+            n_disagrees = (y_pred[:, None, :] != y_pred_dropout).sum(axis=1)
+        else:
+            n_disagrees = (y_pred[:, None] != y_pred_dropout).sum(axis=1)
         if is_multioutput:
             n_disagrees = self.multilabel_aggregation_fn(n_disagrees, axis=-1)
         disagree_rate = n_disagrees.astype(float) / self.n_dropout_samples

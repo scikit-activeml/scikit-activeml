@@ -23,8 +23,11 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     This class implements the "Fast Active Learning by Contrastive UNcertainty"
     (FALCUN) query strategy [1]_, which selects a batch directly in probability
     space using a self-adjusting mix of uncertainty and diversity. By operating
-    only on low-dimensional softmax outputs rather than deep embeddings,
-    it achieves fast acquisitions while retaining strong label efficiency.
+    only on low-dimensional class-probability outputs rather than deep
+    embeddings, it achieves fast acquisitions while retaining strong label
+    efficiency. If `y` is two-dimensional, it is interpreted as multilabel
+    data and the per-label uncertainty scores are reduced by
+    `multilabel_aggregation_fn`.
 
     Parameters
     ----------
@@ -36,7 +39,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    multilabel_aggregation_fn: callable, default=np.average
+    multilabel_aggregation_fn : callable, default=np.average
         Callable that takes `axis` as keyword argument and reduces the
         per-label uncertainty scores for multilabel classification. This is
         only used when `y` is two-dimensional, corresponding to a multilabel
@@ -75,21 +78,27 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional,
-            only multilabel classification problems, i.e. multiple binary
-            classification tasks, are supported.
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row. In this
+            case, only multilabel classification problems, i.e. multiple
+            binary classification tasks, are supported.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`,
+            `sample_weight` must have the same shape as `y`.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -154,6 +163,8 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             target_type=(float, int),
             min_inclusive=True,
         )
+        if not callable(self.multilabel_aggregation_fn):
+            raise TypeError("`multilabel_aggregation_fn` must be callable.")
         check_type(clf, "clf", SkactivemlClassifier)
         check_equal_missing_label(clf.missing_label, self.missing_label_)
         check_scalar(fit_clf, "fit_clf", bool)
@@ -217,6 +228,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             utilities[:, mapping] = utilities_cand
         else:
             utilities = utilities_cand
+        query_indices = np.asarray(query_indices, dtype=int)
 
         if return_utilities:
             return query_indices, utilities

@@ -1176,11 +1176,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             Mean accuracy of `self.predict(X)` regarding `y`.
         """
         y_pred = self.predict(X)
-        y_pred = self._le.transform(y_pred).ravel()
-        y_true = self._le.transform(y).ravel()
-        sample_weight = (
-            None if sample_weight is None else sample_weight.ravel()
-        )
+        y_pred = self._le.transform(y_pred)
+        y_true = self._le.transform(y)
+        if not getattr(self, "multioutput_", False):
+            y_pred = y_pred.ravel()
+            y_true = y_true.ravel()
         return accuracy_score(
             y_pred=y_pred, y_true=y_true, sample_weight=sample_weight
         )
@@ -1223,16 +1223,21 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
+        error_msg = (
+            "No class label is known because `y` contains no actual "
+            "class labels and `classes` is not defined. Change at "
+            "least on of both parameters to overcome this error."
+        )
         if len(y) > 0:
             y = column_or_1d(y) if y_ensure_1d else y
             y = self._le.fit_transform(y)
+            if self._le.multioutput_:
+                is_unlabeled(y, missing_label=-1, is_multioutput=True)
+            if len(self._le.classes_) == 0:
+                raise ValueError(error_msg)
         else:
             if self.classes is None:
-                raise ValueError(
-                    "No class label is known because `y` contains no actual "
-                    "class labels and `classes` is not defined. Change at "
-                    "least on of both parameters to overcome this error."
-                )
+                raise ValueError(error_msg)
             self._le.fit(self.classes)
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
@@ -1248,11 +1253,20 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
-            if len(y) != len(sample_weight):
+            if self.multioutput_ or (
+                not y_ensure_1d and getattr(y, "ndim", 1) == 2
+            ):
+                if not np.array_equal(y.shape, sample_weight.shape):
+                    raise ValueError(
+                        f"`y` has the shape {y.shape} and `sample_weight` has "
+                        f"the shape {sample_weight.shape}. Both need to have "
+                        f"identical shapes."
+                    )
+            elif sample_weight.ndim != 1 or len(y) != len(sample_weight):
                 raise ValueError(
                     f"`y` has the length {len(y)} and `sample_weight` has the "
-                    f"shape {len(sample_weight)}. Both need to have "
-                    f"the same length."
+                    f"shape {sample_weight.shape}. Both need to have "
+                    f"the same one-dimensional shape."
                 )
 
         # Update cost matrix.

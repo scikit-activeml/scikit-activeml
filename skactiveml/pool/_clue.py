@@ -33,9 +33,13 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
     space.
 
     The original `Clue` query strategy was proposed for classification tasks
-    only and did not include a regression variant. Support for regression in
-    this implementation is therefore an extension of the original formulation
-    and relies on user-provided sample-wise uncertainty estimates.
+    only and did not include regression or multilabel variants. Support for
+    multilabel classification in this implementation is therefore an
+    extension of the original formulation. In the multilabel case, predictive
+    uncertainties are computed independently per label and then reduced across
+    labels via `multilabel_aggregation_fn`. Support for regression is likewise
+    an extension and relies on user-provided sample-wise uncertainty
+    estimates.
 
     Parameters
     ----------
@@ -88,7 +92,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
     multilabel_aggregation_fn: callable, default=np.average
         Callable that takes axis as kwarg and reduces along that axis. Common
         choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while
-        `np.sum` is not allowed.
+        `np.sum` is not allowed. This is only used for the multilabel
+        extension of CLUE and is not part of the original method proposed in
+        [1]_.
 
     References
     ----------
@@ -136,18 +142,26 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         estimator : skactiveml.base.SkactivemlClassifier\
                 or skactiveml.base.SkactivemlRegressor
             Estimator implementing the methods `fit` and
             `predict_proba` (classification) or `predict` (regression).
+            For multilabel classification, `predict_proba` may either return
+            one probability per label with shape `(n_samples, n_outputs)` or a
+            list of binary probability arrays as commonly returned by
+            multioutput scikit-learn estimators.
         fit_estimator : bool, default=True
             Defines whether the `estimator` should be fitted on
             `X`, `y`, and `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight: array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`,
+            `sample_weight` must have the same shape as `y`.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -155,6 +169,9 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
+            - Candidate samples passed directly with shape
+              `(n_candidates, n_features)` are not supported because `Clue`
+              requires a mapping to the samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -182,16 +199,18 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
-        is_multilabel = np.array(y).ndim == 2
+        is_multioutput = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
             enforce_mapping=True,
-            is_multilabel=is_multilabel,
+            is_multioutput=is_multioutput,
         )
+        if not callable(self.multilabel_aggregation_fn):
+            raise TypeError("`multilabel_aggregation_fn` must be callable.")
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
         )
@@ -234,6 +253,13 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         if not isinstance(out, tuple):
             out = (out,)
         main = out[0]
+        if is_multioutput and isinstance(main, list):
+            main = np.column_stack(
+                [
+                    proba_j[:, -1] if proba_j.ndim == 2 else proba_j
+                    for proba_j in main
+                ]
+            )
         emb = None
         uncertainties = None
         for out_element in out[1:]:
@@ -257,7 +283,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             uncertainties = uncertainty_scores(
                 probas=main,
                 method=self.method,
-                is_multilabel=is_multilabel,
+                is_multilabel=is_multioutput,
                 multilabel_aggregation_fn=self.multilabel_aggregation_fn,
             )
         elif not is_clf and uncertainties is None:

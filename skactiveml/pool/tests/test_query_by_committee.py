@@ -406,14 +406,14 @@ class TestVoteEntropy(unittest.TestCase):
 
     def test_param_classes(self):
         self.assertRaises(
-            ValueError, vote_entropy, votes=self.votes, classes="string"
+            TypeError, vote_entropy, votes=self.votes, classes="string"
         )
         self.assertRaises(
-            ValueError, vote_entropy, votes=self.votes, classes="class"
+            TypeError, vote_entropy, votes=self.votes, classes="class"
         )
         self.assertRaises(TypeError, vote_entropy, votes=self.votes, classes=1)
         self.assertRaises(
-            TypeError, vote_entropy, votes=self.votes, classes=[[1]]
+            ValueError, vote_entropy, votes=self.votes, classes=[[1]]
         )
         self.assertRaises(
             ValueError,

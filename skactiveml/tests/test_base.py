@@ -1,4 +1,5 @@
 import unittest
+import warnings
 from itertools import product
 from unittest.mock import patch
 
@@ -26,6 +27,108 @@ try:
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover
     pass
+
+
+class DummySkactivemlClassifier(SkactivemlClassifier):
+    def __init__(
+        self,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        cost_matrix=None,
+        random_state=None,
+        probas=None,
+    ):
+        super().__init__(
+            classes=classes,
+            missing_label=missing_label,
+            cost_matrix=cost_matrix,
+            random_state=random_state,
+        )
+        self.probas = probas
+
+    def fit(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        y_ensure_1d=True,
+        multioutput_ensure_multilabel=False,
+    ):
+        self.validated_ = self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            y_ensure_1d=y_ensure_1d,
+            multioutput_ensure_multilabel=multioutput_ensure_multilabel,
+        )
+        return self
+
+    def predict_proba(self, X, **kwargs):
+        if self.probas is None:
+            raise NotImplementedError
+        return self.probas
+
+
+class DummyClassFrequencyEstimator(ClassFrequencyEstimator):
+    def __init__(self, freq=None, class_prior=0):
+        super().__init__(
+            classes=None, missing_label=MISSING_LABEL, class_prior=class_prior
+        )
+        self.freq = freq
+
+    def fit(self, X, y, sample_weight=None):
+        return self
+
+    def predict_freq(self, X):
+        if self.freq is None:
+            raise NotImplementedError
+        return self.freq
+
+
+class DummyDistribution:
+    def __init__(self, mean, std, entropy):
+        self._mean = np.asarray(mean)
+        self._std = np.asarray(std)
+        self._entropy = np.asarray(entropy)
+
+    def mean(self):
+        return self._mean
+
+    def std(self):
+        return self._std
+
+    def entropy(self):
+        return self._entropy
+
+    def rvs(self, size=None, random_state=None):
+        if random_state is None:
+            random_state = np.random.RandomState(0)
+        elif isinstance(random_state, (int, np.integer)):
+            random_state = np.random.RandomState(random_state)
+        return random_state.normal(loc=self._mean, scale=self._std, size=size)
+
+
+class DummyProbabilisticRegressor(ProbabilisticRegressor):
+    def __init__(self, mean=None, std=None, entropy=None, missing_label=-1):
+        super().__init__(missing_label=missing_label)
+        self.mean_ = (
+            np.asarray([0.0, 1.0]) if mean is None else np.asarray(mean)
+        )
+        self.std_ = np.asarray([1.0, 2.0]) if std is None else np.asarray(std)
+        self.entropy_ = (
+            np.asarray([0.5, 1.5]) if entropy is None else np.asarray(entropy)
+        )
+
+    def fit(self, X, y, sample_weight=None):
+        return self
+
+    def predict_target_distribution(self, X):
+        n = len(X)
+        return DummyDistribution(
+            mean=np.resize(self.mean_, n),
+            std=np.resize(self.std_, n),
+            entropy=np.resize(self.entropy_, n),
+        )
 
 
 class QueryStrategyTest(unittest.TestCase):
@@ -77,6 +180,62 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
             y=np.array([0, 1]),
         )
         np.testing.assert_array_equal(X_cand, X[mapping])
+
+        y_ml = np.array([[0, 1], [np.nan, np.nan], [1, 0]])
+        X_ml = np.arange(6).reshape(3, 2)
+        X_cand, mapping = self.qs._transform_candidates(
+            candidates=None,
+            X=X_ml,
+            y=y_ml,
+            is_multioutput=True,
+        )
+        np.testing.assert_array_equal(mapping, np.array([1]))
+        np.testing.assert_array_equal(X_cand, X_ml[[1]])
+
+        X_cand, mapping = self.qs._transform_candidates(
+            candidates=np.array([[9, 9]]),
+            X=X_ml,
+            y=y_ml,
+        )
+        self.assertIsNone(mapping)
+        np.testing.assert_array_equal(X_cand, np.array([[9, 9]]))
+
+    def test__validate_data_multioutput(self):
+        X = np.arange(6).reshape(3, 2)
+        y = np.array([[0, 1], [np.nan, np.nan], [np.nan, np.nan]])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            X_v, y_v, candidates_v, batch_size_v, return_utilities_v = (
+                self.qs._validate_data(
+                    X=X,
+                    y=y,
+                    candidates=None,
+                    batch_size=3,
+                    return_utilities=True,
+                    allow_multioutput=True,
+                )
+            )
+        self.assertEqual(len(w), 1)
+        self.assertEqual(batch_size_v, 2)
+        self.assertTrue(return_utilities_v)
+        np.testing.assert_array_equal(X_v, X)
+        np.testing.assert_array_equal(y_v, y)
+        self.assertIsNone(candidates_v)
+
+        X_v, y_v, candidates_v, batch_size_v, return_utilities_v = (
+            self.qs._validate_data(
+                X=X,
+                y=np.array([0.0, np.nan, 1.0]),
+                candidates=np.array([1, 2]),
+                batch_size=1,
+                return_utilities=False,
+                allow_multioutput=False,
+            )
+        )
+        self.assertEqual(y_v.ndim, 1)
+        np.testing.assert_array_equal(candidates_v, np.array([1, 2]))
+        self.assertEqual(batch_size_v, 1)
+        self.assertFalse(return_utilities_v)
 
 
 class MultiAnnotatorPoolQueryStrategyTest(unittest.TestCase):
@@ -317,6 +476,147 @@ class SkactivemlClassifierTest(unittest.TestCase):
         self.clf.classes = None
         self.assertRaises(ValueError, self.clf._validate_data, X=X, y=y)
 
+    def test__validate_data_multilabel(self):
+        X = np.arange(8).reshape(4, 2)
+        y = np.array([[0, 1], [-1, -1], [1, 0], [0, 0]])
+        sample_weight = np.ones_like(y, dtype=float)
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1], [0, 1]], missing_label=-1
+        )
+
+        clf.fit(
+            X,
+            y,
+            sample_weight=sample_weight,
+            y_ensure_1d=False,
+            multioutput_ensure_multilabel=True,
+        )
+        X_valid, y_valid, sample_weight_valid = clf.validated_
+
+        np.testing.assert_array_equal(X_valid, X)
+        np.testing.assert_array_equal(y_valid, y)
+        np.testing.assert_array_equal(sample_weight_valid, sample_weight)
+        self.assertTrue(clf.multioutput_)
+        self.assertIsNone(clf.cost_matrix_)
+
+    def test__validate_data_multilabel_invalid_rows(self):
+        X = np.arange(6).reshape(3, 2)
+        y = np.array([[0, 1], [-1, 1], [1, 0]])
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1], [0, 1]], missing_label=-1
+        )
+
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X,
+            y,
+            y_ensure_1d=False,
+            multioutput_ensure_multilabel=True,
+        )
+
+    def test__validate_data_multilabel_sample_weight(self):
+        X = np.arange(8).reshape(4, 2)
+        y = np.array([[0, 1], [-1, -1], [1, 0], [0, 0]])
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1], [0, 1]], missing_label=-1
+        )
+
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X,
+            y,
+            sample_weight=np.ones(len(y)),
+            y_ensure_1d=False,
+            multioutput_ensure_multilabel=True,
+        )
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X,
+            y,
+            sample_weight="invalid",
+            y_ensure_1d=False,
+            multioutput_ensure_multilabel=True,
+        )
+
+    def test__validate_data_two_dimensional_non_multioutput_sample_weight(
+        self,
+    ):
+        X = np.arange(6).reshape(3, 2)
+        y = np.array([[0, 1], [-1, -1], [1, 0]])
+        sample_weight = np.ones_like(y, dtype=float)
+        clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
+
+        clf.fit(X, y, sample_weight=sample_weight, y_ensure_1d=False)
+        X_valid, y_valid, sample_weight_valid = clf.validated_
+
+        np.testing.assert_array_equal(X_valid, X)
+        np.testing.assert_array_equal(y_valid, y)
+        np.testing.assert_array_equal(sample_weight_valid, sample_weight)
+        self.assertFalse(clf.multioutput_)
+
+    def test__validate_data_multilabel_binary_enforcement(self):
+        X = np.arange(6).reshape(3, 2)
+        y = np.array([[0, 0], [1, 1], [2, 0]])
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1, 2], [0, 1]], missing_label=-1
+        )
+
+        self.assertRaises(
+            ValueError,
+            clf.fit,
+            X,
+            y,
+            y_ensure_1d=False,
+            multioutput_ensure_multilabel=True,
+        )
+
+    def test_predict_multilabel(self):
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([[1, 1], [1, 0]])
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            probas=np.array([[0.9, 0.9], [0.8, 0.2]]),
+        )
+
+        clf.fit(X, y, y_ensure_1d=False, multioutput_ensure_multilabel=True)
+        np.testing.assert_array_equal(clf.predict(X), y)
+
+    def test_score_multilabel(self):
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([[1, 1], [1, 1]])
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            probas=np.array([[0.9, 0.9], [0.8, 0.2]]),
+        )
+
+        clf.fit(X, y, y_ensure_1d=False, multioutput_ensure_multilabel=True)
+        self.assertEqual(clf.score(X, y), 0.5)
+
+    def test_predict_multioutput_and_tuple_output(self):
+        X = np.arange(4).reshape(2, 2)
+        y = np.array([[2, 1], [1, 0]])
+        probas = (
+            [
+                np.array([[0.1, 0.2, 0.7], [0.1, 0.8, 0.1]]),
+                np.array([[0.4, 0.6], [0.9, 0.1]]),
+            ],
+            "extra",
+        )
+        clf = DummySkactivemlClassifier(
+            classes=[[0, 1, 2], [0, 1]],
+            missing_label=-1,
+            probas=probas,
+        )
+        clf.fit(X, y, y_ensure_1d=False)
+        y_pred, extra = clf.predict(X)
+        np.testing.assert_array_equal(y_pred, y)
+        self.assertEqual(extra, "extra")
+
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
     @patch.multiple(ClassFrequencyEstimator, __abstractmethods__=set())
@@ -325,6 +625,47 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
 
     def test_predict_freq(self):
         self.assertRaises(NotImplementedError, self.clf.predict_freq, X=None)
+
+    def test_predict_proba(self):
+        clf = DummyClassFrequencyEstimator(
+            freq=np.array([[0.0, 0.0], [1.0, 3.0]]),
+            class_prior=0,
+        )
+        clf.classes_ = np.array([0, 1])
+        clf.class_prior_ = np.array([0.0, 0.0])
+        clf.multioutput_ = False
+        P = clf.predict_proba(np.zeros((2, 1)))
+        np.testing.assert_array_equal(P[0], np.array([0.5, 0.5]))
+        np.testing.assert_array_equal(P[1], np.array([0.25, 0.75]))
+
+        clf.multioutput_ = True
+        self.assertRaises(
+            NotImplementedError, clf.predict_proba, np.zeros((2, 1))
+        )
+
+    def test_sample_proba(self):
+        clf = DummyClassFrequencyEstimator(
+            freq=np.array([[1.0, 2.0], [3.0, 4.0]]),
+            class_prior=1.0,
+        )
+        clf.classes_ = np.array([0, 1])
+        clf.class_prior_ = np.array([1.0, 1.0])
+        clf.multioutput_ = False
+        P = clf.sample_proba(np.zeros((2, 1)), n_samples=3, random_state=0)
+        self.assertEqual(P.shape, (3, 2, 2))
+
+        clf_zero = DummyClassFrequencyEstimator(
+            freq=np.zeros((2, 2)),
+            class_prior=0.0,
+        )
+        clf_zero.classes_ = np.array([0, 1])
+        clf_zero.class_prior_ = np.array([0.0, 0.0])
+        clf_zero.multioutput_ = False
+        self.assertRaises(
+            ValueError,
+            clf_zero.sample_proba,
+            np.zeros((2, 1)),
+        )
 
 
 class TestBudgetManager(unittest.TestCase):
@@ -345,6 +686,21 @@ class TestBudgetManager(unittest.TestCase):
             queried_indices=None,
         )
 
+    def test_validate_budget_and_data(self):
+        self.bm.budget = None
+        self.bm._validate_budget()
+        self.assertEqual(self.bm.budget_, 0.1)
+
+        self.bm.budget = 0.2
+        self.bm._validate_budget()
+        self.assertEqual(self.bm.budget_, 0.2)
+
+        utilities = np.array([0.1, 0.2])
+        np.testing.assert_array_equal(
+            self.bm._validate_data(utilities), utilities
+        )
+        self.assertRaises(TypeError, self.bm._validate_data, [0.1, 0.2])
+
 
 class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
     @patch.multiple(
@@ -363,6 +719,22 @@ class SingleAnnotatorStreamQueryStrategyTest(unittest.TestCase):
             candidates=None,
             queried_indices=None,
         )
+
+    def test_validate_helpers(self):
+        self.qs._validate_random_state()
+        self.assertTrue(hasattr(self.qs, "random_state_"))
+        self.qs._validate_budget()
+        self.assertEqual(self.qs.budget_, 0.1)
+        self.qs.budget = 0.2
+        self.qs._validate_budget()
+        self.assertEqual(self.qs.budget_, 0.2)
+
+        candidates, return_utilities = self.qs._validate_data(
+            candidates=np.zeros((2, 1)),
+            return_utilities=True,
+        )
+        self.assertEqual(candidates.shape, (2, 1))
+        self.assertTrue(return_utilities)
 
 
 class SkactivemlRegressorTest(unittest.TestCase):
@@ -387,6 +759,25 @@ class SkactivemlRegressorTest(unittest.TestCase):
             sample_weight=np.arange(1, 5),
         )
 
+        X_valid, y_valid, sample_weight_valid = self.reg._validate_data(
+            X=np.arange(4).reshape(2, 2),
+            y=np.array([0.0, 1.0]),
+            sample_weight=np.array([1.0, 1.0]),
+        )
+        np.testing.assert_array_equal(X_valid, np.arange(4).reshape(2, 2))
+        np.testing.assert_array_equal(y_valid, np.array([0.0, 1.0]))
+        np.testing.assert_array_equal(
+            sample_weight_valid, np.array([1.0, 1.0])
+        )
+
+        X_empty, y_empty, sample_weight_empty = self.reg._validate_data(
+            X=np.array([]),
+            y=np.array([]),
+        )
+        np.testing.assert_array_equal(X_empty, np.array([]))
+        np.testing.assert_array_equal(y_empty, np.array([]))
+        self.assertIsNone(sample_weight_empty)
+
 
 class TargetDistributionEstimatorTest(unittest.TestCase):
     @patch.multiple(ProbabilisticRegressor, __abstractmethods__=set())
@@ -397,6 +788,24 @@ class TargetDistributionEstimatorTest(unittest.TestCase):
         self.assertRaises(
             NotImplementedError, self.reg.predict_target_distribution, X=None
         )
+
+    def test_predict_and_sample_y(self):
+        reg = DummyProbabilisticRegressor()
+        X = np.zeros((2, 1))
+        mu = reg.predict(X)
+        np.testing.assert_array_equal(mu, np.array([0.0, 1.0]))
+
+        mu_std = reg.predict(X, return_std=True)
+        self.assertEqual(len(mu_std), 2)
+        np.testing.assert_array_equal(mu_std[0], np.array([0.0, 1.0]))
+        np.testing.assert_array_equal(mu_std[1], np.array([1.0, 2.0]))
+
+        mu_std_entropy = reg.predict(X, return_std=True, return_entropy=True)
+        self.assertEqual(len(mu_std_entropy), 3)
+        np.testing.assert_array_equal(mu_std_entropy[2], np.array([0.5, 1.5]))
+
+        y_samples = reg.sample_y(X, n_samples=3, random_state=0)
+        self.assertEqual(y_samples.shape, (2, 3))
 
 
 if successful_skorch_torch_import:

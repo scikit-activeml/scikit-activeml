@@ -13,6 +13,7 @@ from ..utils import (
     MISSING_LABEL,
     rand_argmax,
     check_scalar,
+    is_labeled,
 )
 
 
@@ -27,8 +28,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     each step. It chooses `delta` via a purity criterion estimated from
     unlabeled data, prioritizes dense regions, and does not use predictive
     uncertainty. Originally, this query strategy was only proposed for
-    classification tasks. Nevertheless, this implementation is can handle
-    class and multioutput labels.
+    classification tasks. Nevertheless, this implementation can handle class
+    labels and multilabel targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -109,7 +110,7 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must be either contain only observed labels or only
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
@@ -118,6 +119,9 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
+            - Candidate samples passed directly with shape
+              `(n_candidates, n_features)` are not supported because
+              ProbCover requires a mapping to samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -134,8 +138,13 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             The utilities of samples after each selected sample of the batch,
             e.g., `utilities[0]` indicates the utilities used for selecting
             the first sample (with index `query_indices[0]`) of the batch.
-            Utilities for labeled samples will be set to np.nan. The indexing
-            refers to the samples in `X`.
+            Utilities for labeled samples will be set to np.nan.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing would refer to the samples in `candidates`, but this
+              case is not supported by ProbCover.
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -163,7 +172,19 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         is_candidate[mapping] = True
         n_classes = self.n_classes
         if n_classes is None:
-            n_classes = max(len(np.unique(y[~is_candidate])), 2)
+            is_lbld = is_labeled(
+                y=y,
+                missing_label=self.missing_label_,
+                is_multioutput=is_multioutput,
+            )
+            y_labeled = y[is_lbld]
+            if is_multioutput:
+                n_classes = len(
+                    {tuple(np.asarray(row).tolist()) for row in y_labeled}
+                )
+            else:
+                n_classes = len(np.unique(y_labeled))
+            n_classes = max(n_classes, 2)
         check_scalar(
             n_classes,
             "n_classes",

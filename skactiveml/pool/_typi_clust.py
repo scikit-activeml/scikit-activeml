@@ -20,7 +20,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
     `batch_size` uncovered clusters, ensuring diversity while avoiding already
     represented regions. Originally, this query strategy was only proposed for
     classification tasks. Nevertheless, this implementation is task-agnostic
-    such that it can handle class, numerical, and multioutput labels.
+    such that it can handle class labels, numerical targets, and multilabel
+    targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -80,7 +81,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must be either contain only observed labels or only
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
@@ -89,6 +90,9 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
+            - Candidate samples passed directly with shape
+              `(n_candidates, n_features)` are not supported because TypiClust
+              requires a mapping to samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False

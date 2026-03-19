@@ -10,8 +10,8 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
     This class implements random sampling as a lower baseline for other query
     strategies. It randomly selects `batch_size` unlabeled samples whose
     utility scores are also randomly generated. This implementation is
-    task-agnostic such that it can handle class, numerical, and
-    multioutput labels.
+    task-agnostic such that it can handle class labels, numerical targets,
+    and multilabel targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -36,9 +36,11 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from

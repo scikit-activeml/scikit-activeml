@@ -26,8 +26,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
     samples to the labeled/selected samples. It is a pure diversity criterion
     without explicit consideration of prediction uncertainty. Originally,
     this query strategy was only proposed for classification. Nevertheless, it
-    is task-agnostic such that it can handle class, numerical, and multioutput
-    labels.
+    is task-agnostic such that it can handle class labels, numerical targets,
+    and multilabel targets represented by a two-dimensional `y`.
 
     Parameters
     ----------
@@ -79,7 +79,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must be either contain only observed labels or only
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
@@ -160,10 +160,15 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             )
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
-            y_cand = np.full(shape=n_new_cand, fill_value=self.missing_label)
-            y_with_cand = np.concatenate(
-                (y_cand, y[selected_samples]), axis=None
+            y_cand_shape = (
+                (n_new_cand, y.shape[1]) if is_multioutput else (n_new_cand,)
             )
+            y_cand = np.full(
+                shape=y_cand_shape,
+                fill_value=self.missing_label_,
+                dtype=y.dtype,
+            )
+            y_with_cand = np.concatenate((y_cand, y[selected_samples]), axis=0)
             mapping = np.arange(n_new_cand)
             query_indices, utilities = k_greedy_center(
                 X=X_with_cand,
@@ -206,7 +211,7 @@ def k_greedy_center(
     y : array-like of shape (n_samples,) or (n_samples, n_outputs)
         Labels of the training data set (possibly including unlabeled ones
         indicated by `self.missing_label`). If `y` is two-dimensional, a
-        row `y[i]` must be either contain only observed labels or only
+        row `y[i]` must either contain only observed labels or only
         `missing_label` values, i.e., no mixing within a row.
     batch_size : int, default=1
         The number of samples to be selected in one AL cycle.

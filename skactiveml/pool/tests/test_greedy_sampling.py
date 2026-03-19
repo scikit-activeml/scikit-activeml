@@ -24,11 +24,23 @@ class TestGreedySamplingX(
             "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]]),
             "y": np.array([0, 1, MISSING_LABEL, MISSING_LABEL]),
         }
+        params_clf_multilabel = {
+            "X": np.array([[1, 2], [5, 8], [8, 4], [5, 4]], dtype=float),
+            "y": np.array(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                ]
+            ),
+        }
         super().setUp(
             qs_class=GreedySamplingX,
             init_default_params={},
             query_default_params_reg=query_default_params_reg,
             query_default_params_clf=query_default_params_clf,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_metric(self):

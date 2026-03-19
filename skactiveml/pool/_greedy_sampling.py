@@ -24,8 +24,9 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     diversity of the feature space the most. It does this by selecting those
     features that are the furthest away from all previously labeled samples.
     Originally, this query strategy was only proposed for regression.
-    Nevertheless, it is task-agnostic such that it can handle class, numerical,
-    and multioutput labels.
+    Nevertheless, it is task-agnostic such that it can handle class labels,
+    numerical targets, and multilabel targets represented by a
+    two-dimensional `y`.
 
     Parameters
     ----------
@@ -65,13 +66,15 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
     ):
         """Query the next samples to be labeled.
 
+        Parameters
+        ----------
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
             indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must be either contain only observed labels or only
+            row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates, ) of type \
                 int, default=None
@@ -80,8 +83,9 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
-            - If `candidates` is of shape `(n_candidates, ...)`, `candidates`
-              is considered as the candidate samples in `(X,y)`.
+            - If `candidates` is of shape `(n_candidates, ...)`, the candidate
+              samples are directly given in `candidates` (not necessarily
+              contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False

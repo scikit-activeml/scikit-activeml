@@ -1,6 +1,7 @@
 import random
 import unittest
 import warnings
+import inspect
 
 from copy import deepcopy
 import numpy as np
@@ -19,6 +20,7 @@ from sklearn.linear_model import (
 )
 from sklearn.pipeline import Pipeline
 from sklearn.naive_bayes import GaussianNB
+from sklearn.multioutput import MultiOutputClassifier
 from sklearn.semi_supervised import SelfTrainingClassifier
 from sklearn.utils.validation import NotFittedError, check_is_fitted
 
@@ -55,15 +57,69 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             "y": ["tokyo", "paris", "nan", "tokyo"],
         }
         predict_default_params = {"X": [[1]]}
+        self.X_ml = np.array([[-2.0], [-1.0], [1.0], [2.0]], dtype=float)
+        self.y_ml = np.array([[0, 1], [0, 1], [1, 0], [1, 0]], dtype=int)
+        init_default_params_multilabel = {
+            "estimator": MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            "classes": [[0, 1], [0, 1]],
+            "missing_label": -1,
+            "proba_format": "array",
+        }
+        fit_default_params_multilabel = {
+            "X": self.X_ml,
+            "y": self.y_ml,
+        }
+        predict_def_params_multilabel = {"X": self.X_ml}
         super().setUp(
             estimator_class=estimator_class,
             init_default_params=init_default_params,
             fit_default_params=fit_default_params,
             predict_default_params=predict_default_params,
+            init_default_params_multilabel=init_default_params_multilabel,
+            fit_default_params_multilabel=fit_default_params_multilabel,
+            predict_default_params_multilabel=predict_def_params_multilabel,
         )
 
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
+
+    class _NoTargetEstimator:
+        def fit(self, X, z):
+            return self
+
+    class _PredictProbaEstimator:
+        def __init__(self, proba, classes_=None, estimators_=None):
+            self._proba = proba
+            if classes_ is not None:
+                self.classes_ = classes_
+            if estimators_ is not None:
+                self.estimators_ = estimators_
+
+        def predict_proba(self, X, **kwargs):
+            return self._proba
+
+        def predict(self, X, **kwargs):
+            return np.zeros((len(X),), dtype=int)
+
+    @staticmethod
+    def _prefit_multilabel_clf(proba_format="array", classes=None):
+        if classes is None:
+            classes = [[0, 1], [0, 1]]
+        clf = SklearnClassifier(
+            estimator=GaussianNB(),
+            classes=classes,
+            missing_label=-1,
+            proba_format=proba_format,
+            random_state=0,
+        )
+        clf.check_X_dict_ = {"ensure_min_samples": 0, "ensure_min_features": 0}
+        clf.n_features_in_ = 1
+        dummy_classes = np.array([[classes[0][0], classes[1][0]]], dtype=int)
+        clf._initialize_label_state(dummy_classes)
+        clf.is_fitted_ = True
+        return clf
 
     def test_init_param_estimator(self):
         test_cases = [
@@ -82,6 +138,11 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             ("String", TypeError),
         ]
         self._test_param("init", "include_unlabeled_samples", test_cases)
+
+    def test_init_param_proba_format(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [("auto", None), ("list", None), ("array", None)]
+        self._test_param("init", "proba_format", test_cases)
 
     def test_fit(self):
         clf = SklearnClassifier(
@@ -261,6 +322,140 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             self.assertEqual(len(w), 1)
         y_exp = ["tokyo"] * len(self.fit_default_params["X"])
         np.testing.assert_array_equal(y_exp, y)
+
+    def test_multilabel_predict_proba(self):
+        X = self.X_ml
+        y = self.y_ml
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format="array",
+        )
+
+        clf.fit(X=X, Y=y)
+        self.assertTrue(clf.is_fitted_)
+        P = clf.predict_proba(X)
+        self.assertEqual(P.shape, (len(X), 2))
+        y_pred = clf.predict(X)
+        self.assertEqual(y_pred.shape, y.shape)
+
+    def test_multilabel_signature_uses_Y(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            proba_format="array",
+        )
+        fit_signature = inspect.signature(clf.fit)
+        self.assertIn("Y", fit_signature.parameters)
+        self.assertNotIn("y", fit_signature.parameters)
+        self.assertRaises(TypeError, clf.fit, X=self.X_ml, y=self.y_ml)
+        clf.fit(X=self.X_ml, Y=self.y_ml)
+        self.assertTrue(clf.is_fitted_)
+
+    def test_helper_methods_and_prefit_sampling(self):
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
+        self.assertRaises(
+            TypeError,
+            clf._extract_target_arg,
+            self.y_ml,
+            {"Y": self.y_ml},
+        )
+
+        estimator = self._NoTargetEstimator()
+        self.assertRaises(TypeError, clf._target_parameter_name, estimator.fit)
+
+        clf = self._prefit_multilabel_clf(proba_format="array")
+        clf.is_fitted_ = False
+        clf._label_counts = [np.array([1, 3]), np.array([3, 1])]
+        y_pred = clf.predict(np.zeros((4, 1)))
+        self.assertEqual(y_pred.shape, (4, 2))
+
+        clf = self._prefit_multilabel_clf(proba_format="list")
+        clf.is_fitted_ = False
+        clf._label_counts = [np.array([1, 3]), np.array([3, 1])]
+        y_pred = clf.predict(np.zeros((4, 1)))
+        self.assertEqual(y_pred.shape, (4, 2))
+
+    def test_multilabel_predict_proba_edge_cases(self):
+        n_samples = len(self.X_ml)
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.ones((n_samples, 2))], classes_=[np.array([0, 1])]
+        )
+        self.assertRaises(ValueError, clf.predict_proba, self.X_ml)
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.ones(n_samples), np.ones((n_samples, 2))],
+            classes_=[np.array([0, 1]), np.array([0, 1])],
+        )
+        self.assertRaises(ValueError, clf.predict_proba, self.X_ml)
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.ones((n_samples, 1)), np.ones((n_samples, 1))],
+            classes_=[np.array([1]), np.array([0])],
+        )
+        P = clf.predict_proba(self.X_ml)
+        np.testing.assert_array_equal(P[:, 0], np.ones(n_samples))
+        np.testing.assert_array_equal(P[:, 1], np.zeros(n_samples))
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.ones((n_samples, 2)), np.ones((n_samples, 2))],
+            classes_=[np.array([2, 3]), np.array([0, 1])],
+        )
+        self.assertRaises(ValueError, clf.predict_proba, self.X_ml)
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=np.ones((n_samples, 3))
+        )
+        self.assertRaises(ValueError, clf.predict_proba, self.X_ml)
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=np.full((n_samples, 2), 0.5)
+        )
+        P = clf.predict_proba(self.X_ml)
+        self.assertEqual(P.shape, (n_samples, 2))
+
+        clf = self._prefit_multilabel_clf(proba_format="list")
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.full((n_samples, 2), 0.5), np.full((n_samples, 2), 0.5)]
+        )
+        P_list = clf.predict_proba(self.X_ml)
+        self.assertEqual(len(P_list), 2)
+        self.assertEqual(P_list[0].shape, (n_samples, 2))
+
+        clf = self._prefit_multilabel_clf(proba_format="list")
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=np.full((n_samples, 2), 0.5)
+        )
+        P_list = clf.predict_proba(self.X_ml)
+        self.assertEqual(len(P_list), 2)
+        self.assertEqual(P_list[0].shape, (n_samples, 2))
+
+        clf = self._prefit_multilabel_clf(proba_format="list")
+        clf.is_fitted_ = False
+        clf._label_counts = [np.array([1, 3]), np.array([3, 1])]
+        P_list = clf.predict_proba(self.X_ml)
+        self.assertEqual(len(P_list), 2)
+        self.assertEqual(P_list[0].shape, (n_samples, 2))
+
+    def test_proba_format_resolution(self):
+        clf = self._prefit_multilabel_clf(classes=[[0, 1, 2], [0, 1]])
+        clf.proba_format = "invalid"
+        self.assertRaises(ValueError, clf._resolve_proba_format)
+
+        clf.proba_format = "auto"
+        self.assertEqual(clf._resolve_proba_format(), "list")
+
+        clf.proba_format = "array"
+        self.assertRaises(ValueError, clf._resolve_proba_format)
 
     def test_pipeline(self):
         X, y_true = make_blobs(100, centers=2, random_state=0)
@@ -1005,11 +1200,30 @@ if successful_skorch_torch_import:
                 "y": self.y,
             }
             predict_default_params = {"X": self.X}
+            self.X_ml = np.array(
+                [[-2.0], [-1.0], [1.0], [2.0]], dtype=np.float32
+            )
+            self.y_ml = np.array(
+                [[0.0, 1.0], [0.0, 1.0], [1.0, 0.0], [1.0, 0.0]],
+                dtype=np.float32,
+            )
+            init_default_params_multilabel = {
+                "classes": [[0, 1], [0, 1]],
+                "missing_label": -1,
+            }
+            fit_default_params_multilabel = {
+                "X": self.X_ml,
+                "y": self.y_ml,
+            }
+            pred_def_params_multilabel = {"X": self.X_ml}
             super().setUp(
                 estimator_class=estimator_class,
                 init_default_params=init_default_params,
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
+                init_default_params_multilabel=init_default_params_multilabel,
+                fit_default_params_multilabel=fit_default_params_multilabel,
+                predict_default_params_multilabel=pred_def_params_multilabel,
             )
 
         def test_init_param_module(self, test_cases=None):
@@ -1028,13 +1242,18 @@ if successful_skorch_torch_import:
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
                 ("Test", TypeError),
-                (None, TypeError),
+                (None, None),
                 (nn.NLLLoss, None),
                 (nn.CrossEntropyLoss, None),
                 (nn.NLLLoss(), None),
                 (nn.CrossEntropyLoss(), None),
             ]
             self._test_param("init", "criterion", test_cases)
+
+        def test_init_param_target_dtype(self, test_cases=None):
+            test_cases = [] if test_cases is None else test_cases
+            test_cases += [(None, None), (np.int64, None)]
+            self._test_param("init", "target_dtype", test_cases)
 
         def test_init_param_include_unlabeled_samples(self, test_cases=None):
             test_cases = [] if test_cases is None else test_cases
@@ -1058,17 +1277,35 @@ if successful_skorch_torch_import:
             )
 
         def test_initialize(self):
-            # Check prediction w/o initialization and w/o given classes.
+            # Prediction without fit and without classes is ambiguous.
             clf = SkorchClassifier(**self.init_default_params)
             self.assertRaises(NotFittedError, check_is_fitted, clf)
-            y_pred = clf.predict(self.X)
-            self.assertTrue((np.isin(y_pred, self.classes)).all())
+            self.assertRaises(ValueError, clf.predict, self.X)
 
-            # Check prediction with initialization and w/o given classes.
+            # The ambiguity remains even after manual initialization.
             clf = SkorchClassifier(**self.init_default_params)
             clf.initialize()
+            self.assertRaises(ValueError, clf.predict, self.X)
+
+            # Providing flat classes disambiguates multiclass prediction.
+            init_default_params = self.init_default_params.copy()
+            init_default_params["classes"] = [0, 1]
+            clf = SkorchClassifier(**init_default_params)
+            clf.initialize()
+            P = clf.predict_proba(self.X)
+            self.assertEqual(P.shape, (len(self.X), 2))
             y_pred = clf.predict(self.X)
-            self.assertTrue((np.isin(y_pred, self.classes)).all())
+            self.assertTrue((np.isin(y_pred, [0, 1])).all())
+
+            # Providing nested classes disambiguates multilabel prediction.
+            init_default_params = self.init_default_params.copy()
+            init_default_params.update(self.init_default_params_multilabel)
+            clf = SkorchClassifier(**init_default_params)
+            clf.initialize()
+            P = clf.predict_proba(self.X_ml)
+            self.assertEqual(P.shape, self.y_ml.shape)
+            y_pred = clf.predict(self.X_ml)
+            self.assertEqual(y_pred.shape, self.y_ml.shape)
 
         def test_fit(self):
             # Check standard fitting cases.
@@ -1198,6 +1435,10 @@ if successful_skorch_torch_import:
             np.testing.assert_array_equal(L_class.shape, (len(self.X), 2))
             self.assertTrue((L_class < 0).any())
             self.assertTrue(X_embed.shape[1], 1)
+
+            clf = SkorchClassifier(**self.init_default_params)
+            self.assertRaises(ValueError, clf.predict_proba, self.X)
+
             init_default_params = self.init_default_params.copy()
             init_default_params["classes"] = [0, 1]
             clf = SkorchClassifier(**init_default_params)
@@ -1209,6 +1450,41 @@ if successful_skorch_torch_import:
             P_class_2 = clf.predict_proba(self.X)
             self.assertEqual(len(P_class_2), len(self.X))
             self.assertEqual(P_class_2.shape[1], 2)
+
+        def test_multilabel_defaults(self):
+            init_params = self.init_default_params.copy()
+            init_params.update(self.init_default_params_multilabel)
+            clf = SkorchClassifier(**init_params)
+            clf.fit(self.X_ml, self.y_ml)
+            self.assertIsInstance(
+                clf.neural_net_.criterion_, nn.BCEWithLogitsLoss
+            )
+            P = clf.predict_proba(self.X_ml)
+            self.assertEqual(P.shape, self.y_ml.shape)
+
+        def test_skorch_helper_defaults(self):
+            init_params = self.init_default_params.copy()
+            init_params.update(self.init_default_params_multilabel)
+            init_params["criterion"] = nn.BCEWithLogitsLoss
+            clf = SkorchClassifier(**init_params)
+            forward_outputs = clf._effective_forward_outputs()
+            self.assertIn("proba", forward_outputs)
+            self.assertIs(forward_outputs["proba"][1], torch.sigmoid)
+
+            clf_no_classes = SkorchClassifier(**self.init_default_params)
+            clf_no_classes._initialize_fallbacks(np.zeros((2, 3)))
+            np.testing.assert_array_equal(
+                clf_no_classes.classes_, np.arange(3)
+            )
+
+            class DummyLoss(nn.Module):
+                def forward(self, input, target):
+                    return input.sum()
+
+            self.assertEqual(
+                clf._infer_target_numpy_dtype(DummyLoss()),
+                np.int64,
+            )
 
         def test_init_param_sample_dtype(self):
             test_cases = [

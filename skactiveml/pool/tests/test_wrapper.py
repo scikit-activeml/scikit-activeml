@@ -14,6 +14,7 @@ from skactiveml.pool import (
     ParallelUtilityEstimationWrapper,
     QueryByCommittee,
     UncertaintySampling,
+    RandomSampling,
 )
 from skactiveml.pool.multiannotator import SingleAnnotatorWrapper
 from skactiveml.tests.template_query_strategy import (
@@ -75,12 +76,31 @@ class TestSubSamplingWrapper(
             "random_state": 0,
             "missing_label": MISSING_LABEL,
         }
+        init_default_params_multilabel = {
+            "query_strategy": RandomSampling(random_state=0),
+            "max_candidates": 20,
+        }
+        params_clf_multilabel = {
+            "X": X[:20],
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(18)
+                    ],
+                ]
+            ),
+        }
 
         super().setUp(
             qs_class=SubSamplingWrapper,
             init_default_params=init_default_params,
+            init_default_params_multilabel=init_default_params_multilabel,
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel=params_clf_multilabel,
         )
 
     def test_init_param_max_candidates(self, test_cases=None):
@@ -266,6 +286,8 @@ class TestSubSamplingWrapper(
 class TestParallelUtilityEstimationWrapper(
     TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase
 ):
+    supports_multilabel_batch_variation = False
+
     def setUp(self):
         X, y = load_breast_cancer(return_X_y=True)
         X = StandardScaler().fit_transform(X)
@@ -305,8 +327,25 @@ class TestParallelUtilityEstimationWrapper(
                 "query_strategy": QueryByCommittee(random_state=0),
                 "n_jobs": 2,
             },
+            init_default_params_multilabel={
+                "query_strategy": RandomSampling(random_state=0),
+                "n_jobs": 2,
+            },
             query_default_params_clf=query_default_params_clf,
             query_default_params_reg=query_default_params_reg,
+            query_default_params_clf_multilabel={
+                "X": X[:20],
+                "y": np.vstack(
+                    [
+                        [0.0, 1.0],
+                        [1.0, 0.0],
+                        *[
+                            np.full(2, MISSING_LABEL, dtype=float)
+                            for _ in range(18)
+                        ],
+                    ]
+                ),
+            },
         )
 
     def test_init_param_query_strategy(self):

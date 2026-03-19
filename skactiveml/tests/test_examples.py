@@ -8,11 +8,17 @@ from os import path
 from docs.generate import generate_examples
 from skactiveml import pool, stream
 
-from skactiveml.pool import ExpectedErrorReduction
+from skactiveml.pool import (
+    ExpectedErrorReduction,
+    LabelCardinalityInconsistency,
+    MaxLossReductionMaxConfidence,
+)
 from skactiveml.stream import UncertaintyZliobaite, CognitiveDualQueryStrategy
 
 QUERY_STRATEGY_EXCEPTIONS_LIST = [
     ExpectedErrorReduction,
+    LabelCardinalityInconsistency,
+    MaxLossReductionMaxConfidence,
     UncertaintyZliobaite,
     CognitiveDualQueryStrategy,
 ]

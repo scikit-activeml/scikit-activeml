@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.cluster import SpectralClustering, KMeans, MiniBatchKMeans
 from sklearn.exceptions import NotFittedError
 from skactiveml.pool import Clue
@@ -40,6 +42,26 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 classes=self.classes,
             ),
         }
+        self.qs_params_clf_multilabel = {
+            "X": X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "estimator": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=42,
+            ),
+        }
         self.query_default_params_reg = {
             "X": X,
             "y": y,
@@ -51,6 +73,7 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             init_default_params={"cluster_algo_dict": cluster_dict},
             query_default_params_clf=self.query_default_params_clf,
             query_default_params_reg=self.query_default_params_reg,
+            query_default_params_clf_multilabel=self.qs_params_clf_multilabel,
         )
 
     def test_init_param_cluster_algo(self, test_cases=None):
@@ -126,6 +149,11 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             replace_query_params=self.query_default_params_clf_embedding,
             test_cases=test_cases,
         )
+
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_estimator(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -255,6 +283,30 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                         prev_clf_utilities = utilities
 
                     prev_utilities = utilities
+
+    def test_query_multilabel_with_list_probas(self):
+        X = self.query_default_params_clf_multilabel["X"]
+        y = self.query_default_params_clf_multilabel["y"]
+        estimator = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=42,
+        )
+        qs = Clue(
+            random_state=0, cluster_algo_dict={"random_state": 0, "n_init": 1}
+        )
+        query_idx, utilities = qs.query(
+            X,
+            y,
+            estimator=estimator,
+            batch_size=2,
+            return_utilities=True,
+        )
+        self.assertEqual(query_idx.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(X)))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
 
 
 class NadarayaWatsonRegressorUncertainty(NadarayaWatsonRegressor):

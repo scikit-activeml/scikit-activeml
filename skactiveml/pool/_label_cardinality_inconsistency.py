@@ -1,15 +1,14 @@
 import numpy as np
 from sklearn import clone
-from sklearn.cluster import KMeans
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     check_type,
     check_equal_missing_label,
-    unlabeled_indices,
     check_scalar,
     is_unlabeled,
+    is_labeled,
     simple_batch,
 )
 
@@ -17,9 +16,12 @@ from ..utils import (
 class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
     """Label Cardinality Inconsistency (LCI)
 
-    This class implements the query strategy Label Cardinality Inconsistency (LCI) [1]_
-    that selects samples based on the difference in label cardinality between the
-    labeled pool and predicted number of classes in the unlabeled pool.
+    This class implements the query strategy Label Cardinality Inconsistency
+    (LCI) [1]_ that selects samples based on the difference in label
+    cardinality between the labeled pool and the predicted number of positive
+    labels in the unlabeled pool. This strategy is multilabel-only: `y` must
+    be two-dimensional and each row must be either fully labeled or fully
+    unlabeled.
 
     Parameters
     ----------
@@ -30,8 +32,9 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
 
     References
     ----------
-    .. [1] R. Wang and S. Ye (2019). Multi-Label Active Learning Driven by Uncertainty and Inconsistency.
-        In 2019 International Conference on Machine Learning and Cybernetics.
+    .. [1] R. Wang and S. Ye (2019). Multi-Label Active Learning Driven by
+       Uncertainty and Inconsistency. In 2019 International Conference on
+       Machine Learning and Cybernetics.
     """
 
     def __init__(
@@ -54,6 +57,64 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         batch_size=1,
         return_utilities=False,
     ):
+        """Determines for which candidate samples labels are to be queried.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Training data set, usually complete, i.e., including the labeled
+            and unlabeled samples.
+        y : array-like of shape (n_samples, n_outputs)
+            Labels of the training data set (possibly including unlabeled
+            rows indicated by `self.missing_label`). Each row must either
+            contain only observed labels or only `missing_label` values, i.e.,
+            no mixing within a row. This strategy supports multilabel data
+            only.
+        clf : skactiveml.base.SkactivemlClassifier
+            Classifier implementing the methods `fit` and `predict`.
+        fit_clf : bool, default=True
+            Defines whether the classifier `clf` should be fitted on `X`, `y`,
+            and `sample_weight`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`.
+        candidates : None or array-like of shape (n_candidates), dtype=int or \
+                array-like of shape (n_candidates, n_features), default=None
+            - If `candidates` is `None`, the unlabeled samples from `(X, y)`
+              are considered as candidates.
+            - If `candidates` is of shape `(n_candidates,)` and of type
+              `int`, `candidates` is considered as the indices of samples in
+              `(X, y)`.
+            - If `candidates` is of shape `(n_candidates, n_features)`,
+              the candidates are directly given in `candidates`.
+        batch_size : int, default=1
+            The number of samples to be selected in one AL cycle.
+        return_utilities : bool, default=False
+            If `True`, also return the utilities based on the query strategy.
+
+        Returns
+        -------
+        query_indices : numpy.ndarray of shape (batch_size,)
+            The query indices indicate for which candidate sample a label is
+            to be queried, e.g., `query_indices[0]` indicates the first
+            selected sample.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to the samples in `candidates`.
+        utilities : numpy.ndarray of shape (batch_size, n_samples) or \
+                numpy.ndarray of shape (batch_size, n_candidates)
+            The utilities of samples after each selected sample of the batch,
+            e.g., `utilities[0]` indicates the utilities used for selecting
+            the first sample (with index `query_indices[0]`) of the batch.
+            Utilities for labeled samples will be set to np.nan.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to the samples in `candidates`.
+        """
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -62,16 +123,17 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
 
-        is_multilabel = np.array(y).ndim == 2
-        if not is_multilabel:
+        is_multioutput = y.ndim == 2
+        if not is_multioutput:
             raise ValueError(
-                "`y` must be in multi-label format, as the `LabelCardinalityInconsistency` strategy is multi-label only."
+                "`y` must be in multi-label format, as the "
+                "`LabelCardinalityInconsistency` strategy is multi-label only."
             )
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multilabel=is_multilabel
+            candidates, X, y, is_multioutput=is_multioutput
         )
 
         # Validate classifier type
@@ -86,21 +148,22 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             else:
                 clf = clone(clf).fit(X, y, sample_weight=sample_weight)
 
-        # find the unlabeled dataset
-        if candidates is None:
-            X_unlbld = X_cand
-        elif mapping is not None:
-            unlbld_mapping = unlabeled_indices(
-                y[mapping],
-                missing_label=self.missing_label,
-                is_multilabel=True,
-            )
-            X_unlbld = X_cand[unlbld_mapping]
-
+        # Determine candidate samples that are currently unlabeled.
+        if mapping is None:
+            cand_mask = np.ones(len(X_cand), dtype=bool)
         else:
-            X_unlbld = X_cand
+            cand_mask = is_unlabeled(
+                y[mapping],
+                missing_label=self.missing_label_,
+                is_multioutput=True,
+            )
+        X_unlbld = X_cand[cand_mask]
 
-        n_lbld = X.shape[0] - X_unlbld.shape[0]
+        n_lbld = int(
+            is_labeled(
+                y, missing_label=self.missing_label_, is_multioutput=True
+            ).sum()
+        )
 
         y_label_cardinality = 0
         if n_lbld != 0:
@@ -115,7 +178,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             utilities = utilities_cand
         else:
             utilities = np.full(len(X), np.nan)
-            utilities[mapping] = utilities_cand
+            utilities[mapping[cand_mask]] = utilities_cand
 
         return simple_batch(
             utilities,

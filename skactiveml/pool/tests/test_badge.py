@@ -2,6 +2,8 @@ import unittest
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 
 from skactiveml.classifier import SklearnClassifier
@@ -39,10 +41,31 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 classes=self.classes, random_state=42
             ),
         }
+        self.qs_params_clf_multilabel = {
+            "X": np.linspace(0, 1, 20).reshape(10, 2),
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=0,
+            ),
+        }
         super().setUp(
             qs_class=Badge,
             init_default_params={"random_state": 42},
             query_default_params_clf=self.query_default_params_clf,
+            query_default_params_clf_multilabel=self.qs_params_clf_multilabel,
         )
 
     def test_query_param_clf(self):
@@ -82,7 +105,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         y_1 = np.hstack([[0, 1], np.full(8, MISSING_LABEL)])
         clf_1 = SklearnClassifier(LogisticRegression(), classes=self.classes)
 
-        self.assertEqual(
+        np.testing.assert_array_equal(
             badge_1.query(X_1, y_1, clf_1), badge_1.query(X_1, y_1, clf_1)
         )
 
@@ -173,3 +196,41 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             badge_1.query(X_1, y_1, clf_8),
             badge_1.query(X_1, y_1, clf_8),
         )
+
+    def test_query_multilabel(self):
+        qs = Badge(random_state=42)
+        query_params = dict(self.query_default_params_clf_multilabel)
+
+        query_idx, utilities = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(len(query_idx), 2)
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+        query_idx_2, utilities_2 = qs.query(
+            **query_params,
+            candidates=np.arange(2, len(query_params["X"])),
+            batch_size=2,
+            return_utilities=True,
+        )
+        np.testing.assert_array_equal(query_idx, query_idx_2)
+        np.testing.assert_allclose(utilities, utilities_2, equal_nan=True)
+
+    def test_query_multilabel_list_probas(self):
+        qs = Badge(random_state=42)
+        query_params = dict(self.query_default_params_clf_multilabel)
+        query_params["clf"] = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=0,
+        )
+
+        query_idx, utilities = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(len(query_idx), 2)
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())

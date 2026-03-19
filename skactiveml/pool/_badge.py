@@ -27,6 +27,13 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     model’s pseudo-label. Large gradient norms indicate uncertainty, while
     k-means++ spreads selections to avoid redundancy.
 
+    The original BADGE method was proposed for multiclass classification. The
+    multilabel support in this implementation is an extension and not part of
+    the original proposal in [1]_. For two-dimensional label matrices, BADGE
+    assumes independent sigmoid outputs per label and forms a multilabel
+    gradient embedding from the binary-cross-entropy-style last-layer
+    gradients.
+
     Parameters
     ----------
     clf_embedding_flag_name : dict or str or None, default=None
@@ -88,16 +95,23 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row. In this
+            case, BADGE uses a multilabel extension based on independent
+            sigmoid outputs per label. This multilabel variant is an
+            extension in `scikit-activeml` and was not proposed in [1]_.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight`.
-        sample_weight: array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight: array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`,
+            `sample_weight` must have the same shape as `y`.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -146,12 +160,12 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multilabel=True,
+            allow_multioutput=True,
         )
 
-        is_multilabel = np.array(y).ndim == 2
+        is_multioutput = np.array(y).ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multilabel=is_multilabel
+            candidates, X, y, is_multioutput=is_multioutput
         )
 
         # Validate classifier type
@@ -185,8 +199,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         elif mapping is not None:
             unlbld_mapping = unlabeled_indices(
                 y[mapping],
-                missing_label=self.missing_label,
-                is_multilabel=is_multilabel,
+                missing_label=self.missing_label_,
+                is_multioutput=is_multioutput,
             )
             X_unlbld = X_cand[unlbld_mapping]
             unlbld_mapping = mapping[unlbld_mapping]
@@ -199,9 +213,20 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         probas = clf.predict_proba(X_unlbld, **predict_proba_kwargs)
         if isinstance(probas, tuple):
             probas, X_unlbld = probas
+        if is_multioutput and isinstance(probas, list):
+            probas = np.column_stack(
+                [
+                    proba_j[:, -1] if proba_j.ndim == 2 else proba_j
+                    for proba_j in probas
+                ]
+            )
 
-        y_pred = probas.argmax(axis=-1)
-        proba_factor = probas - np.eye(probas.shape[1])[y_pred]
+        if is_multioutput:
+            y_pred = (probas >= 0.5).astype(float)
+            proba_factor = probas - y_pred
+        else:
+            y_pred = probas.argmax(axis=-1)
+            proba_factor = probas - np.eye(probas.shape[1])[y_pred]
         g_x = proba_factor[:, :, None] * X_unlbld[:, None, :]
         g_x = g_x.reshape(*g_x.shape[:-2], -1)
 
@@ -250,6 +275,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
 
             idx = unlbld_mapping[idx_in_unlbld]
             query_indicies.append(idx)
+
+        query_indicies = np.asarray(query_indicies, dtype=int)
 
         if return_utilities:
             return query_indicies, utilities

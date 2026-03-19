@@ -29,6 +29,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
     can further improve the runtime for query strategies that utilize all
     available unlabeled data in their selection.
 
+    If `y` is two-dimensional, it is interpreted as multilabel data and each
+    row must be either fully labeled or fully unlabeled.
+
     Parameters
     ----------
     query_strategy : skactiveml.base.SingleAnnotatorPoolQueryStrategy
@@ -281,6 +284,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         utilities = None
         if return_utilities:
             queried_indices, utilities = qs_output
+        effective_batch_size = len(np.atleast_1d(queried_indices))
 
         # retransform queried indices and utilities as if no training data was
         # removed
@@ -292,7 +296,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             # transform to original utilities shape
             if utilities is not None:
                 new_utilities = np.full(
-                    shape=(batch_size, len(X)), fill_value=np.nan
+                    shape=(effective_batch_size, len(X)), fill_value=np.nan
                 )
                 transformed_new_candidates = subset_and_labeled_indices[
                     new_candidates
@@ -314,13 +318,14 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         if return_utilities:
             if candidates is None or candidates.ndim == 1:
                 new_utilities = np.full(
-                    shape=(batch_size, len(X)), fill_value=np.nan
+                    shape=(effective_batch_size, len(X)), fill_value=np.nan
                 )
                 new_utilities[:, candidate_indices] = -np.inf
                 new_utilities[:, new_candidates] = utilities[:, new_candidates]
             else:
                 new_utilities = np.full(
-                    shape=(batch_size, len(candidates)), fill_value=np.nan
+                    shape=(effective_batch_size, len(candidates)),
+                    fill_value=np.nan,
                 )
                 new_utilities[:, candidate_indices] = -np.inf
                 new_utilities[:, new_candidate_indices] = utilities
@@ -338,6 +343,9 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
     such that utilities for candidates can be calculated in parallel. The main
     assumption for this is that the utility computations are independent from
     another. Therefore, only `batch_size=1` is supported.
+
+    If `y` is two-dimensional, it is interpreted as multilabel data and each
+    row must be either fully labeled or fully unlabeled.
 
     Parameters
     ----------

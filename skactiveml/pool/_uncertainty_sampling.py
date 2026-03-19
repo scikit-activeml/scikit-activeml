@@ -436,6 +436,8 @@ def expected_average_precision(classes, probas):
         )
 
     # Check if `classes` are valid.
+    if isinstance(classes, (str, bytes, np.str_)):
+        raise ValueError("`classes` must be an array-like of class labels.")
     check_classes(classes)
     if len(classes) < 2:
         raise ValueError("`classes` must contain at least 2 entries.")

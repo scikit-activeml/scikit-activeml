@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from copy import deepcopy
 
 from skactiveml.tests.utils import (
@@ -7,6 +8,7 @@ from skactiveml.tests.utils import (
 )
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
     MISSING_LABEL,
 )
@@ -24,6 +26,9 @@ class TemplateEstimator:
         init_default_params,
         fit_default_params=None,
         predict_default_params=None,
+        init_default_params_multilabel=None,
+        fit_default_params_multilabel=None,
+        predict_default_params_multilabel=None,
     ):
         self.super_setUp_has_been_executed = True
         self.estimator_class = estimator_class
@@ -42,6 +47,15 @@ class TemplateEstimator:
 
         self.fit_default_params = deepcopy(fit_default_params)
         self.predict_default_params = deepcopy(predict_default_params)
+        self.init_default_params_multilabel = deepcopy(
+            init_default_params_multilabel
+        )
+        self.fit_default_params_multilabel = deepcopy(
+            fit_default_params_multilabel
+        )
+        self.predict_default_params_multilabel = deepcopy(
+            predict_default_params_multilabel
+        )
 
         check_positional_args(
             self.estimator_class.fit, "fit", self.fit_default_params
@@ -305,13 +319,68 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         init_default_params,
         fit_default_params=None,
         predict_default_params=None,
+        init_default_params_multilabel=None,
+        fit_default_params_multilabel=None,
+        predict_default_params_multilabel=None,
     ):
         super().setUp(
             estimator_class,
             init_default_params,
             fit_default_params,
             predict_default_params,
+            init_default_params_multilabel,
+            fit_default_params_multilabel,
+            predict_default_params_multilabel,
         )
+
+    def _has_multilabel_defaults(self):
+        return self.fit_default_params_multilabel is not None
+
+    def _get_multilabel_params(self):
+        if not self._has_multilabel_defaults():
+            return None, None, None
+
+        init_params = deepcopy(self.init_default_params)
+        if self.init_default_params_multilabel is not None:
+            init_params.update(self.init_default_params_multilabel)
+
+        fit_params = deepcopy(self.fit_default_params_multilabel)
+        predict_params = deepcopy(self.predict_default_params_multilabel)
+        if predict_params is None:
+            predict_params = {"X": fit_params["X"]}
+
+        return init_params, fit_params, predict_params
+
+    def _assert_multilabel_predictions(self, y_pred, classes):
+        y_pred = np.asarray(y_pred)
+        self.assertEqual(y_pred.ndim, 2)
+        self.assertEqual(y_pred.shape[1], len(classes))
+        for j, classes_j in enumerate(classes):
+            self.assertTrue(np.isin(y_pred[:, j], classes_j).all())
+
+    def _build_invalid_multilabel_targets(self, y, missing_label):
+        y_invalid = np.array(y, copy=True)
+        y_invalid = np.atleast_2d(y_invalid)
+        y_invalid[0, 0] = missing_label
+        return y_invalid
+
+    @staticmethod
+    def _target_param_name(method):
+        method_params = inspect.signature(method).parameters
+        return (
+            "Y" if "Y" in method_params and "y" not in method_params else "y"
+        )
+
+    def _call_with_target(
+        self, estimator, method_name, params, **extra_params
+    ):
+        method = getattr(estimator, method_name)
+        call_params = deepcopy(params)
+        target_param = self._target_param_name(method)
+        if target_param != "y" and "y" in call_params:
+            call_params[target_param] = call_params.pop("y")
+        call_params.update(extra_params)
+        return method(**call_params)
 
     def test_init_param_missing_label(
         self, test_cases=None, replace_init_params=None
@@ -563,6 +632,84 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             self, self.estimator_class.predict_proba, "predict_proba", not_test
         )
         super().test_param_test_availability()
+
+    def test_fit_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "fit", fit_params)
+        y_pred = estimator.predict(**predict_params)
+        self._assert_multilabel_predictions(y_pred, estimator.classes_)
+
+    def test_fit_multilabel_invalid_rows(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, _ = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        y_invalid = self._build_invalid_multilabel_targets(
+            fit_params["y"], init_params["missing_label"]
+        )
+        fit_params["y"] = y_invalid
+        with self.assertRaises(ValueError):
+            self._call_with_target(estimator, "fit", fit_params)
+
+    def test_fit_param_sample_weight_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        fit_params = inspect.signature(self.estimator_class.fit).parameters
+        if "sample_weight" not in fit_params:
+            return
+
+        init_params, fit_params, _ = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        y = np.asarray(fit_params["y"])
+        invalid_sample_weight = np.ones(len(y), dtype=float)
+        with self.assertRaises(ValueError):
+            self._call_with_target(
+                estimator,
+                "fit",
+                fit_params,
+                sample_weight=invalid_sample_weight,
+            )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self._call_with_target(
+                estimator,
+                "fit",
+                fit_params,
+                sample_weight=np.ones(y.shape, dtype=float),
+            )
+
+    def test_partial_fit_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        if not hasattr(self.estimator_class, "partial_fit"):
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "partial_fit", fit_params)
+        y_pred = estimator.predict(**predict_params)
+        self._assert_multilabel_predictions(y_pred, estimator.classes_)
+
+    def test_score_multilabel(self):
+        if not self._has_multilabel_defaults():
+            return
+
+        init_params, fit_params, predict_params = self._get_multilabel_params()
+        estimator = self.estimator_class(**init_params)
+        self._call_with_target(estimator, "fit", fit_params)
+        X = predict_params["X"]
+        y_true = fit_params["y"]
+        y_pred = estimator.predict(X)
+        expected_score = accuracy_score(y_true=y_true, y_pred=y_pred)
+        self.assertAlmostEqual(estimator.score(X, y_true), expected_score)
 
 
 class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):

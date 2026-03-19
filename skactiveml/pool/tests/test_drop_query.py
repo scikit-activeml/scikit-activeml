@@ -5,6 +5,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.datasets import make_blobs
 from sklearn.cluster import SpectralClustering, KMeans, MiniBatchKMeans
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from skactiveml.pool import DropQuery
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.utils import MISSING_LABEL
@@ -38,11 +40,32 @@ class TestDropQuery(
                 classes=self.classes,
             ),
         }
+        self.params_clf_multilabel = {
+            "X": X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(8)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=42,
+            ),
+        }
         cluster_dict = {"random_state": 0, "n_init": 1}
         super().setUp(
             qs_class=DropQuery,
             init_default_params={"cluster_algo_dict": cluster_dict},
             query_default_params_clf=self.query_default_params_clf,
+            query_default_params_clf_multilabel=self.params_clf_multilabel,
         )
 
     def test_init_param_dropout_rate(self, test_cases=None):
@@ -129,6 +152,11 @@ class TestDropQuery(
             replace_query_params=self.query_default_params_clf_embedding,
             test_cases=test_cases,
         )
+
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
