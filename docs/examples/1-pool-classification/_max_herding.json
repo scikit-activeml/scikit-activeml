@@ -11,7 +11,7 @@
     "sequence" : ["title", "text_0", "plot", "refs"],
     "text_0" : "**Idea:** MaxHerding greedily selects `batch_size` unlabeled samples that most increase a smooth, kernel-based coverage objective in embedding space, accounting for the already labeled set. The objective promotes representativeness and diversity via kernel similarity.",
     "import_misc" : "from skactiveml.pool import MaxHerding",
-    "init_qs" : "MaxHerding()",
+    "init_qs" : "MaxHerding(normalize_samples=False)",
     "query_params" : "X=X, y=y"
 }
 ]

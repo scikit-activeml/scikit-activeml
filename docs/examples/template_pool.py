@@ -44,7 +44,7 @@ X = X_pool
 y = np.full(shape=y_pool.shape, fill_value=MISSING_LABEL)
 
 # Initialise the classifier.
-clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], random_state=random_state)"
+clf = "$init_clf|ParzenWindowClassifier(classes=[0, 1], class_prior=1e-3, metric_dict={'gamma': 3}, random_state=random_state)"
 
 # Initialise the query strategy.
 qs = "$init_qs"

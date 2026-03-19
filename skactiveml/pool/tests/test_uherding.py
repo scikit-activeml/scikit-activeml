@@ -69,10 +69,10 @@ class TestUHerding(
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
             (1, TypeError),
-            (None, ValueError),
+            (None, None),
             ({"extra_outputs": ["logits"]}, None),
             ({"extra_outputs": ["logits", "emb"]}, None),
-            ({"test": True}, (TypeError, ValueError)),
+            ({"test": True}, None),
         ]
         self._test_param("init", "predict_proba_dict", test_cases)
 
@@ -160,7 +160,7 @@ class TestUHerding(
             ),
             (
                 ParzenWindowClassifier(classes=self.classes, random_state=0),
-                (TypeError, ValueError),
+                None,
             ),
         ]
         super().test_query_param_clf(test_cases=test_cases)
@@ -393,6 +393,31 @@ class TestUHerding(
         )
         self.assertEqual(len(query_indices), 1)
         self.assertEqual(utilities.shape, (1, len(X)))
+
+    def test_query_zero_uncertainty_falls_back_to_pure_coverage(self):
+        X = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, 0.5],
+                [0.0, 1.0],
+            ]
+        )
+        y = np.array([0, MISSING_LABEL, MISSING_LABEL, MISSING_LABEL])
+        clf = ParzenWindowClassifier(classes=self.classes, random_state=0)
+
+        query_indices_uh, utilities_uh = UHerding(
+            adaptive_sigma=False, random_state=0
+        ).query(X, y, clf=clf, batch_size=2, return_utilities=True)
+        query_indices_mh, utilities_mh = MaxHerding(random_state=0).query(
+            X, y, batch_size=2, return_utilities=True
+        )
+
+        self.assertFalse(
+            np.allclose(np.nan_to_num(utilities_uh, nan=0.0), 0.0)
+        )
+        np.testing.assert_array_equal(query_indices_uh, query_indices_mh)
+        np.testing.assert_allclose(utilities_uh, utilities_mh)
 
     def test_select_temperature_second_split_failure(self):
         qs = UHerding(random_state=0)
