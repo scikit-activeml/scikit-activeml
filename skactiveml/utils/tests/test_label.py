@@ -30,6 +30,19 @@ class TestLabel(unittest.TestCase):
         )
         self.assertRaises(ValueError, is_unlabeled, [[]], missing_label="2")
         self.assertRaises(
+            ValueError,
+            is_unlabeled,
+            y=np.zeros((1, 1, 1)),
+            missing_label=-1,
+        )
+        self.assertRaises(
+            ValueError,
+            is_unlabeled,
+            y=[0, 1],
+            missing_label=-1,
+            is_multioutput=True,
+        )
+        self.assertRaises(
             TypeError, is_unlabeled, y=self.y2, missing_label=np.nan
         )
         self.assertRaises(

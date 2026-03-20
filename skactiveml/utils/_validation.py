@@ -179,15 +179,7 @@ def check_classes(classes):
         for i, c in enumerate(outer):
             _check_1d_class_list(c, name=f"classes[{i}]")
     else:
-        # Enforce single-output multiclass to be strictly one-dimensional.
-        arr = np.asarray(list(classes), dtype=object)
-        if arr.ndim != 1:
-            raise ValueError(
-                "`classes` must be one dimensional for single output "
-                "multiclass classification. For multioutput, pass a nested "
-                "structure like `classes=[['a','b'], ['x','y']]`."
-            )
-        _check_1d_class_list(arr, name="classes")
+        _check_1d_class_list(classes, name="classes")
 
 
 def check_classifier_params(classes, missing_label, cost_matrix=None):

@@ -18,7 +18,12 @@ from skactiveml.utils import (
     check_random_state,
     check_class_prior,
 )
-from skactiveml.utils._validation import _check_callable
+from skactiveml.utils._validation import (
+    _check_1d_class_list,
+    _check_callable,
+    _check_forward_outputs,
+    _is_multioutput_classes,
+)
 
 
 class TestValidation(unittest.TestCase):
@@ -118,12 +123,55 @@ class TestValidation(unittest.TestCase):
             classes=["a", "b"],
             missing_label="a",
         )
+        self.assertRaises(
+            ValueError,
+            check_classifier_params,
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            cost_matrix=np.eye(2),
+        )
+        self.assertRaises(
+            ValueError,
+            check_classifier_params,
+            classes=[[0, -1], [0, 1]],
+            missing_label=-1,
+        )
 
     def test_check_classes(self):
         self.assertRaises(TypeError, check_classes, classes=[None, 1, 2])
         self.assertRaises(TypeError, check_classes, classes=["2", 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
         self.assertRaises(ValueError, check_classes, classes=[1, 2, 2])
+        self.assertIsNone(check_classes(None))
+
+    def test_private_class_validation_helpers(self):
+        self.assertFalse(_is_multioutput_classes(2))
+
+        self.assertRaises(TypeError, _check_1d_class_list, 2, name="classes")
+        self.assertRaises(
+            ValueError,
+            _check_1d_class_list,
+            np.array([[1, 2]]),
+            name="classes",
+        )
+        self.assertRaises(
+            ValueError,
+            _check_1d_class_list,
+            [],
+            name="classes",
+        )
+        self.assertRaises(
+            ValueError,
+            _check_1d_class_list,
+            [[1], [2]],
+            name="classes",
+        )
+        self.assertRaises(
+            TypeError,
+            _check_1d_class_list,
+            [{}, {"a": 1}],
+            name="classes",
+        )
 
     def test_check_class_prior(self):
         self.assertRaises(TypeError, check_class_prior, None, 1)
@@ -373,6 +421,18 @@ class TestValidation(unittest.TestCase):
                 0.1, SplitBudgetManager(budget=0.2), SplitBudgetManager
             )
 
+        class DummyBudgetManager:
+            def __init__(self, budget):
+                self.budget = budget
+
+        budget_manager = check_budget_manager(
+            0.1,
+            None,
+            DummyBudgetManager,
+            {"random_state": 0},
+        )
+        self.assertEqual(budget_manager.budget, 0.1)
+
     def test_check_n_features(self):
 
         # Define a simple DummyEstimator
@@ -416,3 +476,23 @@ class TestValidation(unittest.TestCase):
             X = np.array([[1, 2], [3, 4]])
             with self.assertRaises(ValueError):
                 check_n_features(est, X, reset=False)
+
+    def test_check_forward_outputs(self):
+        self.assertRaises(TypeError, _check_forward_outputs, [])
+        self.assertRaises(ValueError, _check_forward_outputs, {})
+        self.assertRaises(
+            TypeError,
+            _check_forward_outputs,
+            {"proba": (0,)},
+        )
+        self.assertRaises(
+            ValueError,
+            _check_forward_outputs,
+            {"proba": (-1, None)},
+        )
+        self.assertRaises(
+            TypeError,
+            _check_forward_outputs,
+            {"proba": (0, "bad")},
+        )
+        _check_forward_outputs({"proba": (0, None), "emb": (1, lambda x: x)})

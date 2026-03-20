@@ -281,6 +281,13 @@ class TestUncertaintyScores(unittest.TestCase):
         self.assertRaises(
             ValueError, uncertainty_scores, self.probas, method=1
         )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            self.multilabel_probas,
+            method="String",
+            is_multilabel=True,
+        )
 
     def test_param_cost_matrix(self):
         self.assertRaises(
