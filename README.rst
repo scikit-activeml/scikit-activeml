@@ -18,7 +18,7 @@ A Comprehensive and User-friendly Active Learning Library
 .. |Codecov| image:: https://codecov.io/gh/scikit-activeml/scikit-activeml/branch/master/graph/badge.svg
    :target: https://app.codecov.io/gh/scikit-activeml/scikit-activeml
 
-.. |PythonVersion| image:: https://img.shields.io/badge/python-3.12%20%7C3.13%20%7C3.14-blue.svg
+.. |PythonVersion| image:: https://img.shields.io/badge/python-3.11%20%7C3.12%20%7C3.13%20%7C3.14-blue.svg
    :target: https://pypi.org/project/scikit-activeml/
 
 .. |PyPi| image:: https://badge.fury.io/py/scikit-activeml.svg
