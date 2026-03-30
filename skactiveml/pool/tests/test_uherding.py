@@ -72,7 +72,7 @@ class TestUHerding(
             (None, None),
             ({"extra_outputs": ["logits"]}, None),
             ({"extra_outputs": ["logits", "emb"]}, None),
-            ({"test": True}, None),
+            ({"test": True}, TypeError),
         ]
         self._test_param("init", "predict_proba_dict", test_cases)
 
@@ -144,9 +144,20 @@ class TestUHerding(
         test_cases += [
             ("gamma", TypeError),
             ({}, None),
-            ({"gamma": 2}, None),
+            ({"gamma": 2}, ValueError),
         ]
         self._test_param("init", "metric_dict", test_cases)
+        test_cases = [
+            ("gamma", TypeError),
+            ({}, None),
+            ({"gamma": 2}, None),
+        ]
+        self._test_param(
+            "init",
+            "metric_dict",
+            test_cases,
+            replace_init_params={"adaptive_sigma": False},
+        )
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -163,7 +174,12 @@ class TestUHerding(
                 None,
             ),
         ]
-        super().test_query_param_clf(test_cases=test_cases)
+        self._test_param(
+            "query",
+            "clf",
+            test_cases,
+            replace_init_params={"predict_proba_dict": None},
+        )
 
     def test_query(self):
         X = np.array(

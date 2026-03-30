@@ -228,16 +228,18 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         metric_dict = (
             {} if self.metric_dict is None else self.metric_dict.copy()
         )
-    if self.adaptive_sigma:
-        if self.metric != "rbf":
-            raise ValueError(
-                "`adaptive_sigma=True` is only supported with `metric='rbf'`."
-            )
-        elif "gamma" in metric_dict:
-            raise ValueError(
-                "`'gamma' cannot be part of the `metric_dict` "
-                "with `adaptive_sigma=True`."
-            )
+
+        if self.adaptive_sigma:
+            if self.metric != "rbf":
+                raise ValueError(
+                    "`adaptive_sigma=True` is only supported with "
+                    "`metric='rbf'`."
+                )
+            elif "gamma" in metric_dict:
+                raise ValueError(
+                    "`'gamma' cannot be part of the `metric_dict` "
+                    "with `adaptive_sigma=True`."
+                )
         if isinstance(self.validation_size, int):
             check_scalar(
                 self.validation_size, "validation_size", int, min_val=1
