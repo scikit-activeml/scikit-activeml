@@ -49,6 +49,7 @@ from ._label_cardinality_inconsistency import LabelCardinalityInconsistency
 from ._wrapper import SubSamplingWrapper, ParallelUtilityEstimationWrapper
 from ._falcun import Falcun
 from ._max_herding import MaxHerding
+from ._uherding import UHerding
 
 __all__ = [
     "multiannotator",
@@ -95,4 +96,5 @@ __all__ = [
     "ParallelUtilityEstimationWrapper",
     "Falcun",
     "MaxHerding",
+    "UHerding",
 ]

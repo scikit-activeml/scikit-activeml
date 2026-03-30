@@ -134,3 +134,83 @@ class ParzenWindowClassifierTriplet(ParzenWindowClassifier):
         probas = super().predict_proba(X)
         unc = uncertainty_scores(probas, method="entropy")
         return probas, unc, X
+
+
+def _softmax_logits_from_probas(probas):
+    return np.log(np.clip(probas, a_min=1e-12, a_max=1.0))
+
+
+def _normalize_extra_outputs(extra_outputs):
+    if extra_outputs is None:
+        return []
+    if isinstance(extra_outputs, str):
+        return [extra_outputs]
+    return list(extra_outputs)
+
+
+class ParzenWindowClassifierLogitsEmbedding(ParzenWindowClassifier):
+    fit_calls = 0
+
+    @classmethod
+    def reset_fit_calls(cls):
+        cls.fit_calls = 0
+
+    def fit(self, X, y, sample_weight=None):
+        type(self).fit_calls += 1
+        return super().fit(X, y, sample_weight=sample_weight)
+
+    def predict_proba(
+        self,
+        X,
+        return_embeddings=False,
+        return_logits=False,
+        extra_outputs=None,
+    ):
+        probas = super().predict_proba(X)
+        logits = _softmax_logits_from_probas(probas)
+        emb = np.asarray(X)
+        extra_outputs = _normalize_extra_outputs(extra_outputs)
+        if extra_outputs:
+            out = [probas]
+            for name in extra_outputs:
+                if name == "logits":
+                    out.append(logits)
+                elif name in ["emb", "embedding", "embeddings"]:
+                    out.append(emb)
+                else:
+                    raise ValueError(f"Unsupported extra output `{name}`.")
+            return tuple(out)
+        out = [probas]
+        if return_logits:
+            out.append(logits)
+        if return_embeddings:
+            out.append(emb)
+        if len(out) == 1:
+            return out[0]
+        return tuple(out)
+
+
+class ParzenWindowClassifierLogitsEmbeddingTuple(
+    ParzenWindowClassifierLogitsEmbedding
+):
+    def predict_proba(self, X):
+        probas = super().predict_proba(X)
+        logits = _softmax_logits_from_probas(probas)
+        return probas, logits, np.asarray(X)
+
+
+class ParzenWindowClassifierWeirdTuple(ParzenWindowClassifier):
+    def predict_proba(self, X, return_stuff=False):
+        probas = super().predict_proba(X)
+        if not return_stuff:
+            return probas
+        logits = _softmax_logits_from_probas(probas)
+        return probas, np.asarray(X), logits
+
+
+class ParzenWindowClassifierLogitsOnly(ParzenWindowClassifier):
+    def predict_proba(self, X, return_logits=False):
+        probas = super().predict_proba(X)
+        if return_logits:
+            return _softmax_logits_from_probas(probas)
+        return probas
