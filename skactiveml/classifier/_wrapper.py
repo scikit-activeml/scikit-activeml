@@ -56,7 +56,6 @@ try:
     from inspect import signature
     import river
     import river.base
-    from ..utils import rand_argmax
     import pandas as pd
 
     successful_river_import = True
@@ -1307,9 +1306,10 @@ if successful_capymoa_import:
     class CapyMOAClassifier(SkactivemlClassifier):
         """CapyMOA Classifier
 
-        Implementation of a wrapper class for `CapyMOA` classifiers such that
-        missing labels can be handled and the interfaces are compatible with
-        `scikit-learn`. Therefore, samples with missing labels are filtered.
+        Implementation of a wrapper class for `CapyMOA` [1]_ classifiers such
+        that missing labels can be handled and the interfaces are compatible
+        with `scikit-activeml`. Therefore, samples with missing labels are
+        filtered.
 
         Parameters
         ----------
@@ -1344,6 +1344,13 @@ if successful_capymoa_import:
         estimator_ : capymoa.base.MOAClassifier
             initialized MOAClassifier whose predictions and training are
             wrapped.
+
+        References
+        ----------
+        .. [1] Gomes, H.M., Lee, A., Gunasekara, N., Sun, Y., Cassales, G.W.,
+           Liu, J., Heyden, M., Cerqueira, V., Bahri, M., Koh, Y.S. and
+           Pfahringer, B., 2025. Capymoa: Efficient machine learning for data
+           streams in python. arXiv preprint arXiv:2502.07432.
         """
 
         def __init__(
@@ -1406,45 +1413,6 @@ if successful_capymoa_import:
             """
             return self._fit("partial_fit", X, y)
 
-        def predict(self, X):
-            """Return class predictions for the test samples `X`.
-
-            Parameters
-            ----------
-            X : array-like of shape (n_samples, ...)
-                Test samples.
-
-            Returns
-            -------
-            y_pred : numpy.ndarray of shape (n_samples,)
-                Predicted class labels of the test samples.
-            """
-            check_is_fitted(self)
-            predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
-            X = check_array(X, **(self.check_X_dict_ | predict_dict))
-            check_n_features(self, X, reset=False)
-            if self.is_fitted_:
-                if self.cost_matrix is None:
-                    P = self.predict_proba(X)
-                    y_pred = rand_argmax(
-                        P, random_state=self.random_state_, axis=1
-                    )
-                else:
-                    P = self.predict_proba(X)
-                    costs = np.dot(P, self.cost_matrix_)
-                    y_pred = rand_argmin(
-                        costs, random_state=self.random_state_, axis=1
-                    )
-                y_pred = self._le.inverse_transform(y_pred)
-            else:
-                p = self.predict_proba([X[0]])[0]
-                y_pred = self.random_state_.choice(
-                    np.arange(len(self.classes_)), len(X), replace=True, p=p
-                )
-                y_pred = self._le.inverse_transform(y_pred)
-            y_pred = y_pred.astype(self.classes_.dtype)
-            return y_pred
-
         def predict_proba(self, X):
             """Return probability estimates for the input data `X`.
 
@@ -1468,21 +1436,26 @@ if successful_capymoa_import:
             check_n_features(self, X, reset=False)
             n_classes = len(self.classes_)
             if self.is_fitted_:
-                P_list = []
+                p_list = []
                 for x in X:
                     x_instance = capymoa.instance.Instance(
                         schema=self.schema_, instance=x
                     )
-                    P_i = self.estimator_.predict_proba(x_instance)
+                    p_i = self.estimator_.predict_proba(x_instance)
                     # if estimator_ fails, it returns None. In this case, we
                     # use a uniform distribution as fallback
-                    if P_i is None:
-                        P_i = np.ones(n_classes) / n_classes
-                    pad_length = n_classes - len(P_i)
+                    if p_i is None:
+                        if sum(self._label_counts) == 0:
+                            p_i = np.ones(n_classes) / n_classes
+                        else:
+                            p_i = self._label_counts / np.sum(
+                                self._label_counts
+                            )
+                    pad_length = n_classes - len(p_i)
                     if pad_length > 0:
-                        P_i = np.pad(P_i, (0, pad_length))
-                    P_list.append(P_i)
-                P = np.array(P_list)
+                        p_i = np.pad(p_i, (0, pad_length))
+                    p_list.append(p_i)
+                P = np.array(p_list)
                 if not np.any(np.isnan(P)):
                     return P
 
@@ -1544,7 +1517,7 @@ if successful_capymoa_import:
             if self.estimator_ is None:
                 self.is_fitted_ = False
                 return self
-            # Check whether estimator can deal with cost matrix.
+
             try:
                 X_train = X[is_included]
                 y_train = y[is_included].astype(np.int64)
@@ -1626,9 +1599,9 @@ if successful_river_import:
     class RiverClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         """River Classifier
 
-        Implementation of a wrapper class for `river` classifiers such that
-        they implement the SkactivemlClassifier interfaces for classifiers.
-        Additionally, filters the samples with missing labels if
+        Implementation of a wrapper class for `river` [1]_ classifiers such
+        that they implement the `SkactivemlClassifier` interfaces for
+        classifiers. Additionally, filters the samples with missing labels if
         needed.
 
         Parameters
@@ -1657,6 +1630,14 @@ if successful_river_import:
             class `classes_[j]` for a sample of class `classes_[i]`.
         estimator_ : river.base.Classifier
             The `river` classifier after calling the `fit` method.
+
+        References
+        ----------
+        .. [1] Montiel, J., Halford, M., Mastelini, S.M., Bolmier, G.,
+           Sourty, R., Vaysse, R., Zouitine, A., Gomes, H.M., Read, J.,
+           Abdessalem, T. and Bifet, A., 2021. River: machine learning for
+           streaming data in python. Journal of Machine Learning Research,
+           22(110), pp.1-8.
         """
 
         def __init__(
@@ -1675,7 +1656,7 @@ if successful_river_import:
             )
             self.estimator = estimator
 
-        def fit(self, X, y, sample_weight=None, **fit_kwargs):
+        def fit(self, X, y, sample_weight=None):
             """Fit the model using `X` as training data and `y` as class
             labels.
 
@@ -1685,16 +1666,13 @@ if successful_river_import:
                 The feature matrix representing the samples.
             y : array-like of shape (n_samples,) or (n_samples, n_outputs)
                 It contains the class labels of the training samples. Missing
-                labels are represented the attribute `self.missing_label_`. In
-                case of multiple labels per sample (i.e., n_outputs > 1), the
-                samples are duplicated.
+                labels are represented by the attribute `self.missing_label_`.
+                In case of multiple labels per sample (i.e., n_outputs > 1),
+                the samples are duplicated.
             sample_weight : array-like of shape (n_samples,) or\
                     (n_samples, n_outputs)
                 It contains the weights of the training samples' class labels.
                 It must have the same shape as `y`.
-            fit_kwargs : dict-like
-                Further parameters as input to the `fit` method of the
-                `estimator`.
 
             Returns
             -------
@@ -1706,10 +1684,9 @@ if successful_river_import:
                 X=X,
                 y=y,
                 sample_weight=sample_weight,
-                **fit_kwargs,
             )
 
-        def partial_fit(self, X, y, sample_weight=None, **fit_kwargs):
+        def partial_fit(self, X, y, sample_weight=None):
             """Partially fitting the model using `X` as training data and `y`
             as class labels.
 
@@ -1726,9 +1703,6 @@ if successful_river_import:
                     (n_samples, n_outputs)
                 It contains the weights of the training samples' class labels.
                 It must have the same shape as `y`.
-            fit_kwargs : dict-like
-                Further parameters as input to the `partial_fit` method of the
-                `estimator`.
 
             Returns
             -------
@@ -1740,50 +1714,7 @@ if successful_river_import:
                 X=X,
                 y=y,
                 sample_weight=sample_weight,
-                **fit_kwargs,
             )
-
-        def predict(self, X, **predict_kwargs):
-            """Return class label predictions for the input data `X`.
-
-            Parameters
-            ----------
-            X : array-like of shape (n_samples, ...)
-                Input samples.
-            predict_kwargs : dict-like
-                Further parameters as input to the `predict` method of the
-                `estimator`.
-
-            Returns
-            -------
-            y_pred :  numpy.ndarray of shape (n_samples,)
-                Predicted class labels of the input samples.
-            """
-            check_is_fitted(self)
-            predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
-            X = check_array(X, **(self.check_X_dict_ | predict_dict))
-            check_n_features(self, X, reset=False)
-            if self.is_fitted_:
-                if self.cost_matrix is None:
-                    P = self.predict_proba(X)
-                    y_pred = rand_argmax(
-                        P, random_state=self.random_state_, axis=1
-                    )
-
-                else:
-                    P = self.predict_proba(X)
-                    costs = np.dot(P, self.cost_matrix_)
-                    y_pred = rand_argmin(
-                        costs, random_state=self.random_state_, axis=1
-                    )
-            else:
-                p = self.predict_proba([X[0]])[0]
-                y_pred = self.random_state_.choice(
-                    np.arange(len(self.classes_)), len(X), replace=True, p=p
-                )
-                y_pred = self._le.inverse_transform(y_pred)
-            y_pred = y_pred.astype(self.classes_.dtype)
-            return y_pred
 
         def predict_proba(self, X, **predict_proba_kwargs):
             """Return probability estimates for the input data `X`.
@@ -1840,7 +1771,7 @@ if successful_river_import:
                     [len(X), 1],
                 )
 
-        def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        def _fit(self, fit_function, X, y, sample_weight=None):
             # Check input parameters.
             self.check_X_dict_ = {
                 "ensure_min_samples": 0,
