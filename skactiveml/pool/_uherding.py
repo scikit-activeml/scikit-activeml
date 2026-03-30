@@ -27,10 +27,10 @@ from ._uncertainty_sampling import uncertainty_scores
 class UHerding(SingleAnnotatorPoolQueryStrategy):
     """Uncertainty Herding (UHerding)
 
-    "Uncertainty Herding" (UHering) is a query strategy [1]_ that
+    "Uncertainty Herding" (UHerding) is a query strategy [1]_ that
     greedily maximizes an uncertainty-weighted coverage objective in feature
     space. In addition to the greedy selection itself, the implementation
-    follows the paper-faithful parameter adaptation scheme:
+    follows the parameter adaptation scheme of the paper:
 
     - select a temperature based on calibration via train/validation splits of
       the currently labeled set,
@@ -81,13 +81,13 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     normalize_samples : bool, default=True
         Flag whether to normalize feature vectors to unit length before
         computing pairwise distances and kernels.
-    adaptive_sigma : bool, default=True
-        Flag whether to adapt the radius according to the minimum non-zero
-        labeled pairwise distance. This option requires `metric='rbf'`.
     metric : str or callable, default='rbf'
         Kernel used for the coverage objective.
     metric_dict : dict or None, default=None
         Optional keyword arguments passed to `pairwise_kernels`.
+    adaptive_sigma : bool, default=True
+        Flag whether to adapt the radius according to the minimum non-zero
+        labeled pairwise distance. This option requires `metric='rbf'`.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
@@ -109,9 +109,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         validation_size=0.2,
         n_ece_bins=15,
         normalize_samples=True,
-        adaptive_sigma=True,
         metric="rbf",
         metric_dict=None,
+        adaptive_sigma=True,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -125,9 +125,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         self.validation_size = validation_size
         self.n_ece_bins = n_ece_bins
         self.normalize_samples = normalize_samples
-        self.adaptive_sigma = adaptive_sigma
         self.metric = metric
         self.metric_dict = metric_dict
+        self.adaptive_sigma = adaptive_sigma
 
     def query(
         self,
@@ -144,7 +144,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, ...)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
         y : array-like of shape (n_samples,)
@@ -164,13 +164,13 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         sample_weight : array-like of shape (n_samples,), default=None
             Weights of training samples in `X`.
         candidates : None or array-like of shape (n_candidates,), dtype=int \
-                or array-like of shape (n_candidates, n_features), default=None
+                or array-like of shape (n_candidates, ...), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X, y)`
               are considered as candidates.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the samples
               in `(X, y)`.
-            - If `candidates` is of shape `(n_candidates, n_features)`, the
+            - If `candidates` is of shape `(n_candidates, ...)`, the
               candidate samples are directly given in `candidates` (not
               necessarily contained in `X`).
         batch_size : int, default=1
@@ -187,7 +187,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
 
             - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to the samples in `X`.
-            - If `candidates` is of shape `(n_candidates, n_features)`, the
+            - If `candidates` is of shape `(n_candidates, ...)`, the
               indexing refers to the samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or \
                 numpy.ndarray of shape (batch_size, n_candidates)
@@ -201,7 +201,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
               in `X`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `utilities` refers to the samples in `X`.
-            - If `candidates` is of shape `(n_candidates, n_features)`,
+            - If `candidates` is of shape `(n_candidates, ...)`,
               `utilities` refers to the indexing in `candidates`.
         """
         # Determine candidate samples and validate parameters.
@@ -228,9 +228,15 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         metric_dict = (
             {} if self.metric_dict is None else self.metric_dict.copy()
         )
-        if self.adaptive_sigma and self.metric != "rbf":
+    if self.adaptive_sigma:
+        if self.metric != "rbf":
             raise ValueError(
                 "`adaptive_sigma=True` is only supported with `metric='rbf'`."
+            )
+        elif "gamma" in metric_dict:
+            raise ValueError(
+                "`'gamma' cannot be part of the `metric_dict` "
+                "with `adaptive_sigma=True`."
             )
         if isinstance(self.validation_size, int):
             check_scalar(
@@ -283,7 +289,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         else:
             clf_eval = clf
 
-        # Infere probabilities and if available logits as well as embeddings.
+        # Infer probabilities and if available logits as well as embeddings.
         probas_cand, logits_cand, X_cand_repr = self._predict_with_extras(
             clf_eval, X_cand
         )
@@ -292,7 +298,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if logits_cand is not None:
             probas_cand = softmax(logits_cand / tau, axis=1)
 
-        # Compute uncertatiny scores by either using the original probability
+        # Compute uncertainty scores by either using the original probability
         # scores or the calibrated ones, if logits were available.
         unc_cand = uncertainty_scores(probas=probas_cand, method=self.method)
         if not np.all(np.isfinite(unc_cand)) or np.allclose(unc_cand, 0.0):
@@ -317,7 +323,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
                 X_labeled_repr = normalize(X_labeled_repr, copy=True)
 
         # Compute kernel similarities, where the bandwidth is automatically
-        # tune if an RBF kernel is employed.
+        # tuned if an RBF kernel is employed.
         metric_dict = self._resolve_metric_dict(
             X_cand_repr=X_cand_repr,
             X_labeled_repr=X_labeled_repr,
@@ -459,13 +465,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             if self.predict_proba_dict is None
             else self.predict_proba_dict.copy()
         )
-        try:
-            out = clf.predict_proba(X, **predict_proba_dict)
-        except TypeError:
-            if predict_proba_dict:
-                out = clf.predict_proba(X)
-            else:
-                raise
+        out = clf.predict_proba(X, **predict_proba_dict)
         probas, logits, emb = self._parse_predict_output(out)
 
         if logits is None:

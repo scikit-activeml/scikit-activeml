@@ -1,6 +1,7 @@
 import os
 from collections import OrderedDict
 from pathlib import Path
+import black
 
 import packaging.version
 import importlib
@@ -23,32 +24,13 @@ import git
 
 import skactiveml
 
-try:
-    import black
-except ModuleNotFoundError:
-    black = None
-
 for module in skactiveml.__all__:
     importlib.import_module("skactiveml." + module)
 
 warnings.filterwarnings("ignore")
 
-_BLACK_WARNING_EMITTED = False
-
-
 def _format_generated_python_script(file_path, line_length=79):
-    """Formats a generated Python example script with Black if available."""
-    global _BLACK_WARNING_EMITTED
-
-    if black is None:
-        if not _BLACK_WARNING_EMITTED:
-            warnings.warn(
-                "Black is not installed; generated example scripts will not "
-                "be reformatted."
-            )
-            _BLACK_WARNING_EMITTED = True
-        return
-
+    """Formats a generated Python example script with Black."""
     black.format_file_in_place(
         Path(file_path),
         fast=False,
