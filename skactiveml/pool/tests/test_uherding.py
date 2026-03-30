@@ -3,9 +3,13 @@ from copy import deepcopy
 from unittest.mock import patch
 
 import numpy as np
+from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 
+from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import MaxHerding, UHerding
 from skactiveml.tests.template_query_strategy import (
@@ -18,6 +22,83 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierWeirdTuple,
 )
 from skactiveml.utils import MISSING_LABEL
+
+
+class DummyMultilabelLogitClassifier(SkactivemlClassifier):
+    fit_calls = 0
+
+    def __init__(
+        self,
+        probas=None,
+        logits=None,
+        return_as_list=False,
+        missing_label=MISSING_LABEL,
+    ):
+        super().__init__(
+            classes=[[0, 1], [0, 1]],
+            missing_label=missing_label,
+        )
+        self.probas = probas
+        self.logits = logits
+        self.return_as_list = return_as_list
+
+    @classmethod
+    def reset_fit_calls(cls):
+        cls.fit_calls = 0
+
+    def fit(self, X, y, sample_weight=None):
+        type(self).fit_calls += 1
+        self._validate_data(
+            X=X,
+            y=y,
+            sample_weight=sample_weight,
+            y_ensure_1d=False,
+            multioutput_ensure_multilabel=True,
+        )
+        self.is_fitted_ = True
+        return self
+
+    def _generate_logits(self, X):
+        if self.logits is not None:
+            logits = np.asarray(self.logits, dtype=float)
+            if logits.ndim == 1:
+                logits = np.tile(logits, (len(X), 1))
+            return logits
+        X = np.asarray(X, dtype=float)
+        return np.column_stack([4 * X[:, 0] - 2, 2 - 4 * X[:, 1]])
+
+    def predict_proba(
+        self,
+        X,
+        return_logits=False,
+        extra_outputs=None,
+    ):
+        logits = self._generate_logits(X)
+        if self.probas is None:
+            probas = expit(logits)
+        else:
+            probas = np.asarray(self.probas, dtype=float)
+            if probas.ndim == 1:
+                probas = np.tile(probas, (len(X), 1))
+        if self.return_as_list:
+            probas_out = [
+                np.column_stack([1 - probas[:, j], probas[:, j]])
+                for j in range(probas.shape[1])
+            ]
+        else:
+            probas_out = probas
+
+        if extra_outputs is not None:
+            out = [probas_out]
+            for name in extra_outputs:
+                if name == "logits":
+                    out.append(logits)
+                else:
+                    raise ValueError(f"Unsupported extra output `{name}`.")
+            return tuple(out)
+        if return_logits:
+            return probas_out, logits
+        return probas_out
 
 
 class TestUHerding(
@@ -45,6 +126,26 @@ class TestUHerding(
                 classes=self.classes, random_state=0
             ),
         }
+        self.query_def_clf_multilabel = {
+            "X": X,
+            "y": np.vstack(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    *[
+                        np.full(2, MISSING_LABEL, dtype=float)
+                        for _ in range(len(X) - 2)
+                    ],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="array",
+                random_state=0,
+            ),
+        }
         super().setUp(
             qs_class=UHerding,
             init_default_params={
@@ -52,6 +153,11 @@ class TestUHerding(
                 "random_state": 0,
             },
             query_default_params_clf=self.query_default_params_clf,
+            init_default_params_multilabel={
+                "predict_proba_dict": None,
+                "random_state": 0,
+            },
+            query_default_params_clf_multilabel=self.query_def_clf_multilabel,
         )
 
     def test_init_param_method(self, test_cases=None):
@@ -158,6 +264,11 @@ class TestUHerding(
             test_cases,
             replace_init_params={"adaptive_sigma": False},
         )
+
+    def test_init_param_multilabel_aggregation_fn(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [(np.average, None), (np.max, None), ("bad", TypeError)]
+        self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
     def test_query_param_clf(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -306,6 +417,107 @@ class TestUHerding(
             np.nansum(np.abs(utilities[0] - utilities_max[0])), 0.0
         )
 
+    def test_query_multilabel(self):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        qs = UHerding(predict_proba_dict=None, random_state=0)
+        query_indices, utilities = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(query_indices.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue((utilities[~np.isnan(utilities)] >= 0).all())
+
+        clf_list = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=0,
+        )
+        query_params["clf"] = clf_list
+        query_indices_list, utilities_list = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(query_indices_list.shape, (2,))
+        self.assertEqual(utilities_list.shape, (2, len(query_params["X"])))
+
+    def test_query_multilabel_fit_clf_false(self):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        clf = query_params["clf"]
+        clf.fit(query_params["X"], query_params["y"])
+        query_params["clf"] = clf
+        qs = UHerding(predict_proba_dict=None, random_state=0)
+        query_indices, utilities = qs.query(
+            **query_params,
+            fit_clf=False,
+            batch_size=2,
+            return_utilities=True,
+        )
+        self.assertEqual(query_indices.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+
+    def test_query_multilabel_aggregation_changes_utilities(self):
+        X = self.query_default_params_clf["X"]
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        query_params = {
+            "X": X,
+            "y": y,
+            "clf": DummyMultilabelLogitClassifier(),
+        }
+        qs_mean = UHerding(
+            predict_proba_dict=None,
+            multilabel_aggregation_fn=np.average,
+            random_state=0,
+        )
+        qs_max = UHerding(
+            predict_proba_dict=None,
+            multilabel_aggregation_fn=np.max,
+            random_state=0,
+        )
+        _, utilities_mean = qs_mean.query(
+            **query_params, batch_size=1, return_utilities=True
+        )
+        _, utilities_max = qs_max.query(
+            **query_params, batch_size=1, return_utilities=True
+        )
+        self.assertGreater(
+            np.nansum(np.abs(utilities_mean - utilities_max)), 0.0
+        )
+
+    def test_query_multilabel_with_logits(self):
+        X = self.query_default_params_clf["X"]
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = DummyMultilabelLogitClassifier()
+        query_indices, utilities = UHerding(
+            predict_proba_dict={"extra_outputs": ["logits"]},
+            random_state=0,
+        ).query(X, y, clf=clf, batch_size=2, return_utilities=True)
+        self.assertEqual(query_indices.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(X)))
+        self.assertTrue((utilities[~np.isnan(utilities)] >= 0).all())
+
     def test_query_fit_clf_false_uses_temp_clones_only(self):
         ParzenWindowClassifierLogitsEmbedding.reset_fit_calls()
         clf = ParzenWindowClassifierLogitsEmbedding(
@@ -399,6 +611,31 @@ class TestUHerding(
             ParzenWindowClassifierLogitsEmbedding.fit_calls, fit_calls_before
         )
 
+    def test_query_multilabel_fixed_temperature_skips_calibration_refits(self):
+        DummyMultilabelLogitClassifier.reset_fit_calls()
+        X = self.query_default_params_clf["X"]
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = DummyMultilabelLogitClassifier()
+        clf.fit(X, y)
+        fit_calls_before = DummyMultilabelLogitClassifier.fit_calls
+
+        qs = UHerding(temperatures=0.5, random_state=0)
+        qs.query(X, y, clf=clf, fit_clf=False)
+        self.assertEqual(
+            DummyMultilabelLogitClassifier.fit_calls, fit_calls_before
+        )
+
     def test_query_no_logits_with_single_labeled_class(self):
         X = np.array([[0.0, 0.0], [1.0, 0.0], [0.5, 0.5]])
         y = np.array([0, MISSING_LABEL, MISSING_LABEL], dtype=float)
@@ -432,6 +669,40 @@ class TestUHerding(
         self.assertFalse(
             np.allclose(np.nan_to_num(utilities_uh, nan=0.0), 0.0)
         )
+        np.testing.assert_array_equal(query_indices_uh, query_indices_mh)
+        np.testing.assert_allclose(utilities_uh, utilities_mh)
+
+    def test_query_multilabel_zero_uncertainty_falls_back_to_pure_coverage(
+        self,
+    ):
+        X = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, 0.5],
+                [0.0, 1.0],
+            ]
+        )
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = DummyMultilabelLogitClassifier(
+            probas=np.array([1.0, 0.0]),
+            logits=np.array([50.0, -50.0]),
+        )
+
+        query_indices_uh, utilities_uh = UHerding(
+            adaptive_sigma=False, random_state=0
+        ).query(X, y, clf=clf, batch_size=2, return_utilities=True)
+        query_indices_mh, utilities_mh = MaxHerding(random_state=0).query(
+            X, y, batch_size=2, return_utilities=True
+        )
+
         np.testing.assert_array_equal(query_indices_uh, query_indices_mh)
         np.testing.assert_allclose(utilities_uh, utilities_mh)
 
@@ -481,6 +752,139 @@ class TestUHerding(
                 X, y, clf, temperatures=np.array([0.5, 1.0])
             )
         self.assertEqual(tau, 1.0)
+
+    def test_select_temperature_multilabel_missing_logits_and_split_fallback(
+        self,
+    ):
+        qs = UHerding(predict_proba_dict=None, random_state=0)
+        qs.missing_label_ = qs.missing_label
+        qs.random_state_ = np.random.RandomState(0)
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+
+        tau = qs._select_temperature(
+            query_params["X"],
+            query_params["y"],
+            query_params["clf"],
+            temperatures=np.array([0.5, 1.0]),
+            is_multioutput=True,
+        )
+        np.testing.assert_array_equal(tau, np.ones(2))
+
+        y_small = np.array(
+            [
+                [0.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = DummyMultilabelLogitClassifier()
+        tau_small = qs._select_temperature(
+            query_params["X"][:3],
+            y_small,
+            clf,
+            temperatures=np.array([0.5, 1.0]),
+            is_multioutput=True,
+        )
+        np.testing.assert_array_equal(tau_small, np.ones(2))
+
+    def test_select_temperature_multilabel_degenerate_label(self):
+        qs = UHerding(random_state=0)
+        qs.missing_label_ = qs.missing_label
+        qs.random_state_ = np.random.RandomState(0)
+        X = self.query_default_params_clf["X"][:4]
+        y = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 1.0],
+            ]
+        )
+        clf = DummyMultilabelLogitClassifier()
+
+        with patch(
+            "skactiveml.pool._uherding.train_test_split",
+            return_value=(np.array([2, 3]), np.array([0, 1])),
+        ):
+            tau = qs._select_temperature(
+                X,
+                y,
+                clf,
+                temperatures=np.array([0.5, 1.0, 2.0]),
+                is_multioutput=True,
+            )
+
+        self.assertEqual(tau.shape, (2,))
+        self.assertEqual(tau[1], 1.0)
+        self.assertIn(tau[0], [0.5, 1.0, 2.0])
+
+    def test_select_temperature_multilabel_with_logits(self):
+        qs = UHerding(
+            predict_proba_dict={"extra_outputs": ["logits"]},
+            random_state=0,
+        )
+        qs.missing_label_ = qs.missing_label
+        qs.random_state_ = np.random.RandomState(0)
+        X = self.query_default_params_clf["X"]
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [1.0, 0.0],
+            ]
+        )
+        clf = DummyMultilabelLogitClassifier()
+
+        with patch(
+            "skactiveml.pool._uherding.train_test_split",
+            return_value=(np.array([0, 1, 2, 3]), np.array([4, 5, 6, 7])),
+        ):
+            tau = qs._select_temperature(
+                X,
+                y,
+                clf,
+                temperatures=np.array([0.5, 1.0, 2.0]),
+                is_multioutput=True,
+            )
+
+        self.assertEqual(tau.shape, (2,))
+        self.assertTrue(np.isin(tau, [0.5, 1.0, 2.0]).all())
+
+    def test_predict_with_extras_multilabel_logits_only(self):
+        qs = UHerding(
+            predict_proba_dict={"extra_outputs": ["logits"]},
+            predict_proba_parser=lambda out: (None, out[1], None),
+            random_state=0,
+        )
+        clf = DummyMultilabelLogitClassifier()
+        clf.fit(
+            self.query_default_params_clf["X"],
+            np.array(
+                [
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    [0.0, 1.0],
+                    [1.0, 0.0],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                ]
+            ),
+        )
+        probas, logits, emb = qs._predict_with_extras(
+            clf,
+            self.query_default_params_clf["X"][:2],
+            is_multioutput=True,
+        )
+        self.assertIsNone(emb)
+        self.assertEqual(logits.shape, (2, 2))
+        np.testing.assert_allclose(probas, expit(logits))
 
     def test_predict_with_extras_type_error_without_kwargs_reraises(self):
         qs = UHerding(random_state=0)
@@ -539,6 +943,39 @@ class TestUHerding(
             BadDecisionClassifier(), np.zeros((2, 2))
         )
         self.assertIsNone(logits)
+
+    def test_multilabel_helper_edge_cases(self):
+        self.assertIsNone(UHerding._canonicalize_multilabel_probas(None))
+
+        probas = UHerding._canonicalize_multilabel_probas(
+            [np.array([0.1, 0.2]), np.array([[0.7, 0.3], [0.4, 0.6]])]
+        )
+        np.testing.assert_allclose(probas, np.array([[0.1, 0.3], [0.2, 0.6]]))
+
+        self.assertRaises(
+            ValueError,
+            UHerding._canonicalize_multilabel_probas,
+            [np.ones((2, 2, 1))],
+        )
+        self.assertRaises(
+            ValueError,
+            UHerding._canonicalize_multilabel_probas,
+            np.ones(2),
+        )
+
+        self.assertIsNone(
+            UHerding._canonicalize_multilabel_logits(None, np.zeros((2, 2)))
+        )
+        self.assertIsNone(
+            UHerding._canonicalize_multilabel_logits(
+                np.ones(2), np.zeros((2, 2))
+            )
+        )
+        self.assertIsNone(
+            UHerding._canonicalize_multilabel_logits(
+                np.ones((3, 2)), np.zeros((2, 2))
+            )
+        )
 
     @staticmethod
     def _assert_object_dict_equal(dict_a, dict_b):
