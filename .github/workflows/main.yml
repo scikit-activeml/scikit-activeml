@@ -8,7 +8,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
     - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
@@ -33,7 +33,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13']
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
     - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
@@ -58,7 +58,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13' ]
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
     - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
@@ -87,7 +87,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ '3.10', '3.11', '3.12', '3.13']
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
     steps:
     - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
@@ -109,7 +109,7 @@ jobs:
       run: |
         pytest
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         fail_ci_if_error: true
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.13']
+        python-version: ['3.14']
     steps:
     - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.13']
+        python-version: ['3.14']
     steps:
     - uses: actions/checkout@v6
     - name: Set up Python ${{ matrix.python-version }}
