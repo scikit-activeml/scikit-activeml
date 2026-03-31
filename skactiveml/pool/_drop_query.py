@@ -65,7 +65,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    multilabel_aggregation_fn : callable, default=np.average
+    multilabel_aggregation_fn : callable, default=np.mean
         Callable used only for two-dimensional `y` (multilabel classification).
         It must accept `axis` as a keyword argument and reduce the per-label
         disagreement counts along that axis. Common choices are `np.mean`,
@@ -89,7 +89,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         clf_embedding_flag_name=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        multilabel_aggregation_fn=np.average,
+        multilabel_aggregation_fn=np.mean,
     ):
         self.dropout_rate = dropout_rate
         self.n_dropout_samples = n_dropout_samples
@@ -132,8 +132,10 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            Weights of training samples in `X`. For two-dimensional `y`,
-            `sample_weight` must have the same shape as `y`.
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         candidates : None or array-like of shape (n_candidates,) of type \
                 int, default=None
             - If `candidates` is `None`, the unlabeled samples from

@@ -479,7 +479,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
     def test__validate_data_multilabel(self):
         X = np.arange(8).reshape(4, 2)
         y = np.array([[0, 1], [-1, -1], [1, 0], [0, 0]])
-        sample_weight = np.ones_like(y, dtype=float)
         clf = DummySkactivemlClassifier(
             classes=[[0, 1], [0, 1]], missing_label=-1
         )
@@ -487,7 +486,7 @@ class SkactivemlClassifierTest(unittest.TestCase):
         clf.fit(
             X,
             y,
-            sample_weight=sample_weight,
+            sample_weight=np.ones(len(y), dtype=float),
             y_ensure_1d=False,
             multioutput_ensure_multilabel=True,
         )
@@ -495,7 +494,9 @@ class SkactivemlClassifierTest(unittest.TestCase):
 
         np.testing.assert_array_equal(X_valid, X)
         np.testing.assert_array_equal(y_valid, y)
-        np.testing.assert_array_equal(sample_weight_valid, sample_weight)
+        np.testing.assert_array_equal(
+            sample_weight_valid, np.ones(len(y), dtype=float)
+        )
         self.assertTrue(clf.multioutput_)
         self.assertIsNone(clf.cost_matrix_)
 
@@ -522,14 +523,15 @@ class SkactivemlClassifierTest(unittest.TestCase):
             classes=[[0, 1], [0, 1]], missing_label=-1
         )
 
-        self.assertRaises(
-            ValueError,
-            clf.fit,
+        clf.fit(
             X,
             y,
-            sample_weight=np.ones(len(y)),
+            sample_weight=np.ones_like(y, dtype=float),
             y_ensure_1d=False,
             multioutput_ensure_multilabel=True,
+        )
+        np.testing.assert_array_equal(
+            clf.validated_[2], np.ones_like(y, dtype=float)
         )
         self.assertRaises(
             ValueError,
@@ -546,16 +548,34 @@ class SkactivemlClassifierTest(unittest.TestCase):
     ):
         X = np.arange(6).reshape(3, 2)
         y = np.array([[0, 1], [-1, -1], [1, 0]])
-        sample_weight = np.ones_like(y, dtype=float)
         clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
 
-        clf.fit(X, y, sample_weight=sample_weight, y_ensure_1d=False)
+        clf.fit(
+            X,
+            y,
+            sample_weight=np.ones(len(y), dtype=float),
+            y_ensure_1d=False,
+        )
         X_valid, y_valid, sample_weight_valid = clf.validated_
 
         np.testing.assert_array_equal(X_valid, X)
         np.testing.assert_array_equal(y_valid, y)
-        np.testing.assert_array_equal(sample_weight_valid, sample_weight)
+        np.testing.assert_array_equal(
+            sample_weight_valid, np.ones(len(y), dtype=float)
+        )
         self.assertFalse(clf.multioutput_)
+
+    def test__validate_data_two_dimensional_non_multioutput_matrix_weights(
+        self,
+    ):
+        X = np.arange(6).reshape(3, 2)
+        y = np.array([[0, 1], [-1, -1], [1, 0]])
+        sample_weight = np.ones_like(y, dtype=float)
+        clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
+
+        clf.fit(X, y, sample_weight=sample_weight, y_ensure_1d=False)
+
+        np.testing.assert_array_equal(clf.validated_[2], sample_weight)
 
     def test__validate_data_multilabel_binary_enforcement(self):
         X = np.arange(6).reshape(3, 2)

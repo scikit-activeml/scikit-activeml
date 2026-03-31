@@ -83,7 +83,19 @@ def check_scalar(
 
 
 def _is_nonstring_iterable(obj):
-    """True if `obj` is iterable but not a string/bytes."""
+    """Check whether `obj` is iterable but not string-like.
+
+    Parameters
+    ----------
+    obj : object
+        Object to be checked.
+
+    Returns
+    -------
+    is_iterable : bool
+        `True` if `obj` is iterable and not a string, bytes object, or
+        NumPy string scalar, and `False` otherwise.
+    """
     if isinstance(obj, (str, bytes, np.str_)):
         return False
     try:
@@ -94,11 +106,26 @@ def _is_nonstring_iterable(obj):
 
 
 def _is_multioutput_classes(classes):
-    """Rule: nested structure corresponds to multioutput.
+    """Check whether `classes` encodes a multioutput structure.
 
-    - single output: one-dimensional iterable of scalars (strings/numbers)
-    - multioutput: outer iterable whose elements are themselves iterables
-      of scalars (strings/numbers)
+    Parameters
+    ----------
+    classes : object
+        Candidate class specification. Single-output class specifications are
+        expected to be one-dimensional iterables of scalar labels. Multioutput
+        specifications are expected to be iterables whose elements are
+        themselves one-dimensional iterables of scalar labels.
+
+    Returns
+    -------
+    is_multioutput : bool
+        `True` if `classes` has a nested structure corresponding to a
+        multioutput classification problem and `False` otherwise.
+
+    Raises
+    ------
+    ValueError
+        If `classes` is an empty iterable.
     """
     if classes is None:
         return False
@@ -114,8 +141,23 @@ def _is_multioutput_classes(classes):
 
 
 def _check_1d_class_list(c, name="classes"):
-    """Validate one output's class list: one-dimensional, non-empty, unique,
-    all strings or all numbers."""
+    """Validate a one-dimensional class list.
+
+    Parameters
+    ----------
+    c : iterable
+        Class labels of a single output.
+    name : str, default="classes"
+        Name used in error messages.
+
+    Raises
+    ------
+    TypeError
+        If `c` is not iterable, contains unhashable or unsupported label
+        types, or mixes numeric and string labels.
+    ValueError
+        If `c` is empty, not one-dimensional, or contains duplicate labels.
+    """
     if not _is_nonstring_iterable(c):
         raise TypeError(f"`{name}` must be iterable. Got {type(c)}.")
 
@@ -156,6 +198,90 @@ def _check_1d_class_list(c, name="classes"):
             f"`{name}` must be uniformly strings or numbers. "
             f"Got mixture: {sorted(kinds)}."
         )
+
+
+def _canonicalize_multilabel_probas(
+    probas,
+    n_samples=None,
+    n_outputs=None,
+    allow_none=False,
+):
+    """Convert multilabel probabilities to a 2D positive-class matrix.
+
+    Parameters
+    ----------
+    probas : array-like of shape (n_samples, n_outputs) or list of \
+            array-like of shape (n_samples, 2), or None
+        Multilabel probabilities. Array input is interpreted as one
+        positive-class probability per label. List input is interpreted as one
+        binary probability matrix per label.
+    n_samples : int or None, default=None
+        Expected number of samples. If not `None`, the returned array must
+        have this many rows.
+    n_outputs : int or None, default=None
+        Expected number of outputs. If not `None`, the returned array must
+        have this many columns.
+    allow_none : bool, default=False
+        If `True`, `None` is returned unchanged.
+
+    Returns
+    -------
+    probas : numpy.ndarray of shape (n_samples, n_outputs) or None
+        Canonicalized multilabel probabilities containing one positive-class
+        probability per output.
+
+    Raises
+    ------
+    ValueError
+        If `probas` is `None` while `allow_none=False`, or if the provided
+        probabilities do not match the expected multilabel format.
+    """
+    if probas is None:
+        if allow_none:
+            return None
+        raise ValueError("`probas` must not be `None`.")
+
+    if isinstance(probas, list):
+        if n_outputs is not None and len(probas) != n_outputs:
+            raise ValueError(
+                f"`probas` contains {len(probas)} outputs, expected "
+                f"{n_outputs}."
+            )
+
+        probas_cols = []
+        for j, probas_j in enumerate(probas):
+            probas_j = np.asarray(probas_j, dtype=float)
+            if probas_j.ndim != 2 or probas_j.shape[1] != 2:
+                raise ValueError(
+                    f"`probas[{j}]` must have shape `(n_samples, 2)`, got "
+                    f"{probas_j.shape}."
+                )
+            if n_samples is not None and probas_j.shape[0] != n_samples:
+                raise ValueError(
+                    f"`probas[{j}]` has {probas_j.shape[0]} samples, "
+                    f"expected {n_samples}."
+                )
+            probas_cols.append(probas_j[:, 1])
+
+        probas = np.column_stack(probas_cols)
+    else:
+        probas = np.asarray(probas, dtype=float)
+        if probas.ndim != 2:
+            raise ValueError(
+                "`probas` must have shape `(n_samples, n_outputs)` for "
+                f"multilabel data, got {probas.shape}."
+            )
+
+    if n_samples is not None and probas.shape[0] != n_samples:
+        raise ValueError(
+            f"`probas` has {probas.shape[0]} samples, expected {n_samples}."
+        )
+    if n_outputs is not None and probas.shape[1] != n_outputs:
+        raise ValueError(
+            f"`probas` has {probas.shape[1]} outputs, expected {n_outputs}."
+        )
+
+    return probas
 
 
 def check_classes(classes):
@@ -695,10 +821,7 @@ def check_indices(indices, A, dim="adaptive", unique=True):
 def check_type(
     obj, name, *target_types, target_vals=None, indicator_funcs=None
 ):
-    """Check if `obj` is one of the given types. It is also possible to allow
-    specific values. Further it is possible to pass indicator functions
-    that can also accept `obj`. Thereby, `obj` must either have a correct type
-    a correct value or be accepted by an indicator function.
+    """Check whether an object satisfies type, value, or indicator rules.
 
     Parameters
     ----------
@@ -713,6 +836,12 @@ def check_type(
     indicator_funcs : iterable, default=None
         Possible further custom indicator (boolean) functions that accept
         the object by returning `True` if the object is passed as a parameter.
+
+    Raises
+    ------
+    TypeError
+        If `obj` does not match any allowed type or value and is not accepted
+        by any indicator function.
     """
     target_vals = target_vals if target_vals is not None else []
     indicator_funcs = indicator_funcs if indicator_funcs is not None else []
@@ -765,18 +894,25 @@ def check_type(
 
 
 def _check_callable(func, name, n_positional_parameters=None):
-    """Checks if `func` is a callable and if the number of free parameters is
-    correct.
+    """Check whether `func` is callable with the expected arity.
 
     Parameters
     ----------
     func : callable
-        The functions to be validated.
+        Callable to be validated.
     name : str
-        The name of the function
+        Name used in error messages.
     n_positional_parameters : int, default=None
-        The number of free parameters. If `n_free_parameters` is `None`,
-        `n_free_parameters` is set to `1`.
+        Expected number of positional parameters without defaults. If `None`,
+        one positional parameter is expected.
+
+    Raises
+    ------
+    TypeError
+        If `func` is not callable.
+    ValueError
+        If `func` does not expose the expected number of positional
+        parameters.
     """
     if n_positional_parameters is None:
         n_positional_parameters = 1
@@ -919,31 +1055,22 @@ def check_budget_manager(
 
 
 def check_n_features(obj, X, reset):
-    """
-    Validate and update the number of features for an estimator based on the
-    input data.
-
-    This function either sets or verifies the estimator's expected number of
-    features using the provided data array. When `reset` is True, it updates
-    the estimator's attribute `n_features_in_` with the number of features in
-    `X` (i.e., `X.shape[1]`). If `X` is empty (has zero rows), the attribute is
-    set to `None`. When `reset` is False and `n_features_in_` is already
-    defined, the function delegates the verification process to
-    `sklearn_check_n_features`.
+    """Validate and update the expected number of features of an estimator.
 
     Parameters
     ----------
     obj : object
-        An estimator or any object that is expected to have an attribute
-        `n_features_in_` indicating the number of features it was fitted on.
+        Estimator-like object expected to expose `n_features_in_`.
     X : array-like of shape (n_samples, n_features)
-        The input data to check. The number of columns in X represents the
-        number of features.
+        Input data whose second dimension determines the number of features.
     reset : bool
-        If True, the function will set `obj.n_features_in_` to the number of
-        features in X. If False, and if `obj.n_features_in_` is already set,
-        the function will check that X has the expected number of features
-        using `sklearn_check_n_features`.
+        If `True`, set `obj.n_features_in_` from `X`. If `False`, validate
+        `X` against the existing value of `obj.n_features_in_`.
+
+    Raises
+    ------
+    ValueError
+        If `reset=False` and `X` does not match the stored number of features.
     """
     if reset:
         obj.n_features_in_ = X.shape[1] if len(X) > 0 else None
@@ -953,14 +1080,13 @@ def check_n_features(obj, X, reset):
 
 
 def _check_forward_outputs(forward_outputs):
-    """Check forward outputs required by `SkorchMixin`
-    and `make_criterion_tuple_aware`.
+    """Validate the `forward_outputs` mapping used by `SkorchMixin`.
 
     Parameters
     ----------
     forward_outputs : dict[str, tuple[int, Callable | None]]
-        `dict` that describes how to obtain and post-process the
-        outputs of `module.forward` for prediction.
+        Mapping that describes how to obtain and post-process the outputs of
+        `module.forward` for prediction.
 
         Given `raw_outputs = module.forward(X)`, each entry
         `name -> (idx, transform)` is interpreted as:
@@ -969,6 +1095,14 @@ def _check_forward_outputs(forward_outputs):
         - `transform`: callable `f(tensor) -> tensor` or `None`.
           If `transform` is not `None`, it is applied to the selected
           raw tensor; otherwise the raw tensor is used.
+
+    Raises
+    ------
+    TypeError
+        If `forward_outputs` is not a dictionary or contains invalid entry
+        specifications.
+    ValueError
+        If `forward_outputs` is empty or contains negative indices.
     """
 
     # Check forward_outputs configured.

@@ -15,6 +15,7 @@ from sklearn.utils.validation import (
     check_is_fitted,
     check_array,
     has_fit_parameter,
+    column_or_1d,
 )
 
 from sklearn.utils import check_consistent_length
@@ -46,6 +47,18 @@ try:
     successful_skorch_torch_import = True
 except ImportError:  # pragma: no cover
     pass
+
+
+def _prior_matrix_from_counts(counts, n_samples):
+    counts = np.asarray(counts, dtype=float)
+    total = counts.sum()
+    k = counts.size
+
+    if total == 0:
+        return np.full((n_samples, k), 1.0 / k, dtype=float)
+
+    row = counts / total
+    return np.tile(row, (n_samples, 1))
 
 
 class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -411,10 +424,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                         if not any(np.any(np.isnan(P_j)) for P_j in P_list):
                             return P_list
 
-            # General multioutput format: return one probability matrix
-            # (n_samples, n_classes) per task.
-            pass
-
         # Fallback, if fitting of the underlying estimator failed.
         warnings.warn(
             f"Since the 'base_estimator' could not be fitted when"
@@ -423,27 +432,15 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             f"make the predictions."
         )
 
-        # Helper functions to normalize label counts.
-        def prior_matrix_from_counts(counts):
-            counts = np.asarray(counts, dtype=float)
-            total = counts.sum()
-            k = counts.size
-
-            if total == 0:
-                return np.full((len(X), k), 1.0 / k, dtype=float)
-
-            row = counts / total
-            return np.tile(row, (len(X), 1))
-
         # Fallback for single output.
         if not self.multioutput_:
-            return prior_matrix_from_counts(self._label_counts)
+            return _prior_matrix_from_counts(self._label_counts, len(X))
 
         if proba_format == "array":
             # Binary per task: return (n_samples, n_outputs) with P(y=1).
             return np.column_stack(
                 [
-                    prior_matrix_from_counts(counts_j)[:, 1]
+                    _prior_matrix_from_counts(counts_j, len(X))[:, 1]
                     for counts_j in self._label_counts
                 ]
             )
@@ -451,7 +448,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         # General multioutput format: return one probability matrix
         # (n_samples, n_classes) per task.
         return [
-            prior_matrix_from_counts(counts_j)
+            _prior_matrix_from_counts(counts_j, len(X))
             for counts_j in self._label_counts
         ]
 
@@ -737,15 +734,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ----------
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,)
             It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            labels are represented by the attribute `self.missing_label_`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
         fit_kwargs : dict-like
             Further parameters as input to the `fit` method of the `estimator`.
 
@@ -798,15 +791,11 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ----------
         X : array-like of shape (n_samples, ...)
             The feature matrix representing the samples.
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        y : array-like of shape (n_samples,)
             It contains the class labels of the training samples. Missing
-            labels are represented the attribute `self.missing_label_`. In case
-            of multiple labels per sample (i.e., n_outputs > 1), the samples
-            are duplicated.
-        sample_weight : array-like of shape (n_samples,) or\
-                (n_samples, n_outputs)
-            It contains the weights of the training samples' class labels. It
-            must have the same shape as `y`.
+            labels are represented by the attribute `self.missing_label_`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            It contains the weights of the training samples' class labels.
         fit_kwargs : dict-like
             Further parameters as input to the `fit` method of the `estimator`.
 
@@ -924,17 +913,19 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Check input parameters.
         y = check_array(y, **check_y_dict)
+        y = column_or_1d(y)
         if len(y) == 0:
             check_X_dict["ensure_2d"] = False
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
-            if not np.array_equal(y.shape, sample_weight.shape):
+            sample_weight = column_or_1d(sample_weight)
+            if len(y) != len(sample_weight):
                 raise ValueError(
-                    f"`y` has the shape {y.shape} and `sample_weight` has the "
+                    f"`y` has the length {len(y)} and `sample_weight` has the "
                     f"shape {sample_weight.shape}. Both need to have "
-                    f"identical shapes."
+                    f"the same one-dimensional shape."
                 )
 
         # Check common classifier parameters.
@@ -1420,14 +1411,6 @@ if successful_skorch_torch_import:
                 first element is `P` and whose remaining elements
                 (`extras`) correspond to the requested forward outputs in the
                 order given by `extra_outputs`.
-
-            Raises
-            ------
-            ValueError
-                If the classifier was not fitted yet and `classes=None`, the
-                task type is ambiguous before the first prediction. In this
-                case, call `fit` first or provide `classes` to disambiguate
-                multiclass versus multilabel behavior.
             """
             # Initialize module, if not done yet.
             if not hasattr(self, "neural_net_"):
@@ -1438,6 +1421,7 @@ if successful_skorch_torch_import:
             check_n_features(
                 self, X, reset=not hasattr(self, "n_features_in_")
             )
+            self._check_prefit_prediction_ambiguity()
 
             # Resolve effective forward_outputs (either user-provided or
             # defaulted based on the criterion).
@@ -1451,7 +1435,6 @@ if successful_skorch_torch_import:
 
             # First element is expected to be the class probabilities.
             P = fw_out[0] if isinstance(fw_out, tuple) else fw_out
-            self._check_prefit_prediction_ambiguity(P)
             self._initialize_fallbacks(P)
             return fw_out
 
@@ -1638,8 +1621,15 @@ if successful_skorch_torch_import:
                 self.classes_, self.missing_label, self.cost_matrix_
             )
 
-        def _check_prefit_prediction_ambiguity(self, P):
-            """Reject ambiguous prediction before the task type is known."""
+        def _check_prefit_prediction_ambiguity(self):
+            """Reject prefit prediction when the output task type is unknown.
+
+            Without fitted label state or user-provided `classes`, predictions
+            cannot be interpreted unambiguously as multiclass versus
+            multilabel/multioutput-binary. `_initialize_fallbacks` can infer
+            flat classes from `P.shape[-1]`, but that only yields the single-
+            output interpretation.
+            """
             if hasattr(self, "_le") or self.classes is not None:
                 return
             raise ValueError(

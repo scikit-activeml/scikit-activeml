@@ -234,3 +234,28 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertEqual(len(query_idx), 2)
         self.assertEqual(utilities.shape, (2, len(query_params["X"])))
         self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_multioutput_multiclass_list_probas_raises(self):
+        qs = Badge(random_state=42)
+        query_params = {
+            "X": np.linspace(0, 1, 12).reshape(6, 2),
+            "y": np.array(
+                [
+                    [0.0, 0.0],
+                    [1.0, 1.0],
+                    [2.0, 0.0],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1, 2], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="list",
+                random_state=0,
+            ),
+        }
+
+        self.assertRaises(ValueError, qs.query, **query_params)

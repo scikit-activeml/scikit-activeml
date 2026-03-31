@@ -15,6 +15,7 @@ from ..utils import (
     unlabeled_indices,
     check_scalar,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
@@ -101,8 +102,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row. In this
             case, BADGE uses a multilabel extension based on independent
-            sigmoid outputs per label. This multilabel variant is an
-            extension in `scikit-activeml` and was not proposed in [1]_.
+            sigmoid outputs per label. `predict_proba` must then return either
+            one positive-class probability per label with shape
+            `(n_samples, n_outputs)` or a list of binary probability matrices
+            with shape `(n_samples, 2)` per output. This multilabel variant
+            is an extension in `scikit-activeml` and was not proposed in [1]_.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -110,8 +114,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight: array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            Weights of training samples in `X`. For two-dimensional `y`,
-            `sample_weight` must have the same shape as `y`.
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -213,12 +219,11 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         probas = clf.predict_proba(X_unlbld, **predict_proba_kwargs)
         if isinstance(probas, tuple):
             probas, X_unlbld = probas
-        if is_multioutput and isinstance(probas, list):
-            probas = np.column_stack(
-                [
-                    proba_j[:, -1] if proba_j.ndim == 2 else proba_j
-                    for proba_j in probas
-                ]
+        if is_multioutput:
+            probas = _canonicalize_multilabel_probas(
+                probas,
+                n_samples=len(X_unlbld),
+                n_outputs=y.shape[1],
             )
 
         if is_multioutput:

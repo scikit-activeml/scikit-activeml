@@ -173,6 +173,45 @@ class TestUncertaintySampling(
         self.assertEqual(utilities.shape, (1, len(candidates)))
         self.assertEqual(best_indices.shape, (1,))
 
+    def test_query_multilabel_list_probas(self):
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        query_params["clf"] = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            proba_format="list",
+        )
+
+        query_idx, utilities = UncertaintySampling().query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(query_idx.shape, (2,))
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_multilabel_multiclass_list_probas_raises(self):
+        query_params = {
+            "X": np.linspace(0, 1, 12).reshape(6, 2),
+            "y": np.array(
+                [
+                    [0.0, 0.0],
+                    [1.0, 1.0],
+                    [2.0, 0.0],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                    [np.nan, np.nan],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1, 2], [0, 1]],
+                proba_format="list",
+            ),
+        }
+
+        self.assertRaises(
+            ValueError, UncertaintySampling().query, **query_params
+        )
+
 
 class TestExpectedAveragePrecision(unittest.TestCase):
     def setUp(self):
@@ -273,6 +312,18 @@ class TestUncertaintyScores(unittest.TestCase):
             probas=[[-0.1, 0.2], [0.4, 0.6]],
             is_multilabel=True,
         )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=[np.ones((2, 3)), np.ones((2, 2))],
+            is_multilabel=True,
+        )
+        self.assertRaises(
+            ValueError,
+            uncertainty_scores,
+            probas=[np.ones((2, 2)), np.ones((3, 2))],
+            is_multilabel=True,
+        )
 
     def test_init_param_method(self):
         self.assertRaises(
@@ -369,3 +420,30 @@ class TestUncertaintyScores(unittest.TestCase):
             multilabel_aggregation_fn=np.max,
         )
         np.testing.assert_allclose(val_scores, scores)
+
+        multilabel_list = [
+            np.column_stack(
+                [
+                    1 - self.multilabel_probas[:, 0],
+                    self.multilabel_probas[:, 0],
+                ]
+            ),
+            np.column_stack(
+                [
+                    1 - self.multilabel_probas[:, 1],
+                    self.multilabel_probas[:, 1],
+                ]
+            ),
+            np.column_stack(
+                [
+                    1 - self.multilabel_probas[:, 2],
+                    self.multilabel_probas[:, 2],
+                ]
+            ),
+        ]
+        scores = uncertainty_scores(
+            multilabel_list, method="entropy", is_multilabel=True
+        )
+        np.testing.assert_allclose(
+            np.array([0.4477710424, 0.6154752525]), scores
+        )

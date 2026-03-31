@@ -77,7 +77,9 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            Weights of training samples in `X`.
+            Weights of training samples in `X`. One weight per sample is
+            supported. Per-target weights are forwarded to `clf.fit` without
+            additional validation and require estimator support.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X, y)`

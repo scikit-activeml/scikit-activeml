@@ -89,7 +89,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    multilabel_aggregation_fn: callable, default=np.average
+    multilabel_aggregation_fn: callable, default=np.mean
         Callable that takes axis as kwarg and reduces along that axis. Common
         choices are `np.mean`, `np.min`, `np.max`, or any quantiles, while
         `np.sum` is not allowed. This is only used for the multilabel
@@ -112,7 +112,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         n_cluster_param_name="n_clusters",
         missing_label=MISSING_LABEL,
         random_state=None,
-        multilabel_aggregation_fn=np.average,
+        multilabel_aggregation_fn=np.mean,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -139,7 +139,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
 
         Parameters
         ----------
-        X : array-like of shape (n_samples, n_features)
+        X : array-like of shape (n_samples, ...)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
@@ -153,24 +153,27 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             `predict_proba` (classification) or `predict` (regression).
             For multilabel classification, `predict_proba` may either return
             one probability per label with shape `(n_samples, n_outputs)` or a
-            list of binary probability arrays as commonly returned by
+            list of binary probability matrices with shape
+            `(n_samples, 2)` per output as commonly returned by
             multioutput scikit-learn estimators.
         fit_estimator : bool, default=True
             Defines whether the `estimator` should be fitted on
             `X`, `y`, and `sample_weight`.
         sample_weight: array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            Weights of training samples in `X`. For two-dimensional `y`,
-            `sample_weight` must have the same shape as `y`.
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `estimator.fit` without additional validation and require
+            estimator support.
         candidates : None or array-like of shape (n_candidates,), dtype=int or\
-                array-like of shape (n_candidates, n_features), default=None
+                array-like of shape (n_candidates, ...), default=None
             - If `candidates` is `None`, the unlabeled samples from
               `(X,y)` are considered as `candidates`.
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
             - Candidate samples passed directly with shape
-              `(n_candidates, n_features)` are not supported because `Clue`
+              `(n_candidates, ...)` are not supported because `Clue`
               requires a mapping to the samples in `X`.
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
@@ -253,13 +256,6 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         if not isinstance(out, tuple):
             out = (out,)
         main = out[0]
-        if is_multioutput and isinstance(main, list):
-            main = np.column_stack(
-                [
-                    proba_j[:, -1] if proba_j.ndim == 2 else proba_j
-                    for proba_j in main
-                ]
-            )
         emb = None
         uncertainties = None
         for out_element in out[1:]:

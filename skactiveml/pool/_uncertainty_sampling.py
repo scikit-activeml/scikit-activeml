@@ -18,6 +18,7 @@ from ..utils import (
     check_type,
     check_equal_missing_label,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
 
 
 class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
@@ -59,12 +60,15 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState
         The random state to use.
-    multilabel_aggregation_fn: callable, default=np.average
+    multilabel_aggregation_fn: callable, default=np.mean
         Callable that takes axis as kwarg and reduces along that axis.
         Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles,
         while `np.sum` is not allowed. This is only used when
         `method in ['least_confident', 'margin_sampling', 'entropy']` and
-        multilabel targets are provided.
+        multilabel targets are provided. For multilabel classification,
+        `predict_proba` may return either shape `(n_samples, n_outputs)` or a
+        list of binary probability matrices with shape `(n_samples, 2)` per
+        output.
 
     References
     ----------
@@ -90,7 +94,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
-        multilabel_aggregation_fn=np.average,
+        multilabel_aggregation_fn=np.mean,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -118,16 +122,22 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         X : array-like of shape (n_samples, n_features)
             Training data set, usually complete, i.e., including the labeled
             and unlabeled samples.
-        y : array-like of shape (n_samples,)
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`).
+            indicated by `self.missing_label`). If `y` is two-dimensional, a
+            row `y[i]` must either contain only observed labels or only
+            `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
             Model implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
             Defines whether the classifier should be fitted on `X`, `y`, and
             `sample_weight`.
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         utility_weight : array-like, default=None
             Weight for each candidate (multiplied with utilities). Usually,
             this is to be the density of a candidate. The length of
@@ -278,7 +288,7 @@ def uncertainty_scores(
     cost_matrix=None,
     method="least_confident",
     is_multilabel=False,
-    multilabel_aggregation_fn=np.average,
+    multilabel_aggregation_fn=np.mean,
 ):
     """Computes uncertainty scores. Three methods are available: least
     confident ('least_confident'), margin sampling ('margin_sampling'),
@@ -303,7 +313,7 @@ def uncertainty_scores(
         supported.
     is_multilabel: bool, default=False
         indicates if provided probas should be multilabel
-    multilabel_aggregation_fn: callable, default=np.average
+    multilabel_aggregation_fn: callable, default=np.mean
         Callable that takes axis as kwarg and reduces along that axis.
         Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles,
         while `np.sum` is not allowed.
@@ -318,7 +328,10 @@ def uncertainty_scores(
        Technol. Appl. Artif. Intell., pages 13–18, 2013.
     """
     # Check probabilities.
-    probas = check_array(probas)
+    if is_multilabel:
+        probas = _canonicalize_multilabel_probas(probas)
+    else:
+        probas = check_array(probas)
 
     if is_multilabel and (not np.all(probas <= 1) or not np.all(0 <= probas)):
         raise ValueError("'probas' are invalid. They need to be within [0,1].")

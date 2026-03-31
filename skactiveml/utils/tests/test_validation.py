@@ -19,6 +19,7 @@ from skactiveml.utils import (
     check_class_prior,
 )
 from skactiveml.utils._validation import (
+    _canonicalize_multilabel_probas,
     _check_1d_class_list,
     _check_callable,
     _check_forward_outputs,
@@ -27,6 +28,70 @@ from skactiveml.utils._validation import (
 
 
 class TestValidation(unittest.TestCase):
+    def test_canonicalize_multilabel_probas(self):
+        probas_array = np.array([[0.2, 0.8], [0.7, 0.3]])
+        np.testing.assert_allclose(
+            _canonicalize_multilabel_probas(
+                probas_array, n_samples=2, n_outputs=2
+            ),
+            probas_array,
+        )
+
+        probas_list = [
+            np.array([[0.8, 0.2], [0.3, 0.7]]),
+            np.array([[0.2, 0.8], [0.7, 0.3]]),
+        ]
+        np.testing.assert_allclose(
+            _canonicalize_multilabel_probas(
+                probas_list, n_samples=2, n_outputs=2
+            ),
+            np.array([[0.2, 0.8], [0.7, 0.3]]),
+        )
+
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.array([0.2, 0.7]), np.array([[0.2, 0.8], [0.7, 0.3]])],
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.ones((2, 3)), np.ones((2, 2))],
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.ones((3, 2)), np.ones((3, 2))],
+            n_samples=2,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            [np.ones((2, 2)), np.ones((2, 2))],
+            n_outputs=3,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            np.ones((3, 2)),
+            n_samples=2,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            np.ones((2, 3)),
+            n_outputs=2,
+        )
+        self.assertRaises(
+            ValueError,
+            _canonicalize_multilabel_probas,
+            np.ones(2),
+        )
+        self.assertRaises(ValueError, _canonicalize_multilabel_probas, None)
+        self.assertIsNone(
+            _canonicalize_multilabel_probas(None, allow_none=True)
+        )
+
     def test_check_scalar(self):
         x = 5
         self.assertRaises(

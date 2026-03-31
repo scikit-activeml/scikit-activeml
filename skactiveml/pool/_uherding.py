@@ -21,6 +21,7 @@ from ..utils import (
     labeled_indices,
     rand_argmax,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
 from ._uncertainty_sampling import uncertainty_scores
 
 
@@ -88,7 +89,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     adaptive_sigma : bool, default=True
         Flag whether to adapt the radius according to the minimum non-zero
         labeled pairwise distance. This option requires `metric='rbf'`.
-    multilabel_aggregation_fn : callable, default=np.average
+    multilabel_aggregation_fn : callable, default=np.mean
         Callable that takes `axis` as keyword argument and reduces per-label
         uncertainty scores for multilabel classification. This is only used
         when `y` is two-dimensional.
@@ -116,7 +117,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         metric="rbf",
         metric_dict=None,
         adaptive_sigma=True,
-        multilabel_aggregation_fn=np.average,
+        multilabel_aggregation_fn=np.mean,
         missing_label=MISSING_LABEL,
         random_state=None,
     ):
@@ -163,14 +164,21 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             temperature-scaled uncertainty estimation, the classifier should
             either provide logits via `predict_proba` extras or implement
             `decision_function`. Otherwise, the non-calibrated probabilities
-            are used as fallback.
+            are used as fallback. For multilabel classification,
+            `predict_proba` must return either shape `(n_samples, n_outputs)`
+            or a list of binary probability matrices with shape
+            `(n_samples, 2)` per output.
         fit_clf : bool, default=True
             Defines whether the classifier `clf` should be fitted on `X`, `y`,
             and `sample_weight` before evaluating the acquisition function.
             Independent of this flag, temporary cloned classifiers may still be
             fitted internally to select the temperature parameter.
-        sample_weight : array-like of shape (n_samples,), default=None
-            Weights of training samples in `X`.
+        sample_weight : array-like of shape (n_samples,) or \
+                (n_samples, n_outputs), default=None
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         candidates : None or array-like of shape (n_candidates,), dtype=int \
                 or array-like of shape (n_candidates, ...), default=None
             - If `candidates` is `None`, the unlabeled samples from `(X, y)`
@@ -540,7 +548,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if logits is None:
             logits = self._decision_function_logits(clf, X)
         if is_multioutput:
-            probas = self._canonicalize_multilabel_probas(probas)
+            probas = _canonicalize_multilabel_probas(probas, allow_none=True)
             logits = self._canonicalize_multilabel_logits(logits, X)
             if probas is None and logits is not None:
                 probas = expit(logits)
@@ -647,33 +655,6 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         if logits.ndim == 1:
             logits = np.column_stack([np.zeros_like(logits), logits])
         return logits
-
-    @staticmethod
-    def _canonicalize_multilabel_probas(probas):
-        if probas is None:
-            return None
-        if isinstance(probas, list):
-            probas_cols = []
-            for probas_j in probas:
-                probas_j = np.asarray(probas_j, dtype=float)
-                if probas_j.ndim == 1:
-                    probas_cols.append(probas_j)
-                elif probas_j.ndim == 2:
-                    probas_cols.append(probas_j[:, -1])
-                else:
-                    raise ValueError(
-                        "Multilabel probabilities in list format must "
-                        "contain one- or two-dimensional arrays."
-                    )
-            return np.column_stack(probas_cols)
-
-        probas = np.asarray(probas, dtype=float)
-        if probas.ndim != 2:
-            raise ValueError(
-                "Multilabel probabilities must have shape "
-                "`(n_samples, n_outputs)`."
-            )
-        return probas
 
     @staticmethod
     def _canonicalize_multilabel_logits(logits, X):

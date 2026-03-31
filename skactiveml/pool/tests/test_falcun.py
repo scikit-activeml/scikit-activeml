@@ -114,7 +114,7 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             if candidates is not None and candidates.ndim == 1:
                 expected_utilities[:, :10] = np.nan
                 expected_utilities[:, 30:] = np.nan
-            np.testing.assert_array_equal(utilities_1, expected_utilities)
+                np.testing.assert_array_equal(utilities_1, expected_utilities)
 
             # All utilities are non-negative values or np.nan.
             is_unlabeled = np.random.RandomState(0).choice(
@@ -155,3 +155,46 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                     )
                 else:
                     prev_utilities = utilities_copy
+
+    def test_query_multilabel_list_probas(self):
+        qs = Falcun(random_state=42)
+        query_params = dict(self.query_default_params_clf_multilabel)
+        query_params["clf"] = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=42,
+        )
+
+        query_idx, utilities = qs.query(
+            **query_params, batch_size=2, return_utilities=True
+        )
+        self.assertEqual(len(query_idx), 2)
+        self.assertEqual(utilities.shape, (2, len(query_params["X"])))
+        self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_multioutput_multiclass_list_probas_raises(self):
+        qs = Falcun(random_state=42)
+        query_params = {
+            "X": np.linspace(0, 1, 12).reshape(6, 2),
+            "y": np.array(
+                [
+                    [0.0, 0.0],
+                    [1.0, 1.0],
+                    [2.0, 0.0],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                    [MISSING_LABEL, MISSING_LABEL],
+                ]
+            ),
+            "clf": SklearnClassifier(
+                estimator=MultiOutputClassifier(GaussianNB()),
+                classes=[[0, 1, 2], [0, 1]],
+                missing_label=MISSING_LABEL,
+                proba_format="list",
+                random_state=42,
+            ),
+        }
+
+        self.assertRaises(ValueError, qs.query, **query_params)

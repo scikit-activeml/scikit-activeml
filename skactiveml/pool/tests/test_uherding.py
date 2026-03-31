@@ -22,6 +22,7 @@ from skactiveml.tests.utils import (
     ParzenWindowClassifierWeirdTuple,
 )
 from skactiveml.utils import MISSING_LABEL
+from skactiveml.utils._validation import _canonicalize_multilabel_probas
 
 
 class DummyMultilabelLogitClassifier(SkactivemlClassifier):
@@ -440,6 +441,28 @@ class TestUHerding(
         )
         self.assertEqual(query_indices_list.shape, (2,))
         self.assertEqual(utilities_list.shape, (2, len(query_params["X"])))
+
+    def test_query_multilabel_multiclass_list_probas_raises(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [2.0, 0.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1, 2], [0, 1]],
+            missing_label=MISSING_LABEL,
+            proba_format="list",
+            random_state=0,
+        )
+        qs = UHerding(predict_proba_dict=None, random_state=0)
+        self.assertRaises(ValueError, qs.query, X, y, clf=clf)
 
     def test_query_multilabel_fit_clf_false(self):
         query_params = deepcopy(self.query_default_params_clf_multilabel)
@@ -945,21 +968,26 @@ class TestUHerding(
         self.assertIsNone(logits)
 
     def test_multilabel_helper_edge_cases(self):
-        self.assertIsNone(UHerding._canonicalize_multilabel_probas(None))
+        self.assertIsNone(
+            _canonicalize_multilabel_probas(None, allow_none=True)
+        )
 
-        probas = UHerding._canonicalize_multilabel_probas(
-            [np.array([0.1, 0.2]), np.array([[0.7, 0.3], [0.4, 0.6]])]
+        probas = _canonicalize_multilabel_probas(
+            [
+                np.array([[0.9, 0.1], [0.8, 0.2]]),
+                np.array([[0.7, 0.3], [0.4, 0.6]]),
+            ]
         )
         np.testing.assert_allclose(probas, np.array([[0.1, 0.3], [0.2, 0.6]]))
 
         self.assertRaises(
             ValueError,
-            UHerding._canonicalize_multilabel_probas,
+            _canonicalize_multilabel_probas,
             [np.ones((2, 2, 1))],
         )
         self.assertRaises(
             ValueError,
-            UHerding._canonicalize_multilabel_probas,
+            _canonicalize_multilabel_probas,
             np.ones(2),
         )
 

@@ -30,6 +30,7 @@ from skactiveml.classifier import (
     ParzenWindowClassifier,
     MixtureModelClassifier,
 )
+from skactiveml.classifier._wrapper import _prior_matrix_from_counts
 from skactiveml.tests.template_estimator import TemplateSkactivemlClassifier
 from skactiveml.utils import MISSING_LABEL
 
@@ -120,6 +121,16 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         clf._initialize_label_state(dummy_classes)
         clf.is_fitted_ = True
         return clf
+
+    def test_prior_matrix_from_counts(self):
+        np.testing.assert_allclose(
+            _prior_matrix_from_counts([0, 0], n_samples=3),
+            np.full((3, 2), 0.5),
+        )
+        np.testing.assert_allclose(
+            _prior_matrix_from_counts([1, 3], n_samples=2),
+            np.array([[0.25, 0.75], [0.25, 0.75]]),
+        )
 
     def test_init_param_estimator(self):
         test_cases = [
@@ -793,6 +804,13 @@ class TestSlidingWindowClassifier(
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
         )
+
+    def test_fit_param_sample_weight(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (np.ones(len(self.fit_default_params["y"]) + 1), ValueError),
+        ]
+        super().test_fit_param_sample_weight(test_cases=test_cases)
 
     def test_partial_fit_param_y(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -1476,6 +1494,18 @@ if successful_skorch_torch_import:
             np.testing.assert_array_equal(
                 clf_no_classes.classes_, np.arange(3)
             )
+            self.assertFalse(clf_no_classes.multioutput_)
+
+            clf_multilabel = SkorchClassifier(**init_params)
+            clf_multilabel._initialize_fallbacks(np.zeros((2, 2)))
+            self.assertTrue(clf_multilabel.multioutput_)
+            np.testing.assert_array_equal(
+                clf_multilabel.classes_[0], np.array([0, 1])
+            )
+            np.testing.assert_array_equal(
+                clf_multilabel.classes_[1], np.array([0, 1])
+            )
+            self.assertIsNone(clf_multilabel.cost_matrix_)
 
             class DummyLoss(nn.Module):
                 def forward(self, input, target):
@@ -1485,6 +1515,21 @@ if successful_skorch_torch_import:
                 clf._infer_target_numpy_dtype(DummyLoss()),
                 np.int64,
             )
+
+        def test_prefit_prediction_ambiguity_helper(self):
+            clf = SkorchClassifier(**self.init_default_params)
+            self.assertRaises(
+                ValueError, clf._check_prefit_prediction_ambiguity
+            )
+
+            init_params = self.init_default_params.copy()
+            init_params["classes"] = [0, 1]
+            clf = SkorchClassifier(**init_params)
+            clf._check_prefit_prediction_ambiguity()
+
+            clf = SkorchClassifier(**self.init_default_params)
+            clf._initialize_fallbacks(np.zeros((2, 3)))
+            clf._check_prefit_prediction_ambiguity()
 
         def test_init_param_sample_dtype(self):
             test_cases = [

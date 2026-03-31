@@ -573,6 +573,26 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         qs = self.qs_class(**self._multilabel_init_params())
         self.assertRaises(ValueError, qs.query, **query_params)
 
+    def test_query_param_sample_weight_multilabel(self):
+        if self.query_default_params_clf_multilabel is None:
+            return
+
+        query_signature = inspect.signature(self.qs_class.query).parameters
+        if "sample_weight" not in query_signature:
+            return
+
+        base_query_params = deepcopy(self.query_default_params_clf_multilabel)
+        y = np.asarray(base_query_params["y"])
+        qs = self.qs_class(**self._multilabel_init_params())
+
+        query_params = deepcopy(base_query_params)
+        query_params["sample_weight"] = np.ones(len(y))
+        qs.query(**query_params)
+
+        query_params = deepcopy(base_query_params)
+        query_params["sample_weight"] = np.ones(len(y) + 1)
+        self.assertRaises(ValueError, qs.query, **query_params)
+
     def _multilabel_init_params(self):
         init_params = deepcopy(self.init_default_params)
         if self.init_default_params_multilabel is not None:

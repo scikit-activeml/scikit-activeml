@@ -139,3 +139,14 @@ class TestLabelCardinalityInconsistency(unittest.TestCase):
         np.testing.assert_array_equal(
             DummyMultilabelClassifier.last_sample_weight, sample_weight
         )
+
+        sample_weight = np.ones(len(self.y))
+        self.qs.query(
+            self.X,
+            self.y,
+            clf=DummyMultilabelClassifier(),
+            sample_weight=sample_weight,
+        )
+        np.testing.assert_array_equal(
+            DummyMultilabelClassifier.last_sample_weight, sample_weight
+        )

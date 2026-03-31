@@ -14,6 +14,7 @@ from ..utils import (
     check_type,
     check_equal_missing_label,
 )
+from ..utils._validation import _canonicalize_multilabel_probas
 from ._uncertainty_sampling import uncertainty_scores
 
 
@@ -39,7 +40,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
-    multilabel_aggregation_fn : callable, default=np.average
+    multilabel_aggregation_fn : callable, default=np.mean
         Callable that takes `axis` as keyword argument and reduces the
         per-label uncertainty scores for multilabel classification. This is
         only used when `y` is two-dimensional, corresponding to a multilabel
@@ -57,7 +58,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         gamma=10,
         missing_label=MISSING_LABEL,
         random_state=None,
-        multilabel_aggregation_fn=np.average,
+        multilabel_aggregation_fn=np.mean,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -89,7 +90,10 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             row `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row. In this
             case, only multilabel classification problems, i.e. multiple
-            binary classification tasks, are supported.
+            binary classification tasks, are supported. `predict_proba` must
+            then return either shape `(n_samples, n_outputs)` or a list of
+            binary probability matrices with shape `(n_samples, 2)` per
+            output.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict_proba`.
         fit_clf : bool, default=True
@@ -97,8 +101,10 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             and `sample_weight`.
         sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            Weights of training samples in `X`. For two-dimensional `y`,
-            `sample_weight` must have the same shape as `y`.
+            Weights of training samples in `X`. For two-dimensional `y`, one
+            weight per sample is supported. Per-target weights are forwarded
+            to `clf.fit` without additional validation and require estimator
+            support.
         candidates : None or array-like of shape (n_candidates), dtype=int or \
                 array-like of shape (n_candidates, n_features), default=None
             - If `candidates` is `None`, the unlabeled samples from
@@ -178,6 +184,12 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
 
         # Compute uncertainties via margin sampling (cf. Eq. (1) in [1]).
         probas_cand = clf.predict_proba(X_cand)
+        if is_multioutput:
+            probas_cand = _canonicalize_multilabel_probas(
+                probas_cand,
+                n_samples=len(X_cand),
+                n_outputs=y.shape[1],
+            )
         unc_cand = uncertainty_scores(
             probas=probas_cand,
             method="margin_sampling",

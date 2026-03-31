@@ -667,22 +667,13 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         init_params, fit_params, _ = self._get_multilabel_params()
         estimator = self.estimator_class(**init_params)
         y = np.asarray(fit_params["y"])
-        invalid_sample_weight = np.ones(len(y), dtype=float)
-        with self.assertRaises(ValueError):
-            self._call_with_target(
-                estimator,
-                "fit",
-                fit_params,
-                sample_weight=invalid_sample_weight,
-            )
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             self._call_with_target(
                 estimator,
                 "fit",
                 fit_params,
-                sample_weight=np.ones(y.shape, dtype=float),
+                sample_weight=np.ones(len(y), dtype=float),
             )
 
     def test_partial_fit_multilabel(self):

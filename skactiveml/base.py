@@ -1086,10 +1086,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             within a row. For multi-annotator classification, a row can contain
             labeled and unlabeled entries, where `y[i, j]` indicates the
             potential class label for sample `X[i]` from annotator `j`.
-        sample_weight : array-like of shape (n_samples) or \
+        sample_weight : array-like of shape (n_samples,) or \
                 (n_samples, n_outputs), default=None
-            It contains the weights of the training samples' class labels and
-            must have the same shape as `y`.
+            It contains the weights of the training samples. For two-
+            dimensional targets, either one weight per sample or one weight
+            per target entry can be provided.
 
         Returns
         -------
@@ -1178,9 +1179,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         y_pred = self.predict(X)
         y_pred = self._le.transform(y_pred)
         y_true = self._le.transform(y)
-        if not getattr(self, "multioutput_", False):
-            y_pred = y_pred.ravel()
-            y_true = y_true.ravel()
         return accuracy_score(
             y_pred=y_pred, y_true=y_true, sample_weight=sample_weight
         )
@@ -1253,8 +1251,15 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
-            if self.multioutput_ or (
-                not y_ensure_1d and getattr(y, "ndim", 1) == 2
+            if sample_weight.ndim == 1:
+                if len(y) != len(sample_weight):
+                    raise ValueError(
+                        f"`y` has the length {len(y)} and `sample_weight` has "
+                        f"the shape {sample_weight.shape}. Both need to have "
+                        f"the same one-dimensional shape."
+                    )
+            elif sample_weight.ndim == 2 and (
+                self.multioutput_ or (not y_ensure_1d and y.ndim == 2)
             ):
                 if not np.array_equal(y.shape, sample_weight.shape):
                     raise ValueError(
@@ -1262,11 +1267,10 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                         f"the shape {sample_weight.shape}. Both need to have "
                         f"identical shapes."
                     )
-            elif sample_weight.ndim != 1 or len(y) != len(sample_weight):
+            else:
                 raise ValueError(
-                    f"`y` has the length {len(y)} and `sample_weight` has the "
-                    f"shape {sample_weight.shape}. Both need to have "
-                    f"the same one-dimensional shape."
+                    "`sample_weight` must have shape `(n_samples,)` or, for "
+                    "two-dimensional targets, the same shape as `y`."
                 )
 
         # Update cost matrix.
