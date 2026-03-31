@@ -303,13 +303,13 @@ class TestUncertaintyScores(unittest.TestCase):
         self.assertRaises(
             ValueError,
             uncertainty_scores,
-            probas=[[1.1, 0.2], [0.4, 0.6]],
+            probas=np.array([[1.1, 0.2], [0.4, 0.6]]),
             is_multilabel=True,
         )
         self.assertRaises(
             ValueError,
             uncertainty_scores,
-            probas=[[-0.1, 0.2], [0.4, 0.6]],
+            probas=np.array([[-0.1, 0.2], [0.4, 0.6]]),
             is_multilabel=True,
         )
         self.assertRaises(
