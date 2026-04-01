@@ -70,6 +70,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         It must accept `axis` as a keyword argument and reduce the per-label
         disagreement counts along that axis. Common choices are `np.mean`,
         `np.min`, `np.max`, or quantiles.
+    disagreement_threshold : float, default=0.5
+        Threshold used to filter candidate samples based on their disagreement
+        score. For two-dimensional `y`, the disagreement scores are first
+        aggregated by `multilabel_aggregation_fn`, such that valid threshold
+        values depend on the chosen aggregation function.
 
 
     References
@@ -90,6 +95,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
+        disagreement_threshold=0.5,
     ):
         self.dropout_rate = dropout_rate
         self.n_dropout_samples = n_dropout_samples
@@ -98,6 +104,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         self.n_cluster_param_name = n_cluster_param_name
         self.clf_embedding_flag_name = clf_embedding_flag_name
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
+        self.disagreement_threshold = disagreement_threshold
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
@@ -197,6 +204,24 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         )
         if not callable(self.multilabel_aggregation_fn):
             raise TypeError("`multilabel_aggregation_fn` must be callable.")
+        if is_multioutput:
+            check_type(
+                self.disagreement_threshold, "disagreement_threshold", float
+            )
+            if np.isnan(self.disagreement_threshold):
+                raise ValueError(
+                    "`disagreement_threshold` must not be `np.nan`."
+                )
+        else:
+            check_scalar(
+                self.disagreement_threshold,
+                name="disagreement_threshold",
+                min_val=0.0,
+                max_val=1.0,
+                min_inclusive=True,
+                max_inclusive=True,
+                target_type=float,
+            )
         check_type(
             self.cluster_algo_dict, "cluster_algo_dict", (dict, type(None))
         )
@@ -235,7 +260,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             y_pred, X_embed = y_pred
         else:
             X_embed = X_cand
-        y_pred = np.asarray(y_pred)
 
         # Number of candidate samples.
         n_candidates = len(X_cand)
@@ -264,7 +288,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             y_pred_dropout_current = clf.predict(X_dropout)
             if isinstance(y_pred_dropout_current, tuple):
                 y_pred_dropout_current, _ = y_pred_dropout_current
-            y_pred_dropout_current = np.asarray(y_pred_dropout_current)
             y_pred_dropout[:, i] = y_pred_dropout_current
 
         # Filter candidates for clustering based on disagreement.
@@ -275,7 +298,8 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         if is_multioutput:
             n_disagrees = self.multilabel_aggregation_fn(n_disagrees, axis=-1)
         disagree_rate = n_disagrees.astype(float) / self.n_dropout_samples
-        n_threshold_samples = max(((disagree_rate > 0.5).sum(), batch_size))
+        n_selected = (disagree_rate > self.disagreement_threshold).sum()
+        n_threshold_samples = max(n_selected, batch_size)
         prefiltered_indices = np.argsort(disagree_rate)[-n_threshold_samples:]
 
         # Perform clustering to get centroids.

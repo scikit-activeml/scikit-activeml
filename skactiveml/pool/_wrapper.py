@@ -160,16 +160,12 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
                 f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
             )
         check_scalar(self.exclude_non_subsample, "exclude_non_subsample", bool)
-        seed_multiplier = (
-            int(
-                is_labeled(
-                    y,
-                    missing_label=self.missing_label_,
-                    is_multioutput=is_multioutput,
-                ).sum()
-            )
-            + 1
+        is_lbld = is_labeled(
+            y=y,
+            missing_label=self.missing_label_,
+            is_multioutput=is_multioutput,
         )
+        seed_multiplier = int(is_lbld.sum() + 1)
         max_candidates = self.max_candidates
         if isinstance(self.max_candidates, int):
             check_scalar(

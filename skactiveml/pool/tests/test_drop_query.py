@@ -96,6 +96,35 @@ class TestDropQuery(
             test_cases,
         )
 
+    def test_init_param_disagreement_threshold(self, test_cases=None):
+        test_cases = [] if test_cases is None else test_cases
+        test_cases += [
+            (1, TypeError),
+            (np.nan, ValueError),
+            (-0.1, ValueError),
+            (0.0, None),
+            (0.5, None),
+            (1.0, None),
+            (1.1, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "disagreement_threshold",
+            test_cases,
+        )
+        test_cases = [
+            (-0.1, None),
+            (1.1, None),
+            (np.nan, ValueError),
+        ]
+        self._test_param(
+            "init",
+            "disagreement_threshold",
+            test_cases,
+            replace_query_params=self.params_clf_multilabel,
+            exclude_reg=True,
+        )
+
     def test_init_param_cluster_algo(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

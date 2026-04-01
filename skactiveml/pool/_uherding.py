@@ -89,14 +89,14 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
     adaptive_sigma : bool, default=True
         Flag whether to adapt the radius according to the minimum non-zero
         labeled pairwise distance. This option requires `metric='rbf'`.
-    multilabel_aggregation_fn : callable, default=np.mean
-        Callable that takes `axis` as keyword argument and reduces per-label
-        uncertainty scores for multilabel classification. This is only used
-        when `y` is two-dimensional.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    multilabel_aggregation_fn : callable, default=np.mean
+        Callable that takes `axis` as keyword argument and reduces per-label
+        uncertainty scores for multilabel classification. This is only used
+        when `y` is two-dimensional.
 
     References
     ----------
@@ -117,9 +117,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         metric="rbf",
         metric_dict=None,
         adaptive_sigma=True,
-        multilabel_aggregation_fn=np.mean,
         missing_label=MISSING_LABEL,
         random_state=None,
+        multilabel_aggregation_fn=np.mean,
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -549,7 +549,9 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             logits = self._decision_function_logits(clf, X)
         if is_multioutput:
             probas = _canonicalize_multilabel_probas(probas, allow_none=True)
-            logits = self._canonicalize_multilabel_logits(logits, X)
+            logits = _canonicalize_multilabel_probas(
+                logits, n_samples=len(X), allow_none=True
+            )
             if probas is None and logits is not None:
                 probas = expit(logits)
         elif probas is None and logits is not None:
@@ -654,15 +656,6 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         logits = np.asarray(logits)
         if logits.ndim == 1:
             logits = np.column_stack([np.zeros_like(logits), logits])
-        return logits
-
-    @staticmethod
-    def _canonicalize_multilabel_logits(logits, X):
-        if logits is None:
-            return None
-        logits = np.asarray(logits, dtype=float)
-        if logits.ndim != 2 or logits.shape[0] != len(X):
-            return None
         return logits
 
     @staticmethod

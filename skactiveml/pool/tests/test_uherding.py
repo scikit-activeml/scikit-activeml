@@ -991,20 +991,6 @@ class TestUHerding(
             np.ones(2),
         )
 
-        self.assertIsNone(
-            UHerding._canonicalize_multilabel_logits(None, np.zeros((2, 2)))
-        )
-        self.assertIsNone(
-            UHerding._canonicalize_multilabel_logits(
-                np.ones(2), np.zeros((2, 2))
-            )
-        )
-        self.assertIsNone(
-            UHerding._canonicalize_multilabel_logits(
-                np.ones((3, 2)), np.zeros((2, 2))
-            )
-        )
-
     @staticmethod
     def _assert_object_dict_equal(dict_a, dict_b):
         assert dict_a.keys() == dict_b.keys()

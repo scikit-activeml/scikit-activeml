@@ -142,7 +142,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
 
         # Determine candidate samples for selection.
         is_multioutput = y.ndim == 2
-        X_cand, mapping = self._transform_candidates(
+        _, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,

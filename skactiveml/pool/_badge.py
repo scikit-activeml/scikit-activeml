@@ -169,7 +169,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             allow_multioutput=True,
         )
 
-        is_multioutput = np.array(y).ndim == 2
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates, X, y, is_multioutput=is_multioutput
         )

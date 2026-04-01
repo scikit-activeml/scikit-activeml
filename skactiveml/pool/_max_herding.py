@@ -89,9 +89,9 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates,)` and of type
               `int`, `candidates` is considered as the indices of the
               samples in `(X,y)`.
-            - Candidate samples passed directly with shape
-              `(n_candidates, n_features)` are not supported because
-              MaxHerding requires a mapping to samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              candidate samples are directly given in `candidates` (not
+              necessarily contained in `X`).
         batch_size : int, default=1
             The number of samples to be selected in one AL cycle.
         return_utilities : bool, default=False
@@ -102,7 +102,12 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         query_indices : numpy.ndarray of shape (batch_size,)
             The query indices indicate for which candidate sample a label is
             to be queried, e.g., `query_indices[0]` indicates the first
-            selected sample. The indexing refers to the samples in `X`.
+            selected sample.
+
+            - If `candidates` is `None` or of shape `(n_candidates,)`, the
+              indexing refers to the samples in `X`.
+            - If `candidates` is of shape `(n_candidates, n_features)`, the
+              indexing refers to the samples in `candidates`.
         utilities : numpy.ndarray of shape (batch_size, n_samples) or \
                 numpy.ndarray of shape (batch_size, n_candidates)
             The utilities of samples after each selected sample of the batch,
@@ -113,8 +118,7 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to the samples in `X`.
             - If `candidates` is of shape `(n_candidates, n_features)`, the
-              indexing would refer to the samples in `candidates`, but this
-              case is not supported by MaxHerding.
+              indexing refers to the samples in `candidates`.
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

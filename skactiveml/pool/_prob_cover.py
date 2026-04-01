@@ -36,8 +36,11 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
     n_classes : None or int, default=None
         This parameter is used to determine the delta value. If
         `n_classes=None`, the number of classes is extracted from the
-        given labels. If this extracted number of classes is below 2,
-        `n_classes=2` is used as a fallback.
+        given labels. For one-dimensional `y`, this is the number of unique
+        observed labels. For two-dimensional `y`, this is the number of unique
+        observed label rows, i.e., distinct multilabel combinations. If this
+        extracted number of classes is below 2, `n_classes=2` is used as a
+        fallback.
     deltas : None or array-like of shape (n_deltas,), default=None
         List of deltas (ball radii) to be tested for finding the maximum
         value satisfying a sample coverage >= `alpha`. If no value in
@@ -142,9 +145,6 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
 
             - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to the samples in `X`.
-            - If `candidates` is of shape `(n_candidates, n_features)`, the
-              indexing would refer to the samples in `candidates`, but this
-              case is not supported by ProbCover.
         """
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

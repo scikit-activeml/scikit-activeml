@@ -9,9 +9,7 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
 
     This class implements random sampling as a lower baseline for other query
     strategies. It randomly selects `batch_size` unlabeled samples whose
-    utility scores are also randomly generated. This implementation is
-    task-agnostic such that it can handle class labels, numerical targets,
-    and multilabel targets represented by a two-dimensional `y`.
+    utility scores are also randomly generated.
 
     Parameters
     ----------

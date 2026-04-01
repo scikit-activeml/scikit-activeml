@@ -204,7 +204,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             reset=True,
             allow_multioutput=True,
         )
-        is_multioutput = np.array(y).ndim == 2
+        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,

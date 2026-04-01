@@ -227,7 +227,7 @@ class TestExpectedAveragePrecision(unittest.TestCase):
             probas=self.probas,
         )
         self.assertRaises(
-            ValueError,
+            TypeError,
             expected_average_precision,
             classes="string",
             probas=self.probas,

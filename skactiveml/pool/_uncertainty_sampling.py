@@ -32,7 +32,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     - least confident [1]_ selecting samples whose predicted top
       class has the lowest confidence,
     - margin sampling [1]_ selecting samples where the gap between the two most
-      probable classes is smallest (single-label only),
+      probable classes is smallest,
     - entropy-based uncertainty [1]_ selecting samples with the highest overall
       predictive uncertainty across classes,
     - and expected average precision [3] selecting samples with the highest
@@ -62,8 +62,8 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         The random state to use.
     multilabel_aggregation_fn: callable, default=np.mean
         Callable that takes axis as kwarg and reduces along that axis.
-        Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles,
-        while `np.sum` is not allowed. This is only used when
+        Common choices are `np.mean`, `np.sum`, `np.min`, `np.max`, or
+        quantiles. This is only used when
         `method in ['least_confident', 'margin_sampling', 'entropy']` and
         multilabel targets are provided. For multilabel classification,
         `predict_proba` may return either shape `(n_samples, n_outputs)` or a
@@ -295,7 +295,7 @@ def uncertainty_scores(
     and entropy based uncertainty ('entropy') [1]_. For the least confident and
     margin sampling methods cost-sensitive variants are implemented in case of
     a given cost matrix (see [2]_ for more information). For multilabel data,
-    only `'least_confident'`, `'margin_sampling'`, and `'entropy'` are
+    only 'least_confident', 'margin_sampling', and 'entropy' are
     supported.
 
     Parameters
@@ -315,8 +315,8 @@ def uncertainty_scores(
         indicates if provided probas should be multilabel
     multilabel_aggregation_fn: callable, default=np.mean
         Callable that takes axis as kwarg and reduces along that axis.
-        Common choices are `np.mean`, `np.min`, `np.max`, or any quantiles,
-        while `np.sum` is not allowed.
+        Common choices are `np.mean`, `np.sum`, `np.min`, `np.max`, or
+        quantiles.
 
 
     References
@@ -449,8 +449,6 @@ def expected_average_precision(classes, probas):
         )
 
     # Check if `classes` are valid.
-    if isinstance(classes, (str, bytes, np.str_)):
-        raise ValueError("`classes` must be an array-like of class labels.")
     check_classes(classes)
     if len(classes) < 2:
         raise ValueError("`classes` must contain at least 2 entries.")
