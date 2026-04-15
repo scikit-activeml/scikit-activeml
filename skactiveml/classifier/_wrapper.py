@@ -1445,9 +1445,8 @@ if successful_capymoa_import:
                     # if estimator_ fails, it returns None. In this case, we
                     # use a uniform distribution as fallback
                     if p_i is None:
-                        if sum(self._label_counts) == 0:
-                            p_i = np.ones(n_classes) / n_classes
-                        else:
+                        p_i = np.ones(n_classes) / n_classes
+                        if sum(self._label_counts) > 0:
                             p_i = self._label_counts / np.sum(
                                 self._label_counts
                             )
