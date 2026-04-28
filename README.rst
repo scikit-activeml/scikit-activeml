@@ -450,10 +450,7 @@ modality, and models used in the tutorial.
      - Stream
      - Classification
      - Text
-     - - Sentence Transformer embeddings with classifiers from:
-       - Scikit-learn
-       - River
-       - CapyMOA
+     - - SentenceTransformers embeddings with classifiers from scikit-learn, River, CapyMOA
 
 .. examples_end
 
