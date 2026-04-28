@@ -34,6 +34,9 @@ from ..utils import (
     check_n_features,
 )
 
+# used to defer import of capymoa as it may result in an error with pytest
+import importlib
+
 successful_skorch_torch_import = False
 try:
     import torch
@@ -42,6 +45,20 @@ try:
     from skactiveml.utils import make_criterion_tuple_aware
 
     successful_skorch_torch_import = True
+except ImportError:  # pragma: no cover
+    pass
+
+spec = importlib.util.find_spec("capymoa")
+successful_capymoa_import = spec is not None
+
+successful_river_import = False
+try:
+    from inspect import signature
+    import river
+    import river.base
+    import pandas as pd
+
+    successful_river_import = True
 except ImportError:  # pragma: no cover
     pass
 
@@ -1282,3 +1299,576 @@ if successful_skorch_torch_import:
                     if self.cost_matrix is None
                     else self.cost_matrix
                 )
+
+
+if successful_capymoa_import:
+
+    class CapyMOAClassifier(SkactivemlClassifier):
+        """CapyMOA Classifier
+
+        Implementation of a wrapper class for `CapyMOA` [1]_ classifiers such
+        that missing labels can be handled and the interfaces are compatible
+        with `scikit-activeml`. Therefore, samples with missing labels are
+        filtered.
+
+        Parameters
+        ----------
+        estimator_class : capymoa.base.MOAClassifier.__class__
+            The `capymoa` classifier class that is used to initialize the
+            `capymoa` classifier.
+        estimator_param_dict : dict, default=None
+            Additional arguments for `capymoa.base.MOAClassifier`. If
+            `estimator_param_dict` is `None`, no additional arguments are
+            added. `schema` is not allowed in this dictionary and will be
+            created internally.
+        classes : array-like of shape (n_classes,), default=None
+            Holds the label for each class. If `None`, the classes are
+            determined during `fit`.
+        missing_label : scalar or string or np.nan or None, default=np.nan
+            Value to represent a missing label.
+        cost_matrix : array-like of shape (n_classes, n_classes)
+            Cost matrix with `cost_matrix[i,j]` indicating cost of predicting
+            class `classes[j]` for a sample of class `classes[i]`. Can be only
+            set, if `classes` is not `None`.
+        random_state : int or RandomState instance or None, default=None
+            Determines random number for `predict` method. Pass an int for
+            reproducible results across multiple method calls.
+
+        Attributes
+        ----------
+        classes_ : numpy.ndarray of shape (n_classes,)
+            Holds the label for each class after fitting.
+        cost_matrix_ : numpy.ndarray of shape (classes, classes)
+            Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+            class `classes_[j]` for a sample of class `classes_[i]`.
+        estimator_ : capymoa.base.MOAClassifier
+            initialized MOAClassifier whose predictions and training are
+            wrapped.
+
+        References
+        ----------
+        .. [1] Gomes, H.M., Lee, A., Gunasekara, N., Sun, Y., Cassales, G.W.,
+           Liu, J., Heyden, M., Cerqueira, V., Bahri, M., Koh, Y.S. and
+           Pfahringer, B., 2025. Capymoa: Efficient machine learning for data
+           streams in python. arXiv preprint arXiv:2502.07432.
+        """
+
+        def __init__(
+            self,
+            estimator_class,
+            estimator_param_dict=None,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            random_state=None,
+        ):
+            super().__init__(
+                classes=classes,
+                missing_label=missing_label,
+                cost_matrix=cost_matrix,
+                random_state=random_state,
+            )
+            self.estimator_class = estimator_class
+            self.estimator_param_dict = estimator_param_dict
+
+        def fit(self, X, y):
+            """Fit the module with (re-)initialization using `X` as training
+            data and `y` as class labels. The model is reinitialized from
+            scratch when using `fit`
+
+            Parameters
+            ----------
+            X : matrix-like, shape (n_samples, n_features)
+                Training data set, usually complete, i.e. including the labeled
+                and unlabeled samples
+            y : array-like of shape (n_samples, )
+                Labels of the training data set (possibly including unlabeled
+                ones indicated by self.missing_label)
+
+            Returns
+            -------
+            self: CapyMOAClassifier,
+                `CapyMOAClassifier` object fitted on the training data.
+            """
+            return self._fit("fit", X, y)
+
+        def partial_fit(self, X, y):
+            """Fit the module without re-initialization. If the module was
+            already initialized, by calling `partial_fit` or `fit`, the module
+            will not be re-initialized again.
+
+            Parameters
+            ----------
+            X : matrix-like, shape (n_samples, n_features)
+                Training data set, usually complete, i.e. including the labeled
+                and unlabeled samples
+            y : array-like of shape (n_samples, )
+                Labels of the training data set (possibly including unlabeled
+                ones indicated by `self.missing_label`)
+
+            Returns
+            -------
+            self: CapyMOAClassifier
+                `CapyMOAClassifier` object fitted on the training data.
+            """
+            return self._fit("partial_fit", X, y)
+
+        def predict_proba(self, X):
+            """Return probability estimates for the input data `X`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+
+            Returns
+            -------
+            P : array-like of shape (n_samples, classes)
+                The class probabilities of the input samples. Classes are
+                ordered according to the attribute `self.classes_`.
+            """
+            import capymoa
+            import capymoa.instance
+
+            check_is_fitted(self)
+            predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
+            X = check_array(X, **(self.check_X_dict_ | predict_dict))
+            check_n_features(self, X, reset=False)
+            n_classes = len(self.classes_)
+            if self.is_fitted_:
+                p_list = []
+                for x in X:
+                    x_instance = capymoa.instance.Instance(
+                        schema=self.schema_, instance=x
+                    )
+                    p_i = self.estimator_.predict_proba(x_instance)
+                    # if estimator_ fails, it returns None. In this case, we
+                    # use a uniform distribution as fallback
+                    if p_i is None:
+                        p_i = np.ones(n_classes) / n_classes
+                        if sum(self._label_counts) > 0:
+                            p_i = self._label_counts / np.sum(
+                                self._label_counts
+                            )
+                    pad_length = n_classes - len(p_i)
+                    if pad_length > 0:
+                        p_i = np.pad(p_i, (0, pad_length))
+                    p_list.append(p_i)
+                P = np.array(p_list)
+                if not np.any(np.isnan(P)):
+                    return P
+
+            warnings.warn(
+                f"Since the 'base_estimator' could not be fitted when"
+                f" calling the `fit` method, the class label "
+                f"distribution`_label_counts={self._label_counts}` is used to "
+                f"make the predictions."
+            )
+            # fallback if clf could not be fitted (i.e., no labeled data)
+            if sum(self._label_counts) == 0:
+                n_classes = len(self.classes_)
+                return np.ones([len(X), n_classes]) / n_classes
+            else:
+                return np.tile(
+                    self._label_counts / np.sum(self._label_counts),
+                    [len(X), 1],
+                )
+
+        def _fit(self, fit_function, X, y, sample_weight=None):
+            import capymoa
+            import capymoa.base
+            import capymoa.instance
+
+            # Check input parameters.
+            self.check_X_dict_ = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "allow_nd": True,
+                "dtype": None,
+            }
+            X, y, _ = self._validate_data(
+                X=X,
+                y=y,
+                sample_weight=None,
+                check_X_dict=self.check_X_dict_,
+                reset=fit_function == "fit"
+                or not hasattr(self, "n_features_in_"),
+            )
+
+            # Check whether estimator is a valid classifier.
+            if not isinstance(self.estimator_class, type) or not issubclass(
+                self.estimator_class, capymoa.base.MOAClassifier
+            ):
+                raise TypeError(
+                    "'{}' must be a capymoa "
+                    "classifier.".format(self.estimator_class)
+                )
+            is_included = is_labeled(y, missing_label=-1)
+            self._label_counts = [
+                np.sum(y[is_included] == c)
+                for c in range(len(self._le.classes_))
+            ]
+            if hasattr(self, "estimator_"):
+                if fit_function != "partial_fit":
+                    self.estimator_ = self._create_estimator(X)
+            else:
+                self.estimator_ = self._create_estimator(X)
+            if self.estimator_ is None:
+                self.is_fitted_ = False
+                return self
+
+            try:
+                X_train = X[is_included]
+                y_train = y[is_included].astype(np.int64)
+                if np.sum(is_included) == 0:
+                    raise ValueError("There is no labeled data.")
+
+                column_list = [(str(i) for i in range(X.shape[1]))]
+                column_list += ["label"]
+
+                for i in range(len(y_train)):
+                    x_inst = X_train[i]
+                    y_inst = y_train[i].item()
+                    instance = capymoa.instance.LabeledInstance.from_array(
+                        self.schema_,
+                        x=x_inst,
+                        y_index=y_inst,
+                    )
+                    self.estimator_.train(instance)
+                self.is_fitted_ = True
+            except Exception as e:
+                self.is_fitted_ = False
+                warnings.warn(
+                    "The 'base_estimator' could not be fitted because of"
+                    " '{}'. Therefore, the class labels of the samples "
+                    "are counted and will be used to make predictions. "
+                    "The class label distribution is "
+                    "`_label_counts={}`.".format(e, self._label_counts)
+                )
+            return self
+
+        def _create_estimator(self, X):
+            """Initialize the estimator according so `self.classes_` and `X`.
+            This function assumes that self.validate_data has been used to
+            guarantee that `self.classes_` exists.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+
+            Returns
+            -------
+            estimator: CapyMOAClassifier,
+                The initialized but untrained `CapyMOAClassifier`.
+            """
+            import capymoa
+            import capymoa.stream
+
+            estimator_kwargs = {}
+            if self.estimator_param_dict is not None:
+                if not isinstance(self.estimator_param_dict, dict):
+                    raise TypeError(
+                        "The 'estimator_param_dict=' must be a dictionary but"
+                        f"is {self.estimator_param_dict}."
+                    )
+                if "schema" in self.estimator_param_dict:
+                    raise AttributeError(
+                        "The schema must not be set in "
+                        "'self.estimator_param_dict' and must only be set"
+                        "with 'self.schema'."
+                    )
+                estimator_kwargs = self.estimator_param_dict
+            # features here means all attributes of an instance including their
+            # class label
+            X_shape = X.shape
+            if len(X_shape) != 2:
+                return None
+            features = [f"f{f}" for f in range(X.shape[1])]
+            features.append("label")
+            categories = {"label": [str(c) for c in range(len(self.classes_))]}
+            self.schema_ = capymoa.stream.Schema.from_custom(
+                features=features, target="label", categories=categories
+            )
+            return self.estimator_class(self.schema_, **estimator_kwargs)
+
+
+if successful_river_import:
+
+    class RiverClassifier(SkactivemlClassifier, MetaEstimatorMixin):
+        """River Classifier
+
+        Implementation of a wrapper class for `river` [1]_ classifiers such
+        that they implement the `SkactivemlClassifier` interfaces for
+        classifiers. Additionally, filters the samples with missing labels if
+        needed.
+
+        Parameters
+        ----------
+        estimator : river.base.Classifier
+            The `river` classifier to be wrapped.
+        classes : array-like of shape (n_classes,), default=None
+            Holds the label for each class. If `None`, the classes are
+            determined during `fit`.
+        missing_label : scalar or string or np.nan or None, default=np.nan
+            Value to represent a missing label.
+        cost_matrix : array-like of shape (n_classes, n_classes)
+            Cost matrix with `cost_matrix[i,j]` indicating cost of predicting
+            class `classes[j]` for a sample of class `classes[i]`. Can be only
+            set, if `classes` is not `None`.
+        random_state : int or RandomState instance or None, default=None
+            Determines random number for `predict` method. Pass an int for
+            reproducible results across multiple method calls.
+
+        Attributes
+        ----------
+        classes_ : numpy.ndarray of shape (n_classes,)
+            Holds the label for each class after fitting.
+        cost_matrix_ : numpy.ndarray of shape (classes, classes)
+            Cost matrix with `cost_matrix_[i,j]` indicating cost of predicting
+            class `classes_[j]` for a sample of class `classes_[i]`.
+        estimator_ : river.base.Classifier
+            The `river` classifier after calling the `fit` method.
+
+        References
+        ----------
+        .. [1] Montiel, J., Halford, M., Mastelini, S.M., Bolmier, G.,
+           Sourty, R., Vaysse, R., Zouitine, A., Gomes, H.M., Read, J.,
+           Abdessalem, T. and Bifet, A., 2021. River: machine learning for
+           streaming data in python. Journal of Machine Learning Research,
+           22(110), pp.1-8.
+        """
+
+        def __init__(
+            self,
+            estimator,
+            classes=None,
+            missing_label=MISSING_LABEL,
+            cost_matrix=None,
+            random_state=None,
+        ):
+            super().__init__(
+                classes=classes,
+                missing_label=missing_label,
+                cost_matrix=cost_matrix,
+                random_state=random_state,
+            )
+            self.estimator = estimator
+
+        def fit(self, X, y, sample_weight=None):
+            """Fit the model using `X` as training data and `y` as class
+            labels.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+                It contains the class labels of the training samples. Missing
+                labels are represented by the attribute `self.missing_label_`.
+                In case of multiple labels per sample (i.e., n_outputs > 1),
+                the samples are duplicated.
+            sample_weight : array-like of shape (n_samples,) or\
+                    (n_samples, n_outputs)
+                It contains the weights of the training samples' class labels.
+                It must have the same shape as `y`.
+
+            Returns
+            -------
+            self: Riverclassifier,
+                The `Riverclassifier` fitted on the training data.
+            """
+            return self._fit(
+                fit_function="fit",
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+            )
+
+        def partial_fit(self, X, y, sample_weight=None):
+            """Partially fitting the model using `X` as training data and `y`
+            as class labels.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                The feature matrix representing the samples.
+            y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+                It contains the class labels of the training samples. Missing
+                labels are represented the attribute `self.missing_label_`. In
+                case of multiple labels per sample (i.e., n_outputs > 1), the
+                samples are duplicated.
+            sample_weight : array-like of shape (n_samples,) or\
+                    (n_samples, n_outputs)
+                It contains the weights of the training samples' class labels.
+                It must have the same shape as `y`.
+
+            Returns
+            -------
+            self : Riverclassifier,
+                The `Riverclassifier` is fitted on the training data.
+            """
+            return self._fit(
+                fit_function="partial_fit",
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+            )
+
+        def predict_proba(self, X, **predict_proba_kwargs):
+            """Return probability estimates for the input data `X`.
+
+            Parameters
+            ----------
+            X : array-like of shape (n_samples, ...)
+                Input samples.
+            predict_proba_kwargs : dict-like
+                Further parameters as input to the `predict_proba` method of
+                the `estimator`.
+
+            Returns
+            -------
+            P : array-like of shape (n_samples, classes)
+                The class probabilities of the input samples. Classes are
+                ordered according to the attribute `self.classes_`.
+            """
+            check_is_fitted(self)
+            predict_dict = {"ensure_min_samples": 1, "ensure_min_features": 1}
+            X = check_array(X, **(self.check_X_dict_ | predict_dict))
+            check_n_features(self, X, reset=False)
+            if self.is_fitted_:
+                P_list = []
+                est_classes = None
+                for x in X:
+                    x_dict = self.transform_data_to_dict(x)
+                    P_i_dict = self.estimator_.predict_proba_one(
+                        x_dict, **predict_proba_kwargs
+                    )
+                    P_i = []
+                    if est_classes is None:
+                        est_classes = np.sort(list(P_i_dict.keys()))
+                    for c in self.classes_:
+                        P_i.append(P_i_dict.get(c, 0.0))
+                    P_list.append(P_i)
+                P = np.array(P_list)
+                if not np.any(np.isnan(P)):
+                    return P
+
+            warnings.warn(
+                f"Since the 'base_estimator' could not be fitted when"
+                f" calling the `fit` method, the class label "
+                f"distribution`_label_counts={self._label_counts}` is used to "
+                f"make the predictions."
+            )
+            # fallback if clf could not be fitted (i.e., no labeled data)
+            if sum(self._label_counts) == 0:
+                n_classes = len(self.classes_)
+                return np.ones([len(X), n_classes]) / n_classes
+            else:
+                return np.tile(
+                    self._label_counts / np.sum(self._label_counts),
+                    [len(X), 1],
+                )
+
+        def _fit(self, fit_function, X, y, sample_weight=None):
+            # Check input parameters.
+            self.check_X_dict_ = {
+                "ensure_min_samples": 0,
+                "ensure_min_features": 0,
+                "allow_nd": True,
+                "dtype": None,
+            }
+            X, y, sample_weight = self._validate_data(
+                X=X,
+                y=y,
+                sample_weight=sample_weight,
+                check_X_dict=self.check_X_dict_,
+                reset=fit_function == "fit"
+                or not hasattr(self, "n_features_in_"),
+            )
+
+            # Check whether estimator is a valid classifier.
+            if not isinstance(self.estimator, river.base.Classifier):
+                raise TypeError(
+                    "'{}' must be a river classifier.".format(self.estimator)
+                )
+
+            if hasattr(self, "estimator_"):
+                if fit_function != "partial_fit":
+                    self.estimator_ = deepcopy(self.estimator)
+            else:
+                self.estimator_ = deepcopy(self.estimator)
+            # count labels per class
+            is_included = is_labeled(y, missing_label=-1)
+            self._label_counts = [
+                np.sum(y[is_included] == c)
+                for c in range(len(self._le.classes_))
+            ]
+            try:
+                X_train = X[is_included]
+                y_train = y[is_included].astype(np.int64)
+                if np.sum(is_included) == 0:
+                    raise ValueError("There is no labeled data.")
+
+                supports_learn_many = hasattr(self.estimator_, "learn_many")
+                if supports_learn_many:
+                    params = signature(self.estimator_.learn_many).parameters
+                else:
+                    params = signature(self.estimator_.learn_one).parameters
+                supports_sample_weight = "w" in params or np.any(
+                    [p.kind == p.VAR_KEYWORD for p_name, p in params.items()]
+                )
+
+                if not supports_sample_weight and sample_weight is not None:
+                    raise ValueError(
+                        "The estimator does not support training "
+                        "with sample_weight."
+                    )
+
+                sample_weight_train = None
+                if supports_sample_weight and sample_weight is not None:
+                    sample_weight_train = sample_weight[is_included]
+                if supports_learn_many:
+                    fit_args = {}
+                    fit_args["X"] = pd.DataFrame(
+                        self.transform_data_to_dict(X_train)
+                    )
+                    fit_args["y"] = pd.Series(y_train)
+                    if sample_weight_train is not None:
+                        fit_args["w"] = pd.Series(sample_weight_train)
+                    self.estimator_.learn_many(**fit_args)
+                else:
+                    for idx in range(len(X_train)):
+                        fit_args = {}
+                        fit_args["x"] = self.transform_data_to_dict(
+                            X_train[idx]
+                        )
+                        fit_args["y"] = y_train[idx]
+                        if sample_weight_train is not None:
+                            fit_args["w"] = sample_weight_train[idx]
+                        self.estimator_.learn_one(**fit_args)
+                self.is_fitted_ = True
+            except Exception as e:
+                if (
+                    "supports_sample_weight" in locals()
+                    and not supports_sample_weight
+                    and sample_weight is not None
+                ):
+                    raise e
+                else:
+                    self.is_fitted_ = False
+                    warnings.warn(
+                        "The 'estimator' could not be fitted because of"
+                        " '{}'. Therefore, the number of classes  are counted"
+                        "and will be used to make predictions. The class"
+                        "labels are assumed to be uniformly "
+                        "distributed.".format(e)
+                    )
+            return self
+
+        def transform_data_to_dict(self, data):
+            return {str(i): x for i, x in enumerate(data.T)}
+
+        def __sklearn_is_fitted__(self):
+            if hasattr(self, "is_fitted_"):
+                return True

@@ -79,7 +79,7 @@ can do this via:
 .. code-block:: bash
 
    pip install -U torch torchvision
-   pip install -U scikit-activeml[opt] datasets sentence-transformers
+   pip install -U 'scikit-activeml[opt]' datasets sentence-transformers
 
 Note that you might need to adjust this command for GPU support with
 :code:`torch`.
@@ -216,7 +216,7 @@ default :code:`skactiveml` installation and must be installed separately.
 .. code-block:: bash
 
    pip install -U torch torchvision
-   pip install -U scikit-activeml[opt] datasets transformers
+   pip install -U 'scikit-activeml[opt]' datasets transformers
 
 Note that you might need to adjust this command for GPU support with
 :code:`torch`.
@@ -337,7 +337,7 @@ optional dependencies for better support of **deep active learning**:
 
 .. code-block:: bash
 
-   pip install -U scikit-activeml[opt]
+   pip install -U 'scikit-activeml[opt]'
 
 The ``opt`` installs additional packages such as ``skorch`` to enable
 more sophisticated deep learning support.
@@ -381,7 +381,7 @@ downgrades within your existing environment.
 
 .. code-block:: bash
 
-   pip install -U scikit-activeml[max,opt_max]
+   pip install -U 'scikit-activeml[max,opt_max]'
 
 This setup uses the versions listed in ``requirements_max.txt`` and
 ``requirements_opt_max.txt`` and corresponds to the configuration used in
@@ -390,7 +390,7 @@ tested core dependencies via:
 
 .. code-block:: bash
 
-   pip install -U scikit-activeml[max]
+   pip install -U 'scikit-activeml[max]'
 
 .. raw:: html
 
@@ -450,7 +450,10 @@ modality, and models used in the tutorial.
      - Stream
      - Classification
      - Text
-     - - Sentence Transformer with Parzen Window Classifier
+     - - Sentence Transformer embeddings with classifiers from:
+       - Scikit-learn
+       - River
+       - CapyMOA
 
 .. examples_end
 

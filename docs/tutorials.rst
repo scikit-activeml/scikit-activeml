@@ -119,7 +119,10 @@ Classification
      - Models
    * - :doc:`Stream-based Active Learning: Getting Started </generated/tutorials/20_stream_getting_started>`
      - Text
-     - - Sentence Transformer with Parzen Window Classifier
+     - - Sentence Transformer embeddings with classifiers from:
+       - Scikit-learn
+       - River
+       - CapyMOA
    * - :doc:`Stream-based Active Learning in Batches </generated/tutorials/21_stream_batch_with_pool_al>`
      - Synthetic
      - - Parzen Window Classifier

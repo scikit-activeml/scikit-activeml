@@ -227,7 +227,7 @@ class TemplateQueryStrategy:
             replace_query_params = {}
 
         for i, (test_val, err) in enumerate(test_cases):
-            with self.subTest(msg="Param", id=i, val=test_val):
+            with self.subTest(msg="Param", id=i, val=str(test_val)):
                 init_params = deepcopy(self.init_default_params)
                 for key, val in replace_init_params.items():
                     init_params[key] = val
@@ -564,7 +564,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                     y = np.full(y_true.shape, fill_value=missing_label)
                     y[0:init_labels] = y_true[0:init_labels]
 
-                    with self.subTest(init_labels=init_labels):
+                    with self.subTest(init_labels=str(init_labels)):
                         for b in range(budget):
                             query_params["y"] = y
                             query_id = qs.query(**query_params)
@@ -1077,7 +1077,7 @@ class TemplateSingleAnnotatorStreamQueryStrategy(TemplateQueryStrategy):
             replace_query_params = {}
 
         for i, (test_val, err) in enumerate(test_cases):
-            with self.subTest(msg="Param", id=i, val=test_val):
+            with self.subTest(msg="Param", id=i, val=str(test_val)):
                 init_params = deepcopy(self.init_default_params)
                 for key, val in replace_init_params.items():
                     init_params[key] = val
