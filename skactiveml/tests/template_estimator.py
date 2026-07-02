@@ -32,6 +32,7 @@ class TemplateEstimator:
     ):
         self.super_setUp_has_been_executed = True
         self.estimator_class = estimator_class
+        self.test_param_id_offset = 0
 
         self.init_default_params = {
             "random_state": 42,
@@ -267,7 +268,6 @@ class TemplateEstimator:
         replace_fit_params=None,
         extras_params=None,
         exclude_fit=False,
-        id_offset=0,
     ):
         if replace_init_params is None:
             replace_init_params = {}
@@ -277,11 +277,15 @@ class TemplateEstimator:
             extras_params = {}
 
         for i, (test_val, err) in enumerate(test_cases):
+
             with self.subTest(
-                msg=f"Param: {test_param}, expected: {err}",
-                id=i + id_offset,
-                val=test_val,
+                msg=(
+                    f"ID: {self.test_param_id_offset}, param: {test_param},"
+                    f"expected: {err}"
+                ),
+                val=str(test_val),
             ):
+                self.test_param_id_offset += 1
                 init_params = deepcopy(self.init_default_params)
                 init_params.update(replace_init_params)
 
@@ -410,7 +414,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            id_offset=3,
         )
 
         test_cases = [("state", TypeError), (None, None)]
@@ -422,7 +425,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            id_offset=5,
+            # id_offset=5,
         )
 
         test_cases = [("state", TypeError), (0.0, None)]
@@ -434,7 +437,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            id_offset=7,
         )
 
         test_cases = [("state", TypeError), (None, ValueError), (np.nan, None)]
@@ -446,7 +448,6 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            id_offset=9,
         )
 
     def test_init_param_classes(self, test_cases=None):
@@ -513,7 +514,7 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
             test_cases,
             replace_init_params=replace_init_params,
             replace_fit_params=replace_fit_params,
-            id_offset=4,
+            # id_offset=4,
         )
 
     def test_fit_param_X(self, test_cases=None):

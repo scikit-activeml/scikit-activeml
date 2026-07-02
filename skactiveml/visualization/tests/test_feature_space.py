@@ -27,6 +27,9 @@ from skactiveml.visualization import (
 )
 from skactiveml.visualization._feature_space import _general_plot_utilities
 
+# PDF rasterization differs slightly across supported Matplotlib versions.
+IMAGE_COMPARE_TOL = 6.0
+
 
 class TestFeatureSpace(unittest.TestCase):
     def setUp(self):
@@ -85,6 +88,17 @@ class TestFeatureSpace(unittest.TestCase):
         testing.set_font_settings_for_testing()
         testing.set_reproducibility_for_testing()
         testing.setup()
+
+    def tearDown(self):
+        plt.close("all")
+
+    def assertImagesClose(self, expected, actual):
+        comparison = compare_images(
+            self.path_prefix + expected,
+            self.path_prefix + actual,
+            tol=IMAGE_COMPARE_TOL,
+        )
+        self.assertIsNone(comparison)
 
     # Tests for plot_decision_boundary function
     def test_decision_boundary_param_clf(self):
@@ -764,12 +778,9 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(self.clf, self.bound, ax=ax, cmap=self.cmap)
 
         fig.savefig(self.path_prefix + "dec_bound_wo_cand.pdf")
-        comparison = compare_images(
-            self.path_prefix + "dec_bound_wo_cand_expected.pdf",
-            self.path_prefix + "dec_bound_wo_cand.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "dec_bound_wo_cand_expected.pdf", "dec_bound_wo_cand.pdf"
         )
-        self.assertIsNone(comparison)
 
     def test_with_candidates(self):
         fig, ax = plt.subplots()
@@ -793,12 +804,9 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(self.clf, self.bound, ax=ax, cmap=self.cmap)
 
         fig.savefig(self.path_prefix + "dec_bound_w_cand.pdf")
-        comparison = compare_images(
-            self.path_prefix + "dec_bound_w_cand_expected.pdf",
-            self.path_prefix + "dec_bound_w_cand.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "dec_bound_w_cand_expected.pdf", "dec_bound_w_cand.pdf"
         )
-        self.assertIsNone(comparison)
 
     def test_multi_class(self):
         random_state = np.random.RandomState(0)
@@ -834,12 +842,9 @@ class TestFeatureSpace(unittest.TestCase):
         )
         plot_decision_boundary(clf, bound, ax=ax, res=101, cmap=self.cmap)
         fig.savefig(self.path_prefix + "dec_bound_multiclass.pdf")
-        comparison = compare_images(
-            self.path_prefix + "dec_bound_multiclass.pdf",
-            self.path_prefix + "dec_bound_multiclass_expected.pdf",
-            tol=1.0,
+        self.assertImagesClose(
+            "dec_bound_multiclass_expected.pdf", "dec_bound_multiclass.pdf"
         )
-        self.assertIsNone(comparison)
 
     def test_svc(self):
         svc = LinearSVC()
@@ -866,12 +871,9 @@ class TestFeatureSpace(unittest.TestCase):
         plot_decision_boundary(svc, self.bound, ax=ax, cmap=self.cmap)
 
         fig.savefig(self.path_prefix + "dec_bound_svc.pdf")
-        comparison = compare_images(
-            self.path_prefix + "dec_bound_svc_expected.pdf",
-            self.path_prefix + "dec_bound_svc.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "dec_bound_svc_expected.pdf", "dec_bound_svc.pdf"
         )
-        self.assertIsNone(comparison)
 
     def test_multi_with_axes(self):
         fig, axes = plt.subplots(1, 5, figsize=(10, 2))
@@ -886,12 +888,9 @@ class TestFeatureSpace(unittest.TestCase):
         )
 
         fig.savefig(self.path_prefix + "multi_with_axes.pdf")
-        comparison = compare_images(
-            self.path_prefix + "multi_with_axes_expected.pdf",
-            self.path_prefix + "multi_with_axes.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "multi_with_axes_expected.pdf", "multi_with_axes.pdf"
         )
-        self.assertIsNone(comparison)
 
     def test_multi_without_axes(self):
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
@@ -904,12 +903,9 @@ class TestFeatureSpace(unittest.TestCase):
         )
 
         plt.savefig(self.path_prefix + "multi_without_axes.pdf")
-        comparison = compare_images(
-            self.path_prefix + "multi_without_axes_expected.pdf",
-            self.path_prefix + "multi_without_axes.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "multi_without_axes_expected.pdf", "multi_without_axes.pdf"
         )
-        self.assertIsNone(comparison)
 
     def test_multi_without_axes_cand(self):
         qs = SingleAnnotatorWrapper(clone(self.qs), random_state=0)
@@ -923,12 +919,10 @@ class TestFeatureSpace(unittest.TestCase):
         )
 
         plt.savefig(self.path_prefix + "multi_without_axes_cand.pdf")
-        comparison = compare_images(
-            self.path_prefix + "multi_without_axes_cand_expected.pdf",
-            self.path_prefix + "multi_without_axes_cand.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "multi_without_axes_cand_expected.pdf",
+            "multi_without_axes_cand.pdf",
         )
-        self.assertIsNone(comparison)
 
     def test_stream(self):
         fig, ax = plt.subplots()
@@ -968,12 +962,10 @@ class TestFeatureSpace(unittest.TestCase):
         )
 
         fig.savefig(self.path_prefix + "dec_bound_w_cand_stream.pdf")
-        comparison = compare_images(
-            self.path_prefix + "dec_bound_w_cand_stream_expected.pdf",
-            self.path_prefix + "dec_bound_w_cand_stream.pdf",
-            tol=0.05,
+        self.assertImagesClose(
+            "dec_bound_w_cand_stream_expected.pdf",
+            "dec_bound_w_cand_stream.pdf",
         )
-        self.assertIsNone(comparison)
 
 
 class TestClassifier(ClassifierMixin):

@@ -127,7 +127,7 @@ class TemplateBudgetManager:
             replace_query_by_utility_params = {}
 
         for i, (test_val, err) in enumerate(test_cases):
-            with self.subTest(msg="Param", id=i, val=test_val):
+            with self.subTest(msg="Param", id=i, val=str(test_val)):
                 init_params = deepcopy(self.init_default_params)
                 for key, val in replace_init_params.items():
                     init_params[key] = val

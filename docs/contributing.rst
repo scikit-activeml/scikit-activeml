@@ -90,14 +90,41 @@ Then install ``pip``:
 Install Dependencies
 ~~~~~~~~~~~~~~~~~~~~
 
-Now, install the required project dependencies, which are defined in the
-``requirements.txt`` and ``requirements_extra.txt`` (for development) files.
+Now, install the required project dependencies for development. A standard
+editable contributor setup uses the ``dev`` extra:
 
 .. code:: bash
 
    # Make sure your scikit-activeml Python environment is active!
    cd <project-root>
-   pip install -e .[dev]
+   pip install -e '.[dev]'
+
+If you also need the optional dependencies used by deep learning features,
+streaming integrations, or tutorials, install the ``opt`` extra alongside the
+development dependencies:
+
+.. code:: bash
+
+   pip install -e '.[dev,opt]'
+
+This uses the same ``opt`` extra described in the installation section of the
+README and pulls in the packages listed in ``requirements_opt.txt``. If you
+need the maximum tested dependency set for local reproduction of the CI
+environment, you can additionally use:
+
+.. code:: bash
+
+   pip install -e '.[dev,max,opt_max]'
+
+As in the README, the ``opt`` extra does **not** install PyTorch automatically.
+Please install the appropriate PyTorch build separately for your hardware and
+CUDA setup if your contribution depends on ``torch``/``skorch`` features.
+If your contribution uses ``capymoa``, you also need a Java runtime. One
+simple option with ``conda`` is:
+
+.. code:: bash
+
+   conda install conda-forge::openjdk
 
 After the pip installation is successful, you must install ``pandoc`` and
 ``ghostscript``, and ``ffmpeg`` if they are not already installed. For example,
