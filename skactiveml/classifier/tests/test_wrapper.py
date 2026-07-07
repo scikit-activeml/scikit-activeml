@@ -611,6 +611,31 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         clf = self._prefit_multilabel_clf()
         clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.ones((n_samples - 1, 2)), np.ones((n_samples, 2))],
+            classes_=[np.array([0, 1]), np.array([0, 1])],
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            "Expected P\\[0\\] to contain 4 samples, got 3",
+            clf.predict_proba,
+            self.X_ml,
+        )
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
+            proba=[np.ones((n_samples, 1)), np.ones((n_samples, 2))],
+            classes_=[np.array([0, 1]), np.array([0, 1])],
+        )
+        self.assertRaisesRegex(
+            ValueError,
+            "P\\[0\\] has 1 columns but the fitted estimator reports "
+            "2 classes",
+            clf.predict_proba,
+            self.X_ml,
+        )
+
+        clf = self._prefit_multilabel_clf()
+        clf.estimator_ = self._PredictProbaEstimator(
             proba=[np.ones((n_samples, 1)), np.ones((n_samples, 1))],
             classes_=[np.array([1]), np.array([0])],
         )
