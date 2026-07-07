@@ -362,75 +362,32 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if proba_format == "array":
                 # Binary per task: return (n_samples, n_outputs) with P(y=1).
                 if isinstance(P, list):
-                    # Wrapped classifier returns list of probability matrices.
-                    if len(P) != n_outputs:
-                        raise ValueError(
-                            f"Expected {n_outputs} outputs from "
-                            f"`predict_proba`, got {len(P)}."
-                        )
-
-                    P_ml = np.empty((n_samples, n_outputs), dtype=float)
-                    for j in range(n_outputs):
-                        P_j = np.asarray(P[j], dtype=float)
-                        if P_j.ndim != 2:
-                            raise ValueError(
-                                f"Expected P[{j}] to be of shape "
-                                f"(n_samples, n_classes), got {P_j.shape}."
-                            )
-                        if (
-                            hasattr(self.estimator_, "estimators_")
-                            and len(self.estimator_.estimators_) == n_outputs
-                            and hasattr(
-                                self.estimator_.estimators_[j], "classes_"
-                            )
-                        ):
-                            est_classes_j = np.asarray(
-                                self.estimator_.estimators_[j].classes_
-                            )
-                        else:
-                            est_classes = getattr(
-                                self.estimator_, "classes_", None
-                            )
-                            est_classes_j = (
-                                np.asarray(est_classes[j])
-                                if est_classes is not None
-                                and len(est_classes) == n_outputs
-                                else np.asarray(self.classes_[j])
-                            )
-                        pos_label = self.classes_[j][1]
-                        if P_j.shape[1] == 1:
-                            if est_classes_j[0] == pos_label:
-                                P_ml[:, j] = 1.0
-                            else:
-                                P_ml[:, j] = 0.0
-                        else:
-                            pos_idx = np.flatnonzero(
-                                est_classes_j == pos_label
-                            )
-                            if len(pos_idx) == 1:
-                                P_ml[:, j] = P_j[:, pos_idx[0]]
-                            else:
-                                raise ValueError(
-                                    f"Could not determine positive class "
-                                    f"probability for output {j}."
-                                )
-                    if not np.any(np.isnan(P_ml)):
-                        return P_ml
-
-                # Wrapped classifier returns desired format.
-                P_ml = np.asarray(P, dtype=float)
-                if P_ml.ndim != 2 or P_ml.shape[1] != n_outputs:
-                    raise ValueError(
-                        f"Expected predict_proba to return shape "
-                        f"`(n_samples, {n_outputs})` for multilabel format, "
-                        f"got {P_ml.shape}."
+                    P_list = self._normalize_multioutput_proba_list(
+                        P, n_samples=n_samples
                     )
+                    P_ml = np.column_stack(
+                        [P_list[j][:, 1] for j in range(n_outputs)]
+                    )
+                else:
+                    # Wrapped classifier returns desired format.
+                    P_ml = np.asarray(P, dtype=float)
+                    if P_ml.ndim != 2 or P_ml.shape[1] != n_outputs:
+                        raise ValueError(
+                            f"Expected predict_proba to return shape "
+                            f"`(n_samples, {n_outputs})` for multilabel "
+                            f"format, got {P_ml.shape}."
+                        )
+                # Fall through to the label-count prior fallback if the
+                # fitted estimator yielded NaN probabilities.
                 if not np.any(np.isnan(P_ml)):
                     return P_ml
             else:
                 if isinstance(P, list):
-                    if not any(np.any(np.isnan(np.asarray(P_j))) for P_j in P):
-                        return P
+                    P_list = self._normalize_multioutput_proba_list(
+                        P, n_samples=n_samples
+                    )
+                    if not any(np.any(np.isnan(P_j)) for P_j in P_list):
+                        return P_list
                 else:
                     P_ml = np.asarray(P, dtype=float)
                     if P_ml.ndim == 2 and P_ml.shape[1] == n_outputs:
@@ -599,6 +556,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         if fitted_classes is not None:
             self._initialize_label_state(fitted_classes)
+            self._initialize_label_counts_from_classes()
 
         return True
 
@@ -610,10 +568,21 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     def _initialize_label_state(self, classes):
         self.random_state_ = check_random_state(self.random_state)
-        self._le = ExtLabelEncoder(
-            classes=self.classes, missing_label=self.missing_label
+        effective_classes = (
+            self.classes if self.classes is not None else classes
         )
-        self._le.fit(classes)
+        self._le = ExtLabelEncoder(
+            classes=effective_classes, missing_label=self.missing_label
+        )
+        y_dummy = (
+            np.empty(
+                (0, len(effective_classes)),
+                dtype=np.asarray(self.missing_label).dtype,
+            )
+            if _is_multioutput_classes(effective_classes)
+            else classes
+        )
+        self._le.fit(y_dummy)
         self.classes_ = self._le.classes_
         self.multioutput_ = self._le.multioutput_
         if self.multioutput_:
@@ -627,6 +596,22 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_classifier_params(
             self.classes_, self.missing_label, self.cost_matrix_
         )
+
+    def _initialize_label_counts_from_classes(self):
+        """Initialize the per-class label counts with zeros.
+
+        This is used for pre-fitted estimators, where no labels are observed
+        through the wrapper's own `fit` method. The resulting all-zero counts
+        make the label-count prior fallback of `predict` and `predict_proba`
+        default to a uniform class distribution.
+        """
+        if self.multioutput_:
+            self._label_counts = [
+                np.zeros(len(classes_j), dtype=int)
+                for classes_j in self.classes_
+            ]
+        else:
+            self._label_counts = [0 for _ in self.classes_]
 
     @staticmethod
     def _extract_target_arg(y, fit_kwargs):
@@ -669,6 +654,139 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             call_kwargs["sample_weight"] = sample_weight
 
         return fit_method(**call_kwargs)
+
+    def _normalize_multioutput_proba_list(self, P, n_samples):
+        """Align a list of per-output probability matrices to `classes_`.
+
+        The wrapped estimator may return, for each output, a probability
+        matrix whose columns follow its own class order and may omit classes
+        that were not observed during fitting. This method maps each such
+        matrix onto the declared classes of the corresponding output, filling
+        the probabilities of unobserved classes with zeros.
+
+        Parameters
+        ----------
+        P : list of array-like
+            One probability matrix of shape `(n_samples, n_classes)` per
+            output, as returned by the wrapped estimator's `predict_proba`.
+        n_samples : int
+            Number of samples the probability matrices are expected to have.
+
+        Returns
+        -------
+        P_list : list of numpy.ndarray
+            One probability matrix of shape `(n_samples, n_classes)` per
+            output, with columns aligned to `self.classes_`.
+
+        Raises
+        ------
+        ValueError
+            If the number of outputs, the shape of a matrix, or the class
+            mapping of an output cannot be reconciled with `self.classes_`.
+        """
+        n_outputs = len(self.classes_)
+        if len(P) != n_outputs:
+            raise ValueError(
+                f"Expected {n_outputs} outputs from `predict_proba`, got "
+                f"{len(P)}."
+            )
+
+        P_list = []
+        for j, P_j in enumerate(P):
+            P_j = np.asarray(P_j, dtype=float)
+            classes_j = np.asarray(self.classes_[j])
+            if P_j.ndim != 2:
+                raise ValueError(
+                    f"Expected P[{j}] to be of shape "
+                    f"(n_samples, n_classes), got {P_j.shape}."
+                )
+            if P_j.shape[0] != n_samples:
+                raise ValueError(
+                    f"Expected P[{j}] to contain {n_samples} samples, got "
+                    f"{P_j.shape[0]}."
+                )
+
+            est_classes_j = self._estimator_classes_for_output(j, n_outputs)
+            if est_classes_j is None:
+                if P_j.shape[1] != len(classes_j):
+                    raise ValueError(
+                        f"P[{j}] has {P_j.shape[1]} columns but output {j} "
+                        f"declares {len(classes_j)} classes, and the wrapped "
+                        f"estimator does not expose per-output classes to map "
+                        f"them. Provide an estimator that exposes `classes_` "
+                        f"(or per-output `estimators_`), declare `classes` "
+                        f"matching the estimator, or return probabilities for "
+                        f"all declared classes."
+                    )
+                P_list.append(P_j)
+                continue
+
+            est_classes_j = np.asarray(est_classes_j)
+            if P_j.shape[1] != len(est_classes_j):
+                raise ValueError(
+                    f"P[{j}] has {P_j.shape[1]} columns but the fitted "
+                    f"estimator reports {len(est_classes_j)} classes."
+                )
+
+            class_indices = []
+            for est_class in est_classes_j:
+                indices = np.flatnonzero(classes_j == est_class)
+                if len(indices) != 1:
+                    raise ValueError(
+                        f"Class {est_class!r} of output {j} is not contained "
+                        "in the declared classes."
+                    )
+                class_indices.append(indices[0])
+
+            P_ext = np.zeros((n_samples, len(classes_j)), dtype=float)
+            P_ext[:, class_indices] = P_j
+            P_list.append(P_ext)
+
+        return P_list
+
+    def _estimator_classes_for_output(self, output_idx, n_outputs):
+        """Determine the class labels of the wrapped estimator for one output.
+
+        The aggregated `classes_` attribute is preferred because it holds the
+        per-output class vector for both `MultiOutputClassifier` and native
+        multilabel estimators. The `estimators_[output_idx].classes_` attribute
+        is only used as a fallback, since for ensembles the `estimators_` are
+        base learners trained on all outputs, so this attribute is a list of
+        per-output arrays rather than this output's class vector.
+
+        Parameters
+        ----------
+        output_idx : int
+            Index of the output whose class labels are requested.
+        n_outputs : int
+            Total number of outputs of the multilabel problem.
+
+        Returns
+        -------
+        classes_j : numpy.ndarray of shape (n_classes,) or None
+            The class labels of the wrapped estimator for the output
+            `output_idx`, or `None` if they cannot be determined.
+        """
+        # Collect class candidates in priority order.
+        candidates = []
+        est_classes = getattr(self.estimator_, "classes_", None)
+        if est_classes is not None and len(est_classes) == n_outputs:
+            candidates.append(est_classes[output_idx])
+        if (
+            hasattr(self.estimator_, "estimators_")
+            and len(self.estimator_.estimators_) == n_outputs
+            and hasattr(self.estimator_.estimators_[output_idx], "classes_")
+        ):
+            candidates.append(self.estimator_.estimators_[output_idx].classes_)
+
+        for candidate in candidates:
+            classes_j = np.asarray(candidate)
+            # Accept only a flat vector of scalar class labels, rejecting
+            # scalars (ndim 0) and list-of-arrays specifications.
+            if classes_j.ndim == 1 and all(np.ndim(c) == 0 for c in classes_j):
+                return classes_j
+
+        return None
 
     def _resolve_proba_format(self):
         check_type(self.proba_format, "proba_format", str)
