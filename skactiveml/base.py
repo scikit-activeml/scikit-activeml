@@ -17,6 +17,7 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError
+from .utils._target import check_target_capability, resolve_target_spec
 from .utils import (
     MISSING_LABEL,
     is_labeled,
@@ -1117,6 +1118,27 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         self.cost_matrix = cost_matrix
         self.random_state = random_state
 
+    @property
+    def _target_capabilities(self):
+        """Exact target semantics supported by a conservative classifier."""
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def _resolve_target_spec(self, y):
+        target_spec = resolve_target_spec(
+            y,
+            task="classification",
+            target_type="auto",
+            annotation_type="single-annotator",
+            classes=self.classes,
+            missing_label=self.missing_label,
+        )
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
+
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
         """Fit the model using `X` as training data and `y` as class labels.
@@ -1497,6 +1519,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         y_ensure_1d=True,
         reset=True,
         multioutput_ensure_multilabel=False,
+        target_spec=None,
     ):
         X, y, sample_weight = super()._validate_data(
             X=X,
@@ -1507,6 +1530,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             y_ensure_1d=y_ensure_1d,
             reset=reset,
             multioutput_ensure_multilabel=multioutput_ensure_multilabel,
+            target_spec=target_spec,
         )
 
         # Check class prior.

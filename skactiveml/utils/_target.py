@@ -104,6 +104,8 @@ def resolve_target_spec(
         raise ValueError(
             "`target_type='multi-label'` requires classification."
         )
+    if task == "regression" and classes is not None:
+        raise ValueError("`classes` is not accepted for regression targets.")
     if task == "classification" and classes is not None:
         check_classifier_params(classes, missing_label)
 
@@ -114,6 +116,39 @@ def resolve_target_spec(
         ensure_min_samples=0,
         dtype=None,
     )
+    if y.ndim == 0:
+        raise TypeError("`y` must be a one- or two-dimensional array-like.")
+
+    if target_type == "auto":
+        if annotation_type == "multi-annotator":
+            if classes is not None and _has_nested_classes(classes):
+                raise ValueError(
+                    "Nested class vocabularies contradict "
+                    "`annotation_type='multi-annotator'`."
+                )
+            target_type = "single-output"
+        elif task == "regression":
+            target_type = (
+                "single-output"
+                if y.ndim == 1 or y.shape[1] == 1
+                else "multi-output"
+            )
+        elif classes is not None:
+            if _has_nested_classes(classes):
+                target_type = (
+                    "multi-label"
+                    if all(len(classes_i) == 2 for classes_i in classes)
+                    else "multi-output"
+                )
+            else:
+                target_type = "single-output"
+        elif y.ndim == 1:
+            target_type = "single-output"
+        else:
+            raise ValueError(
+                "Two-dimensional targets with `target_type='auto'` are "
+                "ambiguous; declare `target_type` or `classes`."
+            )
 
     if target_type == "multi-label":
         return _resolve_multilabel(
@@ -123,53 +158,35 @@ def resolve_target_spec(
             classes=classes,
             missing_label=missing_label,
         )
-
-    if target_type == "auto":
-        if classes is not None and _has_nested_classes(classes):
-            if all(len(classes_i) == 2 for classes_i in classes):
-                return _resolve_multilabel(
-                    y,
-                    task=task,
-                    annotation_type=annotation_type,
-                    classes=classes,
-                    missing_label=missing_label,
-                )
-            target_type = "multi-output"
-        elif classes is not None or y.ndim == 1:
-            target_type = "single-output"
-        else:
-            raise ValueError(
-                "Two-dimensional targets with `target_type='auto'` are "
-                "ambiguous; declare `target_type` or `classes`."
-            )
-
     if target_type == "multi-output":
-        normalized_classes = None
-        if task == "classification" and classes is not None:
-            normalized_classes = tuple(
-                tuple(LabelEncoder().fit(classes_i).classes_)
-                for classes_i in classes
-            )
-        return TargetSpec(
+        return _resolve_multioutput(
+            y,
             task=task,
-            target_type="multi-output",
             annotation_type=annotation_type,
-            classes=normalized_classes,
+            classes=classes,
+            missing_label=missing_label,
         )
     if target_type != "single-output":
         raise ValueError(f"Cannot resolve `target_type='{target_type}'`.")
 
+    _validate_single_output_shape(y, task, annotation_type)
+
     normalized_classes = None
     if task == "classification":
+        if classes is not None and _has_nested_classes(classes):
+            raise ValueError(
+                "Single-output classification requires a flat class "
+                "vocabulary."
+            )
         observed = np.asarray(y)[~is_unlabeled(y, missing_label=missing_label)]
         declared = observed if classes is None else np.asarray(classes)
         if classes is None and len(observed) == 0:
             raise ValueError(
                 "No class label is observed and `classes` is not defined."
             )
-        if classes is not None and not np.isin(observed, declared).all():
-            _raise_unknown_class_error(observed, declared, "`classes`")
-        normalized_classes = tuple(LabelEncoder().fit(declared).classes_)
+        normalized_classes = _normalize_class_vocabulary(
+            declared, observed, "`classes`"
+        )
 
     return TargetSpec(
         task=task,
@@ -192,6 +209,76 @@ def _has_nested_classes(classes):
     )
 
 
+def _validate_single_output_shape(y, task, annotation_type):
+    if annotation_type == "multi-annotator":
+        if y.ndim != 2:
+            raise ValueError(
+                "Multi-annotator targets must be two-dimensional."
+            )
+        return
+
+    if task == "classification" and y.ndim != 1:
+        raise ValueError(
+            "Single-output, single-annotator classification targets must be "
+            "one-dimensional."
+        )
+    if task == "regression" and y.ndim == 2 and y.shape[1] != 1:
+        raise ValueError(
+            "Single-output regression targets must be one-dimensional or a "
+            "column vector."
+        )
+
+
+def _resolve_multioutput(y, *, task, annotation_type, classes, missing_label):
+    if annotation_type != "single-annotator":
+        raise ValueError(
+            "Multi-output targets cannot be combined with "
+            "`annotation_type='multi-annotator'`."
+        )
+    if y.ndim != 2 or y.shape[1] < 2:
+        raise ValueError(
+            "Multi-output targets must be two-dimensional with at least two "
+            "target columns."
+        )
+
+    normalized_classes = None
+    if task == "classification":
+        if classes is not None and not _has_nested_classes(classes):
+            raise ValueError(
+                "Multi-output classification requires nested class "
+                "vocabularies."
+            )
+        if classes is not None and len(classes) != y.shape[1]:
+            raise ValueError(
+                "Multi-output `classes` must contain one vocabulary per "
+                "target column."
+            )
+
+        missing = is_unlabeled(y, missing_label=missing_label)
+        normalized_classes = []
+        for output_idx in range(y.shape[1]):
+            observed = y[:, output_idx][~missing[:, output_idx]]
+            declared = observed if classes is None else classes[output_idx]
+            if len(declared) == 0:
+                raise ValueError(
+                    "No class label is observed for multi-output target "
+                    f"column {output_idx} and `classes` is not defined."
+                )
+            normalized_classes.append(
+                _normalize_class_vocabulary(
+                    declared, observed, f"`classes[{output_idx}]`"
+                )
+            )
+        normalized_classes = tuple(normalized_classes)
+
+    return TargetSpec(
+        task=task,
+        target_type="multi-output",
+        annotation_type="single-annotator",
+        classes=normalized_classes,
+    )
+
+
 def _resolve_multilabel(y, *, task, annotation_type, classes, missing_label):
     if task != "classification":
         raise ValueError(
@@ -199,10 +286,16 @@ def _resolve_multilabel(y, *, task, annotation_type, classes, missing_label):
         )
     if annotation_type != "single-annotator":
         raise ValueError(
-            "Multi-label multi-annotator targets are not supported."
+            "Multi-label targets cannot be combined with "
+            "`annotation_type='multi-annotator'`."
         )
     if y.ndim != 2:
         raise ValueError("Multi-label targets must be two-dimensional.")
+    if classes is not None and not _has_nested_classes(classes):
+        raise ValueError(
+            "Multi-label classification requires nested binary class "
+            "vocabularies."
+        )
 
     is_missing = is_unlabeled(
         y, missing_label=missing_label, target_type="multi-label"
@@ -212,14 +305,18 @@ def _resolve_multilabel(y, *, task, annotation_type, classes, missing_label):
     if classes is None:
         normalized_classes = []
         for output_idx in range(y.shape[1]):
-            classes_i = LabelEncoder().fit(observed_y[:, output_idx]).classes_
+            classes_i = _normalize_class_vocabulary(
+                observed_y[:, output_idx],
+                observed_y[:, output_idx],
+                f"`classes[{output_idx}]`",
+            )
             if len(classes_i) != 2:
                 raise ValueError(
                     "Each multi-label output must expose exactly two observed "
                     "classes when `classes=None`; output "
                     f"{output_idx} exposes {len(classes_i)}."
                 )
-            normalized_classes.append(tuple(classes_i))
+            normalized_classes.append(classes_i)
     else:
         if len(classes) != y.shape[1]:
             raise ValueError(
@@ -228,20 +325,18 @@ def _resolve_multilabel(y, *, task, annotation_type, classes, missing_label):
             )
         normalized_classes = []
         for output_idx, declared in enumerate(classes):
-            classes_i = LabelEncoder().fit(declared).classes_
+            classes_i = _normalize_class_vocabulary(
+                declared,
+                observed_y[:, output_idx],
+                f"`classes[{output_idx}]`",
+            )
             if len(classes_i) != 2:
                 raise ValueError(
                     "Each multi-label class vocabulary must contain exactly "
                     f"two classes; output {output_idx} contains "
                     f"{len(classes_i)}."
                 )
-            if not np.isin(observed_y[:, output_idx], classes_i).all():
-                _raise_unknown_class_error(
-                    observed_y[:, output_idx],
-                    classes_i,
-                    f"`classes[{output_idx}]`",
-                )
-            normalized_classes.append(tuple(classes_i))
+            normalized_classes.append(classes_i)
 
     return TargetSpec(
         task="classification",
@@ -264,6 +359,13 @@ def check_target_capability(component, target_spec, capabilities):
             f"{component} does not support target capability {capability!r}. "
             f"Supported capabilities are: {supported}."
         )
+
+
+def _normalize_class_vocabulary(declared, observed, name):
+    normalized = tuple(LabelEncoder().fit(declared).classes_)
+    if not np.isin(observed, normalized).all():
+        _raise_unknown_class_error(observed, normalized, name)
+    return normalized
 
 
 def _raise_unknown_class_error(observed, declared, name):

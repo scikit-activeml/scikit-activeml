@@ -85,6 +85,36 @@ class TestUncertaintySampling(
             ],
         )
 
+    def test_capabilities_are_exact_and_configuration_dependent(self):
+        standard = UncertaintySampling(method="entropy")
+        average_precision = UncertaintySampling(
+            method="expected_average_precision"
+        )
+
+        self.assertEqual(
+            standard._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            ),
+        )
+        self.assertEqual(
+            average_precision._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+        self.assertNotIn(
+            ("classification", "multi-label", "multi-annotator"),
+            standard._target_capabilities,
+        )
+
     def test_query_param_clf(self):
         add_test_cases = [
             (SVC(), TypeError),

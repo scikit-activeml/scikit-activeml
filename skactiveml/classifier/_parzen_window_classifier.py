@@ -130,8 +130,14 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         self : ParzenWindowClassifier,
             The `ParzenWindowClassifier` is fitted on the training data.
         """
+        # Resolve semantics and reject unsupported targets before fitted state
+        # is changed.
+        target_spec = self._resolve_target_spec(y)
+
         # Check input parameters.
-        X, y, sample_weight = self._validate_data(X, y, sample_weight)
+        X, y, sample_weight = self._validate_data(
+            X, y, sample_weight, target_spec=target_spec
+        )
 
         # Check whether metric is available.
         if self.metric not in ParzenWindowClassifier.METRICS and not callable(
@@ -184,6 +190,8 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
                 classes=np.arange(len(self.classes_)),
                 missing_label=-1,
             )
+
+        self.target_spec_ = target_spec
 
         return self
 

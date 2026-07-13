@@ -93,6 +93,27 @@ class TestParzenWindowClassifier(
         after_metric_dict = deepcopy(pwc.metric_dict)
         self.assertEqual(before_metric_dict, after_metric_dict)
 
+    def test_multilabel_is_rejected_before_fitted_state_changes(self):
+        pwc = ParzenWindowClassifier(classes=[[0, 1], [0, 1]])
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "ParzenWindowClassifier.*multi-label.*Supported capabilities",
+        ):
+            pwc.fit(
+                X=[[0], [1]],
+                y=[[0, 1], [1, 0]],
+            )
+
+        self.assertEqual(
+            pwc._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+        self.assertIsInstance(pwc._target_capabilities, frozenset)
+        self.assertFalse(any(name.endswith("_") for name in vars(pwc)))
+
     def test_predict_freq(self):
         pwc = ParzenWindowClassifier(
             classes=["tokyo", "paris", "new york"],
