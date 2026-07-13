@@ -40,7 +40,7 @@ class TestLabel(unittest.TestCase):
             is_unlabeled,
             y=[0, 1],
             missing_label=-1,
-            is_multioutput=True,
+            target_type="multi-label",
         )
         self.assertRaises(
             TypeError, is_unlabeled, y=self.y2, missing_label=np.nan
@@ -83,7 +83,7 @@ class TestLabel(unittest.TestCase):
             is_unlabeled,
             y=self.y9,
             missing_label=-1,
-            is_multioutput=True,
+            target_type="multi-label",
         )
 
         np.testing.assert_array_equal(
@@ -122,11 +122,13 @@ class TestLabel(unittest.TestCase):
         )
         np.testing.assert_array_equal(
             np.array([0, 0, 0, 1], dtype=bool),
-            is_unlabeled(self.y8, missing_label=-1, is_multioutput=True),
+            is_unlabeled(self.y8, missing_label=-1, target_type="multi-label"),
         )
         np.testing.assert_array_equal(
             np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 0, 1]], dtype=bool),
-            is_unlabeled(self.y9, missing_label=-1, is_multioutput=False),
+            is_unlabeled(
+                self.y9, missing_label=-1, target_type="single-output"
+            ),
         )
 
     def test_is_labeled(self):
@@ -163,13 +165,13 @@ class TestLabel(unittest.TestCase):
         )
         np.testing.assert_array_equal(
             ~np.array([0, 0, 0, 1], dtype=bool),
-            is_labeled(self.y8, missing_label=-1, is_multioutput=True),
+            is_labeled(self.y8, missing_label=-1, target_type="multi-label"),
         )
         np.testing.assert_array_equal(
             ~np.array(
                 [[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 0, 1]], dtype=bool
             ),
-            is_labeled(self.y9, missing_label=-1, is_multioutput=False),
+            is_labeled(self.y9, missing_label=-1, target_type="single-output"),
         )
 
     def test_unlabeled_indices(self):

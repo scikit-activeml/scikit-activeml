@@ -680,7 +680,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
                 is_unlabeled(
                     query_params["y"],
                     missing_label,
-                    is_multioutput=True,
+                    target_type="multi-label",
                 )
             )
         )
@@ -698,7 +698,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
             is_labeled(
                 query_params["y"],
                 missing_label,
-                is_multioutput=True,
+                target_type="multi-label",
             )
         )
         self.assertEqual(sum(np.isnan(utils[0])), n_labeled)
@@ -764,7 +764,7 @@ class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
         unld_idx = unlabeled_indices(
             query_params["y"],
             missing_label,
-            is_multioutput=True,
+            target_type="multi-label",
         )
         query_params["candidates"] = unld_idx
         query_idx2, utils2 = qs.query(**query_params)

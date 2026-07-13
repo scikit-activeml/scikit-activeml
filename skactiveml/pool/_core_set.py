@@ -156,7 +156,9 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             selected_samples = labeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                is_multioutput=is_multioutput,
+                target_type=(
+                    "multi-label" if is_multioutput else "single-output"
+                ),
             )
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
@@ -275,7 +277,9 @@ def k_greedy_center(
 
     if mapping is None:
         mapping = unlabeled_indices(
-            y=y, missing_label=missing_label, is_multioutput=is_multioutput
+            y=y,
+            missing_label=missing_label,
+            target_type=("multi-label" if is_multioutput else "single-output"),
         )
     else:
         mapping = column_or_1d(mapping, dtype=int, warn=True)
@@ -297,7 +301,9 @@ def k_greedy_center(
         raise TypeError("Only n_new_cand with type int is supported.")
 
     selected_samples = labeled_indices(
-        y=y, missing_label=missing_label, is_multioutput=is_multioutput
+        y=y,
+        missing_label=missing_label,
+        target_type=("multi-label" if is_multioutput else "single-output"),
     )
     query_indices = np.zeros(batch_size, dtype=int)
     for i in range(batch_size):

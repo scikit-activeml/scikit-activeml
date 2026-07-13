@@ -206,7 +206,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = unlabeled_indices(
                 y[mapping],
                 missing_label=self.missing_label_,
-                is_multioutput=is_multioutput,
+                target_type=(
+                    "multi-label" if is_multioutput else "single-output"
+                ),
             )
             X_unlbld = X_cand[unlbld_mapping]
             unlbld_mapping = mapping[unlbld_mapping]

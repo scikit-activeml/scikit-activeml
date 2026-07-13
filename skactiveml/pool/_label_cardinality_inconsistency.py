@@ -157,13 +157,15 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             cand_mask = is_unlabeled(
                 y[mapping],
                 missing_label=self.missing_label_,
-                is_multioutput=True,
+                target_type="multi-label",
             )
         X_unlbld = X_cand[cand_mask]
 
         n_lbld = int(
             is_labeled(
-                y, missing_label=self.missing_label_, is_multioutput=True
+                y,
+                missing_label=self.missing_label_,
+                target_type="multi-label",
             ).sum()
         )
 

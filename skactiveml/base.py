@@ -106,6 +106,7 @@ class PoolQueryStrategy(QueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
+        target_type="single-output",
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -173,7 +174,18 @@ class PoolQueryStrategy(QueryStrategy):
         self.missing_label_ = self.missing_label
 
         # Check candidates (+1 to avoid zero multiplier).
-        seed_mult = int(np.sum(is_unlabeled(y, self.missing_label_))) + 1
+        seed_mult = (
+            int(
+                np.sum(
+                    is_unlabeled(
+                        y,
+                        self.missing_label_,
+                        target_type=target_type,
+                    )
+                )
+            )
+            + 1
+        )
         if candidates is not None:
             candidates = np.array(candidates)
             if candidates.ndim == 1:
@@ -275,6 +287,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         reset=True,
         check_X_dict=None,
         allow_multioutput=False,
+        target_type=None,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -334,23 +347,46 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             batch_size,
             return_utilities,
         ) = super()._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset, check_X_dict
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset,
+            check_X_dict,
+            target_type=(
+                "single-output" if target_type is None else target_type
+            ),
         )
 
-        if allow_multioutput:
+        if target_type == "multi-label":
             y = check_array(
                 y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
             )
-            is_multioutput = y.ndim == 2
+            if y.ndim != 2:
+                raise ValueError(
+                    "Multi-label targets must be two-dimensional."
+                )
+            resolved_target_type = "multi-label"
+        elif target_type == "single-output":
+            y = column_or_1d(y, warn=True)
+            resolved_target_type = "single-output"
+        elif allow_multioutput:
+            y = check_array(
+                y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
+            )
+            resolved_target_type = (
+                "multi-label" if y.ndim == 2 else "single-output"
+            )
         else:
             y = column_or_1d(y, warn=True)
-            is_multioutput = False
+            resolved_target_type = "single-output"
 
         if candidates is None:
             is_ulbld = is_unlabeled(
                 y,
                 missing_label=self.missing_label_,
-                is_multioutput=is_multioutput,
+                target_type=resolved_target_type,
             )
             n_candidates = int(is_ulbld.sum())
         else:
@@ -373,6 +409,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         enforce_mapping=False,
         allow_only_unlabeled=False,
         is_multioutput=False,
+        target_type=None,
     ):
         """Transforms the `candidates` parameter into a sample array and the
         corresponding index array `mapping` such that
@@ -412,14 +449,25 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             (`candidates = X[mapping]`)
         """
 
+        resolved_target_type = (
+            "multi-label"
+            if target_type is None and is_multioutput
+            else ("single-output" if target_type is None else target_type)
+        )
         if candidates is None:
             ulbd_idx = unlabeled_indices(
-                y, self.missing_label_, is_multioutput=is_multioutput
+                y,
+                self.missing_label_,
+                target_type=resolved_target_type,
             )
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
             if allow_only_unlabeled:
-                if is_labeled(y[candidates], self.missing_label_).any():
+                if is_labeled(
+                    y[candidates],
+                    self.missing_label_,
+                    target_type=resolved_target_type,
+                ).any():
                     raise ValueError(
                         "Candidates must not contain labeled " "samples."
                     )
@@ -1193,6 +1241,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         y_ensure_1d=True,
         reset=True,
         multioutput_ensure_multilabel=False,
+        target_spec=None,
     ):
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1215,8 +1264,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         self.random_state_ = check_random_state(self.random_state)
 
         # Create label encoder.
+        resolved_classes = (
+            self.classes if target_spec is None else target_spec.classes
+        )
         self._le = ExtLabelEncoder(
-            classes=self.classes, missing_label=self.missing_label
+            classes=resolved_classes, missing_label=self.missing_label
         )
 
         # Check input parameters.
@@ -1230,7 +1282,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             y = column_or_1d(y) if y_ensure_1d else y
             y = self._le.fit_transform(y)
             if self._le.multioutput_:
-                is_unlabeled(y, missing_label=-1, is_multioutput=True)
+                is_unlabeled(y, missing_label=-1, target_type="multi-label")
             if len(self._le.classes_) == 0:
                 raise ValueError(error_msg)
         else:

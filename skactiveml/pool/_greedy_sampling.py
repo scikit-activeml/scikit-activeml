@@ -138,7 +138,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         selected_indices = labeled_indices(
             y=y,
             missing_label=self.missing_label,
-            is_multioutput=is_multioutput,
+            target_type=("multi-label" if is_multioutput else "single-output"),
         )
 
         if mapping is None:

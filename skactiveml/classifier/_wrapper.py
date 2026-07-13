@@ -22,6 +22,7 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
+from ..utils._target import check_target_capability
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
@@ -35,6 +36,7 @@ from ..utils import (
     match_signature,
     check_n_features,
     _is_multioutput_classes,
+    resolve_target_spec,
 )
 
 # used to defer import of capymoa as it may result in an error with pytest
@@ -132,6 +134,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         * 'list'  -> list of `(n_samples, 2)` arrays
         * 'array' -> array of shape `(n_samples, n_outputs)` with
           `P(y=pos_label)`
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. Explicit `"multi-label"` supports resolving
+        binary per-label vocabularies from observed targets when `classes` is
+        `None`. Multi-output classification is recognized but unsupported.
 
     References
     ----------
@@ -152,6 +159,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         cost_matrix=None,
         random_state=None,
         proba_format="auto",
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
@@ -162,6 +170,32 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
         self.proba_format = proba_format
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        capabilities = {
+            ("classification", "single-output", "single-annotator")
+        }
+        if hasattr(self.estimator, "predict_proba"):
+            capabilities.add(
+                ("classification", "multi-label", "single-annotator")
+            )
+        return frozenset(capabilities)
+
+    def _resolve_target_spec(self, y, classes=None):
+        target_spec = resolve_target_spec(
+            y,
+            task="classification",
+            target_type=self.target_type,
+            annotation_type="single-annotator",
+            classes=self.classes if classes is None else classes,
+            missing_label=self.missing_label,
+        )
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
 
     @match_signature("estimator", "fit")
     def fit(self, X, y=None, sample_weight=None, **fit_kwargs):
@@ -265,7 +299,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         if self.is_fitted_:
             if self.cost_matrix is None:
                 y_pred = self.estimator_.predict(X, **predict_kwargs)
-                if self.multioutput_:
+                if self._is_multilabel_target():
                     y_pred = np.asarray(y_pred)
                 else:
                     y_pred = y_pred.astype(self.classes_.dtype)
@@ -278,7 +312,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 y_pred = self._le.inverse_transform(y_pred)
         else:
             p = self.predict_proba([X[0]])
-            if self.multioutput_:
+            if self._is_multilabel_target():
                 if isinstance(p, np.ndarray) and p.ndim == 2:
                     # Uniform sampling in (0, 1).
                     rand_p = self.random_state_.random((len(X), len(p[0])))
@@ -335,7 +369,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             # fitted.
             P = self.estimator_.predict_proba(X, **predict_proba_kwargs)
 
-            if not self.multioutput_:
+            if not self._is_multilabel_target():
                 # Single output classification.
                 if P.shape[1] != len(self.classes_):
                     # Map the predicted classes to self.classes.
@@ -407,7 +441,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
 
         # Fallback for single output.
-        if not self.multioutput_:
+        if not self._is_multilabel_target():
             return _prior_matrix_from_counts(self._label_counts, len(X))
 
         if proba_format == "array":
@@ -427,6 +461,8 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ]
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
+        target_spec = self._resolve_target_spec(y)
+
         # Check input parameters.
         self.check_X_dict_ = {
             "ensure_min_samples": 0,
@@ -434,7 +470,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "allow_nd": True,
             "dtype": None,
         }
-        is_multioutput = np.asarray(y, dtype=object).ndim == 2
+        is_multioutput = target_spec.target_type == "multi-label"
         X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
@@ -443,7 +479,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             y_ensure_1d=not is_multioutput,
             multioutput_ensure_multilabel=is_multioutput,
             reset=fit_function == "fit" or not hasattr(self, "n_features_in_"),
+            target_spec=target_spec,
         )
+        self.target_spec_ = target_spec
 
         # Check whether estimator is a valid classifier.
         if not is_classifier(estimator=self.estimator):
@@ -479,14 +517,19 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             is_included = np.full_like(y, fill_value=True, dtype=bool)
         else:
             is_included = is_labeled(
-                y=y, missing_label=-1, is_multioutput=self.multioutput_
+                y=y,
+                missing_label=-1,
+                target_type=target_spec.target_type,
             )
 
         # Count labels per class.
-        if self.multioutput_:
+        if self._is_multilabel_target():
             self._label_counts = [
                 np.array(
-                    [np.sum(y[is_included, j] == c) for c in classes_j],
+                    [
+                        np.sum(y[is_included, j] == class_idx)
+                        for class_idx in range(len(classes_j))
+                    ],
                     dtype=int,
                 )
                 for j, classes_j in enumerate(self._le.classes_)
@@ -571,9 +614,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         effective_classes = (
             self.classes if self.classes is not None else classes
         )
-        self._le = ExtLabelEncoder(
-            classes=effective_classes, missing_label=self.missing_label
-        )
         y_dummy = (
             np.empty(
                 (0, len(effective_classes)),
@@ -582,10 +622,17 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             if _is_multioutput_classes(effective_classes)
             else classes
         )
+        target_spec = self._resolve_target_spec(
+            y_dummy, classes=effective_classes
+        )
+        self.target_spec_ = target_spec
+        self._le = ExtLabelEncoder(
+            classes=self.target_spec_.classes, missing_label=self.missing_label
+        )
         self._le.fit(y_dummy)
         self.classes_ = self._le.classes_
         self.multioutput_ = self._le.multioutput_
-        if self.multioutput_:
+        if self._is_multilabel_target():
             self.cost_matrix_ = None
         else:
             self.cost_matrix_ = (
@@ -605,7 +652,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         make the label-count prior fallback of `predict` and `predict_proba`
         default to a uniform class distribution.
         """
-        if self.multioutput_:
+        if self._is_multilabel_target():
             self._label_counts = [
                 np.zeros(len(classes_j), dtype=int)
                 for classes_j in self.classes_
@@ -794,7 +841,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             raise ValueError(
                 "`proba_format` must be one of {'auto', 'list', 'array'}."
             )
-        if not getattr(self, "multioutput_", False):
+        if not self._is_multilabel_target():
             return "array"
 
         is_multilabel = all(len(classes_j) == 2 for classes_j in self.classes_)
@@ -806,6 +853,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 "classification."
             )
         return self.proba_format
+
+    def _is_multilabel_target(self):
+        return (
+            "target_spec_" in self.__dict__
+            and self.target_spec_.target_type == "multi-label"
+        )
 
 
 class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
@@ -1712,7 +1765,11 @@ if successful_skorch_torch_import:
             else:
                 is_multioutput = y.ndim == 2
                 is_included = is_labeled(
-                    y=y, missing_label=-1, is_multioutput=is_multioutput
+                    y=y,
+                    missing_label=-1,
+                    target_type=(
+                        "multi-label" if is_multioutput else "single-output"
+                    ),
                 )
             if np.sum(is_included) > 0:
                 X_train = X[is_included]

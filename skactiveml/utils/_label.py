@@ -1,7 +1,5 @@
 import numpy as np
 
-from sklearn.utils.validation import check_scalar
-
 # Define constant for missing label used throughout the package.
 
 MISSING_LABEL = np.nan
@@ -43,7 +41,12 @@ def _deepflatten(to_flatten):
     return flattened_list
 
 
-def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
+def is_unlabeled(
+    y,
+    missing_label=MISSING_LABEL,
+    *,
+    target_type="single-output",
+):
     """Creates a boolean mask indicating missing labels.
 
     Parameters
@@ -52,8 +55,8 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
         Class labels to be checked w.r.t. to missing labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    is_multioutput : bool, default=False
-        Indicating if `y` is multioutput. In this case, `y` must be
+    target_type : {"single-output", "multi-label"}, default="single-output"
+        The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must be either contain
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
@@ -63,12 +66,30 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
     is_unlbld : np.ndarray of shape (n_samples,) or (n_samples, n_outputs)
         Boolean mask indicating missing labels in `y`.
 
-        - If `is_multioutput=False`, `is_unlbld` has the same shape as `y`.
-        - If `is_multioutput=True`, `is_unlbld` is of shape `(n_samples,)`.
+        - If `target_type="single-output"`, `is_unlbld` has the same shape as
+          `y`.
+        - If `target_type="multi-label"`, `is_unlbld` is of shape
+          `(n_samples,)`.
     """
     check_missing_label(missing_label)
-    check_scalar(is_multioutput, name="is_multioutput", target_type=bool)
+    if target_type == "auto":
+        raise ValueError(
+            "`target_type='auto'` is not supported by label helpers; pass a "
+            "resolved target type."
+        )
+    if target_type not in {"single-output", "multi-label"}:
+        raise ValueError(
+            "`target_type` must be either 'single-output' or 'multi-label'."
+        )
     if len(y) == 0:
+        y = np.asarray(y)
+        if target_type == "multi-label":
+            if y.ndim != 2:
+                raise ValueError(
+                    "`y` must be two-dimensional when "
+                    "`target_type='multi-label'`."
+                )
+            return np.zeros(y.shape[0], dtype=bool)
         return np.array(y, dtype=bool)
     if not isinstance(y, np.ndarray):
         types = set(
@@ -89,8 +110,8 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
                     "'NoneType' is allowed. Got {}".format(types)
                 )
         y = np.asarray(y)
-    target_type = np.result_type(y, np.asarray(missing_label))
-    check_missing_label(missing_label, target_type=target_type, name="y")
+    y_dtype = np.result_type(y, np.asarray(missing_label))
+    check_missing_label(missing_label, target_type=y_dtype, name="y")
 
     # Check requirements for labels `y`.
     if y.ndim not in (1, 2):
@@ -103,9 +124,9 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
             "`n_outputs > 0`."
         )
 
-    if is_multioutput and y.ndim != 2:
+    if target_type == "multi-label" and y.ndim != 2:
         raise ValueError(
-            "`y` must be two-dimensional when `is_multioutput=True`."
+            "`y` must be two-dimensional when `target_type='multi-label'`."
         )
 
     # Compute elementwise missing mask.
@@ -115,11 +136,11 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
     if missing_is_nan:
         is_missing = np.isnan(y.astype(float))
     else:
-        y = y.astype(target_type)
+        y = y.astype(y_dtype)
         is_missing = y == missing_label
 
     # Handle single output.
-    if not is_multioutput:
+    if target_type == "single-output":
         return is_missing
 
     # Handle multiple outputs.
@@ -135,7 +156,12 @@ def is_unlabeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
     return row_all
 
 
-def is_labeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
+def is_labeled(
+    y,
+    missing_label=MISSING_LABEL,
+    *,
+    target_type="single-output",
+):
     """Creates a boolean mask indicating present labels.
 
     Parameters
@@ -144,8 +170,8 @@ def is_labeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    is_multioutput : bool, default=False
-        Indicating if `y` is multioutput. In this case, `y` must be
+    target_type : {"single-output", "multi-label"}, default="single-output"
+        The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must be either contain
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
@@ -155,15 +181,23 @@ def is_labeled(y, missing_label=MISSING_LABEL, is_multioutput=False):
     is_lbld : np.ndarray of shape (n_samples,) or (n_samples, n_outputs)
         Boolean mask indicating present labels in `y`.
 
-        - If `is_multioutput=False`, `is_lbld` has the same shape as `y`.
-        - If `is_multioutput=True`, `is_lbld` is of shape `(n_samples,)`.
+        - If `target_type="single-output"`, `is_lbld` has the same shape as
+          `y`.
+        - If `target_type="multi-label"`, `is_lbld` has shape `(n_samples,)`.
     """
     return ~is_unlabeled(
-        y=y, missing_label=missing_label, is_multioutput=is_multioutput
+        y=y,
+        missing_label=missing_label,
+        target_type=target_type,
     )
 
 
-def unlabeled_indices(y, missing_label=MISSING_LABEL, is_multioutput=False):
+def unlabeled_indices(
+    y,
+    missing_label=MISSING_LABEL,
+    *,
+    target_type="single-output",
+):
     """Return an array of indices indicating missing labels.
 
     Parameters
@@ -172,8 +206,8 @@ def unlabeled_indices(y, missing_label=MISSING_LABEL, is_multioutput=False):
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    is_multioutput : bool, default=False
-        Indicating if `y` is multioutput. In this case, `y` must be
+    target_type : {"single-output", "multi-label"}, default="single-output"
+        The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must be either contain
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
@@ -183,18 +217,26 @@ def unlabeled_indices(y, missing_label=MISSING_LABEL, is_multioutput=False):
     unlbld_indices : numpy.ndarray of shape (n_samples,) or (n_samples, 2)
         Index array of missing labels.
 
-        - If `is_multioutput=False` and `y` is a 2D-array, `unlbld_indices`
+        - If `target_type="single-output"` and `y` is a 2D-array,
+          `unlbld_indices`
           has the shape `(n_samples, 2)`.
         - Otherwise, `unlbld_indices` has the shape `(n_samples,)`.
     """
     is_unlbld = is_unlabeled(
-        y=y, missing_label=missing_label, is_multioutput=is_multioutput
+        y=y,
+        missing_label=missing_label,
+        target_type=target_type,
     )
     unlbld_indices = np.argwhere(is_unlbld)
     return unlbld_indices[:, 0] if is_unlbld.ndim == 1 else unlbld_indices
 
 
-def labeled_indices(y, missing_label=MISSING_LABEL, is_multioutput=False):
+def labeled_indices(
+    y,
+    missing_label=MISSING_LABEL,
+    *,
+    target_type="single-output",
+):
     """Return an array of indices indicating present labels.
 
     Parameters
@@ -203,8 +245,8 @@ def labeled_indices(y, missing_label=MISSING_LABEL, is_multioutput=False):
         Class labels to be checked w.r.t. to present labels.
     missing_label : number or str or None or np.nan, default=np.nan
         Value to represent a missing label.
-    is_multioutput : bool, default=False
-        Indicating if `y` is multioutput. In this case, `y` must be
+    target_type : {"single-output", "multi-label"}, default="single-output"
+        The resolved target type. For multi-label targets, `y` must be
         two-dimensional. Furthermore, a row `y[i]` must be either contain
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
@@ -214,11 +256,16 @@ def labeled_indices(y, missing_label=MISSING_LABEL, is_multioutput=False):
     lbld_indices : numpy.ndarray of shape (n_samples) or (n_samples, 2)
         Index array of present labels.
 
-        - If `is_multioutput=False` and `y` is a 2D-array, `unlbld_indices`
+        - If `target_type="single-output"` and `y` is a 2D-array,
+          `lbld_indices`
           has the shape `(n_samples, 2)`.
-        - Otherwise, `unlbld_indices` has the shape `(n_samples,)`.
+        - Otherwise, `lbld_indices` has the shape `(n_samples,)`.
     """
-    is_lbld = is_labeled(y, missing_label, is_multioutput)
+    is_lbld = is_labeled(
+        y,
+        missing_label,
+        target_type=target_type,
+    )
     lbld_indices = np.argwhere(is_lbld)
     return lbld_indices[:, 0] if is_lbld.ndim == 1 else lbld_indices
 

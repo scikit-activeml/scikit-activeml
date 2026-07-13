@@ -17,8 +17,11 @@ from ..utils import (
     check_classes,
     check_type,
     check_equal_missing_label,
+    is_unlabeled,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
+from ..utils._target import check_target_capability
+from ..utils import resolve_target_spec
 
 
 class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
@@ -69,6 +72,10 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         `predict_proba` may return either shape `(n_samples, n_outputs)` or a
         list of binary probability matrices with shape `(n_samples, 2)` per
         output.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted classifier's target specification is
+        authoritative when available.
 
     References
     ----------
@@ -95,6 +102,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
+        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -102,6 +110,22 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         self.method = method
         self.cost_matrix = cost_matrix
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        capabilities = {
+            ("classification", "single-output", "single-annotator")
+        }
+        if self.method in {
+            "least_confident",
+            "margin_sampling",
+            "entropy",
+        }:
+            capabilities.add(
+                ("classification", "multi-label", "single-annotator")
+            )
+        return frozenset(capabilities)
 
     def query(
         self,
@@ -184,6 +208,43 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        # Resolve through the classifier before acquisition state is changed.
+        check_type(clf, "clf", SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label)
+        check_type(fit_clf, "fit_clf", bool)
+        if fit_clf:
+            if sample_weight is not None:
+                clf = clone(clf).fit(X, y, sample_weight)
+            else:
+                clf = clone(clf).fit(X, y)
+
+        if hasattr(clf, "target_spec_"):
+            target_spec = clf.target_spec_
+        else:
+            target_spec = resolve_target_spec(
+                y,
+                task="classification",
+                target_type=self.target_type,
+                annotation_type="single-annotator",
+                classes=getattr(clf, "classes_", clf.classes),
+                missing_label=self.missing_label,
+            )
+        if self.target_type != "auto" and (
+            self.target_type != target_spec.target_type
+        ):
+            raise ValueError(
+                "UncertaintySampling's explicit `target_type` conflicts with "
+                "the fitted classifier's target specification."
+            )
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        is_unlabeled(
+            y,
+            missing_label=self.missing_label,
+            target_type=target_spec.target_type,
+        )
+
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -193,20 +254,16 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_spec.target_type,
         )
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+            candidates=candidates,
+            X=X,
+            y=y,
+            target_type=target_spec.target_type,
         )
-
-        # Validate classifier type.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-
-        # Validate classifier type.
-        check_type(fit_clf, "fit_clf", bool)
 
         # Check `utility_weight`.
         if utility_weight is None:
@@ -234,13 +291,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                 "expected".format(type(self.method), str)
             )
 
-        # Fit the classifier.
-        if fit_clf:
-            if sample_weight is not None:
-                clf = clone(clf).fit(X, y, sample_weight)
-            else:
-                clf = clone(clf).fit(X, y)
-
         # Predict class-membership probabilities.
         probas = clf.predict_proba(X_cand)
 
@@ -255,7 +305,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
                     probas=probas,
                     method=self.method,
                     cost_matrix=self.cost_matrix,
-                    is_multilabel=is_multioutput,
+                    is_multilabel=target_spec.target_type == "multi-label",
                     multilabel_aggregation_fn=self.multilabel_aggregation_fn,
                 )
             elif self.method == "expected_average_precision":

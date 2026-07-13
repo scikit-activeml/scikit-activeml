@@ -148,7 +148,7 @@ class MaxHerding(SingleAnnotatorPoolQueryStrategy):
         is_lbld = is_labeled(
             y=y,
             missing_label=self.missing_label_,
-            is_multioutput=is_multioutput,
+            target_type=("multi-label" if is_multioutput else "single-output"),
         )
         if is_lbld.sum() > 0:
             X_lbld = X[is_lbld]

@@ -71,6 +71,20 @@ class TestUncertaintySampling(
         test_cases += [(np.max, None), (np.average, None)]
         self._test_param("init", "multilabel_aggregation_fn", test_cases)
 
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("invalid", ValueError),
+                (1, ValueError),
+                ("multi-label", ValueError),
+                ("multi-output", ValueError),
+            ],
+        )
+
     def test_query_param_clf(self):
         add_test_cases = [
             (SVC(), TypeError),
@@ -187,6 +201,117 @@ class TestUncertaintySampling(
         self.assertEqual(query_idx.shape, (2,))
         self.assertEqual(utilities.shape, (2, len(query_params["X"])))
         self.assertTrue(np.isnan(utilities[:, :2]).all())
+
+    def test_query_reuses_fitted_multilabel_target_spec(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+        ).fit(X, y_fit)
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        strategy = UncertaintySampling(target_type="auto", random_state=0)
+
+        query_idx, utilities = strategy.query(
+            X,
+            y_query,
+            clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+        self.assertFalse(hasattr(strategy, "target_spec_"))
+
+    def test_query_fits_explicit_multilabel_without_declared_classes(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+        )
+
+        query_idx, utilities = UncertaintySampling(random_state=0).query(
+            X, y, clf, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], [4, 5])
+        self.assertTrue(np.isnan(utilities[0, :4]).all())
+
+    def test_multilabel_capability_failure_precedes_acquisition_state(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y)
+        strategy = UncertaintySampling(method="expected_average_precision")
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            strategy.query(X, y, clf, fit_clf=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
+    def test_ambiguous_resolution_failure_precedes_acquisition_state(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(estimator=MultiOutputClassifier(GaussianNB()))
+        strategy = UncertaintySampling()
+
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            strategy.query(X, y, clf, fit_clf=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
+    def test_default_single_output_classifier_query_remains_supported(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, 1.0, np.nan, np.nan])
+        clf = SklearnClassifier(estimator=GaussianNB()).fit(X, y)
+
+        query_idx = UncertaintySampling(random_state=0).query(
+            X, y, clf, fit_clf=False
+        )
+
+        self.assertEqual(clf.target_spec_.target_type, "single-output")
+        self.assertIn(query_idx[0], [2, 3])
 
     def test_query_multilabel_multiclass_list_probas_raises(self):
         query_params = {

@@ -16,6 +16,7 @@ from ._label import (
 from ._label_encoder import ExtLabelEncoder
 from ._multi_annot import ext_confusion_matrix
 from ._selection import rand_argmax, rand_argmin, simple_batch
+from ._target import TargetSpec, resolve_target_spec
 from ._validation import (
     check_classes,
     check_scalar,
@@ -66,6 +67,8 @@ __all__ = [
     "_check_callable",
     "_check_forward_outputs",
     "_is_multioutput_classes",
+    "TargetSpec",
+    "resolve_target_spec",
 ]
 
 try:

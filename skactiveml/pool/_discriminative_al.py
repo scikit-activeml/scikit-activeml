@@ -164,7 +164,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             y_discriminator = is_unlabeled(
                 y=y,
                 missing_label=self.missing_label,
-                is_multioutput=is_multioutput,
+                target_type=(
+                    "multi-label" if is_multioutput else "single-output"
+                ),
             )
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
@@ -192,7 +194,9 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
                 y_discriminator = is_unlabeled(
                     y=y,
                     missing_label=self.missing_label,
-                    is_multioutput=is_multioutput,
+                    target_type=(
+                        "multi-label" if is_multioutput else "single-output"
+                    ),
                 )
                 y_discriminator = y_discriminator.astype(int)
 

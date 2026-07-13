@@ -56,7 +56,7 @@ class TestLabelCardinalityInconsistency(unittest.TestCase):
             ]
         )
         self.unld_idx = unlabeled_indices(
-            self.y, missing_label=MISSING_LABEL, is_multioutput=True
+            self.y, missing_label=MISSING_LABEL, target_type="multi-label"
         )
         self.clf = SklearnClassifier(
             estimator=MultiOutputClassifier(GaussianNB()),

@@ -151,7 +151,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
 
         # Determine unlabeled vs. labeled samples.
         lbld_mask = ~is_unlabeled(
-            y, missing_label=self.missing_label_, is_multioutput=True
+            y, missing_label=self.missing_label_, target_type="multi-label"
         )
         if mapping is None:
             cand_mask = np.ones(len(X_cand), dtype=bool)
@@ -159,7 +159,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
             cand_mask = is_unlabeled(
                 y[mapping],
                 missing_label=self.missing_label_,
-                is_multioutput=True,
+                target_type="multi-label",
             )
         X_unlbld = X_cand[cand_mask]
 

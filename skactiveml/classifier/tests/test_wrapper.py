@@ -6,6 +6,7 @@ import inspect
 from copy import deepcopy
 import numpy as np
 from sklearn.datasets import make_blobs
+from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import BaggingClassifier, RandomForestClassifier
 from sklearn.gaussian_process import (
@@ -372,6 +373,126 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         y_pred = clf.predict(X)
         self.assertEqual(y_pred.shape, y.shape)
 
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("invalid", ValueError),
+                (1, ValueError),
+                ("multi-label", ValueError),
+                ("multi-output", ValueError),
+            ],
+        )
+
+    def test_explicit_multilabel_without_declared_classes_resolves_on_fit(
+        self,
+    ):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            missing_label=-1,
+            target_type="multi-label",
+        )
+
+        clf.fit(self.X_ml, self.y_ml)
+
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
+        self.assertEqual(clf.target_spec_.classes, ((0, 1), (0, 1)))
+        for classes_i in clf.classes_:
+            np.testing.assert_array_equal(classes_i, [0, 1])
+
+    def test_multilabel_resolution_failure_does_not_commit_fitted_state(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=None,
+            target_type="multi-label",
+        )
+        y = np.array([[0, 1], [1, np.nan], [np.nan, np.nan]])
+
+        with self.assertRaisesRegex(ValueError, "no mixing within a row"):
+            clf.fit(np.arange(3).reshape(-1, 1), y)
+
+        self.assertFalse(hasattr(clf, "target_spec_"))
+        self.assertFalse(hasattr(clf, "classes_"))
+        self.assertFalse(hasattr(clf, "estimator_"))
+
+    def test_multioutput_capability_failure_does_not_commit_fitted_state(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1, 2], [0, 1]],
+            target_type="multi-output",
+        )
+        y = np.array([[0, 1], [1, 0], [2, 1]])
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            clf.fit(np.arange(3).reshape(-1, 1), y)
+
+        self.assertFalse(hasattr(clf, "target_spec_"))
+        self.assertFalse(hasattr(clf, "classes_"))
+        self.assertFalse(hasattr(clf, "estimator_"))
+
+    def test_explicit_multilabel_uses_resolved_order_for_public_outputs(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [
+                [7.0, 4.0],
+                [3.0, -2.0],
+                [7.0, 4.0],
+                [7.0, 4.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(DummyClassifier(strategy="prior")),
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        ).fit(X, y)
+
+        probabilities = clf.predict_proba(X)
+        predictions = clf.predict(X)
+
+        self.assertEqual(clf.target_spec_.classes, ((3.0, 7.0), (-2.0, 4.0)))
+        np.testing.assert_allclose(probabilities, 0.75)
+        np.testing.assert_array_equal(
+            predictions, np.tile([7.0, 4.0], (len(X), 1))
+        )
+        self.assertEqual(clf.score(X[:4], y[:4]), 0.75)
+
+    def test_explicit_multilabel_fallback_uses_resolved_class_order(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [
+                [7.0, 4.0],
+                [3.0, -2.0],
+                [7.0, -2.0],
+                [7.0, 4.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            clf.fit(X, y)
+            probabilities = clf.predict_proba(X)
+            predictions = clf.predict(X)
+
+        np.testing.assert_allclose(probabilities[:, 0], 0.75)
+        np.testing.assert_allclose(probabilities[:, 1], 0.5)
+        self.assertTrue(np.isin(predictions[:, 0], [3.0, 7.0]).all())
+        self.assertTrue(np.isin(predictions[:, 1], [-2.0, 4.0]).all())
+
     def test_multilabel_signature_uses_Y(self):
         clf = SklearnClassifier(
             estimator=MultiOutputClassifier(GaussianNB()),
@@ -726,15 +847,18 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
             np.testing.assert_array_equal(P_j[:, 1], np.zeros(len(self.X_ml)))
 
     def test_proba_format_resolution(self):
-        clf = self._prefit_multilabel_clf(classes=[[0, 1, 2], [0, 1]])
+        clf = self._prefit_multilabel_clf()
         clf.proba_format = "invalid"
         self.assertRaises(ValueError, clf._resolve_proba_format)
 
         clf.proba_format = "auto"
-        self.assertEqual(clf._resolve_proba_format(), "list")
+        self.assertEqual(clf._resolve_proba_format(), "array")
 
         clf.proba_format = "array"
-        self.assertRaises(ValueError, clf._resolve_proba_format)
+        self.assertEqual(clf._resolve_proba_format(), "array")
+
+        clf.proba_format = "list"
+        self.assertEqual(clf._resolve_proba_format(), "list")
 
     def test_pipeline(self):
         X, y_true = make_blobs(100, centers=2, random_state=0)

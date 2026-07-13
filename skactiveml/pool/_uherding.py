@@ -348,7 +348,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         labeled_idx = labeled_indices(
             y=y,
             missing_label=self.missing_label_,
-            is_multioutput=is_multioutput,
+            target_type=("multi-label" if is_multioutput else "single-output"),
         )
         X_labeled_repr = None
         if len(labeled_idx) > 0:
@@ -427,7 +427,7 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
         labeled_idx = labeled_indices(
             y=y,
             missing_label=self.missing_label_,
-            is_multioutput=is_multioutput,
+            target_type=("multi-label" if is_multioutput else "single-output"),
         )
         if len(labeled_idx) < 2:
             return self._default_temperature(y, is_multioutput)

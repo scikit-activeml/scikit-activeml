@@ -163,7 +163,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         is_lbld = is_labeled(
             y=y,
             missing_label=self.missing_label_,
-            is_multioutput=is_multioutput,
+            target_type=("multi-label" if is_multioutput else "single-output"),
         )
         seed_multiplier = int(is_lbld.sum() + 1)
         max_candidates = self.max_candidates
@@ -203,7 +203,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             candidate_indices = unlabeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                is_multioutput=is_multioutput,
+                target_type=(
+                    "multi-label" if is_multioutput else "single-output"
+                ),
             )
             # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
@@ -240,7 +242,9 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             all_labeled = labeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                is_multioutput=is_multioutput,
+                target_type=(
+                    "multi-label" if is_multioutput else "single-output"
+                ),
             )
             if candidates is not None and candidates.ndim > 1:
                 subset_and_labeled_indices = all_labeled
