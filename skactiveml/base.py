@@ -1553,11 +1553,39 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     random_state : int, RandomState or None, default=None
         Determines random number for `fit` and `predict` method. Pass an int
         for reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+        Declared target type. Multi-output regression is recognized but not
+        supported for execution in version 1.1.
     """
 
-    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
+    ):
         self.missing_label = missing_label
         self.random_state = random_state
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        """Exact target semantics supported by regressors in version 1.1."""
+        return frozenset({("regression", "single-output", "single-annotator")})
+
+    def _resolve_target_spec(self, y):
+        target_spec = resolve_target_spec(
+            y,
+            task="regression",
+            target_type=self.target_type,
+            annotation_type="single-annotator",
+            classes=None,
+            missing_label=self.missing_label,
+        )
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -1607,6 +1635,8 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         y_ensure_1d=True,
         reset=True,
     ):
+        target_spec = self._resolve_target_spec(y)
+
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
         if check_y_dict is None:
@@ -1641,6 +1671,8 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         X = check_array(X, **check_X_dict)
         check_consistent_length(X, y)
         check_n_features(self, X, reset=reset)
+
+        self.target_spec_ = target_spec
 
         return X, y, sample_weight
 

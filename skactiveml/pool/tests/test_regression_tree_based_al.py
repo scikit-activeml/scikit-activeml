@@ -47,6 +47,62 @@ class TestRegressionTreeBasedAL(
         ]
         self._test_param("init", "method", test_cases)
 
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-output", ValueError),
+                ("multi-label", ValueError),
+                ("invalid", ValueError),
+            ],
+        )
+
+    def test_query_uses_fitted_regressor_target_spec(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
+        ).fit(X, y)
+
+        query_idx = RegressionTreeBasedAL(random_state=0).query(
+            X, y, reg, fit_reg=False
+        )
+
+        self.assertIn(query_idx[0], [4, 5])
+
+    def test_multi_output_failure_precedes_acquisition_state(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.arange(12, dtype=float).reshape(6, 2)
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
+        ).fit(X, np.arange(6, dtype=float))
+        strategy = RegressionTreeBasedAL()
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            strategy.query(X, y, reg, fit_reg=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+
+    def test_strategy_target_type_errors_are_semantic(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.arange(6, dtype=float)
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0)
+        ).fit(X, y)
+
+        with self.assertRaisesRegex(ValueError, "must be one of"):
+            RegressionTreeBasedAL(target_type="invalid").query(
+                X, y, reg, fit_reg=False
+            )
+        with self.assertRaisesRegex(ValueError, "requires classification"):
+            RegressionTreeBasedAL(target_type="multi-label").query(
+                X, y, reg, fit_reg=False
+            )
+
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []
         test_cases += [

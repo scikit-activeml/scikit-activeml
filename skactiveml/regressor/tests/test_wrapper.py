@@ -93,6 +93,27 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         reg_2.fit(X, y)
         self.assertTrue(np.any(reg_1.predict(X) != reg_2.predict(X)))
 
+    def test_column_vector_preserves_single_output_regression(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float).reshape(-1, 1)
+        reg = SklearnRegressor(LinearRegression())
+
+        reg.fit(X, y)
+
+        self.assertEqual(reg.target_spec_.target_type, "single-output")
+        self.assertEqual(reg.predict([[8.0]]).shape, (1,))
+
+    def test_multi_output_capability_failure_precedes_fitted_state(self):
+        X = np.arange(8, dtype=float).reshape(4, 2)
+        y = np.arange(8, dtype=float).reshape(4, 2)
+        reg = SklearnRegressor(LinearRegression())
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            reg.fit(X, y)
+
+        self.assertFalse(hasattr(reg, "target_spec_"))
+        self.assertFalse(hasattr(reg, "estimator_"))
+
     def test_fit(self):
         class DummyRegressor(SkactivemlRegressor):
             def predict(self, X):

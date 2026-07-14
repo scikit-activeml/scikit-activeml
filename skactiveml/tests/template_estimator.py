@@ -838,6 +838,35 @@ class TemplateSkactivemlRegressor(TemplateEstimator):
         # ("nan", TypeError),
         super().test_init_param_missing_label(test_cases)
 
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-output", ValueError),
+                ("multi-label", ValueError),
+                ("invalid", ValueError),
+            ],
+        )
+
+    def test_fitted_target_spec_is_single_output_regression(self):
+        estimator = self.estimator_class(**self.init_default_params)
+
+        estimator.fit(**self.fit_default_params)
+
+        self.assertEqual(
+            estimator._target_capabilities,
+            frozenset({("regression", "single-output", "single-annotator")}),
+        )
+        self.assertEqual(estimator.target_spec_.task, "regression")
+        self.assertEqual(estimator.target_spec_.target_type, "single-output")
+        self.assertEqual(
+            estimator.target_spec_.annotation_type, "single-annotator"
+        )
+        self.assertIsNone(estimator.target_spec_.classes)
+
     def test_fit_param_X(self, test_cases=None):
         super().test_fit_param_X(test_cases)
         test_cases = [([], None)]

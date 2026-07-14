@@ -58,6 +58,9 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+        Declared target type. Multi-output regression is recognized but not
+        supported for execution in version 1.1.
     """
 
     def __init__(
@@ -66,9 +69,12 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         include_unlabeled_samples=False,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
@@ -374,13 +380,23 @@ class SklearnNormalRegressor(ProbabilisticRegressor, SklearnRegressor):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+        Declared target type. Multi-output regression is recognized but not
+        supported for execution in version 1.1.
     """
 
     def __init__(
-        self, estimator, missing_label=MISSING_LABEL, random_state=None
+        self,
+        estimator,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            estimator, missing_label=missing_label, random_state=random_state
+            estimator,
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
 
     def _fit(self, fit_function, X, y, sample_weight, **fit_kwargs):
@@ -566,6 +582,10 @@ if successful_skorch_torch_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for 'predict' method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : {"auto", "single-output", "multi-output"}, \
+                default="auto"
+            Declared target type. Multi-output regression is recognized but
+            not supported for execution in version 1.1.
 
         References
         ----------
@@ -585,10 +605,12 @@ if successful_skorch_torch_import:
             include_unlabeled_samples=False,
             missing_label=MISSING_LABEL,
             random_state=None,
+            target_type="auto",
         ):
             super(SkorchRegressor, self).__init__(
                 missing_label=missing_label,
                 random_state=random_state,
+                target_type=target_type,
             )
             self.module = module
             self.criterion = criterion
