@@ -62,6 +62,18 @@ except ImportError:  # pragma: no cover
     pass
 
 
+def _reuse_established_target_spec(resolved_spec, established_spec=None):
+    if established_spec is None:
+        return resolved_spec
+    if resolved_spec != established_spec:
+        raise ValueError(
+            "Incremental fitting cannot change the established target "
+            f"specification {established_spec!r}; received "
+            f"{resolved_spec!r}."
+        )
+    return established_spec
+
+
 class QueryStrategy(ABC, BaseEstimator):
     """Base class for all query strategies in scikit-activeml.
 
@@ -1125,19 +1137,28 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             {("classification", "single-output", "single-annotator")}
         )
 
-    def _resolve_target_spec(self, y):
+    def _resolve_target_spec(self, y, classes=None):
         target_spec = resolve_target_spec(
             y,
             task="classification",
-            target_type="auto",
+            target_type=getattr(self, "target_type", "auto"),
             annotation_type="single-annotator",
-            classes=self.classes,
+            classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
         )
         check_target_capability(
             type(self).__name__, target_spec, self._target_capabilities
         )
         return target_spec
+
+    def _resolve_fitting_target_spec(
+        self, y, established_spec=None, classes=None
+    ):
+        classes = self.classes if classes is None else classes
+        if classes is None and established_spec is not None:
+            classes = established_spec.classes
+        resolved_spec = self._resolve_target_spec(y, classes=classes)
+        return _reuse_established_target_spec(resolved_spec, established_spec)
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -1265,6 +1286,15 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         multioutput_ensure_multilabel=False,
         target_spec=None,
     ):
+        resolves_target_spec = getattr(
+            self, "_resolve_target_spec_on_validate", False
+        )
+        if target_spec is None and resolves_target_spec:
+            target_spec = self._resolve_fitting_target_spec(y)
+        elif target_spec is not None:
+            target_spec = self._resolve_fitting_target_spec(
+                y, established_spec=target_spec
+            )
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
         if check_y_dict is None:
@@ -1372,6 +1402,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 class_indices = np.argsort(self.classes)
                 self.cost_matrix_ = self.cost_matrix_[class_indices]
                 self.cost_matrix_ = self.cost_matrix_[:, class_indices]
+
+        if target_spec is not None:
+            self.target_spec_ = target_spec
 
         return X, y, sample_weight
 
@@ -1587,6 +1620,10 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         )
         return target_spec
 
+    def _resolve_fitting_target_spec(self, y, established_spec=None):
+        resolved_spec = self._resolve_target_spec(y)
+        return _reuse_established_target_spec(resolved_spec, established_spec)
+
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
         """Fit the model using `X` as training data and y as numerical labels.
@@ -1634,8 +1671,11 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
         check_y_dict=None,
         y_ensure_1d=True,
         reset=True,
+        target_spec=None,
     ):
-        target_spec = self._resolve_target_spec(y)
+        target_spec = self._resolve_fitting_target_spec(
+            y, established_spec=target_spec
+        )
 
         if check_X_dict is None:
             check_X_dict = {"ensure_min_samples": 0, "ensure_min_features": 0}
@@ -1862,6 +1902,8 @@ if successful_skorch_torch_import:
                 _, X, y = self.initialize(X=X, y=y, enforce_check_X_y=True)
             else:
                 vd_kwargs = self._validate_data_kwargs()
+                if hasattr(self, "target_spec_"):
+                    vd_kwargs["target_spec"] = self.target_spec_
                 X, y, _ = self._validate_data(X=X, y=y, **vd_kwargs)
 
             X_train, y_train = self._return_training_data(X=X, y=y)

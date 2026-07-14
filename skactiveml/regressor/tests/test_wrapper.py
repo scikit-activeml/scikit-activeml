@@ -161,6 +161,49 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         reg_no_partial_fit = SklearnRegressor(GaussianProcessRegressor())
         self.assertFalse(hasattr(reg_no_partial_fit, "partial_fit"))
 
+    def test_partial_fit_reuses_established_target_spec_and_estimator(self):
+        reg = SklearnRegressor(SGDRegressor(random_state=0))
+        X = np.array([[0.0], [1.0], [2.0]])
+
+        reg.partial_fit(X, np.array([0.0, 1.0, 2.0]))
+        established_spec = reg.target_spec_
+        established_estimator = reg.estimator_
+
+        reg.partial_fit(X[:1], np.array([3.0]))
+
+        self.assertIs(reg.target_spec_, established_spec)
+        self.assertIs(reg.estimator_, established_estimator)
+
+    def test_partial_fit_rejects_changed_target_type_before_mutating_state(
+        self,
+    ):
+        reg = SklearnRegressor(SGDRegressor(random_state=0))
+        X = np.array([[0.0], [1.0]])
+        reg.partial_fit(X, np.array([0.0, 1.0]))
+        established_spec = reg.target_spec_
+        established_estimator = reg.estimator_
+        established_coef = reg.estimator_.coef_.copy()
+
+        reg.target_type = "multi-output"
+        with self.assertRaises(ValueError):
+            reg.partial_fit(X, np.array([[0.0, 1.0], [1.0, 0.0]]))
+
+        self.assertIs(reg.target_spec_, established_spec)
+        self.assertIs(reg.estimator_, established_estimator)
+        np.testing.assert_array_equal(reg.estimator_.coef_, established_coef)
+
+    def test_fit_reinitializes_target_spec_after_partial_fit(self):
+        reg = SklearnRegressor(SGDRegressor(random_state=0))
+        X = np.array([[0.0], [1.0]])
+        reg.partial_fit(X, np.array([0.0, 1.0]))
+        established_spec = reg.target_spec_
+        established_estimator = reg.estimator_
+
+        reg.fit(X, np.array([2.0, 3.0]))
+
+        self.assertIsNot(reg.target_spec_, established_spec)
+        self.assertIsNot(reg.estimator_, established_estimator)
+
     def test_predict(self):
         reg = SklearnRegressor(
             estimator=ARDRegression(),
@@ -689,6 +732,70 @@ if successful_skorch_torch_import:
             reg.partial_fit(self.X, self.y_ulbld)
             y_pred_1 = reg.predict(self.X)
             np.testing.assert_almost_equal(y_pred_0, y_pred_1)
+
+        def test_partial_fit_reuses_target_spec_and_network(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["neural_net_param_dict"]["max_epochs"] = 1
+            reg = SkorchRegressor(**init_params)
+            reg.partial_fit(self.X, self.y)
+            established_spec = reg.target_spec_
+            established_net = reg.neural_net_
+
+            reg.partial_fit(self.X[:2], self.y[:2])
+
+            self.assertIs(reg.target_spec_, established_spec)
+            self.assertIs(reg.neural_net_, established_net)
+            self.assertIsNone(reg.target_spec_.classes)
+
+        def test_warm_start_fit_reuses_target_spec(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["neural_net_param_dict"].update(
+                {"max_epochs": 1, "warm_start": True}
+            )
+            reg = SkorchRegressor(**init_params)
+            reg.fit(self.X, self.y)
+            established_spec = reg.target_spec_
+            established_net = reg.neural_net_
+
+            reg.fit(self.X[:2], self.y[:2])
+
+            self.assertIs(reg.target_spec_, established_spec)
+            self.assertIs(reg.neural_net_, established_net)
+
+        def test_reinitializing_fit_resolves_new_target_spec(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["neural_net_param_dict"].update(
+                {"max_epochs": 1, "warm_start": False}
+            )
+            reg = SkorchRegressor(**init_params)
+            reg.fit(self.X, self.y)
+            established_spec = reg.target_spec_
+            established_net = reg.neural_net_
+
+            reg.fit(self.X, self.y + 1)
+
+            self.assertIsNot(reg.target_spec_, established_spec)
+            self.assertIsNot(reg.neural_net_, established_net)
+
+        def test_partial_fit_rejects_changed_target_type_before_training(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["neural_net_param_dict"]["max_epochs"] = 1
+            reg = SkorchRegressor(**init_params)
+            reg.partial_fit(self.X, self.y)
+            established_spec = reg.target_spec_
+            established_weights = to_numpy(
+                deepcopy(reg.neural_net_.module_.input_to_hidden.weight)
+            )
+
+            reg.target_type = "multi-output"
+            with self.assertRaises(ValueError):
+                reg.partial_fit(self.X, np.column_stack([self.y, self.y]))
+
+            self.assertIs(reg.target_spec_, established_spec)
+            np.testing.assert_array_equal(
+                to_numpy(reg.neural_net_.module_.input_to_hidden.weight),
+                established_weights,
+            )
 
         def test_predict(self):
             init_default_params = self.init_default_params.copy()

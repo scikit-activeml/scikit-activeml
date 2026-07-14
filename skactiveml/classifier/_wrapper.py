@@ -461,7 +461,27 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         ]
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
-        target_spec = self._resolve_target_spec(y)
+        is_incremental = fit_function == "partial_fit"
+        established_spec = (
+            getattr(self, "target_spec_", None) if is_incremental else None
+        )
+        supplied_classes = (
+            fit_kwargs.get("classes") if is_incremental else None
+        )
+        if supplied_classes is not None and self.classes is not None:
+            configured_spec = self._resolve_fitting_target_spec(
+                y, classes=self.classes
+            )
+            self._resolve_fitting_target_spec(
+                y,
+                established_spec=configured_spec,
+                classes=supplied_classes,
+            )
+        target_spec = self._resolve_fitting_target_spec(
+            y,
+            established_spec=established_spec,
+            classes=supplied_classes,
+        )
 
         # Check input parameters.
         self.check_X_dict_ = {
@@ -1376,6 +1396,10 @@ if successful_skorch_torch_import:
               inference fails, default to `np.int64`.
             - Otherwise, cast targets via
               `y_enc.astype(target_dtype, copy=False)`.
+        target_type : {"auto", "single-output", "multi-label", \
+                "multi-output"}, default="auto"
+            Declared target type. Multi-label classification is supported;
+            multi-output classification is recognized but unsupported.
         include_unlabeled_samples : bool, default=False
             - If `False`, only labeled samples are passed to the `fit` method
               of the estimator.
@@ -1426,6 +1450,7 @@ if successful_skorch_torch_import:
             missing_label=MISSING_LABEL,
             random_state=None,
             target_dtype=None,
+            target_type="auto",
         ):
             super(SkorchClassifier, self).__init__(
                 classes=classes,
@@ -1440,7 +1465,18 @@ if successful_skorch_torch_import:
             self.neural_net_param_dict = neural_net_param_dict
             self.sample_dtype = sample_dtype
             self.target_dtype = target_dtype
+            self.target_type = target_type
+            self._resolve_target_spec_on_validate = True
             self.include_unlabeled_samples = include_unlabeled_samples
+
+        @property
+        def _target_capabilities(self):
+            return frozenset(
+                {
+                    ("classification", "single-output", "single-annotator"),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            )
 
         def fit(self, X, y, **fit_params):
             """Initialize and fit the module.
@@ -1647,11 +1683,18 @@ if successful_skorch_torch_import:
                 return self.forward_outputs
 
             # No explicit mapping: handle common single-output cases.
-            crit_cls = (
-                self.criterion
-                if isinstance(self.criterion, type)
-                else self.criterion.__class__
-            )
+            if self.criterion is None:
+                crit_cls = (
+                    nn.BCEWithLogitsLoss
+                    if self._uses_multilabel_target()
+                    else nn.CrossEntropyLoss
+                )
+            else:
+                crit_cls = (
+                    self.criterion
+                    if isinstance(self.criterion, type)
+                    else self.criterion.__class__
+                )
 
             if crit_cls is nn.CrossEntropyLoss:
                 # Single-output network returning logits.
@@ -1669,6 +1712,12 @@ if successful_skorch_torch_import:
             # Fallback: treat the single forward output as already in
             # probability space. Caller is responsible for making this true.
             return {"proba": (0, None)}
+
+        def _uses_multilabel_target(self):
+            target_spec = getattr(self, "target_spec_", None)
+            if target_spec is not None:
+                return target_spec.target_type == "multi-label"
+            return _is_multioutput_classes(classes=self.classes)
 
         def _net_parts(self, X=None, y=None):
             """Assemble and validate network components.
@@ -1699,7 +1748,7 @@ if successful_skorch_torch_import:
                 empty.
             """
             if self.criterion is None:
-                if _is_multioutput_classes(classes=self.classes):
+                if self._uses_multilabel_target():
                     criterion = nn.BCEWithLogitsLoss
                 else:
                     criterion = nn.CrossEntropyLoss

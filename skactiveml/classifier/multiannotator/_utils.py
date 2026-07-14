@@ -114,6 +114,7 @@ try:
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
             )
+            self._resolve_target_spec_on_validate = False
             self.clf_module = clf_module
             self.n_annotators = n_annotators
 

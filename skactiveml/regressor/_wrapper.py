@@ -158,12 +158,22 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             "dtype": None,
         }
 
+        established_spec = (
+            getattr(self, "target_spec_", None)
+            if fit_function == "partial_fit"
+            else None
+        )
+        target_spec = self._resolve_fitting_target_spec(
+            y, established_spec=established_spec
+        )
+
         X, y, sample_weight = self._validate_data(
             X,
             y,
             sample_weight,
             check_X_dict=self.check_X_dict_,
             reset=fit_function == "fit" or not hasattr(self, "n_features_in_"),
+            target_spec=target_spec,
         )
 
         is_lbld = is_labeled(y, missing_label=self.missing_label_)
@@ -180,7 +190,8 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
 
         self._label_mean = np.mean(y[is_lbld]) if np.sum(is_lbld) > 0 else 0
         self._label_std = np.std(y[is_lbld]) if np.sum(is_lbld) > 1 else 1
-        self.estimator_ = deepcopy(self.estimator)
+        if fit_function != "partial_fit" or not hasattr(self, "estimator_"):
+            self.estimator_ = deepcopy(self.estimator)
         try:
             attrgetter(fit_function)(self.estimator_)(
                 X_train, y_train, **estimator_params

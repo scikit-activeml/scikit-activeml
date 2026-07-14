@@ -266,6 +266,115 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         )
         self.assertFalse(hasattr(clf, "partial_fit"))
 
+    def test_partial_fit_reuses_established_target_spec(self):
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+
+        clf.partial_fit(X, np.array([0, 1, 0, 1]))
+        established_spec = clf.target_spec_
+
+        clf.partial_fit(X[:2], np.array([1, 1]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertEqual(clf.target_spec_.classes, (0, 1))
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+
+    def test_first_partial_fit_uses_supplied_class_vocabulary(self):
+        clf = SklearnClassifier(
+            estimator=SGDClassifier(loss="log_loss", random_state=0),
+            missing_label=-1,
+        )
+        X = np.array([[0.0], [1.0]])
+
+        clf.partial_fit(X, np.array([0, 0]), classes=[0, 1])
+
+        self.assertEqual(clf.target_spec_.classes, (0, 1))
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+        np.testing.assert_array_equal(clf.estimator_.classes_, [0, 1])
+        self.assertTrue(clf.is_fitted_)
+
+    def test_partial_fit_rejects_unseen_class_before_mutating_state(self):
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        clf.partial_fit(X, np.array([0, 1, 0, 1]))
+        established_spec = clf.target_spec_
+        established_counts = clf.estimator_.class_count_.copy()
+
+        with self.assertRaisesRegex(ValueError, "class"):
+            clf.partial_fit(X[:1], np.array([2]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        np.testing.assert_array_equal(
+            clf.estimator_.class_count_, established_counts
+        )
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+
+    def test_partial_fit_reuses_multilabel_vocabularies(self):
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            missing_label=-1,
+            target_type="multi-label",
+            proba_format="array",
+        )
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        y = np.array([[0, 1], [1, 0], [0, 1], [1, 0]])
+        clf.partial_fit(X, y)
+        established_spec = clf.target_spec_
+
+        clf.partial_fit(X[:2], np.array([[1, 0], [1, 0]]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertEqual(clf.target_spec_.classes, ((0, 1), (0, 1)))
+        for classes in clf.classes_:
+            np.testing.assert_array_equal(classes, [0, 1])
+
+    def test_partial_fit_rejects_changed_target_declaration(self):
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+        established_counts = clf.estimator_.class_count_.copy()
+
+        clf.target_type = "multi-label"
+        with self.assertRaises(ValueError):
+            clf.partial_fit(X, np.array([0, 1]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        np.testing.assert_array_equal(
+            clf.estimator_.class_count_, established_counts
+        )
+
+    def test_partial_fit_rejects_changed_class_vocabulary(self):
+        clf = SklearnClassifier(
+            estimator=GaussianNB(), classes=[0, 1], missing_label=-1
+        )
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+        established_estimator = clf.estimator_
+
+        clf.classes = [0, 2]
+        with self.assertRaises(ValueError):
+            clf.partial_fit(X[:1], np.array([0]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertIs(clf.estimator_, established_estimator)
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+
+    def test_fit_reinitializes_target_spec_after_partial_fit(self):
+        clf = SklearnClassifier(estimator=GaussianNB(), missing_label=-1)
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        clf.partial_fit(X, np.array([0, 1, 0, 1]))
+        established_spec = clf.target_spec_
+
+        clf.fit(X, np.array([2, 3, 2, 3]))
+
+        self.assertIsNot(clf.target_spec_, established_spec)
+        self.assertEqual(clf.target_spec_.classes, (2, 3))
+        np.testing.assert_array_equal(clf.classes_, [2, 3])
+
         # Test semi-supervised learning.
         X, y = make_blobs(
             centers=10, n_samples=200, random_state=0, shuffle=True
@@ -1665,6 +1774,19 @@ if successful_skorch_torch_import:
             test_cases += [(None, None), (np.int64, None)]
             self._test_param("init", "target_dtype", test_cases)
 
+        def test_init_param_target_type(self):
+            self._test_param(
+                "init",
+                "target_type",
+                [
+                    ("auto", None),
+                    ("single-output", None),
+                    ("multi-label", ValueError),
+                    ("multi-output", ValueError),
+                    ("invalid", ValueError),
+                ],
+            )
+
         def test_init_param_include_unlabeled_samples(self, test_cases=None):
             test_cases = [] if test_cases is None else test_cases
             test_cases += [
@@ -1822,6 +1944,97 @@ if successful_skorch_torch_import:
             predict_proba_1 = clf.predict_proba(self.X)
             np.testing.assert_almost_equal(predict_proba_0, predict_proba_1)
 
+        def test_partial_fit_reuses_resolved_multilabel_target_spec(self):
+            init_params = self.init_default_params.copy()
+            init_params.update(
+                {
+                    "classes": None,
+                    "missing_label": -1,
+                    "target_type": "multi-label",
+                }
+            )
+            clf = SkorchClassifier(**init_params)
+
+            clf.partial_fit(self.X_ml, self.y_ml)
+            established_spec = clf.target_spec_
+            established_net = clf.neural_net_
+
+            clf.partial_fit(
+                self.X_ml[:2], np.array([[1, 0], [1, 0]], dtype=np.float32)
+            )
+
+            self.assertIs(clf.target_spec_, established_spec)
+            self.assertIs(clf.neural_net_, established_net)
+            self.assertEqual(clf.target_spec_.classes, ((0.0, 1.0),) * 2)
+            for classes in clf.classes_:
+                np.testing.assert_array_equal(classes, [0.0, 1.0])
+            probabilities = clf.predict_proba(self.X_ml)
+            self.assertTrue(np.all(probabilities >= 0))
+            self.assertTrue(np.all(probabilities <= 1))
+
+        def test_partial_fit_rejects_unseen_multilabel_class_before_training(
+            self,
+        ):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(
+                {
+                    "classes": None,
+                    "missing_label": -1,
+                    "target_type": "multi-label",
+                }
+            )
+            init_params["neural_net_param_dict"]["max_epochs"] = 1
+            clf = SkorchClassifier(**init_params)
+            clf.partial_fit(self.X_ml, self.y_ml)
+            established_spec = clf.target_spec_
+            established_weights = to_numpy(
+                deepcopy(clf.neural_net_.module_.input_to_hidden.weight)
+            )
+
+            invalid_y = self.y_ml[:1].copy()
+            invalid_y[0, 0] = 2
+            with self.assertRaisesRegex(ValueError, "class"):
+                clf.partial_fit(self.X_ml[:1], invalid_y)
+
+            self.assertIs(clf.target_spec_, established_spec)
+            np.testing.assert_array_equal(
+                to_numpy(clf.neural_net_.module_.input_to_hidden.weight),
+                established_weights,
+            )
+
+        def test_warm_start_fit_reuses_target_spec(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["neural_net_param_dict"].update(
+                {"max_epochs": 1, "warm_start": True}
+            )
+            clf = SkorchClassifier(**init_params)
+            clf.fit(self.X, self.y_true)
+            established_spec = clf.target_spec_
+            established_net = clf.neural_net_
+
+            clf.fit(self.X[:2], np.array([0, 0], dtype=np.float32))
+
+            self.assertIs(clf.target_spec_, established_spec)
+            self.assertIs(clf.neural_net_, established_net)
+            np.testing.assert_array_equal(clf.classes_, [0, 1])
+
+        def test_reinitializing_fit_resolves_new_target_spec(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params["neural_net_param_dict"].update(
+                {"max_epochs": 1, "warm_start": False}
+            )
+            clf = SkorchClassifier(**init_params)
+            clf.fit(self.X, self.y_true)
+            established_spec = clf.target_spec_
+            established_net = clf.neural_net_
+
+            clf.fit(self.X, self.y_true + 2)
+
+            self.assertIsNot(clf.target_spec_, established_spec)
+            self.assertIsNot(clf.neural_net_, established_net)
+            self.assertEqual(clf.target_spec_.classes, (2, 3))
+            np.testing.assert_array_equal(clf.classes_, [2, 3])
+
         def test_predict(self):
             clf = SkorchClassifier(**self.init_default_params)
             clf.fit(**self.fit_default_params)
@@ -1871,6 +2084,23 @@ if successful_skorch_torch_import:
             )
             P = clf.predict_proba(self.X_ml)
             self.assertEqual(P.shape, self.y_ml.shape)
+
+        def test_multilabel_public_fallback_preserves_predictions(self):
+            init_params = deepcopy(self.init_default_params)
+            init_params.update(self.init_default_params_multilabel)
+            init_params["neural_net_param_dict"]["max_epochs"] = 1
+            clf = SkorchClassifier(**init_params)
+
+            probabilities_before = clf.predict_proba(self.X_ml)
+            clf.partial_fit(
+                self.X_ml,
+                np.full_like(self.y_ml, fill_value=-1),
+            )
+            probabilities_after = clf.predict_proba(self.X_ml)
+
+            np.testing.assert_array_equal(
+                probabilities_after, probabilities_before
+            )
 
         def test_skorch_helper_defaults(self):
             init_params = self.init_default_params.copy()
