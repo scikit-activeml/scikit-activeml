@@ -7,6 +7,7 @@ from sklearn import clone
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
+    ExtLabelEncoder,
     MISSING_LABEL,
     is_unlabeled,
     simple_batch,
@@ -189,7 +190,11 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         unlbld_probas = np.flip(np.sort(unlbld_probas, axis=1), axis=-1)
         unlbld_probas /= unlbld_probas.sum(axis=1, keepdims=True)
 
-        y_discriminator = y[lbld_mask].sum(axis=1).astype(int)
+        label_encoder = ExtLabelEncoder(
+            classes=target_spec.classes,
+            missing_label=self.missing_label_,
+        )
+        y_discriminator = label_encoder.fit_transform(y[lbld_mask]).sum(axis=1)
         discriminator.fit(lbld_probas, y_discriminator)
 
         unlbld_pred = discriminator.predict(unlbld_probas)

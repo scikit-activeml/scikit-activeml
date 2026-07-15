@@ -95,6 +95,35 @@ class MultilabelOnlyTargetSemanticsMixin:
         self.assertEqual(clf.target_type, "multi-label")
         self.assertFalse(hasattr(clf, "target_spec_"))
 
+    def test_query_supports_custom_binary_vocabularies(self):
+        missing_label = -1
+        y = np.array(
+            [
+                [0, 0],
+                [0, 5],
+                [2, 5],
+                *[[missing_label, missing_label] for _ in range(5)],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 2], [0, 5]],
+            missing_label=missing_label,
+            target_type="multi-label",
+            proba_format="array",
+            random_state=0,
+        )
+        strategy = self.strategy_class(
+            missing_label=missing_label, random_state=0
+        )
+
+        query_idx, utilities = self._query_strategy(
+            strategy, y, clf, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], range(3, len(y)))
+        self.assertTrue(np.isfinite(utilities[0, 3:]).all())
+
     def test_query_rejects_partially_observed_rows_before_state(self):
         clf = self.clf.fit(self.X, self.y)
         y = self.y.copy()

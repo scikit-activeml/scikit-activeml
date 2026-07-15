@@ -10,11 +10,16 @@ from skactiveml.pool import MaxLossReductionMaxConfidence
 from skactiveml.pool.tests._multilabel_target_semantics import (
     MultilabelOnlyTargetSemanticsMixin,
 )
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 
 
 class TestMaxLossReductionMaxConfidence(
-    MultilabelOnlyTargetSemanticsMixin, unittest.TestCase
+    MultilabelOnlyTargetSemanticsMixin,
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    unittest.TestCase,
 ):
     def setUp(self):
         self.X = np.linspace(0, 1, 16).reshape(8, 2)
@@ -46,6 +51,17 @@ class TestMaxLossReductionMaxConfidence(
         self.qs = MaxLossReductionMaxConfidence(random_state=0)
 
         self.strategy_class = MaxLossReductionMaxConfidence
+        TemplateSingleAnnotatorPoolQueryStrategy.setUp(
+            self,
+            qs_class=MaxLossReductionMaxConfidence,
+            init_default_params={"random_state": 0},
+            query_default_params_clf_multilabel={
+                "X": self.X,
+                "y": self.y,
+                "discriminator": self.discriminator,
+                "clf": self.clf,
+            },
+        )
 
     def _query_strategy(self, strategy, y, clf, **kwargs):
         return strategy.query(
@@ -56,7 +72,17 @@ class TestMaxLossReductionMaxConfidence(
             **kwargs,
         )
 
-    def test_query_candidate_variation(self):
+    def test_query_param_clf(self):
+        super().test_query_param_clf(test_cases=[])
+
+    def test_query_param_discriminator(self):
+        self._test_param(
+            "query",
+            "discriminator",
+            [("invalid", TypeError), (self.discriminator, None)],
+        )
+
+    def test_query(self):
         query_idx1, utilities1 = self.qs.query(
             self.X,
             self.y,

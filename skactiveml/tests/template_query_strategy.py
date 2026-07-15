@@ -66,12 +66,14 @@ class TemplateQueryStrategy:
         if (
             self.query_default_params_clf is None
             and self.query_default_params_reg is None
+            and self.query_default_params_clf_multilabel is None
         ):
             raise ValueError(
                 "The query strategies must support either "
                 "classification or regression. Hence, at least "
                 "one parameter of `query_default_params_clf` "
-                "and `query_default_params_reg` must be not None. "
+                "and `query_default_params_reg` or "
+                "`query_default_params_clf_multilabel` must be not None. "
                 "Use emtpy dictionary to use default values."
             )
         if self.query_default_params_clf is not None:
@@ -124,7 +126,11 @@ class TemplateQueryStrategy:
             for fit_type in fit_values:
                 with self.subTest(msg="Model consistency"):
                     if model_type == "clf":
-                        query_params = self.query_default_params_clf
+                        query_params = (
+                            self.query_default_params_clf
+                            if self.query_default_params_clf is not None
+                            else self.query_default_params_clf_multilabel
+                        )
                     elif model_type == "reg":
                         query_params = self.query_default_params_reg
                     else:
@@ -179,7 +185,11 @@ class TemplateQueryStrategy:
             # check if model remains the same
             with self.subTest(msg=f"{model_type} consistency"):
                 if model_type == "clf":
-                    query_params = self.query_default_params_clf
+                    query_params = (
+                        self.query_default_params_clf
+                        if self.query_default_params_clf is not None
+                        else self.query_default_params_clf_multilabel
+                    )
                 elif model_type == "reg":
                     query_params = self.query_default_params_reg
                 else:
@@ -250,10 +260,21 @@ class TemplateQueryStrategy:
                 for key, val in replace_init_params.items():
                     init_params[key] = val
 
-                for query_params, exclude_case in [
+                query_param_cases = [
                     (self.query_default_params_clf, exclude_clf),
                     (self.query_default_params_reg, exclude_reg),
-                ]:
+                ]
+                if (
+                    self.query_default_params_clf is None
+                    and self.query_default_params_reg is None
+                ):
+                    query_param_cases.append(
+                        (
+                            self.query_default_params_clf_multilabel,
+                            exclude_clf,
+                        )
+                    )
+                for query_params, exclude_case in query_param_cases:
                     if not (query_params is None or exclude_case):
                         query_params = deepcopy(query_params)
                         for key, val in replace_query_params.items():
@@ -294,11 +315,13 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
             query_default_params_reg,
             query_default_params_clf_multilabel,
         )
-        self.y_shape = list(
-            self.query_default_params_clf["y"].shape
-            if self.query_default_params_clf is not None
-            else self.query_default_params_reg["y"].shape
-        )
+        if self.query_default_params_clf is not None:
+            default_query_params = self.query_default_params_clf
+        elif self.query_default_params_reg is not None:
+            default_query_params = self.query_default_params_reg
+        else:
+            default_query_params = self.query_default_params_clf_multilabel
+        self.y_shape = list(default_query_params["y"].shape)
 
     def test_init_param_missing_label(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

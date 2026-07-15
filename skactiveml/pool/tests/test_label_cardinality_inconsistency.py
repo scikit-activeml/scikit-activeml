@@ -11,16 +11,23 @@ from skactiveml.pool import LabelCardinalityInconsistency
 from skactiveml.pool.tests._multilabel_target_semantics import (
     MultilabelOnlyTargetSemanticsMixin,
 )
+from skactiveml.tests.template_query_strategy import (
+    TemplateSingleAnnotatorPoolQueryStrategy,
+)
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 
 
 class DummyMultilabelClassifier(SkactivemlClassifier):
     last_sample_weight = None
 
-    def __init__(self, prediction=None, missing_label=MISSING_LABEL):
-        super().__init__(classes=[[0, 1], [0, 1]], missing_label=missing_label)
+    def __init__(
+        self, prediction=None, missing_label=MISSING_LABEL, classes=None
+    ):
+        classes = [[0, 1], [0, 1]] if classes is None else classes
+        super().__init__(classes=classes, missing_label=missing_label)
         self.prediction = [1, 0] if prediction is None else prediction
         self.missing_label = missing_label
+        self.classes = classes
         self.target_type = "multi-label"
 
     @property
@@ -54,7 +61,9 @@ class DummyMultilabelClassifier(SkactivemlClassifier):
 
 
 class TestLabelCardinalityInconsistency(
-    MultilabelOnlyTargetSemanticsMixin, unittest.TestCase
+    MultilabelOnlyTargetSemanticsMixin,
+    TemplateSingleAnnotatorPoolQueryStrategy,
+    unittest.TestCase,
 ):
     def setUp(self):
         self.X = np.linspace(0, 1, 16).reshape(8, 2)
@@ -83,11 +92,24 @@ class TestLabelCardinalityInconsistency(
         self.qs = LabelCardinalityInconsistency(random_state=0)
 
         self.strategy_class = LabelCardinalityInconsistency
+        TemplateSingleAnnotatorPoolQueryStrategy.setUp(
+            self,
+            qs_class=LabelCardinalityInconsistency,
+            init_default_params={"random_state": 0},
+            query_default_params_clf_multilabel={
+                "X": self.X,
+                "y": self.y,
+                "clf": self.clf,
+            },
+        )
 
     def _query_strategy(self, strategy, y, clf, **kwargs):
         return strategy.query(self.X, y, clf=clf, **kwargs)
 
-    def test_query_candidate_variation(self):
+    def test_query_param_clf(self):
+        super().test_query_param_clf(test_cases=[])
+
+    def test_query(self):
         query_idx1, utilities1 = self.qs.query(
             self.X, self.y, clf=self.clf, return_utilities=True
         )
@@ -180,3 +202,29 @@ class TestLabelCardinalityInconsistency(
         )
 
         np.testing.assert_allclose(utilities[0, self.unld_idx], 0)
+
+    def test_label_cardinality_uses_positive_class_vocabularies(self):
+        missing_label = -1
+        y = np.array(
+            [
+                [0, 0],
+                [0, 5],
+                [2, 5],
+                *[[missing_label, missing_label] for _ in range(5)],
+            ]
+        )
+        classes = [[0, 2], [0, 5]]
+        strategy = LabelCardinalityInconsistency(
+            missing_label=missing_label, random_state=0
+        )
+        clf = DummyMultilabelClassifier(
+            prediction=[0, 5],
+            missing_label=missing_label,
+            classes=classes,
+        )
+
+        _, utilities = strategy.query(
+            self.X, y, clf=clf, return_utilities=True
+        )
+
+        np.testing.assert_allclose(utilities[0, 3:], 0)

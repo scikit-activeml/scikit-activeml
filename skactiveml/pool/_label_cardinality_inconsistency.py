@@ -2,6 +2,7 @@ import numpy as np
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
+    ExtLabelEncoder,
     MISSING_LABEL,
     is_unlabeled,
     is_labeled,
@@ -173,12 +174,18 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         )
         n_lbld = int(lbld_mask.sum())
 
+        label_encoder = ExtLabelEncoder(
+            classes=target_spec.classes,
+            missing_label=self.missing_label_,
+        ).fit(y[lbld_mask])
         y_label_cardinality = 0
         if n_lbld != 0:
-            y_label_cardinality = np.sum(y[lbld_mask]) / n_lbld
+            y_label_cardinality = (
+                label_encoder.transform(y[lbld_mask]).sum() / n_lbld
+            )
 
         Y_pred = clf.predict(X_unlbld)
-        pred_mean_cardinality = Y_pred.sum(axis=-1)
+        pred_mean_cardinality = label_encoder.transform(Y_pred).sum(axis=-1)
 
         utilities_cand = np.abs(pred_mean_cardinality - y_label_cardinality)
 
