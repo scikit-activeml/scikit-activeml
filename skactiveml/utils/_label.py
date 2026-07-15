@@ -57,7 +57,7 @@ def is_unlabeled(
         Value to represent a missing label.
     target_type : {"single-output", "multi-label"}, default="single-output"
         The resolved target type. For multi-label targets, `y` must be
-        two-dimensional. Furthermore, a row `y[i]` must be either contain
+        two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
 
@@ -172,7 +172,7 @@ def is_labeled(
         Value to represent a missing label.
     target_type : {"single-output", "multi-label"}, default="single-output"
         The resolved target type. For multi-label targets, `y` must be
-        two-dimensional. Furthermore, a row `y[i]` must be either contain
+        two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
 
@@ -208,7 +208,7 @@ def unlabeled_indices(
         Value to represent a missing label.
     target_type : {"single-output", "multi-label"}, default="single-output"
         The resolved target type. For multi-label targets, `y` must be
-        two-dimensional. Furthermore, a row `y[i]` must be either contain
+        two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
 
@@ -247,7 +247,7 @@ def labeled_indices(
         Value to represent a missing label.
     target_type : {"single-output", "multi-label"}, default="single-output"
         The resolved target type. For multi-label targets, `y` must be
-        two-dimensional. Furthermore, a row `y[i]` must be either contain
+        two-dimensional. Furthermore, a row `y[i]` must contain either
         only observed labels or only `missing_label` values, i.e., no mixing
         within a row.
 

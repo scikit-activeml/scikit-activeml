@@ -61,6 +61,13 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
     target_type : {"auto", "single-output", "multi-output"}, default="auto"
         Declared target type. Multi-output regression is recognized but not
         supported for execution in version 1.1.
+
+    Attributes
+    ----------
+    target_spec_ : skactiveml.utils.TargetSpec
+        Immutable target specification established by a successful fit. Its
+        `target_type` is `"single-output"` and its `classes` field is `None`
+        for supported version 1.1 execution.
     """
 
     def __init__(

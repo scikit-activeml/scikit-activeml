@@ -110,13 +110,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
           `missing_label=-1`.
     classes : array-like of shape (n_classes,), or a list of such \
             array-likes, default=None
-        - If `classes` is not nested (`None` or one-dimensional), a single task
-          problem is assumed such that `y` can be shape `(n_samples,)` or
-          `(n_samples, n_annotators)`.
-        - If `classes` is nested (list of array-like objects), multilabel
-          classification is assumed in this wrapper and `y` must be
-          two-dimensional with shape `(n_samples, n_tasks)` and
-          `n_tasks == len(classes)`. Each task must be binary.
+        - A flat vocabulary describes single-output classification.
+        - Nested binary vocabularies describe multi-label classification, one
+          class vocabulary per label output. With explicit
+          `target_type="multi-label"`, vocabularies can instead be resolved
+          from `y` when `classes=None` and both classes are observed in every
+          output.
     missing_label : scalar or string or np.nan or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -139,6 +138,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         Declared target type. Explicit `"multi-label"` supports resolving
         binary per-label vocabularies from observed targets when `classes` is
         `None`. Multi-output classification is recognized but unsupported.
+
+    Attributes
+    ----------
+    target_spec_ : skactiveml.utils.TargetSpec
+        Immutable target specification established by a successful fit. Use
+        its `classes` field for canonical class ordering.
 
     References
     ----------

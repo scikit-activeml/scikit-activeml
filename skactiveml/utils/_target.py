@@ -24,7 +24,8 @@ class TargetSpec:
         Whether observations come from one or multiple annotators.
     classes : tuple or None
         The normalized immutable class vocabulary for classification, or
-        `None` for regression.
+        `None` for regression. Single-output classification stores one tuple;
+        multi-label classification stores one binary tuple per label output.
     """
 
     task: str
@@ -119,7 +120,10 @@ def resolve_target_spec(
             default="single-annotator"
         Declared annotation type.
     classes : array-like or tuple of array-like, default=None
-        Optional classification class vocabularies.
+        Optional classification class vocabularies. A flat vocabulary
+        describes single-output classification. Nested binary vocabularies
+        describe multi-label classification; nested non-binary vocabularies
+        describe recognized multi-output classification semantics.
     missing_label : scalar or str or None, default=np.nan
         Value representing a missing target observation.
 

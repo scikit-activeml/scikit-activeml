@@ -1280,13 +1280,11 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     ----------
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
-        - If `classes` is not nested (`None` or one-dimensional), a single task
-          problem is assumed such that `y` can be shape `(n_samples,)` or
-          `(n_samples, n_annotators)`. Same encoder is applied to all entries.
-        - If `classes` is nested (list of array-like objects), a multioutput
-          (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
-          `n_tasks == len(classes)`. Each column is encoded with its
-          task-specific encoder.
+        - A flat vocabulary describes single-output classification and is
+          applied to every annotator entry for multi-annotator components.
+        - Nested binary vocabularies describe multi-label classification, one
+          class vocabulary per label output. Nested non-binary vocabularies
+          describe recognized multi-output classification semantics.
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     cost_matrix : array-like of shape (n_classes, n_classes)
@@ -1301,6 +1299,12 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             default="auto"
         Declared target type. Components reject resolved target specifications
         outside their exact capabilities.
+
+    Attributes
+    ----------
+    target_spec_ : skactiveml.utils.TargetSpec
+        Immutable target specification established by a successful fit. Its
+        class vocabularies use the canonical ordering of `classes_`.
     """
 
     def __init__(
@@ -1776,7 +1780,7 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     Base class for `scikit-activeml` regressors.
 
     Parameters
-    __________
+    ----------
     missing_label : scalar, string, np.nan, or None, default=np.nan
         Value to represent a missing label.
     random_state : int, RandomState or None, default=None
@@ -1785,6 +1789,12 @@ class SkactivemlRegressor(RegressorMixin, BaseEstimator, ABC):
     target_type : {"auto", "single-output", "multi-output"}, default="auto"
         Declared target type. Multi-output regression is recognized but not
         supported for execution in version 1.1.
+
+    Attributes
+    ----------
+    target_spec_ : skactiveml.utils.TargetSpec
+        Immutable target specification established by a successful fit. For
+        regression, its `classes` field is `None`.
     """
 
     def __init__(
