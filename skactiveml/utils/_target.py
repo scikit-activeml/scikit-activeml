@@ -136,15 +136,7 @@ def resolve_target_spec(
     if task == "classification" and classes is not None:
         check_classifier_params(classes, missing_label)
 
-    y = check_array(
-        y,
-        ensure_2d=False,
-        ensure_all_finite=False,
-        ensure_min_samples=0,
-        dtype=None,
-    )
-    if y.ndim == 0:
-        raise TypeError("`y` must be a one- or two-dimensional array-like.")
+    y = _check_target_array(y)
 
     if target_type == "auto":
         if annotation_type == "multi-annotator":
@@ -233,15 +225,7 @@ def _resolve_task_agnostic_target_type(
         "single-annotator",
         allow_auto=True,
     )
-    y = check_array(
-        y,
-        ensure_2d=False,
-        ensure_all_finite=False,
-        ensure_min_samples=0,
-        dtype=None,
-    )
-    if y.ndim == 0:
-        raise TypeError("`y` must be a one- or two-dimensional array-like.")
+    y = _check_target_array(y)
 
     if target_type == "auto":
         if y.ndim != 1:
@@ -278,6 +262,19 @@ def _resolve_task_agnostic_target_type(
             "target columns."
         )
     return target_type
+
+
+def _check_target_array(y):
+    y = check_array(
+        y,
+        ensure_2d=False,
+        ensure_all_finite=False,
+        ensure_min_samples=0,
+        dtype=None,
+    )
+    if y.ndim == 0:
+        raise TypeError("`y` must be a one- or two-dimensional array-like.")
+    return y
 
 
 def _has_nested_classes(classes):
