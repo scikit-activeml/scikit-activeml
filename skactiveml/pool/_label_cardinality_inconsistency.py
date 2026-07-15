@@ -1,16 +1,13 @@
 import numpy as np
-from sklearn import clone
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
-    check_type,
-    check_equal_missing_label,
-    check_scalar,
     is_unlabeled,
     is_labeled,
     simple_batch,
 )
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
@@ -29,6 +26,11 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance or None, default=None
         Controls the randomness of the estimator.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted classifier's target specification is
+        authoritative when available. This strategy supports only multi-label
+        classification with a single annotator.
 
     References
     ----------
@@ -41,9 +43,17 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         self,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
+        )
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "multi-label", "single-annotator")}
         )
 
     def query(
@@ -117,6 +127,19 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`, the
               indexing refers to the samples in `candidates`.
         """
+        # Resolve through the classifier before acquisition state is changed.
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
+
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -125,30 +148,12 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_spec.target_type,
         )
 
-        is_multioutput = y.ndim == 2
-        if not is_multioutput:
-            raise ValueError(
-                "`y` must be in multi-label format, as the "
-                "`LabelCardinalityInconsistency` strategy is multi-label only."
-            )
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multioutput=is_multioutput
+            candidates, X, y, target_type=target_spec.target_type
         )
-
-        # Validate classifier type
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_scalar(fit_clf, "fit_clf", bool)
-
-        # Fit the classifier
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight=sample_weight)
 
         # Determine candidate samples that are currently unlabeled.
         if mapping is None:
@@ -157,21 +162,20 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
             cand_mask = is_unlabeled(
                 y[mapping],
                 missing_label=self.missing_label_,
-                target_type="multi-label",
+                target_type=target_spec.target_type,
             )
         X_unlbld = X_cand[cand_mask]
 
-        n_lbld = int(
-            is_labeled(
-                y,
-                missing_label=self.missing_label_,
-                target_type="multi-label",
-            ).sum()
+        lbld_mask = is_labeled(
+            y,
+            missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
         )
+        n_lbld = int(lbld_mask.sum())
 
         y_label_cardinality = 0
         if n_lbld != 0:
-            y_label_cardinality = np.nansum(y) / n_lbld
+            y_label_cardinality = np.sum(y[lbld_mask]) / n_lbld
 
         Y_pred = clf.predict(X_unlbld)
         pred_mean_cardinality = Y_pred.sum(axis=-1)

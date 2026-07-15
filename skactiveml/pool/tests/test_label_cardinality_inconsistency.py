@@ -8,15 +8,26 @@ from sklearn.naive_bayes import GaussianNB
 from skactiveml.base import SkactivemlClassifier
 from skactiveml.classifier import SklearnClassifier
 from skactiveml.pool import LabelCardinalityInconsistency
+from skactiveml.pool.tests._multilabel_target_semantics import (
+    MultilabelOnlyTargetSemanticsMixin,
+)
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 
 
 class DummyMultilabelClassifier(SkactivemlClassifier):
     last_sample_weight = None
 
-    def __init__(self, prediction=None):
-        super().__init__(classes=[[0, 1], [0, 1]], missing_label=MISSING_LABEL)
+    def __init__(self, prediction=None, missing_label=MISSING_LABEL):
+        super().__init__(classes=[[0, 1], [0, 1]], missing_label=missing_label)
         self.prediction = [1, 0] if prediction is None else prediction
+        self.missing_label = missing_label
+        self.target_type = "multi-label"
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
 
     def fit(self, X, y, sample_weight=None):
         DummyMultilabelClassifier.last_sample_weight = (
@@ -24,13 +35,15 @@ class DummyMultilabelClassifier(SkactivemlClassifier):
             if sample_weight is None
             else np.array(sample_weight, copy=True)
         )
+        target_spec = self._resolve_target_spec(y)
         self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
             y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
+            target_spec=target_spec,
         )
+        self.target_spec_ = target_spec
         return self
 
     def predict_proba(self, X, **kwargs):
@@ -40,7 +53,9 @@ class DummyMultilabelClassifier(SkactivemlClassifier):
         return np.tile(self.prediction, (len(X), 1))
 
 
-class TestLabelCardinalityInconsistency(unittest.TestCase):
+class TestLabelCardinalityInconsistency(
+    MultilabelOnlyTargetSemanticsMixin, unittest.TestCase
+):
     def setUp(self):
         self.X = np.linspace(0, 1, 16).reshape(8, 2)
         self.y = np.array(
@@ -67,9 +82,10 @@ class TestLabelCardinalityInconsistency(unittest.TestCase):
         )
         self.qs = LabelCardinalityInconsistency(random_state=0)
 
-    def test_query_requires_multilabel_y(self):
-        y = np.array([0.0, 1.0, 0.0, np.nan, np.nan, np.nan, np.nan, np.nan])
-        self.assertRaises(ValueError, self.qs.query, self.X, y, clf=self.clf)
+        self.strategy_class = LabelCardinalityInconsistency
+
+    def _query_strategy(self, strategy, y, clf, **kwargs):
+        return strategy.query(self.X, y, clf=clf, **kwargs)
 
     def test_query_candidate_variation(self):
         query_idx1, utilities1 = self.qs.query(
@@ -150,3 +166,17 @@ class TestLabelCardinalityInconsistency(unittest.TestCase):
         np.testing.assert_array_equal(
             DummyMultilabelClassifier.last_sample_weight, sample_weight
         )
+
+    def test_label_cardinality_ignores_unlabeled_rows(self):
+        missing_label = -1
+        y = np.where(np.isnan(self.y), missing_label, self.y)
+        strategy = LabelCardinalityInconsistency(
+            missing_label=missing_label, random_state=0
+        )
+        clf = DummyMultilabelClassifier(missing_label=missing_label)
+
+        _, utilities = strategy.query(
+            self.X, y, clf=clf, return_utilities=True
+        )
+
+        np.testing.assert_allclose(utilities[0, self.unld_idx], 0)

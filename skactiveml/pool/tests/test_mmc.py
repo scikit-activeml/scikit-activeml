@@ -7,10 +7,15 @@ from sklearn.naive_bayes import GaussianNB
 
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.pool import MaxLossReductionMaxConfidence
+from skactiveml.pool.tests._multilabel_target_semantics import (
+    MultilabelOnlyTargetSemanticsMixin,
+)
 from skactiveml.utils import MISSING_LABEL, unlabeled_indices
 
 
-class TestMaxLossReductionMaxConfidence(unittest.TestCase):
+class TestMaxLossReductionMaxConfidence(
+    MultilabelOnlyTargetSemanticsMixin, unittest.TestCase
+):
     def setUp(self):
         self.X = np.linspace(0, 1, 16).reshape(8, 2)
         self.y = np.array(
@@ -40,15 +45,15 @@ class TestMaxLossReductionMaxConfidence(unittest.TestCase):
         )
         self.qs = MaxLossReductionMaxConfidence(random_state=0)
 
-    def test_query_requires_multilabel_y(self):
-        y = np.array([0.0, 1.0, 0.0, np.nan, np.nan, np.nan, np.nan, np.nan])
-        self.assertRaises(
-            ValueError,
-            self.qs.query,
+        self.strategy_class = MaxLossReductionMaxConfidence
+
+    def _query_strategy(self, strategy, y, clf, **kwargs):
+        return strategy.query(
             self.X,
             y,
             discriminator=self.discriminator,
-            clf=self.clf,
+            clf=clf,
+            **kwargs,
         )
 
     def test_query_candidate_variation(self):
