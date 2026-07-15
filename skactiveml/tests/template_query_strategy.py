@@ -618,6 +618,33 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
+    def _test_classification_target_contract(
+        self,
+        expected_capabilities,
+        *,
+        estimator_param="clf",
+        fit_param="fit_clf",
+    ):
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(strategy._target_capabilities, expected_capabilities)
+
+        query_params = deepcopy(self.query_default_params_clf_multilabel)
+        estimator = clone(query_params[estimator_param])
+        estimator.set_params(target_type="multi-label")
+        estimator.fit(query_params["X"], query_params["y"])
+        query_params[estimator_param] = estimator
+        query_params[fit_param] = False
+        conflicting = clone(strategy).set_params(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            conflicting.query(**query_params)
+
+        self.assertFalse(hasattr(conflicting, "n_features_in_"))
+        self.assertFalse(hasattr(conflicting, "missing_label_"))
+        self.assertFalse(hasattr(conflicting, "random_state_"))
+
     def test_query_al_cycles(self):
         budget = 1
         init_params = deepcopy(self.init_default_params)

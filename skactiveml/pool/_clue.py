@@ -17,11 +17,9 @@ from ..utils import (
     MISSING_LABEL,
     rand_argmax,
     check_type,
-    check_equal_missing_label,
 )
-from sklearn.base import clone
 from sklearn.cluster import KMeans
-from ._target import _resolve_estimator_target_spec
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class Clue(SingleAnnotatorPoolQueryStrategy):
@@ -212,17 +210,17 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             refers to the samples in `X`.
         """
         # Resolve through the estimator before acquisition state is changed.
-        check_type(
-            estimator, "estimator", SkactivemlClassifier, SkactivemlRegressor
+        estimator, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            estimator,
+            X,
+            y,
+            fit_estimator=fit_estimator,
+            sample_weight=sample_weight,
+            estimator_name="estimator",
+            fit_name="fit_estimator",
+            estimator_types=(SkactivemlClassifier, SkactivemlRegressor),
         )
-        check_type(fit_estimator, "fit_estimator", bool)
-        check_equal_missing_label(estimator.missing_label, self.missing_label)
-        if fit_estimator:
-            if sample_weight is not None:
-                estimator = clone(estimator).fit(X, y, sample_weight)
-            else:
-                estimator = clone(estimator).fit(X, y)
-        target_spec = _resolve_estimator_target_spec(self, estimator, y)
 
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(

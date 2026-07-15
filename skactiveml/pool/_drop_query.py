@@ -3,18 +3,16 @@ Module implementing the pool-based query strategy `DropQuery`.
 """
 
 import numpy as np
-from sklearn import clone
 from sklearn.cluster import KMeans
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     check_type,
-    check_equal_missing_label,
     rand_argmax,
     check_scalar,
 )
-from ._target import _resolve_estimator_target_spec
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class DropQuery(SingleAnnotatorPoolQueryStrategy):
@@ -185,15 +183,17 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             refers to the samples in `X`.
         """
         # Resolve through the classifier before acquisition state is changed.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        check_equal_missing_label(clf.missing_label, self.missing_label)
-        if fit_clf:
-            if sample_weight is not None:
-                clf = clone(clf).fit(X, y, sample_weight)
-            else:
-                clf = clone(clf).fit(X, y)
-        target_spec = _resolve_estimator_target_spec(self, clf, y)
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
         is_multilabel = target_spec.target_type == "multi-label"
 
         # Check `__init__` and `query` parameters.

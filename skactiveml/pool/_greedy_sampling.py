@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn import clone
 from sklearn.metrics import pairwise_distances, pairwise
 
 from skactiveml.base import (
@@ -14,9 +13,8 @@ from skactiveml.utils import (
     is_labeled,
     check_type,
     check_scalar,
-    check_equal_missing_label,
 )
-from ._target import _resolve_estimator_target_spec
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
@@ -327,15 +325,17 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
               refers to the indexing in `candidates`.
         """
         # Resolve through the regressor before acquisition state is changed.
-        check_type(reg, "reg", SkactivemlRegressor)
-        check_type(fit_reg, "fit_reg", bool)
-        check_equal_missing_label(reg.missing_label, self.missing_label)
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
-        target_spec = _resolve_estimator_target_spec(self, reg, y)
+        reg, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            reg,
+            X,
+            y,
+            fit_estimator=fit_reg,
+            sample_weight=sample_weight,
+            estimator_name="reg",
+            fit_name="fit_reg",
+            estimator_types=(SkactivemlRegressor,),
+        )
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,

@@ -4,19 +4,16 @@ Diverse Gradient Embedding (BADGE).
 """
 
 import numpy as np
-from sklearn import clone
 from sklearn.metrics import pairwise_distances_argmin_min
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     check_type,
-    check_equal_missing_label,
     unlabeled_indices,
-    check_scalar,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
-from ._target import _resolve_estimator_target_spec
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
@@ -175,15 +172,17 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
               the indexing refers to the samples in `candidates`.
         """
         # Resolve through the classifier before acquisition state is changed.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label)
-        check_scalar(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-        target_spec = _resolve_estimator_target_spec(self, clf, y)
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
 
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(

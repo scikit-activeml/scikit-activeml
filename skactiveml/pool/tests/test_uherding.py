@@ -172,11 +172,7 @@ class TestUHerding(
         )
 
     def test_target_contract(self):
-        strategy = UHerding()
-
-        self.assertEqual(strategy.target_type, "auto")
-        self.assertEqual(
-            strategy._target_capabilities,
+        self._test_classification_target_contract(
             frozenset(
                 {
                     (
@@ -188,21 +184,6 @@ class TestUHerding(
                 }
             ),
         )
-
-    def test_fitted_target_spec_is_authoritative(self):
-        X = self.query_default_params_clf_multilabel["X"]
-        y = self.query_default_params_clf_multilabel["y"]
-        clf = SklearnClassifier(
-            estimator=MultiOutputClassifier(GaussianNB()),
-            classes=[[0, 1], [0, 1]],
-            target_type="multi-label",
-        ).fit(X, y)
-        strategy = UHerding(target_type="single-output")
-
-        with self.assertRaisesRegex(ValueError, "conflicts"):
-            strategy.query(X, y, clf, fit_clf=False)
-
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
 
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases

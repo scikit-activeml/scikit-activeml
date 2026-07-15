@@ -69,11 +69,7 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         )
 
     def test_target_contract(self):
-        strategy = Badge()
-
-        self.assertEqual(strategy.target_type, "auto")
-        self.assertEqual(
-            strategy._target_capabilities,
+        self._test_classification_target_contract(
             frozenset(
                 {
                     (
@@ -85,31 +81,6 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
                 }
             ),
         )
-
-    def test_explicit_target_conflict_precedes_acquisition_state(self):
-        X = np.linspace(0, 1, 12).reshape(6, 2)
-        y = np.array(
-            [
-                [0.0, 1.0],
-                [1.0, 0.0],
-                [0.0, 0.0],
-                [1.0, 1.0],
-                [MISSING_LABEL, MISSING_LABEL],
-                [MISSING_LABEL, MISSING_LABEL],
-            ]
-        )
-        clf = SklearnClassifier(
-            estimator=MultiOutputClassifier(GaussianNB()),
-            target_type="multi-label",
-        ).fit(X, y)
-        strategy = Badge(target_type="single-output")
-
-        with self.assertRaisesRegex(ValueError, "conflicts"):
-            strategy.query(X, y, clf, fit_clf=False)
-
-        self.assertFalse(hasattr(strategy, "n_features_in_"))
-        self.assertFalse(hasattr(strategy, "missing_label_"))
-        self.assertFalse(hasattr(strategy, "random_state_"))
 
     def test_fit_clone_keeps_classifier_target_declaration(self):
         X = np.linspace(0, 1, 12).reshape(6, 2)

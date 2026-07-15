@@ -193,6 +193,49 @@ class TestSubSamplingWrapper(
             conflicting.query(X, y_query, clf=clf, fit_clf=False)
         self.assertFalse(hasattr(conflicting, "n_features_in_"))
 
+    def test_resolved_target_type_reaches_auto_and_nested_strategies(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapped = RandomSampling(random_state=0)
+        direct = SubSamplingWrapper(
+            query_strategy=wrapped,
+            max_candidates=4,
+            target_type="multi-label",
+            random_state=0,
+        )
+
+        direct_idx, direct_utilities = direct.query(
+            X, y, return_utilities=True
+        )
+
+        self.assertIn(direct_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(direct_utilities[0, :2]).all())
+        self.assertEqual(wrapped.target_type, "auto")
+
+        nested = SubSamplingWrapper(
+            query_strategy=SubSamplingWrapper(
+                query_strategy=RandomSampling(
+                    target_type="multi-label", random_state=0
+                ),
+                max_candidates=4,
+                random_state=0,
+            ),
+            max_candidates=4,
+            random_state=0,
+        )
+        nested_idx, nested_utilities = nested.query(
+            X, y, return_utilities=True
+        )
+
+        self.assertIn(nested_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(nested_utilities[0, :2]).all())
+
     def test_init_param_max_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -466,6 +509,29 @@ class TestParallelUtilityEstimationWrapper(
             wrapper.query(X, y)
 
         self.assertFalse(hasattr(wrapper, "n_features_in_"))
+
+    def test_resolved_target_type_reaches_auto_strategy(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapped = RandomSampling(random_state=0)
+        wrapper = ParallelUtilityEstimationWrapper(
+            query_strategy=wrapped,
+            n_jobs=1,
+            target_type="multi-label",
+            random_state=0,
+        )
+
+        query_idx, utilities = wrapper.query(X, y, return_utilities=True)
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+        self.assertEqual(wrapped.target_type, "auto")
 
     def test_init_param_query_strategy(self):
         test_cases = [

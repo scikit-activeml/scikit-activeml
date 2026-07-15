@@ -13,11 +13,41 @@ from ..utils import (
 from math import ceil
 import numpy as np
 from joblib import Parallel, delayed, cpu_count
+from sklearn import clone
 import warnings
 from ._target import _resolve_wrapper_target_type
 
 
-class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
+class _TargetPreservingWrapper(SingleAnnotatorPoolQueryStrategy):
+    @property
+    def _target_capabilities(self):
+        return getattr(
+            self.query_strategy, "_target_capabilities", frozenset()
+        )
+
+    def _resolve_wrapped_target_type(self, y, query_kwargs):
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+        check_equal_missing_label(
+            self.query_strategy.missing_label, self.missing_label
+        )
+        return _resolve_wrapper_target_type(self, y, query_kwargs)
+
+    def _query_strategy_for_target_type(self, target_type):
+        query_strategy = self.query_strategy
+        if getattr(query_strategy, "target_type", None) == "auto":
+            query_strategy = clone(query_strategy).set_params(
+                target_type=target_type
+            )
+        return query_strategy
+
+
+class SubSamplingWrapper(_TargetPreservingWrapper):
     """Sub-sampling Wrapper
 
     This class implements a wrapper for single-annotator pool-based strategies
@@ -82,12 +112,6 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         self.exclude_non_subsample = exclude_non_subsample
         self.embed_samples_func = embed_samples_func
         self.target_type = target_type
-
-    @property
-    def _target_capabilities(self):
-        return getattr(
-            self.query_strategy, "_target_capabilities", frozenset()
-        )
 
     @match_signature("query_strategy", "query")
     def query(
@@ -155,17 +179,8 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
-        check_equal_missing_label(
-            self.query_strategy.missing_label, self.missing_label
-        )
-        target_type = _resolve_wrapper_target_type(self, y, query_kwargs)
+        target_type = self._resolve_wrapped_target_type(y, query_kwargs)
+        query_strategy = self._query_strategy_for_target_type(target_type)
 
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -285,7 +300,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         if self.embed_samples_func:
             new_X = self.embed_samples_func(new_X)
 
-        qs_output = self.query_strategy.query(
+        qs_output = query_strategy.query(
             X=new_X,
             y=new_y,
             candidates=new_candidates,
@@ -351,7 +366,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             return new_queried_indices
 
 
-class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
+class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
     """Parallel Utility Estimation Wrapper
 
     This class implements a wrapper for single-annotator pool-based strategies
@@ -401,12 +416,6 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         self.n_jobs = n_jobs
         self.parallel_dict = parallel_dict
         self.target_type = target_type
-
-    @property
-    def _target_capabilities(self):
-        return getattr(
-            self.query_strategy, "_target_capabilities", frozenset()
-        )
 
     @match_signature("query_strategy", "query")
     def query(
@@ -476,17 +485,8 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
-        check_equal_missing_label(
-            self.query_strategy.missing_label, self.missing_label
-        )
-        target_type = _resolve_wrapper_target_type(self, y, query_kwargs)
+        target_type = self._resolve_wrapped_target_type(y, query_kwargs)
+        query_strategy = self._query_strategy_for_target_type(target_type)
 
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
@@ -526,7 +526,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         parallel_pool = Parallel(**parallel_dict)
 
         def query_lambda_func(candidate):
-            return self.query_strategy.query(
+            return query_strategy.query(
                 X=X,
                 y=y,
                 candidates=np.array(candidate),

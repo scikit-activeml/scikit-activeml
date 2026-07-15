@@ -1,5 +1,12 @@
+from sklearn import clone
+
 from ..base import SkactivemlClassifier, SkactivemlRegressor
-from ..utils import is_unlabeled, resolve_target_spec
+from ..utils import (
+    check_equal_missing_label,
+    check_type,
+    is_unlabeled,
+    resolve_target_spec,
+)
 from ..utils._target import (
     _resolve_task_agnostic_target_type,
     _validate_target_semantics,
@@ -81,6 +88,31 @@ def _resolve_estimator_target_spec(strategy, estimator, y):
     return target_spec
 
 
+def _fit_and_resolve_estimator_target_spec(
+    strategy,
+    estimator,
+    X,
+    y,
+    *,
+    fit_estimator,
+    sample_weight,
+    estimator_name,
+    fit_name,
+    estimator_types,
+):
+    """Validate, optionally fit, and resolve an estimator-backed query."""
+    check_type(estimator, estimator_name, *estimator_types)
+    check_equal_missing_label(estimator.missing_label, strategy.missing_label)
+    check_type(fit_estimator, fit_name, bool)
+    if fit_estimator:
+        if sample_weight is None:
+            estimator = clone(estimator).fit(X, y)
+        else:
+            estimator = clone(estimator).fit(X, y, sample_weight)
+    target_spec = _resolve_estimator_target_spec(strategy, estimator, y)
+    return estimator, target_spec
+
+
 def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
     """Resolve the target structure a strategy wrapper must preserve."""
     allowed_target_types = {
@@ -89,11 +121,23 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
         "multi-label",
         "multi-output",
     }
-    wrapper_target_type = wrapper.target_type
-    wrapped_target_type = getattr(
-        wrapper.query_strategy, "target_type", "auto"
-    )
-    for target_type in (wrapper_target_type, wrapped_target_type):
+    target_declarations = [(wrapper.target_type, type(wrapper).__name__)]
+    wrapped_strategy = wrapper.query_strategy
+    seen_strategies = set()
+    while (
+        wrapped_strategy is not None
+        and id(wrapped_strategy) not in seen_strategies
+    ):
+        seen_strategies.add(id(wrapped_strategy))
+        target_declarations.append(
+            (
+                getattr(wrapped_strategy, "target_type", "auto"),
+                type(wrapped_strategy).__name__,
+            )
+        )
+        wrapped_strategy = getattr(wrapped_strategy, "query_strategy", None)
+
+    for target_type, _ in target_declarations:
         if target_type not in allowed_target_types:
             raise ValueError(
                 "`target_type` must be one of {'auto', 'single-output', "
@@ -139,8 +183,7 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
         explicit_target_types = {
             target_type
             for target_type in (
-                wrapper_target_type,
-                wrapped_target_type,
+                *(value for value, _ in target_declarations),
                 *estimator_target_types,
             )
             if target_type != "auto"
@@ -187,10 +230,7 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
             )
             target_spec = None
 
-    for component_target_type, component_name in (
-        (wrapper_target_type, type(wrapper).__name__),
-        (wrapped_target_type, type(wrapper.query_strategy).__name__),
-    ):
+    for component_target_type, component_name in target_declarations:
         if component_target_type != "auto" and (
             component_target_type != target_type
         ):
