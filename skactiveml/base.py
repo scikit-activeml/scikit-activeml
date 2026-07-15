@@ -62,6 +62,22 @@ except ImportError:  # pragma: no cover
     pass
 
 
+_MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES = frozenset(
+    {("classification", "single-output", "multi-annotator")}
+)
+_TARGET_SPEC_NOT_PROVIDED = object()
+
+
+def _has_no_class_evidence(y, target_type, annotation_type, missing_label):
+    y_array = np.asarray(y)
+    expected_ndim = 2 if annotation_type == "multi-annotator" else 1
+    return (
+        target_type in {"auto", "single-output"}
+        and y_array.ndim == expected_ndim
+        and is_unlabeled(y_array, missing_label=missing_label).all()
+    )
+
+
 def _reuse_established_target_spec(resolved_spec, established_spec=None):
     if established_spec is None:
         return resolved_spec
@@ -516,9 +532,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     @property
     def _target_capabilities(self):
         """Exact target semantics supported by multi-annotator strategies."""
-        return frozenset(
-            {("classification", "single-output", "multi-annotator")}
-        )
+        return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
 
     def _resolve_target_spec(self, y, classes=None):
         try:
@@ -531,17 +545,14 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 missing_label=self.missing_label,
             )
         except ValueError:
-            y_array = np.asarray(y)
             # A class-agnostic strategy can still acquire the first
             # sample-annotator pair before a class vocabulary is observable.
             # The matrix structure remains unambiguously multi-annotator.
-            lacks_class_evidence = (
-                classes is None
-                and self.target_type in {"auto", "single-output"}
-                and y_array.ndim == 2
-                and is_unlabeled(
-                    y_array, missing_label=self.missing_label
-                ).all()
+            lacks_class_evidence = classes is None and _has_no_class_evidence(
+                y,
+                self.target_type,
+                "multi-annotator",
+                self.missing_label,
             )
             if lacks_class_evidence:
                 return None
@@ -652,6 +663,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         reset=True,
         check_X_dict=None,
         classes=None,
+        target_spec=_TARGET_SPEC_NOT_PROVIDED,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -705,6 +717,10 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
+        target_spec : TargetSpec or None, optional
+            The already resolved local target specification. If omitted, it
+            is resolved from `y`. `None` represents a cycle with no observable
+            class evidence.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
 
@@ -725,7 +741,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
-        self._resolve_target_spec(y, classes=classes)
+        if target_spec is _TARGET_SPEC_NOT_PROVIDED:
+            self._resolve_target_spec(y, classes=classes)
 
         (
             X,

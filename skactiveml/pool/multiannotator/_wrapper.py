@@ -7,6 +7,7 @@ from sklearn.utils.validation import check_array, _is_arraylike
 from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
+    _has_no_class_evidence,
 )
 from ...utils import (
     rand_argmax,
@@ -15,7 +16,6 @@ from ...utils import (
     majority_vote,
     check_random_state,
     check_scalar,
-    is_unlabeled,
     resolve_target_spec,
 )
 from ...utils._target import check_target_capability
@@ -210,6 +210,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
+            target_spec=outer_target_spec,
         )
 
         X_cand, mapping, A_cand = self._transform_cand_annot(
@@ -282,16 +283,16 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
                 missing_label=self.missing_label,
             )
         except ValueError:
-            y_sq_array = np.asarray(y_sq)
             # Preserve cycle-zero acquisition for class-agnostic wrapped
             # strategies without inventing a class vocabulary.
             lacks_class_evidence = (
                 outer_target_spec is None
-                and strategy_target_type in {"auto", "single-output"}
-                and y_sq_array.ndim == 1
-                and is_unlabeled(
-                    y_sq_array, missing_label=self.missing_label
-                ).all()
+                and _has_no_class_evidence(
+                    y_sq,
+                    strategy_target_type,
+                    "single-annotator",
+                    self.missing_label,
+                )
             )
             if not lacks_class_evidence:
                 raise

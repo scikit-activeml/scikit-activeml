@@ -6,7 +6,9 @@ from sklearn.utils.validation import check_array, check_is_fitted
 from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SkactivemlClassifier,
+    _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES,
 )
+from ...utils._target import check_target_capability
 from ...pool._uncertainty_sampling import uncertainty_scores
 from ...utils import (
     check_scalar,
@@ -15,6 +17,8 @@ from ...utils import (
     check_type,
     simple_batch,
     majority_vote,
+    resolve_target_spec,
+    check_missing_label,
 )
 
 
@@ -40,6 +44,10 @@ class IntervalEstimationAnnotModel(BaseEstimator):
     random_state : None or int or numpy.random.RandomState, default=None
         The random state used for deciding on majority vote labels in case of
         ties.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. This estimator supports only single-output
+        classification with multiple annotators.
 
     Attributes
     ----------
@@ -50,6 +58,8 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         `A_cand[i, 0]` indicates the lower bound, `A_cand[i, 1]` indicates the
         mean, and `A_cand[i, 2]` indicates the upper bound of the estimation
         labeling accuracy.
+    target_spec_ : skactiveml.utils.TargetSpec
+        Resolved target semantics established during fitting.
 
     References
     ----------
@@ -65,12 +75,18 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         alpha=0.05,
         mode="upper",
         random_state=None,
+        target_type="auto",
     ):
         self.classes = classes
         self.missing_label = missing_label
         self.alpha = alpha
         self.mode = mode
         self.random_state = random_state
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
 
     def fit(self, X, y, sample_weight=None):
         """Fit annotator model for given samples.
@@ -90,6 +106,19 @@ class IntervalEstimationAnnotModel(BaseEstimator):
         self : IntervalEstimationAnnotModel object
             The fitted annotator model.
         """
+        y_array = np.asarray(y)
+        check_missing_label(self.missing_label, target_type=y_array.dtype)
+        target_spec = resolve_target_spec(
+            y,
+            task="classification",
+            target_type=self.target_type,
+            annotation_type="multi-annotator",
+            classes=self.classes,
+            missing_label=self.missing_label,
+        )
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
         # Check whether alpha is float in (0, 1).
         check_scalar(
             x=self.alpha,
@@ -138,6 +167,7 @@ class IntervalEstimationAnnotModel(BaseEstimator):
             self.A_perf_[a_idx, 1] = mean
             self.A_perf_[a_idx, 2] = mean + t_value
 
+        self.target_spec_ = target_spec
         return self
 
     def predict_annotator_perf(self, X):
@@ -343,6 +373,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             classes=target_classes,
+            target_spec=query_target_spec,
         )
 
         X_cand, mapping, A_cand = self._transform_cand_annot(
@@ -388,21 +419,17 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             classifier_target_spec = clf._resolve_target_spec(
                 y, classes=query_target_spec.classes
             )
-        classifier_prediction_semantics = (
-            classifier_target_spec.task,
-            classifier_target_spec.target_type,
-            classifier_target_spec.classes,
+        has_conflicting_prediction_contract = (
+            classifier_target_spec.task != query_target_spec.task
+            or classifier_target_spec.target_type
+            != query_target_spec.target_type
+            or classifier_target_spec.classes != query_target_spec.classes
         )
-        query_prediction_semantics = (
-            query_target_spec.task,
-            query_target_spec.target_type,
-            query_target_spec.classes,
-        )
-        if classifier_prediction_semantics != query_prediction_semantics:
+        if has_conflicting_prediction_contract:
             raise ValueError(
-                "IntervalEstimationThreshold's resolved prediction target "
-                "semantics conflict with the classifier's resolved target "
-                "specification."
+                "The classifier's task, target type, or class vocabulary "
+                "conflicts with IntervalEstimationThreshold's resolved outer "
+                "target specification."
             )
 
         P = clf.predict_proba(X_cand)
@@ -414,6 +441,7 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             missing_label=clf.missing_label,
             alpha=self.alpha,
             mode="upper",
+            target_type=self.target_type,
         )
 
         ie_model.fit(X=X, y=y, sample_weight=sample_weight)

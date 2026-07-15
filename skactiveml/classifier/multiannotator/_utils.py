@@ -7,6 +7,7 @@ try:
     from torch.utils.data import default_collate
 
     from ...classifier import SkorchClassifier
+    from ...base import _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
     from ...utils import (
         MISSING_LABEL,
         is_labeled,
@@ -95,9 +96,7 @@ try:
 
         @property
         def _target_capabilities(self):
-            return frozenset(
-                {("classification", "single-output", "multi-annotator")}
-            )
+            return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
 
         def __init__(
             self,

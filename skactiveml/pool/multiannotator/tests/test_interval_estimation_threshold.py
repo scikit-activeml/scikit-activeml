@@ -60,6 +60,37 @@ class TestIntervalEstimationAnnotModel(unittest.TestCase):
         ie_model = IntervalEstimationAnnotModel(random_state="test")
         self.assertRaises(ValueError, ie_model.fit, X=self.X, y=self.y)
 
+    def test_init_param_target_type(self):
+        ie_model = IntervalEstimationAnnotModel(target_type="auto")
+
+        self.assertEqual(ie_model.target_type, "auto")
+        self.assertEqual(
+            ie_model._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+
+        ie_model.fit(self.X, self.y)
+        self.assertEqual(ie_model.target_spec_.task, "classification")
+        self.assertEqual(ie_model.target_spec_.target_type, "single-output")
+        self.assertEqual(
+            ie_model.target_spec_.annotation_type, "multi-annotator"
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            IntervalEstimationAnnotModel(target_type="multi-label").fit(
+                self.X, self.y
+            )
+
     def test_fit_param_y(self):
         ie_model = IntervalEstimationAnnotModel()
         self.assertRaises(ValueError, ie_model.fit, X=self.X, y=np.ones(4))
@@ -120,7 +151,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.A_cand = np.ones_like(self.y)
         self.sample_weight = np.ones_like(self.y)
 
-    def test_target_semantics_are_single_output_multi_annotator(self):
+    def test_init_param_target_type(self):
         ie_thresh = IntervalEstimationThreshold(target_type="auto")
 
         self.assertEqual(ie_thresh.target_type, "auto")
@@ -136,6 +167,9 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
                 }
             ),
         )
+
+    def test_query_preserves_sample_annotator_acquisition(self):
+        ie_thresh = IntervalEstimationThreshold(target_type="auto")
 
         query_indices, utilities = ie_thresh.query(
             X=self.X,

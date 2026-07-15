@@ -35,18 +35,11 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
         self.random_state = 0
 
-    def test_outer_and_aggregated_targets_use_separate_semantics(self):
+    def test_init_param_target_type(self):
         wrapper = SingleAnnotatorWrapper(
             RandomSampling(random_state=self.random_state),
             target_type="auto",
             random_state=self.random_state,
-        )
-
-        query_indices, utilities = wrapper.query(
-            self.X,
-            self.y,
-            batch_size=2,
-            return_utilities=True,
         )
 
         self.assertEqual(wrapper.target_type, "auto")
@@ -62,6 +55,21 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
                 }
             ),
         )
+
+    def test_outer_and_aggregated_targets_use_separate_semantics(self):
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            target_type="auto",
+            random_state=self.random_state,
+        )
+
+        query_indices, utilities = wrapper.query(
+            self.X,
+            self.y,
+            batch_size=2,
+            return_utilities=True,
+        )
+
         self.assertEqual(query_indices.shape, (2, 2))
         self.assertEqual(utilities.shape, (2, len(self.X), self.y.shape[1]))
 

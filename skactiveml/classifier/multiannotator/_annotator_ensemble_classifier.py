@@ -11,7 +11,10 @@ from sklearn.utils.validation import (
     check_is_fitted,
 )
 
-from ...base import SkactivemlClassifier
+from ...base import (
+    SkactivemlClassifier,
+    _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES,
+)
 from ...utils import (
     MISSING_LABEL,
     is_labeled,
@@ -70,9 +73,7 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
 
     @property
     def _target_capabilities(self):
-        return frozenset(
-            {("classification", "single-output", "multi-annotator")}
-        )
+        return _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES
 
     def __init__(
         self,
