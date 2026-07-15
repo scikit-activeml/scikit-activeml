@@ -4,6 +4,7 @@ from sklearn import clone
 from skactiveml.base import (
     SingleAnnotatorPoolQueryStrategy,
     ProbabilisticRegressor,
+    _SINGLE_OUTPUT_REGRESSION_CAPABILITIES,
 )
 
 from skactiveml.pool.utils import (
@@ -43,6 +44,9 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Random state for candidate selection.
+    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+        Declared target type. This strategy supports only single-output
+        regression.
 
     References
     ----------
@@ -53,7 +57,7 @@ class KLDivergenceMaximization(SingleAnnotatorPoolQueryStrategy):
 
     @property
     def _target_capabilities(self):
-        return frozenset({("regression", "single-output", "single-annotator")})
+        return _SINGLE_OUTPUT_REGRESSION_CAPABILITIES
 
     def __init__(
         self,

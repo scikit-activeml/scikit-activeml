@@ -14,6 +14,7 @@ from ..utils import (
     unlabeled_indices,
     is_unlabeled,
 )
+from ._target import _resolve_estimator_target_spec
 
 
 class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
@@ -40,6 +41,10 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. Expected-error-reduction strategies support
+        only single-output classification.
 
     References
     ----------
@@ -159,6 +164,11 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        check_type(clf, "clf", SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label)
+        check_type(fit_clf, "fit_clf", bool)
+        target_spec = _resolve_estimator_target_spec(self, clf, y)
+
         (
             X,
             y,
@@ -183,6 +193,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             check_X_dict=None,
+            target_type=target_spec.target_type,
         )
 
         _, mapping = self._transform_candidates(
@@ -206,9 +217,6 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             X_eval,
             sample_weight_eval,
         )
-
-        # Check fit_clf
-        check_type(fit_clf, "fit_clf", bool)
 
         # Initialize classifier that works with indices to improve readability
         id_clf = IndexClassifierWrapper(
@@ -293,6 +301,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
+        target_type=None,
     ):
         # Validate input parameters.
         (
@@ -309,6 +318,7 @@ class ExpectedErrorReduction(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=reset,
             check_X_dict=check_X_dict,
+            target_type=target_type,
         )
 
         # Validate classifier type.
@@ -532,6 +542,10 @@ class MonteCarloEER(ExpectedErrorReduction):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None,d efault=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. MonteCarloEER supports only single-output
+        classification.
 
     References
     ----------
@@ -669,6 +683,10 @@ class ValueOfInformationEER(ExpectedErrorReduction):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. ValueOfInformationEER supports only
+        single-output classification.
 
     References
     ----------

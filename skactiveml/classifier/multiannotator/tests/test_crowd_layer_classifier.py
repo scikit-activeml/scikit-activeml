@@ -14,10 +14,15 @@ try:
 
     from skorch.utils import to_numpy
 
-    from skactiveml.tests.template_estimator import TemplateEstimator
+    from skactiveml.tests.template_estimator import (
+        TemplateEstimator,
+        TemplateMultiAnnotatorClassifier,
+    )
     from skactiveml.classifier.multiannotator import CrowdLayerClassifier
 
-    class TestCrowdLayerClassifier(TemplateEstimator, unittest.TestCase):
+    class TestCrowdLayerClassifier(
+        TemplateMultiAnnotatorClassifier, TemplateEstimator, unittest.TestCase
+    ):
 
         def setUp(self):
             # Set global seeds.
@@ -90,6 +95,12 @@ try:
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
             )
+            self.target_contract_estimator_factory = (
+                lambda: CrowdLayerClassifier(
+                    **deepcopy(self.init_default_params)
+                )
+            )
+            self.target_contract_fit_params = deepcopy(self.fit_default_params)
 
         # ------------------------------------------------------------------
         # Helpers
@@ -266,19 +277,6 @@ try:
                 (np.int32, RuntimeError),
             ]
             self._test_param("init", "sample_dtype", test_cases)
-
-        def test_init_param_target_type(self):
-            self._test_param(
-                "init",
-                "target_type",
-                [
-                    ("auto", None),
-                    ("single-output", None),
-                    ("multi-label", ValueError),
-                    ("multi-output", ValueError),
-                    ("invalid", ValueError),
-                ],
-            )
 
         def test_init_param_cost_matrix(self):
             test_cases = [

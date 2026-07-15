@@ -909,6 +909,10 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. It must remain compatible with the wrapped
+        estimator across incremental updates.
     """
 
     def __init__(
@@ -1981,6 +1985,10 @@ if successful_capymoa_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : {"auto", "single-output", "multi-label", \
+                "multi-output"}, default="auto"
+            Declared target type. This wrapper supports only single-output
+            classification.
 
         Attributes
         ----------
@@ -2009,12 +2017,14 @@ if successful_capymoa_import:
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
+            target_type="auto",
         ):
             super().__init__(
                 classes=classes,
                 missing_label=missing_label,
                 cost_matrix=cost_matrix,
                 random_state=random_state,
+                target_type=target_type,
             )
             self.estimator_class = estimator_class
             self.estimator_param_dict = estimator_param_dict
@@ -2267,6 +2277,10 @@ if successful_river_import:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : {"auto", "single-output", "multi-label", \
+                "multi-output"}, default="auto"
+            Declared target type. This wrapper supports only single-output
+            classification.
 
         Attributes
         ----------
@@ -2294,12 +2308,14 @@ if successful_river_import:
             missing_label=MISSING_LABEL,
             cost_matrix=None,
             random_state=None,
+            target_type="auto",
         ):
             super().__init__(
                 classes=classes,
                 missing_label=missing_label,
                 cost_matrix=cost_matrix,
                 random_state=random_state,
+                target_type=target_type,
             )
             self.estimator = estimator
 

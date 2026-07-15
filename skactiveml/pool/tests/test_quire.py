@@ -51,6 +51,20 @@ class TestQuire(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             {"y": ["0", "1", "none", "none"]},
         )
 
+    def test_nested_classes_resolve_before_capability_rejection(self):
+        strategy = Quire(classes=[[0, 1, 2], [0, 1, 2]])
+        y = np.array([[0, 1], [1, 2], [np.nan, np.nan], [np.nan, np.nan]])
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Quire does not support target capability.*multi-output",
+        ):
+            strategy.query(X=self.X, y=y)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
     def test_init_param_lmbda(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

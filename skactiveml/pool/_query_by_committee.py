@@ -24,6 +24,7 @@ from ..utils import (
     check_equal_missing_label,
     check_scalar,
 )
+from ._target import _resolve_estimator_target_spec
 
 
 class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
@@ -92,6 +93,10 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. This strategy supports single-output
+        classification and regression.
 
     References
     ----------
@@ -225,12 +230,6 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
-        # Validate input parameters.
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
-        )
-
-        X_cand, mapping = self._transform_candidates(candidates, X, y)
         check_type(fit_ensemble, "fit_ensemble", bool)
         ensemble, est_arr, classes, sample_func, sample_dict = _check_ensemble(
             ensemble=ensemble,
@@ -238,11 +237,32 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
             y=y,
             sample_weight=sample_weight,
             fit_ensemble=fit_ensemble,
-            missing_label=self.missing_label_,
+            missing_label=self.missing_label,
             estimator_types=[SkactivemlClassifier, SkactivemlRegressor],
             sample_predictions_method_name=self.sample_predictions_method_name,
             sample_predictions_dict=self.sample_predictions_dict,
         )
+        target_estimator = (
+            ensemble
+            if isinstance(
+                ensemble, (SkactivemlClassifier, SkactivemlRegressor)
+            )
+            else est_arr[0]
+        )
+        target_spec = _resolve_estimator_target_spec(self, target_estimator, y)
+
+        # Validate input parameters.
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
+
+        X_cand, mapping = self._transform_candidates(candidates, X, y)
         check_type(
             self.method,
             "method",

@@ -6,18 +6,16 @@ Module implementing 4DS active learning strategy.
 
 
 import numpy as np
-from sklearn.base import clone
 
 from ..base import SingleAnnotatorPoolQueryStrategy
 from ..classifier import MixtureModelClassifier
 from ..utils import (
     rand_argmax,
     is_labeled,
-    check_type,
     MISSING_LABEL,
-    check_equal_missing_label,
     check_scalar,
 )
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class FourDs(SingleAnnotatorPoolQueryStrategy):
@@ -41,6 +39,10 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. This strategy supports only single-output
+        classification.
 
     References
     ----------
@@ -128,6 +130,18 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(MixtureModelClassifier,),
+        )
+
         # Check standard parameters.
         (
             X,
@@ -142,12 +156,8 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
+            target_type=target_spec.target_type,
         )
-
-        # Check classifier type.
-        check_type(clf, "clf", MixtureModelClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
 
         # Check lmbda.
         lmbda = self.lmbda
@@ -163,9 +173,7 @@ class FourDs(SingleAnnotatorPoolQueryStrategy):
         # Storage for query indices.
         query_indices_cand = np.full(batch_size, fill_value=-1, dtype=int)
 
-        # Fit the classifier and get the probabilities.
-        if fit_clf:
-            clf = clone(clf).fit(X, y, sample_weight)
+        # Get classifier probabilities.
         P_cand = clf.predict_proba(X_cand)
         R_cand = clf.mixture_model_.predict_proba(X_cand)
         is_lbld = is_labeled(y, missing_label=clf.missing_label)

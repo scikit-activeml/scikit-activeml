@@ -61,6 +61,13 @@ class TestQueryByCommittee(
             query_default_params_reg=query_default_params_reg,
         )
 
+    def test_fitted_multilabel_classifier_rejected_before_state(self):
+        self._test_fitted_multilabel_classifier_rejection(
+            estimator_param="ensemble",
+            fit_param="fit_ensemble",
+            ensemble=True,
+        )
+
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [(1, TypeError), ("string", TypeError)]

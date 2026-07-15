@@ -5,6 +5,7 @@ from sklearn.utils.validation import check_array, _check_n_features
 from skactiveml.base import (
     ProbabilisticRegressor,
     SingleAnnotatorPoolQueryStrategy,
+    _SINGLE_OUTPUT_REGRESSION_CAPABILITIES,
 )
 from skactiveml.utils import check_type, simple_batch, MISSING_LABEL
 from skactiveml.pool.utils import _update_reg, conditional_expect
@@ -28,6 +29,9 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState or None, default=None
         Random state for candidate selection.
+    target_type : {"auto", "single-output", "multi-output"}, default="auto"
+        Declared target type. This strategy supports only single-output
+        regression.
 
     References
     ----------
@@ -37,7 +41,7 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
 
     @property
     def _target_capabilities(self):
-        return frozenset({("regression", "single-output", "single-annotator")})
+        return _SINGLE_OUTPUT_REGRESSION_CAPABILITIES
 
     def __init__(
         self,

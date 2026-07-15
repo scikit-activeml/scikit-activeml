@@ -6,6 +6,8 @@ import numpy as np
 from numpy.random import RandomState
 from sklearn import clone
 import sklearn.datasets
+from sklearn.linear_model import SGDClassifier
+from sklearn.multioutput import MultiOutputClassifier
 
 from skactiveml.tests.utils import (
     check_positional_args,
@@ -13,6 +15,7 @@ from skactiveml.tests.utils import (
 )
 
 from skactiveml.exceptions import MappingError
+from skactiveml.classifier import SklearnClassifier
 from skactiveml.utils import (
     MISSING_LABEL,
     is_unlabeled,
@@ -639,6 +642,46 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
 
 
 class TemplateSingleAnnotatorPoolQueryStrategy(TemplatePoolQueryStrategy):
+    def _test_fitted_multilabel_classifier_rejection(
+        self,
+        *,
+        estimator_param="clf",
+        fit_param="fit_clf",
+        ensemble=False,
+    ):
+        X = np.array([[0.0], [1.0], [2.0], [3.0]])
+        y = np.array([[0, 1], [1, 0], [-1, -1], [-1, -1]])
+        classifier = SklearnClassifier(
+            MultiOutputClassifier(
+                SGDClassifier(loss="log_loss", random_state=0)
+            ),
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
+        ).fit(X, y)
+        estimator = (
+            [classifier, deepcopy(classifier)] if ensemble else classifier
+        )
+        init_params = deepcopy(self.init_default_params)
+        init_params["missing_label"] = -1
+        strategy = self.qs_class(**init_params)
+        query_params = {
+            "X": X,
+            "y": y,
+            estimator_param: estimator,
+            fit_param: False,
+        }
+
+        with self.assertRaisesRegex(
+            ValueError,
+            rf"{type(strategy).__name__} does not support target capability",
+        ):
+            strategy.query(**query_params)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
     def _test_classification_target_contract(
         self,
         expected_capabilities,

@@ -41,6 +41,10 @@ class Quire(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. This strategy supports only single-output
+        classification.
 
     References
     ----------

@@ -64,6 +64,10 @@ class CostEmbeddingAL(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for annotator selection.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. This strategy supports only single-output
+        classification.
 
     References
     ----------

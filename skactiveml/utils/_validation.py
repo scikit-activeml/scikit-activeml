@@ -345,7 +345,8 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
     if has_nested_classes:
         if cost_matrix is not None:
             raise ValueError(
-                "`cost_matrix` must be `None` for multi-label classification."
+                "`cost_matrix` must be `None` when `classes` contains "
+                "per-output vocabularies."
             )
         outer = list(classes)
         # Missing_label type check and ensure missing_label not in any task's

@@ -37,6 +37,21 @@ class TestCostEmbeddingAL(
         ]
         self._test_param("init", "classes", test_cases)
 
+    def test_nested_classes_resolve_before_capability_rejection(self):
+        strategy = CostEmbeddingAL(classes=[[0, 1, 2], [0, 1, 2]])
+        X = np.arange(8).reshape(4, 2)
+        y = np.array([[0, 1], [1, 2], [np.nan, np.nan], [np.nan, np.nan]])
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "CostEmbeddingAL does not support target capability.*multi-output",
+        ):
+            strategy.query(X=X, y=y)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
     def test_init_param_base_regressor(self):
         test_cases = [
             (1, TypeError),

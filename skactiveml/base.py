@@ -69,6 +69,9 @@ except ImportError:  # pragma: no cover
 _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES = frozenset(
     {("classification", "single-output", "multi-annotator")}
 )
+_SINGLE_OUTPUT_REGRESSION_CAPABILITIES = frozenset(
+    {("regression", "single-output", "single-annotator")}
+)
 _TASK_AGNOSTIC_TARGET_CAPABILITIES = frozenset(
     {
         ("classification", "single-output", "single-annotator"),
@@ -251,6 +254,13 @@ class PoolQueryStrategy(QueryStrategy):
 class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with a
     single annotator in scikit-activeml.
+
+    Parameters
+    ----------
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. Subclasses reject resolved specifications
+        outside their exact capabilities.
     """
 
     def __init__(
@@ -277,17 +287,28 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         if len(tasks) == 1:
             task = next(iter(tasks))
             if task == "classification":
-                target_type = _resolve_task_agnostic_target_type(
-                    y,
-                    target_type=self.target_type,
-                    missing_label=self.missing_label,
-                )
-                target_spec = TargetSpec(
-                    task=task,
-                    target_type=target_type,
-                    annotation_type="single-annotator",
-                    classes=None,
-                )
+                classes = getattr(self, "classes", None)
+                if classes is None:
+                    target_type = _resolve_task_agnostic_target_type(
+                        y,
+                        target_type=self.target_type,
+                        missing_label=self.missing_label,
+                    )
+                    target_spec = TargetSpec(
+                        task=task,
+                        target_type=target_type,
+                        annotation_type="single-annotator",
+                        classes=None,
+                    )
+                else:
+                    target_spec = resolve_target_spec(
+                        y,
+                        task=task,
+                        target_type=self.target_type,
+                        annotation_type="single-annotator",
+                        classes=classes,
+                        missing_label=self.missing_label,
+                    )
             else:
                 target_spec = resolve_target_spec(
                     y,
@@ -592,33 +613,19 @@ class _TaskAgnosticPoolQueryStrategy(SingleAnnotatorPoolQueryStrategy):
         return _TASK_AGNOSTIC_TARGET_CAPABILITIES
 
     def _resolve_target_type(self, y):
-        target_type = _resolve_task_agnostic_target_type(
-            y,
-            target_type=self.target_type,
-            missing_label=self.missing_label,
-        )
-        tasks = (
-            ("classification",)
-            if target_type == "multi-label"
-            else ("classification", "regression")
-        )
-        for task in tasks:
-            check_target_capability(
-                type(self).__name__,
-                TargetSpec(
-                    task=task,
-                    target_type=target_type,
-                    annotation_type="single-annotator",
-                    classes=None,
-                ),
-                self._target_capabilities,
-            )
-        return target_type
+        return self._resolve_query_target_type(y)
 
 
 class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     """Base class for all pool-based active learning query strategies with
     multiple annotators in scikit-activeml.
+
+    Parameters
+    ----------
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. Multi-annotator strategies support only
+        single-output classification in version 1.1.
     """
 
     def __init__(
@@ -1631,6 +1638,10 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
     random_state : int or np.RandomState or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. Concrete estimators reject resolved
+        specifications outside their exact capabilities.
     """
 
     def __init__(

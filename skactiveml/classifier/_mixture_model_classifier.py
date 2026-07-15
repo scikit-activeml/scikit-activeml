@@ -57,6 +57,10 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. This estimator supports only single-output
+        classification.
 
     Attributes
     ----------

@@ -6,7 +6,6 @@ selecting contrastive samples.
 import numpy as np
 
 from sklearn.neighbors import NearestNeighbors
-from sklearn.base import clone
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
@@ -15,8 +14,8 @@ from ..utils import (
     simple_batch,
     check_scalar,
     check_type,
-    check_equal_missing_label,
 )
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
@@ -58,6 +57,10 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", \
+            "multi-output"}, default="auto"
+        Declared target type. This strategy supports only single-output
+        classification.
 
     References
     ----------
@@ -153,9 +156,27 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
+            y,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
+        )
+
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         X_labeled = X[is_labeled(y, self.missing_label_)]
@@ -181,9 +202,6 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
             target_type=(float, int),
             min_inclusive=False,
         )
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_scalar(fit_clf, "fit_clf", bool)
         predict_proba_kwargs = {}
         if self.clf_embedding_flag_name is not None:
             check_type(
@@ -196,12 +214,6 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
                 predict_proba_kwargs = {self.clf_embedding_flag_name: True}
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
-
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
 
         if len(X_labeled) > 0:
             # Obtain classifier predictions and optionally learned feature
