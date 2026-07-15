@@ -1,10 +1,10 @@
 import numpy as np
 
-from ..base import SingleAnnotatorPoolQueryStrategy
+from ..base import _TaskAgnosticPoolQueryStrategy
 from ..utils import MISSING_LABEL, simple_batch
 
 
-class RandomSampling(SingleAnnotatorPoolQueryStrategy):
+class RandomSampling(_TaskAgnosticPoolQueryStrategy):
     """Random Sampling (RS)
 
     This class implements random sampling as a lower baseline for other query
@@ -17,11 +17,23 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Random state for candidate selection.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
     """
 
-    def __init__(self, missing_label=MISSING_LABEL, random_state=None):
+    def __init__(
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
+    ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
 
     def query(
@@ -80,6 +92,8 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X=X,
@@ -88,16 +102,15 @@ class RandomSampling(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_type,
         )
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
-            is_multioutput=is_multioutput,
+            target_type=target_type,
         )
 
         if mapping is None:

@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..base import SingleAnnotatorPoolQueryStrategy
+from ..base import _TaskAgnosticPoolQueryStrategy
 from ..utils import MISSING_LABEL, labeled_indices, check_scalar, rand_argmax
 
 from copy import deepcopy
@@ -9,7 +9,7 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
 
-class TypiClust(SingleAnnotatorPoolQueryStrategy):
+class TypiClust(_TaskAgnosticPoolQueryStrategy):
     """Typical Clustering (TypiClust)
 
     This class implements the Typical Clustering (TypiClust) query strategy
@@ -38,6 +38,11 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         The name of the parameter for the number of clusters.
     k : int, default=5
         The number for k-nearest-neighbors for the computation of typicality.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -54,9 +59,12 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
         cluster_algo_dict=None,
         n_cluster_param_name="n_clusters",
         k=5,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.cluster_algo = cluster_algo
         self.cluster_algo_dict = cluster_algo_dict
@@ -112,6 +120,8 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
+        target_type = self._resolve_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X=X,
@@ -120,7 +130,7 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_type,
         )
         check_scalar(self.k, "k", target_type=int, min_val=1)
         if not (
@@ -141,20 +151,19 @@ class TypiClust(SingleAnnotatorPoolQueryStrategy):
             raise TypeError("`n_cluster_param_name` supports only string.")
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         _, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
             enforce_mapping=True,
-            is_multioutput=is_multioutput,
+            target_type=target_type,
         )
 
         # Determine already labeled samples.
         labeled_sample_indices = labeled_indices(
             y=y,
             missing_label=self.missing_label,
-            target_type=("multi-label" if is_multioutput else "single-output"),
+            target_type=target_type,
         )
 
         # Set number of clusters.

@@ -8,7 +8,7 @@ from sklearn.metrics import pairwise_distances
 from sklearn.cluster import KMeans
 from sklearn.utils.validation import column_or_1d
 
-from ..base import SingleAnnotatorPoolQueryStrategy
+from ..base import _TaskAgnosticPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     rand_argmax,
@@ -17,7 +17,7 @@ from ..utils import (
 )
 
 
-class ProbCover(SingleAnnotatorPoolQueryStrategy):
+class ProbCover(_TaskAgnosticPoolQueryStrategy):
     """Probability Coverage (ProbCover)
 
     This class implements the Probability Coverage (ProbCover) query strategy
@@ -64,6 +64,11 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -82,9 +87,12 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
         distance_func=pairwise_distances,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.deltas = deltas
         self.alpha = alpha
@@ -146,6 +154,8 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is `None` or of shape `(n_candidates,)`, the
               indexing refers to the samples in `X`.
         """
+        target_type = self._resolve_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X=X,
@@ -154,17 +164,16 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_type,
         )
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         _, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
             enforce_mapping=True,
-            is_multioutput=is_multioutput,
+            target_type=target_type,
         )
 
         # Infer number of classes, which must have a minimum of 2.
@@ -175,12 +184,10 @@ class ProbCover(SingleAnnotatorPoolQueryStrategy):
             is_lbld = is_labeled(
                 y=y,
                 missing_label=self.missing_label_,
-                target_type=(
-                    "multi-label" if is_multioutput else "single-output"
-                ),
+                target_type=target_type,
             )
             y_labeled = y[is_lbld]
-            if is_multioutput:
+            if target_type == "multi-label":
                 n_classes = len(
                     {tuple(np.asarray(row).tolist()) for row in y_labeled}
                 )

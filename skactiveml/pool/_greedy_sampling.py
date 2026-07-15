@@ -3,6 +3,7 @@ from sklearn import clone
 from sklearn.metrics import pairwise_distances, pairwise
 
 from skactiveml.base import (
+    _TaskAgnosticPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
     SkactivemlRegressor,
 )
@@ -16,7 +17,7 @@ from skactiveml.utils import (
 )
 
 
-class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
+class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
     """Greedy Sampling in the Feature Space (GSx)
 
     This class implements the query strategy Greedy Sampling in the Feature
@@ -41,6 +42,11 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -54,9 +60,12 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         metric_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict
@@ -116,6 +125,8 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        target_type = self._resolve_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -124,13 +135,12 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_type,
         )
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+            candidates=candidates, X=X, y=y, target_type=target_type
         )
 
         # Determine already labeled samples.
@@ -138,7 +148,7 @@ class GreedySamplingX(SingleAnnotatorPoolQueryStrategy):
         selected_indices = labeled_indices(
             y=y,
             missing_label=self.missing_label,
-            target_type=("multi-label" if is_multioutput else "single-output"),
+            target_type=target_type,
         )
 
         if mapping is None:

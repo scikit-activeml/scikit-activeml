@@ -77,7 +77,9 @@ class TestSubSamplingWrapper(
             "missing_label": MISSING_LABEL,
         }
         init_default_params_multilabel = {
-            "query_strategy": RandomSampling(random_state=0),
+            "query_strategy": RandomSampling(
+                random_state=0, target_type="multi-label"
+            ),
             "max_candidates": 20,
         }
         params_clf_multilabel = {
@@ -328,7 +330,9 @@ class TestParallelUtilityEstimationWrapper(
                 "n_jobs": 2,
             },
             init_default_params_multilabel={
-                "query_strategy": RandomSampling(random_state=0),
+                "query_strategy": RandomSampling(
+                    random_state=0, target_type="multi-label"
+                ),
                 "n_jobs": 2,
             },
             query_default_params_clf=query_default_params_clf,

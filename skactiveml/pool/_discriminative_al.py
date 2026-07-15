@@ -7,7 +7,7 @@ Module implementing discriminative active learning.
 import numpy as np
 from sklearn import clone
 
-from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
+from ..base import _TaskAgnosticPoolQueryStrategy, SkactivemlClassifier
 from ..utils import (
     MISSING_LABEL,
     rand_argmax,
@@ -17,7 +17,7 @@ from ..utils import (
 )
 
 
-class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
+class DiscriminativeAL(_TaskAgnosticPoolQueryStrategy):
     """Discriminative Active Learning (DAL)
 
     This class implements the "Discriminative Active Learning" (DAL) [1]_
@@ -43,6 +43,11 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -55,9 +60,12 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
         greedy_selection=False,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.greedy_selection = greedy_selection
 
@@ -128,6 +136,8 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X=X,
@@ -136,20 +146,19 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_type,
         )
         check_type(discriminator, "discriminator", SkactivemlClassifier)
         check_type(self.greedy_selection, "greedy_selection", bool)
 
         # Retransform candidates and create a potential mapping to the samples
         # in `X`.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
             enforce_mapping=True,
-            is_multioutput=is_multioutput,
+            target_type=target_type,
         )
 
         # Re-define discriminator to fit the setting of classifying
@@ -164,9 +173,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
             y_discriminator = is_unlabeled(
                 y=y,
                 missing_label=self.missing_label,
-                target_type=(
-                    "multi-label" if is_multioutput else "single-output"
-                ),
+                target_type=target_type,
             )
             y_discriminator = y_discriminator.astype(int)
             discriminator.fit(X, y_discriminator)
@@ -194,9 +201,7 @@ class DiscriminativeAL(SingleAnnotatorPoolQueryStrategy):
                 y_discriminator = is_unlabeled(
                     y=y,
                     missing_label=self.missing_label,
-                    target_type=(
-                        "multi-label" if is_multioutput else "single-output"
-                    ),
+                    target_type=target_type,
                 )
                 y_discriminator = y_discriminator.astype(int)
 

@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..base import SingleAnnotatorPoolQueryStrategy
+from ..base import _TaskAgnosticPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     labeled_indices,
@@ -16,7 +16,7 @@ from sklearn.utils.validation import (
 from sklearn.metrics import pairwise_distances_argmin_min
 
 
-class CoreSet(SingleAnnotatorPoolQueryStrategy):
+class CoreSet(_TaskAgnosticPoolQueryStrategy):
     """Core Set
 
     This class implements the core-set based query strategy, i.e., the
@@ -41,6 +41,11 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target structure. Automatic resolution accepts only
+        unambiguous one-dimensional targets; two-dimensional multi-label
+        targets must be declared explicitly.
 
     References
     ----------
@@ -54,9 +59,12 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
         metric_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.metric = metric
         self.metric_dict = metric_dict
@@ -121,6 +129,8 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        target_type = self._resolve_target_type(y)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X=X,
@@ -129,13 +139,12 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
             batch_size=batch_size,
             return_utilities=return_utilities,
             reset=True,
-            allow_multioutput=True,
+            target_type=target_type,
         )
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+            candidates=candidates, X=X, y=y, target_type=target_type
         )
 
         # Perform selection depending on whether the candidate samples are part
@@ -150,20 +159,20 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 mapping=mapping,
                 metric=self.metric,
                 metric_dict=self.metric_dict,
-                is_multioutput=is_multioutput,
+                target_type=target_type,
             )
         else:
             selected_samples = labeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                target_type=(
-                    "multi-label" if is_multioutput else "single-output"
-                ),
+                target_type=target_type,
             )
             X_with_cand = np.concatenate((X_cand, X[selected_samples]), axis=0)
             n_new_cand = X_cand.shape[0]
             y_cand_shape = (
-                (n_new_cand, y.shape[1]) if is_multioutput else (n_new_cand,)
+                (n_new_cand, y.shape[1])
+                if target_type == "multi-label"
+                else (n_new_cand,)
             )
             y_cand = np.full(
                 shape=y_cand_shape,
@@ -182,7 +191,7 @@ class CoreSet(SingleAnnotatorPoolQueryStrategy):
                 n_new_cand=n_new_cand,
                 metric=self.metric,
                 metric_dict=self.metric_dict,
-                is_multioutput=is_multioutput,
+                target_type=target_type,
             )
         if return_utilities:
             return query_indices, utilities
@@ -200,7 +209,7 @@ def k_greedy_center(
     n_new_cand=None,
     metric="euclidean",
     metric_dict=None,
-    is_multioutput=False,
+    target_type="single-output",
 ):
     """An active learning method that greedily forms a batch to minimize the
     maximum distance to a cluster center among all unlabeled datapoints.
@@ -233,8 +242,8 @@ def k_greedy_center(
     metric_dict : dict, default=None
         Any further parameters are passed directly to the function
         `sklearn.metrics.pairwise_distances_argmin_min` as `metric_kwargs`.
-    is_multioutput : bool, default=False
-        Whether provided data is in multioutput format or not.
+    target_type : {"single-output", "multi-label"}, default="single-output"
+        Resolved target type used for sample-level label masks.
 
     Returns
     -------
@@ -263,14 +272,18 @@ def k_greedy_center(
     """
     # Validate input parameters.
     X = check_array(X, allow_nd=True)
-    if not is_multioutput:
+    if target_type == "single-output":
         y = check_array(
             y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
         )
         y = column_or_1d(y, warn=True)
-    else:
+    elif target_type == "multi-label":
         y = check_array(
             y, ensure_2d=True, ensure_all_finite="allow-nan", dtype=None
+        )
+    else:
+        raise ValueError(
+            "`target_type` must be either 'single-output' or 'multi-label'."
         )
     check_consistent_length(X, y)
     random_state_ = check_random_state(random_state)
@@ -279,7 +292,7 @@ def k_greedy_center(
         mapping = unlabeled_indices(
             y=y,
             missing_label=missing_label,
-            target_type=("multi-label" if is_multioutput else "single-output"),
+            target_type=target_type,
         )
     else:
         mapping = column_or_1d(mapping, dtype=int, warn=True)
@@ -303,7 +316,7 @@ def k_greedy_center(
     selected_samples = labeled_indices(
         y=y,
         missing_label=missing_label,
-        target_type=("multi-label" if is_multioutput else "single-output"),
+        target_type=target_type,
     )
     query_indices = np.zeros(batch_size, dtype=int)
     for i in range(batch_size):

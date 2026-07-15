@@ -722,9 +722,9 @@ class TestUHerding(
         query_indices_uh, utilities_uh = UHerding(
             adaptive_sigma=False, random_state=0
         ).query(X, y, clf=clf, batch_size=2, return_utilities=True)
-        query_indices_mh, utilities_mh = MaxHerding(random_state=0).query(
-            X, y, batch_size=2, return_utilities=True
-        )
+        query_indices_mh, utilities_mh = MaxHerding(
+            random_state=0, target_type="multi-label"
+        ).query(X, y, batch_size=2, return_utilities=True)
 
         np.testing.assert_array_equal(query_indices_uh, query_indices_mh)
         np.testing.assert_allclose(utilities_uh, utilities_mh)

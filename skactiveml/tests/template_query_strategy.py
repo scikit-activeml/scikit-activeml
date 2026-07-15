@@ -306,6 +306,18 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         test_cases += [(ml, None), (Dummy, TypeError)]
         self._test_param("init", "missing_label", test_cases)
 
+    def test_init_param_target_type(self):
+        if (
+            "target_type"
+            not in inspect.signature(self.qs_class.__init__).parameters
+        ):
+            return
+        self._test_param(
+            "init",
+            "target_type",
+            [("invalid", ValueError)],
+        )
+
     def test_query_param_X(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [
@@ -597,6 +609,11 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         init_params = deepcopy(self.init_default_params)
         if self.init_default_params_multilabel is not None:
             init_params.update(deepcopy(self.init_default_params_multilabel))
+        if (
+            "target_type"
+            in inspect.signature(self.qs_class.__init__).parameters
+        ):
+            init_params["target_type"] = "multi-label"
         return init_params
 
 

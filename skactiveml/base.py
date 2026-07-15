@@ -17,9 +17,14 @@ from sklearn.utils.validation import (
 )
 
 from .exceptions import MappingError
-from .utils._target import check_target_capability, resolve_target_spec
+from .utils._target import (
+    _resolve_task_agnostic_target_type,
+    check_target_capability,
+    resolve_target_spec,
+)
 from .utils import (
     MISSING_LABEL,
+    TargetSpec,
     is_labeled,
     is_unlabeled,
     unlabeled_indices,
@@ -64,6 +69,13 @@ except ImportError:  # pragma: no cover
 
 _MULTI_ANNOTATOR_CLASSIFICATION_CAPABILITIES = frozenset(
     {("classification", "single-output", "multi-annotator")}
+)
+_TASK_AGNOSTIC_TARGET_CAPABILITIES = frozenset(
+    {
+        ("classification", "single-output", "single-annotator"),
+        ("classification", "multi-label", "single-annotator"),
+        ("regression", "single-output", "single-annotator"),
+    }
 )
 _TARGET_SPEC_NOT_PROVIDED = object()
 
@@ -510,6 +522,50 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 )
             else:
                 return candidates, None
+
+
+class _TaskAgnosticPoolQueryStrategy(SingleAnnotatorPoolQueryStrategy):
+    """Shared target contract for estimator-free, task-agnostic strategies."""
+
+    def __init__(
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
+    ):
+        super().__init__(
+            missing_label=missing_label,
+            random_state=random_state,
+        )
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return _TASK_AGNOSTIC_TARGET_CAPABILITIES
+
+    def _resolve_target_type(self, y):
+        target_type = _resolve_task_agnostic_target_type(
+            y,
+            target_type=self.target_type,
+            missing_label=self.missing_label,
+        )
+        tasks = (
+            ("classification",)
+            if target_type == "multi-label"
+            else ("classification", "regression")
+        )
+        for task in tasks:
+            check_target_capability(
+                type(self).__name__,
+                TargetSpec(
+                    task=task,
+                    target_type=target_type,
+                    annotation_type="single-annotator",
+                    classes=None,
+                ),
+                self._target_capabilities,
+            )
+        return target_type
 
 
 class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):

@@ -220,6 +220,66 @@ def resolve_target_spec(
     )
 
 
+def _resolve_task_agnostic_target_type(
+    y,
+    *,
+    target_type="auto",
+    missing_label=MISSING_LABEL,
+):
+    """Resolve target structure without assigning a prediction task."""
+    _validate_target_semantics(
+        "classification",
+        target_type,
+        "single-annotator",
+        allow_auto=True,
+    )
+    y = check_array(
+        y,
+        ensure_2d=False,
+        ensure_all_finite=False,
+        ensure_min_samples=0,
+        dtype=None,
+    )
+    if y.ndim == 0:
+        raise TypeError("`y` must be a one- or two-dimensional array-like.")
+
+    if target_type == "auto":
+        if y.ndim != 1:
+            raise ValueError(
+                "Two-dimensional targets with `target_type='auto'` are "
+                "ambiguous for a task-agnostic strategy; declare "
+                "`target_type`."
+            )
+        return "single-output"
+
+    if target_type == "single-output":
+        if y.ndim == 2 and y.shape[1] == 1:
+            return target_type
+        if y.ndim != 1:
+            raise ValueError(
+                "Single-output targets must be one-dimensional or a column "
+                "vector."
+            )
+        return target_type
+
+    if target_type == "multi-label":
+        if y.ndim != 2:
+            raise ValueError("Multi-label targets must be two-dimensional.")
+        is_unlabeled(
+            y,
+            missing_label=missing_label,
+            target_type="multi-label",
+        )
+        return target_type
+
+    if y.ndim != 2 or y.shape[1] < 2:
+        raise ValueError(
+            "Multi-output targets must be two-dimensional with at least two "
+            "target columns."
+        )
+    return target_type
+
+
 def _has_nested_classes(classes):
     if isinstance(classes, (str, bytes)):
         return False

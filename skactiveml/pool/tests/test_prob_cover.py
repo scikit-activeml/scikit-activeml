@@ -258,6 +258,7 @@ class TestProbCover(
             cluster_algo=ClusterRecorder,
             cluster_algo_dict={},
             random_state=0,
+            target_type="multi-label",
         )
         qs.query(X, y, update=True)
         self.assertEqual(ClusterRecorder.seen_n_clusters, 3)
