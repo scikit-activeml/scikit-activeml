@@ -113,6 +113,17 @@ class TemplateQueryStrategy:
             test_cases=test_cases, fit_values=fit_values, model_type="reg"
         )
 
+    def _default_query_params(self, model_type):
+        if model_type == "clf":
+            return (
+                self.query_default_params_clf
+                if self.query_default_params_clf is not None
+                else self.query_default_params_clf_multilabel
+            )
+        if model_type == "reg":
+            return self.query_default_params_reg
+        raise ValueError("Only 'reg' or 'clf' is allowed as `model_type`.")
+
     def _fit_test(self, test_cases, model_type, fit_values=None):
         fit_values = [False, True] if fit_values is None else fit_values
         query_params = inspect.signature(self.qs_class.query).parameters
@@ -125,18 +136,7 @@ class TemplateQueryStrategy:
             # check if model remains the same for both options
             for fit_type in fit_values:
                 with self.subTest(msg="Model consistency"):
-                    if model_type == "clf":
-                        query_params = (
-                            self.query_default_params_clf
-                            if self.query_default_params_clf is not None
-                            else self.query_default_params_clf_multilabel
-                        )
-                    elif model_type == "reg":
-                        query_params = self.query_default_params_reg
-                    else:
-                        raise ValueError(
-                            "Only 'reg' or 'clf' is allowed as `model_type`."
-                        )
+                    query_params = self._default_query_params(model_type)
                     mdl = deepcopy(query_params[f"{model_type}"])
                     if not fit_type:
                         mdl.fit(query_params["X"], query_params["y"])
@@ -184,18 +184,7 @@ class TemplateQueryStrategy:
 
             # check if model remains the same
             with self.subTest(msg=f"{model_type} consistency"):
-                if model_type == "clf":
-                    query_params = (
-                        self.query_default_params_clf
-                        if self.query_default_params_clf is not None
-                        else self.query_default_params_clf_multilabel
-                    )
-                elif model_type == "reg":
-                    query_params = self.query_default_params_reg
-                else:
-                    raise ValueError(
-                        "Only 'reg' or 'clf' is allowed as `model_type`."
-                    )
+                query_params = self._default_query_params(model_type)
                 mdl = deepcopy(query_params[f"{model_type}"])
                 query_params = deepcopy(query_params)
                 query_params[f"{model_type}"] = deepcopy(mdl)
