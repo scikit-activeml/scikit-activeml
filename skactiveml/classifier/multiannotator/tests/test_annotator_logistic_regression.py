@@ -6,11 +6,16 @@ from sklearn.utils.validation import check_is_fitted
 from sklearn.datasets import make_blobs
 from sklearn.linear_model import LogisticRegression
 
-from skactiveml.tests.template_estimator import TemplateEstimator
+from skactiveml.tests.template_estimator import (
+    TemplateEstimator,
+    TemplateMultiAnnotatorClassifier,
+)
 from skactiveml.classifier.multiannotator import AnnotatorLogisticRegression
 
 
-class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
+class TestAnnotatorLogisticRegression(
+    TemplateMultiAnnotatorClassifier, TemplateEstimator, unittest.TestCase
+):
     def setUp(self):
         self.X = np.zeros((2, 1))
         self.y_nan = [["nan", "nan", "nan"], ["nan", "nan", "nan"]]
@@ -41,6 +46,14 @@ class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
             fit_default_params=fit_default_params,
             predict_default_params=predict_default_params,
         )
+        self.target_contract_estimator_factory = lambda: (
+            AnnotatorLogisticRegression(
+                classes=self.classes,
+                missing_label="nan",
+                random_state=0,
+            )
+        )
+        self.target_contract_fit_params = fit_default_params
 
     def test_init_param_n_annotators(self):
         lr = AnnotatorLogisticRegression()
@@ -53,61 +66,6 @@ class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
         lr = AnnotatorLogisticRegression(n_annotators=1, missing_label="nan")
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
-
-    def test_init_param_target_type(self):
-        self._test_param(
-            "init",
-            "target_type",
-            [
-                ("auto", None),
-                ("single-output", None),
-                ("multi-label", ValueError),
-                ("multi-output", ValueError),
-                ("invalid", ValueError),
-            ],
-        )
-
-    def test_resolved_target_spec_preserves_annotator_columns(self):
-        lr = AnnotatorLogisticRegression(
-            classes=self.classes,
-            missing_label="nan",
-            random_state=0,
-        )
-
-        lr.fit(X=self.X, y=self.y)
-
-        self.assertEqual(lr.target_type, "auto")
-        self.assertEqual(
-            lr._target_capabilities,
-            frozenset(
-                {
-                    (
-                        "classification",
-                        "single-output",
-                        "multi-annotator",
-                    )
-                }
-            ),
-        )
-        self.assertEqual(lr.target_spec_.task, "classification")
-        self.assertEqual(lr.target_spec_.target_type, "single-output")
-        self.assertEqual(lr.target_spec_.annotation_type, "multi-annotator")
-        self.assertEqual(lr.target_spec_.classes, ("paris", "tokyo"))
-
-    def test_explicit_multilabel_intent_fails_before_fitted_state(self):
-        lr = AnnotatorLogisticRegression(
-            classes=self.classes,
-            missing_label="nan",
-            target_type="multi-label",
-        )
-
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            lr.fit(X=self.X, y=self.y)
-
-        self.assertFalse(hasattr(lr, "target_spec_"))
-        self.assertFalse(hasattr(lr, "classes_"))
 
     def test_init_param_tol(self):
         lr = AnnotatorLogisticRegression()

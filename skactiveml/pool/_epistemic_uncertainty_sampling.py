@@ -57,10 +57,16 @@ class EpistemicUncertaintySampling(SingleAnnotatorPoolQueryStrategy):
     """
 
     def __init__(
-        self, precompute=False, missing_label=MISSING_LABEL, random_state=None
+        self,
+        precompute=False,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.precompute = precompute
 

@@ -253,7 +253,6 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
             target_type=target_spec.target_type,
         )
 

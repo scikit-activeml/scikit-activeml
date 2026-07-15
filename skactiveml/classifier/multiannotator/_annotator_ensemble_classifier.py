@@ -91,8 +91,8 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
-        self.target_type = target_type
         self.estimators = estimators
         self.voting = voting
 
@@ -133,7 +133,6 @@ class AnnotatorEnsembleClassifier(MetaEstimatorMixin, SkactivemlClassifier):
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
-            y_ensure_1d=False,
         )
 
         # Copy estimators

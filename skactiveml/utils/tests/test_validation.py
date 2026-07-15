@@ -23,7 +23,7 @@ from skactiveml.utils._validation import (
     _check_1d_class_list,
     _check_callable,
     _check_forward_outputs,
-    _is_multioutput_classes,
+    _has_nested_classes,
 )
 
 
@@ -210,7 +210,7 @@ class TestValidation(unittest.TestCase):
         self.assertIsNone(check_classes(None))
 
     def test_private_class_validation_helpers(self):
-        self.assertFalse(_is_multioutput_classes(2))
+        self.assertFalse(_has_nested_classes(2))
 
         self.assertRaises(TypeError, _check_1d_class_list, 2, name="classes")
         self.assertRaises(
@@ -315,7 +315,7 @@ class TestValidation(unittest.TestCase):
         self.assertTrue(isinstance(X, np.ndarray))
         y = [[1], [0]]
         X, y, X_cand, sample_weight, _ = check_X_y(
-            X, y, X_cand, sample_weight, multi_output=True
+            X, y, X_cand, sample_weight, target_type="multi-label"
         )
         self.assertTrue(isinstance(y, np.ndarray))
         y = np.array([1, 0], dtype=object)
@@ -330,7 +330,7 @@ class TestValidation(unittest.TestCase):
             y,
             X_cand_false,
             sample_weight,
-            multi_output=True,
+            target_type="multi-label",
         )
         y = np.array([[1, 0, 1], [2, 0, 1]])
         self.assertRaises(
@@ -340,7 +340,7 @@ class TestValidation(unittest.TestCase):
             y,
             X_cand,
             sample_weight,
-            multi_output=True,
+            target_type="multi-label",
         )
 
     def test_check_random_state(self):

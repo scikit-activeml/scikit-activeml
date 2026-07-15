@@ -105,22 +105,20 @@ def _is_nonstring_iterable(obj):
         return False
 
 
-def _is_multioutput_classes(classes):
-    """Check whether `classes` encodes a multioutput structure.
+def _has_nested_classes(classes):
+    """Check whether `classes` contains one vocabulary per target label.
 
     Parameters
     ----------
     classes : object
         Candidate class specification. Single-output class specifications are
-        expected to be one-dimensional iterables of scalar labels. Multioutput
-        specifications are expected to be iterables whose elements are
-        themselves one-dimensional iterables of scalar labels.
+        expected to be one-dimensional iterables of scalar labels. Nested
+        specifications are expected to contain one iterable per target label.
 
     Returns
     -------
-    is_multioutput : bool
-        `True` if `classes` has a nested structure corresponding to a
-        multioutput classification problem and `False` otherwise.
+    has_nested_classes : bool
+        `True` if `classes` has a nested structure and `False` otherwise.
 
     Raises
     ------
@@ -300,7 +298,7 @@ def check_classes(classes):
     if not _is_nonstring_iterable(classes):
         raise TypeError(f"`classes` is not iterable. Got {type(classes)}.")
 
-    if _is_multioutput_classes(classes):
+    if _has_nested_classes(classes):
         outer = list(classes)
         for i, c in enumerate(outer):
             _check_1d_class_list(c, name=f"classes[{i}]")
@@ -340,14 +338,14 @@ def check_classifier_params(classes, missing_label, cost_matrix=None):
     # Validates structure + duplicates + type-uniformity.
     check_classes(classes)
 
-    # Check whether `classes` is nested corresponding to multioutput.
-    multioutput = _is_multioutput_classes(classes)
+    # Check whether `classes` contains one vocabulary per target label.
+    has_nested_classes = _has_nested_classes(classes)
 
     # Enforce cost_matrix semantics.
-    if multioutput:
+    if has_nested_classes:
         if cost_matrix is not None:
             raise ValueError(
-                "`cost_matrix` must be `None` for multioutput classification."
+                "`cost_matrix` must be `None` for multi-label classification."
             )
         outer = list(classes)
         # Missing_label type check and ensure missing_label not in any task's
@@ -502,7 +500,7 @@ def check_X_y(
     ensure_all_finite=True,
     ensure_2d=True,
     allow_nd=False,
-    multi_output=False,
+    target_type="single-output",
     allow_nan=None,
     ensure_min_samples=1,
     ensure_min_features=1,
@@ -516,7 +514,7 @@ def check_X_y(
     `y` 1D. By default, `X` is checked to be non-empty and containing only
     finite values. Standard input checks are also applied to `y`, such as
     checking that `y` does not have `np.nan` or `np.inf` targets.
-    For multi-label `y`, set multi_output=True to allow 2D and sparse `y`.
+    For multi-label `y`, set `target_type="multi-label"`.
     If the dtype of `X` is object, attempt converting to float, raising on
     failure.
 
@@ -565,10 +563,9 @@ def check_X_y(
         Whether to raise a value error if X is not 2D.
     allow_nd : boolean, default=False
         Whether to allow X.ndim > 2.
-    multi_output : boolean, default=False
-        Whether to allow 2D y (array or sparse matrix). If false, y will be
-        validated as a vector. y cannot have np.nan or np.inf values if
-        multi_output=True.
+    target_type : {"single-output", "multi-label", "multi-output"}, \
+            default="single-output"
+        Resolved target type controlling target-array validation.
     allow_nan : boolean, default=None
         Whether to allow np.nan in y.
     ensure_min_samples : int, default=1
@@ -638,7 +635,16 @@ def check_X_y(
             estimator=estimator,
         )
     if y is not None:
-        if multi_output:
+        if target_type not in {
+            "single-output",
+            "multi-label",
+            "multi-output",
+        }:
+            raise ValueError(
+                "`target_type` must be one of {'single-output', "
+                "'multi-label', 'multi-output'}."
+            )
+        if target_type in {"multi-label", "multi-output"}:
             y = check_array(
                 y,
                 accept_sparse="csr",

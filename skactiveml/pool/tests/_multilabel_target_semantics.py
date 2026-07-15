@@ -136,7 +136,7 @@ class MultilabelOnlyTargetSemanticsMixin:
         self._assert_no_acquisition_state(strategy)
 
     def test_query_rejects_other_target_capabilities_before_state(self):
-        multioutput_y = np.array(
+        multi_output_y = np.array(
             [
                 [0.0, 0.0],
                 [1.0, 1.0],
@@ -144,7 +144,7 @@ class MultilabelOnlyTargetSemanticsMixin:
                 *[[np.nan, np.nan] for _ in range(5)],
             ]
         )
-        multioutput_clf = SklearnClassifier(
+        multi_output_clf = SklearnClassifier(
             estimator=MultiOutputClassifier(GaussianNB()),
             classes=[[0, 1, 2], [0, 1]],
             target_type="multi-output",
@@ -158,7 +158,7 @@ class MultilabelOnlyTargetSemanticsMixin:
         ).fit(self.X, self.y)
 
         cases = [
-            (multioutput_y, multioutput_clf, "SklearnClassifier"),
+            (multi_output_y, multi_output_clf, "SklearnClassifier"),
             (self.y, multiannotator_clf, self.strategy_class.__name__),
         ]
         for y, clf, component in cases:

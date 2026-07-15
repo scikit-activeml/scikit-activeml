@@ -111,7 +111,9 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         self.disagreement_threshold = disagreement_threshold
         self.target_type = target_type
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
 
     @property
@@ -204,7 +206,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
             target_type=target_spec.target_type,
         )
         X_cand, mapping = self._transform_candidates(

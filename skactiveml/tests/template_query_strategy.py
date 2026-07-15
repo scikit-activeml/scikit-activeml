@@ -319,11 +319,20 @@ class TemplatePoolQueryStrategy(TemplateQueryStrategy):
         self._test_param("init", "missing_label", test_cases)
 
     def test_init_param_target_type(self):
-        if (
-            "target_type"
-            not in inspect.signature(self.qs_class.__init__).parameters
-        ):
-            return
+        self.assertIn(
+            "target_type",
+            inspect.signature(self.qs_class.__init__).parameters,
+        )
+        strategy = self.qs_class(**deepcopy(self.init_default_params))
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertIsInstance(strategy._target_capabilities, frozenset)
+        self.assertTrue(strategy._target_capabilities)
+        self.assertFalse(
+            any(
+                target_type == "multi-output"
+                for _, target_type, _ in strategy._target_capabilities
+            )
+        )
         self._test_param(
             "init",
             "target_type",

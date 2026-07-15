@@ -162,8 +162,8 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
-        self.target_type = target_type
         self.n_annotators = n_annotators
         self.tol = tol
         self.max_iter = max_iter
@@ -201,7 +201,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         """
         # Check input data.
         X, y, sample_weight = self._validate_data(
-            X=X, y=y, sample_weight=sample_weight, y_ensure_1d=False
+            X=X, y=y, sample_weight=sample_weight
         )
 
         # Ensure value of 'tol' to be a positive integer.

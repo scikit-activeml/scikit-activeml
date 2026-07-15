@@ -87,6 +87,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
         cost_matrix=None,
         class_prior=0.0,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
@@ -94,6 +95,7 @@ class MixtureModelClassifier(ClassFrequencyEstimator):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.mixture_model = mixture_model
         self.weight_mode = weight_mode

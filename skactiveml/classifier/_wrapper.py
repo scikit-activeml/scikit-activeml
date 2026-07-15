@@ -22,7 +22,7 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
-from ..utils._target import check_target_capability
+from ..utils._target import TargetSpec, check_target_capability
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
@@ -35,7 +35,7 @@ from ..utils import (
     check_scalar,
     match_signature,
     check_n_features,
-    _is_multioutput_classes,
+    _has_nested_classes,
     resolve_target_spec,
 )
 
@@ -166,11 +166,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.estimator = estimator
         self.include_unlabeled_samples = include_unlabeled_samples
         self.proba_format = proba_format
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -390,13 +390,13 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 if not np.any(np.isnan(P)):
                     return P
 
-            # Multioutput corresponds to list of class arrays.
+            # Multi-label targets correspond to a list of class arrays.
             n_outputs = len(self.classes_)
 
             if proba_format == "array":
                 # Binary per task: return (n_samples, n_outputs) with P(y=1).
                 if isinstance(P, list):
-                    P_list = self._normalize_multioutput_proba_list(
+                    P_list = self._normalize_multilabel_proba_list(
                         P, n_samples=n_samples
                     )
                     P_ml = np.column_stack(
@@ -417,7 +417,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                     return P_ml
             else:
                 if isinstance(P, list):
-                    P_list = self._normalize_multioutput_proba_list(
+                    P_list = self._normalize_multilabel_proba_list(
                         P, n_samples=n_samples
                     )
                     if not any(np.any(np.isnan(P_j)) for P_j in P_list):
@@ -453,8 +453,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 ]
             )
 
-        # General multioutput format: return one probability matrix
-        # (n_samples, n_classes) per task.
+        # List format: return one probability matrix per label.
         return [
             _prior_matrix_from_counts(counts_j, len(X))
             for counts_j in self._label_counts
@@ -490,14 +489,11 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             "allow_nd": True,
             "dtype": None,
         }
-        is_multioutput = target_spec.target_type == "multi-label"
         X, y, sample_weight = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
-            y_ensure_1d=not is_multioutput,
-            multioutput_ensure_multilabel=is_multioutput,
             reset=fit_function == "fit" or not hasattr(self, "n_features_in_"),
             target_spec=target_spec,
         )
@@ -639,7 +635,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 (0, len(effective_classes)),
                 dtype=np.asarray(self.missing_label).dtype,
             )
-            if _is_multioutput_classes(effective_classes)
+            if _has_nested_classes(effective_classes)
             else classes
         )
         target_spec = self._resolve_target_spec(
@@ -647,11 +643,12 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         )
         self.target_spec_ = target_spec
         self._le = ExtLabelEncoder(
-            classes=self.target_spec_.classes, missing_label=self.missing_label
+            classes=self.target_spec_.classes,
+            missing_label=self.missing_label,
+            target_type=self.target_spec_.target_type,
         )
         self._le.fit(y_dummy)
         self.classes_ = self._le.classes_
-        self.multioutput_ = self._le.multioutput_
         if self._is_multilabel_target():
             self.cost_matrix_ = None
         else:
@@ -722,7 +719,7 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         return fit_method(**call_kwargs)
 
-    def _normalize_multioutput_proba_list(self, P, n_samples):
+    def _normalize_multilabel_proba_list(self, P, n_samples):
         """Align a list of per-output probability matrices to `classes_`.
 
         The wrapped estimator may return, for each output, a probability
@@ -923,12 +920,14 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         window_size=None,
         only_labeled=False,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.estimator = estimator
         self.only_labeled = only_labeled
@@ -972,6 +971,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
+            established_spec=None,
         )
 
         self._add_samples("fit", X, y, sample_weight)
@@ -1029,6 +1029,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
             y=y,
             sample_weight=sample_weight,
             check_X_dict=self.check_X_dict_,
+            established_spec=getattr(self, "target_spec_", None),
         )
 
         self._add_samples("partial_fit", X, y, sample_weight)
@@ -1096,11 +1097,21 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         return self
 
-    def _validate_data(self, X, y, sample_weight=None, check_X_dict=None):
+    def _validate_data(
+        self,
+        X,
+        y,
+        sample_weight=None,
+        check_X_dict=None,
+        established_spec=None,
+    ):
         # super._validate_data is not called because training with partial fit
         # with only one single available class in y leads to an error if
         # self.classes is not set, even though self.classes has no function in
         # this class.
+        target_spec = self._resolve_fitting_target_spec(
+            y, established_spec=established_spec
+        )
         if self.window_size is not None:
             check_scalar(
                 self.window_size,
@@ -1179,6 +1190,7 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
         # Store and check random state.
         self.random_state_ = check_random_state(self.random_state)
+        self.target_spec_ = target_spec
 
         return X, y, sample_weight
 
@@ -1662,7 +1674,7 @@ if successful_skorch_torch_import:
             self._initialize_fallbacks(P)
             return fw_out
 
-        def _effective_forward_outputs(self):
+        def _effective_forward_outputs(self, y=None):
             """Return the effective `forward_outputs` mapping.
 
             If the user did not specify `forward_outputs`, choose a reasonable
@@ -1686,7 +1698,7 @@ if successful_skorch_torch_import:
             if self.criterion is None:
                 crit_cls = (
                     nn.BCEWithLogitsLoss
-                    if self._uses_multilabel_target()
+                    if self._uses_multilabel_target(y=y)
                     else nn.CrossEntropyLoss
                 )
             else:
@@ -1705,19 +1717,51 @@ if successful_skorch_torch_import:
                 return {"proba": (0, torch.exp)}
 
             if crit_cls is nn.BCEWithLogitsLoss:
-                # Multilabel (or multioutput-binary): module returns
-                # logits per label.
+                # Multi-label modules return logits per label.
                 return {"proba": (0, torch.sigmoid)}
 
             # Fallback: treat the single forward output as already in
             # probability space. Caller is responsible for making this true.
             return {"proba": (0, None)}
 
-        def _uses_multilabel_target(self):
+        def _provisional_target_spec(self, y=None):
+            """Resolve semantics needed while constructing an unfitted net."""
             target_spec = getattr(self, "target_spec_", None)
             if target_spec is not None:
-                return target_spec.target_type == "multi-label"
-            return _is_multioutput_classes(classes=self.classes)
+                return target_spec
+            if y is not None:
+                return self._resolve_target_spec(y)
+            if self.classes is not None:
+                y_dummy = (
+                    np.empty(
+                        (0, len(self.classes)),
+                        dtype=np.asarray(self.missing_label).dtype,
+                    )
+                    if _has_nested_classes(self.classes)
+                    else self.classes
+                )
+                return self._resolve_target_spec(y_dummy)
+
+            target_type = (
+                "single-output"
+                if self.target_type == "auto"
+                else self.target_type
+            )
+            target_spec = TargetSpec(
+                task="classification",
+                target_type=target_type,
+                annotation_type="single-annotator",
+                classes=None,
+            )
+            check_target_capability(
+                type(self).__name__, target_spec, self._target_capabilities
+            )
+            return target_spec
+
+        def _uses_multilabel_target(self, y=None):
+            return (
+                self._provisional_target_spec(y).target_type == "multi-label"
+            )
 
         def _net_parts(self, X=None, y=None):
             """Assemble and validate network components.
@@ -1748,7 +1792,7 @@ if successful_skorch_torch_import:
                 empty.
             """
             if self.criterion is None:
-                if self._uses_multilabel_target():
+                if self._uses_multilabel_target(y=y):
                     criterion = nn.BCEWithLogitsLoss
                 else:
                     criterion = nn.CrossEntropyLoss
@@ -1757,7 +1801,7 @@ if successful_skorch_torch_import:
             criterion = make_criterion_tuple_aware(
                 criterion=criterion,
                 criterion_output_keys=self.criterion_output_keys,
-                forward_outputs=self._effective_forward_outputs(),
+                forward_outputs=self._effective_forward_outputs(y=y),
             )
             return (
                 self.module,
@@ -1786,8 +1830,6 @@ if successful_skorch_torch_import:
             )
             return {
                 "check_X_dict": self.check_X_dict_,
-                "y_ensure_1d": False,
-                "multioutput_ensure_multilabel": True,
             }
 
         def _return_training_data(self, X, y):
@@ -1812,13 +1854,10 @@ if successful_skorch_torch_import:
             if self.include_unlabeled_samples:
                 is_included = np.full_like(y, fill_value=True, dtype=bool)
             else:
-                is_multioutput = y.ndim == 2
                 is_included = is_labeled(
                     y=y,
                     missing_label=-1,
-                    target_type=(
-                        "multi-label" if is_multioutput else "single-output"
-                    ),
+                    target_type=self.target_spec_.target_type,
                 )
             if np.sum(is_included) > 0:
                 X_train = X[is_included]
@@ -1843,18 +1882,16 @@ if successful_skorch_torch_import:
             """
             self.random_state_ = check_random_state(self.random_state)
             if not hasattr(self, "_le"):
-                self._le = ExtLabelEncoder(
-                    classes=self.classes, missing_label=self.missing_label
-                )
                 if self.classes is not None:
                     y_dummy = self.classes
                 else:
                     y_dummy = np.arange(P.shape[-1], dtype=int)
-                self._le.fit(y_dummy)
-                self.classes_ = self._le.classes_
-                self.multioutput_ = self._le.multioutput_
+                self._initialize_label_state(y_dummy)
             if not hasattr(self, "cost_matrix_"):
-                if self.cost_matrix is None and not self.multioutput_:
+                if (
+                    self.cost_matrix is None
+                    and self.target_spec_.target_type == "single-output"
+                ):
                     self.cost_matrix_ = 1 - np.eye(len(self.classes_))
                 else:
                     self.cost_matrix_ = self.cost_matrix
@@ -1867,7 +1904,7 @@ if successful_skorch_torch_import:
 
             Without fitted label state or user-provided `classes`, predictions
             cannot be interpreted unambiguously as multiclass versus
-            multilabel/multioutput-binary. `_initialize_fallbacks` can infer
+            multi-label. `_initialize_fallbacks` can infer
             flat classes from `P.shape[-1]`, but that only yields the single-
             output interpretation.
             """

@@ -193,6 +193,7 @@ class MaxLossReductionMaxConfidence(SingleAnnotatorPoolQueryStrategy):
         label_encoder = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
         )
         y_discriminator = label_encoder.fit_transform(y[lbld_mask]).sum(axis=1)
         discriminator.fit(lbld_probas, y_discriminator)

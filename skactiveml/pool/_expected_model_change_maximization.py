@@ -57,6 +57,10 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
        on Data Mining, pages 51--60, 2013.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
+
     def __init__(
         self,
         bootstrap_size=3,
@@ -65,9 +69,12 @@ class ExpectedModelChangeMaximization(SingleAnnotatorPoolQueryStrategy):
         feature_map=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.bootstrap_size = bootstrap_size
         self.n_train = n_train

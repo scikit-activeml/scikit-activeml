@@ -100,6 +100,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
         cost_matrix=None,
         class_prior=0.0,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
@@ -107,6 +108,7 @@ class ParzenWindowClassifier(ClassFrequencyEstimator):
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.metric = metric
         self.n_neighbors = n_neighbors

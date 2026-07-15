@@ -528,7 +528,9 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertFalse(hasattr(clf, "classes_"))
         self.assertFalse(hasattr(clf, "estimator_"))
 
-    def test_multioutput_capability_failure_does_not_commit_fitted_state(self):
+    def test_multi_output_capability_failure_does_not_commit_fitted_state(
+        self,
+    ):
         clf = SklearnClassifier(
             estimator=MultiOutputClassifier(GaussianNB()),
             classes=[[0, 1, 2], [0, 1]],
@@ -625,7 +627,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         P = clf.predict_proba(self.X_ml)
         y_pred = clf.predict(self.X_ml)
 
-        self.assertTrue(clf.multioutput_)
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
         for classes, expected_classes in zip(clf.classes_, estimator.classes_):
             np.testing.assert_array_equal(classes, expected_classes)
         self.assertEqual(P.shape, self.y_ml.shape)
@@ -636,7 +638,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         )
         P_list = clf.predict_proba(self.X_ml)
 
-        self.assertTrue(clf.multioutput_)
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
         self.assertEqual(len(P_list), self.y_ml.shape[1])
         for P_j in P_list:
             self.assertEqual(P_j.shape, (len(self.X_ml), 2))
@@ -647,7 +649,7 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
 
         P = clf.predict_proba(self.X_ml)
 
-        self.assertFalse(clf.multioutput_)
+        self.assertEqual(clf.target_spec_.target_type, "single-output")
         np.testing.assert_array_equal(clf.classes_, estimator.classes_)
         self.assertEqual(P.shape, (len(self.X_ml), len(estimator.classes_)))
 
@@ -1337,7 +1339,7 @@ class TestSlidingWindowClassifier(
             exclude_fit=True,
         )
         test_cases = [
-            ([0, 1, 2, -1], None),
+            ([0, 1, 2, -1], ValueError),
             (["nan", "nan", "nan", "nan"], TypeError),
         ]
         replace_init_params = {
@@ -2116,11 +2118,15 @@ if successful_skorch_torch_import:
             np.testing.assert_array_equal(
                 clf_no_classes.classes_, np.arange(3)
             )
-            self.assertFalse(clf_no_classes.multioutput_)
+            self.assertEqual(
+                clf_no_classes.target_spec_.target_type, "single-output"
+            )
 
             clf_multilabel = SkorchClassifier(**init_params)
             clf_multilabel._initialize_fallbacks(np.zeros((2, 2)))
-            self.assertTrue(clf_multilabel.multioutput_)
+            self.assertEqual(
+                clf_multilabel.target_spec_.target_type, "multi-label"
+            )
             np.testing.assert_array_equal(
                 clf_multilabel.classes_[0], np.array([0, 1])
             )

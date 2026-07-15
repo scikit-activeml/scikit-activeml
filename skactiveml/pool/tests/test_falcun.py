@@ -188,7 +188,7 @@ class TestFalcun(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
         self.assertEqual(utilities.shape, (2, len(query_params["X"])))
         self.assertTrue(np.isnan(utilities[:, :2]).all())
 
-    def test_query_multioutput_multiclass_list_probas_raises(self):
+    def test_query_multi_output_multiclass_list_probas_raises(self):
         qs = Falcun(random_state=42)
         query_params = {
             "X": np.linspace(0, 1, 12).reshape(6, 2),

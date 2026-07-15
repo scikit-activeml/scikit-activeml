@@ -47,7 +47,6 @@ class DummyMultilabelClassifier(SkactivemlClassifier):
             X=X,
             y=y,
             sample_weight=sample_weight,
-            y_ensure_1d=False,
             target_spec=target_spec,
         )
         self.target_spec_ = target_spec

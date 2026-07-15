@@ -73,9 +73,12 @@ class ContrastiveAL(SingleAnnotatorPoolQueryStrategy):
         eps=1e-7,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.nearest_neighbors_dict = nearest_neighbors_dict
         self.clf_embedding_flag_name = clf_embedding_flag_name

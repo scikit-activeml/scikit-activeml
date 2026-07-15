@@ -189,7 +189,6 @@ class SubSamplingWrapper(_TargetPreservingWrapper):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
             target_type=target_type,
         )
 
@@ -496,7 +495,6 @@ class ParallelUtilityEstimationWrapper(_TargetPreservingWrapper):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
             target_type=target_type,
         )
         if batch_size != 1:

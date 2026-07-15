@@ -32,7 +32,7 @@ from ._validation import (
     check_n_features,
     _check_callable,
     _check_forward_outputs,
-    _is_multioutput_classes,
+    _has_nested_classes,
 )
 
 __all__ = [
@@ -66,7 +66,7 @@ __all__ = [
     "check_n_features",
     "_check_callable",
     "_check_forward_outputs",
-    "_is_multioutput_classes",
+    "_has_nested_classes",
     "TargetSpec",
     "resolve_target_spec",
 ]

@@ -39,11 +39,11 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
         super().__init__(
             classes=[[0, 1], [0, 1]],
             missing_label=missing_label,
+            target_type=target_type,
         )
         self.probas = probas
         self.logits = logits
         self.return_as_list = return_as_list
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -62,8 +62,7 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
             X=X,
             y=y,
             sample_weight=sample_weight,
-            y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
+            target_spec=target_spec,
         )
         self.target_spec_ = target_spec
         self.is_fitted_ = True

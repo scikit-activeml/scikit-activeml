@@ -177,6 +177,7 @@ class LabelCardinalityInconsistency(SingleAnnotatorPoolQueryStrategy):
         label_encoder = ExtLabelEncoder(
             classes=target_spec.classes,
             missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
         ).fit(y[lbld_mask])
         y_label_cardinality = 0
         if n_lbld != 0:

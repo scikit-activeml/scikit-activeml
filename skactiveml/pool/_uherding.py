@@ -257,7 +257,6 @@ class UHerding(SingleAnnotatorPoolQueryStrategy):
             batch_size,
             return_utilities,
             reset=True,
-            allow_multioutput=True,
             target_type=target_spec.target_type,
         )
         X_cand, mapping = self._transform_candidates(

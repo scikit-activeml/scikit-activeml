@@ -7,6 +7,7 @@ from skactiveml.tests.utils import (
     check_test_param_test_availability,
 )
 import numpy as np
+from sklearn.base import clone
 from sklearn.datasets import make_blobs
 from sklearn.metrics import accuracy_score
 from skactiveml.utils import (
@@ -339,6 +340,33 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
 
     def _has_multilabel_defaults(self):
         return self.fit_default_params_multilabel is not None
+
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-label", ValueError),
+                ("multi-output", ValueError),
+                ("invalid", ValueError),
+            ],
+        )
+
+    def test_fitted_target_spec_matches_declared_capability(self):
+        estimator = self.estimator_class(**deepcopy(self.init_default_params))
+        estimator.fit(**deepcopy(self.fit_default_params))
+
+        capability = (
+            estimator.target_spec_.task,
+            estimator.target_spec_.target_type,
+            estimator.target_spec_.annotation_type,
+        )
+        self.assertEqual(estimator.target_type, "auto")
+        self.assertIn(capability, estimator._target_capabilities)
+        self.assertEqual(capability[0], "classification")
+        self.assertNotEqual(capability[1], "multi-output")
 
     def _get_multilabel_params(self):
         if not self._has_multilabel_defaults():
@@ -702,6 +730,62 @@ class TemplateSkactivemlClassifier(TemplateEstimator):
         y_pred = estimator.predict(X)
         expected_score = accuracy_score(y_true=y_true, y_pred=y_pred)
         self.assertAlmostEqual(estimator.score(X, y_true), expected_score)
+
+
+class TemplateMultiAnnotatorClassifier:
+    """Shared resolved-target contract for multi-annotator classifiers."""
+
+    def test_init_param_target_type(self):
+        for target_type, error in [
+            ("auto", None),
+            ("single-output", None),
+            ("multi-label", ValueError),
+            ("multi-output", ValueError),
+            ("invalid", ValueError),
+        ]:
+            with self.subTest(target_type=target_type):
+                estimator = clone(
+                    self.target_contract_estimator_factory()
+                ).set_params(target_type=target_type)
+                if error is None:
+                    estimator.fit(**deepcopy(self.target_contract_fit_params))
+                else:
+                    with self.assertRaises(error):
+                        estimator.fit(
+                            **deepcopy(self.target_contract_fit_params)
+                        )
+
+    def test_multiannotator_target_contract(self):
+        estimator = self.target_contract_estimator_factory()
+        fit_params = deepcopy(self.target_contract_fit_params)
+
+        self.assertEqual(estimator.target_type, "auto")
+        self.assertEqual(
+            estimator._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+        estimator.fit(**fit_params)
+        self.assertEqual(estimator.target_spec_.task, "classification")
+        self.assertEqual(estimator.target_spec_.target_type, "single-output")
+        self.assertEqual(
+            estimator.target_spec_.annotation_type, "multi-annotator"
+        )
+
+        unsupported = clone(estimator).set_params(target_type="multi-label")
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            unsupported.fit(**fit_params)
+        self.assertFalse(hasattr(unsupported, "target_spec_"))
+        self.assertFalse(hasattr(unsupported, "classes_"))
 
 
 class TemplateClassFrequencyEstimator(TemplateSkactivemlClassifier):

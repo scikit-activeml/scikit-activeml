@@ -30,6 +30,15 @@ except ImportError:  # pragma: no cover
 
 
 class DummySkactivemlClassifier(SkactivemlClassifier):
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+            }
+        )
+
     def __init__(
         self,
         classes=None,
@@ -37,29 +46,22 @@ class DummySkactivemlClassifier(SkactivemlClassifier):
         cost_matrix=None,
         random_state=None,
         probas=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.probas = probas
 
-    def fit(
-        self,
-        X,
-        y,
-        sample_weight=None,
-        y_ensure_1d=True,
-        multioutput_ensure_multilabel=False,
-    ):
+    def fit(self, X, y, sample_weight=None):
         self.validated_ = self._validate_data(
             X=X,
             y=y,
             sample_weight=sample_weight,
-            y_ensure_1d=y_ensure_1d,
-            multioutput_ensure_multilabel=multioutput_ensure_multilabel,
         )
         return self
 
@@ -187,7 +189,7 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
             candidates=None,
             X=X_ml,
             y=y_ml,
-            is_multioutput=True,
+            target_type="multi-label",
         )
         np.testing.assert_array_equal(mapping, np.array([1]))
         np.testing.assert_array_equal(X_cand, X_ml[[1]])
@@ -200,7 +202,7 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
         self.assertIsNone(mapping)
         np.testing.assert_array_equal(X_cand, np.array([[9, 9]]))
 
-    def test__validate_data_multioutput(self):
+    def test__validate_data_multilabel(self):
         X = np.arange(6).reshape(3, 2)
         y = np.array([[0, 1], [np.nan, np.nan], [np.nan, np.nan]])
         with warnings.catch_warnings(record=True) as w:
@@ -212,7 +214,7 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
                     candidates=None,
                     batch_size=3,
                     return_utilities=True,
-                    allow_multioutput=True,
+                    target_type="multi-label",
                 )
             )
         self.assertEqual(len(w), 1)
@@ -229,7 +231,7 @@ class SingleAnnotPoolBasedQueryStrategyTest(unittest.TestCase):
                 candidates=np.array([1, 2]),
                 batch_size=1,
                 return_utilities=False,
-                allow_multioutput=False,
+                target_type="single-output",
             )
         )
         self.assertEqual(y_v.ndim, 1)
@@ -480,15 +482,15 @@ class SkactivemlClassifierTest(unittest.TestCase):
         X = np.arange(8).reshape(4, 2)
         y = np.array([[0, 1], [-1, -1], [1, 0], [0, 0]])
         clf = DummySkactivemlClassifier(
-            classes=[[0, 1], [0, 1]], missing_label=-1
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
         )
 
         clf.fit(
             X,
             y,
             sample_weight=np.ones(len(y), dtype=float),
-            y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
         )
         X_valid, y_valid, sample_weight_valid = clf.validated_
 
@@ -497,14 +499,16 @@ class SkactivemlClassifierTest(unittest.TestCase):
         np.testing.assert_array_equal(
             sample_weight_valid, np.ones(len(y), dtype=float)
         )
-        self.assertTrue(clf.multioutput_)
+        self.assertEqual(clf.target_spec_.target_type, "multi-label")
         self.assertIsNone(clf.cost_matrix_)
 
     def test__validate_data_multilabel_invalid_rows(self):
         X = np.arange(6).reshape(3, 2)
         y = np.array([[0, 1], [-1, 1], [1, 0]])
         clf = DummySkactivemlClassifier(
-            classes=[[0, 1], [0, 1]], missing_label=-1
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
         )
 
         self.assertRaises(
@@ -512,23 +516,21 @@ class SkactivemlClassifierTest(unittest.TestCase):
             clf.fit,
             X,
             y,
-            y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
         )
 
     def test__validate_data_multilabel_sample_weight(self):
         X = np.arange(8).reshape(4, 2)
         y = np.array([[0, 1], [-1, -1], [1, 0], [0, 0]])
         clf = DummySkactivemlClassifier(
-            classes=[[0, 1], [0, 1]], missing_label=-1
+            classes=[[0, 1], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
         )
 
         clf.fit(
             X,
             y,
             sample_weight=np.ones_like(y, dtype=float),
-            y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
         )
         np.testing.assert_array_equal(
             clf.validated_[2], np.ones_like(y, dtype=float)
@@ -539,49 +541,15 @@ class SkactivemlClassifierTest(unittest.TestCase):
             X,
             y,
             sample_weight="invalid",
-            y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
         )
-
-    def test__validate_data_two_dimensional_non_multioutput_sample_weight(
-        self,
-    ):
-        X = np.arange(6).reshape(3, 2)
-        y = np.array([[0, 1], [-1, -1], [1, 0]])
-        clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
-
-        clf.fit(
-            X,
-            y,
-            sample_weight=np.ones(len(y), dtype=float),
-            y_ensure_1d=False,
-        )
-        X_valid, y_valid, sample_weight_valid = clf.validated_
-
-        np.testing.assert_array_equal(X_valid, X)
-        np.testing.assert_array_equal(y_valid, y)
-        np.testing.assert_array_equal(
-            sample_weight_valid, np.ones(len(y), dtype=float)
-        )
-        self.assertFalse(clf.multioutput_)
-
-    def test__validate_data_two_dimensional_non_multioutput_matrix_weights(
-        self,
-    ):
-        X = np.arange(6).reshape(3, 2)
-        y = np.array([[0, 1], [-1, -1], [1, 0]])
-        sample_weight = np.ones_like(y, dtype=float)
-        clf = DummySkactivemlClassifier(classes=[0, 1], missing_label=-1)
-
-        clf.fit(X, y, sample_weight=sample_weight, y_ensure_1d=False)
-
-        np.testing.assert_array_equal(clf.validated_[2], sample_weight)
 
     def test__validate_data_multilabel_binary_enforcement(self):
         X = np.arange(6).reshape(3, 2)
         y = np.array([[0, 0], [1, 1], [2, 0]])
         clf = DummySkactivemlClassifier(
-            classes=[[0, 1, 2], [0, 1]], missing_label=-1
+            classes=[[0, 1, 2], [0, 1]],
+            missing_label=-1,
+            target_type="multi-label",
         )
 
         self.assertRaises(
@@ -589,8 +557,6 @@ class SkactivemlClassifierTest(unittest.TestCase):
             clf.fit,
             X,
             y,
-            y_ensure_1d=False,
-            multioutput_ensure_multilabel=True,
         )
 
     def test_predict_multilabel(self):
@@ -600,9 +566,10 @@ class SkactivemlClassifierTest(unittest.TestCase):
             classes=[[0, 1], [0, 1]],
             missing_label=-1,
             probas=np.array([[0.9, 0.9], [0.8, 0.2]]),
+            target_type="multi-label",
         )
 
-        clf.fit(X, y, y_ensure_1d=False, multioutput_ensure_multilabel=True)
+        clf.fit(X, y)
         np.testing.assert_array_equal(clf.predict(X), y)
 
     def test_score_multilabel(self):
@@ -612,30 +579,23 @@ class SkactivemlClassifierTest(unittest.TestCase):
             classes=[[0, 1], [0, 1]],
             missing_label=-1,
             probas=np.array([[0.9, 0.9], [0.8, 0.2]]),
+            target_type="multi-label",
         )
 
-        clf.fit(X, y, y_ensure_1d=False, multioutput_ensure_multilabel=True)
+        clf.fit(X, y)
         self.assertEqual(clf.score(X, y), 0.5)
 
-    def test_predict_multioutput_and_tuple_output(self):
+    def test_multi_output_is_rejected_before_fitted_state(self):
         X = np.arange(4).reshape(2, 2)
         y = np.array([[2, 1], [1, 0]])
-        probas = (
-            [
-                np.array([[0.1, 0.2, 0.7], [0.1, 0.8, 0.1]]),
-                np.array([[0.4, 0.6], [0.9, 0.1]]),
-            ],
-            "extra",
-        )
         clf = DummySkactivemlClassifier(
             classes=[[0, 1, 2], [0, 1]],
             missing_label=-1,
-            probas=probas,
+            target_type="multi-output",
         )
-        clf.fit(X, y, y_ensure_1d=False)
-        y_pred, extra = clf.predict(X)
-        np.testing.assert_array_equal(y_pred, y)
-        self.assertEqual(extra, "extra")
+        with self.assertRaisesRegex(ValueError, "Supported capabilities"):
+            clf.fit(X, y)
+        self.assertFalse(hasattr(clf, "target_spec_"))
 
 
 class ClassFrequencyEstimatorTest(unittest.TestCase):
@@ -653,15 +613,9 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
         )
         clf.classes_ = np.array([0, 1])
         clf.class_prior_ = np.array([0.0, 0.0])
-        clf.multioutput_ = False
         P = clf.predict_proba(np.zeros((2, 1)))
         np.testing.assert_array_equal(P[0], np.array([0.5, 0.5]))
         np.testing.assert_array_equal(P[1], np.array([0.25, 0.75]))
-
-        clf.multioutput_ = True
-        self.assertRaises(
-            NotImplementedError, clf.predict_proba, np.zeros((2, 1))
-        )
 
     def test_sample_proba(self):
         clf = DummyClassFrequencyEstimator(
@@ -670,7 +624,6 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
         )
         clf.classes_ = np.array([0, 1])
         clf.class_prior_ = np.array([1.0, 1.0])
-        clf.multioutput_ = False
         P = clf.sample_proba(np.zeros((2, 1)), n_samples=3, random_state=0)
         self.assertEqual(P.shape, (3, 2, 2))
 
@@ -680,7 +633,6 @@ class ClassFrequencyEstimatorTest(unittest.TestCase):
         )
         clf_zero.classes_ = np.array([0, 1])
         clf_zero.class_prior_ = np.array([0.0, 0.0])
-        clf_zero.multioutput_ = False
         self.assertRaises(
             ValueError,
             clf_zero.sample_proba,

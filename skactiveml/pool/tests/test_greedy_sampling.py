@@ -96,7 +96,7 @@ class TestGreedySamplingTarget(
             frozenset({("regression", "single-output", "single-annotator")}),
         )
 
-    def test_multioutput_capability_failure_precedes_acquisition_state(self):
+    def test_multi_output_capability_failure_precedes_acquisition_state(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
             [

@@ -30,7 +30,6 @@ from .utils import (
     unlabeled_indices,
     ExtLabelEncoder,
     rand_argmin,
-    rand_argmax,
     check_classifier_params,
     check_random_state,
     check_cost_matrix,
@@ -254,6 +253,75 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     single annotator in scikit-activeml.
     """
 
+    def __init__(
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
+    ):
+        super().__init__(
+            missing_label=missing_label,
+            random_state=random_state,
+        )
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        """Conservative base capability for single-annotator strategies."""
+        return frozenset(
+            {("classification", "single-output", "single-annotator")}
+        )
+
+    def _resolve_query_target_type(self, y):
+        tasks = {capability[0] for capability in self._target_capabilities}
+        if len(tasks) == 1:
+            task = next(iter(tasks))
+            if task == "classification":
+                target_type = _resolve_task_agnostic_target_type(
+                    y,
+                    target_type=self.target_type,
+                    missing_label=self.missing_label,
+                )
+                target_spec = TargetSpec(
+                    task=task,
+                    target_type=target_type,
+                    annotation_type="single-annotator",
+                    classes=None,
+                )
+            else:
+                target_spec = resolve_target_spec(
+                    y,
+                    task=task,
+                    target_type=self.target_type,
+                    annotation_type="single-annotator",
+                    classes=None,
+                    missing_label=self.missing_label,
+                )
+            check_target_capability(
+                type(self).__name__, target_spec, self._target_capabilities
+            )
+            return target_spec.target_type
+        target_type = _resolve_task_agnostic_target_type(
+            y,
+            target_type=self.target_type,
+            missing_label=self.missing_label,
+        )
+        applicable_tasks = (
+            {"classification"} if target_type == "multi-label" else tasks
+        )
+        for task in applicable_tasks:
+            check_target_capability(
+                type(self).__name__,
+                TargetSpec(
+                    task=task,
+                    target_type=target_type,
+                    annotation_type="single-annotator",
+                    classes=None,
+                ),
+                self._target_capabilities,
+            )
+        return target_type
+
     @abstractmethod
     def query(
         self,
@@ -327,7 +395,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
-        allow_multioutput=False,
         target_type=None,
     ):
         """Validate input data, all attributes and set or check the
@@ -362,10 +429,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             provided when reset was last True.
         **check_X_dict : kwargs
             Parameters passed to :func:`sklearn.utils.check_array`.
-        allow_multioutput : bool, default=False
-            Whether provided labels are allowed to be in multioutput format or
-            not.
-
         Returns
         -------
         X : np.ndarray of shape (n_samples, n_features)
@@ -381,6 +444,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             Checked boolean value of `return_utilities`.
         """
 
+        if target_type is None:
+            target_type = self._resolve_query_target_type(y)
+
         (
             X,
             y,
@@ -395,9 +461,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             return_utilities,
             reset,
             check_X_dict,
-            target_type=(
-                "single-output" if target_type is None else target_type
-            ),
+            target_type=target_type,
         )
 
         if target_type == "multi-label":
@@ -412,13 +476,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         elif target_type == "single-output":
             y = column_or_1d(y, warn=True)
             resolved_target_type = "single-output"
-        elif allow_multioutput:
-            y = check_array(
-                y, ensure_2d=False, ensure_all_finite="allow-nan", dtype=None
-            )
-            resolved_target_type = (
-                "multi-label" if y.ndim == 2 else "single-output"
-            )
         else:
             y = column_or_1d(y, warn=True)
             resolved_target_type = "single-output"
@@ -449,8 +506,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         y,
         enforce_mapping=False,
         allow_only_unlabeled=False,
-        is_multioutput=False,
-        target_type=None,
+        target_type="single-output",
     ):
         """Transforms the `candidates` parameter into a sample array and the
         corresponding index array `mapping` such that
@@ -478,9 +534,6 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         allow_only_unlabeled : bool, default=False
             If True, an exception is raised when indices of candidates contain
             labeled samples.
-        is_multioutput : bool, default=False
-            Whether provided data is in multioutput format or not.
-
         Returns
         -------
         candidates : np.ndarray of shape (n_candidates, n_features)
@@ -490,16 +543,11 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             (`candidates = X[mapping]`)
         """
 
-        resolved_target_type = (
-            "multi-label"
-            if target_type is None and is_multioutput
-            else ("single-output" if target_type is None else target_type)
-        )
         if candidates is None:
             ulbd_idx = unlabeled_indices(
                 y,
                 self.missing_label_,
-                target_type=resolved_target_type,
+                target_type=target_type,
             )
             return X[ulbd_idx], ulbd_idx
         elif candidates.ndim == 1:
@@ -507,7 +555,7 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                 if is_labeled(
                     y[candidates],
                     self.missing_label_,
-                    target_type=resolved_target_type,
+                    target_type=target_type,
                 ).any():
                     raise ValueError(
                         "Candidates must not contain labeled " "samples."
@@ -536,8 +584,8 @@ class _TaskAgnosticPoolQueryStrategy(SingleAnnotatorPoolQueryStrategy):
         super().__init__(
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
-        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -1242,6 +1290,10 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. Components reject resolved target specifications
+        outside their exact capabilities.
     """
 
     def __init__(
@@ -1250,11 +1302,13 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
+        target_type="auto",
     ):
         self.classes = classes
         self.missing_label = missing_label
         self.cost_matrix = cost_matrix
         self.random_state = random_state
+        self.target_type = target_type
 
     @property
     def _target_capabilities(self):
@@ -1291,6 +1345,35 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             classes = established_spec.classes
         resolved_spec = self._resolve_target_spec(y, classes=classes)
         return _reuse_established_target_spec(resolved_spec, established_spec)
+
+    def _initialize_label_state(self, y, classes=None):
+        """Initialize resolved class metadata without fitting model state."""
+        effective_classes = self.classes if classes is None else classes
+        annotation_type = getattr(self, "_annotation_type", "single-annotator")
+        resolution_y = np.asarray(y)
+        if annotation_type == "multi-annotator" and resolution_y.ndim == 1:
+            resolution_y = resolution_y.reshape(-1, 1)
+        target_spec = self._resolve_target_spec(
+            resolution_y, classes=effective_classes
+        )
+        self.target_spec_ = target_spec
+        self._le = ExtLabelEncoder(
+            classes=target_spec.classes,
+            missing_label=self.missing_label,
+            target_type=target_spec.target_type,
+        ).fit(resolution_y)
+        self.classes_ = self._le.classes_
+        if target_spec.target_type == "multi-label":
+            self.cost_matrix_ = None
+        else:
+            self.cost_matrix_ = (
+                1 - np.eye(len(self.classes_))
+                if self.cost_matrix is None
+                else self.cost_matrix
+            )
+            self.cost_matrix_ = check_cost_matrix(
+                self.cost_matrix_, len(self.classes_)
+            )
 
     @abstractmethod
     def fit(self, X, y, sample_weight=None):
@@ -1356,24 +1439,18 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         out = self.predict_proba(X, **kwargs)
         P = out[0] if isinstance(out, tuple) else out
 
-        # Obtain predictions for single output problem.
-        if not getattr(self, "multioutput_", False):
+        if self.target_spec_.target_type == "single-output":
             costs = np.dot(P, self.cost_matrix_)
             y_pred = rand_argmin(
                 costs, random_state=self.random_state_, axis=1
             )
-        elif isinstance(P, np.ndarray) and P.ndim == 2:
-            # Obtain predictions for multilabel problem.
+        elif self.target_spec_.target_type == "multi-label":
             y_pred = (P >= 0.5).astype(int, copy=False)
         else:
-            # Obtain predictions for multioutput problem.
-            n_samples = P[0].shape[0]
-            n_outputs = len(P)
-            y_pred = np.empty((n_samples, n_outputs), dtype=int)
-            for t in range(n_outputs):
-                y_pred[:, t] = rand_argmax(
-                    P[t], random_state=self.random_state_, axis=1
-                )
+            raise ValueError(
+                f"{type(self).__name__} cannot predict for resolved "
+                f"target type {self.target_spec_.target_type!r}."
+            )
 
         # Transform labels and append extra outputs.
         y_pred = self._le.inverse_transform(y_pred)
@@ -1413,17 +1490,12 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         sample_weight=None,
         check_X_dict=None,
         check_y_dict=None,
-        y_ensure_1d=True,
         reset=True,
-        multioutput_ensure_multilabel=False,
         target_spec=None,
     ):
-        resolves_target_spec = getattr(
-            self, "_resolve_target_spec_on_validate", False
-        )
-        if target_spec is None and resolves_target_spec:
+        if target_spec is None:
             target_spec = self._resolve_fitting_target_spec(y)
-        elif target_spec is not None:
+        else:
             target_spec = self._resolve_fitting_target_spec(
                 y, established_spec=target_spec
             )
@@ -1452,7 +1524,9 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             self.classes if target_spec is None else target_spec.classes
         )
         self._le = ExtLabelEncoder(
-            classes=resolved_classes, missing_label=self.missing_label
+            classes=resolved_classes,
+            missing_label=self.missing_label,
+            target_type=target_spec.target_type,
         )
 
         # Check input parameters.
@@ -1462,10 +1536,14 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
             "class labels and `classes` is not defined. Change at "
             "least on of both parameters to overcome this error."
         )
+        structured_target = (
+            target_spec.target_type == "multi-label"
+            or target_spec.annotation_type == "multi-annotator"
+        )
         if len(y) > 0:
-            y = column_or_1d(y) if y_ensure_1d else y
+            y = y if structured_target else column_or_1d(y)
             y = self._le.fit_transform(y)
-            if self._le.multioutput_:
+            if target_spec.target_type == "multi-label":
                 is_unlabeled(y, missing_label=-1, target_type="multi-label")
             if len(self._le.classes_) == 0:
                 raise ValueError(error_msg)
@@ -1481,9 +1559,6 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         # Update detected classes.
         self.classes_ = self._le.classes_
 
-        # Save task type.
-        self.multioutput_ = self._le.multioutput_
-
         # Check classes.
         if sample_weight is not None:
             sample_weight = check_array(sample_weight, **check_y_dict)
@@ -1494,9 +1569,7 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                         f"the shape {sample_weight.shape}. Both need to have "
                         f"the same one-dimensional shape."
                     )
-            elif sample_weight.ndim == 2 and (
-                self.multioutput_ or (not y_ensure_1d and y.ndim == 2)
-            ):
+            elif sample_weight.ndim == 2 and structured_target:
                 if not np.array_equal(y.shape, sample_weight.shape):
                     raise ValueError(
                         f"`y` has the shape {y.shape} and `sample_weight` has "
@@ -1510,17 +1583,8 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
                 )
 
         # Update cost matrix.
-        if self.multioutput_:
+        if target_spec.target_type == "multi-label":
             self.cost_matrix_ = None
-            if multioutput_ensure_multilabel:
-                for classes_task in self.classes_:
-                    if len(classes_task) != 2:
-                        raise ValueError(
-                            "Only multilabel classification problems, i.e., "
-                            "multiple binary classification problems, are "
-                            "supported but `classes` contains at least one "
-                            "non-binary classification task."
-                        )
         else:
             self.cost_matrix_ = (
                 1 - np.eye(len(self.classes_))
@@ -1576,12 +1640,14 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         missing_label=MISSING_LABEL,
         cost_matrix=None,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
             missing_label=missing_label,
             cost_matrix=cost_matrix,
             random_state=random_state,
+            target_type=target_type,
         )
         self.class_prior = class_prior
 
@@ -1618,20 +1684,11 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         """
         out = self.predict_freq(X, **kwargs)
         F = out[0] if isinstance(out, tuple) else out
-        if not getattr(self, "multioutput_", False):
-            # Normalize probabilities of each sample.
-            P = F + self.class_prior_
-            normalizer = np.sum(P, axis=1)
-            P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
-            P[normalizer == 0, :] = [1 / len(self.classes_)] * len(
-                self.classes_
-            )
-            return P
-        else:
-            raise NotImplementedError(
-                "`predict_proba` must be explicitly implemented for "
-                "multioutput classification."
-            )
+        P = F + self.class_prior_
+        normalizer = np.sum(P, axis=1)
+        P[normalizer > 0] /= normalizer[normalizer > 0, np.newaxis]
+        P[normalizer == 0, :] = [1 / len(self.classes_)] * len(self.classes_)
+        return P
 
     def sample_proba(self, X, n_samples=10, random_state=None):
         """Samples probability vectors from Dirichlet distributions whose
@@ -1681,9 +1738,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
         sample_weight=None,
         check_X_dict=None,
         check_y_dict=None,
-        y_ensure_1d=True,
         reset=True,
-        multioutput_ensure_multilabel=False,
         target_spec=None,
     ):
         X, y, sample_weight = super()._validate_data(
@@ -1692,9 +1747,7 @@ class ClassFrequencyEstimator(SkactivemlClassifier):
             sample_weight=sample_weight,
             check_X_dict=check_X_dict,
             check_y_dict=check_y_dict,
-            y_ensure_1d=y_ensure_1d,
             reset=reset,
-            multioutput_ensure_multilabel=multioutput_ensure_multilabel,
             target_spec=target_spec,
         )
 

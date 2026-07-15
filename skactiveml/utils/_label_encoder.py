@@ -5,7 +5,7 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from ._label import MISSING_LABEL, is_labeled, check_missing_label
-from ._validation import check_classifier_params, _is_multioutput_classes
+from ._validation import check_classifier_params, _has_nested_classes
 
 
 class ExtLabelEncoder(BaseEstimator):
@@ -16,25 +16,28 @@ class ExtLabelEncoder(BaseEstimator):
     ----------
     classes : array-like of shape (n_classes,) or a list of such array-likes, \
             default=None
-        TODO: Allow `classes=None` for multioutput.
-        TODO: Add `interpret_y_columns_as_separate_tasks=False`.
         - If `classes` is not nested (`None` or one-dimensional), a single task
           problem is assumed such that `y` can be shape `(n_samples,)` or
           `(n_samples, n_annotators)`. Same encoder is applied to all entries.
-        - If `classes` is nested (list of array-like objects), a multioutput
-          (tasks) problem `y` must be shape `(n_samples, n_tasks)` with
-          `n_tasks == len(classes)`. Each column is encoded with its
-          task-specific encoder.
+        - If `classes` is nested, `target_type` must be `"multi-label"`, and
+          `y` must contain one column per binary class vocabulary.
     missing_label : scalar or string or np.nan or None, default=np.nan
-        Value to represent a missing label. In the case of a multioutput
-        setting, we expect that the missing label is identical across all
-        tasks.
+        Value to represent a missing label.
+    target_type : {"single-output", "multi-label"}, default="single-output"
+        Resolved target type controlling whether one shared encoder or one
+        encoder per label is used.
 
     """
 
-    def __init__(self, classes=None, missing_label=MISSING_LABEL):
+    def __init__(
+        self,
+        classes=None,
+        missing_label=MISSING_LABEL,
+        target_type="single-output",
+    ):
         self.classes = classes
         self.missing_label = missing_label
+        self.target_type = target_type
 
     def fit(self, y):
         """Fit label encoder.
@@ -56,20 +59,30 @@ class ExtLabelEncoder(BaseEstimator):
             ensure_min_samples=0,
             dtype=None,
         )
+        if self.target_type not in {"single-output", "multi-label"}:
+            raise ValueError(
+                "`target_type` must be either 'single-output' or "
+                "'multi-label'."
+            )
+        has_nested_classes = _has_nested_classes(self.classes)
+        if has_nested_classes != (self.target_type == "multi-label"):
+            raise ValueError(
+                "Nested `classes` require `target_type='multi-label'`, and "
+                "multi-label encoding requires nested `classes`."
+            )
         check_missing_label(
             missing_label=self.missing_label, target_type=y.dtype
         )
-        self.multioutput_ = _is_multioutput_classes(classes=self.classes)
         check_classifier_params(
             classes=self.classes, missing_label=self.missing_label
         )
-        if self.multioutput_:
+        if self.target_type == "multi-label":
             classes_outer = list(self.classes)
-            self.n_outputs_ = len(classes_outer)
-            if y.ndim != 2 or y.shape[1] != self.n_outputs_:
+            self.n_labels_ = len(classes_outer)
+            if y.ndim != 2 or y.shape[1] != self.n_labels_:
                 raise ValueError(
-                    f"Expected y with shape `(n_samples, {self.n_outputs_})` "
-                    f"in multioutput mode, got {y.shape}."
+                    f"Expected y with shape `(n_samples, {self.n_labels_})` "
+                    f"for multi-label targets, got {y.shape}."
                 )
             self._le = []
             self.classes_ = []
@@ -137,13 +150,13 @@ class ExtLabelEncoder(BaseEstimator):
         is_lbld = is_labeled(y, missing_label=self.missing_label)
         y_enc = np.full_like(y, -1, dtype=int)
 
-        if self.multioutput_:
-            if y.ndim != 2 or y.shape[1] != self.n_outputs_:
+        if self.target_type == "multi-label":
+            if y.ndim != 2 or y.shape[1] != self.n_labels_:
                 raise ValueError(
-                    f"Expected y with shape `(n_samples, {self.n_outputs_})` "
-                    f"in multioutput mode, got {y.shape}."
+                    f"Expected y with shape `(n_samples, {self.n_labels_})` "
+                    f"for multi-label targets, got {y.shape}."
                 )
-            for t in range(self.n_outputs_):
+            for t in range(self.n_labels_):
                 y_t = y[:, t]
                 is_lbld_t = is_lbld[:, t]
                 if is_lbld_t.any():
@@ -180,13 +193,13 @@ class ExtLabelEncoder(BaseEstimator):
             y, dtype=self._dtype, fill_value=self.missing_label
         )
 
-        if self.multioutput_:
-            if y.ndim != 2 or y.shape[1] != self.n_outputs_:
+        if self.target_type == "multi-label":
+            if y.ndim != 2 or y.shape[1] != self.n_labels_:
                 raise ValueError(
-                    f"Expected y with shape `(n_samples, {self.n_outputs_})` "
-                    f"in multioutput mode, got {y.shape}."
+                    f"Expected y with shape `(n_samples, {self.n_labels_})` "
+                    f"for multi-label targets, got {y.shape}."
                 )
-            for t in range(self.n_outputs_):
+            for t in range(self.n_labels_):
                 y_t = y[:, t]
                 is_lbld_t = is_lbld[:, t]
                 if is_lbld_t.any():

@@ -301,7 +301,6 @@ try:
                 Keyword arguments consumed by `_validate_data`.
             """
             vd_kwargs = super()._validate_data_kwargs()
-            vd_kwargs["y_ensure_1d"] = False
             return vd_kwargs
 
         @abstractmethod

@@ -115,6 +115,15 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
        IEEE/CVF Conf. Comput. Vis. Pattern Recognit., pages 9368–9377, 2018.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
+
     def __init__(
         self,
         method="KL_divergence",
@@ -123,9 +132,12 @@ class QueryByCommittee(SingleAnnotatorPoolQueryStrategy):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            missing_label=missing_label, random_state=random_state
+            missing_label=missing_label,
+            random_state=random_state,
+            target_type=target_type,
         )
         self.method = method
         self.eps = eps

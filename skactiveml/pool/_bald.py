@@ -88,6 +88,7 @@ class _GeneralBALD(QueryByCommittee):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             eps=eps,
@@ -95,6 +96,7 @@ class _GeneralBALD(QueryByCommittee):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
         self.n_MC_samples = n_MC_samples
         self.greedy_selection = greedy_selection
@@ -299,6 +301,7 @@ class BatchBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -308,6 +311,7 @@ class BatchBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
 
 
@@ -367,6 +371,7 @@ class GreedyBALD(_GeneralBALD):
         sample_predictions_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             n_MC_samples=n_MC_samples,
@@ -376,6 +381,7 @@ class GreedyBALD(_GeneralBALD):
             sample_predictions_dict=sample_predictions_dict,
             missing_label=missing_label,
             random_state=random_state,
+            target_type=target_type,
         )
 
 

@@ -9,13 +9,27 @@ from sklearn.utils.validation import NotFittedError
 from skactiveml.classifier import ParzenWindowClassifier, SklearnClassifier
 from skactiveml.classifier.multiannotator import AnnotatorEnsembleClassifier
 from skactiveml.utils import MISSING_LABEL
+from skactiveml.tests.template_estimator import (
+    TemplateMultiAnnotatorClassifier,
+)
 
 
-class TestAnnotatorEnsembleClassifier(unittest.TestCase):
+class TestAnnotatorEnsembleClassifier(
+    TemplateMultiAnnotatorClassifier, unittest.TestCase
+):
     def setUp(self):
         self.X, self.y_true = make_blobs(n_samples=300, random_state=0)
         self.y = np.array([self.y_true, self.y_true], dtype=float).T
         self.y[:100, 0] = MISSING_LABEL
+        self.target_contract_estimator_factory = lambda: (
+            AnnotatorEnsembleClassifier(
+                estimators=[
+                    ("pwc-0", ParzenWindowClassifier()),
+                    ("pwc-1", ParzenWindowClassifier()),
+                ]
+            )
+        )
+        self.target_contract_fit_params = {"X": self.X, "y": self.y}
 
     def test_init_param_estimators(self):
         clf = AnnotatorEnsembleClassifier(estimators="Test")
@@ -78,43 +92,6 @@ class TestAnnotatorEnsembleClassifier(unittest.TestCase):
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
         clf = AnnotatorEnsembleClassifier(estimators=estimators, voting=1)
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
-
-    def test_init_param_target_type(self):
-        estimators = [
-            ("pwc-0", ParzenWindowClassifier()),
-            ("pwc-1", ParzenWindowClassifier()),
-        ]
-        clf = AnnotatorEnsembleClassifier(
-            estimators=estimators,
-            target_type="auto",
-        )
-
-        self.assertEqual(clf.target_type, "auto")
-        self.assertEqual(
-            clf._target_capabilities,
-            frozenset(
-                {
-                    (
-                        "classification",
-                        "single-output",
-                        "multi-annotator",
-                    )
-                }
-            ),
-        )
-
-        clf.fit(self.X, self.y)
-        self.assertEqual(clf.target_spec_.task, "classification")
-        self.assertEqual(clf.target_spec_.target_type, "single-output")
-        self.assertEqual(clf.target_spec_.annotation_type, "multi-annotator")
-
-        with self.assertRaisesRegex(
-            ValueError, "Multi-label targets cannot be combined"
-        ):
-            AnnotatorEnsembleClassifier(
-                estimators=estimators,
-                target_type="multi-label",
-            ).fit(self.X, self.y)
 
     def test_fit(self):
         pwc = ParzenWindowClassifier(classes=[1, 2])

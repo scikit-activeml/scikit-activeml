@@ -35,14 +35,21 @@ class ExpectedModelVarianceReduction(SingleAnnotatorPoolQueryStrategy):
        learning with statistical models, pages 129--145, 1996.
     """
 
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
+
     def __init__(
         self,
         integration_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.integration_dict = integration_dict
 
