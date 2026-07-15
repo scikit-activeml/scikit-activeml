@@ -35,6 +35,74 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
         )
         self.random_state = 0
 
+    def test_outer_and_aggregated_targets_use_separate_semantics(self):
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            target_type="auto",
+            random_state=self.random_state,
+        )
+
+        query_indices, utilities = wrapper.query(
+            self.X,
+            self.y,
+            batch_size=2,
+            return_utilities=True,
+        )
+
+        self.assertEqual(wrapper.target_type, "auto")
+        self.assertEqual(
+            wrapper._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+        self.assertEqual(query_indices.shape, (2, 2))
+        self.assertEqual(utilities.shape, (2, len(self.X), self.y.shape[1]))
+
+    def test_explicit_multilabel_intent_fails_before_aggregation(self):
+        calls = []
+
+        def y_aggregate(y):
+            calls.append(y)
+            return majority_vote(y)
+
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            y_aggregate=y_aggregate,
+            target_type="multi-label",
+            random_state=self.random_state,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            wrapper.query(self.X, self.y)
+
+        self.assertEqual(calls, [])
+
+    def test_class_agnostic_wrapper_accepts_an_all_missing_matrix(self):
+        y = np.full_like(self.y, MISSING_LABEL)
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(random_state=self.random_state),
+            random_state=self.random_state,
+        )
+
+        query_indices, utilities = wrapper.query(
+            self.X,
+            y,
+            batch_size=2,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query_indices.shape, (2, 2))
+        self.assertEqual(utilities.shape, (2, len(self.X), y.shape[1]))
+
     def test_init_param_strategy(self):
         wrapper = SingleAnnotatorWrapper(MixtureModelClassifier())
 

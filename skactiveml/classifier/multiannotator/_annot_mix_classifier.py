@@ -90,6 +90,10 @@ try:
         random_state : int or RandomState instance or None, default=None
             Determines random number for `predict` method. Pass an int for
             reproducible results across multiple method calls.
+        target_type : {"auto", "single-output", "multi-label", \
+                "multi-output"}, default="auto"
+            Declared target type. This classifier supports only single-output
+            classification with multiple annotators.
 
         References
         ----------
@@ -126,6 +130,7 @@ try:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
+            target_type="auto",
         ):
             super(AnnotMixClassifier, self).__init__(
                 multi_annotator_module=_AnnotMixModule,
@@ -137,6 +142,7 @@ try:
                 random_state=random_state,
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
+                target_type=target_type,
             )
             self.clf_module = clf_module
             self.alpha = alpha

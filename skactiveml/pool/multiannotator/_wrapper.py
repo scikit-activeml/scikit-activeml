@@ -15,7 +15,10 @@ from ...utils import (
     majority_vote,
     check_random_state,
     check_scalar,
+    is_unlabeled,
+    resolve_target_spec,
 )
+from ...utils._target import check_target_capability
 
 
 class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
@@ -42,6 +45,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or RandomState instance, default=None
         Controls the randomness of the estimator.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. The outer target matrix is resolved as
+        single-output classification with multiple annotators before its
+        aggregated vector is resolved for `strategy`.
     """
 
     def __init__(
@@ -50,9 +58,12 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         y_aggregate=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.strategy = strategy
         self.y_aggregate = y_aggregate
@@ -183,6 +194,7 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
               indexing refers to samples in `candidates`.
         """
 
+        outer_target_spec = self._resolve_target_spec(y)
         (
             X,
             y,
@@ -255,6 +267,43 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
             )
 
         y_sq = y_aggregate(y)
+        strategy_target_type = getattr(self.strategy, "target_type", "auto")
+        try:
+            aggregate_target_spec = resolve_target_spec(
+                y_sq,
+                task="classification",
+                target_type=strategy_target_type,
+                annotation_type="single-annotator",
+                classes=(
+                    None
+                    if outer_target_spec is None
+                    else outer_target_spec.classes
+                ),
+                missing_label=self.missing_label,
+            )
+        except ValueError:
+            y_sq_array = np.asarray(y_sq)
+            # Preserve cycle-zero acquisition for class-agnostic wrapped
+            # strategies without inventing a class vocabulary.
+            lacks_class_evidence = (
+                outer_target_spec is None
+                and strategy_target_type in {"auto", "single-output"}
+                and y_sq_array.ndim == 1
+                and is_unlabeled(
+                    y_sq_array, missing_label=self.missing_label
+                ).all()
+            )
+            if not lacks_class_evidence:
+                raise
+            aggregate_target_spec = None
+        if aggregate_target_spec is not None and hasattr(
+            self.strategy, "_target_capabilities"
+        ):
+            check_target_capability(
+                type(self.strategy).__name__,
+                aggregate_target_spec,
+                self.strategy._target_capabilities,
+            )
 
         n_selectable_candidates = len(X_cand)
         n_candidates = len(candidates) if candidates is not None else len(X)

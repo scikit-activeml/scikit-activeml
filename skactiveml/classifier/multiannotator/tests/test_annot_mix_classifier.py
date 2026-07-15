@@ -282,6 +282,19 @@ try:
             ]
             self._test_param("init", "sample_dtype", test_cases)
 
+        def test_init_param_target_type(self):
+            self._test_param(
+                "init",
+                "target_type",
+                [
+                    ("auto", None),
+                    ("single-output", None),
+                    ("multi-label", ValueError),
+                    ("multi-output", ValueError),
+                    ("invalid", ValueError),
+                ],
+            )
+
         def test_init_param_cost_matrix(self):
             test_cases = [
                 (1 - np.eye(self.n_classes), None),

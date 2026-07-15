@@ -91,6 +91,14 @@ try:
           `NeuralNet` backend.
         """
 
+        _annotation_type = "multi-annotator"
+
+        @property
+        def _target_capabilities(self):
+            return frozenset(
+                {("classification", "single-output", "multi-annotator")}
+            )
+
         def __init__(
             self,
             multi_annotator_module,
@@ -103,6 +111,7 @@ try:
             cost_matrix=None,
             missing_label=MISSING_LABEL,
             random_state=None,
+            target_type="auto",
         ):
             super(_SkorchMultiAnnotatorClassifier, self).__init__(
                 module=multi_annotator_module,
@@ -113,8 +122,9 @@ try:
                 random_state=random_state,
                 neural_net_param_dict=neural_net_param_dict,
                 sample_dtype=sample_dtype,
+                target_type=target_type,
             )
-            self._resolve_target_spec_on_validate = False
+            self._resolve_target_spec_on_validate = True
             self.clf_module = clf_module
             self.n_annotators = n_annotators
 

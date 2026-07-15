@@ -54,6 +54,61 @@ class TestAnnotatorLogisticRegression(TemplateEstimator, unittest.TestCase):
         lr = AnnotatorLogisticRegression(n_annotators=1, missing_label="nan")
         self.assertRaises(ValueError, lr.fit, X=self.X, y=self.y)
 
+    def test_init_param_target_type(self):
+        self._test_param(
+            "init",
+            "target_type",
+            [
+                ("auto", None),
+                ("single-output", None),
+                ("multi-label", ValueError),
+                ("multi-output", ValueError),
+                ("invalid", ValueError),
+            ],
+        )
+
+    def test_resolved_target_spec_preserves_annotator_columns(self):
+        lr = AnnotatorLogisticRegression(
+            classes=self.classes,
+            missing_label="nan",
+            random_state=0,
+        )
+
+        lr.fit(X=self.X, y=self.y)
+
+        self.assertEqual(lr.target_type, "auto")
+        self.assertEqual(
+            lr._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+        self.assertEqual(lr.target_spec_.task, "classification")
+        self.assertEqual(lr.target_spec_.target_type, "single-output")
+        self.assertEqual(lr.target_spec_.annotation_type, "multi-annotator")
+        self.assertEqual(lr.target_spec_.classes, ("paris", "tokyo"))
+
+    def test_explicit_multilabel_intent_fails_before_fitted_state(self):
+        lr = AnnotatorLogisticRegression(
+            classes=self.classes,
+            missing_label="nan",
+            target_type="multi-label",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            lr.fit(X=self.X, y=self.y)
+
+        self.assertFalse(hasattr(lr, "target_spec_"))
+        self.assertFalse(hasattr(lr, "classes_"))
+
     def test_init_param_tol(self):
         lr = AnnotatorLogisticRegression()
         self.assertEqual(lr.tol, 1.0e-4)

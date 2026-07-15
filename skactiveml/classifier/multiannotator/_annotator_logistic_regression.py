@@ -95,6 +95,10 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
     random_state : int or RandomState instance or None, default=None
         Determines random number for `predict` method. Pass an int for
         reproducible results across multiple method calls.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. This classifier supports only single-output
+        classification with multiple annotators.
 
 
     Attributes
@@ -126,6 +130,14 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         "annotator_perf",
         "annotator_class",
     }
+    _annotation_type = "multi-annotator"
+    _resolve_target_spec_on_validate = True
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
 
     def __init__(
         self,
@@ -142,6 +154,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
         cost_matrix=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             classes=classes,
@@ -149,6 +162,7 @@ class AnnotatorLogisticRegression(SkactivemlClassifier):
             cost_matrix=cost_matrix,
             random_state=random_state,
         )
+        self.target_type = target_type
         self.n_annotators = n_annotators
         self.tol = tol
         self.max_iter = max_iter

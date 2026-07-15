@@ -194,6 +194,10 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         Half of the confidence level for student's t-distribution.
     random_state : int or np.random.RandomState or None, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. This strategy supports only single-output
+        classification with multiple annotators.
 
     References
     ----------
@@ -208,9 +212,12 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         alpha=0.05,
         random_state=None,
         missing_label=MISSING_LABEL,
+        target_type="auto",
     ):
         super().__init__(
-            random_state=random_state, missing_label=missing_label
+            random_state=random_state,
+            missing_label=missing_label,
+            target_type=target_type,
         )
         self.epsilon = epsilon
         self.alpha = alpha
@@ -313,6 +320,12 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
               indexing refers to samples in `candidates`.
         """
 
+        check_type(clf, "clf", SkactivemlClassifier)
+        target_classes = getattr(clf, "classes_", clf.classes)
+        query_target_spec = self._resolve_target_spec(
+            y, classes=target_classes
+        )
+
         # base check
         (
             X,
@@ -322,15 +335,19 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             _,
             return_utilities,
         ) = super()._validate_data(
-            X, y, candidates, annotators, 1, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            annotators,
+            1,
+            return_utilities,
+            reset=True,
+            classes=target_classes,
         )
 
         X_cand, mapping, A_cand = self._transform_cand_annot(
             candidates, annotators, X, y
         )
-
-        # Validate classifier type.
-        check_type(clf, "clf", SkactivemlClassifier)
 
         # Check whether epsilon is float in [0, 1].
         check_scalar(
@@ -364,6 +381,29 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
                 clf = clone(clf).fit(X, y)
             else:
                 clf = clone(clf).fit(X, y, sample_weight)
+
+        if hasattr(clf, "target_spec_"):
+            classifier_target_spec = clf.target_spec_
+        else:
+            classifier_target_spec = clf._resolve_target_spec(
+                y, classes=query_target_spec.classes
+            )
+        classifier_prediction_semantics = (
+            classifier_target_spec.task,
+            classifier_target_spec.target_type,
+            classifier_target_spec.classes,
+        )
+        query_prediction_semantics = (
+            query_target_spec.task,
+            query_target_spec.target_type,
+            query_target_spec.classes,
+        )
+        if classifier_prediction_semantics != query_prediction_semantics:
+            raise ValueError(
+                "IntervalEstimationThreshold's resolved prediction target "
+                "semantics conflict with the classifier's resolved target "
+                "specification."
+            )
 
         P = clf.predict_proba(X_cand)
         uncertainties = uncertainty_scores(probas=P, method="least_confident")

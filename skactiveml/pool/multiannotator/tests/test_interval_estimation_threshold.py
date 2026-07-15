@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.datasets import make_blobs
 from sklearn.preprocessing import StandardScaler
 
+from skactiveml.classifier import ParzenWindowClassifier
 from skactiveml.classifier.multiannotator import AnnotatorLogisticRegression
 from skactiveml.pool.multiannotator import (
     IntervalEstimationThreshold,
@@ -118,6 +119,71 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
         self.clf = AnnotatorLogisticRegression()
         self.A_cand = np.ones_like(self.y)
         self.sample_weight = np.ones_like(self.y)
+
+    def test_target_semantics_are_single_output_multi_annotator(self):
+        ie_thresh = IntervalEstimationThreshold(target_type="auto")
+
+        self.assertEqual(ie_thresh.target_type, "auto")
+        self.assertEqual(
+            ie_thresh._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+
+        query_indices, utilities = ie_thresh.query(
+            X=self.X,
+            y=self.y,
+            clf=self.clf,
+            candidates=self.X,
+            annotators=self.A_cand,
+            batch_size=3,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query_indices.shape, (3, 2))
+        self.assertEqual(utilities.shape, (3, len(self.X), self.y.shape[1]))
+
+    def test_explicit_multilabel_intent_fails_before_acquisition_state(self):
+        ie_thresh = IntervalEstimationThreshold(target_type="multi-label")
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            ie_thresh.query(
+                X=self.X,
+                y=self.y,
+                clf=self.clf,
+                candidates=self.X,
+                annotators=self.A_cand,
+            )
+
+        self.assertFalse(hasattr(ie_thresh, "n_features_in_"))
+        self.assertFalse(hasattr(ie_thresh, "random_state_"))
+
+    def test_fitted_aggregated_classifier_is_a_semantic_boundary(self):
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            self.X, np.arange(len(self.X)) % 2
+        )
+        y = np.full_like(self.y, np.nan)
+
+        query_indices, utilities = IntervalEstimationThreshold().query(
+            X=self.X,
+            y=y,
+            clf=clf,
+            fit_clf=False,
+            batch_size=2,
+            return_utilities=True,
+        )
+
+        self.assertEqual(query_indices.shape, (2, 2))
+        self.assertEqual(utilities.shape, (2, len(self.X), y.shape[1]))
 
     def test_init_param_alpha(self):
         ie_thresh = IntervalEstimationThreshold(alpha=0.0, random_state=0)

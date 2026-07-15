@@ -501,6 +501,56 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
     multiple annotators in scikit-activeml.
     """
 
+    def __init__(
+        self,
+        missing_label=MISSING_LABEL,
+        random_state=None,
+        target_type="auto",
+    ):
+        super().__init__(
+            missing_label=missing_label,
+            random_state=random_state,
+        )
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        """Exact target semantics supported by multi-annotator strategies."""
+        return frozenset(
+            {("classification", "single-output", "multi-annotator")}
+        )
+
+    def _resolve_target_spec(self, y, classes=None):
+        try:
+            target_spec = resolve_target_spec(
+                y,
+                task="classification",
+                target_type=self.target_type,
+                annotation_type="multi-annotator",
+                classes=classes,
+                missing_label=self.missing_label,
+            )
+        except ValueError:
+            y_array = np.asarray(y)
+            # A class-agnostic strategy can still acquire the first
+            # sample-annotator pair before a class vocabulary is observable.
+            # The matrix structure remains unambiguously multi-annotator.
+            lacks_class_evidence = (
+                classes is None
+                and self.target_type in {"auto", "single-output"}
+                and y_array.ndim == 2
+                and is_unlabeled(
+                    y_array, missing_label=self.missing_label
+                ).all()
+            )
+            if lacks_class_evidence:
+                return None
+            raise
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+        return target_spec
+
     @abstractmethod
     def query(
         self,
@@ -601,6 +651,7 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities,
         reset=True,
         check_X_dict=None,
+        classes=None,
     ):
         """Validate input data, all attributes and set or check the
         `n_features_in_` attribute.
@@ -674,6 +725,8 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
         return_utilities : bool,
             Checked boolean value of `return_utilities`.
         """
+        self._resolve_target_spec(y, classes=classes)
+
         (
             X,
             y,
@@ -1138,11 +1191,17 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         )
 
     def _resolve_target_spec(self, y, classes=None):
+        annotation_type = getattr(self, "_annotation_type", "single-annotator")
+        resolution_y = y
+        if annotation_type == "multi-annotator":
+            y_array = np.asarray(y)
+            if y_array.ndim == 1 and y_array.size == 0:
+                resolution_y = y_array.reshape(0, 1)
         target_spec = resolve_target_spec(
-            y,
+            resolution_y,
             task="classification",
             target_type=getattr(self, "target_type", "auto"),
-            annotation_type="single-annotator",
+            annotation_type=annotation_type,
             classes=self.classes if classes is None else classes,
             missing_label=self.missing_label,
         )
