@@ -34,6 +34,7 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
         logits=None,
         return_as_list=False,
         missing_label=MISSING_LABEL,
+        target_type="multi-label",
     ):
         super().__init__(
             classes=[[0, 1], [0, 1]],
@@ -42,6 +43,13 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
         self.probas = probas
         self.logits = logits
         self.return_as_list = return_as_list
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {("classification", "multi-label", "single-annotator")}
+        )
 
     @classmethod
     def reset_fit_calls(cls):
@@ -49,6 +57,7 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
 
     def fit(self, X, y, sample_weight=None):
         type(self).fit_calls += 1
+        target_spec = self._resolve_fitting_target_spec(y)
         self._validate_data(
             X=X,
             y=y,
@@ -56,6 +65,7 @@ class DummyMultilabelLogitClassifier(SkactivemlClassifier):
             y_ensure_1d=False,
             multioutput_ensure_multilabel=True,
         )
+        self.target_spec_ = target_spec
         self.is_fitted_ = True
         return self
 
@@ -160,6 +170,39 @@ class TestUHerding(
             },
             query_default_params_clf_multilabel=self.query_def_clf_multilabel,
         )
+
+    def test_target_contract(self):
+        strategy = UHerding()
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            ),
+        )
+
+    def test_fitted_target_spec_is_authoritative(self):
+        X = self.query_default_params_clf_multilabel["X"]
+        y = self.query_default_params_clf_multilabel["y"]
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            target_type="multi-label",
+        ).fit(X, y)
+        strategy = UHerding(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            strategy.query(X, y, clf, fit_clf=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
 
     def test_init_param_method(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -789,7 +832,7 @@ class TestUHerding(
             query_params["y"],
             query_params["clf"],
             temperatures=np.array([0.5, 1.0]),
-            is_multioutput=True,
+            is_multilabel=True,
         )
         np.testing.assert_array_equal(tau, np.ones(2))
 
@@ -806,7 +849,7 @@ class TestUHerding(
             y_small,
             clf,
             temperatures=np.array([0.5, 1.0]),
-            is_multioutput=True,
+            is_multilabel=True,
         )
         np.testing.assert_array_equal(tau_small, np.ones(2))
 
@@ -834,7 +877,7 @@ class TestUHerding(
                 y,
                 clf,
                 temperatures=np.array([0.5, 1.0, 2.0]),
-                is_multioutput=True,
+                is_multilabel=True,
             )
 
         self.assertEqual(tau.shape, (2,))
@@ -872,7 +915,7 @@ class TestUHerding(
                 y,
                 clf,
                 temperatures=np.array([0.5, 1.0, 2.0]),
-                is_multioutput=True,
+                is_multilabel=True,
             )
 
         self.assertEqual(tau.shape, (2,))
@@ -903,7 +946,7 @@ class TestUHerding(
         probas, logits, emb = qs._predict_with_extras(
             clf,
             self.query_default_params_clf["X"][:2],
-            is_multioutput=True,
+            is_multilabel=True,
         )
         self.assertIsNone(emb)
         self.assertEqual(logits.shape, (2, 2))

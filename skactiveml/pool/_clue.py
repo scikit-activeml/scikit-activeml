@@ -21,6 +21,7 @@ from ..utils import (
 )
 from sklearn.base import clone
 from sklearn.cluster import KMeans
+from ._target import _resolve_estimator_target_spec
 
 
 class Clue(SingleAnnotatorPoolQueryStrategy):
@@ -95,6 +96,10 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         `np.sum` is not allowed. This is only used for the multilabel
         extension of CLUE and is not part of the original method proposed in
         [1]_.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted estimator's target specification is
+        authoritative when available.
 
     References
     ----------
@@ -113,6 +118,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
+        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -123,6 +129,17 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
         self.method = method
         self.predict_dict = predict_dict
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+                ("regression", "single-output", "single-annotator"),
+            }
+        )
 
     def query(
         self,
@@ -144,8 +161,8 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         estimator : skactiveml.base.SkactivemlClassifier\
                 or skactiveml.base.SkactivemlRegressor
@@ -194,6 +211,19 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
+        # Resolve through the estimator before acquisition state is changed.
+        check_type(
+            estimator, "estimator", SkactivemlClassifier, SkactivemlRegressor
+        )
+        check_type(fit_estimator, "fit_estimator", bool)
+        check_equal_missing_label(estimator.missing_label, self.missing_label)
+        if fit_estimator:
+            if sample_weight is not None:
+                estimator = clone(estimator).fit(X, y, sample_weight)
+            else:
+                estimator = clone(estimator).fit(X, y)
+        target_spec = _resolve_estimator_target_spec(self, estimator, y)
+
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X=X,
@@ -203,14 +233,14 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             return_utilities=return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_spec.target_type,
         )
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
             enforce_mapping=True,
-            is_multioutput=is_multioutput,
+            target_type=target_spec.target_type,
         )
         if not callable(self.multilabel_aggregation_fn):
             raise TypeError("`multilabel_aggregation_fn` must be callable.")
@@ -223,11 +253,6 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             else self.cluster_algo_dict.copy()
         )
         check_type(self.n_cluster_param_name, "n_cluster_param_name", str)
-        check_type(
-            estimator, "estimator", SkactivemlClassifier, SkactivemlRegressor
-        )
-        check_type(fit_estimator, "fit_estimator", bool)
-        check_equal_missing_label(estimator.missing_label, self.missing_label_)
         predict_dict = {} if self.predict_dict is None else self.predict_dict
         check_type(predict_dict, "predict_dict", dict)
         if self.method not in [
@@ -240,15 +265,8 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
                 f"or 'entropy'. Got {self.method} instead."
             )
 
-        # Fit the estimator.
-        if fit_estimator:
-            if sample_weight is not None:
-                estimator = clone(estimator).fit(X, y, sample_weight)
-            else:
-                estimator = clone(estimator).fit(X, y)
-
         # Compute predictions plus optional embeddings and/or uncertainties.
-        is_clf = isinstance(estimator, SkactivemlClassifier)
+        is_clf = target_spec.task == "classification"
         if is_clf:
             out = estimator.predict_proba(X_cand, **predict_dict)
         else:
@@ -279,7 +297,7 @@ class Clue(SingleAnnotatorPoolQueryStrategy):
             uncertainties = uncertainty_scores(
                 probas=main,
                 method=self.method,
-                is_multilabel=is_multioutput,
+                is_multilabel=target_spec.target_type == "multi-label",
                 multilabel_aggregation_fn=self.multilabel_aggregation_fn,
             )
         elif not is_clf and uncertainties is None:

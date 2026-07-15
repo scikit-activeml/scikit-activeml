@@ -14,6 +14,7 @@ from ..utils import (
     rand_argmax,
     check_scalar,
 )
+from ._target import _resolve_estimator_target_spec
 
 
 class DropQuery(SingleAnnotatorPoolQueryStrategy):
@@ -24,9 +25,9 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     batch. For this purpose, unlabeled samples are filtered according to a
     disagreement-based measure via dropout such that only the unlabeled samples
     with a disagreement above a threshold are clustered for selecting the
-    unlabeled samples nearest to the respective clusters. If `y` is
-    two-dimensional, it is interpreted as multilabel data and the per-label
-    disagreement scores are reduced by `multilabel_aggregation_fn`.
+    unlabeled samples nearest to the respective clusters. For resolved
+    multi-label targets, per-label disagreement scores are reduced by
+    `multilabel_aggregation_fn`.
 
     Parameters
     ----------
@@ -66,15 +67,19 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
     multilabel_aggregation_fn : callable, default=np.mean
-        Callable used only for two-dimensional `y` (multilabel classification).
+        Callable used only for resolved multi-label classification targets.
         It must accept `axis` as a keyword argument and reduce the per-label
         disagreement counts along that axis. Common choices are `np.mean`,
         `np.min`, `np.max`, or quantiles.
     disagreement_threshold : float, default=0.5
         Threshold used to filter candidate samples based on their disagreement
-        score. For two-dimensional `y`, the disagreement scores are first
+        score. For multi-label targets, the disagreement scores are first
         aggregated by `multilabel_aggregation_fn`, such that valid threshold
         values depend on the chosen aggregation function.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted classifier's target specification is
+        authoritative when available.
 
 
     References
@@ -96,6 +101,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         random_state=None,
         multilabel_aggregation_fn=np.mean,
         disagreement_threshold=0.5,
+        target_type="auto",
     ):
         self.dropout_rate = dropout_rate
         self.n_dropout_samples = n_dropout_samples
@@ -105,8 +111,18 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         self.clf_embedding_flag_name = clf_embedding_flag_name
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
         self.disagreement_threshold = disagreement_threshold
+        self.target_type = target_type
         super().__init__(
             missing_label=missing_label, random_state=random_state
+        )
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+            }
         )
 
     def query(
@@ -129,8 +145,8 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         clf : skactiveml.base.SkactivemlClassifier
             Classifier implementing the methods `fit` and `predict`.
@@ -168,6 +184,18 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             Utilities for labeled samples will be set to np.nan. The indexing
             refers to the samples in `X`.
         """
+        # Resolve through the classifier before acquisition state is changed.
+        check_type(clf, "clf", SkactivemlClassifier)
+        check_type(fit_clf, "fit_clf", bool)
+        check_equal_missing_label(clf.missing_label, self.missing_label)
+        if fit_clf:
+            if sample_weight is not None:
+                clf = clone(clf).fit(X, y, sample_weight)
+            else:
+                clf = clone(clf).fit(X, y)
+        target_spec = _resolve_estimator_target_spec(self, clf, y)
+        is_multilabel = target_spec.target_type == "multi-label"
+
         # Check `__init__` and `query` parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -177,14 +205,14 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_spec.target_type,
         )
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
             candidates=candidates,
             X=X,
             y=y,
             enforce_mapping=True,
-            is_multioutput=is_multioutput,
+            target_type=target_spec.target_type,
         )
         check_scalar(
             self.dropout_rate,
@@ -204,7 +232,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
         )
         if not callable(self.multilabel_aggregation_fn):
             raise TypeError("`multilabel_aggregation_fn` must be callable.")
-        if is_multioutput:
+        if is_multilabel:
             check_type(
                 self.disagreement_threshold, "disagreement_threshold", float
             )
@@ -231,9 +259,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             else self.cluster_algo_dict.copy()
         )
         check_type(self.n_cluster_param_name, "n_cluster_param_name", str)
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_type(fit_clf, "fit_clf", bool)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
         predict_proba_kwargs = {}
         if self.clf_embedding_flag_name is not None:
             check_type(
@@ -247,13 +272,6 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
 
-        # Fit the classifier, if requested.
-        if fit_clf:
-            if sample_weight is not None:
-                clf = clone(clf).fit(X, y, sample_weight)
-            else:
-                clf = clone(clf).fit(X, y)
-
         # Compute predictions and optionally embeddings for original samples.
         y_pred = clf.predict(X_cand, **predict_proba_kwargs)
         if isinstance(y_pred, tuple):
@@ -266,7 +284,7 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
 
         # Prepare an array to hold the dropout predictions.
         shape = (n_candidates, self.n_dropout_samples)
-        if is_multioutput:
+        if is_multilabel:
             shape = shape + (y.shape[1],)
 
         y_pred_dropout = np.empty(shape, dtype=object)
@@ -291,11 +309,11 @@ class DropQuery(SingleAnnotatorPoolQueryStrategy):
             y_pred_dropout[:, i] = y_pred_dropout_current
 
         # Filter candidates for clustering based on disagreement.
-        if is_multioutput:
+        if is_multilabel:
             n_disagrees = (y_pred[:, None, :] != y_pred_dropout).sum(axis=1)
         else:
             n_disagrees = (y_pred[:, None] != y_pred_dropout).sum(axis=1)
-        if is_multioutput:
+        if is_multilabel:
             n_disagrees = self.multilabel_aggregation_fn(n_disagrees, axis=-1)
         disagree_rate = n_disagrees.astype(float) / self.n_dropout_samples
         n_selected = (disagree_rate > self.disagreement_threshold).sum()

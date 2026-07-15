@@ -2,6 +2,7 @@ from ..base import SingleAnnotatorPoolQueryStrategy
 from ..utils import (
     MISSING_LABEL,
     check_random_state,
+    check_equal_missing_label,
     is_labeled,
     labeled_indices,
     unlabeled_indices,
@@ -13,6 +14,7 @@ from math import ceil
 import numpy as np
 from joblib import Parallel, delayed, cpu_count
 import warnings
+from ._target import _resolve_wrapper_target_type
 
 
 class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
@@ -29,8 +31,8 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
     can further improve the runtime for query strategies that utilize all
     available unlabeled data in their selection.
 
-    If `y` is two-dimensional, it is interpreted as multilabel data and each
-    row must be either fully labeled or fully unlabeled.
+    Resolved multi-label targets preserve sample-level masks, so each row must
+    be either fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -56,6 +58,10 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. Automatic resolution preserves target semantics
+        declared by the wrapped strategy or a supplied estimator.
     """
 
     def __init__(
@@ -66,6 +72,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         embed_samples_func=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -74,6 +81,13 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
         self.max_candidates = max_candidates
         self.exclude_non_subsample = exclude_non_subsample
         self.embed_samples_func = embed_samples_func
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return getattr(
+            self.query_strategy, "_target_capabilities", frozenset()
+        )
 
     @match_signature("query_strategy", "query")
     def query(
@@ -94,8 +108,8 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or\
                 array-like of shape (n_candidates, n_features), default=None
@@ -141,6 +155,18 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+        check_equal_missing_label(
+            self.query_strategy.missing_label, self.missing_label
+        )
+        target_type = _resolve_wrapper_target_type(self, y, query_kwargs)
+
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
             y,
@@ -149,21 +175,14 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_type,
         )
-        is_multioutput = y.ndim == 2
 
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
         check_scalar(self.exclude_non_subsample, "exclude_non_subsample", bool)
         is_lbld = is_labeled(
             y=y,
             missing_label=self.missing_label_,
-            target_type=("multi-label" if is_multioutput else "single-output"),
+            target_type=target_type,
         )
         seed_multiplier = int(is_lbld.sum() + 1)
         max_candidates = self.max_candidates
@@ -203,9 +222,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             candidate_indices = unlabeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                target_type=(
-                    "multi-label" if is_multioutput else "single-output"
-                ),
+                target_type=target_type,
             )
             # transform max_candidates to int if a ratio is given
             if isinstance(max_candidates, float):
@@ -242,9 +259,7 @@ class SubSamplingWrapper(SingleAnnotatorPoolQueryStrategy):
             all_labeled = labeled_indices(
                 y=y,
                 missing_label=self.missing_label_,
-                target_type=(
-                    "multi-label" if is_multioutput else "single-output"
-                ),
+                target_type=target_type,
             )
             if candidates is not None and candidates.ndim > 1:
                 subset_and_labeled_indices = all_labeled
@@ -344,8 +359,8 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
     assumption for this is that the utility computations are independent from
     another. Therefore, only `batch_size=1` is supported.
 
-    If `y` is two-dimensional, it is interpreted as multilabel data and each
-    row must be either fully labeled or fully unlabeled.
+    Resolved multi-label targets preserve sample-level masks, so each row must
+    be either fully labeled or fully unlabeled.
 
     Parameters
     ----------
@@ -363,6 +378,10 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. Automatic resolution preserves target semantics
+        declared by the wrapped strategy or a supplied estimator.
 
     """
 
@@ -373,6 +392,7 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         parallel_dict=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
@@ -380,6 +400,13 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
         self.query_strategy = query_strategy
         self.n_jobs = n_jobs
         self.parallel_dict = parallel_dict
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return getattr(
+            self.query_strategy, "_target_capabilities", frozenset()
+        )
 
     @match_signature("query_strategy", "query")
     def query(
@@ -400,8 +427,8 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row.
         candidates : None or array-like of shape (n_candidates), dtype=int or
             array-like of shape (n_candidates, n_features), (default=None)
@@ -449,6 +476,18 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        if not isinstance(
+            self.query_strategy, SingleAnnotatorPoolQueryStrategy
+        ):
+            raise TypeError(
+                f"`query_strategy` is of type `{type(self.query_strategy)}` "
+                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
+            )
+        check_equal_missing_label(
+            self.query_strategy.missing_label, self.missing_label
+        )
+        target_type = _resolve_wrapper_target_type(self, y, query_kwargs)
+
         # Validate parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -458,21 +497,13 @@ class ParallelUtilityEstimationWrapper(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_type,
         )
         if batch_size != 1:
             raise ValueError("`batch_size` must be set to 1.")
-        if not isinstance(
-            self.query_strategy, SingleAnnotatorPoolQueryStrategy
-        ):
-            raise TypeError(
-                f"`query_strategy` is of type `{type(self.query_strategy)}` "
-                f"but must be of type `SingleAnnotatorPoolQueryStrategy`."
-            )
-
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+            candidates=candidates, X=X, y=y, target_type=target_type
         )
 
         # Determine number of parallel jobs.

@@ -76,6 +76,48 @@ class TestClue(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             query_default_params_clf_multilabel=self.qs_params_clf_multilabel,
         )
 
+    def test_target_contract(self):
+        strategy = Clue()
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                    ("regression", "single-output", "single-annotator"),
+                }
+            ),
+        )
+
+    def test_fitted_target_spec_is_authoritative(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        estimator = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y)
+        strategy = Clue(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            strategy.query(X, y, estimator, fit_estimator=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+
     def test_init_param_cluster_algo(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
         test_cases += [

@@ -5,6 +5,8 @@ import inspect
 
 import numpy as np
 from sklearn.datasets import load_breast_cancer
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.preprocessing import StandardScaler
 
 from skactiveml.classifier import SklearnClassifier, ParzenWindowClassifier
@@ -104,6 +106,92 @@ class TestSubSamplingWrapper(
             query_default_params_reg=query_default_params_reg,
             query_default_params_clf_multilabel=params_clf_multilabel,
         )
+
+    def test_target_contract_preserves_wrapped_strategy(self):
+        wrapped = UncertaintySampling(method="entropy")
+        wrapper = SubSamplingWrapper(query_strategy=wrapped)
+
+        self.assertEqual(wrapper.target_type, "auto")
+        self.assertEqual(
+            wrapper._target_capabilities, wrapped._target_capabilities
+        )
+        restricted = UncertaintySampling(method="expected_average_precision")
+        restricted_wrapper = SubSamplingWrapper(query_strategy=restricted)
+        self.assertEqual(
+            restricted_wrapper._target_capabilities,
+            restricted._target_capabilities,
+        )
+        self.assertNotIn(
+            ("classification", "multi-label", "single-annotator"),
+            restricted_wrapper._target_capabilities,
+        )
+
+    def test_ambiguous_targets_fail_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=RandomSampling(), max_candidates=2
+        )
+
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            wrapper.query(X, y)
+
+        self.assertFalse(hasattr(wrapper, "n_features_in_"))
+
+    def test_fitted_estimator_semantics_reach_wrapped_strategy(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
+        ).fit(X, y_fit)
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = SubSamplingWrapper(
+            query_strategy=UncertaintySampling(),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        query_idx, utilities = wrapper.query(
+            X,
+            y_query,
+            clf=clf,
+            fit_clf=False,
+            return_utilities=True,
+        )
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertEqual(utilities.shape, (1, len(X)))
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+
+        conflicting = SubSamplingWrapper(
+            query_strategy=UncertaintySampling(),
+            max_candidates=4,
+            target_type="single-output",
+        )
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            conflicting.query(X, y_query, clf=clf, fit_clf=False)
+        self.assertFalse(hasattr(conflicting, "n_features_in_"))
 
     def test_init_param_max_candidates(self, test_cases=None):
         test_cases = [] if test_cases is None else test_cases
@@ -351,6 +439,33 @@ class TestParallelUtilityEstimationWrapper(
                 ),
             },
         )
+
+    def test_target_contract_preserves_wrapped_strategy(self):
+        wrapped = RandomSampling(target_type="multi-label")
+        wrapper = ParallelUtilityEstimationWrapper(query_strategy=wrapped)
+
+        self.assertEqual(wrapper.target_type, "auto")
+        self.assertEqual(
+            wrapper._target_capabilities, wrapped._target_capabilities
+        )
+
+    def test_ambiguous_targets_fail_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+        wrapper = ParallelUtilityEstimationWrapper(
+            query_strategy=RandomSampling(), n_jobs=1
+        )
+
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            wrapper.query(X, y)
+
+        self.assertFalse(hasattr(wrapper, "n_features_in_"))
 
     def test_init_param_query_strategy(self):
         test_cases = [

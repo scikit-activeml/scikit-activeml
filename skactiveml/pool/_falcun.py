@@ -16,6 +16,7 @@ from ..utils import (
 )
 from ..utils._validation import _canonicalize_multilabel_probas
 from ._uncertainty_sampling import uncertainty_scores
+from ._target import _resolve_estimator_target_spec
 
 
 class Falcun(SingleAnnotatorPoolQueryStrategy):
@@ -26,8 +27,8 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     space using a self-adjusting mix of uncertainty and diversity. By operating
     only on low-dimensional class-probability outputs rather than deep
     embeddings, it achieves fast acquisitions while retaining strong label
-    efficiency. If `y` is two-dimensional, it is interpreted as multilabel
-    data and the per-label uncertainty scores are reduced by
+    efficiency. For resolved multi-label targets, the per-label uncertainty
+    scores are reduced by
     `multilabel_aggregation_fn`.
 
     Parameters
@@ -43,8 +44,11 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
     multilabel_aggregation_fn : callable, default=np.mean
         Callable that takes `axis` as keyword argument and reduces the
         per-label uncertainty scores for multilabel classification. This is
-        only used when `y` is two-dimensional, corresponding to a multilabel
-        classification problem.
+        only used for resolved multi-label classification targets.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted classifier's target specification is
+        authoritative when available.
 
     References
     ----------
@@ -59,12 +63,23 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         missing_label=MISSING_LABEL,
         random_state=None,
         multilabel_aggregation_fn=np.mean,
+        target_type="auto",
     ):
         super().__init__(
             missing_label=missing_label, random_state=random_state
         )
         self.gamma = gamma
         self.multilabel_aggregation_fn = multilabel_aggregation_fn
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+            }
+        )
 
     def query(
         self,
@@ -86,8 +101,8 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row. In this
             case, only multilabel classification problems, i.e. multiple
             binary classification tasks, are supported. `predict_proba` must
@@ -145,6 +160,17 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
+        # Resolve through the classifier before acquisition state is changed.
+        check_type(clf, "clf", SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label)
+        check_scalar(fit_clf, "fit_clf", bool)
+        if fit_clf:
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
+        target_spec = _resolve_estimator_target_spec(self, clf, y)
+
         # Check parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -154,12 +180,15 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_spec.target_type,
         )
 
         # Determine candidate samples for selection.
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates=candidates, X=X, y=y, is_multioutput=is_multioutput
+            candidates=candidates,
+            X=X,
+            y=y,
+            target_type=target_spec.target_type,
         )
 
         check_scalar(
@@ -171,20 +200,10 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         )
         if not callable(self.multilabel_aggregation_fn):
             raise TypeError("`multilabel_aggregation_fn` must be callable.")
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_scalar(fit_clf, "fit_clf", bool)
-
-        # Fit classifier, if requested.
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-
         # Compute uncertainties via margin sampling (cf. Eq. (1) in [1]).
         probas_cand = clf.predict_proba(X_cand)
-        if is_multioutput:
+        is_multilabel = target_spec.target_type == "multi-label"
+        if is_multilabel:
             probas_cand = _canonicalize_multilabel_probas(
                 probas_cand,
                 n_samples=len(X_cand),
@@ -193,7 +212,7 @@ class Falcun(SingleAnnotatorPoolQueryStrategy):
         unc_cand = uncertainty_scores(
             probas=probas_cand,
             method="margin_sampling",
-            is_multilabel=is_multioutput,
+            is_multilabel=is_multilabel,
             multilabel_aggregation_fn=self.multilabel_aggregation_fn,
         )
 

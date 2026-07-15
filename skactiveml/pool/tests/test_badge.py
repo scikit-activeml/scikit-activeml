@@ -68,6 +68,105 @@ class TestBadge(TemplateSingleAnnotatorPoolQueryStrategy, unittest.TestCase):
             query_default_params_clf_multilabel=self.qs_params_clf_multilabel,
         )
 
+    def test_target_contract(self):
+        strategy = Badge()
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "single-annotator",
+                    ),
+                    ("classification", "multi-label", "single-annotator"),
+                }
+            ),
+        )
+
+    def test_explicit_target_conflict_precedes_acquisition_state(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y)
+        strategy = Badge(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            strategy.query(X, y, clf, fit_clf=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
+    def test_fit_clone_keeps_classifier_target_declaration(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        )
+
+        query_idx = Badge(random_state=0).query(X, y, clf, fit_clf=True)
+
+        self.assertIn(query_idx[0], [4, 5])
+        self.assertEqual(clf.target_type, "multi-label")
+        self.assertFalse(hasattr(clf, "target_spec_"))
+
+    def test_query_reuses_fitted_target_spec_without_class_evidence(self):
+        X = np.linspace(0, 1, 12).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y_fit)
+        established_spec = clf.target_spec_
+        y_query = np.array(
+            [
+                [0.0, 1.0],
+                [0.0, 1.0],
+                *[[MISSING_LABEL, MISSING_LABEL] for _ in range(4)],
+            ]
+        )
+
+        query_idx, utilities = Badge(random_state=0).query(
+            X, y_query, clf, fit_clf=False, return_utilities=True
+        )
+
+        self.assertIn(query_idx[0], [2, 3, 4, 5])
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertTrue(np.isnan(utilities[0, :2]).all())
+
     def test_query_param_clf(self):
         add_test_cases = [
             (SVC(), TypeError),

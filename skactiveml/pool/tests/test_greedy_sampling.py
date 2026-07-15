@@ -87,6 +87,37 @@ class TestGreedySamplingTarget(
             query_default_params_reg=query_default_params_reg,
         )
 
+    def test_target_contract(self):
+        strategy = GreedySamplingTarget()
+
+        self.assertEqual(strategy.target_type, "auto")
+        self.assertEqual(
+            strategy._target_capabilities,
+            frozenset({("regression", "single-output", "single-annotator")}),
+        )
+
+    def test_multioutput_capability_failure_precedes_acquisition_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 2.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        reg = SklearnRegressor(
+            GaussianProcessRegressor(), target_type="multi-output"
+        )
+        strategy = GreedySamplingTarget()
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            strategy.query(X, y, reg, fit_reg=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+
     def test_init_param_x_metric(self):
         test_cases = [
             (np.nan, TypeError),

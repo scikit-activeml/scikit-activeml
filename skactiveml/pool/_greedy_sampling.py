@@ -14,7 +14,9 @@ from skactiveml.utils import (
     is_labeled,
     check_type,
     check_scalar,
+    check_equal_missing_label,
 )
+from ._target import _resolve_estimator_target_spec
 
 
 class GreedySamplingX(_TaskAgnosticPoolQueryStrategy):
@@ -227,6 +229,11 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : int or np.random.RandomState, default=None
         Random state for candidate selection.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted regressor's target specification is
+        authoritative when available. Only single-output regression is
+        supported.
 
     References
     ----------
@@ -244,6 +251,7 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         n_GSx_samples=1,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         super().__init__(
             random_state=random_state, missing_label=missing_label
@@ -254,6 +262,11 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         self.x_metric_dict = x_metric_dict
         self.y_metric_dict = y_metric_dict
         self.n_GSx_samples = n_GSx_samples
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return frozenset({("regression", "single-output", "single-annotator")})
 
     def query(
         self,
@@ -313,12 +326,27 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
-        )
-
+        # Resolve through the regressor before acquisition state is changed.
         check_type(reg, "reg", SkactivemlRegressor)
         check_type(fit_reg, "fit_reg", bool)
+        check_equal_missing_label(reg.missing_label, self.missing_label)
+        if fit_reg:
+            if sample_weight is None:
+                reg = clone(reg).fit(X, y)
+            else:
+                reg = clone(reg).fit(X, y, sample_weight)
+        target_spec = _resolve_estimator_target_spec(self, reg, y)
+
+        X, y, candidates, batch_size, return_utilities = self._validate_data(
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
+        )
+
         if self.method is None:
             self.method = "GSi"
         check_type(self.method, "self.method", target_vals=["GSy", "GSi"])
@@ -330,14 +358,12 @@ class GreedySamplingTarget(SingleAnnotatorPoolQueryStrategy):
         batch_size_x = max(0, min(self.n_GSx_samples - n_labeled, batch_size))
         batch_size_y = batch_size - batch_size_x
 
-        if fit_reg:
-            if sample_weight is None:
-                reg = clone(reg).fit(X, y)
-            else:
-                reg = clone(reg).fit(X, y, sample_weight)
-
         sample_indices = np.arange(len(X), dtype=int)
-        selected_indices = labeled_indices(y)
+        selected_indices = labeled_indices(
+            y,
+            missing_label=self.missing_label_,
+            target_type=target_spec.target_type,
+        )
         y_cand = reg.predict(X_cand)
 
         if mapping is None:

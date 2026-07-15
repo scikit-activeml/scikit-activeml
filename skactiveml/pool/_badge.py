@@ -16,6 +16,7 @@ from ..utils import (
     check_scalar,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
+from ._target import _resolve_estimator_target_spec
 
 
 class Badge(SingleAnnotatorPoolQueryStrategy):
@@ -29,9 +30,9 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
     k-means++ spreads selections to avoid redundancy.
 
     The original BADGE method was proposed for multiclass classification. The
-    multilabel support in this implementation is an extension and not part of
-    the original proposal in [1]_. For two-dimensional label matrices, BADGE
-    assumes independent sigmoid outputs per label and forms a multilabel
+    multi-label support in this implementation is an extension and not part of
+    the original proposal in [1]_. For resolved multi-label targets, BADGE
+    assumes independent sigmoid outputs per label and forms a multi-label
     gradient embedding from the binary-cross-entropy-style last-layer
     gradients.
 
@@ -59,6 +60,10 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         Value to represent a missing label.
     random_state : None or int or np.random.RandomState, default=None
         The random state to use.
+    target_type : {"auto", "single-output", "multi-label", "multi-output"}, \
+            default="auto"
+        Declared target type. A fitted classifier's target specification is
+        authoritative when available.
 
     References
     ----------
@@ -72,10 +77,21 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         clf_embedding_flag_name=None,
         missing_label=MISSING_LABEL,
         random_state=None,
+        target_type="auto",
     ):
         self.clf_embedding_flag_name = clf_embedding_flag_name
         super().__init__(
             missing_label=missing_label, random_state=random_state
+        )
+        self.target_type = target_type
+
+    @property
+    def _target_capabilities(self):
+        return frozenset(
+            {
+                ("classification", "single-output", "single-annotator"),
+                ("classification", "multi-label", "single-annotator"),
+            }
         )
 
     def query(
@@ -98,8 +114,8 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             and unlabeled samples.
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             Labels of the training data set (possibly including unlabeled ones
-            indicated by `self.missing_label`). If `y` is two-dimensional, a
-            row `y[i]` must either contain only observed labels or only
+            indicated by `self.missing_label`). For multi-label targets, a row
+            `y[i]` must either contain only observed labels or only
             `missing_label` values, i.e., no mixing within a row. In this
             case, BADGE uses a multilabel extension based on independent
             sigmoid outputs per label. `predict_proba` must then return either
@@ -158,6 +174,17 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, n_features)`,
               the indexing refers to the samples in `candidates`.
         """
+        # Resolve through the classifier before acquisition state is changed.
+        check_type(clf, "clf", SkactivemlClassifier)
+        check_equal_missing_label(clf.missing_label, self.missing_label)
+        check_scalar(fit_clf, "fit_clf", bool)
+        if fit_clf:
+            if sample_weight is None:
+                clf = clone(clf).fit(X, y)
+            else:
+                clf = clone(clf).fit(X, y, sample_weight)
+        target_spec = _resolve_estimator_target_spec(self, clf, y)
+
         # Validate input parameters
         X, y, candidates, batch_size, return_utilities = self._validate_data(
             X,
@@ -167,17 +194,14 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             return_utilities,
             reset=True,
             allow_multioutput=True,
+            target_type=target_spec.target_type,
         )
 
-        is_multioutput = y.ndim == 2
         X_cand, mapping = self._transform_candidates(
-            candidates, X, y, is_multioutput=is_multioutput
+            candidates, X, y, target_type=target_spec.target_type
         )
 
         # Validate classifier type
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label_)
-        check_scalar(fit_clf, "fit_clf", bool)
         predict_proba_kwargs = {}
         if self.clf_embedding_flag_name is not None:
             check_type(
@@ -191,13 +215,6 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             else:
                 predict_proba_kwargs = self.clf_embedding_flag_name
 
-        # Fit the classifier
-        if fit_clf:
-            if sample_weight is None:
-                clf = clone(clf).fit(X, y)
-            else:
-                clf = clone(clf).fit(X, y, sample_weight)
-
         # find the unlabeled dataset
         if candidates is None:
             X_unlbld = X_cand
@@ -206,9 +223,7 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
             unlbld_mapping = unlabeled_indices(
                 y[mapping],
                 missing_label=self.missing_label_,
-                target_type=(
-                    "multi-label" if is_multioutput else "single-output"
-                ),
+                target_type=target_spec.target_type,
             )
             X_unlbld = X_cand[unlbld_mapping]
             unlbld_mapping = mapping[unlbld_mapping]
@@ -221,14 +236,14 @@ class Badge(SingleAnnotatorPoolQueryStrategy):
         probas = clf.predict_proba(X_unlbld, **predict_proba_kwargs)
         if isinstance(probas, tuple):
             probas, X_unlbld = probas
-        if is_multioutput:
+        if target_spec.target_type == "multi-label":
             probas = _canonicalize_multilabel_probas(
                 probas,
                 n_samples=len(X_unlbld),
                 n_outputs=y.shape[1],
             )
 
-        if is_multioutput:
+        if target_spec.target_type == "multi-label":
             y_pred = (probas >= 0.5).astype(float)
             proba_factor = probas - y_pred
         else:
