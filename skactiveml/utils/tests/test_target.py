@@ -15,6 +15,99 @@ from skactiveml.utils import (
 from skactiveml.utils._target import check_target_capability
 
 
+class TestTargetSpec(unittest.TestCase):
+    def test_rejects_unresolved_or_unknown_semantic_values(self):
+        invalid_specs = [
+            (
+                {
+                    "task": "clustering",
+                    "target_type": "single-output",
+                    "annotation_type": "single-annotator",
+                },
+                "task",
+            ),
+            (
+                {
+                    "task": "classification",
+                    "target_type": "auto",
+                    "annotation_type": "single-annotator",
+                },
+                "target_type",
+            ),
+            (
+                {
+                    "task": "classification",
+                    "target_type": "multilabel",
+                    "annotation_type": "single-annotator",
+                },
+                "target_type",
+            ),
+            (
+                {
+                    "task": "classification",
+                    "target_type": "single-output",
+                    "annotation_type": "crowd",
+                },
+                "annotation_type",
+            ),
+        ]
+
+        for declarations, message in invalid_specs:
+            with self.subTest(declarations=declarations):
+                with self.assertRaisesRegex(ValueError, message):
+                    TargetSpec(classes=None, **declarations)
+
+    def test_rejects_incompatible_semantic_combinations(self):
+        invalid_specs = [
+            (
+                {
+                    "task": "regression",
+                    "target_type": "multi-label",
+                    "annotation_type": "single-annotator",
+                },
+                "requires classification",
+            ),
+            (
+                {
+                    "task": "classification",
+                    "target_type": "multi-label",
+                    "annotation_type": "multi-annotator",
+                },
+                "cannot be combined",
+            ),
+            (
+                {
+                    "task": "classification",
+                    "target_type": "multi-output",
+                    "annotation_type": "multi-annotator",
+                },
+                "cannot be combined",
+            ),
+        ]
+
+        for declarations, message in invalid_specs:
+            with self.subTest(declarations=declarations):
+                with self.assertRaisesRegex(ValueError, message):
+                    TargetSpec(classes=None, **declarations)
+
+    def test_freezes_flat_and_nested_class_vocabularies(self):
+        flat = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=["cat", "dog"],
+        )
+        nested = TargetSpec(
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=[np.array([0, 1]), [2, 3]],
+        )
+
+        self.assertEqual(flat.classes, ("cat", "dog"))
+        self.assertEqual(nested.classes, ((0, 1), (2, 3)))
+
+
 class TestResolveTargetSpec(unittest.TestCase):
     def test_auto_classification_uses_unambiguous_declarations(self):
         single_output = resolve_target_spec(

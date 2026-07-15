@@ -33,6 +33,12 @@ class TargetSpec:
     classes: tuple | None
 
     def __post_init__(self):
+        _validate_target_semantics(
+            self.task,
+            self.target_type,
+            self.annotation_type,
+            allow_auto=False,
+        )
         if self.classes is not None:
             object.__setattr__(self, "classes", _freeze_classes(self.classes))
 
@@ -46,6 +52,47 @@ def _freeze_classes(classes):
         )
         for value in classes
     )
+
+
+def _validate_target_semantics(
+    task, target_type, annotation_type, *, allow_auto
+):
+    if task not in {"classification", "regression"}:
+        raise ValueError(
+            "`task` must be either 'classification' or 'regression'."
+        )
+
+    target_types = {"single-output", "multi-label", "multi-output"}
+    if allow_auto:
+        target_types.add("auto")
+    if target_type not in target_types:
+        allowed = (
+            "{'auto', 'single-output', 'multi-label', 'multi-output'}"
+            if allow_auto
+            else "{'single-output', 'multi-label', 'multi-output'}"
+        )
+        raise ValueError(f"`target_type` must be one of {allowed}.")
+
+    if annotation_type not in {"single-annotator", "multi-annotator"}:
+        raise ValueError(
+            "`annotation_type` must be either 'single-annotator' or "
+            "'multi-annotator'."
+        )
+    if task == "regression" and target_type == "multi-label":
+        raise ValueError(
+            "`target_type='multi-label'` requires classification."
+        )
+    if (
+        target_type in {"multi-label", "multi-output"}
+        and annotation_type == "multi-annotator"
+    ):
+        target_name = (
+            "Multi-label" if target_type == "multi-label" else "Multi-output"
+        )
+        raise ValueError(
+            f"{target_name} targets cannot be combined with "
+            "`annotation_type='multi-annotator'`."
+        )
 
 
 def resolve_target_spec(
@@ -81,29 +128,9 @@ def resolve_target_spec(
     target_spec : TargetSpec
         The resolved immutable target specification.
     """
-    if task not in {"classification", "regression"}:
-        raise ValueError(
-            "`task` must be either 'classification' or 'regression'."
-        )
-    if target_type not in {
-        "auto",
-        "single-output",
-        "multi-label",
-        "multi-output",
-    }:
-        raise ValueError(
-            "`target_type` must be one of {'auto', 'single-output', "
-            "'multi-label', 'multi-output'}."
-        )
-    if annotation_type not in {"single-annotator", "multi-annotator"}:
-        raise ValueError(
-            "`annotation_type` must be either 'single-annotator' or "
-            "'multi-annotator'."
-        )
-    if task == "regression" and target_type == "multi-label":
-        raise ValueError(
-            "`target_type='multi-label'` requires classification."
-        )
+    _validate_target_semantics(
+        task, target_type, annotation_type, allow_auto=True
+    )
     if task == "regression" and classes is not None:
         raise ValueError("`classes` is not accepted for regression targets.")
     if task == "classification" and classes is not None:
@@ -153,8 +180,6 @@ def resolve_target_spec(
     if target_type == "multi-label":
         return _resolve_multilabel(
             y,
-            task=task,
-            annotation_type=annotation_type,
             classes=classes,
             missing_label=missing_label,
         )
@@ -162,7 +187,6 @@ def resolve_target_spec(
         return _resolve_multioutput(
             y,
             task=task,
-            annotation_type=annotation_type,
             classes=classes,
             missing_label=missing_label,
         )
@@ -229,12 +253,7 @@ def _validate_single_output_shape(y, task, annotation_type):
         )
 
 
-def _resolve_multioutput(y, *, task, annotation_type, classes, missing_label):
-    if annotation_type != "single-annotator":
-        raise ValueError(
-            "Multi-output targets cannot be combined with "
-            "`annotation_type='multi-annotator'`."
-        )
+def _resolve_multioutput(y, *, task, classes, missing_label):
     if y.ndim != 2 or y.shape[1] < 2:
         raise ValueError(
             "Multi-output targets must be two-dimensional with at least two "
@@ -279,16 +298,7 @@ def _resolve_multioutput(y, *, task, annotation_type, classes, missing_label):
     )
 
 
-def _resolve_multilabel(y, *, task, annotation_type, classes, missing_label):
-    if task != "classification":
-        raise ValueError(
-            "`target_type='multi-label'` requires classification."
-        )
-    if annotation_type != "single-annotator":
-        raise ValueError(
-            "Multi-label targets cannot be combined with "
-            "`annotation_type='multi-annotator'`."
-        )
+def _resolve_multilabel(y, *, classes, missing_label):
     if y.ndim != 2:
         raise ValueError("Multi-label targets must be two-dimensional.")
     if classes is not None and not _has_nested_classes(classes):
