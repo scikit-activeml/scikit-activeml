@@ -79,6 +79,43 @@ class TestAnnotatorEnsembleClassifier(unittest.TestCase):
         clf = AnnotatorEnsembleClassifier(estimators=estimators, voting=1)
         self.assertRaises(ValueError, clf.fit, X=self.X, y=self.y)
 
+    def test_init_param_target_type(self):
+        estimators = [
+            ("pwc-0", ParzenWindowClassifier()),
+            ("pwc-1", ParzenWindowClassifier()),
+        ]
+        clf = AnnotatorEnsembleClassifier(
+            estimators=estimators,
+            target_type="auto",
+        )
+
+        self.assertEqual(clf.target_type, "auto")
+        self.assertEqual(
+            clf._target_capabilities,
+            frozenset(
+                {
+                    (
+                        "classification",
+                        "single-output",
+                        "multi-annotator",
+                    )
+                }
+            ),
+        )
+
+        clf.fit(self.X, self.y)
+        self.assertEqual(clf.target_spec_.task, "classification")
+        self.assertEqual(clf.target_spec_.target_type, "single-output")
+        self.assertEqual(clf.target_spec_.annotation_type, "multi-annotator")
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            AnnotatorEnsembleClassifier(
+                estimators=estimators,
+                target_type="multi-label",
+            ).fit(self.X, self.y)
+
     def test_fit(self):
         pwc = ParzenWindowClassifier(classes=[1, 2])
         gnb = SklearnClassifier(GaussianNB(), classes=[1, 2])
