@@ -466,9 +466,6 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
 
     def _fit(self, fit_function, X, y, sample_weight=None, **fit_kwargs):
         is_incremental = fit_function == "partial_fit"
-        established_spec = (
-            getattr(self, "target_spec_", None) if is_incremental else None
-        )
         supplied_classes = (
             fit_kwargs.get("classes") if is_incremental else None
         )
@@ -481,9 +478,9 @@ class SklearnClassifier(SkactivemlClassifier, MetaEstimatorMixin):
                 established_spec=configured_spec,
                 classes=supplied_classes,
             )
-        target_spec = self._resolve_fitting_target_spec(
+        target_spec = self._resolve_target_spec_for_fit(
             y,
-            established_spec=established_spec,
+            is_incremental=is_incremental,
             classes=supplied_classes,
         )
 
@@ -1099,6 +1096,9 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         else:
             self.estimator_ = deepcopy(self.estimator)
 
+        if self.estimator_.classes is None:
+            self.estimator_.set_params(classes=self.target_spec_.classes)
+
         if has_fit_parameter(self.estimator, "sample_weight"):
             fit_kwargs["sample_weight"] = sample_weight
 
@@ -1114,12 +1114,27 @@ class SlidingWindowClassifier(SkactivemlClassifier, MetaEstimatorMixin):
         check_X_dict=None,
         established_spec=None,
     ):
-        # super._validate_data is not called because training with partial fit
-        # with only one single available class in y leads to an error if
-        # self.classes is not set, even though self.classes has no function in
-        # this class.
+        # super._validate_data is not called because a partial-fit window may
+        # contain only a subset of the established class vocabulary.
+        outer_classes = (
+            self.classes
+            if self.classes is not None
+            else self.estimator.classes
+        )
         target_spec = self._resolve_fitting_target_spec(
-            y, established_spec=established_spec
+            y,
+            established_spec=established_spec,
+            classes=outer_classes,
+        )
+        inner_classes = (
+            self.estimator.classes
+            if self.estimator.classes is not None
+            else target_spec.classes
+        )
+        self.estimator._resolve_fitting_target_spec(
+            y,
+            established_spec=target_spec,
+            classes=inner_classes,
         )
         if self.window_size is not None:
             check_scalar(
@@ -2136,6 +2151,10 @@ if successful_capymoa_import:
             import capymoa.base
             import capymoa.instance
 
+            target_spec = self._resolve_target_spec_for_fit(
+                y, is_incremental=fit_function == "partial_fit"
+            )
+
             # Check input parameters.
             self.check_X_dict_ = {
                 "ensure_min_samples": 0,
@@ -2150,6 +2169,7 @@ if successful_capymoa_import:
                 check_X_dict=self.check_X_dict_,
                 reset=fit_function == "fit"
                 or not hasattr(self, "n_features_in_"),
+                target_spec=target_spec,
             )
 
             # Check whether estimator is a valid classifier.
@@ -2434,6 +2454,10 @@ if successful_river_import:
                 )
 
         def _fit(self, fit_function, X, y, sample_weight=None):
+            target_spec = self._resolve_target_spec_for_fit(
+                y, is_incremental=fit_function == "partial_fit"
+            )
+
             # Check input parameters.
             self.check_X_dict_ = {
                 "ensure_min_samples": 0,
@@ -2448,6 +2472,7 @@ if successful_river_import:
                 check_X_dict=self.check_X_dict_,
                 reset=fit_function == "fit"
                 or not hasattr(self, "n_features_in_"),
+                target_spec=target_spec,
             )
 
             # Check whether estimator is a valid classifier.

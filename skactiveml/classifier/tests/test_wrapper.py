@@ -1074,8 +1074,91 @@ class TestSklearnClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
         self.assertRaises(ValueError, clf.partial_fit, X_train, y_train_true)
 
 
+class _IncrementalClassifierTargetContract:
+    def _make_incremental_contract_classifier(self):
+        raise NotImplementedError
+
+    def _capture_incremental_contract_details(self, clf):
+        return None
+
+    def _assert_incremental_contract_details(
+        self, clf, established_spec, initial_details
+    ):
+        pass
+
+    def test_incremental_target_contract_preserves_vocabulary_on_subset(self):
+        clf = self._make_incremental_contract_classifier()
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+        initial_details = self._capture_incremental_contract_details(clf)
+
+        clf.partial_fit(X, np.array([0, 0]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        self.assertEqual(clf.target_spec_.classes, (0, 1))
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+        self.assertEqual(clf.predict_proba(X).shape, (2, 2))
+        self._assert_incremental_contract_details(
+            clf, established_spec, initial_details
+        )
+
+    def test_incremental_target_contract_rejects_unseen_class_before_training(
+        self,
+    ):
+        clf = self._make_incremental_contract_classifier()
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+        probabilities = clf.predict_proba(X)
+
+        with self.assertRaisesRegex(ValueError, "class"):
+            clf.partial_fit(X[:1], np.array([2]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+        np.testing.assert_array_equal(clf.predict_proba(X), probabilities)
+
+    def test_incremental_target_contract_accepts_unlabeled_subset(self):
+        clf = self._make_incremental_contract_classifier()
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            clf.partial_fit(X, np.array([-1, -1]))
+
+        self.assertIs(clf.target_spec_, established_spec)
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            probabilities = clf.predict_proba(X)
+        self.assertEqual(probabilities.shape, (2, 2))
+
+    def test_incremental_contract_rejects_target_type_change_before_training(
+        self,
+    ):
+        clf = self._make_incremental_contract_classifier()
+        X = np.array([[0.0], [1.0]])
+        clf.partial_fit(X, np.array([0, 1]))
+        established_spec = clf.target_spec_
+        probabilities = clf.predict_proba(X)
+
+        clf.target_type = "multi-label"
+        with self.assertRaises(ValueError):
+            clf.partial_fit(X, np.array([[0, 1], [1, 0]]))
+        clf.target_type = "auto"
+
+        self.assertIs(clf.target_spec_, established_spec)
+        np.testing.assert_array_equal(clf.classes_, [0, 1])
+        np.testing.assert_array_equal(clf.predict_proba(X), probabilities)
+
+
 class TestSlidingWindowClassifier(
-    TemplateSkactivemlClassifier, unittest.TestCase
+    _IncrementalClassifierTargetContract,
+    TemplateSkactivemlClassifier,
+    unittest.TestCase,
 ):
     def setUp(self):
         estimator_class = SlidingWindowClassifier
@@ -1101,6 +1184,23 @@ class TestSlidingWindowClassifier(
 
         self.y2 = ["tokyo", "nan", "nan", "tokyo"]
         self.y_nan = ["nan", "nan", "nan", "nan"]
+
+    def _make_incremental_contract_classifier(self):
+        return SlidingWindowClassifier(
+            estimator=SklearnClassifier(GaussianNB(), missing_label=-1),
+            missing_label=-1,
+            window_size=2,
+        )
+
+    def _capture_incremental_contract_details(self, clf):
+        return clf.estimator_
+
+    def _assert_incremental_contract_details(
+        self, clf, established_spec, initial_estimator
+    ):
+        self.assertIsNot(clf.estimator_, initial_estimator)
+        self.assertEqual(clf.estimator_.target_spec_, established_spec)
+        np.testing.assert_array_equal(clf.estimator_.classes_, [0, 1])
 
     def test_init_param_estimator(self):
         test_cases = []
@@ -2337,7 +2437,11 @@ if successful_skorch_torch_import:
 
 if successful_river_import:
 
-    class TestRiverClassifier(TemplateSkactivemlClassifier, unittest.TestCase):
+    class TestRiverClassifier(
+        _IncrementalClassifierTargetContract,
+        TemplateSkactivemlClassifier,
+        unittest.TestCase,
+    ):
         def setUp(self):
             # Set global seeds.
             random.seed(0)
@@ -2370,6 +2474,13 @@ if successful_river_import:
                 init_default_params=init_default_params,
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
+            )
+
+        def _make_incremental_contract_classifier(self):
+            return RiverClassifier(
+                estimator=river.naive_bayes.GaussianNB(),
+                missing_label=-1,
+                random_state=0,
             )
 
         def test_init_param_estimator(self):
@@ -2433,9 +2544,7 @@ if successful_river_import:
                         # is_fitted_=True
                         fit_func(X, y_true)
                         self.assertTrue(clf.is_fitted_)
-                        # check that training with empty arrays works with
-                        # is_fitted_=False if classes is provided, else a
-                        # ValueError is expected
+                        # Empty batches still require configured classes.
                         if provide_classes:
                             fit_func(X[:0], y_true[:0])
                             self.assertFalse(clf.is_fitted_)
@@ -2443,13 +2552,10 @@ if successful_river_import:
                             self.assertRaises(
                                 ValueError, fit_func, X[:0], y_true[:0]
                             )
-                        # check that training with fully unlabeled data works
-                        # with is_fitted_=False if classes is provided, else a
-                        # ValueError is expected
                         if provide_classes:
                             fit_func(X, y_all_missing)
                             self.assertFalse(clf.is_fitted_)
-                        else:
+                        elif fit_function == "fit":
                             self.assertRaises(
                                 ValueError, fit_func, X, y_all_missing
                             )
@@ -2794,7 +2900,9 @@ if successful_capymoa_import:
     from skactiveml.classifier import CapyMOAClassifier
 
     class TestCapyMOAClassifier(
-        TemplateSkactivemlClassifier, unittest.TestCase
+        _IncrementalClassifierTargetContract,
+        TemplateSkactivemlClassifier,
+        unittest.TestCase,
     ):
         def setUp(self):
             from capymoa.classifier import AdaptiveRandomForestClassifier
@@ -2828,6 +2936,15 @@ if successful_capymoa_import:
                 init_default_params=init_default_params,
                 fit_default_params=fit_default_params,
                 predict_default_params=predict_default_params,
+            )
+
+        def _make_incremental_contract_classifier(self):
+            from capymoa.classifier import AdaptiveRandomForestClassifier
+
+            return CapyMOAClassifier(
+                estimator_class=AdaptiveRandomForestClassifier,
+                missing_label=-1,
+                random_state=0,
             )
 
         def test_init_param_estimator_class(self):
@@ -2907,9 +3024,7 @@ if successful_capymoa_import:
                         # is_fitted_=True
                         fit_func(X, y_true)
                         self.assertTrue(clf.is_fitted_)
-                        # check that training with empty arrays works with
-                        # is_fitted_=False if classes is provided, else a
-                        # ValueError is expected
+                        # Empty batches still require configured classes.
                         if provide_classes:
                             fit_func(X[:0], y_true[:0])
                             self.assertFalse(clf.is_fitted_)
@@ -2917,13 +3032,10 @@ if successful_capymoa_import:
                             self.assertRaises(
                                 ValueError, fit_func, X[:0], y_true[:0]
                             )
-                        # check that training with fully unlabeled data works
-                        # with is_fitted_=False if classes is provided, else a
-                        # ValueError is expected
                         if provide_classes:
                             fit_func(X, y_all_missing)
                             self.assertFalse(clf.is_fitted_)
-                        else:
+                        elif fit_function == "fit":
                             self.assertRaises(
                                 ValueError, fit_func, X, y_all_missing
                             )

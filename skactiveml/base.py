@@ -1352,6 +1352,16 @@ class SkactivemlClassifier(ClassifierMixin, BaseEstimator, ABC):
         resolved_spec = self._resolve_target_spec(y, classes=classes)
         return _reuse_established_target_spec(resolved_spec, established_spec)
 
+    def _resolve_target_spec_for_fit(self, y, *, is_incremental, classes=None):
+        established_spec = (
+            getattr(self, "target_spec_", None) if is_incremental else None
+        )
+        return self._resolve_fitting_target_spec(
+            y,
+            established_spec=established_spec,
+            classes=classes,
+        )
+
     def _initialize_label_state(self, y, classes=None):
         """Initialize resolved class metadata without fitting model state."""
         effective_classes = self.classes if classes is None else classes
