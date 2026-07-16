@@ -5,7 +5,7 @@ from operator import attrgetter
 
 import numpy as np
 from scipy.stats import norm
-from sklearn.base import MetaEstimatorMixin, is_regressor
+from sklearn.base import MetaEstimatorMixin, get_tags, is_regressor
 from sklearn.exceptions import NotFittedError
 from sklearn.utils.validation import (
     check_array,
@@ -21,7 +21,10 @@ from ..utils import (
     check_scalar,
     check_type,
     MISSING_LABEL,
+    TargetSpec,
+    resolve_target_spec,
 )
+from ..utils._target import check_target_capability
 
 successful_skorch_torch_import = False
 try:
@@ -240,7 +243,27 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         X = check_array(X, **(self.check_X_dict_ | predict_dict))
         check_n_features(self, X, reset=False)
         if self.is_fitted_:
-            return self.estimator_.predict(X, **predict_kwargs)
+            prediction = self.estimator_.predict(X, **predict_kwargs)
+            y_pred = (
+                prediction[0] if isinstance(prediction, tuple) else prediction
+            )
+            prediction_spec = resolve_target_spec(
+                y_pred,
+                task="regression",
+                target_type="auto",
+                annotation_type="single-annotator",
+                classes=None,
+                missing_label=self.missing_label,
+            )
+            check_target_capability(
+                type(self).__name__,
+                prediction_spec,
+                self._target_capabilities,
+            )
+            y_pred = np.asarray(y_pred).reshape(-1)
+            if isinstance(prediction, tuple):
+                return (y_pred, *prediction[1:])
+            return y_pred
 
         warnings.warn(
             f"Since the 'estimator' could not be fitted when"
@@ -349,7 +372,7 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
             return y_samples
 
     def __sklearn_is_fitted__(self):
-        if hasattr(self, "is_fitted_"):
+        if "is_fitted_" in self.__dict__:
             return True
 
         try:
@@ -357,8 +380,11 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         except NotFittedError:
             return False
 
+        target_spec = self._resolve_prefitted_target_spec()
+
         # set attributes that would be set by the fit function
         self.is_fitted_ = True
+        self.target_spec_ = target_spec
         self._label_mean = 0
         self._label_std = 1
         self.estimator_ = deepcopy(self.estimator)
@@ -370,6 +396,95 @@ class SklearnRegressor(SkactivemlRegressor, MetaEstimatorMixin):
         }
 
         return True
+
+    def _resolve_prefitted_target_spec(self):
+        target_type = (
+            "single-output" if self.target_type == "auto" else self.target_type
+        )
+        target_spec = TargetSpec(
+            task="regression",
+            target_type=target_type,
+            annotation_type="single-annotator",
+            classes=None,
+        )
+        check_target_capability(
+            type(self).__name__, target_spec, self._target_capabilities
+        )
+
+        estimator_target_spec = getattr(self.estimator, "target_spec_", None)
+        if estimator_target_spec is None:
+            estimator_target_type = self._prefitted_estimator_target_type(
+                self.estimator
+            )
+            if estimator_target_type is None:
+                raise ValueError(
+                    "Cannot establish a single-output target specification "
+                    "from the pre-fitted estimator. The estimator must expose "
+                    "`target_spec_` or fitted output metadata."
+                )
+            estimator_target_spec = TargetSpec(
+                task="regression",
+                target_type=estimator_target_type,
+                annotation_type="single-annotator",
+                classes=None,
+            )
+        elif not isinstance(estimator_target_spec, TargetSpec):
+            raise ValueError(
+                "The pre-fitted estimator's `target_spec_` must be a "
+                "`TargetSpec`."
+            )
+        check_target_capability(
+            type(self).__name__,
+            estimator_target_spec,
+            self._target_capabilities,
+        )
+
+        return target_spec
+
+    @classmethod
+    def _prefitted_estimator_target_type(cls, estimator):
+        target_tags = get_tags(estimator).target_tags
+        if not target_tags.multi_output:
+            return "single-output"
+        if not target_tags.single_output:
+            return "multi-output"
+
+        n_outputs = getattr(estimator, "n_outputs_", None)
+        if n_outputs is not None:
+            return "single-output" if n_outputs == 1 else "multi-output"
+
+        for attr in ("y_train_", "_y"):
+            target_values = getattr(estimator, attr, None)
+            if target_values is not None:
+                target_values = np.asarray(target_values)
+                is_single_output = (
+                    target_values.ndim == 1
+                    or target_values.ndim == 2
+                    and target_values.shape[1] == 1
+                )
+                return "single-output" if is_single_output else "multi-output"
+
+        intercept = getattr(estimator, "intercept_", None)
+        if intercept is not None:
+            intercept = np.asarray(intercept)
+            if intercept.ndim > 0:
+                return (
+                    "single-output" if intercept.size == 1 else "multi-output"
+                )
+            coefficients = np.asarray(getattr(estimator, "coef_", []))
+            if coefficients.ndim == 2:
+                return (
+                    "single-output"
+                    if coefficients.shape[0] == 1
+                    else "multi-output"
+                )
+            return "single-output"
+
+        steps = getattr(estimator, "steps", None)
+        if steps:
+            return cls._prefitted_estimator_target_type(steps[-1][1])
+
+        return None
 
     def __getattr__(self, item):
         if "estimator_" in self.__dict__:

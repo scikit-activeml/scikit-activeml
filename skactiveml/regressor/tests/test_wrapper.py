@@ -103,6 +103,77 @@ class TestSklearnRegressor(TemplateSkactivemlRegressor, unittest.TestCase):
         self.assertEqual(reg.target_spec_.target_type, "single-output")
         self.assertEqual(reg.predict([[8.0]]).shape, (1,))
 
+    def test_prefitted_estimator_establishes_target_spec(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = LinearRegression().fit(X, y)
+        reg = SklearnRegressor(estimator)
+
+        check_is_fitted(reg)
+
+        self.assertEqual(reg.target_spec_.task, "regression")
+        self.assertEqual(reg.target_spec_.target_type, "single-output")
+        self.assertEqual(reg.target_spec_.annotation_type, "single-annotator")
+        self.assertIsNone(reg.target_spec_.classes)
+
+    def test_prefitted_estimator_marker_does_not_skip_wrapper_contract(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = LinearRegression().fit(X, y)
+        estimator.is_fitted_ = True
+        reg = SklearnRegressor(estimator)
+
+        check_is_fitted(reg)
+
+        self.assertEqual(reg.target_spec_.target_type, "single-output")
+
+    def test_prefitted_estimator_rejects_invalid_and_unsupported_declarations(
+        self,
+    ):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float)
+        estimator = LinearRegression().fit(X, y)
+        cases = [
+            ("invalid", "must be one of"),
+            ("multi-label", "requires classification"),
+            ("multi-output", "does not support"),
+        ]
+
+        for target_type, error_message in cases:
+            with self.subTest(target_type=target_type):
+                reg = SklearnRegressor(estimator, target_type=target_type)
+
+                with self.assertRaisesRegex(ValueError, error_message):
+                    reg.predict([[8.0]])
+
+                self.assertFalse(hasattr(reg, "target_spec_"))
+
+    def test_prefitted_estimator_rejects_multi_output_before_prediction(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.column_stack(
+            (np.arange(8, dtype=float), np.arange(8, dtype=float) ** 2)
+        )
+        estimator = LinearRegression().fit(X, y)
+        reg = SklearnRegressor(estimator)
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            check_is_fitted(reg)
+
+        self.assertFalse(hasattr(reg, "target_spec_"))
+
+    def test_prefitted_column_vector_matches_direct_prediction_shape(self):
+        X = np.arange(8, dtype=float).reshape(-1, 1)
+        y = np.arange(8, dtype=float).reshape(-1, 1)
+        direct = SklearnRegressor(LinearRegression()).fit(X, y)
+        prefitted = SklearnRegressor(LinearRegression().fit(X, y))
+
+        direct_prediction = direct.predict([[8.0], [9.0]])
+        prefitted_prediction = prefitted.predict([[8.0], [9.0]])
+
+        self.assertEqual(direct_prediction.shape, (2,))
+        self.assertEqual(prefitted_prediction.shape, (2,))
+        np.testing.assert_allclose(prefitted_prediction, direct_prediction)
+
     def test_multi_output_capability_failure_precedes_fitted_state(self):
         X = np.arange(8, dtype=float).reshape(4, 2)
         y = np.arange(8, dtype=float).reshape(4, 2)
