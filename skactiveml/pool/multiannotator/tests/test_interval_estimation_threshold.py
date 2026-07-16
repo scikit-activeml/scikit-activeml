@@ -10,6 +10,7 @@ from skactiveml.pool.multiannotator import (
     IntervalEstimationThreshold,
     IntervalEstimationAnnotModel,
 )
+from skactiveml.utils import TargetSpec
 
 
 class TestIntervalEstimationAnnotModel(unittest.TestCase):
@@ -199,6 +200,7 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
             )
 
         self.assertFalse(hasattr(ie_thresh, "n_features_in_"))
+        self.assertFalse(hasattr(ie_thresh, "missing_label_"))
         self.assertFalse(hasattr(ie_thresh, "random_state_"))
 
     def test_fitted_aggregated_classifier_is_a_semantic_boundary(self):
@@ -218,6 +220,114 @@ class TestIntervalEstimationThreshold(unittest.TestCase):
 
         self.assertEqual(query_indices.shape, (2, 2))
         self.assertEqual(utilities.shape, (2, len(self.X), y.shape[1]))
+
+    def test_query_rejects_unsupported_classifier_before_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        clf = ParzenWindowClassifier(classes=[0, 1, 2])
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            ie_thresh.query(X=self.X, y=self.y, clf=clf)
+
+        for attribute in (
+            "n_features_in_",
+            "missing_label_",
+            "random_state_",
+        ):
+            self.assertFalse(hasattr(ie_thresh, attribute))
+
+    def test_cycle_zero_rejection_precedes_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        y = np.full_like(self.y, np.nan)
+        clf = AnnotatorLogisticRegression(target_type="multi-label")
+
+        with self.assertRaisesRegex(
+            ValueError, "Multi-label targets cannot be combined"
+        ):
+            ie_thresh.query(X=self.X, y=y, clf=clf)
+
+        for attribute in (
+            "n_features_in_",
+            "missing_label_",
+            "random_state_",
+        ):
+            self.assertFalse(hasattr(ie_thresh, attribute))
+
+    def test_query_param_fit_clf(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+
+        with self.assertRaises(TypeError):
+            ie_thresh.query(
+                X=self.X,
+                y=self.y,
+                clf=self.clf,
+                fit_clf="invalid",
+            )
+
+        self.assertFalse(hasattr(ie_thresh, "n_features_in_"))
+
+    def test_explicit_classifier_conflict_precedes_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        clf = AnnotatorLogisticRegression(
+            classes=[0, 1, 2], target_type="multi-label"
+        )
+
+        with self.assertRaisesRegex(ValueError, "explicit `target_type`"):
+            ie_thresh.query(X=self.X, y=self.y, clf=clf)
+
+        for attribute in (
+            "n_features_in_",
+            "missing_label_",
+            "random_state_",
+        ):
+            self.assertFalse(hasattr(ie_thresh, attribute))
+
+    def test_fitted_classifier_conflict_precedes_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        clf = ParzenWindowClassifier(classes=[0, 1]).fit(
+            self.X, np.arange(len(self.X)) % 2
+        )
+        clf.target_spec_ = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=(0, 2),
+        )
+        y = np.full_like(self.y, np.nan)
+
+        with self.assertRaisesRegex(ValueError, "vocabulary conflicts"):
+            ie_thresh.query(X=self.X, y=y, clf=clf, fit_clf=False)
+
+        for attribute in (
+            "n_features_in_",
+            "missing_label_",
+            "random_state_",
+        ):
+            self.assertFalse(hasattr(ie_thresh, attribute))
+
+    def test_classifier_rejection_preserves_existing_query_state(self):
+        ie_thresh = IntervalEstimationThreshold(random_state=0)
+        ie_thresh.query(X=self.X, y=self.y, clf=self.clf)
+        expected_n_features = ie_thresh.n_features_in_
+        expected_missing_label = ie_thresh.missing_label_
+        expected_random_state = ie_thresh.random_state_.get_state()
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            ie_thresh.query(
+                X=self.X,
+                y=self.y,
+                clf=ParzenWindowClassifier(classes=[0, 1, 2]),
+            )
+
+        self.assertEqual(ie_thresh.n_features_in_, expected_n_features)
+        np.testing.assert_equal(
+            ie_thresh.missing_label_, expected_missing_label
+        )
+        actual_random_state = ie_thresh.random_state_.get_state()
+        self.assertEqual(actual_random_state[0], expected_random_state[0])
+        np.testing.assert_array_equal(
+            actual_random_state[1], expected_random_state[1]
+        )
+        self.assertEqual(actual_random_state[2:], expected_random_state[2:])
 
     def test_init_param_alpha(self):
         ie_thresh = IntervalEstimationThreshold(alpha=0.0, random_state=0)

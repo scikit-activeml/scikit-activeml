@@ -22,6 +22,22 @@ from ...utils import (
 )
 
 
+def _check_classifier_prediction_contract(
+    classifier_target_spec, query_target_spec
+):
+    has_conflicting_prediction_contract = (
+        classifier_target_spec.task != query_target_spec.task
+        or classifier_target_spec.target_type != query_target_spec.target_type
+        or classifier_target_spec.classes != query_target_spec.classes
+    )
+    if has_conflicting_prediction_contract:
+        raise ValueError(
+            "The classifier's task, target type, or class vocabulary "
+            "conflicts with IntervalEstimationThreshold's resolved outer "
+            "target specification."
+        )
+
+
 class IntervalEstimationAnnotModel(BaseEstimator):
     """IELearning
 
@@ -351,10 +367,35 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
         """
 
         check_type(clf, "clf", SkactivemlClassifier)
+        check_type(fit_clf, "fit_clf", bool)
         target_classes = getattr(clf, "classes_", clf.classes)
         query_target_spec = self._resolve_target_spec(
             y, classes=target_classes
         )
+        if query_target_spec is None:
+            clf._resolve_target_spec(y)
+        else:
+            classifier_target_type = getattr(clf, "target_type", "auto")
+            if classifier_target_type != "auto" and (
+                classifier_target_type != query_target_spec.target_type
+            ):
+                raise ValueError(
+                    "The classifier's explicit `target_type` conflicts with "
+                    "IntervalEstimationThreshold's resolved outer target "
+                    "specification."
+                )
+            if fit_clf:
+                check_target_capability(
+                    type(clf).__name__,
+                    query_target_spec,
+                    clf._target_capabilities,
+                )
+            elif hasattr(clf, "target_spec_"):
+                _check_classifier_prediction_contract(
+                    clf.target_spec_, query_target_spec
+                )
+            else:
+                clf._resolve_target_spec(y, classes=query_target_spec.classes)
 
         # base check
         (
@@ -419,18 +460,9 @@ class IntervalEstimationThreshold(MultiAnnotatorPoolQueryStrategy):
             classifier_target_spec = clf._resolve_target_spec(
                 y, classes=query_target_spec.classes
             )
-        has_conflicting_prediction_contract = (
-            classifier_target_spec.task != query_target_spec.task
-            or classifier_target_spec.target_type
-            != query_target_spec.target_type
-            or classifier_target_spec.classes != query_target_spec.classes
+        _check_classifier_prediction_contract(
+            classifier_target_spec, query_target_spec
         )
-        if has_conflicting_prediction_contract:
-            raise ValueError(
-                "The classifier's task, target type, or class vocabulary "
-                "conflicts with IntervalEstimationThreshold's resolved outer "
-                "target specification."
-            )
 
         P = clf.predict_proba(X_cand)
         uncertainties = uncertainty_scores(probas=P, method="least_confident")

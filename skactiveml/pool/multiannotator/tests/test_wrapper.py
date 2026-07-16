@@ -5,6 +5,7 @@ from sklearn.datasets import make_blobs
 from sklearn.gaussian_process import GaussianProcessClassifier
 
 from skactiveml.classifier import SklearnClassifier, MixtureModelClassifier
+from skactiveml.classifier.multiannotator import AnnotatorLogisticRegression
 from skactiveml.pool import UncertaintySampling, RandomSampling
 from skactiveml.pool.multiannotator._wrapper import SingleAnnotatorWrapper
 from skactiveml.utils import is_labeled
@@ -93,6 +94,93 @@ class TestSingleAnnotatorWrapper(unittest.TestCase):
             wrapper.query(self.X, self.y)
 
         self.assertEqual(calls, [])
+        for attribute in (
+            "n_features_in_",
+            "missing_label_",
+            "random_state_",
+        ):
+            self.assertFalse(hasattr(wrapper, attribute))
+
+    def test_wrapped_target_rejection_precedes_query_state(self):
+        wrapper = SingleAnnotatorWrapper(
+            RandomSampling(target_type="multi-label"),
+            random_state=self.random_state,
+        )
+
+        with self.assertRaises(ValueError):
+            wrapper.query(self.X, self.y)
+
+        for attribute in (
+            "n_features_in_",
+            "missing_label_",
+            "random_state_",
+        ):
+            self.assertFalse(hasattr(wrapper, attribute))
+
+    def test_wrapped_classifier_rejection_precedes_query_state(self):
+        strategy = UncertaintySampling(random_state=self.random_state)
+        wrapper = SingleAnnotatorWrapper(
+            strategy,
+            random_state=self.random_state,
+        )
+        clf = AnnotatorLogisticRegression(classes=[0, 1])
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            wrapper.query(self.X, self.y, clf=clf)
+
+        for component in (wrapper, strategy):
+            for attribute in (
+                "n_features_in_",
+                "missing_label_",
+                "random_state_",
+            ):
+                self.assertFalse(hasattr(component, attribute))
+
+    def test_wrapped_rejection_preserves_existing_query_state(self):
+        strategy = UncertaintySampling(random_state=self.random_state)
+        wrapper = SingleAnnotatorWrapper(
+            strategy,
+            random_state=self.random_state,
+        )
+        clf = SklearnClassifier(
+            estimator=GaussianProcessClassifier(),
+            classes=[0, 1],
+            random_state=self.random_state,
+        )
+        wrapper.query(self.X, self.y, clf=clf)
+        expected_state = {}
+        for component in (wrapper, strategy):
+            expected_state[component] = (
+                component.n_features_in_,
+                component.missing_label_,
+                component.random_state_.get_state(),
+            )
+
+        with self.assertRaisesRegex(ValueError, "does not support"):
+            wrapper.query(
+                self.X,
+                self.y,
+                clf=AnnotatorLogisticRegression(classes=[0, 1]),
+            )
+
+        for component in (wrapper, strategy):
+            (
+                expected_n_features,
+                expected_missing_label,
+                expected_random_state,
+            ) = expected_state[component]
+            self.assertEqual(component.n_features_in_, expected_n_features)
+            np.testing.assert_equal(
+                component.missing_label_, expected_missing_label
+            )
+            actual_random_state = component.random_state_.get_state()
+            self.assertEqual(actual_random_state[0], expected_random_state[0])
+            np.testing.assert_array_equal(
+                actual_random_state[1], expected_random_state[1]
+            )
+            self.assertEqual(
+                actual_random_state[2:], expected_random_state[2:]
+            )
 
     def test_class_agnostic_wrapper_accepts_an_all_missing_matrix(self):
         y = np.full_like(self.y, MISSING_LABEL)

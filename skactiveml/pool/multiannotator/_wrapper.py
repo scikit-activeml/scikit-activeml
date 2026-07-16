@@ -7,8 +7,11 @@ from sklearn.utils.validation import check_array, _is_arraylike
 from ...base import (
     MultiAnnotatorPoolQueryStrategy,
     SingleAnnotatorPoolQueryStrategy,
+    SkactivemlClassifier,
+    SkactivemlRegressor,
     _has_no_class_evidence,
 )
+from .._target import _resolve_estimator_target_spec
 from ...utils import (
     rand_argmax,
     check_type,
@@ -195,6 +198,104 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         """
 
         outer_target_spec = self._resolve_target_spec(y)
+
+        # Preflight the aggregate and wrapped strategy before base validation
+        # commits public query state.
+        check_type(
+            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
+        )
+        if self.strategy.missing_label != self.missing_label and not (
+            np.isnan(self.strategy.missing_label)
+            & np.isnan(self.missing_label)
+        ):
+            raise ValueError(
+                f"`self.missing_label` must equal "
+                f"`self.strategy.missing_label`, but "
+                f"`self.missing_label` equals {self.missing_label} and"
+                f"`self.strategy.missing_label` equals "
+                f"{self.strategy.missing_label}."
+            )
+
+        uses_default_aggregate = self.y_aggregate is None
+        y_aggregate = (
+            majority_vote if uses_default_aggregate else self.y_aggregate
+        )
+        if not callable(y_aggregate):
+            raise TypeError(
+                f"`self.y_aggregate` must be callable. "
+                f"`self.y_aggregate` is of type {type(y_aggregate)}"
+            )
+
+        n_free_params = len(
+            list(
+                filter(
+                    lambda x: x.default == Parameter.empty,
+                    signature(y_aggregate).parameters.values(),
+                )
+            )
+        )
+        if n_free_params != 1:
+            raise TypeError(
+                f"The number of free parameters of the callable has to "
+                f"equal one. "
+                f"The number of free parameters is {n_free_params}."
+            )
+
+        if uses_default_aggregate:
+            # Majority voting preserves the outer class vocabulary and always
+            # produces one value per sample. A fixed local seed preflights the
+            # aggregate without consuming query randomness.
+            preflight_aggregated_y = majority_vote(y, random_state=0)
+        else:
+            preflight_aggregated_y = y_aggregate(np.asarray(y))
+
+        strategy_target_type = getattr(self.strategy, "target_type", "auto")
+        try:
+            aggregate_target_spec = resolve_target_spec(
+                preflight_aggregated_y,
+                task="classification",
+                target_type=strategy_target_type,
+                annotation_type="single-annotator",
+                classes=(
+                    None
+                    if outer_target_spec is None
+                    else outer_target_spec.classes
+                ),
+                missing_label=self.missing_label,
+            )
+        except ValueError:
+            # Preserve cycle-zero acquisition for class-agnostic wrapped
+            # strategies without inventing a class vocabulary.
+            lacks_class_evidence = (
+                outer_target_spec is None
+                and _has_no_class_evidence(
+                    preflight_aggregated_y,
+                    strategy_target_type,
+                    "single-annotator",
+                    self.missing_label,
+                )
+            )
+            if not lacks_class_evidence:
+                raise
+            aggregate_target_spec = None
+        if aggregate_target_spec is not None and hasattr(
+            self.strategy, "_target_capabilities"
+        ):
+            check_target_capability(
+                type(self.strategy).__name__,
+                aggregate_target_spec,
+                self.strategy._target_capabilities,
+            )
+        for value in query_kwargs.values():
+            values = value if isinstance(value, (list, tuple)) else (value,)
+            for estimator in values:
+                if isinstance(
+                    estimator, (SkactivemlClassifier, SkactivemlRegressor)
+                ):
+                    _resolve_estimator_target_spec(
+                        self.strategy, estimator, preflight_aggregated_y
+                    )
+
         (
             X,
             y,
@@ -218,93 +319,11 @@ class SingleAnnotatorWrapper(MultiAnnotatorPoolQueryStrategy):
         )
 
         random_state = self.random_state_
-
-        # check strategy
-        check_type(
-            self.strategy, "self.strategy", SingleAnnotatorPoolQueryStrategy
+        y_sq = (
+            majority_vote(y, random_state=random_state)
+            if uses_default_aggregate
+            else preflight_aggregated_y
         )
-        if self.strategy.missing_label != self.missing_label and not (
-            np.isnan(self.strategy.missing_label)
-            & np.isnan(self.missing_label)
-        ):
-            raise ValueError(
-                f"`self.missing_label` must equal "
-                f"`self.strategy.missing_label`, but "
-                f"`self.missing_label` equals {self.missing_label} and"
-                f"`self.strategy.missing_label` equals "
-                f"{self.strategy.missing_label}."
-            )
-
-        # aggregate y
-        if self.y_aggregate is None:
-
-            def y_aggregate(y):
-                return majority_vote(y, random_state=random_state)
-
-        else:
-            y_aggregate = self.y_aggregate
-
-        if not callable(y_aggregate):
-            raise TypeError(
-                f"`self.y_aggregate` must be callable. "
-                f"`self.y_aggregate` is of type {type(y_aggregate)}"
-            )
-
-        # count the number of arguments that have no default value
-        n_free_params = len(
-            list(
-                filter(
-                    lambda x: x.default == Parameter.empty,
-                    signature(y_aggregate).parameters.values(),
-                )
-            )
-        )
-
-        if n_free_params != 1:
-            raise TypeError(
-                f"The number of free parameters of the callable has to "
-                f"equal one. "
-                f"The number of free parameters is {n_free_params}."
-            )
-
-        y_sq = y_aggregate(y)
-        strategy_target_type = getattr(self.strategy, "target_type", "auto")
-        try:
-            aggregate_target_spec = resolve_target_spec(
-                y_sq,
-                task="classification",
-                target_type=strategy_target_type,
-                annotation_type="single-annotator",
-                classes=(
-                    None
-                    if outer_target_spec is None
-                    else outer_target_spec.classes
-                ),
-                missing_label=self.missing_label,
-            )
-        except ValueError:
-            # Preserve cycle-zero acquisition for class-agnostic wrapped
-            # strategies without inventing a class vocabulary.
-            lacks_class_evidence = (
-                outer_target_spec is None
-                and _has_no_class_evidence(
-                    y_sq,
-                    strategy_target_type,
-                    "single-annotator",
-                    self.missing_label,
-                )
-            )
-            if not lacks_class_evidence:
-                raise
-            aggregate_target_spec = None
-        if aggregate_target_spec is not None and hasattr(
-            self.strategy, "_target_capabilities"
-        ):
-            check_target_capability(
-                type(self.strategy).__name__,
-                aggregate_target_spec,
-                self.strategy._target_capabilities,
-            )
 
         n_selectable_candidates = len(X_cand)
         n_candidates = len(candidates) if candidates is not None else len(X)
