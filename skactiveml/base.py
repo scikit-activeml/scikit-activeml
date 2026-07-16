@@ -257,6 +257,11 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
     Parameters
     ----------
+    missing_label : scalar or str or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator. If None, the RandomState
+        singleton used by `np.random` is used.
     target_type : {"auto", "single-output", "multi-label", \
             "multi-output"}, default="auto"
         Declared target type. Subclasses reject resolved specifications
@@ -617,6 +622,11 @@ class MultiAnnotatorPoolQueryStrategy(PoolQueryStrategy):
 
     Parameters
     ----------
+    missing_label : scalar or str or np.nan or None, default=np.nan
+        Value to represent a missing label.
+    random_state : int or RandomState instance, default=None
+        Controls the randomness of the estimator. If None, the RandomState
+        singleton used by `np.random` is used.
     target_type : {"auto", "single-output", "multi-label", \
             "multi-output"}, default="auto"
         Declared target type. Multi-annotator strategies support only
