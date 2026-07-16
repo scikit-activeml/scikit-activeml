@@ -22,7 +22,7 @@ from sklearn.utils import check_consistent_length
 from sklearn.exceptions import NotFittedError
 
 from ..base import SkactivemlClassifier
-from ..utils._target import TargetSpec, check_target_capability
+from ..utils._target import _check_target_capability, check_target_capability
 from ..utils import (
     rand_argmin,
     MISSING_LABEL,
@@ -1733,13 +1733,13 @@ if successful_skorch_torch_import:
             # probability space. Caller is responsible for making this true.
             return {"proba": (0, None)}
 
-        def _provisional_target_spec(self, y=None):
+        def _provisional_target_type(self, y=None):
             """Resolve semantics needed while constructing an unfitted net."""
             target_spec = getattr(self, "target_spec_", None)
             if target_spec is not None:
-                return target_spec
+                return target_spec.target_type
             if y is not None:
-                return self._resolve_target_spec(y)
+                return self._resolve_target_spec(y).target_type
             if self.classes is not None:
                 y_dummy = (
                     np.empty(
@@ -1749,28 +1749,22 @@ if successful_skorch_torch_import:
                     if _has_nested_classes(self.classes)
                     else self.classes
                 )
-                return self._resolve_target_spec(y_dummy)
+                return self._resolve_target_spec(y_dummy).target_type
 
             target_type = (
                 "single-output"
                 if self.target_type == "auto"
                 else self.target_type
             )
-            target_spec = TargetSpec(
-                task="classification",
-                target_type=target_type,
-                annotation_type="single-annotator",
-                classes=None,
+            _check_target_capability(
+                type(self).__name__,
+                ("classification", target_type, "single-annotator"),
+                self._target_capabilities,
             )
-            check_target_capability(
-                type(self).__name__, target_spec, self._target_capabilities
-            )
-            return target_spec
+            return target_type
 
         def _uses_multilabel_target(self, y=None):
-            return (
-                self._provisional_target_spec(y).target_type == "multi-label"
-            )
+            return self._provisional_target_type(y) == "multi-label"
 
         def _net_parts(self, X=None, y=None):
             """Assemble and validate network components.

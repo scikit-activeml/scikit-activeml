@@ -18,13 +18,13 @@ from sklearn.utils.validation import (
 
 from .exceptions import MappingError
 from .utils._target import (
+    _check_target_capability,
     _resolve_task_agnostic_target_type,
     check_target_capability,
     resolve_target_spec,
 )
 from .utils import (
     MISSING_LABEL,
-    TargetSpec,
     is_labeled,
     is_unlabeled,
     unlabeled_indices,
@@ -294,12 +294,12 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
                         target_type=self.target_type,
                         missing_label=self.missing_label,
                     )
-                    target_spec = TargetSpec(
-                        task=task,
-                        target_type=target_type,
-                        annotation_type="single-annotator",
-                        classes=None,
+                    _check_target_capability(
+                        type(self).__name__,
+                        (task, target_type, "single-annotator"),
+                        self._target_capabilities,
                     )
+                    return target_type
                 else:
                     target_spec = resolve_target_spec(
                         y,
@@ -331,14 +331,9 @@ class SingleAnnotatorPoolQueryStrategy(PoolQueryStrategy):
             {"classification"} if target_type == "multi-label" else tasks
         )
         for task in applicable_tasks:
-            check_target_capability(
+            _check_target_capability(
                 type(self).__name__,
-                TargetSpec(
-                    task=task,
-                    target_type=target_type,
-                    annotation_type="single-annotator",
-                    classes=None,
-                ),
+                (task, target_type, "single-annotator"),
                 self._target_capabilities,
             )
         return target_type

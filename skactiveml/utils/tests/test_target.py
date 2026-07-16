@@ -16,6 +16,95 @@ from skactiveml.utils._target import check_target_capability
 
 
 class TestTargetSpec(unittest.TestCase):
+    def test_requires_classes_exactly_for_classification(self):
+        with self.assertRaisesRegex(ValueError, "required for classification"):
+            TargetSpec(
+                task="classification",
+                target_type="single-output",
+                annotation_type="single-annotator",
+                classes=None,
+            )
+
+        with self.assertRaisesRegex(ValueError, "not accepted for regression"):
+            TargetSpec(
+                task="regression",
+                target_type="single-output",
+                annotation_type="single-annotator",
+                classes=(0, 1),
+            )
+
+    def test_rejects_incorrect_class_vocabulary_structure(self):
+        invalid_specs = [
+            ("single-output", (), "must not be empty"),
+            ("single-output", (0, (0, 1)), "uniformly flat or nested"),
+            ("single-output", ((0, 1), (0, 1)), "flat"),
+            ("multi-label", (0, 1), "nested"),
+            ("multi-label", ((0, 1, 2), (0, 1)), "exactly two"),
+            ("multi-output", (0, 1), "nested"),
+        ]
+
+        for target_type, classes, message in invalid_specs:
+            with self.subTest(target_type=target_type, classes=classes):
+                with self.assertRaisesRegex(ValueError, message):
+                    TargetSpec(
+                        task="classification",
+                        target_type=target_type,
+                        annotation_type="single-annotator",
+                        classes=classes,
+                    )
+
+    def test_canonicalizes_equivalent_direct_and_resolved_specs(self):
+        direct_single_output = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=("dog", "cat"),
+        )
+        resolved_single_output = resolve_target_spec(
+            ["dog", "cat"],
+            task="classification",
+            classes=("dog", "cat"),
+            missing_label="missing",
+        )
+        direct_multi_label = TargetSpec(
+            task="classification",
+            target_type="multi-label",
+            annotation_type="single-annotator",
+            classes=(("yes", "no"), ("warm", "cold")),
+        )
+        resolved_multi_label = resolve_target_spec(
+            [["yes", "warm"], ["no", "cold"]],
+            task="classification",
+            target_type="multi-label",
+            classes=(("yes", "no"), ("warm", "cold")),
+            missing_label="missing",
+        )
+
+        self.assertEqual(direct_single_output, resolved_single_output)
+        self.assertEqual(direct_single_output.classes, ("cat", "dog"))
+        self.assertEqual(direct_multi_label, resolved_multi_label)
+        self.assertEqual(
+            direct_multi_label.classes,
+            (("no", "yes"), ("cold", "warm")),
+        )
+
+    def test_canonical_equality_treats_nan_classes_as_equal(self):
+        direct = TargetSpec(
+            task="classification",
+            target_type="single-output",
+            annotation_type="single-annotator",
+            classes=(np.nan, 1.0),
+        )
+        resolved = resolve_target_spec(
+            [1.0],
+            task="classification",
+            classes=(np.nan, 1.0),
+            missing_label=-1,
+        )
+
+        self.assertEqual(direct, resolved)
+        self.assertEqual(hash(direct), hash(resolved))
+
     def test_rejects_unresolved_or_unknown_semantic_values(self):
         invalid_specs = [
             (
@@ -91,24 +180,42 @@ class TestTargetSpec(unittest.TestCase):
                     TargetSpec(classes=None, **declarations)
 
     def test_freezes_flat_and_nested_class_vocabularies(self):
+        flat_classes = ["cat", "dog"]
+        nested_classes = [np.array([0, 1]), [2, 3]]
         flat = TargetSpec(
             task="classification",
             target_type="single-output",
             annotation_type="single-annotator",
-            classes=["cat", "dog"],
+            classes=flat_classes,
         )
         nested = TargetSpec(
             task="classification",
             target_type="multi-label",
             annotation_type="single-annotator",
-            classes=[np.array([0, 1]), [2, 3]],
+            classes=nested_classes,
         )
+        flat_classes.append("mouse")
+        nested_classes[0][0] = 2
+        nested_classes[1].append(4)
 
         self.assertEqual(flat.classes, ("cat", "dog"))
         self.assertEqual(nested.classes, ((0, 1), (2, 3)))
+        with self.assertRaises(FrozenInstanceError):
+            flat.classes = ("mouse",)
 
 
 class TestResolveTargetSpec(unittest.TestCase):
+    def test_rejects_empty_or_mixed_class_vocabulary_structure(self):
+        for classes, message in (
+            ([], "must not be empty"),
+            ([0, [0, 1]], "uniformly flat or nested"),
+        ):
+            with self.subTest(classes=classes):
+                with self.assertRaisesRegex(ValueError, message):
+                    resolve_target_spec(
+                        [0, 1], task="classification", classes=classes
+                    )
+
     def test_auto_classification_uses_unambiguous_declarations(self):
         single_output = resolve_target_spec(
             ["dog", "cat", "dog"],

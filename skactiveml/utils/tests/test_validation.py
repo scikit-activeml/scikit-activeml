@@ -207,10 +207,24 @@ class TestValidation(unittest.TestCase):
         self.assertRaises(TypeError, check_classes, classes=["2", 1, 2])
         self.assertRaises(TypeError, check_classes, classes=2)
         self.assertRaises(ValueError, check_classes, classes=[1, 2, 2])
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            check_classes([])
+        with self.assertRaisesRegex(ValueError, "uniformly flat or nested"):
+            check_classes([[0, 1], 0])
         self.assertIsNone(check_classes(None))
 
     def test_private_class_validation_helpers(self):
         self.assertFalse(_has_nested_classes(2))
+        self.assertFalse(_has_nested_classes([0, 1]))
+        self.assertTrue(_has_nested_classes([[0, 1], [0, 1]]))
+        with self.assertRaisesRegex(ValueError, "must not be empty"):
+            _has_nested_classes([])
+        for classes in ([0, [0, 1]], [[0, 1], 0]):
+            with self.subTest(classes=classes):
+                with self.assertRaisesRegex(
+                    ValueError, "uniformly flat or nested"
+                ):
+                    _has_nested_classes(classes)
 
         self.assertRaises(TypeError, _check_1d_class_list, 2, name="classes")
         self.assertRaises(

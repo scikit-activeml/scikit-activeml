@@ -7,10 +7,16 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.validation import check_array
 
 from ._label import MISSING_LABEL, is_unlabeled
-from ._validation import check_classifier_params
+from ._validation import (
+    _has_nested_classes,
+    check_classes,
+    check_classifier_params,
+)
+
+_NAN_CLASS_HASH_KEY = object()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class TargetSpec:
     """Immutable description of resolved target semantics.
 
@@ -40,19 +46,87 @@ class TargetSpec:
             self.annotation_type,
             allow_auto=False,
         )
+        if self.task == "classification" and self.classes is None:
+            raise ValueError(
+                "`classes` is required for classification targets."
+            )
+        if self.task == "regression" and self.classes is not None:
+            raise ValueError(
+                "`classes` is not accepted for regression targets."
+            )
         if self.classes is not None:
-            object.__setattr__(self, "classes", _freeze_classes(self.classes))
+            check_classes(self.classes)
+            has_nested_classes = _check_class_vocabulary_structure(
+                self.target_type, self.classes
+            )
+            if has_nested_classes:
+                normalized_classes = tuple(
+                    _normalize_class_vocabulary(
+                        classes_i, [], f"`classes[{output_idx}]`"
+                    )
+                    for output_idx, classes_i in enumerate(self.classes)
+                )
+            else:
+                normalized_classes = _normalize_class_vocabulary(
+                    self.classes, [], "`classes`"
+                )
+            object.__setattr__(self, "classes", normalized_classes)
+
+    def __eq__(self, other):
+        if not isinstance(other, TargetSpec):
+            return NotImplemented
+        return (
+            self.task == other.task
+            and self.target_type == other.target_type
+            and self.annotation_type == other.annotation_type
+            and _class_vocabularies_equal(self.classes, other.classes)
+        )
+
+    def __hash__(self):
+        return hash(
+            (
+                self.task,
+                self.target_type,
+                self.annotation_type,
+                _class_vocabulary_hash_key(self.classes),
+            )
+        )
 
 
-def _freeze_classes(classes):
+def _class_vocabularies_equal(classes_a, classes_b):
+    if classes_a is None or classes_b is None:
+        return classes_a is classes_b
+    if len(classes_a) != len(classes_b):
+        return False
+    return all(
+        (
+            _class_vocabularies_equal(class_a, class_b)
+            if isinstance(class_a, tuple) and isinstance(class_b, tuple)
+            else class_a == class_b
+            or (_is_nan_class(class_a) and _is_nan_class(class_b))
+        )
+        for class_a, class_b in zip(classes_a, classes_b)
+    )
+
+
+def _class_vocabulary_hash_key(classes):
+    if classes is None:
+        return None
     return tuple(
         (
-            _freeze_classes(value)
-            if isinstance(value, (list, tuple, np.ndarray))
-            else value
+            _class_vocabulary_hash_key(value)
+            if isinstance(value, tuple)
+            else _NAN_CLASS_HASH_KEY if _is_nan_class(value) else value
         )
         for value in classes
     )
+
+
+def _is_nan_class(value):
+    try:
+        return bool(value != value)
+    except (TypeError, ValueError):
+        return False
 
 
 def _validate_target_semantics(
@@ -94,6 +168,37 @@ def _validate_target_semantics(
             f"{target_name} targets cannot be combined with "
             "`annotation_type='multi-annotator'`."
         )
+
+
+def _check_class_vocabulary_structure(target_type, classes):
+    """Validate flat or nested classes against a resolved target type."""
+    if classes is None:
+        return False
+
+    has_nested_classes = _has_nested_classes(classes)
+    if target_type == "single-output" and has_nested_classes:
+        raise ValueError(
+            "Single-output classification requires a flat class vocabulary."
+        )
+    if target_type in {"multi-label", "multi-output"}:
+        if not has_nested_classes:
+            vocabulary_kind = (
+                "nested binary class vocabularies"
+                if target_type == "multi-label"
+                else "nested class vocabularies"
+            )
+            raise ValueError(
+                f"{target_type.capitalize()} classification requires "
+                f"{vocabulary_kind}."
+            )
+        if target_type == "multi-label" and not all(
+            len(classes_i) == 2 for classes_i in classes
+        ):
+            raise ValueError(
+                "Each multi-label class vocabulary must contain exactly two "
+                "classes."
+            )
+    return has_nested_classes
 
 
 def resolve_target_spec(
@@ -173,6 +278,8 @@ def resolve_target_spec(
                 "ambiguous; declare `target_type` or `classes`."
             )
 
+    _check_class_vocabulary_structure(target_type, classes)
+
     if target_type == "multi-label":
         return _resolve_multilabel(
             y,
@@ -193,11 +300,6 @@ def resolve_target_spec(
 
     normalized_classes = None
     if task == "classification":
-        if classes is not None and _has_nested_classes(classes):
-            raise ValueError(
-                "Single-output classification requires a flat class "
-                "vocabulary."
-            )
         observed = np.asarray(y)[~is_unlabeled(y, missing_label=missing_label)]
         declared = observed if classes is None else np.asarray(classes)
         if classes is None and len(observed) == 0:
@@ -281,19 +383,6 @@ def _check_target_array(y):
     return y
 
 
-def _has_nested_classes(classes):
-    if isinstance(classes, (str, bytes)):
-        return False
-    try:
-        values = list(classes)
-    except TypeError:
-        return False
-    return bool(values) and all(
-        not isinstance(value, (str, bytes)) and hasattr(value, "__iter__")
-        for value in values
-    )
-
-
 def _validate_single_output_shape(y, task, annotation_type):
     if annotation_type == "multi-annotator":
         if y.ndim != 2:
@@ -323,11 +412,6 @@ def _resolve_multioutput(y, *, task, classes, missing_label):
 
     normalized_classes = None
     if task == "classification":
-        if classes is not None and not _has_nested_classes(classes):
-            raise ValueError(
-                "Multi-output classification requires nested class "
-                "vocabularies."
-            )
         if classes is not None and len(classes) != y.shape[1]:
             raise ValueError(
                 "Multi-output `classes` must contain one vocabulary per "
@@ -362,11 +446,6 @@ def _resolve_multioutput(y, *, task, classes, missing_label):
 def _resolve_multilabel(y, *, classes, missing_label):
     if y.ndim != 2:
         raise ValueError("Multi-label targets must be two-dimensional.")
-    if classes is not None and not _has_nested_classes(classes):
-        raise ValueError(
-            "Multi-label classification requires nested binary class "
-            "vocabularies."
-        )
 
     is_missing = is_unlabeled(
         y, missing_label=missing_label, target_type="multi-label"
@@ -401,12 +480,6 @@ def _resolve_multilabel(y, *, classes, missing_label):
                 observed_y[:, output_idx],
                 f"`classes[{output_idx}]`",
             )
-            if len(classes_i) != 2:
-                raise ValueError(
-                    "Each multi-label class vocabulary must contain exactly "
-                    f"two classes; output {output_idx} contains "
-                    f"{len(classes_i)}."
-                )
             normalized_classes.append(classes_i)
 
     return TargetSpec(
@@ -424,6 +497,11 @@ def check_target_capability(component, target_spec, capabilities):
         target_spec.target_type,
         target_spec.annotation_type,
     )
+    _check_target_capability(component, capability, capabilities)
+
+
+def _check_target_capability(component, capability, capabilities):
+    """Raise when a component does not declare an exact semantic triple."""
     if capability not in capabilities:
         supported = ", ".join(repr(value) for value in sorted(capabilities))
         raise ValueError(

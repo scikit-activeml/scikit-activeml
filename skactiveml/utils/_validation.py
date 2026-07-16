@@ -135,7 +135,13 @@ def _has_nested_classes(classes):
     if len(outer) == 0:
         raise ValueError("`classes` must not be empty.")
 
-    return _is_nonstring_iterable(outer[0])
+    nested = [_is_nonstring_iterable(value) for value in outer]
+    if any(nested) and not all(nested):
+        raise ValueError(
+            "`classes` must be uniformly flat or nested; mixed class "
+            "vocabularies are not supported."
+        )
+    return all(nested)
 
 
 def _check_1d_class_list(c, name="classes"):
