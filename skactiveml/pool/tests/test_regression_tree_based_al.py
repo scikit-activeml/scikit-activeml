@@ -72,7 +72,7 @@ class TestRegressionTreeBasedAL(
 
         self.assertIn(query_idx[0], [4, 5])
 
-    def test_multi_output_failure_precedes_acquisition_state(self):
+    def test_fitted_target_shape_failure_precedes_acquisition_state(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.arange(12, dtype=float).reshape(6, 2)
         reg = SklearnRegressor(
@@ -80,7 +80,7 @@ class TestRegressionTreeBasedAL(
         ).fit(X, np.arange(6, dtype=float))
         strategy = RegressionTreeBasedAL()
 
-        with self.assertRaisesRegex(ValueError, "does not support"):
+        with self.assertRaisesRegex(ValueError, "Single-output regression"):
             strategy.query(X, y, reg, fit_reg=False)
 
         self.assertFalse(hasattr(strategy, "n_features_in_"))
@@ -101,6 +101,22 @@ class TestRegressionTreeBasedAL(
             RegressionTreeBasedAL(target_type="multi-label").query(
                 X, y, reg, fit_reg=False
             )
+
+    def test_unfitted_regressor_declaration_conflict_precedes_state(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y = np.array([0.0, 1.0, 2.0, 3.0, np.nan, np.nan])
+        reg = SklearnRegressor(
+            DecisionTreeRegressor(min_samples_leaf=2, random_state=0),
+            target_type="multi-output",
+        )
+        strategy = RegressionTreeBasedAL(target_type="single-output")
+
+        with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
+            strategy.query(X, y, reg, fit_reg=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
 
     def test_init_param_max_iter_representativity(self, test_cases=None):
         test_cases = test_cases or []

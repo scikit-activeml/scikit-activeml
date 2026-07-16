@@ -35,6 +35,14 @@ def _resolve_estimator_target_spec(strategy, estimator, y):
 
     if hasattr(estimator, "target_spec_"):
         target_spec = estimator.target_spec_
+        resolve_target_spec(
+            y,
+            task=target_spec.task,
+            target_type=target_spec.target_type,
+            annotation_type=target_spec.annotation_type,
+            classes=target_spec.classes,
+            missing_label=strategy.missing_label,
+        )
     else:
         estimator_target_type = getattr(estimator, "target_type", "auto")
         _validate_target_semantics(
@@ -64,11 +72,12 @@ def _resolve_estimator_target_spec(strategy, estimator, y):
             classes=classes,
             missing_label=strategy.missing_label,
         )
-        check_target_capability(
-            type(estimator).__name__,
-            target_spec,
-            estimator._target_capabilities,
-        )
+
+    check_target_capability(
+        type(estimator).__name__,
+        target_spec,
+        estimator._target_capabilities,
+    )
 
     if strategy_target_type != "auto" and (
         strategy_target_type != target_spec.target_type
@@ -105,6 +114,7 @@ def _fit_and_resolve_estimator_target_spec(
     check_equal_missing_label(estimator.missing_label, strategy.missing_label)
     check_type(fit_estimator, fit_name, bool)
     if fit_estimator:
+        _resolve_estimator_target_spec(strategy, estimator, y)
         if sample_weight is None:
             estimator = clone(estimator).fit(X, y)
         else:

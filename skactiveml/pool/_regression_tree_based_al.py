@@ -23,9 +23,9 @@ from skactiveml.utils import (
     rand_argmax,
     check_scalar,
     labeled_indices,
-    resolve_target_spec,
 )
-from skactiveml.utils._target import check_target_capability
+
+from ._target import _resolve_estimator_target_spec
 
 
 class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
@@ -156,32 +156,19 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
         # is created by the general query-strategy validation.
         check_type(reg, "reg", SklearnRegressor)
         check_type(reg.estimator, "reg.estimator", DecisionTreeRegressor)
-        query_target_spec = resolve_target_spec(
-            y,
-            task="regression",
-            target_type=self.target_type,
-            annotation_type="single-annotator",
-            missing_label=self.missing_label,
-        )
-        check_target_capability(
-            type(self).__name__,
-            query_target_spec,
-            self._target_capabilities,
-        )
-        if hasattr(reg, "target_spec_"):
-            target_spec = reg.target_spec_
-        else:
-            target_spec = reg._resolve_target_spec(y)
-        if query_target_spec != target_spec:
-            raise ValueError(
-                "RegressionTreeBasedAL's resolved target specification "
-                "conflicts "
-                "with the regressor's resolved target specification."
-            )
+        check_equal_missing_label(reg.missing_label, self.missing_label)
+        check_type(fit_reg, "fit_reg", bool)
+        target_spec = _resolve_estimator_target_spec(self, reg, y)
 
         # Validate input parameters.
         X, y, candidates, batch_size, return_utilities = self._validate_data(
-            X, y, candidates, batch_size, return_utilities, reset=True
+            X,
+            y,
+            candidates,
+            batch_size,
+            return_utilities,
+            reset=True,
+            target_type=target_spec.target_type,
         )
         if batch_size == 1:
             warnings.warn(
@@ -190,11 +177,6 @@ class RegressionTreeBasedAL(SingleAnnotatorPoolQueryStrategy):
             )
         X_cand, mapping = self._transform_candidates(candidates, X, y)
         labeled_idxs = labeled_indices(y, self.missing_label_)
-
-        check_equal_missing_label(reg.missing_label, self.missing_label_)
-
-        # Validate boolean flag
-        check_type(fit_reg, "fit_reg", bool)
 
         # Validate method type.
         check_type(self.method, "method", str)

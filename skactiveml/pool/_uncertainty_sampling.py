@@ -6,7 +6,6 @@ Module implementing various uncertainty based query strategies.
 #          Marek Herde <marek.herde@uni-kassel.de>
 
 import numpy as np
-from sklearn import clone
 from sklearn.utils.validation import check_array
 
 from ..base import SingleAnnotatorPoolQueryStrategy, SkactivemlClassifier
@@ -15,13 +14,9 @@ from ..utils import (
     check_cost_matrix,
     simple_batch,
     check_classes,
-    check_type,
-    check_equal_missing_label,
-    is_unlabeled,
 )
 from ..utils._validation import _canonicalize_multilabel_probas
-from ..utils._target import check_target_capability
-from ..utils import resolve_target_spec
+from ._target import _fit_and_resolve_estimator_target_spec
 
 
 class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
@@ -117,7 +112,7 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
         capabilities = {
             ("classification", "single-output", "single-annotator")
         }
-        if self.method in {
+        if self.cost_matrix is None and self.method in {
             "least_confident",
             "margin_sampling",
             "entropy",
@@ -208,41 +203,16 @@ class UncertaintySampling(SingleAnnotatorPoolQueryStrategy):
             - If `candidates` is of shape `(n_candidates, ...)`, `utilities`
               refers to the indexing in `candidates`.
         """
-        # Resolve through the classifier before acquisition state is changed.
-        check_type(clf, "clf", SkactivemlClassifier)
-        check_equal_missing_label(clf.missing_label, self.missing_label)
-        check_type(fit_clf, "fit_clf", bool)
-        if fit_clf:
-            if sample_weight is not None:
-                clf = clone(clf).fit(X, y, sample_weight)
-            else:
-                clf = clone(clf).fit(X, y)
-
-        if hasattr(clf, "target_spec_"):
-            target_spec = clf.target_spec_
-        else:
-            target_spec = resolve_target_spec(
-                y,
-                task="classification",
-                target_type=self.target_type,
-                annotation_type="single-annotator",
-                classes=getattr(clf, "classes_", clf.classes),
-                missing_label=self.missing_label,
-            )
-        if self.target_type != "auto" and (
-            self.target_type != target_spec.target_type
-        ):
-            raise ValueError(
-                "UncertaintySampling's explicit `target_type` conflicts with "
-                "the fitted classifier's target specification."
-            )
-        check_target_capability(
-            type(self).__name__, target_spec, self._target_capabilities
-        )
-        is_unlabeled(
+        clf, target_spec = _fit_and_resolve_estimator_target_spec(
+            self,
+            clf,
+            X,
             y,
-            missing_label=self.missing_label,
-            target_type=target_spec.target_type,
+            fit_estimator=fit_clf,
+            sample_weight=sample_weight,
+            estimator_name="clf",
+            fit_name="fit_clf",
+            estimator_types=(SkactivemlClassifier,),
         )
 
         # Validate input parameters.

@@ -1,5 +1,6 @@
 import unittest
 from copy import deepcopy
+from itertools import product
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier
@@ -90,6 +91,9 @@ class TestUncertaintySampling(
         average_precision = UncertaintySampling(
             method="expected_average_precision"
         )
+        cost_sensitive = UncertaintySampling(
+            method="least_confident", cost_matrix=[[0, 1], [1, 0]]
+        )
 
         self.assertEqual(
             standard._target_capabilities,
@@ -106,6 +110,12 @@ class TestUncertaintySampling(
         )
         self.assertEqual(
             average_precision._target_capabilities,
+            frozenset(
+                {("classification", "single-output", "single-annotator")}
+            ),
+        )
+        self.assertEqual(
+            cost_sensitive._target_capabilities,
             frozenset(
                 {("classification", "single-output", "single-annotator")}
             ),
@@ -273,6 +283,33 @@ class TestUncertaintySampling(
         self.assertTrue(np.isnan(utilities[0, :2]).all())
         self.assertFalse(hasattr(strategy, "target_spec_"))
 
+    def test_query_rejects_values_outside_fitted_class_vocabularies(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+            ]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y_fit)
+        y_query = y_fit.copy()
+        y_query[0, 0] = 2
+        strategy = UncertaintySampling()
+
+        with self.assertRaisesRegex(ValueError, r"outside `classes\[0\]`"):
+            strategy.query(X, y_query, clf, fit_clf=False)
+
+        self.assertFalse(hasattr(strategy, "n_features_in_"))
+        self.assertFalse(hasattr(strategy, "missing_label_"))
+        self.assertFalse(hasattr(strategy, "random_state_"))
+
     def test_query_fits_explicit_multilabel_without_declared_classes(self):
         X = np.arange(12, dtype=float).reshape(-1, 2)
         y = np.array(
@@ -316,6 +353,31 @@ class TestUncertaintySampling(
         self.assertFalse(hasattr(strategy, "missing_label_"))
         self.assertFalse(hasattr(strategy, "random_state_"))
 
+    def test_cost_sensitive_multilabel_methods_fail_before_acquisition_state(
+        self,
+    ):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            target_type="multi-label",
+        ).fit(X, y)
+
+        for method in ["least_confident", "margin_sampling", "entropy"]:
+            with self.subTest(method=method):
+                strategy = UncertaintySampling(
+                    method=method, cost_matrix=[[0, 1], [1, 0]]
+                )
+
+                with self.assertRaisesRegex(ValueError, "does not support"):
+                    strategy.query(X, y, clf, fit_clf=False)
+
+                self.assertFalse(hasattr(strategy, "n_features_in_"))
+                self.assertFalse(hasattr(strategy, "missing_label_"))
+                self.assertFalse(hasattr(strategy, "random_state_"))
+
     def test_ambiguous_resolution_failure_precedes_acquisition_state(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
         y = np.array(
@@ -330,6 +392,127 @@ class TestUncertaintySampling(
         self.assertFalse(hasattr(strategy, "n_features_in_"))
         self.assertFalse(hasattr(strategy, "missing_label_"))
         self.assertFalse(hasattr(strategy, "random_state_"))
+
+    def test_unfitted_classifier_declaration_conflict_precedes_state(self):
+        X = np.arange(8, dtype=float).reshape(-1, 2)
+        y = np.array(
+            [[0.0, 1.0], [1.0, 0.0], [np.nan, np.nan], [np.nan, np.nan]]
+        )
+        clf = SklearnClassifier(
+            estimator=MultiOutputClassifier(GaussianNB()),
+            classes=[[0, 1], [0, 1]],
+            target_type="single-output",
+        )
+        for fit_clf in [False, True]:
+            with self.subTest(fit_clf=fit_clf):
+                strategy = UncertaintySampling(target_type="multi-label")
+
+                with self.assertRaisesRegex(ValueError, "explicit.*conflicts"):
+                    strategy.query(X, y, clf, fit_clf=fit_clf)
+
+                self.assertFalse(hasattr(strategy, "n_features_in_"))
+                self.assertFalse(hasattr(strategy, "missing_label_"))
+                self.assertFalse(hasattr(strategy, "random_state_"))
+
+    def test_estimator_preflight_configuration_cross_product(self):
+        X = np.arange(12, dtype=float).reshape(-1, 2)
+        cost_matrix = [[0, 1], [1, 0]]
+        target_cases = {
+            "single-output": {
+                "fit_y": np.array([0.0, 1.0, 0.0, 1.0, np.nan, np.nan]),
+                "subset_y": np.array(
+                    [0.0, 0.0, np.nan, np.nan, np.nan, np.nan]
+                ),
+                "outside_y": np.array(
+                    [2.0, 0.0, np.nan, np.nan, np.nan, np.nan]
+                ),
+                "estimator": lambda: ParzenWindowClassifier(classes=[0, 1]),
+            },
+            "multi-label": {
+                "fit_y": np.array(
+                    [
+                        [0.0, 1.0],
+                        [1.0, 0.0],
+                        [0.0, 0.0],
+                        [1.0, 1.0],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                "subset_y": np.array(
+                    [
+                        [0.0, 1.0],
+                        [0.0, 1.0],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                "outside_y": np.array(
+                    [
+                        [2.0, 1.0],
+                        [0.0, 1.0],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                        [np.nan, np.nan],
+                    ]
+                ),
+                "estimator": lambda: SklearnClassifier(
+                    estimator=MultiOutputClassifier(GaussianNB()),
+                    classes=[[0, 1], [0, 1]],
+                    target_type="multi-label",
+                    proba_format="array",
+                ),
+            },
+        }
+
+        configurations = product(
+            ["least_confident", "margin_sampling"],
+            [False, True],
+            target_cases,
+            [False, True],
+            ["subset", "outside"],
+        )
+        for (
+            method,
+            has_cost,
+            target_type,
+            is_fitted,
+            vocabulary,
+        ) in configurations:
+            with self.subTest(
+                method=method,
+                has_cost=has_cost,
+                target_type=target_type,
+                is_fitted=is_fitted,
+                vocabulary=vocabulary,
+            ):
+                case = target_cases[target_type]
+                clf = case["estimator"]()
+                if is_fitted:
+                    clf.fit(X, case["fit_y"])
+                y = case[f"{vocabulary}_y"]
+                strategy = UncertaintySampling(
+                    method=method,
+                    cost_matrix=cost_matrix if has_cost else None,
+                    target_type=target_type,
+                    random_state=0,
+                )
+
+                unsupported = target_type == "multi-label" and has_cost
+                if vocabulary == "outside" or unsupported:
+                    with self.assertRaises(ValueError):
+                        strategy.query(X, y, clf, fit_clf=not is_fitted)
+                    self.assertFalse(hasattr(strategy, "n_features_in_"))
+                    self.assertFalse(hasattr(strategy, "missing_label_"))
+                    self.assertFalse(hasattr(strategy, "random_state_"))
+                else:
+                    query_idx = strategy.query(
+                        X, y, clf, fit_clf=not is_fitted
+                    )
+                    self.assertIn(query_idx[0], range(2, len(X)))
 
     def test_default_single_output_classifier_query_remains_supported(self):
         X = np.arange(8, dtype=float).reshape(-1, 2)
