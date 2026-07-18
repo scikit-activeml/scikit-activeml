@@ -112,14 +112,14 @@ vocabulary.  A column with fewer than two observed classes raises an error.
    >>> under_observed = np.array([
    ...     [0.0, 0.0], [1.0, 0.0], [np.nan, np.nan]
    ... ])
-   >>> try:
-   ...     resolve_target_spec(
-   ...         under_observed,
-   ...         task="classification",
-   ...         target_type="multi-label",
-   ...     )
-   ... except ValueError as error:
-   ...     assert "output 1 exposes 1" in str(error)
+   >>> _ = resolve_target_spec(  # doctest: +IGNORE_EXCEPTION_DETAIL
+   ...     under_observed,
+   ...     task="classification",
+   ...     target_type="multi-label",
+   ... )
+   Traceback (most recent call last):
+   ...
+   ValueError:
 
 Version 1.1 treats a multi-label sample as one complete vector.  Each row must
 therefore be wholly observed or wholly missing; mixed rows would imply
@@ -128,15 +128,15 @@ partial-label training or acquisition, which is not supported.
 .. doctest::
 
    >>> mixed_row_y = np.array([[0.0, 1.0], [np.nan, 0.0]])
-   >>> try:
-   ...     resolve_target_spec(
-   ...         mixed_row_y,
-   ...         task="classification",
-   ...         target_type="multi-label",
-   ...         classes=((0, 1), (0, 1)),
-   ...     )
-   ... except ValueError as error:
-   ...     assert "no mixing within a row" in str(error)
+   >>> _ = resolve_target_spec(  # doctest: +IGNORE_EXCEPTION_DETAIL
+   ...     mixed_row_y,
+   ...     task="classification",
+   ...     target_type="multi-label",
+   ...     classes=((0, 1), (0, 1)),
+   ... )
+   Traceback (most recent call last):
+   ...
+   ValueError:
 
 Ambiguous two-dimensional classification
 ========================================
@@ -150,12 +150,12 @@ fitted estimator whose ``target_spec_`` already provides resolved evidence.
 
 .. doctest::
 
-   >>> try:
-   ...     resolve_target_spec(
-   ...         np.array([[0, 1], [1, 0]]), task="classification"
-   ...     )
-   ... except ValueError as error:
-   ...     assert "ambiguous" in str(error)
+   >>> _ = resolve_target_spec(  # doctest: +IGNORE_EXCEPTION_DETAIL
+   ...     np.array([[0, 1], [1, 0]]), task="classification"
+   ... )
+   Traceback (most recent call last):
+   ...
+   ValueError:
 
 A flat vocabulary under ``"auto"`` means single-output classification.  A
 nested set of binary vocabularies means multi-label classification.  A nested

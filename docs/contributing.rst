@@ -1215,10 +1215,12 @@ used by scikit-learn.
 Building the Documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To ensure your documentation is well formatted, build it using Sphinx:
+To ensure your documentation examples execute successfully and the pages are
+well formatted, test and build them using Sphinx:
 
 .. code:: bash
 
+   sphinx-build -b doctest docs docs/_build/doctest
    sphinx-build -b html docs docs/_build
 
 Issue Tracking
