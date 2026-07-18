@@ -194,6 +194,34 @@ class TestSubSamplingWrapper(
             conflicting.query(X, y_query, clf=clf, fit_clf=False)
         assert_no_query_state(self, conflicting)
 
+    def test_fitted_estimator_vocabulary_fails_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
+        ).fit(X, y_fit)
+        y_query = y_fit.copy()
+        y_query[0, 0] = 2.0
+        wrapper = SubSamplingWrapper(
+            query_strategy=UncertaintySampling(),
+            max_candidates=4,
+            random_state=0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "outside `classes\\[0\\]`"):
+            wrapper.query(X, y_query, clf=clf, fit_clf=False)
+
+        assert_no_query_state(self, wrapper)
+
     def test_resolved_target_type_reaches_auto_and_nested_strategies(self):
         X = np.arange(12, dtype=float).reshape(6, 2)
         y = np.array(
@@ -508,6 +536,34 @@ class TestParallelUtilityEstimationWrapper(
 
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             wrapper.query(X, y)
+
+        assert_no_query_state(self, wrapper)
+
+    def test_fitted_estimator_vocabulary_fails_before_wrapper_state(self):
+        X = np.arange(12, dtype=float).reshape(6, 2)
+        y_fit = np.array(
+            [
+                [0.0, 1.0],
+                [1.0, 0.0],
+                [0.0, 0.0],
+                [1.0, 1.0],
+                [MISSING_LABEL, MISSING_LABEL],
+                [MISSING_LABEL, MISSING_LABEL],
+            ]
+        )
+        clf = SklearnClassifier(
+            MultiOutputClassifier(GaussianNB()), target_type="multi-label"
+        ).fit(X, y_fit)
+        y_query = y_fit.copy()
+        y_query[0, 0] = 2.0
+        wrapper = ParallelUtilityEstimationWrapper(
+            query_strategy=UncertaintySampling(),
+            n_jobs=1,
+            random_state=0,
+        )
+
+        with self.assertRaisesRegex(ValueError, "outside `classes\\[0\\]`"):
+            wrapper.query(X, y_query, clf=clf, fit_clf=False)
 
         assert_no_query_state(self, wrapper)
 

@@ -175,6 +175,14 @@ def _resolve_wrapper_target_type(wrapper, y, query_kwargs):
                 "Supplied fitted estimators have conflicting target "
                 "specifications."
             )
+        resolve_target_spec(
+            y,
+            task=target_spec.task,
+            target_type=target_spec.target_type,
+            annotation_type=target_spec.annotation_type,
+            classes=target_spec.classes,
+            missing_label=wrapper.missing_label,
+        )
         target_type = target_spec.target_type
         task = target_spec.task
     else:
